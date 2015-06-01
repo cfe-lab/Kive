@@ -8,6 +8,8 @@ import logging
 from mpi4py import MPI
 import sys
 import time
+import datetime
+import itertools
 
 import archive.models
 import fleet.models
@@ -315,6 +317,11 @@ class Manager:
         """
         Poll the database for new jobs, and handle running of sandboxes.
         """
+        purge_interval = datetime.timedelta(days=kive.settings.SANDBOX_PURGE_DAYS,
+                                            hours=kive.settings.SANDBOX_PURGE_HOURS,
+                                            minutes=kive.settings.SANDBOX_PURGE_MINUTES)
+        keep_recent = kive.settings.SANDBOX_KEEP_RECENT
+
         while True:
             # We can't use a for loop over the task queue because assign_task may add to the queue.
             while len(self.task_queue) > 0:
@@ -381,10 +388,36 @@ class Manager:
                                           groups_allowed=run_to_process.groups_allowed.all(),
                                           sandbox_path=run_to_process.sandbox_path)
                 run_to_process.run = new_sdbx.run
+                run_to_process.sandbox_path = new_sdbx.sandbox_path
                 run_to_process.save()
 
                 mgr_logger.debug("Task queue: {}".format(self.task_queue))
                 mgr_logger.debug("Active sandboxes: {}".format(self.active_sandboxes))
+
+            # Next, look for finished jobs to clean up.
+            mgr_logger.debug("Checking for old sandboxes to clean up....")
+
+            purge_candidates = fleet.models.RunToProcess.objects.filter(
+                run__isnull=False, run__end_time__isnull=False,
+                run__end_time__gte=datetime.now()-purge_interval,
+                purged=False)
+
+            # Retain the most recent ones for each PipelineFamily.
+            pfs_represented = purge_candidates.values_list("pipeline__family")
+
+            ready_to_purge = []
+            for pf in pfs_represented:
+                # Look for the oldest ones.
+                ready_to_purge = itertools.chain(
+                    purge_candidates.filter(pipeline__family=pf).order_by("run__end_time")[keep_recent:]
+                )
+
+            for rtp in ready_to_purge:
+                try:
+                    rtp.collect_garbage()
+                    mgr_logger.debug("Sandbox at {} removed.".format(rtp.sandbox_path))
+                except fleet.models.SandboxActiveException as e:
+                    mgr_logger.warning(e)
 
 
 class Worker:

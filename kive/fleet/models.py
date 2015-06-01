@@ -1,5 +1,6 @@
 import sys
 import threading
+import shutil
 
 from django.db import models, transaction
 from django.core.validators import MinValueValidator
@@ -24,6 +25,15 @@ if worker_count > 0 and sys.argv[-1] == "runserver":
     manager_thread = threading.Thread(target=manager.main_procedure)
     manager_thread.daemon = True
     manager_thread.start()
+
+
+class SandboxActiveException(Exception):
+    """
+    Exception raised when attempting to perform garbage collection on
+    a sandbox that is still active.
+    """
+    def __init__(self, msg):
+        self.msg = msg
 
 
 # Create your models here.
@@ -54,6 +64,7 @@ class RunToProcess(metadata.models.AccessControl):
     sandbox_path = models.CharField(max_length=256, default="", blank=True, null=False)
     time_queued = models.DateTimeField(auto_now_add=True)
     run = models.ForeignKey(Run, null=True)
+    purged = models.BooleanField(default=False)
 
     def clean(self):
         self.validate_restrict_access([self.pipeline])
@@ -220,6 +231,26 @@ class RunToProcess(metadata.models.AccessControl):
         """Remove this Run cleanly."""
         removal_plan = self.build_removal_plan()
         metadata.models.remove_helper(removal_plan)
+
+    def collect_garbage(self):
+        """
+        Dispose of the sandbox used by the Run.
+        """
+        if self.sandbox_path is None:
+            raise SandboxActiveException(
+                "Run (Pipeline={}, queued {}) has not yet started".format(
+                    self.pipeline.pk, self.time_queued)
+                )
+        elif not self.finished:
+            raise SandboxActiveException(
+                "Run (pk={}) is not finished".format(
+                    self.run.pk)
+                )
+
+        shutil.rmtree(self.sandbox_path)
+        self.purged = True
+        self.save()
+
 
 class RunToProcessInput(models.Model):
     """

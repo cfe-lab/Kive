@@ -213,3 +213,13 @@ TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "home"
+
+# Here you specify the time that sandboxes should exist after finishing
+# before being automatically purged. (They may still be manually purged
+# sooner than this.)  These quantities get added up.
+SANDBOX_PURGE_DAYS = 1
+SANDBOX_PURGE_HOURS = 0
+SANDBOX_PURGE_MINUTES = 0
+
+# Keep this many of the most recent Sandboxes for any PipelineFamily.
+SANDBOX_KEEP_RECENT = 10
