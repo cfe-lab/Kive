@@ -409,15 +409,12 @@ class Manager:
             # Retain the most recent ones for each PipelineFamily.
             pfs_represented = purge_candidates.values_list("pipeline__family")
 
-            print("foooooo {}".format(pfs_represented))
-
             ready_to_purge = []
             for pf in set(pfs_represented):
                 # Look for the oldest ones.
                 curr_candidates = purge_candidates.filter(pipeline__family=pf).order_by("run__end_time")
                 num_remaining = curr_candidates.count()
 
-                print("baaaaar {} sandboxes for PF {} remain".format(num_remaining, pf))
                 ready_to_purge = itertools.chain(
                     ready_to_purge,
                     curr_candidates[:max(num_remaining - keep_recent, 0)]
@@ -444,7 +441,6 @@ class Manager:
                 if not matching_rtps.exists():
                     try:
                         path_to_rm = os.path.join(sdbx_path, putative_sdbx)
-                        print("Orphaned directory {} would be removed now!".format(path_to_rm))
                         shutil.rmtree(path_to_rm)
                     except OSError as e:
                         mgr_logger.warning(e)

@@ -16,7 +16,7 @@ from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable
 from fleet.models import RunToProcess, RunToProcessInput, SandboxActiveException
 from librarian.models import ExecRecord, SymbolicDataset
 from pipeline.models import Pipeline
-from metadata.models import CompoundDatatype
+from metadata.models import CompoundDatatype, kive_user
 from archive.models import Dataset
 from kive import settings
 
@@ -309,7 +309,7 @@ class RunApiTests(ExecuteTestsBase):
     def setUp(self):
         super(RunApiTests, self).setUp()
 
-        self.kive_user = User.objects.all()[0]
+        self.kive_user = kive_user()
 
         self.factory = APIRequestFactory()
         self.run_list_path = reverse('runtoprocess-list')
@@ -385,7 +385,7 @@ class RunApiTests(ExecuteTestsBase):
         self.setup_pipeline()
 
         # Kick off the run
-        request = self.factory.post(self.run_list_path, {'pipeline': self.pX.id, 'input_1': self.symDS.id})
+        request = self.factory.post(self.run_list_path, {'pipeline': self.pX.pk, 'input_1': self.symDS.pk})
         force_authenticate(request, user=self.myUser)
         response = self.run_list_view(request).render()
         data = response.render().data

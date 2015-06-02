@@ -5603,8 +5603,9 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
 
         expected_count = Pipeline.objects.count()
         self.assertEquals(len(response.data), expected_count)
-        self.assertEquals(response.data[0]['revision_name'], 'pD_name')
-        self.assertEquals(response.data[0]['inputs'][0]['dataset_name'], 'D1_in')
+        self.assertEquals(response.data[0]['family_name'], 'P_basic')
+        self.assertEquals(response.data[0]['revision_name'], 'v1')
+        self.assertEquals(response.data[0]['inputs'][0]['dataset_name'], 'basic_in')
 
     def test_detail(self):
         request = self.factory.get(self.detail_path)
@@ -5654,7 +5655,7 @@ class PipelineFamilyApiTests(BaseTestCases.ApiTestCase):
         expected_count = PipelineFamily.objects.count()
         self.assertEquals(len(response.data), expected_count)
         self.assertEquals(response.data[1]['name'], 'Pipeline_family')
-        self.assertEquals(response.data[1]['members'][0]['revision_name'], 'pD_name')
+        self.assertEquals(response.data[1]['members'][0]['revision_name'], 'pE_name')
 
     def test_detail(self):
         request = self.factory.get(self.detail_path)
