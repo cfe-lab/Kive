@@ -35,6 +35,9 @@ class SandboxActiveException(Exception):
     def __init__(self, msg):
         self.msg = msg
 
+    def __str__(self):
+        return self.msg
+
 
 # Create your models here.
 class RunToProcess(metadata.models.AccessControl):
@@ -236,17 +239,18 @@ class RunToProcess(metadata.models.AccessControl):
         """
         Dispose of the sandbox used by the Run.
         """
-        if self.sandbox_path is None:
+        if self.sandbox_path == "":
             raise SandboxActiveException(
                 "Run (Pipeline={}, queued {}) has not yet started".format(
-                    self.pipeline.pk, self.time_queued)
+                    self.pipeline, self.time_queued)
                 )
         elif not self.finished:
             raise SandboxActiveException(
-                "Run (pk={}) is not finished".format(
-                    self.run.pk)
+                "Run (Pipeline={}, queued {}) is not finished".format(
+                    self.pipeline, self.time_queued)
                 )
 
+        # This may raise OSError; the caller should catch it.
         shutil.rmtree(self.sandbox_path)
         self.purged = True
         self.save()

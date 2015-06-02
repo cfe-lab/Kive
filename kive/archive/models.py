@@ -575,16 +575,25 @@ class RunComponent(stopwatch.models.Stopwatch):
         for curr_log in logs_to_check:
             curr_log.clean()
 
-            # Clean all content/integrity checks, and make sure at most
-            # one has been done for each output SymbolicDataset.
-            outputs_checked = set([])
-            for check in itertools.chain(curr_log.content_checks.all(),
-                                         curr_log.integrity_checks.all()):
-                if check.symbolicdataset.pk in outputs_checked:
-                    raise ValidationError('{} "{}" has multiple Integrity/ContentCheckLogs for output '
+            # There may be at most a single integrity check and content check for each output.
+            # (Usually there will be only one of each but it's possible for both to occur
+            # when there is lots of parallelism.)
+            outputs_integrity_checked = set([])
+            for check in curr_log.integrity_checks.all():
+                if check.symbolicdataset.pk in outputs_integrity_checked:
+                    raise ValidationError('{} "{}" has multiple IntegrityCheckLogs for output '
                                           'SymbolicDataset {} of ExecLog "{}"'
                                           .format(self.__class__.__name__, self, check.symbolicdataset, curr_log))
-                outputs_checked.add(check.symbolicdataset.pk)
+                outputs_integrity_checked.add(check.symbolicdataset.pk)
+                check.clean()
+
+            outputs_content_checked = set([])
+            for check in curr_log.content_checks.all():
+                if check.symbolicdataset.pk in outputs_content_checked:
+                    raise ValidationError('{} "{}" has multiple ContentCheckLogs for output '
+                                          'SymbolicDataset {} of ExecLog "{}"'
+                                          .format(self.__class__.__name__, self, check.symbolicdataset, curr_log))
+                outputs_content_checked.add(check.symbolicdataset.pk)
                 check.clean()
 
         # If log exists and there are invoked_logs, log should be among

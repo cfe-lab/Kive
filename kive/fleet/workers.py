@@ -10,12 +10,16 @@ import sys
 import time
 import datetime
 import itertools
+import os
+import glob
+import shutil
+
+from django.utils import timezone
 
 import archive.models
 import fleet.models
 import sandbox.execute
 import kive.settings  # @UnresolvedImport
-import os
 
 mgr_logger = logging.getLogger("fleet.Manager")
 worker_logger = logging.getLogger("fleet.Worker")
@@ -399,26 +403,51 @@ class Manager:
 
             purge_candidates = fleet.models.RunToProcess.objects.filter(
                 run__isnull=False, run__end_time__isnull=False,
-                run__end_time__gte=datetime.now()-purge_interval,
+                run__end_time__lte=timezone.now()-purge_interval,
                 purged=False)
 
             # Retain the most recent ones for each PipelineFamily.
             pfs_represented = purge_candidates.values_list("pipeline__family")
 
+            print("foooooo {}".format(pfs_represented))
+
             ready_to_purge = []
-            for pf in pfs_represented:
+            for pf in set(pfs_represented):
                 # Look for the oldest ones.
+                curr_candidates = purge_candidates.filter(pipeline__family=pf).order_by("run__end_time")
+                num_remaining = curr_candidates.count()
+
+                print("baaaaar {} sandboxes for PF {} remain".format(num_remaining, pf))
                 ready_to_purge = itertools.chain(
-                    purge_candidates.filter(pipeline__family=pf).order_by("run__end_time")[keep_recent:]
+                    ready_to_purge,
+                    curr_candidates[:max(num_remaining - keep_recent, 0)]
                 )
 
             for rtp in ready_to_purge:
                 try:
+                    mgr_logger.debug("Removing sandbox at {}".format(rtp.sandbox_path))
                     rtp.collect_garbage()
-                    mgr_logger.debug("Sandbox at {} removed.".format(rtp.sandbox_path))
                 except fleet.models.SandboxActiveException as e:
                     mgr_logger.warning(e)
 
+            # Next, look through the sandbox directory and see if there are any orphaned sandboxes
+            # to remove.
+            mgr_logger.debug("Checking for orphaned sandbox directories to clean up....")
+
+            sdbx_path = os.path.join(kive.settings.MEDIA_ROOT, kive.settings.SANDBOX_PATH)
+            for putative_sdbx in glob.glob(os.path.join(sdbx_path, sandbox.execute.sandbox_glob)):
+
+                # Remove this sandbox if there is no RunToProcess that is on record as having used it.
+                matching_rtps = fleet.models.RunToProcess.objects.filter(
+                    sandbox_path__startswith=putative_sdbx,
+                )
+                if not matching_rtps.exists():
+                    try:
+                        path_to_rm = os.path.join(sdbx_path, putative_sdbx)
+                        print("Orphaned directory {} would be removed now!".format(path_to_rm))
+                        shutil.rmtree(path_to_rm)
+                    except OSError as e:
+                        mgr_logger.warning(e)
 
 class Worker:
     """

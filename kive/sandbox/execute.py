@@ -22,6 +22,10 @@ from collections import defaultdict
 
 logger = logging.getLogger("Sandbox")
 
+sandbox_prefix = "user{}_run{}_"
+# This is used by the fleet Manager when cleaning up.
+sandbox_glob = sandbox_prefix.format("*", "*") + "*"
+
 
 class Sandbox:
     """
@@ -96,8 +100,8 @@ class Sandbox:
         # Determine a sandbox path, and input/output directories for 
         # top-level Pipeline.
         self.sandbox_path = sandbox_path or tempfile.mkdtemp(
-            prefix="user{}_run{}_".format(self.user, self.run.pk),
-            dir=os.path.join(settings.MEDIA_ROOT, "Sandboxes"))
+            prefix=sandbox_prefix.format(self.user, self.run.pk),
+            dir=os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH))
 
         in_dir = os.path.join(self.sandbox_path, dirnames.IN_DIR)
         self.out_dir = os.path.join(self.sandbox_path, dirnames.OUT_DIR)
@@ -1851,7 +1855,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                     summary_path = "{}_summary".format(output_path)
                     check = output_SD.check_file_contents(
                         output_path, summary_path, curr_output.get_min_row(),
-                        curr_output.get_max_row(), curr_log)
+                        curr_output.get_max_row(), curr_log, user)
 
                 if check.is_fail():
                     logger.warn("[%d] ContentCheckLog failed for %s", worker_rank, output_path)

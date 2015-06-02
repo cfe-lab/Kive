@@ -214,6 +214,13 @@ TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "home"
 
+# Sandbox configuration
+
+# The path to the directory that sandboxes run in.  If this is not an absolute path,
+# sandboxes will run in ${MEDIA_ROOT}/${SANDBOX_PATH}.  Otherwise it will run in
+# exactly this path.
+SANDBOX_PATH = "Sandboxes"
+
 # Here you specify the time that sandboxes should exist after finishing
 # before being automatically purged. (They may still be manually purged
 # sooner than this.)  These quantities get added up.

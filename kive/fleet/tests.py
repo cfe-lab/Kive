@@ -1,3 +1,7 @@
+import re
+import os.path
+import tempfile
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils.dateparse import parse_datetime
@@ -9,11 +13,12 @@ from sandbox.tests import ExecuteTestsBase
 from sandbox.execute import Sandbox
 
 from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable
-from fleet.models import RunToProcess, RunToProcessInput
+from fleet.models import RunToProcess, RunToProcessInput, SandboxActiveException
 from librarian.models import ExecRecord, SymbolicDataset
 from pipeline.models import Pipeline
 from metadata.models import CompoundDatatype
 from archive.models import Dataset
+from kive import settings
 
 
 class RunToProcessTest(TestCase):
@@ -229,6 +234,75 @@ class RunToProcessTest(TestCase):
 
         self.assertSequenceEqual('Fasta2CSV at 2015-01-13 00:00:00+00:00',
                                  display_name)
+
+
+class GarbageCollectionTest(TestCase):
+    """
+    Tests of sandbox garbage collection.
+    """
+    fixtures = ["removal"]
+
+    def setUp(self):
+        self.noop_pl = Pipeline.objects.filter(
+            family__name="Nucleotide Sequence Noop"
+        ).order_by(
+            "revision_number"
+        ).first()
+
+        self.noop_run = Run.objects.filter(
+            pipeline=self.noop_pl
+        ).order_by(
+            "end_time"
+        ).first()
+
+        # A phony directory that we mock-run a Pipeline in.
+        self.mock_sandbox_path = tempfile.mkdtemp(
+            prefix="user{}_run{}_".format(self.noop_run.user, self.noop_run.pk),
+            dir=os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH))
+
+    def test_reap_nonexistent_sandbox_path(self):
+        """
+        A RunToProcess that has no sandbox path should raise an exception.
+        """
+        rtp = RunToProcess(pipeline=self.noop_pl, user=self.noop_pl.user)
+        rtp.save()
+
+        self.assertRaisesRegexp(
+            SandboxActiveException,
+            re.escape("Run (Pipeline={}, queued {}) has not yet started".format(self.noop_pl, rtp.time_queued)),
+            rtp.collect_garbage
+        )
+
+    def test_reap_unfinished_run(self):
+        """
+        A RunToProcess that is not marked as finished should raise an exception.
+        """
+        rtp = RunToProcess(pipeline=self.noop_pl, user=self.noop_pl.user)
+        rtp.save()
+        run = Run(pipeline=self.noop_pl, user=self.noop_pl.user)
+        run.save()
+        rtp.sandbox_path = self.mock_sandbox_path
+        rtp.save()
+
+        self.assertRaisesRegexp(
+            SandboxActiveException,
+            re.escape("Run (Pipeline={}, queued {}) is not finished".format(self.noop_pl, rtp.time_queued)),
+            rtp.collect_garbage
+        )
+
+    def test_reap_finished_run(self):
+        """
+        A RunToProcess that is not marked as finished should raise an exception.
+        """
+        rtp = RunToProcess(
+            pipeline=self.noop_pl, run=self.noop_run,
+            sandbox_path=self.mock_sandbox_path,
+            user=self.noop_run.user)
+        rtp.save()
+        rtp.collect_garbage()
+
+        self.assertFalse(os.path.exists(self.mock_sandbox_path))
+        self.assertTrue(rtp.purged)
 
 
 class RunApiTests(ExecuteTestsBase):
