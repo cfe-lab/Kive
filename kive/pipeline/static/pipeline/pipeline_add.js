@@ -700,6 +700,11 @@ $(function() { // wait for page to finish loading before executing jQuery code
         canvasState.autoLayout();
     });
     
+    $('.align-btn').on('click', function() {
+        var axis = $(this).data('axis');
+        canvasState.alignSelection(axis);
+    });
+    
     $('#colour_picker_menu').on('click', 'div', function() {
         var bg_col = $(this).css('background-color');
         $('#colour_picker_pick').css('background-color', bg_col);

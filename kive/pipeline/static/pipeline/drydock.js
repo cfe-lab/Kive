@@ -556,6 +556,49 @@ CanvasState.prototype.autoLayout = function() {
     this.valid = false;
 };
 
+CanvasState.prototype.alignSelection = function(axis) {
+    /* @todo
+     * if nodes are too close together then they will collide and then get pushed back out.
+     * when this "push back out" happens, it should happen -only- on the axis of alignment.
+     */
+    var sel = this.selection,
+        coords = [],
+        i, center, diff;
+    var getCoord = {
+        x:     function(o) { return o.y; },
+        y:     function(o) { return o.x; },
+        iso_z: function(o) { return o.x; },
+        iso_y: function(o) { return Geometry.isometricXCoord(o.x, o.y); },
+        iso_x: function(o) { return Geometry.isometricYCoord(o.x, o.y); }
+    };
+    var setCoord = {
+        x:     function(o,c) { o.y = c; },
+        y:     function(o,c) { o.x = c; },
+        iso_z: function(o,c) { o.x = c; },
+        iso_y: function(o,c) {
+            diff = Geometry.iso2twodim(Geometry.isometricXCoord(o.x, o.y) - c, 0);
+            o.x -= diff.x;
+            o.y -= diff.y;
+        },
+        iso_x: function(o,c) {
+            diff = Geometry.iso2twodim(0, Geometry.isometricYCoord(o.x, o.y) - c);
+            o.x -= diff.x;
+            o.y -= diff.y;
+        }
+    };
+    if (sel instanceof Array && sel.length > 0 && getCoord.hasOwnProperty(axis)) {
+        for (i = 0; i < sel.length; i++) {
+            coords.push(getCoord[axis](sel[i]));
+        }
+        center = coords.reduce(function(a,b) { return a+b; }) / coords.length;
+        for (i = 0; i < sel.length; i++) {
+            setCoord[axis](sel[i], center);
+            this.detectCollisions(sel[i]);
+        }
+        this.valid = false;
+    }
+}
+
 CanvasState.prototype.detectCollisions = function(myShape, bias) {
     var followups = [],
         vertices = myShape.getVertices(),
@@ -1136,7 +1179,7 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
     for (k=0; k < mySel.length; k++) {
         sel = mySel[k];
         
-        if (sel !== null) {
+        if (sel !== null && sel !== undefined) {
             if (sel instanceof Connector) {
                 // remove selected Connector from list
             

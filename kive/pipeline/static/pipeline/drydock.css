@@ -57,6 +57,7 @@ ul#id_ctrl_nav li:hover {
     width: 250px;
 }
 .input-label { color: #ccc; }
+.image-button { border: 1px dotted #888; cursor: pointer; }
 
 #id_datatype_name, #id_select_method_family, 
 #id_select_method, #id_method_name, 
