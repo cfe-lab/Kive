@@ -171,6 +171,7 @@ CanvasState.prototype.doDown = function(e) {
             // create Connector from this out-magnet
             conn = new Connector(null, null, mySel);
             this.connectors.push(conn);
+            mySel.connected.push(conn);
             this.selection = [ conn ];
             this.dragoffx = mx - conn.fromX;
             this.dragoffy = my - conn.fromY;
@@ -420,6 +421,16 @@ CanvasState.prototype.autoLayout = function() {
     node_order.push(layer);
     node_order.push(this.exec_order[0]);
     
+    var matrixIndexOf = function(matrix, value) {
+        for (var i = 0; i < matrix.length; i++) {
+            for (var j = 0; j < matrix[i].length; j++) {
+                if (matrix[i][j] === value) {
+                    return [ i, j ];
+                }
+            }
+        }
+        return false;
+    };
     var addConnectedNodes = function(node, list) {
         // Follow a node's output cables to their connected nodes.
         // Insert these nodes in order into `list`.
@@ -441,7 +452,7 @@ CanvasState.prototype.autoLayout = function() {
         for (var i = 0; i < node.in_magnets.length; i++) {
             for (var j = 0; j < node.in_magnets[i].connected.length; j++) {
                 connected_input = node.in_magnets[i].connected[j].source.parent;
-                if ((connected_input instanceof RawNode || connected_input instanceof CDtNode) && list.indexOf(connected_input) === -1) {
+                if ((connected_input instanceof RawNode || connected_input instanceof CDtNode) && matrixIndexOf(node_order, connected_input) === false) {
                     list.push(connected_input);
                 }
             }
@@ -507,16 +518,17 @@ CanvasState.prototype.autoLayout = function() {
     for (j = 0; j < node_order.length; j++) {
         layer_length = node_order[j].length;
         layer_out_magnets = [];
-        
-        if (j === 0) {
-            node_order[j].center_x = 0;
-        }
+        node_order[j].center_x = node_order[j].center_x || 0;
         
         for (i = 0; i < layer_length; i++ ) {
             node = node_order[j][i];
             node.x = (y_spacing * j + x_spacing * (i - layer_length/2) + node_order[j].center_x) / 1.154700538;
             node.y = (y_spacing * j - x_spacing * (i - layer_length/2) - node_order[j].center_x) / 2;// + y_drop * j;
             node.dx = node.dy = 0;
+            
+            if (isNaN(node.x) || isNaN(node.y) ) {
+                console.error("Autolayout failed!", node.label, j, i, layer_length, node_order[j], node_order[j].center_x);
+            }
             
             if (node.out_magnets.length > 0) {
                 node.draw(this.ctx);// needed to update magnet coords
@@ -529,11 +541,10 @@ CanvasState.prototype.autoLayout = function() {
             num_magnets = layer_out_magnets.length;
             layer_out_magnets = layer_out_magnets.reduce(function(a,b) { return [ a[0]+b.x, a[1]+b.y ]; }, [0,0]);
             node_order[j+1].center_x = Geometry.isometricXCoord( layer_out_magnets[0] / num_magnets, layer_out_magnets[1] / num_magnets );
+            if ( isNaN(node_order[j+1].center_x) ) {
+                console.error("Autolayout failed!", layer_out_magnets, num_magnets);
+            }
         }
-    }
-    
-    for (i = 0; i < this.shapes.length; i++) {
-        console.log(i, this.shapes[i].label, this.shapes[i].x, this.shapes[i].y);
     }
     
     this.scaleToCanvas(true);// argument is to maintain aspect ratio
@@ -684,7 +695,7 @@ CanvasState.prototype.doUp = function(e) {
     if (this.selection[0] instanceof Connector) {
         connector = this.selection[0];
         
-        if (connector.dest === null) {
+        if (!(connector.dest instanceof Magnet)) {
             // connector not yet linked to anything
         
             if (this.outputZone.contains(connector.x, connector.y)) {
@@ -737,7 +748,6 @@ CanvasState.prototype.doUp = function(e) {
                 // Connector not linked to anything - delete
                 index = this.connectors.indexOf(connector);
                 this.connectors.splice(index, 1);
-                
                 index = connector.source.connected.indexOf(connector);
                 connector.source.connected.splice(index, 1);
                 
