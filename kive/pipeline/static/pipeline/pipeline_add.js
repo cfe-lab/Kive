@@ -5,27 +5,6 @@ var canvas,
     submitError = function(error) {
         $('#id_submit_error').show().text(error);
     };
-/*
-legacy code
-
-var rawNodeWidth = 20,
-    rawNodeHeight = 25,
-    rawNodeColour = "#8D8",
-    rawNodeInset = 10,
-    rawNodeOffset = 25;
-
-var cdtNodeWidth = 45,
-    cdtNodeHeight = 28,
-    cdtNodeColour = '#88D',
-    cdtNodeInset = 13,
-    cdtNodeOffset = 15;
-
-var mNodeWidth = 80,
-    mNodeInset = 10,
-    mNodeSpacing = 20,
-    mNodeColour = '#999',
-    mNodeOffset = 10;
-*/
 
 function Menu(selector, button) {
     this.dialog = $(selector);
@@ -144,11 +123,22 @@ $(function() { // wait for page to finish loading before executing jQuery code
     
     canvasState = new CanvasState(canvas);
     
+    var pipelineCheckReadiness = function(e) {
+        var $btn = $('#id_submit_button');
+        if (!!canvasState.exec_order) {
+            $btn.addClass('pipeline-ready').removeClass('pipeline-not-ready');
+        } else {
+            $btn.removeClass('pipeline-ready').addClass('pipeline-not-ready');
+        }
+    };
+    $('<div class="indicator-light">').text(' ').insertAfter('#id_submit_button');
+    pipelineCheckReadiness();
+    
     // de-activate double-click selection of text on page
     canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
     canvas.addEventListener('mousedown',   function(e) { canvasState.doDown(e); }, true);
     canvas.addEventListener('mousemove',   function(e) { canvasState.doMove(e); }, true);
-    canvas.addEventListener('mouseup',     function(e) { canvasState.doUp(e); }, true);
+    canvas.addEventListener('mouseup',     function(e) { canvasState.doUp(e); pipelineCheckReadiness(e); }, true);
     canvas.addEventListener('contextmenu', function(e) { canvasState.contextMenu(e); }, true);
     
     canvasState.old_width = canvasWidth;
@@ -590,6 +580,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 menus.trigger('cancel');
                 $('li', 'ul#id_ctrl_nav').add(menus).removeClass('clicked');
             }
+            
+            pipelineCheckReadiness();
         }
         
         // escape key closes menus

@@ -66,7 +66,7 @@ ul#id_ctrl_nav li:hover {
     width: 250px;
 }
 
-#pipeline_ctrl #form_ctrl { float: right; margin-top: -1.25em; margin-right: 9em; }
+#pipeline_ctrl #form_ctrl { float: right; margin-top: -1.25em; margin-right: 9em; width: 10.7em; }
 #pipeline_ctrl #form_ctrl input[type="submit"] { font-weight: bold; }
 #pipeline_ctrl #form_ctrl input               { border-radius: 0;           padding: 0 .5em;    float: left; margin-right: -1px; margin-left: 0; }
 #pipeline_ctrl #form_ctrl input:first-of-type { border-radius: 1em 0 0 1em; padding: 0 .5em 0 1em; }
@@ -81,6 +81,31 @@ ul#id_ctrl_nav li:hover {
     display: inline;
 }
 
+#id_submit_button {
+    padding-right: 1.75em !important;
+}
+#id_submit_button + .tooltip {
+    display: none;
+    position: absolute;
+    background-color: #fdd;
+    border: 1px solid #c44;
+    padding: .5em;
+}
+#id_submit_button:hover + .tooltip {
+    display: block;
+}
+
+#form_ctrl .indicator-light {
+    border-radius: .35em;
+    padding: .35em;
+    line-height: .01px;
+    width: 1px; height: 1px;
+    float: left;
+    margin-left: -1.5em;
+    margin-top: .3em;
+}
+.pipeline-ready     + .indicator-light { background-color: #0d0; }
+.pipeline-not-ready + .indicator-light { background-color: #d00; }
 
 #id_submit_error {
     display: none;
