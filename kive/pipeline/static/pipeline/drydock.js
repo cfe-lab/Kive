@@ -593,6 +593,7 @@ CanvasState.prototype.alignSelection = function(axis) {
         center = coords.reduce(function(a,b) { return a+b; }) / coords.length;
         for (i = 0; i < sel.length; i++) {
             setCoord[axis](sel[i], center);
+            sel[i].dx = sel[i].dy = 0;
             this.detectCollisions(sel[i]);
         }
         this.valid = false;
