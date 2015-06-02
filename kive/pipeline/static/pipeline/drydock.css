@@ -74,6 +74,7 @@ ul#id_ctrl_nav li:hover {
 #pipeline_ctrl .form-inline-opts {
     font-size: 0.9em;
     font-style:italic;
+    margin: .5em 0 1em;
 }
 #pipeline_ctrl .form-inline-opts input {
     display: inline;

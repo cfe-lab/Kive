@@ -387,34 +387,23 @@ CanvasState.prototype.centreCanvas = function() {
 };
 
 CanvasState.prototype.autoLayout = function() {
-    /* @todo
-     * exec_order is changed by this function. this should not be allowed.
-     */
-    var nodes = this.exec_order,
-        node_order = [],
-        magnets_in_order,
-        layer,
-        node,
-        shapes = this.shapes,
-        layers = nodes.length,
-        max_layer = nodes[0].length,
-        x_spacing = 60,
+    var x_spacing = 60,
         y_spacing = 130,
-        y_drop = 20,
-        i, j, layer_length, position;
+        z_drop = 20,// not implemented yet. intent is for nodes to cascade down into each other like a series of waterfalls!
+        layer = [], layer_length, max_layer = this.exec_order[0].length,
+        node, node_order = [], this_node, connected_nodes_in_order,
+        magnets_in_order = [], layer_out_magnets, num_magnets,
+        i, j, position;
     
-    for (i = 1; i < nodes.length; i++) {
-        if (nodes[i].length > max_layer) {
-            max_layer = nodes[i].length;
+    for (i = 1; i < this.exec_order.length; i++) {
+        if (this.exec_order[i].length > max_layer) {
+            max_layer = this.exec_order[i].length;
         }
     }
     
-    // go to first exec_order layer
-    // get all in-magnets in order
-    // get all inputs
-    // filter out duplicates
-    // insert into node_order
-    
+    // First two layers are relatively easy.
+    // Layer 1 is exec_order[0]. (Potentially with more input nodes which will be found later)
+    // Layer 0 is any input node leading to exec_order[0].
     magnets_in_order = [];
     layer = [];
     for (i = 0; i < this.exec_order[0].length; i++) {
@@ -429,54 +418,85 @@ CanvasState.prototype.autoLayout = function() {
         }
     }
     node_order.push(layer);
-    
-    // go to first exec_order layer
-    // insert into node_order
-    
     node_order.push(this.exec_order[0]);
     
-    // A: get all out-magnets in order
-    // sort exec_order[n+1] by this, but including output nodes
-    // insert exec_order[n+1]+outputs into node_order
-    // go to next exec_order layer
-    // go to A until all nodes are inserted
-    
-    var magnet, this_node, this_connected, connected_nodes_in_order, k, l, last_layer;
-    
-    for (i = 0; i < this.exec_order.length; i++) {
-        connected_nodes_in_order = [];
-        for (j = 0; j < this.exec_order[i].length; j++) {
-            this_node = this.exec_order[i][j];
-            for (k = 0; k < this_node.out_magnets.length; k++) {
-                for (l = 0; l < this_node.out_magnets[k].connected.length; l++) {
-                    this_connected = this_node.out_magnets[k].connected[l].dest.parent;
-                    if (connected_nodes_in_order.indexOf(this_connected) === -1) {
-                        connected_nodes_in_order.push(this_connected);
-                    }
-                }
-            }
-            for (k = 0; k < this_node.in_magnets.length; k++) {
-                for (l = 0; l < this_node.in_magnets[k].connected.length; l++) {
-                    this_connected = this_node.in_magnets[k].connected[l].source.parent;
-                    last_layer = node_order[node_order.length - 2];
-                    if ((this_connected instanceof RawNode || this_connected instanceof CDtNode) && last_layer.indexOf(this_connected) === -1) {
-                        last_layer.push(this_connected);
-                    }
+    var addConnectedNodes = function(node, list) {
+        // Follow a node's output cables to their connected nodes.
+        // Insert these nodes in order into `list`.
+        // Do not insert any duplicates into `list`.
+        var connected_node;
+        for (var i = 0; i < node.out_magnets.length; i++) {
+            for (var j = 0; j < node.out_magnets[i].connected.length; j++) {
+                connected_node = node.out_magnets[i].connected[j].dest.parent;
+                if (list.indexOf(connected_node) === -1) {
+                    list.push(connected_node);
                 }
             }
         }
-        layer = [];
-        for (j = 0; j < connected_nodes_in_order.length; j++) {
-            this_node = connected_nodes_in_order[j];
-            if (
-                    (
-                        this_node instanceof OutputNode || 
-                        typeof this.exec_order[i+1] !== 'undefined' &&
-                        this.exec_order[i+1].indexOf(this_node) > -1
-                    ) &&
-                    layer.indexOf(this_node) === -1) {
-                layer.push(this_node);
+    };
+    var addConnectedNodesReverse = function(node, list) {
+        // Reflexively insert input nodes into `list`.
+        // Do not insert any duplicates into `list`.
+        var connected_input;
+        for (var i = 0; i < node.in_magnets.length; i++) {
+            for (var j = 0; j < node.in_magnets[i].connected.length; j++) {
+                connected_input = node.in_magnets[i].connected[j].source.parent;
+                if ((connected_input instanceof RawNode || connected_input instanceof CDtNode) && list.indexOf(connected_input) === -1) {
+                    list.push(connected_input);
+                }
             }
+        }
+    };
+    var insertIntoLayer = function(node, exec_order, list) {
+        // Insert a node into a list in a "smart" way.
+        // * Checks for duplicate entries
+        // * If `node` is a method which is not the next method in exec_order, insertion is deferred
+        // * If `node` -is- the next method in exec_order, insert all the method nodes that were deferred.
+        var i, method_nodes,
+            queue = this.method_node_queue = this.method_node_queue || []; // queue is a static variable that persists across function calls
+        if (list.indexOf(node) === -1) {
+            if (node instanceof MethodNode && 
+                    typeof exec_order !== 'undefined' &&
+                    exec_order.indexOf(node) > -1) {
+                method_nodes = list.filter(function(node) { return node instanceof MethodNode; });
+                if (exec_order.length <= method_nodes.length) {
+                    console.error("Unexpected number of methods in method_nodes.");
+                }
+                if (exec_order[method_nodes.length] === node) {
+                    // We've found the method node we're looking for.
+                    list.push(node);
+                    method_nodes.push(node);
+                    
+                    // Clear the queue. Make sure we maintain exec_order.
+                    while (queue.length > 0) {
+                        i = queue.indexOf(exec_order[method_nodes.length]);
+                        list.push(queue[i]);
+                        method_nodes.push(queue[i]);
+                        queue.splice(i,1);
+                    }
+                } else {
+                    // Not the method node next in exec_order. Reserve it until we find the right node.
+                    queue.push(node);
+                }
+            }
+            else if (node instanceof OutputNode) {
+                // Output nodes are not relevant to execution order.
+                list.push(node);
+            }
+        }
+        return list;
+    };
+    
+    for (i = 0; i < this.exec_order.length; i++) {
+        connected_nodes_in_order = [];
+        layer = [];
+        for (j = 0; j < this.exec_order[i].length; j++) {
+            this_node = this.exec_order[i][j];
+            addConnectedNodes(this_node, connected_nodes_in_order);// connected_nodes_in_order will be added to here
+            addConnectedNodesReverse(this_node, node_order[node_order.length - 2]);// node_order[node_order.length - 2] will be added to here
+        }
+        for (j = 0; j < connected_nodes_in_order.length; j++) {
+            insertIntoLayer(connected_nodes_in_order[j], this.exec_order[i+1], layer);// `layer` will be added to here
         }
         node_order.push(layer);
     }
@@ -487,7 +507,6 @@ CanvasState.prototype.autoLayout = function() {
     for (j = 0; j < node_order.length; j++) {
         layer_length = node_order[j].length;
         layer_out_magnets = [];
-        position = 0;
         
         if (j === 0) {
             node_order[j].center_x = 0;
@@ -495,16 +514,17 @@ CanvasState.prototype.autoLayout = function() {
         
         for (i = 0; i < layer_length; i++ ) {
             node = node_order[j][i];
-            node.x = (y_spacing * j + x_spacing * (i - layer_length/2) + node_order[j].center_x) / 1.154700538
+            node.x = (y_spacing * j + x_spacing * (i - layer_length/2) + node_order[j].center_x) / 1.154700538;
             node.y = (y_spacing * j - x_spacing * (i - layer_length/2) - node_order[j].center_x) / 2;// + y_drop * j;
-            node.dx = 0;
-            node.dy = 0;
+            node.dx = node.dy = 0;
             
             if (node.out_magnets.length > 0) {
                 node.draw(this.ctx);// needed to update magnet coords
                 layer_out_magnets = layer_out_magnets.concat(node.out_magnets);
             }
         }
+        
+        // added candy: the isometric X centre of the layer after this one will be aligned with the centre of the magnets leading to its nodes.
         if (j !== node_order.length - 1) {
             num_magnets = layer_out_magnets.length;
             layer_out_magnets = layer_out_magnets.reduce(function(a,b) { return [ a[0]+b.x, a[1]+b.y ]; }, [0,0]);
@@ -512,10 +532,14 @@ CanvasState.prototype.autoLayout = function() {
         }
     }
     
+    for (i = 0; i < this.shapes.length; i++) {
+        console.log(i, this.shapes[i].label, this.shapes[i].x, this.shapes[i].y);
+    }
+    
     this.scaleToCanvas(true);// argument is to maintain aspect ratio
     this.centreCanvas();
-    this.testExecutionOrder();
-    for (var i=0; i<this.shapes.length; i++) {
+//    this.testExecutionOrder(); // should not have changed
+    for (i = 0; i < this.shapes.length; i++) {
         this.detectCollisions(this.shapes[i]);
     }
     this.valid = false;

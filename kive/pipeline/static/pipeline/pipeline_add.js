@@ -339,17 +339,17 @@ $(function() { // wait for page to finish loading before executing jQuery code
                     datatype: "json",
                     success: function(result) {
                         ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
-                        var n_outputs = Object.keys(result.outputs).length,
-                            n_inputs  = Object.keys(result.inputs).length;
+                        var n_outputs = Object.keys(result.outputs).length * 8,
+                            n_inputs  = Object.keys(result.inputs).length * 8;
                         
-                        preview_canvas.height = (n_outputs + n_inputs) * 4 + 62;
+                        preview_canvas.height = (n_outputs + n_inputs) / 2 + 62;
                         (new MethodNode(
                             val,
                             null,//family
                             // Ensures node is centred perfectly on the preview canvas
                             // Makes assumptions that parameters like magnet radius and scoop length are default.
-                            preview_canvas.width/2 - Math.sqrt(3) * ( Math.min(- ( n_inputs * 8 + 14 ), 42 - n_outputs * 8) + Math.max( n_inputs  * 8 + 14, n_outputs * 8 + 48 ) ) /4,// x
-                            n_inputs * 4 + 27,// y
+                            preview_canvas.width/2 - ( Math.min(-n_inputs - 14, 42 - n_outputs) + Math.max(n_inputs + 14, n_outputs + 48) ) * 0.4330127,// x
+                            n_inputs / 2 + 27,// y
                             colour, 
                             null,//label
                             result.inputs,
@@ -694,6 +694,10 @@ $(function() { // wait for page to finish loading before executing jQuery code
     $('#colour_picker_pick').on('click', function() {
         var pos = $(this).position();
         $('#colour_picker_menu').css({ top: pos.top + 20, left: pos.left }).show();
+    });
+    
+    $('#autolayout_btn').on('click', function() {
+        canvasState.autoLayout();
     });
     
     $('#colour_picker_menu').on('click', 'div', function() {
