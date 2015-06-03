@@ -913,13 +913,8 @@ drydock_objects = (function(my) {
         var dy = this.y - my;
         return Math.sqrt(dx*dx + dy*dy) <= this.r + this.attract;
     };
-    
-    // TODO: Convert the whole file to this module, then combine all the sections.
-    return my;
-}(drydock_objects));
-var Magnet = drydock_objects.Magnet;
 
-function Connector (from_x, from_y, out_magnet) {
+my.Connector = function(from_x, from_y, out_magnet) {
     /*
     Constructor.
     A Connector is a line drawn between two Magnets.
@@ -953,7 +948,7 @@ function Connector (from_x, from_y, out_magnet) {
         
 }
 
-Connector.prototype.draw = function(ctx) {
+my.Connector.prototype.draw = function(ctx) {
     /*
     Draw a line to represent a Connector originating from a Magnet.
      */
@@ -1071,7 +1066,7 @@ Connector.prototype.draw = function(ctx) {
     ctx.stroke();
 };
 
-Connector.prototype.highlight = function(ctx) {
+my.Connector.prototype.highlight = function(ctx) {
     /*
     Highlight this Connector by drawing another line along
     its length. Colour and line width set by canvasState.
@@ -1087,7 +1082,7 @@ Connector.prototype.highlight = function(ctx) {
 }
 
 // make an object in the format of jsBezier lib
-Connector.prototype.getJsBez = function() {
+my.Connector.prototype.getJsBez = function() {
     return [
         { x: this.fromX,   y: this.fromY   },
         this.ctrl1, this.ctrl2,
@@ -1095,7 +1090,7 @@ Connector.prototype.getJsBez = function() {
     ];
 };
 
-Connector.prototype.drawLabel = function(ctx) {
+my.Connector.prototype.drawLabel = function(ctx) {
     var label = this.source.label;
     if (this.source.label !== this.dest.label) {
         label += "->" + this.dest.label;
@@ -1144,7 +1139,7 @@ Connector.prototype.drawLabel = function(ctx) {
     }
 }
 
-Connector.prototype.debug = function(ctx) {
+my.Connector.prototype.debug = function(ctx) {
     var jsb = this.getJsBez(),
         midpoint = jsBezier.nearestPointOnCurve({ x: this.fromX + this.dx/2, y: this.fromY + this.dy/2 }, jsb),
         midpointAngle = jsBezier.gradientAtPoint(jsb, midpoint.location),
@@ -1212,19 +1207,17 @@ Connector.prototype.debug = function(ctx) {
     
     var final_tangent = atan_bez(linPt);
     
-    with(console) {
-        group('linPt');
-            log('linPt[0]: '+ linPt[0].x + ', ' + linPt[0].y);
-            log('linPt[1]: '+ linPt[1].x + ', ' + linPt[1].y);
-        groupEnd();
-    
-        group('connector debug');
-            log('midpoint location: '+ midpoint.location);
-            log('midpoint coord: '+ midpoint.point.x + ', ' + midpoint.point.y);
-            log('jsbez angle: '+ ( midpointAngle * 180/Math.PI) );
-            log('calculated angle: ' + (final_tangent * 180/Math.PI) );
-        groupEnd();
-    }
+    console.group('linPt');
+    console.log('linPt[0]: '+ linPt[0].x + ', ' + linPt[0].y);
+    console.log('linPt[1]: '+ linPt[1].x + ', ' + linPt[1].y);
+    console.groupEnd();
+
+    console.group('connector debug');
+    console.log('midpoint location: '+ midpoint.location);
+    console.log('midpoint coord: '+ midpoint.point.x + ', ' + midpoint.point.y);
+    console.log('jsbez angle: '+ ( midpointAngle * 180/Math.PI) );
+    console.log('calculated angle: ' + (final_tangent * 180/Math.PI) );
+    console.groupEnd();
     
     ctx.fillStyle = '#0f0';
     ctx.beginPath();
@@ -1232,7 +1225,7 @@ Connector.prototype.debug = function(ctx) {
     ctx.fill();
 };
 
-Connector.prototype.contains = function(mx, my, pad) {
+my.Connector.prototype.contains = function(mx, my, pad) {
     // Uses library jsBezier to accomplish certain tasks.
     // Since precise bezier distance is expensive to compute, we start by
     // running a faster algorithm to see if mx,my is outside the rectangle
@@ -1258,6 +1251,12 @@ Connector.prototype.contains = function(mx, my, pad) {
     // mx,my is outside the rectangle, don't bother computing the bezier distance
     else return false;
 };
+    
+    // TODO: Convert the whole file to this module, then combine all the sections.
+    return my;
+}(drydock_objects));
+var Magnet = drydock_objects.Magnet;
+var Connector = drydock_objects.Connector;
 
 function NodeLabel (label, x, y) {
     this.label = label || '';
@@ -1414,6 +1413,7 @@ drydock_objects = (function(my) {
             y1 = cy + this.h/2,
             y2 = y1 - this.h;
         
+        // Include centre to collide with small objects completely inside border.
         return [
             { x: cx, y: cy },
             { x: x1, y: y1 },
