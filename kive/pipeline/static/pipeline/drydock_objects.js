@@ -1349,29 +1349,6 @@ drydock_objects = (function(my) {
             cy = this.y + this.dy,
             canvas = new my.CanvasWrapper(undefined, ctx);
         
-        // draw bottom ellipse
-        ctx.fillStyle = this.found_md5 ? this.diffFill : this.fill;
-        canvas.drawEllipse({x: cx, y: cy + this.h/2, rx: this.r, ry: this.r2});
-        
-        // draw stack 
-        ctx.fillRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
-        
-        // draw top ellipse
-        canvas.drawEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
-        
-        // some shading
-        ctx.fillStyle = '#fff';
-        ctx.globalAlpha = 0.35;
-        canvas.drawEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
-        ctx.globalAlpha = 1.0;
-        
-        // draw magnet
-        var in_magnet = this.in_magnets[0];
-        in_magnet.x = cx - this.inset;
-        in_magnet.y = cy - this.h/2;
-        in_magnet.draw(ctx);
-    
-    
         // Highlight the method based on status.
         if(typeof this.status === 'string') {
             var cx = this.x + this.dx,
@@ -1397,6 +1374,28 @@ drydock_objects = (function(my) {
     
             ctx.restore();
         }
+        
+        // draw bottom ellipse
+        ctx.fillStyle = this.found_md5 ? this.diffFill : this.fill;
+        canvas.drawEllipse({x: cx, y: cy + this.h/2, rx: this.r, ry: this.r2});
+        
+        // draw stack 
+        ctx.fillRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
+        
+        // draw top ellipse
+        canvas.drawEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
+        
+        // some shading
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = 0.35;
+        canvas.drawEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
+        ctx.globalAlpha = 1.0;
+        
+        // draw magnet
+        var in_magnet = this.in_magnets[0];
+        in_magnet.x = cx - this.inset;
+        in_magnet.y = cy - this.h/2;
+        in_magnet.draw(ctx);
     };
     
     my.OutputNode.prototype.contains = function(mx, my) {
