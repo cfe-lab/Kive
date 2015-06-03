@@ -913,344 +913,344 @@ drydock_objects = (function(my) {
         var dy = this.y - my;
         return Math.sqrt(dx*dx + dy*dy) <= this.r + this.attract;
     };
-
-my.Connector = function(from_x, from_y, out_magnet) {
-    /*
-    Constructor.
-    A Connector is a line drawn between two Magnets.
-    Actions:
-    - on mouse down in raw data end-zone OR an out-magnet:
-        - push new Connector to list
-        - assign out-magnet CDT
-        - else assign x, y in end-zone (TODO: zip to other coords?)
-    - on mouse move
-        - update line with mouse move
-        - light up all CDT-matched in-magnets
-        - if mouse in vicinity of CDT-matched in-magnet, jump to magnet
-    - on mouse up
-        - if mouse NOT on CDT-matched in-magnet, delete Connector
-     */
-    this.dest = null;
-    this.source = out_magnet || null;
-
-    // is this Connector being drawn from an out-magnet?
-    if (this.source instanceof Magnet) {
-        this.fromX = out_magnet.x;
-        this.fromY = out_magnet.y;
-    } else {
-        // FIXME: currently this should never be the case - afyp
-        this.fromX = from_x;
-        this.fromY = from_y;
-    }
-
-    this.x = this.from_x; // for compatibility with shape-based functions
-    this.y = this.from_y;
-        
-}
-
-my.Connector.prototype.draw = function(ctx) {
-    /*
-    Draw a line to represent a Connector originating from a Magnet.
-     */
-    ctx.strokeStyle = '#abc';
-    ctx.lineWidth = 6;
-    ctx.lineCap = 'round';
-
-    if (this.source instanceof Magnet) {
-        // update coordinates in case magnet has moved
-        this.fromX = this.source.x;
-        this.fromY = this.source.y;
-    }
-
-    if (this.dest instanceof Magnet) {
-        // move with the attached shape
-        this.x = this.dest.x;
-        this.y = this.dest.y;
-    } else {
-        // if connector doesn't have a destination yet,
-        // give it the label of the source magnet it's coming from 
-        
-        // save the canvas state to start applying transformations
-        ctx.save();
-        ctx.font = '10pt Lato, sans-serif';
-        this.label_width = ctx.measureText(this.source.label).width + 10;
-        
-        // determine the angle of the bezier at the midpoint
-        var corner = 6,
-            x1 = this.label_width/2,
-            y1 = 7;
     
-        // set the bezier midpoint as the origin
-        $(canvas).css("cursor", "none");
-        ctx.translate(this.x + this.label_width/2 - ctx.lineWidth/2, this.y + 7);
-        ctx.fillStyle = '#aaa';
-        ctx.globalAlpha = 1;
+    my.Connector = function(from_x, from_y, out_magnet) {
+        /*
+        Constructor.
+        A Connector is a line drawn between two Magnets.
+        Actions:
+        - on mouse down in raw data end-zone OR an out-magnet:
+            - push new Connector to list
+            - assign out-magnet CDT
+            - else assign x, y in end-zone (TODO: zip to other coords?)
+        - on mouse move
+            - update line with mouse move
+            - light up all CDT-matched in-magnets
+            - if mouse in vicinity of CDT-matched in-magnet, jump to magnet
+        - on mouse up
+            - if mouse NOT on CDT-matched in-magnet, delete Connector
+         */
+        this.dest = null;
+        this.source = out_magnet || null;
     
-        // rounded rectangle
+        // is this Connector being drawn from an out-magnet?
+        if (this.source instanceof Magnet) {
+            this.fromX = out_magnet.x;
+            this.fromY = out_magnet.y;
+        } else {
+            // FIXME: currently this should never be the case - afyp
+            this.fromX = from_x;
+            this.fromY = from_y;
+        }
+    
+        this.x = this.from_x; // for compatibility with shape-based functions
+        this.y = this.from_y;
+            
+    }
+    
+    my.Connector.prototype.draw = function(ctx) {
+        /*
+        Draw a line to represent a Connector originating from a Magnet.
+         */
+        ctx.strokeStyle = '#abc';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+    
+        if (this.source instanceof Magnet) {
+            // update coordinates in case magnet has moved
+            this.fromX = this.source.x;
+            this.fromY = this.source.y;
+        }
+    
+        if (this.dest instanceof Magnet) {
+            // move with the attached shape
+            this.x = this.dest.x;
+            this.y = this.dest.y;
+        } else {
+            // if connector doesn't have a destination yet,
+            // give it the label of the source magnet it's coming from 
+            
+            // save the canvas state to start applying transformations
+            ctx.save();
+            ctx.font = '10pt Lato, sans-serif';
+            this.label_width = ctx.measureText(this.source.label).width + 10;
+            
+            // determine the angle of the bezier at the midpoint
+            var corner = 6,
+                x1 = this.label_width/2,
+                y1 = 7;
+        
+            // set the bezier midpoint as the origin
+            $(canvas).css("cursor", "none");
+            ctx.translate(this.x + this.label_width/2 - ctx.lineWidth/2, this.y + 7);
+            ctx.fillStyle = '#aaa';
+            ctx.globalAlpha = 1;
+        
+            // rounded rectangle
+            ctx.beginPath();
+            ctx.moveTo(-x1 + corner, -y1);
+            ctx.lineTo( x1 - corner, -y1);
+            ctx.arcTo ( x1, -y1,  x1, -y1 + corner, corner );
+    //        ctx.lineTo( x1, -y1);
+            ctx.lineTo( x1,  y1 - corner);
+            ctx.arcTo ( x1,  y1,  x1 - corner, y1, corner );
+            ctx.lineTo(-x1 + corner, y1);
+            ctx.arcTo (-x1,  y1, -x1, y1 - corner, corner );
+            ctx.lineTo(-x1, -y1 + corner);
+            ctx.arcTo (-x1, -y1, -x1 + corner, -y1, corner );
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(this.source.label, 0, ctx.lineWidth );
+            ctx.restore();
+        }
+        
+        this.dx = this.x - this.fromX,
+        this.dy = this.y - this.fromY;
+        
+        this.ctrl1 = {
+            /*
+            - Comes from origin at a 30-degree angle
+            - cos(30) = sqrt(3)/2  &  sin(30) = 0.5
+            - Distance of ctrl from origin is 70% of dx
+            - Minimum dx is 50, so minimum distance of ctrl is 35.
+            */
+            x: this.fromX + Math.max(this.dx, 50) * Math.sqrt(3) / 2 * .7,
+            y: this.fromY + Math.max(this.dx, 50) / 2 * .7
+        };
+        this.ctrl2 = {
+            /*
+            - Vertical offset is 2/3 of dy, or 2/5 of -dy, whichever is positive
+            - Minimum vertical offset is 50
+            - Horizontal offset is 10% of dx
+            */
+            x: this.x - this.dx / 10,
+            y: this.y - Math.max( (this.dy > 0 ? 1 : -.6) * this.dy, 50) / 1.5
+        };
+    
+        // Recolour this path if the statuses of the source and dest are meaningful
+        if(this.source instanceof Magnet && this.dest instanceof Magnet) {
+            var src = this.source.parent, 
+                dst = this.dest.parent, 
+                cable_stat;
+    
+            if (typeof src.status === 'string') {
+                cable_stat = "RUNNING";
+    
+                // Upper cable is done!
+               if(src.status == 'CLEAR' && typeof dst.status == 'string' ) {
+                    // Whatever, everything else is fine!
+                    cable_stat = "CLEAR";
+                }
+    
+                // Source is borked
+                else if(src.status == 'FAILURE') {
+                    // so is any cable that pokes out of it...
+                    cable_stat = "FAILURE";
+                }
+            }
+    
+            if(_statusColorMap.hasOwnProperty(cable_stat)) {
+                 ctx.strokeStyle = _statusColorMap[cable_stat];
+            }
+        }
+    
+        this.midX = this.fromX + this.dx / 2;
+        
         ctx.beginPath();
-        ctx.moveTo(-x1 + corner, -y1);
-        ctx.lineTo( x1 - corner, -y1);
-        ctx.arcTo ( x1, -y1,  x1, -y1 + corner, corner );
-//        ctx.lineTo( x1, -y1);
-        ctx.lineTo( x1,  y1 - corner);
-        ctx.arcTo ( x1,  y1,  x1 - corner, y1, corner );
-        ctx.lineTo(-x1 + corner, y1);
-        ctx.arcTo (-x1,  y1, -x1, y1 - corner, corner );
-        ctx.lineTo(-x1, -y1 + corner);
-        ctx.arcTo (-x1, -y1, -x1 + corner, -y1, corner );
-        ctx.closePath();
-        ctx.fill();
+        ctx.moveTo(this.fromX, this.fromY);
+        ctx.bezierCurveTo(this.ctrl1.x, this.ctrl1.y, this.ctrl2.x, this.ctrl2.y, this.x, this.y);
+        ctx.stroke();
+    };
+    
+    my.Connector.prototype.highlight = function(ctx) {
+        /*
+        Highlight this Connector by drawing another line along
+        its length. Colour and line width set by canvasState.
+         */
+        ctx.beginPath();
+        ctx.moveTo(this.fromX, this.fromY);
+        ctx.bezierCurveTo(this.ctrl1.x, this.ctrl1.y, this.ctrl2.x, this.ctrl2.y, this.x, this.y);
+        ctx.stroke();
         
-        ctx.fillStyle = 'white';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'bottom';
-        ctx.fillText(this.source.label, 0, ctx.lineWidth );
-        ctx.restore();
-    }
-    
-    this.dx = this.x - this.fromX,
-    this.dy = this.y - this.fromY;
-    
-    this.ctrl1 = {
-        /*
-        - Comes from origin at a 30-degree angle
-        - cos(30) = sqrt(3)/2  &  sin(30) = 0.5
-        - Distance of ctrl from origin is 70% of dx
-        - Minimum dx is 50, so minimum distance of ctrl is 35.
-        */
-        x: this.fromX + Math.max(this.dx, 50) * Math.sqrt(3) / 2 * .7,
-        y: this.fromY + Math.max(this.dx, 50) / 2 * .7
-    };
-    this.ctrl2 = {
-        /*
-        - Vertical offset is 2/3 of dy, or 2/5 of -dy, whichever is positive
-        - Minimum vertical offset is 50
-        - Horizontal offset is 10% of dx
-        */
-        x: this.x - this.dx / 10,
-        y: this.y - Math.max( (this.dy > 0 ? 1 : -.6) * this.dy, 50) / 1.5
-    };
-
-    // Recolour this path if the statuses of the source and dest are meaningful
-    if(this.source instanceof Magnet && this.dest instanceof Magnet) {
-        var src = this.source.parent, 
-            dst = this.dest.parent, 
-            cable_stat;
-
-        if (typeof src.status === 'string') {
-            cable_stat = "RUNNING";
-
-            // Upper cable is done!
-           if(src.status == 'CLEAR' && typeof dst.status == 'string' ) {
-                // Whatever, everything else is fine!
-                cable_stat = "CLEAR";
-            }
-
-            // Source is borked
-            else if(src.status == 'FAILURE') {
-                // so is any cable that pokes out of it...
-                cable_stat = "FAILURE";
-            }
-        }
-
-        if(_statusColorMap.hasOwnProperty(cable_stat)) {
-             ctx.strokeStyle = _statusColorMap[cable_stat];
+        if (this.dest !== null) {
+            this.drawLabel(ctx);
         }
     }
-
-    this.midX = this.fromX + this.dx / 2;
     
-    ctx.beginPath();
-    ctx.moveTo(this.fromX, this.fromY);
-    ctx.bezierCurveTo(this.ctrl1.x, this.ctrl1.y, this.ctrl2.x, this.ctrl2.y, this.x, this.y);
-    ctx.stroke();
-};
-
-my.Connector.prototype.highlight = function(ctx) {
-    /*
-    Highlight this Connector by drawing another line along
-    its length. Colour and line width set by canvasState.
-     */
-    ctx.beginPath();
-    ctx.moveTo(this.fromX, this.fromY);
-    ctx.bezierCurveTo(this.ctrl1.x, this.ctrl1.y, this.ctrl2.x, this.ctrl2.y, this.x, this.y);
-    ctx.stroke();
+    // make an object in the format of jsBezier lib
+    my.Connector.prototype.getJsBez = function() {
+        return [
+            { x: this.fromX,   y: this.fromY   },
+            this.ctrl1, this.ctrl2,
+            { x: this.x,       y: this.y       }
+        ];
+    };
     
-    if (this.dest !== null) {
-        this.drawLabel(ctx);
+    my.Connector.prototype.drawLabel = function(ctx) {
+        var label = this.source.label;
+        if (this.source.label !== this.dest.label) {
+            label += "->" + this.dest.label;
+        }
+        
+        this.label_width = ctx.measureText(label).width + 10;
+        this.dx = this.x - this.fromX,
+        this.dy = this.y - this.fromY;
+        
+        if ( this.dx * this.dx + this.dy * this.dy > this.label_width * this.label_width / .49) {
+            // determine the angle of the bezier at the midpoint
+            var jsb = this.getJsBez(),
+                midpoint = jsBezier.nearestPointOnCurve({ x: this.fromX + this.dx/2, y: this.fromY + this.dy/2 }, jsb),
+                midpointAngle = jsBezier.gradientAtPoint(jsb, midpoint.location),
+                corner = 6;
+            
+            // save the canvas state to start applying transformations
+            ctx.save();
+            
+            // set the bezier midpoint as the origin
+            ctx.translate(midpoint.point.x, midpoint.point.y);
+            ctx.rotate(midpointAngle);
+            ctx.fillStyle = '#aaa';
+            
+            var x1 = this.label_width/2,
+                y1 = 6;
+            
+            // rounded rectangle
+            ctx.beginPath();
+            ctx.moveTo(-x1 + corner, -y1);
+            ctx.lineTo( x1 - corner, -y1);
+            ctx.arcTo ( x1, -y1,  x1, -y1 + corner, corner );
+            ctx.lineTo( x1,  y1 - corner);
+            ctx.arcTo ( x1,  y1,  x1 - corner, y1, corner );
+            ctx.lineTo(-x1 + corner, y1);
+            ctx.arcTo (-x1,  y1, -x1, y1 - corner, corner );
+            ctx.lineTo(-x1, -y1 + corner);
+            ctx.arcTo (-x1, -y1, -x1 + corner, -y1, corner );
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.fillText(label, 0, 0);
+            ctx.restore();
+        }
     }
-}
-
-// make an object in the format of jsBezier lib
-my.Connector.prototype.getJsBez = function() {
-    return [
-        { x: this.fromX,   y: this.fromY   },
-        this.ctrl1, this.ctrl2,
-        { x: this.x,       y: this.y       }
-    ];
-};
-
-my.Connector.prototype.drawLabel = function(ctx) {
-    var label = this.source.label;
-    if (this.source.label !== this.dest.label) {
-        label += "->" + this.dest.label;
-    }
     
-    this.label_width = ctx.measureText(label).width + 10;
-    this.dx = this.x - this.fromX,
-    this.dy = this.y - this.fromY;
-    
-    if ( this.dx * this.dx + this.dy * this.dy > this.label_width * this.label_width / .49) {
-        // determine the angle of the bezier at the midpoint
+    my.Connector.prototype.debug = function(ctx) {
         var jsb = this.getJsBez(),
             midpoint = jsBezier.nearestPointOnCurve({ x: this.fromX + this.dx/2, y: this.fromY + this.dy/2 }, jsb),
             midpointAngle = jsBezier.gradientAtPoint(jsb, midpoint.location),
-            corner = 6;
+            wrong_midpoint = jsBezier.pointOnCurve(jsb, 0.5);
         
-        // save the canvas state to start applying transformations
-        ctx.save();
-        
-        // set the bezier midpoint as the origin
-        ctx.translate(midpoint.point.x, midpoint.point.y);
-        ctx.rotate(midpointAngle);
-        ctx.fillStyle = '#aaa';
-        
-        var x1 = this.label_width/2,
-            y1 = 6;
-        
-        // rounded rectangle
+        ctx.fillStyle = '#000';
         ctx.beginPath();
-        ctx.moveTo(-x1 + corner, -y1);
-        ctx.lineTo( x1 - corner, -y1);
-        ctx.arcTo ( x1, -y1,  x1, -y1 + corner, corner );
-        ctx.lineTo( x1,  y1 - corner);
-        ctx.arcTo ( x1,  y1,  x1 - corner, y1, corner );
-        ctx.lineTo(-x1 + corner, y1);
-        ctx.arcTo (-x1,  y1, -x1, y1 - corner, corner );
-        ctx.lineTo(-x1, -y1 + corner);
-        ctx.arcTo (-x1, -y1, -x1 + corner, -y1, corner );
-        ctx.closePath();
+        ctx.arc(this.ctrl1.x, this.ctrl1.y, 5, 0, 2 * Math.PI, true);
+        ctx.arc(this.ctrl2.x, this.ctrl2.y, 5, 0, 2 * Math.PI, true);
         ctx.fill();
         
-        ctx.fillStyle = 'white';
-        ctx.textAlign = 'center';
-        ctx.fillText(label, 0, 0);
-        ctx.restore();
-    }
-}
-
-my.Connector.prototype.debug = function(ctx) {
-    var jsb = this.getJsBez(),
-        midpoint = jsBezier.nearestPointOnCurve({ x: this.fromX + this.dx/2, y: this.fromY + this.dy/2 }, jsb),
-        midpointAngle = jsBezier.gradientAtPoint(jsb, midpoint.location),
-        wrong_midpoint = jsBezier.pointOnCurve(jsb, 0.5);
+        ctx.fillStyle = '#ff0';
+        ctx.beginPath();
+        ctx.arc(wrong_midpoint.x, wrong_midpoint.y, 5, 0, 2 * Math.PI, true);
+        ctx.fill();
+        
+        var atan_bez = function(pts) {
+            var lin_dy = pts[1].y - pts[0].y,
+                lin_dx = pts[1].x - pts[0].x;
+            return Math.atan(lin_dy / lin_dx);
+        };
+        
+        var quadPt = [];
+        ctx.fillStyle = '#600';
+        for (var i=0; i+1 < jsb.length; i++) {
+            var quadMid = {
+                x: (jsb[i+1].x - jsb[i].x) * midpoint.location + jsb[i].x,
+                y: (jsb[i+1].y - jsb[i].y) * midpoint.location + jsb[i].y
+            };
+            quadPt.push(quadMid);
+            ctx.beginPath();
+            ctx.arc(quadMid.x, quadMid.y, 5, 0, 2 * Math.PI, true);
+            ctx.fill();
+        }
+        console.group('quadratic tangents');
+        for (i=0; i < quadPt.length - 1; i++)
+            console.log(atan_bez(quadPt.slice(i, i+2)) * 180/Math.PI);
+        console.groupEnd();
+        
+        var linPt = [];
+        ctx.fillStyle = '#A00';
+        for (i=0; i+1 < quadPt.length; i++) {
+            var linMid = {
+                x: (quadPt[i+1].x - quadPt[i].x) * midpoint.location + quadPt[i].x,
+                y: (quadPt[i+1].y - quadPt[i].y) * midpoint.location + quadPt[i].y
+            };
+            linPt.push(linMid);
+            ctx.beginPath();
+            ctx.arc(linMid.x, linMid.y, 5, 0, 2 * Math.PI, true);
+            ctx.fill();
+        }
+        
+        var pt = [];
+        ctx.fillStyle = '#F00';
+        for (i=0; i+1 < linPt.length; i++) {
+            var mid = {
+                x: (linPt[i+1].x - linPt[i].x) * midpoint.location + linPt[i].x,
+                y: (linPt[i+1].y - linPt[i].y) * midpoint.location + linPt[i].y
+            };
+            pt.push(mid);
+            ctx.beginPath();
+            ctx.arc(mid.x, mid.y, 5, 0, 2 * Math.PI, true);
+            ctx.fill();
+        }
+        
+        var final_tangent = atan_bez(linPt);
+        
+        console.group('linPt');
+        console.log('linPt[0]: '+ linPt[0].x + ', ' + linPt[0].y);
+        console.log('linPt[1]: '+ linPt[1].x + ', ' + linPt[1].y);
+        console.groupEnd();
     
-    ctx.fillStyle = '#000';
-    ctx.beginPath();
-    ctx.arc(this.ctrl1.x, this.ctrl1.y, 5, 0, 2 * Math.PI, true);
-    ctx.arc(this.ctrl2.x, this.ctrl2.y, 5, 0, 2 * Math.PI, true);
-    ctx.fill();
-    
-    ctx.fillStyle = '#ff0';
-    ctx.beginPath();
-    ctx.arc(wrong_midpoint.x, wrong_midpoint.y, 5, 0, 2 * Math.PI, true);
-    ctx.fill();
-    
-    var atan_bez = function(pts) {
-        var lin_dy = pts[1].y - pts[0].y,
-            lin_dx = pts[1].x - pts[0].x;
-        return Math.atan(lin_dy / lin_dx);
+        console.group('connector debug');
+        console.log('midpoint location: '+ midpoint.location);
+        console.log('midpoint coord: '+ midpoint.point.x + ', ' + midpoint.point.y);
+        console.log('jsbez angle: '+ ( midpointAngle * 180/Math.PI) );
+        console.log('calculated angle: ' + (final_tangent * 180/Math.PI) );
+        console.groupEnd();
+        
+        ctx.fillStyle = '#0f0';
+        ctx.beginPath();
+        ctx.arc(midpoint.point.x, midpoint.point.y, 3, 0, 2 * Math.PI, true);
+        ctx.fill();
     };
     
-    var quadPt = [];
-    ctx.fillStyle = '#600';
-    for (var i=0; i+1 < jsb.length; i++) {
-        var quadMid = {
-            x: (jsb[i+1].x - jsb[i].x) * midpoint.location + jsb[i].x,
-            y: (jsb[i+1].y - jsb[i].y) * midpoint.location + jsb[i].y
-        };
-        quadPt.push(quadMid);
-        ctx.beginPath();
-        ctx.arc(quadMid.x, quadMid.y, 5, 0, 2 * Math.PI, true);
-        ctx.fill();
-    }
-    console.group('quadratic tangents');
-    for (i=0; i < quadPt.length - 1; i++)
-        console.log(atan_bez(quadPt.slice(i, i+2)) * 180/Math.PI);
-    console.groupEnd();
+    my.Connector.prototype.contains = function(mx, my, pad) {
+        // Uses library jsBezier to accomplish certain tasks.
+        // Since precise bezier distance is expensive to compute, we start by
+        // running a faster algorithm to see if mx,my is outside the rectangle
+        // given by the beginning, end, and control points (plus padding).
     
-    var linPt = [];
-    ctx.fillStyle = '#A00';
-    for (i=0; i+1 < quadPt.length; i++) {
-        var linMid = {
-            x: (quadPt[i+1].x - quadPt[i].x) * midpoint.location + quadPt[i].x,
-            y: (quadPt[i+1].y - quadPt[i].y) * midpoint.location + quadPt[i].y
-        };
-        linPt.push(linMid);
-        ctx.beginPath();
-        ctx.arc(linMid.x, linMid.y, 5, 0, 2 * Math.PI, true);
-        ctx.fill();
-    }
-    
-    var pt = [];
-    ctx.fillStyle = '#F00';
-    for (i=0; i+1 < linPt.length; i++) {
-        var mid = {
-            x: (linPt[i+1].x - linPt[i].x) * midpoint.location + linPt[i].x,
-            y: (linPt[i+1].y - linPt[i].y) * midpoint.location + linPt[i].y
-        };
-        pt.push(mid);
-        ctx.beginPath();
-        ctx.arc(mid.x, mid.y, 5, 0, 2 * Math.PI, true);
-        ctx.fill();
-    }
-    
-    var final_tangent = atan_bez(linPt);
-    
-    console.group('linPt');
-    console.log('linPt[0]: '+ linPt[0].x + ', ' + linPt[0].y);
-    console.log('linPt[1]: '+ linPt[1].x + ', ' + linPt[1].y);
-    console.groupEnd();
-
-    console.group('connector debug');
-    console.log('midpoint location: '+ midpoint.location);
-    console.log('midpoint coord: '+ midpoint.point.x + ', ' + midpoint.point.y);
-    console.log('jsbez angle: '+ ( midpointAngle * 180/Math.PI) );
-    console.log('calculated angle: ' + (final_tangent * 180/Math.PI) );
-    console.groupEnd();
-    
-    ctx.fillStyle = '#0f0';
-    ctx.beginPath();
-    ctx.arc(midpoint.point.x, midpoint.point.y, 3, 0, 2 * Math.PI, true);
-    ctx.fill();
-};
-
-my.Connector.prototype.contains = function(mx, my, pad) {
-    // Uses library jsBezier to accomplish certain tasks.
-    // Since precise bezier distance is expensive to compute, we start by
-    // running a faster algorithm to see if mx,my is outside the rectangle
-    // given by the beginning, end, and control points (plus padding).
-
-    var ys = [ this.y, this.fromY, this.ctrl1.y, this.ctrl2.y ],
-        xs = [ this.x, this.fromX, this.ctrl1.x, this.ctrl2.x ],
-        bottom = Math.max.apply(null, ys),
-        top = Math.min.apply(null, ys),
-        right = Math.max.apply(null, xs),
-        left = Math.min.apply(null, xs);
-    
-    if (mx > left - pad && mx < right + pad
-        && my > top - pad && my < bottom + pad
-        ) {
-        // expensive route: run bezier distance algorithm
-        return pad > 
-            jsBezier.distanceFromCurve(
-                { x: mx, y: my }, 
-                this.getJsBez()
-            ).distance;
-    }
-    // mx,my is outside the rectangle, don't bother computing the bezier distance
-    else return false;
-};
+        var ys = [ this.y, this.fromY, this.ctrl1.y, this.ctrl2.y ],
+            xs = [ this.x, this.fromX, this.ctrl1.x, this.ctrl2.x ],
+            bottom = Math.max.apply(null, ys),
+            top = Math.min.apply(null, ys),
+            right = Math.max.apply(null, xs),
+            left = Math.min.apply(null, xs);
+        
+        if (mx > left - pad && mx < right + pad
+            && my > top - pad && my < bottom + pad
+            ) {
+            // expensive route: run bezier distance algorithm
+            return pad > 
+                jsBezier.distanceFromCurve(
+                    { x: mx, y: my }, 
+                    this.getJsBez()
+                ).distance;
+        }
+        // mx,my is outside the rectangle, don't bother computing the bezier distance
+        else return false;
+    };
     
     // TODO: Convert the whole file to this module, then combine all the sections.
     return my;
