@@ -83,19 +83,11 @@
         function drawVertices(canvas, target, vertices) {
             var ctx = canvas.ctx;
             target.draw(ctx);
-            ctx.beginPath();
+            ctx.fillStyle = "green";
             for (var i = 0; i < vertices.length; i++) {
                 var vertex = vertices[i];
-                if (i === 0) {
-                    ctx.moveTo(vertex.x, vertex.y);
-                }
-                else {
-                    ctx.lineTo(vertex.x, vertex.y);
-                }
+                canvas.drawCircle({x: vertex.x, y: vertex.y, r: 2});
             }
-            ctx.strokeStyle = "green";
-            ctx.lineWidth = 1;
-            ctx.stroke();
         }
         
         it('should allow raw calls to canvas context', function() {
