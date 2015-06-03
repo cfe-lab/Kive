@@ -1359,10 +1359,6 @@ drydock_objects = (function(my) {
             ctx.strokeStyle = my.statusColorMap[this.status] || 'black';
             ctx.lineWidth = 5;
     
-            // This line means that we are drawing "behind" the canvas now.
-            // We must set it back after we're done otherwise it'll be utter chaos.
-            ctx.globalCompositeOperation = 'destination-over';
-    
             // draw bottom ellipse
             canvas.strokeEllipse({x: cx, y: cy + this.h/2, rx: this.r, ry: this.r2});
     
