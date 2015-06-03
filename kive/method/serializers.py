@@ -43,7 +43,7 @@ class CodeResourceRevisionSerializer(serializers.ModelSerializer):
                   'display_name',
                   'user',
                   'removal_plan',
-                   'users_allowed',
+                  'users_allowed',
                   'groups_allowed',
                   'absolute_url',
                   'revision_number',
