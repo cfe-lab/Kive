@@ -1346,25 +1346,23 @@ drydock_objects = (function(my) {
     
     my.OutputNode.prototype.draw = function(ctx) {
         var cx = this.x + this.dx,
-            cy = this.y + this.dy;
+            cy = this.y + this.dy,
+            canvas = new my.CanvasWrapper(undefined, ctx);
         
         // draw bottom ellipse
         ctx.fillStyle = this.found_md5 ? this.diffFill : this.fill;
-        ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
-        ctx.fill();
+        canvas.drawEllipse({x: cx, y: cy + this.h/2, rx: this.r, ry: this.r2});
         
         // draw stack 
         ctx.fillRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
         
         // draw top ellipse
-        ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
-        ctx.fill();
+        canvas.drawEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
         
         // some shading
         ctx.fillStyle = '#fff';
         ctx.globalAlpha = 0.35;
-        ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
-        ctx.fill();
+        canvas.drawEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
         ctx.globalAlpha = 1.0;
         
         // draw magnet
@@ -1389,15 +1387,13 @@ drydock_objects = (function(my) {
             ctx.globalCompositeOperation = 'destination-over';
     
             // draw bottom ellipse
-            ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
-            ctx.stroke();
+            canvas.strokeEllipse({x: cx, y: cy + this.h/2, rx: this.r, ry: this.r2});
     
             // draw stack
             ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
     
             // draw top ellipse
-            ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
-            ctx.stroke();
+            canvas.strokeEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
     
             ctx.restore();
         }
@@ -1437,22 +1433,21 @@ drydock_objects = (function(my) {
     my.OutputNode.prototype.highlight = function(ctx) {
         var cx = this.x + this.dx,
             cy = this.y + this.dy,
-            cable = this.in_magnets[0].connected[0];
+            cable = this.in_magnets[0].connected[0],
+            canvas = new my.CanvasWrapper(undefined, ctx);
         
         // This line means that we are drawing "behind" the canvas now.
         // We must set it back after we're done otherwise it'll be utter chaos.
         ctx.globalCompositeOperation = 'destination-over';
         
         // draw bottom ellipse
-        ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
-        ctx.stroke();
+        canvas.strokeEllipse({x: cx, y: cy + this.h/2, rx: this.r, ry: this.r2});
         
         // draw stack
         ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
         
         // draw top ellipse
-        ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
-        ctx.stroke();
+        canvas.strokeEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
         
         ctx.globalCompositeOperation = 'source-over';
         
