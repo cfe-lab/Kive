@@ -330,7 +330,9 @@ function InputNode(pk, x, y, w, h, fill, inset, offset, label) {
 InputNode.prototype = Object.create(Node.prototype);
 InputNode.prototype.constructor = InputNode;
 
-function RawNode (x, y, label) {
+drydock_objects = (function(my) {
+    "use strict";
+    my.RawNode = function(x, y, label) {
     /*
     Node representing an unstructured (raw) datatype.
     Rendered as a circle.
@@ -353,7 +355,7 @@ function RawNode (x, y, label) {
     this.out_magnets = [ new Magnet(this, 5, 2, "white", null, this.label, null, true) ];
 }
 
-RawNode.prototype.draw = function(ctx) {
+my.RawNode.prototype.draw = function(ctx) {
     var cx = this.x + this.dx,
         cy = this.y + this.dy;
 
@@ -383,7 +385,7 @@ RawNode.prototype.draw = function(ctx) {
     out_magnet.draw(ctx);
 };
 
-RawNode.prototype.highlight = function(ctx) {
+my.RawNode.prototype.highlight = function(ctx) {
     ctx.globalCompositeOperation = 'destination-over';
     var cx = this.x + this.dx,
         cy = this.y + this.dy;
@@ -402,7 +404,7 @@ RawNode.prototype.highlight = function(ctx) {
     ctx.globalCompositeOperation = 'source-over';
 }
 
-RawNode.prototype.contains = function(mx, my) {
+my.RawNode.prototype.contains = function(mx, my) {
     var cx = this.x + this.dx,
         cy = this.y + this.dy;
     // node is comprised of a rectangle and two ellipses
@@ -411,7 +413,7 @@ RawNode.prototype.contains = function(mx, my) {
         || Geometry.inEllipse(mx, my, cx, cy + this.h/2, this.r, this.r2);
 };
 
-RawNode.prototype.getVertices = function() {
+my.RawNode.prototype.getVertices = function() {
     var cx = this.x + this.dx,
         cy = this.y + this.dy;
     
@@ -431,10 +433,14 @@ RawNode.prototype.getVertices = function() {
     ];
 };
 
-RawNode.prototype.getLabel = function() {
+my.RawNode.prototype.getLabel = function() {
     return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
 };
 
+    // TODO: Convert the whole file to this module, then combine all the sections.
+    return my;
+}(drydock_objects));
+var RawNode = drydock_objects.RawNode;
 
 function CDtNode (pk, x, y,label) {
     /*
