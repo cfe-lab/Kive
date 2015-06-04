@@ -492,131 +492,131 @@ drydock_objects = (function(my) {
     my.RawNode.prototype = Object.create(my.CylinderNode.prototype);
     my.RawNode.prototype.constructor = my.RawNode;
 
-my.CdtNode = function(pk, x, y,label) {
-    /*
-    Node represents a Compound Datatype (CSV structured data).
-    Rendered as a square shape.
-     */
-    this.pk = pk;
-    this.x = x || 0;
-    this.y = y || 0;
-    this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
-    this.dy = 0;
-    this.w = 45;
-    this.h = 28;
-    this.fill = "#88D";
-    this.inset = 13;
-    this.offset = 15;
-    this.label = label || '';
-    this.in_magnets = [];
-    this.out_magnets = [ new Magnet(this, 5, 2, "white", this.pk, this.label, null, true) ];
-}
-
-my.CdtNode.prototype.draw = function(ctx) {
-    var cx = this.x + this.dx,
-        cy = this.y + this.dy,
-        out_magnet;
+    my.CdtNode = function(pk, x, y,label) {
+        /*
+        Node represents a Compound Datatype (CSV structured data).
+        Rendered as a square shape.
+         */
+        this.pk = pk;
+        this.x = x || 0;
+        this.y = y || 0;
+        this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
+        this.dy = 0;
+        this.w = 45;
+        this.h = 28;
+        this.fill = "#88D";
+        this.inset = 13;
+        this.offset = 15;
+        this.label = label || '';
+        this.in_magnets = [];
+        this.out_magnets = [ new Magnet(this, 5, 2, "white", this.pk, this.label, null, true) ];
+    }
     
-    ctx.fillStyle = this.fill;
+    my.CdtNode.prototype.draw = function(ctx) {
+        var cx = this.x + this.dx,
+            cy = this.y + this.dy,
+            out_magnet;
+        
+        ctx.fillStyle = this.fill;
+        
+        // draw base
+        var prism_base = cy + this.h/2;
+        ctx.beginPath();
+        ctx.moveTo(cx - this.w/2, prism_base);
+        ctx.lineTo(cx, prism_base + this.w/4);
+        ctx.lineTo(cx + this.w/2, prism_base);
+        ctx.lineTo(cx, prism_base - this.w/4);
+        ctx.closePath();
+        ctx.fill();
+        
+        // draw stack 
+        ctx.fillRect(cx - this.w/2, cy - this.h/2, this.w, this.h);
+        
+        // draw top
+        var prism_cap = cy - this.h/2;
+        ctx.beginPath();
+        ctx.moveTo(cx - this.w/2, prism_cap);
+        ctx.lineTo(cx, prism_cap + this.w/4);
+        ctx.lineTo(cx + this.w/2, prism_cap);
+        ctx.lineTo(cx, prism_cap - this.w/4);
+        ctx.closePath();
+        ctx.fill();
+        
+        // some shading
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = 0.35;
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
     
-    // draw base
-    var prism_base = cy + this.h/2;
-    ctx.beginPath();
-    ctx.moveTo(cx - this.w/2, prism_base);
-    ctx.lineTo(cx, prism_base + this.w/4);
-    ctx.lineTo(cx + this.w/2, prism_base);
-    ctx.lineTo(cx, prism_base - this.w/4);
-    ctx.closePath();
-    ctx.fill();
+        // draw magnet
+        out_magnet = this.out_magnets[0];
+        out_magnet.x = cx + this.inset;
+        out_magnet.y = cy + this.w/8;
+        out_magnet.draw(ctx);
+    };
     
-    // draw stack 
-    ctx.fillRect(cx - this.w/2, cy - this.h/2, this.w, this.h);
+    my.CdtNode.prototype.getVertices = function() {
+        var cx = this.x + this.dx,
+            cy = this.y + this.dy;
+        
+        var w2 = this.w/2,
+            butt = cy + this.h/2,
+            cap  = cy - this.h/2;
+        
+        return [
+            { x: cx,      y: cy },
+            { x: cx - w2, y: butt },
+            { x: cx,      y: butt + w2/2 },
+            { x: cx + w2, y: butt },
+            { x: cx + w2, y: cap },
+            { x: cx,      y: cap - w2/2 },
+            { x: cx - w2, y: cap }
+        ];
+    };
     
-    // draw top
-    var prism_cap = cy - this.h/2;
-    ctx.beginPath();
-    ctx.moveTo(cx - this.w/2, prism_cap);
-    ctx.lineTo(cx, prism_cap + this.w/4);
-    ctx.lineTo(cx + this.w/2, prism_cap);
-    ctx.lineTo(cx, prism_cap - this.w/4);
-    ctx.closePath();
-    ctx.fill();
+    my.CdtNode.prototype.highlight = function(ctx) {
+        var cx = this.x + this.dx,
+            cy = this.y + this.dy;
+        
+        ctx.globalCompositeOperation = 'destination-over';
+    //    ctx.lineJoin = 'bevel';
+        
+        var w2 = this.w/2,
+            h2 = this.h/2,
+            butt = cy + h2,
+            cap = cy - h2;
+        
+        ctx.beginPath();
+        ctx.moveTo(cx - w2, butt);
+        ctx.lineTo(cx,      butt + w2/2);
+        ctx.lineTo(cx + w2, butt);
+        ctx.lineTo(cx + w2, cap);
+        ctx.lineTo(cx,      cap - w2/2);
+        ctx.lineTo(cx - w2, cap);
+        ctx.closePath();
+        ctx.stroke();
+        
+        ctx.globalCompositeOperation = 'source-over';
+    };
     
-    // some shading
-    ctx.fillStyle = '#fff';
-    ctx.globalAlpha = 0.35;
-    ctx.fill();
-    ctx.globalAlpha = 1.0;
-
-    // draw magnet
-    out_magnet = this.out_magnets[0];
-    out_magnet.x = cx + this.inset;
-    out_magnet.y = cy + this.w/8;
-    out_magnet.draw(ctx);
-};
-
-my.CdtNode.prototype.getVertices = function() {
-    var cx = this.x + this.dx,
-        cy = this.y + this.dy;
     
-    var w2 = this.w/2,
-        butt = cy + this.h/2,
-        cap  = cy - this.h/2;
+    my.CdtNode.prototype.contains = function(mx, my) {
+        /*
+        Are mouse coordinates within the perimeter of this node?
+         */
+        var dx = Math.abs(this.x + this.dx - mx),
+            dy = Math.abs(this.y + this.dy - my);
+        
+        // mouse coords are within the 4 diagonal lines.
+        // can be checked with 1 expression because the 4 lines are mirror images of each other
+        return this.h/2 + this.w/4 - dy > dx / 2 
+        // then check the horizontal boundaries on the sides of the hexagon
+            && dx < this.w/2;
+    };
     
-    return [
-        { x: cx,      y: cy },
-        { x: cx - w2, y: butt },
-        { x: cx,      y: butt + w2/2 },
-        { x: cx + w2, y: butt },
-        { x: cx + w2, y: cap },
-        { x: cx,      y: cap - w2/2 },
-        { x: cx - w2, y: cap }
-    ];
-};
-
-my.CdtNode.prototype.highlight = function(ctx) {
-    var cx = this.x + this.dx,
-        cy = this.y + this.dy;
-    
-    ctx.globalCompositeOperation = 'destination-over';
-//    ctx.lineJoin = 'bevel';
-    
-    var w2 = this.w/2,
-        h2 = this.h/2,
-        butt = cy + h2,
-        cap = cy - h2;
-    
-    ctx.beginPath();
-    ctx.moveTo(cx - w2, butt);
-    ctx.lineTo(cx,      butt + w2/2);
-    ctx.lineTo(cx + w2, butt);
-    ctx.lineTo(cx + w2, cap);
-    ctx.lineTo(cx,      cap - w2/2);
-    ctx.lineTo(cx - w2, cap);
-    ctx.closePath();
-    ctx.stroke();
-    
-    ctx.globalCompositeOperation = 'source-over';
-};
-
-
-my.CdtNode.prototype.contains = function(mx, my) {
-    /*
-    Are mouse coordinates within the perimeter of this node?
-     */
-    var dx = Math.abs(this.x + this.dx - mx),
-        dy = Math.abs(this.y + this.dy - my);
-    
-    // mouse coords are within the 4 diagonal lines.
-    // can be checked with 1 expression because the 4 lines are mirror images of each other
-    return this.h/2 + this.w/4 - dy > dx / 2 
-    // then check the horizontal boundaries on the sides of the hexagon
-        && dx < this.w/2;
-};
-
-my.CdtNode.prototype.getLabel = function() {
-    return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
-};
+    my.CdtNode.prototype.getLabel = function() {
+        return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
+    };
     
     // TODO: Convert the whole file to this module, then combine all the sections.
     return my;
