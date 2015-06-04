@@ -1,3 +1,5 @@
+from django.db import transaction
+
 from rest_framework import permissions, mixins
 from rest_framework.decorators import detail_route
 from rest_framework.response import Response
@@ -155,3 +157,16 @@ class RemovableModelViewSet(RemoveModelMixin,
     command actually triggers the remove() method instead of destroy().
     """
     pass
+
+
+class CleanCreateModelMixin(mixins.CreateModelMixin):
+    """
+    A mixin that adds POST support through the REST API.
+    """
+    @transaction.atomic
+    def perform_create(self, serializer):
+        """
+        Handle creation and cleaning of a new object.
+        """
+        new_obj = serializer.save()
+        new_obj.full_clean()

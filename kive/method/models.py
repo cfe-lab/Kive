@@ -140,6 +140,14 @@ class CodeResourceRevision(metadata.models.AccessControl):
             blank=True,
             help_text="File contents of this code resource revision")
 
+    MD5_checksum = models.CharField(
+            max_length=64,
+            blank=True,
+            help_text="Used to validate file contents of this resource revision")
+
+    class Meta:
+        ordering = ["coderesource__name", "-revision_number"]
+
     @property
     def filename(self):
         """
@@ -147,11 +155,6 @@ class CodeResourceRevision(metadata.models.AccessControl):
         TODO: use os.path.split() instead of split("/")
         """
         return '_'.join(self.content_file.name.split('/')[-1].split('_')[:-1])
-
-    MD5_checksum = models.CharField(
-            max_length=64,
-            blank=True,
-            help_text="Used to validate file contents of this resource revision")
     
     @property
     def display_name(self):
@@ -166,7 +169,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
         if self.revision_name == "":
             return "[no revision name]"
         else:
-            return self.revision_name
+            return "{}:{} ({})".format(self.coderesource.name, self.revision_number, self.revision_name)
 
     def save(self, *args, **kwargs):
         """Save this CodeResourceRevision, incrementing the revision number."""

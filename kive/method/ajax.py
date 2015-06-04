@@ -1,13 +1,12 @@
 from django.http import HttpResponse, Http404
 from django.core import serializers
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.db import transaction
 
-from rest_framework import permissions, mixins
+from rest_framework import permissions
 from rest_framework.decorators import detail_route
 from rest_framework.response import Response
 
-from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
+from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, CleanCreateModelMixin
 from method.models import CodeResourceRevision, Method, MethodFamily, CodeResource
 from method.serializers import MethodSerializer, MethodFamilySerializer, \
     CodeResourceSerializer, CodeResourceRevisionSerializer
@@ -37,24 +36,10 @@ class CodeResourceViewSet(RemovableModelViewSet):
         )
 
 
-class CodeResourceRevisionViewSet(mixins.CreateModelMixin, RemovableModelViewSet):
+class CodeResourceRevisionViewSet(CleanCreateModelMixin, RemovableModelViewSet):
     queryset = CodeResourceRevision.objects.all()
     serializer_class = CodeResourceRevisionSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
-
-    # We customize the creation to include cleaning.
-    @transaction.atomic
-    def perform_create(self, serializer):
-        """
-        Handle creation of a new CodeResourceRevision.
-
-        This uses the serializer's save() method but additionally
-        cleans the newly-created CodeResourceRevision.
-        """
-        new_crr = serializer.save()
-        # If this fails, the transaction breaks.  Note that this will
-        # clean any dependencies we just defined.
-        new_crr.full_clean()
 
 
 @login_required
@@ -108,7 +93,7 @@ class MethodFamilyViewSet(RemovableModelViewSet):
         return Response(member_serializer.data)
 
 
-class MethodViewSet(RemovableModelViewSet):
+class MethodViewSet(CleanCreateModelMixin, RemovableModelViewSet):
     queryset = Method.objects.all()
     serializer_class = MethodSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
