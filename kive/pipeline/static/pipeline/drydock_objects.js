@@ -71,6 +71,7 @@ var drydock_objects = (function() {
         this.ctx.restore(); // restore to original state
         this.ctx.stroke();
     };
+    
     /**
      * Draw text with a standard font, colour, and background rectangle.
      * 
@@ -87,43 +88,104 @@ var drydock_objects = (function() {
         var width,
             height,
             yoff,
-            dir = args.dir === 1 ? 1 : args.dir === 0 ? 0 : -1;
+            dir = args.dir === 1 ? 1 : args.dir === 0 ? 0 : -1,
+            rectArgs = {x: args.x, y: args.y},
+            textFill = "black",
+            margin = 2;
         this.ctx.save();
-        if (args.style === 'node') {
+        this.ctx.globalAlpha = 0.5;
+        switch (args.style) {
+        case 'node':
             this.ctx.font = '10pt Lato, sans-serif';
             this.ctx.textBaseline = 'alphabetic';
-            height = 14;
-            yoff = 11;
-        }
-        else {
+            rectArgs.height = 14;
+            rectArgs.y -= 11;
+            break;
+        case 'connector':
+            this.ctx.font = '10pt Lato, sans-serif';
+            this.ctx.textBaseline = 'middle';
+            rectArgs.height = 14;
+            rectArgs.y -= 5;
+            rectArgs.r = 6;
+            margin = 5;
+            textFill = "white";
+            this.ctx.globalAlpha = 1;
+            break;
+        case 'midconnector':
+            // TODO: Merge with connector style
             this.ctx.font = '9pt Lato, sans-serif';
             this.ctx.textBaseline = 'middle';
-            height = 15;
-            yoff = 7.5;
+            rectArgs.height = 12;
+            rectArgs.y -= 6;
+            rectArgs.r = 6;
+            margin = 5;
+            textFill = "white";
+            this.ctx.globalAlpha = 1;
+            break;
+        default:
+            this.ctx.font = '9pt Lato, sans-serif';
+            this.ctx.textBaseline = 'middle';
+            rectArgs.height = 15;
+            rectArgs.y -= 7.5;
         }
         this.ctx.textAlign = dir === 1 ? 'left' : dir === 0 ? 'center' : 'right';
         // make a backing box so the label is on the fill colour
-        this.ctx.globalAlpha = 0.5;
-        width = this.ctx.measureText(args.text).width
+        rectArgs.width = 2*margin + this.ctx.measureText(args.text).width;
         if (dir === 0) {
-            this.ctx.fillRect(
-                    args.x - width/2 - 2,
-                    args.y - yoff,
-                    4 + width,
-                    height);
+            rectArgs.x -= rectArgs.width/2;
         }
         else {
-            this.ctx.fillRect(
-                    args.x - dir * 2,
-                    args.y - yoff,
-                    dir * (4 + width),
-                    height
-            );
+            rectArgs.x -= dir * margin;
+            rectArgs.width *= dir;
         }
+        this.fillRect(rectArgs);
         this.ctx.globalAlpha = 1;
-        this.ctx.fillStyle = '#000';
+        this.ctx.fillStyle = textFill;
         this.ctx.fillText(args.text, args.x, args.y);
         this.ctx.restore();
+    };
+    
+    /**
+     * Draw a rectangle or rounded rectangle.
+     * 
+     * @param args.x: the left edge of the rectangle
+     * @param args.y: the top edge of the rectangle
+     * @param args.width: the width of the rectangle
+     * @param args.height: the height of the rectangle
+     * @param args.r: the radius of the corners, or undefined for a regular
+     *  rectangle
+     */
+    my.CanvasWrapper.prototype.fillRect = function(args) {
+        if (args.r === undefined) {
+            this.ctx.fillRect(args.x, args.y, args.width, args.height);
+        }
+        else {
+            this.ctx.beginPath();
+            // middle of top edge
+            this.ctx.moveTo(args.x + args.width/2, args.y);
+            // to middle of right edge
+            this.ctx.arcTo(
+                    args.x + args.width, args.y,
+                    args.x + args.width, args.y + args.height/2,
+                    args.r);
+            // to middle of bottom edge
+            this.ctx.arcTo(
+                    args.x + args.width, args.y + args.height,
+                    args.x + args.width/2, args.y + args.height,
+                    args.r);
+            // to middle of left edge
+            this.ctx.arcTo(
+                    args.x, args.y + args.height,
+                    args.x, args.y + args.height/2,
+                    args.r);
+            // to middle of top edge
+            this.ctx.arcTo(
+                    args.x, args.y,
+                    args.x + args.width/2, args.y,
+                    args.r);
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
     };
     
     // TODO: Convert the whole file to this module, then combine all the sections.
@@ -914,7 +976,7 @@ drydock_objects = (function(my) {
         return Math.sqrt(dx*dx + dy*dy) <= this.r + this.attract;
     };
     
-    my.Connector = function(from_x, from_y, out_magnet) {
+    my.Connector = function(out_magnet) {
         /*
         Constructor.
         A Connector is a line drawn between two Magnets.
@@ -931,17 +993,10 @@ drydock_objects = (function(my) {
             - if mouse NOT on CDT-matched in-magnet, delete Connector
          */
         this.dest = null;
-        this.source = out_magnet || null;
+        this.source = out_magnet;
     
-        // is this Connector being drawn from an out-magnet?
-        if (this.source instanceof Magnet) {
-            this.fromX = out_magnet.x;
-            this.fromY = out_magnet.y;
-        } else {
-            // FIXME: currently this should never be the case - afyp
-            this.fromX = from_x;
-            this.fromY = from_y;
-        }
+        this.fromX = out_magnet.x;
+        this.fromY = out_magnet.y;
     
         this.x = this.from_x; // for compatibility with shape-based functions
         this.y = this.from_y;
@@ -981,7 +1036,7 @@ drydock_objects = (function(my) {
                 y1 = 7;
         
             // set the bezier midpoint as the origin
-            $(canvas).css("cursor", "none");
+            $(ctx.canvas).css("cursor", "none");
             ctx.translate(this.x + this.label_width/2 - ctx.lineWidth/2, this.y + 7);
             ctx.fillStyle = '#aaa';
             ctx.globalAlpha = 1;

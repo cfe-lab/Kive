@@ -76,7 +76,7 @@ function draw_steps(canvasState, pipeline, method_node_offset) {
                 }
 
                 // data nodes only have one out-magnet, so use 0-index
-                connector = new Connector(null, null, source.out_magnets[0]);
+                connector = new Connector(source.out_magnets[0]);
 
                 // connect other end of cable to the MethodNode
                 magnet = method_node.in_magnets[j];
@@ -98,7 +98,7 @@ function draw_steps(canvasState, pipeline, method_node_offset) {
                 for (k = 0; k < source.out_magnets.length; k++) {
                     magnet = source.out_magnets[k];
                     if (magnet.label === cable.source_dataset_name) {
-                        connector = new Connector(null, null, magnet);
+                        connector = new Connector(magnet);
                         magnet = method_node.in_magnets[j];
                         connector.x = magnet.x;
                         connector.y = magnet.y;
@@ -131,7 +131,7 @@ function draw_outputs(canvasState, pipeline, method_node_offset) {
         for (k = 0; k < source.out_magnets.length; k++) {
             magnet = source.out_magnets[k];
             if (magnet.label === this_output.source_dataset_name) {
-                connector = new Connector(null, null, magnet);
+                connector = new Connector(magnet);
                 output_node = new OutputNode(
                     this_output.x * canvasState.canvas.width / canvasState.scale,
                     this_output.y * canvasState.canvas.height / canvasState.scale,

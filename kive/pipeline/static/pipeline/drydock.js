@@ -169,7 +169,7 @@ CanvasState.prototype.doDown = function(e) {
 
         if ((!shift || this.selection.length == 0) && this.can_edit) {
             // create Connector from this out-magnet
-            conn = new Connector(null, null, mySel);
+            conn = new Connector(mySel);
             this.connectors.push(conn);
             mySel.connected.push(conn);
             this.selection = [ conn ];

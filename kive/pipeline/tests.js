@@ -16,7 +16,7 @@
         });
         
         afterEach(function() {
-            var rgb_tolerance = 2; // max 255
+            var rgb_tolerance = 16; // max 255
             expect(this.rawCanvas).toImageDiffEqual(
                     this.expectedRawCanvas,
                     rgb_tolerance);
@@ -57,14 +57,17 @@
                 'contain ' + label;
             it(name, function() {
                 var target = getTarget(this),
-                    isContained = target.contains(x, y),
                     expectedFill = isExpectedToContain ? 'green' : 'red',
-                    actualFill = isContained ? 'green': 'red';
+                    isContained,
+                    actualFill,
+                    pad = 5; // ignored by all except connectors
                 target.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.ctx.fillStyle = expectedFill;
                 this.expectedCanvas.drawCircle({x: x, y: y, r: 2});
                 
                 target.draw(this.canvas.ctx);
+                isContained = target.contains(x, y, pad);
+                actualFill = isContained ? 'green': 'red';
                 this.canvas.ctx.fillStyle = actualFill;
                 this.canvas.drawCircle({x: x, y: y, r: 2});
             });
@@ -98,6 +101,28 @@
             this.ctx.closePath();
             this.ctx.fillStyle = "white";
             this.ctx.fill();
+        });
+        
+        describe("CanvasWrapper", function() {
+            it("should draw a circle", function() {
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.arc(100, 10, 5, 0, 2 * Math.PI);
+                this.expectedCanvas.ctx.closePath();
+                this.expectedCanvas.ctx.fill();
+                
+                this.canvas.ctx.fillStyle = "white";
+                this.canvas.drawCircle({x: 100, y: 10, r:5});
+            });
+            
+            it("should draw a big circle", function() {
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.arc(50, 50, 25, 0, 2 * Math.PI);
+                this.expectedCanvas.ctx.closePath();
+                this.expectedCanvas.ctx.fill();
+                
+                this.canvas.ctx.fillStyle = "white";
+                this.canvas.drawCircle({x: 50, y: 50, r:25});
+            });
         });
         
         describe("Magnet", function() {
@@ -290,7 +315,37 @@
             });
             
             it('should highlight cable', function() {
-                pending('until Connector is tested');
+                var sourceParent = {},
+                    r = 5,
+                    attract = 3,
+                    source = new drydock_objects.Magnet(sourceParent, r, attract),
+                    connector = new drydock_objects.Connector(source);
+                source.x = 50;
+                source.y = 10;
+                source.label = "example";
+                connector.dest = this.node.in_magnets[0];
+                this.node.in_magnets[0].connected.push(connector);
+                this.node.x = 200;
+                this.expectedCanvas.ctx.strokeStyle = "#7bf";
+                this.expectedCanvas.ctx.lineWidth = 4;
+                this.expectedCanvas.strokeEllipse({x: 200, y: 27.5, rx: 20, ry: 10});
+                this.expectedCanvas.ctx.strokeRect(180, 27.5, 40, 25);
+                this.expectedCanvas.strokeEllipse({x: 200, y: 52.5, rx: 20, ry: 10});
+                this.node.draw(this.expectedCanvas.ctx);
+                connector.draw(this.expectedCanvas.ctx);
+                this.expectedCanvas.ctx.strokeStyle = "#7bf";
+                this.expectedCanvas.ctx.lineWidth = 4;
+                this.expectedCanvas.ctx.font = '9pt Lato, sans-serif';
+                this.expectedCanvas.ctx.textBaseline = 'middle';
+                connector.highlight(this.expectedCanvas.ctx);
+                
+                this.node.draw(this.ctx);
+                connector.draw(this.ctx);
+                this.ctx.strokeStyle = "#7bf";
+                this.ctx.lineWidth = 4;
+                this.ctx.font = '9pt Lato, sans-serif';
+                this.ctx.textBaseline = 'middle';
+                this.node.highlight(this.ctx);
             });
             
             it('should have label', function() {
@@ -303,6 +358,205 @@
                 this.canvas.drawText(
                         {x: label.x, y: label.y, text: label.label, dir:0, style: 'node'});
             });
-        });        
+        });
+        
+        describe("Connector", function() {
+            beforeEach(function() {
+                var r = 5,
+                    attract = 3;
+                this.sourceParent = {};
+                this.destParent = {};
+                this.source = new drydock_objects.Magnet(this.sourceParent, r, attract);
+                this.source.x = 50;
+                this.source.y = 10;
+                this.source.label = 'example';
+                this.dest = new drydock_objects.Magnet(this.destParent, r, attract);
+                this.dest.x = 150;
+                this.dest.y = 15;
+                this.dest.label = 'example';
+                this.connector = new drydock_objects.Connector(this.source);
+                this.connector.x = 150;
+                this.connector.y = 15;
+            });
+            
+            it('should draw', function() {
+                this.expectedCanvas.ctx.fillStyle = "#aaa";
+                this.expectedCanvas.drawText(
+                        {x: 152, y: 20, text: "example", dir: 1, style: "connector"});
+                this.expectedCanvas.ctx.strokeStyle = '#abc';
+                this.expectedCanvas.ctx.lineWidth = 6;
+                this.expectedCanvas.ctx.lineCap = 'round';
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.moveTo(50, 10);
+                this.expectedCanvas.ctx.bezierCurveTo(
+                        110.6218,
+                        45,
+                        140,
+                        -18.3333,
+                        150,
+                        15);
+                this.expectedCanvas.ctx.stroke();
+                
+                this.connector.draw(this.ctx);
+            });
+            
+            it('should draw with destination attached', function() {
+                // Don't draw label
+                this.expectedCanvas.ctx.strokeStyle = '#abc';
+                this.expectedCanvas.ctx.lineWidth = 6;
+                this.expectedCanvas.ctx.lineCap = 'round';
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.moveTo(50, 10);
+                this.expectedCanvas.ctx.bezierCurveTo(
+                        110.6218,
+                        45,
+                        140,
+                        -18.3333,
+                        150,
+                        15);
+                this.expectedCanvas.ctx.stroke();
+                
+                this.connector.dest = this.dest;
+                this.connector.draw(this.ctx);
+            });
+            
+            it('should highlight', function() {
+                this.expectedCanvas.ctx.fillStyle = "#aaa";
+                this.expectedCanvas.drawText(
+                        {x: 152, y: 20, text: "example", dir: 1, style: "connector"});
+                this.expectedCanvas.ctx.strokeStyle = '#abc';
+                this.expectedCanvas.ctx.lineWidth = 6;
+                this.expectedCanvas.ctx.lineCap = 'round';
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.moveTo(50, 10);
+                this.expectedCanvas.ctx.bezierCurveTo(
+                        110.6218,
+                        45,
+                        140,
+                        -18.3333,
+                        150,
+                        15);
+                this.expectedCanvas.ctx.stroke();
+                // stroke again in blue
+                this.expectedCanvas.ctx.strokeStyle = 'blue';
+                this.expectedCanvas.ctx.stroke();
+                
+                this.connector.draw(this.ctx);
+                this.ctx.strokeStyle = 'blue';
+                this.connector.highlight(this.ctx);
+            });
+            
+            it('should highlight with destination attached', function() {
+                // Don't draw label
+                this.expectedCanvas.ctx.strokeStyle = '#abc';
+                this.expectedCanvas.ctx.lineWidth = 6;
+                this.expectedCanvas.ctx.lineCap = 'round';
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.moveTo(50, 10);
+                this.expectedCanvas.ctx.bezierCurveTo(
+                        110.6218,
+                        45,
+                        140,
+                        -18.3333,
+                        150,
+                        15);
+                this.expectedCanvas.ctx.stroke();
+                // stroke again in blue
+                this.expectedCanvas.ctx.strokeStyle = 'blue';
+                this.expectedCanvas.ctx.stroke();
+                // draw label
+                this.expectedCanvas.ctx.fillStyle = "#aaa";
+                this.expectedCanvas.ctx.translate(101.552, 19.242);
+                this.expectedCanvas.ctx.rotate(-0.226);
+                this.expectedCanvas.drawText(
+                        {x: 0, y: 0, text: "example", dir: 0, style: "midconnector"});
+                
+                this.connector.dest = this.dest;
+                this.ctx.font = '9pt Lato, sans-serif';
+                this.ctx.textBaseline = 'middle';
+                this.connector.draw(this.ctx);
+                this.ctx.strokeStyle = 'blue';
+                this.connector.highlight(this.ctx);
+            });
+            
+            it('should draw with clear status', function() {
+                // Don't draw label, green stroke
+                this.expectedCanvas.ctx.strokeStyle = 'green';
+                this.expectedCanvas.ctx.lineWidth = 6;
+                this.expectedCanvas.ctx.lineCap = 'round';
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.moveTo(50, 10);
+                this.expectedCanvas.ctx.bezierCurveTo(
+                        110.6218,
+                        45,
+                        140,
+                        -18.3333,
+                        150,
+                        15);
+                this.expectedCanvas.ctx.stroke();
+                
+                this.sourceParent.status = "CLEAR";
+                this.destParent.status = "*";
+                this.connector.dest = this.dest;
+                this.connector.draw(this.ctx);
+            });
+            
+            it('should draw with failure status', function() {
+                // Don't draw label, red stroke
+                this.expectedCanvas.ctx.strokeStyle = 'red';
+                this.expectedCanvas.ctx.lineWidth = 6;
+                this.expectedCanvas.ctx.lineCap = 'round';
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.moveTo(50, 10);
+                this.expectedCanvas.ctx.bezierCurveTo(
+                        110.6218,
+                        45,
+                        140,
+                        -18.3333,
+                        150,
+                        15);
+                this.expectedCanvas.ctx.stroke();
+                
+                this.sourceParent.status = "FAILURE";
+                this.connector.dest = this.dest;
+                this.connector.draw(this.ctx);
+            });
+            
+            it('should draw with running status', function() {
+                // Don't draw label, orange stroke
+                this.expectedCanvas.ctx.strokeStyle = 'orange';
+                this.expectedCanvas.ctx.lineWidth = 6;
+                this.expectedCanvas.ctx.lineCap = 'round';
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.moveTo(50, 10);
+                this.expectedCanvas.ctx.bezierCurveTo(
+                        110.6218,
+                        45,
+                        140,
+                        -18.3333,
+                        150,
+                        15);
+                this.expectedCanvas.ctx.stroke();
+                
+                this.sourceParent.status = "*";
+                this.connector.dest = this.dest;
+                this.connector.draw(this.ctx);
+            });
+            
+            itContains([101, 19, true, 'centre',
+                        101, 15, true, 'upper centre',
+                        101, 14, false, 'above centre',
+                        101, 24, true, 'lower centre',
+                        101, 25, false, 'below centre',
+                        150, 15, true, 'dest',
+                        154, 15, true, 'right dest',
+                        155, 15, false, 'beyond right dest',
+                        150, 19, true, 'lower dest',
+                        150, 20, false, 'below dest'],
+                       function(testCase) {
+                testCase.connector.dest = testCase.dest;
+                return testCase.connector;
+            });
+        });
     });
 })();
