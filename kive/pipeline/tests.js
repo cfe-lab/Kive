@@ -358,6 +358,70 @@
             });
         });
         
+        describe("RawNode", function() {
+            beforeEach(function() {
+                var x = 100,
+                    y = 40,
+                    label = 'example';
+                this.node = new drydock_objects.RawNode(x, y, label);
+            });
+            
+            it('should draw', function() {
+                this.expectedCanvas.ctx.fillStyle = "#8D8";
+                this.expectedCanvas.drawEllipse({x: 100, y: 52.5, rx: 20, ry: 10});
+                this.expectedCanvas.ctx.fillRect(80, 27.5, 40, 25);
+                this.expectedCanvas.drawEllipse({x: 100, y: 27.5, rx: 20, ry: 10});
+                this.expectedCanvas.ctx.fillStyle = "white";
+                this.expectedCanvas.ctx.globalAlpha = 0.35;
+                this.expectedCanvas.drawEllipse({x: 100, y: 27.5, rx: 20, ry: 10});
+                this.expectedCanvas.ctx.globalAlpha = 1;
+                var magnet = new drydock_objects.Magnet();
+                magnet.x = 110;
+                magnet.y = 45;
+                magnet.r = 5;
+                magnet.draw(this.expectedCanvas.ctx);
+                
+                this.node.draw(this.ctx);
+            });
+            
+            it('should highlight', function() {
+                this.expectedCanvas.ctx.strokeStyle = "#7bf";
+                this.expectedCanvas.ctx.lineWidth = 4;
+                this.expectedCanvas.strokeEllipse({x: 100, y: 27.5, rx: 20, ry: 10});
+                this.expectedCanvas.ctx.strokeRect(80, 27.5, 40, 25);
+                this.expectedCanvas.strokeEllipse({x: 100, y: 52.5, rx: 20, ry: 10});
+                this.node.draw(this.expectedCanvas.ctx);
+                
+                this.node.draw(this.ctx);
+                this.ctx.strokeStyle = "#7bf";
+                this.ctx.lineWidth = 4;
+                this.node.highlight(this.ctx);
+            });
+            
+            itContains([100, 40, true, 'centre',
+                        119, 40, true, 'right edge',
+                        120, 40, false, 'past right edge',
+                        81, 40, true, 'left edge',
+                        80, 40, false, 'past left edge',
+                        100, 18, true, 'top edge',
+                        100, 17, false, 'past top edge'],
+                       function(testCase) { return testCase.node; });
+            
+            it('should have vertices', function() {
+                drawVertices(this.expectedCanvas,
+                        this.node,
+                        [{x: 100, y: 40},
+                         {x: 120, y: 52.5},
+                         {x: 80, y: 52.5},
+                         {x: 120, y: 27.5},
+                         {x: 80, y: 27.5},
+                         {x: 100, y: 62.5},
+                         {x: 100, y: 17.5}]);
+                
+                drawVertices(this.canvas, this.node, this.node.getVertices());
+            });
+        });
+        
         describe("Connector", function() {
             beforeEach(function() {
                 var r = 5,

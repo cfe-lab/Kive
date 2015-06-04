@@ -358,7 +358,8 @@ drydock_objects = (function(my) {
     
     my.RawNode.prototype.draw = function(ctx) {
         var cx = this.x + this.dx,
-            cy = this.y + this.dy;
+            cy = this.y + this.dy,
+            out_magnet;
     
         // draw bottom ellipse
         ctx.fillStyle = this.fill;
