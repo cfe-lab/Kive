@@ -149,8 +149,8 @@
             });
             
             it('should highlight when marked as accepting connector', function() {
-                this.expectedCanvas.drawCircle({x: 100, y: 10, r: 5});
                 this.expectedCanvas.drawText({x:90, y: 10, text: 'example'});
+                this.expectedCanvas.drawCircle({x: 100, y: 10, r: 5});
 
                 this.magnet.acceptingConnector = true;
                 this.magnet.draw(this.ctx);
@@ -341,8 +341,6 @@
                 connector.draw(this.ctx);
                 this.ctx.strokeStyle = "#7bf";
                 this.ctx.lineWidth = 4;
-                this.ctx.font = '9pt Lato, sans-serif';
-                this.ctx.textBaseline = 'middle';
                 this.node.highlight(this.ctx);
             });
             
@@ -419,6 +417,18 @@
                          {x: 100, y: 17.5}]);
                 
                 drawVertices(this.canvas, this.node, this.node.getVertices());
+            });
+            
+            
+            it('should have label', function() {
+                this.node.draw(this.expectedCanvas.ctx);
+                this.expectedCanvas.drawText(
+                        {x: 100, y: 9.5, text: 'example', dir: 0, style: 'node'});
+                
+                this.node.draw(this.canvas.ctx);
+                var label = this.node.getLabel();
+                this.canvas.drawText(
+                        {x: label.x, y: label.y, text: label.label, dir:0, style: 'node'});
             });
         });
         

@@ -19,6 +19,7 @@ var permissions = (function() {
      *      });
      *  }
      *  BookTable.prototype = Object.create(permissions.PermissionsTable.prototype);
+     *  BookTable.prototype.constructor = BookTable; // http://stackoverflow.com/a/8454111/4794
      *  
      *  Special columns that derived classes may include in the data rows are:
      *  

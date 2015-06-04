@@ -295,16 +295,6 @@ var Geometry = {
     }
 };
 
-// Add ellipses to canvas element prototype.
-CanvasRenderingContext2D.prototype.ellipse = function (cx, cy, rx, ry) {
-    this.save(); // save state
-    this.beginPath();
-    this.translate(cx - rx, cy - ry);
-    this.scale(rx, ry);
-    this.arc(1, 1, 1, 0, 2 * Math.PI, false);
-    this.restore(); // restore to original state
-};
-
 /*
 To be implemented in the future:
 Parent classes from which RawNode, CDtNode, MethodNode, and OutputNode will stem.
@@ -333,80 +323,104 @@ InputNode.prototype.constructor = InputNode;
 drydock_objects = (function(my) {
     "use strict";
     
-    my.RawNode = function(x, y, label) {
+    /**
+     * A base class for both cylindrical nodes: RawNode and OutputNode.
+     */
+    my.CylinderNode = function(x, y, label) {
         /*
-        Node representing an unstructured (raw) datatype.
-        Rendered as a circle.
+        Node representing an output.
+        Rendered as a cylinder.
          */
         this.x = x || 0; // defaults to top left corner
         this.y = y || 0;
         this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
         this.dy = 0;
-        this.r = 20; // x-radius
-        this.r2 = this.r/2; // y-radius
+        this.r = 20; // x-radius (ellipse)
+        this.r2 = this.r / 2; // y-radius (ellipse)
         this.w = this.r; // for compatibility
-        this.h = 25; // stack height
-        this.fill = "#8D8";
-        this.inset = 10; // distance of magnet from center
+        this.h = 25; // height of cylinder
         this.offset = 18; // distance of label from center
         this.label = label || '';
-        this.in_magnets = []; // for compatibility
-    
-        // CDT node always has one magnet
-        this.out_magnets = [ new Magnet(this, 5, 2, "white", null, this.label, null, true) ];
+        this.fill = "grey";
+        this.magnetOffset = {x: -12, y: -this.h/2};
+        this.in_magnets = [];
+        this.out_magnets = [];
     }
     
-    my.RawNode.prototype.draw = function(ctx) {
+    my.CylinderNode.prototype.draw = function(ctx) {
         var cx = this.x + this.dx,
             cy = this.y + this.dy,
-            out_magnet;
+            canvas = new my.CanvasWrapper(undefined, ctx);
+        
+        // Highlight the method based on status.
+        if(this.highlightStroke !== undefined) {
+            ctx.save();
     
+            ctx.strokeStyle = this.highlightStroke;
+            ctx.lineWidth = 5;
+    
+            // draw bottom ellipse
+            canvas.strokeEllipse({x: cx, y: cy + this.h/2, rx: this.r, ry: this.r2});
+    
+            // draw stack
+            ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
+    
+            // draw top ellipse
+            canvas.strokeEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
+    
+            ctx.restore();
+        }
+        
         // draw bottom ellipse
         ctx.fillStyle = this.fill;
-        ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
-        ctx.fill();
+        canvas.drawEllipse({x: cx, y: cy + this.h/2, rx: this.r, ry: this.r2});
         
         // draw stack 
         ctx.fillRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
         
         // draw top ellipse
-        ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
-        ctx.fill();
+        canvas.drawEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
         
         // some shading
         ctx.fillStyle = '#fff';
         ctx.globalAlpha = 0.35;
-        ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
-        ctx.fill();
+        canvas.drawEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
         ctx.globalAlpha = 1.0;
-    
+        
         // draw magnet
-        out_magnet = this.out_magnets[0];
-        out_magnet.x = cx + this.inset;
-        out_magnet.y = cy + this.r2/2;
-        out_magnet.draw(ctx);
+        var magnet = this.in_magnets[0] || this.out_magnets[0];
+        magnet.x = cx + this.magnetOffset.x;
+        magnet.y = cy + this.magnetOffset.y;
+        magnet.draw(ctx);
     };
     
-    my.RawNode.prototype.highlight = function(ctx) {
-        ctx.globalCompositeOperation = 'destination-over';
+    my.CylinderNode.prototype.highlight = function(ctx) {
         var cx = this.x + this.dx,
-            cy = this.y + this.dy;
+            cy = this.y + this.dy,
+            cable = this.in_magnets[0].connected[0],
+            canvas = new my.CanvasWrapper(undefined, ctx);
+        
+        // This line means that we are drawing "behind" the canvas now.
+        // We must set it back after we're done otherwise it'll be utter chaos.
+        ctx.globalCompositeOperation = 'destination-over';
         
         // draw bottom ellipse
-        ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
-        ctx.stroke();
+        canvas.strokeEllipse({x: cx, y: cy + this.h/2, rx: this.r, ry: this.r2});
         
-        // draw stack 
+        // draw stack
         ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
         
         // draw top ellipse
-        ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
-        ctx.stroke();
+        canvas.strokeEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
         
         ctx.globalCompositeOperation = 'source-over';
+        
+        if (cable) {
+            cable.highlight(ctx);
+        }
     }
     
-    my.RawNode.prototype.contains = function(mx, my) {
+    my.CylinderNode.prototype.contains = function(mx, my) {
         var cx = this.x + this.dx,
             cy = this.y + this.dy;
         // node is comprised of a rectangle and two ellipses
@@ -415,15 +429,16 @@ drydock_objects = (function(my) {
             || Geometry.inEllipse(mx, my, cx, cy + this.h/2, this.r, this.r2);
     };
     
-    my.RawNode.prototype.getVertices = function() {
+    my.CylinderNode.prototype.getVertices = function() {
         var cx = this.x + this.dx,
             cy = this.y + this.dy;
-        
+            
         var x1 = cx + this.r,
             x2 = cx - this.r,
             y1 = cy + this.h/2,
             y2 = y1 - this.h;
         
+        // Include centre to collide with small objects completely inside border.
         return [
             { x: cx, y: cy },
             { x: x1, y: y1 },
@@ -435,9 +450,47 @@ drydock_objects = (function(my) {
         ];
     };
     
-    my.RawNode.prototype.getLabel = function() {
-        return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
+    my.CylinderNode.prototype.highlight = function(ctx) {
+        var cx = this.x + this.dx,
+            cy = this.y + this.dy,
+            canvas = new my.CanvasWrapper(undefined, ctx);
+        
+        // This line means that we are drawing "behind" the canvas now.
+        // We must set it back after we're done otherwise it'll be utter chaos.
+        ctx.globalCompositeOperation = 'destination-over';
+        
+        // draw bottom ellipse
+        canvas.strokeEllipse({x: cx, y: cy + this.h/2, rx: this.r, ry: this.r2});
+        
+        // draw stack
+        ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
+        
+        // draw top ellipse
+        canvas.strokeEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
+        
+        ctx.globalCompositeOperation = 'source-over';
+    }
+    
+    my.CylinderNode.prototype.getLabel = function() {
+        return new NodeLabel(
+                this.label,
+                this.x + this.dx,
+                this.y + this.dy - this.h/2 - this.offset);
     };
+
+    my.RawNode = function(x, y, label) {
+        /*
+        Node representing an unstructured (raw) datatype.
+         */
+        my.CylinderNode.call(this, x, y, label);
+        this.fill = "#8D8";
+        this.magnetOffset = {x: 10, y: this.r2/2};
+        this.inset = 10; // distance of magnet from center
+        // Input node always has one magnet
+        this.out_magnets.push(new Magnet(this, 5, 2, "white", null, this.label, null, true));
+    }
+    my.RawNode.prototype = Object.create(my.CylinderNode.prototype);
+    my.RawNode.prototype.constructor = my.RawNode;
 
     // TODO: Convert the whole file to this module, then combine all the sections.
     return my;
@@ -1333,22 +1386,12 @@ drydock_objects = (function(my) {
     my.OutputNode = function (x, y, label, pk, status, md5, dataset_id) {
         /*
         Node representing an output.
-        Rendered as a cylinder.
          */
-        this.x = x || 0; // defaults to top left corner
-        this.y = y || 0;
-        this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
-        this.dy = 0;
-        this.r = 20; // x-radius (ellipse)
-        this.r2 = this.r / 2; // y-radius (ellipse)
-        this.w = this.r; // for compatibility
-        this.h = 25; // height of cylinder
-        this.fill = "#d40";
+        my.CylinderNode.call(this, x, y, label);
+        this.fill = this.defaultFill = "#d40";
         this.diffFill = "blue";
         this.inset = 12; // distance of magnet from center
-        this.offset = 18; // distance of label from center
-        this.label = label || '';
-        this.out_magnets = []; // for compatibility
+        this.in_magnets.push(new Magnet(this, 5, 2, "white", null, this.label));
         this.pk = pk;
         this.status = status;
         this.md5 = md5;
@@ -1358,122 +1401,32 @@ drydock_objects = (function(my) {
         // was being searched for and was found
         // (when doing an md5 lookup)
         this.found_md5 = false;
-    
-        // CDT node always has one magnet
-        this.in_magnets = [ new Magnet(this, 5, 2, "white", null, this.label) ];
     }
+    my.OutputNode.prototype = Object.create(my.CylinderNode.prototype);
+    my.OutputNode.prototype.constructor = my.OutputNode;
     
     my.OutputNode.prototype.draw = function(ctx) {
-        var cx = this.x + this.dx,
-            cy = this.y + this.dy,
-            canvas = new my.CanvasWrapper(undefined, ctx);
-        
         // Highlight the method based on status.
         if(typeof this.status === 'string') {
-            var cx = this.x + this.dx,
-                cy = this.y + this.dy;
-    
-            ctx.save();
-    
-            ctx.strokeStyle = my.statusColorMap[this.status] || 'black';
-            ctx.lineWidth = 5;
-    
-            // draw bottom ellipse
-            canvas.strokeEllipse({x: cx, y: cy + this.h/2, rx: this.r, ry: this.r2});
-    
-            // draw stack
-            ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
-    
-            // draw top ellipse
-            canvas.strokeEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
-    
-            ctx.restore();
+            this.highlightStroke = my.statusColorMap[this.status] || 'black';
+        }
+        else {
+            this.highlightStroke = undefined;
         }
         
-        // draw bottom ellipse
-        ctx.fillStyle = this.found_md5 ? this.diffFill : this.fill;
-        canvas.drawEllipse({x: cx, y: cy + this.h/2, rx: this.r, ry: this.r2});
-        
-        // draw stack 
-        ctx.fillRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
-        
-        // draw top ellipse
-        canvas.drawEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
-        
-        // some shading
-        ctx.fillStyle = '#fff';
-        ctx.globalAlpha = 0.35;
-        canvas.drawEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
-        ctx.globalAlpha = 1.0;
-        
-        // draw magnet
-        var in_magnet = this.in_magnets[0];
-        in_magnet.x = cx - this.inset;
-        in_magnet.y = cy - this.h/2;
-        in_magnet.draw(ctx);
-    };
-    
-    my.OutputNode.prototype.contains = function(mx, my) {
-        var cx = this.x + this.dx,
-            cy = this.y + this.dy;
-        
-        // node is comprised of a rectangle and two ellipses
-        return Math.abs(mx - cx) < this.r
-            && Math.abs(my - cy) < this.h/2
-            || Geometry.inEllipse(mx, my, cx, cy - this.h/2, this.r, this.r2)
-            || Geometry.inEllipse(mx, my, cx, cy + this.h/2, this.r, this.r2);
-    };
-    
-    my.OutputNode.prototype.getVertices = function() {
-        var cx = this.x + this.dx,
-            cy = this.y + this.dy;
-            
-        var x1 = cx + this.r,
-            x2 = cx - this.r,
-            y1 = cy + this.h/2,
-            y2 = y1 - this.h;
-        
-        // Include centre to collide with small objects completely inside border.
-        return [
-            { x: cx, y: cy },
-            { x: x1, y: y1 },
-            { x: x2, y: y1 },
-            { x: x1, y: y2 },
-            { x: x2, y: y2 },
-            { x: cx, y: cy + this.h/2 + this.r2 },
-            { x: cx, y: cy - this.h/2 - this.r2 }
-        ];
+        this.fill = this.found_md5 ? this.diffFill : this.defaultFill;
+        my.CylinderNode.prototype.draw.call(this, ctx);
     };
     
     my.OutputNode.prototype.highlight = function(ctx) {
-        var cx = this.x + this.dx,
-            cy = this.y + this.dy,
-            cable = this.in_magnets[0].connected[0],
-            canvas = new my.CanvasWrapper(undefined, ctx);
+        var cable = this.in_magnets[0].connected[0];
         
-        // This line means that we are drawing "behind" the canvas now.
-        // We must set it back after we're done otherwise it'll be utter chaos.
-        ctx.globalCompositeOperation = 'destination-over';
-        
-        // draw bottom ellipse
-        canvas.strokeEllipse({x: cx, y: cy + this.h/2, rx: this.r, ry: this.r2});
-        
-        // draw stack
-        ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
-        
-        // draw top ellipse
-        canvas.strokeEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
-        
-        ctx.globalCompositeOperation = 'source-over';
+        my.CylinderNode.prototype.highlight.call(this, ctx);
         
         if (cable) {
             cable.highlight(ctx);
         }
     }
-    
-    my.OutputNode.prototype.getLabel = function() {
-        return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
-    };
 
     my.OutputNode.prototype.debug = function(ctx) {
         this.in_magnets[0].connected[0].debug(ctx);
