@@ -492,12 +492,7 @@ drydock_objects = (function(my) {
     my.RawNode.prototype = Object.create(my.CylinderNode.prototype);
     my.RawNode.prototype.constructor = my.RawNode;
 
-    // TODO: Convert the whole file to this module, then combine all the sections.
-    return my;
-}(drydock_objects));
-var RawNode = drydock_objects.RawNode;
-
-function CDtNode (pk, x, y,label) {
+my.CdtNode = function(pk, x, y,label) {
     /*
     Node represents a Compound Datatype (CSV structured data).
     Rendered as a square shape.
@@ -517,9 +512,10 @@ function CDtNode (pk, x, y,label) {
     this.out_magnets = [ new Magnet(this, 5, 2, "white", this.pk, this.label, null, true) ];
 }
 
-CDtNode.prototype.draw = function(ctx) {
+my.CdtNode.prototype.draw = function(ctx) {
     var cx = this.x + this.dx,
-        cy = this.y + this.dy;
+        cy = this.y + this.dy,
+        out_magnet;
     
     ctx.fillStyle = this.fill;
     
@@ -559,7 +555,7 @@ CDtNode.prototype.draw = function(ctx) {
     out_magnet.draw(ctx);
 };
 
-CDtNode.prototype.getVertices = function() {
+my.CdtNode.prototype.getVertices = function() {
     var cx = this.x + this.dx,
         cy = this.y + this.dy;
     
@@ -578,7 +574,7 @@ CDtNode.prototype.getVertices = function() {
     ];
 };
 
-CDtNode.prototype.highlight = function(ctx) {
+my.CdtNode.prototype.highlight = function(ctx) {
     var cx = this.x + this.dx,
         cy = this.y + this.dy;
     
@@ -604,7 +600,7 @@ CDtNode.prototype.highlight = function(ctx) {
 };
 
 
-CDtNode.prototype.contains = function(mx, my) {
+my.CdtNode.prototype.contains = function(mx, my) {
     /*
     Are mouse coordinates within the perimeter of this node?
      */
@@ -618,9 +614,15 @@ CDtNode.prototype.contains = function(mx, my) {
         && dx < this.w/2;
 };
 
-CDtNode.prototype.getLabel = function() {
+my.CdtNode.prototype.getLabel = function() {
     return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
 };
+    
+    // TODO: Convert the whole file to this module, then combine all the sections.
+    return my;
+}(drydock_objects));
+var CDtNode = drydock_objects.CdtNode;
+var RawNode = drydock_objects.RawNode;
 
 function MethodNode (pk, family, x, y, fill, label, inputs, outputs, status, log_id) {
     /*
