@@ -332,110 +332,111 @@ InputNode.prototype.constructor = InputNode;
 
 drydock_objects = (function(my) {
     "use strict";
+    
     my.RawNode = function(x, y, label) {
-    /*
-    Node representing an unstructured (raw) datatype.
-    Rendered as a circle.
-     */
-    this.x = x || 0; // defaults to top left corner
-    this.y = y || 0;
-    this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
-    this.dy = 0;
-    this.r = 20; // x-radius
-    this.r2 = this.r/2; // y-radius
-    this.w = this.r; // for compatibility
-    this.h = 25; // stack height
-    this.fill = "#8D8";
-    this.inset = 10; // distance of magnet from center
-    this.offset = 18; // distance of label from center
-    this.label = label || '';
-    this.in_magnets = []; // for compatibility
-
-    // CDT node always has one magnet
-    this.out_magnets = [ new Magnet(this, 5, 2, "white", null, this.label, null, true) ];
-}
-
-my.RawNode.prototype.draw = function(ctx) {
-    var cx = this.x + this.dx,
-        cy = this.y + this.dy;
-
-    // draw bottom ellipse
-    ctx.fillStyle = this.fill;
-    ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
-    ctx.fill();
+        /*
+        Node representing an unstructured (raw) datatype.
+        Rendered as a circle.
+         */
+        this.x = x || 0; // defaults to top left corner
+        this.y = y || 0;
+        this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
+        this.dy = 0;
+        this.r = 20; // x-radius
+        this.r2 = this.r/2; // y-radius
+        this.w = this.r; // for compatibility
+        this.h = 25; // stack height
+        this.fill = "#8D8";
+        this.inset = 10; // distance of magnet from center
+        this.offset = 18; // distance of label from center
+        this.label = label || '';
+        this.in_magnets = []; // for compatibility
     
-    // draw stack 
-    ctx.fillRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
+        // CDT node always has one magnet
+        this.out_magnets = [ new Magnet(this, 5, 2, "white", null, this.label, null, true) ];
+    }
     
-    // draw top ellipse
-    ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
-    ctx.fill();
+    my.RawNode.prototype.draw = function(ctx) {
+        var cx = this.x + this.dx,
+            cy = this.y + this.dy;
     
-    // some shading
-    ctx.fillStyle = '#fff';
-    ctx.globalAlpha = 0.35;
-    ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
-    ctx.fill();
-    ctx.globalAlpha = 1.0;
-
-    // draw magnet
-    out_magnet = this.out_magnets[0];
-    out_magnet.x = cx + this.inset;
-    out_magnet.y = cy + this.r2/2;
-    out_magnet.draw(ctx);
-};
-
-my.RawNode.prototype.highlight = function(ctx) {
-    ctx.globalCompositeOperation = 'destination-over';
-    var cx = this.x + this.dx,
-        cy = this.y + this.dy;
+        // draw bottom ellipse
+        ctx.fillStyle = this.fill;
+        ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
+        ctx.fill();
+        
+        // draw stack 
+        ctx.fillRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
+        
+        // draw top ellipse
+        ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
+        ctx.fill();
+        
+        // some shading
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = 0.35;
+        ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
     
-    // draw bottom ellipse
-    ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
-    ctx.stroke();
+        // draw magnet
+        out_magnet = this.out_magnets[0];
+        out_magnet.x = cx + this.inset;
+        out_magnet.y = cy + this.r2/2;
+        out_magnet.draw(ctx);
+    };
     
-    // draw stack 
-    ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
+    my.RawNode.prototype.highlight = function(ctx) {
+        ctx.globalCompositeOperation = 'destination-over';
+        var cx = this.x + this.dx,
+            cy = this.y + this.dy;
+        
+        // draw bottom ellipse
+        ctx.ellipse(cx, cy + this.h/2, this.r, this.r2);
+        ctx.stroke();
+        
+        // draw stack 
+        ctx.strokeRect(cx - this.r, cy - this.h/2, this.r * 2, this.h);
+        
+        // draw top ellipse
+        ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
+        ctx.stroke();
+        
+        ctx.globalCompositeOperation = 'source-over';
+    }
     
-    // draw top ellipse
-    ctx.ellipse(cx, cy - this.h/2, this.r, this.r2);
-    ctx.stroke();
+    my.RawNode.prototype.contains = function(mx, my) {
+        var cx = this.x + this.dx,
+            cy = this.y + this.dy;
+        // node is comprised of a rectangle and two ellipses
+        return Geometry.inRectangleFromCentre(mx, my, cx, cy, this.r, this.h/2)
+            || Geometry.inEllipse(mx, my, cx, cy - this.h/2, this.r, this.r2)
+            || Geometry.inEllipse(mx, my, cx, cy + this.h/2, this.r, this.r2);
+    };
     
-    ctx.globalCompositeOperation = 'source-over';
-}
-
-my.RawNode.prototype.contains = function(mx, my) {
-    var cx = this.x + this.dx,
-        cy = this.y + this.dy;
-    // node is comprised of a rectangle and two ellipses
-    return Geometry.inRectangleFromCentre(mx, my, cx, cy, this.r, this.h/2)
-        || Geometry.inEllipse(mx, my, cx, cy - this.h/2, this.r, this.r2)
-        || Geometry.inEllipse(mx, my, cx, cy + this.h/2, this.r, this.r2);
-};
-
-my.RawNode.prototype.getVertices = function() {
-    var cx = this.x + this.dx,
-        cy = this.y + this.dy;
+    my.RawNode.prototype.getVertices = function() {
+        var cx = this.x + this.dx,
+            cy = this.y + this.dy;
+        
+        var x1 = cx + this.r,
+            x2 = cx - this.r,
+            y1 = cy + this.h/2,
+            y2 = y1 - this.h;
+        
+        return [
+            { x: cx, y: cy },
+            { x: x1, y: y1 },
+            { x: x2, y: y1 },
+            { x: x1, y: y2 },
+            { x: x2, y: y2 },
+            { x: cx, y: cy + this.h/2 + this.r2 },
+            { x: cx, y: cy - this.h/2 - this.r2 }
+        ];
+    };
     
-    var x1 = cx + this.r,
-        x2 = cx - this.r,
-        y1 = cy + this.h/2,
-        y2 = y1 - this.h;
-    
-    return [
-        { x: cx, y: cy },
-        { x: x1, y: y1 },
-        { x: x2, y: y1 },
-        { x: x1, y: y2 },
-        { x: x2, y: y2 },
-        { x: cx, y: cy + this.h/2 + this.r2 },
-        { x: cx, y: cy - this.h/2 - this.r2 }
-    ];
-};
-
-my.RawNode.prototype.getLabel = function() {
-    return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
-};
+    my.RawNode.prototype.getLabel = function() {
+        return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
+    };
 
     // TODO: Convert the whole file to this module, then combine all the sections.
     return my;
