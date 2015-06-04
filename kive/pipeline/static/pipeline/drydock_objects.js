@@ -105,18 +105,7 @@ var drydock_objects = (function() {
             this.ctx.font = '10pt Lato, sans-serif';
             this.ctx.textBaseline = 'middle';
             rectArgs.height = 14;
-            rectArgs.y -= 5;
-            rectArgs.r = 6;
-            margin = 5;
-            textFill = "white";
-            this.ctx.globalAlpha = 1;
-            break;
-        case 'midconnector':
-            // TODO: Merge with connector style
-            this.ctx.font = '9pt Lato, sans-serif';
-            this.ctx.textBaseline = 'middle';
-            rectArgs.height = 12;
-            rectArgs.y -= 6;
+            rectArgs.y -= 7;
             rectArgs.r = 6;
             margin = 5;
             textFill = "white";
@@ -1007,87 +996,30 @@ drydock_objects = (function(my) {
         /*
         Draw a line to represent a Connector originating from a Magnet.
          */
+        var canvas = new my.CanvasWrapper(undefined, ctx);
+        this.calculateCurve();
         ctx.strokeStyle = '#abc';
         ctx.lineWidth = 6;
         ctx.lineCap = 'round';
-    
-        if (this.source instanceof Magnet) {
-            // update coordinates in case magnet has moved
-            this.fromX = this.source.x;
-            this.fromY = this.source.y;
-        }
-    
-        if (this.dest instanceof Magnet) {
-            // move with the attached shape
-            this.x = this.dest.x;
-            this.y = this.dest.y;
-        } else {
+        
+        if (this.dest === null) {
             // if connector doesn't have a destination yet,
             // give it the label of the source magnet it's coming from 
             
             // save the canvas state to start applying transformations
             ctx.save();
-            ctx.font = '10pt Lato, sans-serif';
-            this.label_width = ctx.measureText(this.source.label).width + 10;
-            
-            // determine the angle of the bezier at the midpoint
-            var corner = 6,
-                x1 = this.label_width/2,
-                y1 = 7;
-        
-            // set the bezier midpoint as the origin
-            $(ctx.canvas).css("cursor", "none");
-            ctx.translate(this.x + this.label_width/2 - ctx.lineWidth/2, this.y + 7);
             ctx.fillStyle = '#aaa';
-            ctx.globalAlpha = 1;
-        
-            // rounded rectangle
-            ctx.beginPath();
-            ctx.moveTo(-x1 + corner, -y1);
-            ctx.lineTo( x1 - corner, -y1);
-            ctx.arcTo ( x1, -y1,  x1, -y1 + corner, corner );
-    //        ctx.lineTo( x1, -y1);
-            ctx.lineTo( x1,  y1 - corner);
-            ctx.arcTo ( x1,  y1,  x1 - corner, y1, corner );
-            ctx.lineTo(-x1 + corner, y1);
-            ctx.arcTo (-x1,  y1, -x1, y1 - corner, corner );
-            ctx.lineTo(-x1, -y1 + corner);
-            ctx.arcTo (-x1, -y1, -x1 + corner, -y1, corner );
-            ctx.closePath();
-            ctx.fill();
-            
-            ctx.fillStyle = 'white';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText(this.source.label, 0, ctx.lineWidth );
+            canvas.drawText({
+                x: this.x + 2,
+                y: this.y + 5,
+                text: this.source.label,
+                dir: 1,
+                style: "connector"});
             ctx.restore();
+            $(ctx.canvas).css("cursor", "none");
         }
-        
-        this.dx = this.x - this.fromX,
-        this.dy = this.y - this.fromY;
-        
-        this.ctrl1 = {
-            /*
-            - Comes from origin at a 30-degree angle
-            - cos(30) = sqrt(3)/2  &  sin(30) = 0.5
-            - Distance of ctrl from origin is 70% of dx
-            - Minimum dx is 50, so minimum distance of ctrl is 35.
-            */
-            x: this.fromX + Math.max(this.dx, 50) * Math.sqrt(3) / 2 * .7,
-            y: this.fromY + Math.max(this.dx, 50) / 2 * .7
-        };
-        this.ctrl2 = {
-            /*
-            - Vertical offset is 2/3 of dy, or 2/5 of -dy, whichever is positive
-            - Minimum vertical offset is 50
-            - Horizontal offset is 10% of dx
-            */
-            x: this.x - this.dx / 10,
-            y: this.y - Math.max( (this.dy > 0 ? 1 : -.6) * this.dy, 50) / 1.5
-        };
-    
-        // Recolour this path if the statuses of the source and dest are meaningful
-        if(this.source instanceof Magnet && this.dest instanceof Magnet) {
+        else {
+            // Recolour this path if the statuses of the source and dest are meaningful
             var src = this.source.parent, 
                 dst = this.dest.parent, 
                 cable_stat;
@@ -1112,12 +1044,13 @@ drydock_objects = (function(my) {
                  ctx.strokeStyle = _statusColorMap[cable_stat];
             }
         }
-    
-        this.midX = this.fromX + this.dx / 2;
-        
+
         ctx.beginPath();
         ctx.moveTo(this.fromX, this.fromY);
-        ctx.bezierCurveTo(this.ctrl1.x, this.ctrl1.y, this.ctrl2.x, this.ctrl2.y, this.x, this.y);
+        ctx.bezierCurveTo(
+                this.ctrl1.x, this.ctrl1.y,
+                this.ctrl2.x, this.ctrl2.y,
+                this.x, this.y);
         ctx.stroke();
     };
     
@@ -1126,6 +1059,7 @@ drydock_objects = (function(my) {
         Highlight this Connector by drawing another line along
         its length. Colour and line width set by canvasState.
          */
+        this.calculateCurve();
         ctx.beginPath();
         ctx.moveTo(this.fromX, this.fromY);
         ctx.bezierCurveTo(this.ctrl1.x, this.ctrl1.y, this.ctrl2.x, this.ctrl2.y, this.x, this.y);
@@ -1137,7 +1071,46 @@ drydock_objects = (function(my) {
     }
     
     // make an object in the format of jsBezier lib
-    my.Connector.prototype.getJsBez = function() {
+    my.Connector.prototype.calculateCurve = function() {
+        if (this.dest !== null) {
+            // move with the attached shape
+            this.x = this.dest.x;
+            this.y = this.dest.y;
+        }
+        if (this.ctrl1 === undefined ||
+                this.fromX !== this.source.x ||
+                this.fromY !== this.source.y ||
+                this.x !== this.prevX ||
+                this.y !== this.prevY) {
+            // Either the curve has never been calculated or an end moved.
+            this.fromX = this.source.x;
+            this.fromY = this.source.y;
+            this.prevX = this.x;
+            this.prevY = this.y;
+            
+            this.dx = this.x - this.fromX,
+            this.dy = this.y - this.fromY;
+            
+            this.ctrl1 = {
+                    /*
+            - Comes from origin at a 30-degree angle
+            - cos(30) = sqrt(3)/2  &  sin(30) = 0.5
+            - Distance of ctrl from origin is 70% of dx
+            - Minimum dx is 50, so minimum distance of ctrl is 35.
+                     */
+                    x: this.fromX + Math.max(this.dx, 50) * Math.sqrt(3) / 2 * .7,
+                    y: this.fromY + Math.max(this.dx, 50) / 2 * .7
+            };
+            this.ctrl2 = {
+                    /*
+            - Vertical offset is 2/3 of dy, or 2/5 of -dy, whichever is positive
+            - Minimum vertical offset is 50
+            - Horizontal offset is 10% of dx
+                     */
+                    x: this.x - this.dx / 10,
+                    y: this.y - Math.max( (this.dy > 0 ? 1 : -.6) * this.dy, 50) / 1.5
+            };
+        }
         return [
             { x: this.fromX,   y: this.fromY   },
             this.ctrl1, this.ctrl2,
@@ -1146,7 +1119,9 @@ drydock_objects = (function(my) {
     };
     
     my.Connector.prototype.drawLabel = function(ctx) {
-        var label = this.source.label;
+        var jsb = this.calculateCurve(),
+            label = this.source.label,
+            canvas = new my.CanvasWrapper(undefined, ctx);
         if (this.source.label !== this.dest.label) {
             label += "->" + this.dest.label;
         }
@@ -1157,10 +1132,10 @@ drydock_objects = (function(my) {
         
         if ( this.dx * this.dx + this.dy * this.dy > this.label_width * this.label_width / .49) {
             // determine the angle of the bezier at the midpoint
-            var jsb = this.getJsBez(),
-                midpoint = jsBezier.nearestPointOnCurve({ x: this.fromX + this.dx/2, y: this.fromY + this.dy/2 }, jsb),
-                midpointAngle = jsBezier.gradientAtPoint(jsb, midpoint.location),
-                corner = 6;
+            var midpoint = jsBezier.nearestPointOnCurve(
+                    { x: this.fromX + this.dx/2, y: this.fromY + this.dy/2 },
+                    jsb),
+                midpointAngle = jsBezier.gradientAtPoint(jsb, midpoint.location);
             
             // save the canvas state to start applying transformations
             ctx.save();
@@ -1170,32 +1145,14 @@ drydock_objects = (function(my) {
             ctx.rotate(midpointAngle);
             ctx.fillStyle = '#aaa';
             
-            var x1 = this.label_width/2,
-                y1 = 6;
-            
-            // rounded rectangle
-            ctx.beginPath();
-            ctx.moveTo(-x1 + corner, -y1);
-            ctx.lineTo( x1 - corner, -y1);
-            ctx.arcTo ( x1, -y1,  x1, -y1 + corner, corner );
-            ctx.lineTo( x1,  y1 - corner);
-            ctx.arcTo ( x1,  y1,  x1 - corner, y1, corner );
-            ctx.lineTo(-x1 + corner, y1);
-            ctx.arcTo (-x1,  y1, -x1, y1 - corner, corner );
-            ctx.lineTo(-x1, -y1 + corner);
-            ctx.arcTo (-x1, -y1, -x1 + corner, -y1, corner );
-            ctx.closePath();
-            ctx.fill();
-            
-            ctx.fillStyle = 'white';
-            ctx.textAlign = 'center';
-            ctx.fillText(label, 0, 0);
+            canvas.drawText(
+                    {x: 0, y: 0, dir: 0, text: label, style: "connector"});
             ctx.restore();
         }
     }
     
     my.Connector.prototype.debug = function(ctx) {
-        var jsb = this.getJsBez(),
+        var jsb = this.calculateCurve(),
             midpoint = jsBezier.nearestPointOnCurve({ x: this.fromX + this.dx/2, y: this.fromY + this.dy/2 }, jsb),
             midpointAngle = jsBezier.gradientAtPoint(jsb, midpoint.location),
             wrong_midpoint = jsBezier.pointOnCurve(jsb, 0.5);
@@ -1285,7 +1242,7 @@ drydock_objects = (function(my) {
         // Since precise bezier distance is expensive to compute, we start by
         // running a faster algorithm to see if mx,my is outside the rectangle
         // given by the beginning, end, and control points (plus padding).
-    
+        this.calculateCurve();
         var ys = [ this.y, this.fromY, this.ctrl1.y, this.ctrl2.y ],
             xs = [ this.x, this.fromX, this.ctrl1.x, this.ctrl2.x ],
             bottom = Math.max.apply(null, ys),
@@ -1300,7 +1257,7 @@ drydock_objects = (function(my) {
             return pad > 
                 jsBezier.distanceFromCurve(
                     { x: mx, y: my }, 
-                    this.getJsBez()
+                    this.calculateCurve()
                 ).distance;
         }
         // mx,my is outside the rectangle, don't bother computing the bezier distance

@@ -13,13 +13,13 @@
                     this.expectedRawCanvas);
             this.ctx = this.canvas.ctx;
             this.expectedCanvas.ctx.fillStyle = "white";
+            this.rgb_tolerance = 16; // max 255
         });
         
         afterEach(function() {
-            var rgb_tolerance = 16; // max 255
             expect(this.rawCanvas).toImageDiffEqual(
                     this.expectedRawCanvas,
-                    rgb_tolerance);
+                    this.rgb_tolerance);
         });
         
         /**
@@ -57,17 +57,15 @@
                 'contain ' + label;
             it(name, function() {
                 var target = getTarget(this),
+                    pad = 5, // ignored by all except connectors
+                    isContained = target.contains(x, y, pad),
                     expectedFill = isExpectedToContain ? 'green' : 'red',
-                    isContained,
-                    actualFill,
-                    pad = 5; // ignored by all except connectors
+                    actualFill = isContained ? 'green': 'red';
                 target.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.ctx.fillStyle = expectedFill;
                 this.expectedCanvas.drawCircle({x: x, y: y, r: 2});
                 
                 target.draw(this.canvas.ctx);
-                isContained = target.contains(x, y, pad);
-                actualFill = isContained ? 'green': 'red';
                 this.canvas.ctx.fillStyle = actualFill;
                 this.canvas.drawCircle({x: x, y: y, r: 2});
             });
@@ -466,14 +464,39 @@
                 this.expectedCanvas.ctx.stroke();
                 // draw label
                 this.expectedCanvas.ctx.fillStyle = "#aaa";
-                this.expectedCanvas.ctx.translate(101.552, 19.242);
-                this.expectedCanvas.ctx.rotate(-0.226);
+                this.expectedCanvas.ctx.translate(101.5519, 19.2424);
+                this.expectedCanvas.ctx.rotate(-0.2262);
                 this.expectedCanvas.drawText(
-                        {x: 0, y: 0, text: "example", dir: 0, style: "midconnector"});
+                        {x: 0, y: 0, text: "example", dir: 0, style: "connector"});
                 
                 this.connector.dest = this.dest;
-                this.ctx.font = '9pt Lato, sans-serif';
-                this.ctx.textBaseline = 'middle';
+                this.connector.draw(this.ctx);
+                this.ctx.strokeStyle = 'blue';
+                this.connector.highlight(this.ctx);
+            });
+            
+            it('should highlight without room for label', function() {
+                // Don't draw label
+                this.expectedCanvas.ctx.strokeStyle = '#abc';
+                this.expectedCanvas.ctx.lineWidth = 6;
+                this.expectedCanvas.ctx.lineCap = 'round';
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.moveTo(50, 10);
+                this.expectedCanvas.ctx.bezierCurveTo(
+                        80.31088913245534,
+                        27.5,
+                        95,
+                        -18.3333,
+                        100,
+                        15);
+                this.expectedCanvas.ctx.stroke();
+                // stroke again in blue
+                this.expectedCanvas.ctx.strokeStyle = 'blue';
+                this.expectedCanvas.ctx.stroke();
+                // don't draw label
+                
+                this.dest.x -= 50;
+                this.connector.dest = this.dest;
                 this.connector.draw(this.ctx);
                 this.ctx.strokeStyle = 'blue';
                 this.connector.highlight(this.ctx);
