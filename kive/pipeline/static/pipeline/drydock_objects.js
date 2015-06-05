@@ -591,192 +591,213 @@ drydock_objects = (function(my) {
         return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
     };
 
-my.MethodNode = function(pk, family, x, y, fill, label, inputs, outputs, status, log_id) {
-    /*
-    CONSTRUCTOR
-    A MethodNode is a rectangle of constant width (w) and varying height (h)
-    where h is proportional to the maximum number of xputs (inputs or outputs).
-    h = max(n_inputs, n_ouputs) * spacing
-    Holes for inputs and outputs are drawn at some (inset) into the left
-    and right sides, respectively.  The width must be greater than 2 * inset.
-    */
-    this.pk = pk;
-    this.family = family; // can be passed from database
-
-    this.x = x || 0;
-    this.y = y || 0;
-    this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
-    this.dy = 0;
-    this.w = 10;
-    this.inputs = inputs;
-    this.outputs = outputs;
-
-    this.n_inputs = Object.keys(inputs).length;
-    this.n_outputs = Object.keys(outputs).length;
-
-    this.inset = 10; // distance from left or right edge to center of hole
-    this.offset = 10; // space between bottom of node and label
-
-    this.spacing = 20; // separation between pins
-    this.h = Math.max(this.n_inputs, this.n_outputs) * this.spacing;
-    this.fill = fill || '#999';
-    this.label = label || '';
+    my.MethodNode = function(pk, family, x, y, fill, label, inputs, outputs, status, log_id) {
+        /*
+        CONSTRUCTOR
+        A MethodNode is a rectangle of constant width (w) and varying height (h)
+        where h is proportional to the maximum number of xputs (inputs or outputs).
+        h = max(n_inputs, n_ouputs) * spacing
+        Holes for inputs and outputs are drawn at some (inset) into the left
+        and right sides, respectively.  The width must be greater than 2 * inset.
+        */
+        this.pk = pk;
+        this.family = family; // can be passed from database
     
-    this.stack = 20;
-    this.scoop = 45;
-
-    // Members for instances of methods in runs
-    this.status = status;
-    this.log_id = log_id;
-
-    this.in_magnets = [];
-    var sorted_in_keys = Object.keys(this.inputs).sort(function(a,b){return a-b}),
-        parent = this,
-        r = 5,
-        attract = 5,
-        fill = '#fff';
-    for (var keyIndex in sorted_in_keys) {
-        var key = sorted_in_keys[keyIndex],
-            this_input = this.inputs[key],
-            cdt = this_input['cdt_pk'],
-            magnet_label = this_input['datasetname'],
-            magnet = new Magnet(
-                parent,
-                r,
-                attract,
-                fill,
-                cdt,
-                magnet_label,
-                null,
-                false
-            );
-
-        if (this.n_inputs == 1) {
-            magnet.x -= this.h/3
+        this.x = x || 0;
+        this.y = y || 0;
+        this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
+        this.dy = 0;
+        this.w = 10;
+        this.inputs = inputs;
+        this.outputs = outputs;
+    
+        this.n_inputs = Object.keys(inputs).length;
+        this.n_outputs = Object.keys(outputs).length;
+    
+        this.inset = 10; // distance from left or right edge to center of hole
+        this.offset = 10; // space between bottom of node and label
+    
+        this.spacing = 20; // separation between pins
+        this.h = Math.max(this.n_inputs, this.n_outputs) * this.spacing;
+        this.fill = fill || '#999';
+        this.label = label || '';
+        
+        this.stack = 20;
+        this.scoop = 45;
+    
+        // Members for instances of methods in runs
+        this.status = status;
+        this.log_id = log_id;
+    
+        this.in_magnets = [];
+        var sorted_in_keys = Object.keys(this.inputs).sort(function(a,b){return a-b}),
+            parent = this,
+            r = 5,
+            attract = 5,
+            fill = '#fff';
+        for (var keyIndex in sorted_in_keys) {
+            var key = sorted_in_keys[keyIndex],
+                this_input = this.inputs[key],
+                cdt = this_input['cdt_pk'],
+                magnet_label = this_input['datasetname'],
+                magnet = new Magnet(
+                    parent,
+                    r,
+                    attract,
+                    fill,
+                    cdt,
+                    magnet_label,
+                    null,
+                    false
+                );
+    
+            if (this.n_inputs == 1) {
+                magnet.x -= this.h/3
+            }
+    
+            this.in_magnets.push(magnet);
         }
-
-        this.in_magnets.push(magnet);
-    }
-
-    this.out_magnets = [];
-    var sorted_out_keys = Object.keys(outputs).sort(function(a,b){return a-b});
-    for (keyIndex in sorted_out_keys) {
-        var key = sorted_out_keys[keyIndex],
-            this_output = this.outputs[key],
-            cdt = this_output['cdt_pk'],
-            magnet_label = this_output['datasetname'],
-            magnet = new Magnet(
-                parent,
-                r,
-                attract,
-                fill,
-                cdt,
-                magnet_label,
-                null,
-                true
-            );
-
-        if (this.n_inputs == 1) {
-            magnet.x += this.h/3
+    
+        this.out_magnets = [];
+        var sorted_out_keys = Object.keys(outputs).sort(function(a,b){return a-b});
+        for (keyIndex in sorted_out_keys) {
+            var key = sorted_out_keys[keyIndex],
+                this_output = this.outputs[key],
+                cdt = this_output['cdt_pk'],
+                magnet_label = this_output['datasetname'],
+                magnet = new Magnet(
+                    parent,
+                    r,
+                    attract,
+                    fill,
+                    cdt,
+                    magnet_label,
+                    null,
+                    true
+                );
+    
+            if (this.n_inputs == 1) {
+                magnet.x += this.h/3
+            }
+    
+            this.out_magnets.push(magnet);
         }
-
-        this.out_magnets.push(magnet);
     }
-}
-
-my.MethodNode.prototype.draw = function(ctx) {
-    ctx.fillStyle = this.fill;
-    var vertices = this.getVertices();
-    this.vertices = vertices;
-    ctx.beginPath();
     
-    // body
-    ctx.moveTo( vertices[4].x, vertices[4].y );
-    ctx.lineTo( vertices[5].x, vertices[5].y );
-    ctx.lineTo( vertices[6].x, vertices[6].y );
-    ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[1].x, vertices[1].y );
-    ctx.lineTo( vertices[2].x, vertices[2].y );
-    ctx.lineTo( vertices[3].x, vertices[3].y );
-    ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
-    ctx.fill();
+    my.MethodNode.prototype.draw = function(ctx) {
+        ctx.fillStyle = this.fill;
+        var vertices = this.getVertices();
+        this.vertices = vertices;
+        ctx.beginPath();
+        
+        // body
+        ctx.moveTo( vertices[4].x, vertices[4].y );
+        ctx.lineTo( vertices[5].x, vertices[5].y );
+        ctx.lineTo( vertices[6].x, vertices[6].y );
+        ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[1].x, vertices[1].y );
+        ctx.lineTo( vertices[2].x, vertices[2].y );
+        ctx.lineTo( vertices[3].x, vertices[3].y );
+        ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
+        ctx.fill();
+        
+        // input plane (shading)
+        ctx.beginPath();
+        ctx.moveTo( vertices[0].x, vertices[0].y );
+        ctx.lineTo( vertices[1].x, vertices[1].y );
+        ctx.lineTo( vertices[2].x, vertices[2].y );
+        ctx.lineTo( vertices[3].x, vertices[3].y );
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha = 0.35;
+        ctx.fill();
+        
+        // top bend (shading)
+        ctx.beginPath();
+        ctx.moveTo( vertices[6].x, vertices[6].y );
+        ctx.lineTo( vertices[7].x, vertices[7].y );
+        ctx.bezierCurveTo( vertices[9].x,  vertices[9].y,  vertices[9].x,  vertices[9].y,  vertices[0].x, vertices[0].y );
+        ctx.lineTo( vertices[1].x, vertices[1].y );
+        ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[6].x, vertices[6].y );
+        ctx.globalAlpha = 0.12;
+        ctx.fill();
+        
+        ctx.fillStyle = this.fill;
+        ctx.globalAlpha = 1.0;
+        
+    /*  // output plane
+        ctx.moveTo( vertices[4].x, vertices[4].y );
+        ctx.lineTo( vertices[5].x, vertices[5].y );
+        ctx.lineTo( vertices[6].x, vertices[6].y );
+        ctx.lineTo( vertices[7].x, vertices[7].y );
     
-    // input plane (shading)
-    ctx.beginPath();
-    ctx.moveTo( vertices[0].x, vertices[0].y );
-    ctx.lineTo( vertices[1].x, vertices[1].y );
-    ctx.lineTo( vertices[2].x, vertices[2].y );
-    ctx.lineTo( vertices[3].x, vertices[3].y );
-    ctx.fillStyle = '#fff';
-    ctx.globalAlpha = 0.35;
-    ctx.fill();
+        // side bend
+        ctx.moveTo( vertices[4].x, vertices[4].y );
+        ctx.lineTo( vertices[7].x, vertices[7].y );
+        ctx.bezierCurveTo( vertices[9].x, vertices[9].y, vertices[9].x, vertices[9].y, vertices[0].x, vertices[0].y );
+        ctx.lineTo( vertices[3].x, vertices[3].y );
+        ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
+        */
     
-    // top bend (shading)
-    ctx.beginPath();
-    ctx.moveTo( vertices[6].x, vertices[6].y );
-    ctx.lineTo( vertices[7].x, vertices[7].y );
-    ctx.bezierCurveTo( vertices[9].x,  vertices[9].y,  vertices[9].x,  vertices[9].y,  vertices[0].x, vertices[0].y );
-    ctx.lineTo( vertices[1].x, vertices[1].y );
-    ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[6].x, vertices[6].y );
-    ctx.globalAlpha = 0.12;
-    ctx.fill();
+        // draw magnets
+        var cx = this.x + this.dx,
+            cy = this.y + this.dy,
+            cos30 = Math.sqrt(3)/2,
+         // sin30 = 0.5 (this is trivial)
+            magnet_margin = 6,
+            y_inputs = cy - this.stack,
+            x_outputs = cx + this.scoop * cos30,
+            y_outputs = cy + this.scoop * .5,
+            c2c = this.in_magnets[0].r * 2 + magnet_margin,
+            ipl  = (this.in_magnets.length  * c2c + magnet_margin) / 2,// distance from magnet centre to edge
+            magnet,
+            pos;
     
-    ctx.fillStyle = this.fill;
-    ctx.globalAlpha = 1.0;
+        this.input_plane_len = ipl;
+        
+        for (var i = 0, len = this.in_magnets.length; i < len; i++) {
+            magnet = this.in_magnets[i];
+            pos = i - len/2 + .5;
+            magnet.x = cx + pos * cos30 * c2c;
+            magnet.y = y_inputs - pos * c2c/2;
+            magnet.draw(ctx);
+        }
+        for (i = 0, len = this.out_magnets.length; i < len; i++) {
+            magnet = this.out_magnets[i];
+            pos = i - len/2 + .5;
+            magnet.x = x_outputs + pos * cos30 * c2c;
+            magnet.y = y_outputs - pos * c2c/2;
+            magnet.draw(ctx);
+        }
     
-/*  // output plane
-    ctx.moveTo( vertices[4].x, vertices[4].y );
-    ctx.lineTo( vertices[5].x, vertices[5].y );
-    ctx.lineTo( vertices[6].x, vertices[6].y );
-    ctx.lineTo( vertices[7].x, vertices[7].y );
-
-    // side bend
-    ctx.moveTo( vertices[4].x, vertices[4].y );
-    ctx.lineTo( vertices[7].x, vertices[7].y );
-    ctx.bezierCurveTo( vertices[9].x, vertices[9].y, vertices[9].x, vertices[9].y, vertices[0].x, vertices[0].y );
-    ctx.lineTo( vertices[3].x, vertices[3].y );
-    ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
-    */
-
-    // draw magnets
-    var cx = this.x + this.dx,
-        cy = this.y + this.dy,
-        cos30 = Math.sqrt(3)/2,
-     // sin30 = 0.5 (this is trivial)
-        magnet_margin = 6,
-        y_inputs = cy - this.stack,
-        x_outputs = cx + this.scoop * cos30,
-        y_outputs = cy + this.scoop * .5,
-        c2c = this.in_magnets[0].r * 2 + magnet_margin,
-        ipl  = (this.in_magnets.length  * c2c + magnet_margin) / 2,// distance from magnet centre to edge
-        magnet,
-        pos;
-
-    this.input_plane_len = ipl;
+        // Highlight the method based on status.
+        if(typeof this.status === 'string') {
+            ctx.save();
     
-    for (var i = 0, len = this.in_magnets.length; i < len; i++) {
-        magnet = this.in_magnets[i];
-        pos = i - len/2 + .5;
-        magnet.x = cx + pos * cos30 * c2c;
-        magnet.y = y_inputs - pos * c2c/2;
-        magnet.draw(ctx);
-    }
-    for (i = 0, len = this.out_magnets.length; i < len; i++) {
-        magnet = this.out_magnets[i];
-        pos = i - len/2 + .5;
-        magnet.x = x_outputs + pos * cos30 * c2c;
-        magnet.y = y_outputs - pos * c2c/2;
-        magnet.draw(ctx);
-    }
-
-    // Highlight the method based on status.
-    if(typeof this.status === 'string') {
-        ctx.save();
-
-        ctx.strokeStyle = _statusColorMap[this.status] || 'black';
-        ctx.lineWidth = 5;
-
+            ctx.strokeStyle = _statusColorMap[this.status] || 'black';
+            ctx.lineWidth = 5;
+    
+            ctx.globalCompositeOperation = 'destination-over';
+    
+            // body
+            ctx.beginPath();
+            ctx.moveTo( vertices[4].x, vertices[4].y );
+            ctx.lineTo( vertices[5].x, vertices[5].y );
+            ctx.lineTo( vertices[6].x, vertices[6].y );
+            ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[1].x, vertices[1].y );
+            ctx.lineTo( vertices[2].x, vertices[2].y );
+            ctx.lineTo( vertices[3].x, vertices[3].y );
+            ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
+            ctx.closePath();
+    
+            ctx.stroke();
+            ctx.restore();
+        }
+    };
+    
+    my.MethodNode.prototype.highlight = function(ctx, dragging) {
+        // highlight this node shape
+        var vertices = this.getVertices();
         ctx.globalCompositeOperation = 'destination-over';
-
+    
         // body
         ctx.beginPath();
         ctx.moveTo( vertices[4].x, vertices[4].y );
@@ -787,141 +808,120 @@ my.MethodNode.prototype.draw = function(ctx) {
         ctx.lineTo( vertices[3].x, vertices[3].y );
         ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
         ctx.closePath();
-
+        
         ctx.stroke();
-        ctx.restore();
-    }
-};
-
-my.MethodNode.prototype.highlight = function(ctx, dragging) {
-    // highlight this node shape
-    var vertices = this.getVertices();
-    ctx.globalCompositeOperation = 'destination-over';
-
-    // body
-    ctx.beginPath();
-    ctx.moveTo( vertices[4].x, vertices[4].y );
-    ctx.lineTo( vertices[5].x, vertices[5].y );
-    ctx.lineTo( vertices[6].x, vertices[6].y );
-    ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[1].x, vertices[1].y );
-    ctx.lineTo( vertices[2].x, vertices[2].y );
-    ctx.lineTo( vertices[3].x, vertices[3].y );
-    ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
-    ctx.closePath();
-    
-    ctx.stroke();
-    ctx.globalCompositeOperation = 'source-over';
-    
-    // Any output nodes will also be highlighted.
-    var magnet, connected_node, i, j;
-    for (i = 0; i < this.out_magnets.length; i++) {
-        magnet = this.out_magnets[i];
-        for (j = 0; j < magnet.connected.length; j++) {
-            connected_node = magnet.connected[j].dest.parent;
-            if (connected_node.constructor == OutputNode) {
-                connected_node.highlight(ctx);
+        ctx.globalCompositeOperation = 'source-over';
+        
+        // Any output nodes will also be highlighted.
+        var magnet, connected_node, i, j;
+        for (i = 0; i < this.out_magnets.length; i++) {
+            magnet = this.out_magnets[i];
+            for (j = 0; j < magnet.connected.length; j++) {
+                connected_node = magnet.connected[j].dest.parent;
+                if (connected_node.constructor == OutputNode) {
+                    connected_node.highlight(ctx);
+                }
+                
+                // Draw label on cable.
+                magnet.connected[j].drawLabel(ctx);
             }
             
-            // Draw label on cable.
-            magnet.connected[j].drawLabel(ctx);
+            if (magnet.connected.length === 0) {
+                // Highlight (label) the magnet
+                magnet.highlight(ctx);
+            }
         }
-        
-        if (magnet.connected.length === 0) {
-            // Highlight (label) the magnet
-            magnet.highlight(ctx);
-        }
-    }
-    for (var i = 0; i < this.in_magnets.length; i++) {
-        magnet = this.in_magnets[i];
-        if (magnet.connected.length === 0) {
-            magnet.highlight(ctx);
-        } else {
-            magnet.connected[0].drawLabel(ctx);
+        for (var i = 0; i < this.in_magnets.length; i++) {
+            magnet = this.in_magnets[i];
+            if (magnet.connected.length === 0) {
+                magnet.highlight(ctx);
+            } else {
+                magnet.connected[0].drawLabel(ctx);
+            }
         }
     }
-}
-
-my.MethodNode.prototype.contains = function(mx, my) {
-    var vertices = this.getVertices();
-    var polygon = [ 1,2,3,8,4,5,6,10 ];
-    var shape = [];
     
-    for ( var i=0; i < polygon.length; i++ )
-        shape.push(vertices[polygon[i]]);
-    return Geometry.inPolygon(mx, my, shape);
-};
-
-my.MethodNode.prototype.getVertices = function() {
-    var cx = this.x + this.dx,
-        cy = this.y + this.dy;
-    
-    // experimental draw
-    var cos30 = Math.sqrt(3)/2,
-     // sin30 = 0.5 (this is trivial)
-        magnet_radius = this.in_magnets[0].r, 
-        magnet_margin = 6,
-        dmc = magnet_radius + magnet_margin,// distance from magnet centre to edge
-        c2c = dmc + magnet_radius,//centre 2 centre of adjacent magnets
-        cosdmc = cos30 * dmc,
-        ipy = cy - this.stack,
-        input_plane_len  = (this.n_inputs * c2c + magnet_margin) / 2,
-        cosipl = cos30 * input_plane_len;
-    
-    if (typeof this.vertices == 'undefined' 
-        || this.vertices[1].x != cx + cosdmc + cosipl 
-        || this.vertices[1].y != ipy + (dmc - input_plane_len) / 2
-        ) {
+    my.MethodNode.prototype.contains = function(mx, my) {
+        var vertices = this.getVertices();
+        var polygon = [ 1,2,3,8,4,5,6,10 ];
+        var shape = [];
         
-        var opx = cx + this.scoop * cos30,
-            opy = cy + this.scoop * .5,
-            output_plane_len = (this.n_outputs * c2c + magnet_margin) / 2,
-            cosopl = cos30 * output_plane_len; // half of the length of the parallelogram ("half hypoteneuse")
+        for ( var i=0; i < polygon.length; i++ )
+            shape.push(vertices[polygon[i]]);
+        return Geometry.inPolygon(mx, my, shape);
+    };
     
-        var vertices = [
-            { x: cx + cosdmc - cosipl, y: ipy + (dmc + input_plane_len) / 2 },
-            { x: cx + cosdmc + cosipl, y: ipy + (dmc - input_plane_len) / 2 },
-            { x: cx - cosdmc + cosipl, y: ipy - (dmc + input_plane_len) / 2 },
-            { x: cx - cosdmc - cosipl, y: ipy - (dmc - input_plane_len) / 2 },
-            { x: opx - cosopl, y: opy + dmc + output_plane_len / 2 },
-            { x: opx + cosopl, y: opy + dmc - output_plane_len / 2 },
-            { x: opx + cosopl, y: opy - dmc - output_plane_len / 2 },
-            { x: opx - cosopl, y: opy - dmc + output_plane_len / 2 }
-        ];
-    
-        if (this.in_magnets.length > this.out_magnets.length) {
-            vertices.push(
-                { x: cx - cosdmc - cosopl, y: cy + (dmc + output_plane_len) / 2 },
-                { x: cx + cosdmc - cosopl, y: cy - (dmc - output_plane_len) / 2 },
-                { x: cx + cosdmc + cosopl, y: cy - (dmc + output_plane_len) / 2 }
-    //            { x: cx + cosdmc - cosopl, y: cy + dmc * 1.5 + output_plane_len / 2 },
-    //            { x: cx + cosdmc + cosopl, y: cy + dmc * 1.5 - output_plane_len / 2 },
-    //            { x: cx - cosdmc + cosopl, y: cy + (dmc - output_plane_len) / 2 },
-    //            { x: cx - cosdmc + cosopl, y: cy - dmc * 1.5 - output_plane_len / 2 },
-    //            { x: cx - cosdmc - cosopl, y: cy - dmc * 1.5 + output_plane_len / 2 }
-            );
-        } else { 
-            vertices.push(
-                { x: cx - cosdmc - cosipl, y: cy + cosdmc - (dmc - input_plane_len) / 2 },
-                { x: cx + cosdmc - cosipl, y: cy - cosdmc + (dmc + input_plane_len) / 2 },
-                { x: cx + cosdmc + cosipl, y: cy - cosdmc + (dmc - input_plane_len) / 2 }
-    //            { x: cx + cosdmc - cosipl, y: cy + cosdmc + (dmc + input_plane_len) / 2 },
-    //            { x: cx + cosdmc + cosipl, y: cy + cosdmc + (dmc - input_plane_len) / 2 },
-    //            { x: cx - cosdmc + cosipl, y: cy + cosdmc - (dmc + input_plane_len) / 2 },
-    //            { x: cx - cosdmc + cosipl, y: cy - cosdmc - (dmc + input_plane_len) / 2 },
-    //            { x: cx - cosdmc - cosipl, y: cy - cosdmc - (dmc - input_plane_len) / 2 }
-            );
+    my.MethodNode.prototype.getVertices = function() {
+        var cx = this.x + this.dx,
+            cy = this.y + this.dy;
+        
+        // experimental draw
+        var cos30 = Math.sqrt(3)/2,
+         // sin30 = 0.5 (this is trivial)
+            magnet_radius = this.in_magnets[0].r, 
+            magnet_margin = 6,
+            dmc = magnet_radius + magnet_margin,// distance from magnet centre to edge
+            c2c = dmc + magnet_radius,//centre 2 centre of adjacent magnets
+            cosdmc = cos30 * dmc,
+            ipy = cy - this.stack,
+            input_plane_len  = (this.n_inputs * c2c + magnet_margin) / 2,
+            cosipl = cos30 * input_plane_len;
+        
+        if (typeof this.vertices == 'undefined' 
+            || this.vertices[1].x != cx + cosdmc + cosipl 
+            || this.vertices[1].y != ipy + (dmc - input_plane_len) / 2
+            ) {
+            
+            var opx = cx + this.scoop * cos30,
+                opy = cy + this.scoop * .5,
+                output_plane_len = (this.n_outputs * c2c + magnet_margin) / 2,
+                cosopl = cos30 * output_plane_len; // half of the length of the parallelogram ("half hypoteneuse")
+        
+            var vertices = [
+                { x: cx + cosdmc - cosipl, y: ipy + (dmc + input_plane_len) / 2 },
+                { x: cx + cosdmc + cosipl, y: ipy + (dmc - input_plane_len) / 2 },
+                { x: cx - cosdmc + cosipl, y: ipy - (dmc + input_plane_len) / 2 },
+                { x: cx - cosdmc - cosipl, y: ipy - (dmc - input_plane_len) / 2 },
+                { x: opx - cosopl, y: opy + dmc + output_plane_len / 2 },
+                { x: opx + cosopl, y: opy + dmc - output_plane_len / 2 },
+                { x: opx + cosopl, y: opy - dmc - output_plane_len / 2 },
+                { x: opx - cosopl, y: opy - dmc + output_plane_len / 2 }
+            ];
+        
+            if (this.in_magnets.length > this.out_magnets.length) {
+                vertices.push(
+                    { x: cx - cosdmc - cosopl, y: cy + (dmc + output_plane_len) / 2 },
+                    { x: cx + cosdmc - cosopl, y: cy - (dmc - output_plane_len) / 2 },
+                    { x: cx + cosdmc + cosopl, y: cy - (dmc + output_plane_len) / 2 }
+        //            { x: cx + cosdmc - cosopl, y: cy + dmc * 1.5 + output_plane_len / 2 },
+        //            { x: cx + cosdmc + cosopl, y: cy + dmc * 1.5 - output_plane_len / 2 },
+        //            { x: cx - cosdmc + cosopl, y: cy + (dmc - output_plane_len) / 2 },
+        //            { x: cx - cosdmc + cosopl, y: cy - dmc * 1.5 - output_plane_len / 2 },
+        //            { x: cx - cosdmc - cosopl, y: cy - dmc * 1.5 + output_plane_len / 2 }
+                );
+            } else { 
+                vertices.push(
+                    { x: cx - cosdmc - cosipl, y: cy + cosdmc - (dmc - input_plane_len) / 2 },
+                    { x: cx + cosdmc - cosipl, y: cy - cosdmc + (dmc + input_plane_len) / 2 },
+                    { x: cx + cosdmc + cosipl, y: cy - cosdmc + (dmc - input_plane_len) / 2 }
+        //            { x: cx + cosdmc - cosipl, y: cy + cosdmc + (dmc + input_plane_len) / 2 },
+        //            { x: cx + cosdmc + cosipl, y: cy + cosdmc + (dmc - input_plane_len) / 2 },
+        //            { x: cx - cosdmc + cosipl, y: cy + cosdmc - (dmc + input_plane_len) / 2 },
+        //            { x: cx - cosdmc + cosipl, y: cy - cosdmc - (dmc + input_plane_len) / 2 },
+        //            { x: cx - cosdmc - cosipl, y: cy - cosdmc - (dmc - input_plane_len) / 2 }
+                );
+            }
+            
+            this.vertices = vertices;
         }
         
-        this.vertices = vertices;
-    }
+        return this.vertices;
+    };
     
-    return this.vertices;
-};
-
-my.MethodNode.prototype.getLabel = function() {
-    return new NodeLabel(this.label, this.x + this.dx + this.scoop/4, this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset);
-};
-
+    my.MethodNode.prototype.getLabel = function() {
+        return new NodeLabel(this.label, this.x + this.dx + this.scoop/4, this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset);
+    };
+    
     my.Magnet = function(parent, r, attract, fill, cdt, label, offset, isOutput) {
         /*
         CONSTRUCTOR
