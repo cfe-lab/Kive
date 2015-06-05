@@ -92,16 +92,16 @@
                 }
             });
 
-            $("#bulkSubmit").submit(function(submitEvent){
+            $("#archiveSubmit").submit(function(submitEvent){
                 //disable the submit button until after the files have been uploaded and the datasets have been created.
-                $("#bulkSubmit").attr("disabled", true);
+                $("#archiveSubmit").attr("disabled", true);
 
                 // Indicate to user that we are going to wait a long time
                 $("#loading").show();
 
                 // Update mode?
                 if (!$("#editButton").is(":disabled")) {
-                    $("#datasetBulkForm").action = "/datasets_update_bulk";
+                    $("#datasetArchiveForm").action = "/datasets_update_bulk";
                 }
             });
         });
@@ -114,39 +114,39 @@
 
 <h2>Add Datasets</h2>
 
-<form id="datasetBulkForm" name="datasetBulkForm" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+<form id="datasetArchiveForm" name="datasetArchiveForm" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
     <div style="width:100em">
         <fieldset class="multiFieldSet">
             <legend>Multiple Datasets from Archive</legend>
             <table>
                 <tr>
-                    <td><label>{{ bulkAddDatasetForm.dataset_file.label }}</label></td>
-                    <td>{{ bulkAddDatasetForm.dataset_file }}</td>
-                    <td class="errortext">{{ bulkAddDatasetForm.dataset_file.errors }}</td>
+                    <td><label>{{ archiveAddDatasetForm.dataset_file.label }}</label></td>
+                    <td>{{ archiveAddDatasetForm.dataset_file }}</td>
+                    <td class="errortext">{{ archiveAddDatasetForm.dataset_file.errors }}</td>
 
-                    <td><label>{{ bulkAddDatasetForm.compound_datatype.label }}</label></td>
-                    <td>{{ bulkAddDatasetForm.compound_datatype }}</td>
-                    <td class="errortext">{{ bulkAddDatasetForm.compound_datatype.errors }}</td>
+                    <td><label>{{ archiveAddDatasetForm.compound_datatype.label }}</label></td>
+                    <td>{{ archiveAddDatasetForm.compound_datatype }}</td>
+                    <td class="errortext">{{ archiveAddDatasetForm.compound_datatype.errors }}</td>
                 </tr>
-                <tr><td><label>{{ bulkAddDatasetForm.name_prefix.label }}</label></td>
-                    <td>{{ bulkAddDatasetForm.name_prefix }}</td>
-                    <td class="errortext">{{ bulkAddDatasetForm.name_prefix.errors }}</td>
+                <tr><td><label>{{ archiveAddDatasetForm.name_prefix.label }}</label></td>
+                    <td>{{ archiveAddDatasetForm.name_prefix }}</td>
+                    <td class="errortext">{{ archiveAddDatasetForm.name_prefix.errors }}</td>
 
-                    <td><label>{{ bulkAddDatasetForm.description.label }}</label></td>
-                    <td>{{ bulkAddDatasetForm.description }}</td>
-                    <td class="errortext">{{ bulkAddDatasetForm.description.errors }}</td>
+                    <td><label>{{ archiveAddDatasetForm.description.label }}</label></td>
+                    <td>{{ archiveAddDatasetForm.description }}</td>
+                    <td class="errortext">{{ archiveAddDatasetForm.description.errors }}</td>
                 </tr>
-                <tr><td><label>{{ bulkAddDatasetForm.users_allowed.label }}</label></td>
-                    <td>{{ bulkAddDatasetForm.users_allowed }}</td>
-                    <td class="errortext">{{ bulkAddDatasetForm.users_allowed.errors }}</td>
+                <tr><td><label>{{ archiveAddDatasetForm.users_allowed.label }}</label></td>
+                    <td>{{ archiveAddDatasetForm.users_allowed }}</td>
+                    <td class="errortext">{{ archiveAddDatasetForm.users_allowed.errors }}</td>
 
-                    <td><label>{{ bulkAddDatasetForm.groups_allowed.label }}</label></td>
-                    <td>{{ bulkAddDatasetForm.groups_allowed }}</td>
-                    <td class="errortext">{{ bulkAddDatasetForm.groups_allowed.errors }}</td>
+                    <td><label>{{ archiveAddDatasetForm.groups_allowed.label }}</label></td>
+                    <td>{{ archiveAddDatasetForm.groups_allowed }}</td>
+                    <td class="errortext">{{ archiveAddDatasetForm.groups_allowed.errors }}</td>
                 </tr>
             </table>
         </fieldset>
-        <input type="submit" id="bulkSubmit" name="bulkSubmit" value="Submit and Unarchive Datasets" />
+        <input type="submit" id="archiveSubmit" name="archiveSubmit" value="Submit and Unarchive Datasets" />
 
     {% comment "This code may become useful again if we get to implementing a progress bar." %}
         <!--

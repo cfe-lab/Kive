@@ -235,37 +235,37 @@ def datasets_add_archive(request):
                 add_results = archive_add_dataset_form.create_datasets(request.user)
             else:
                 # TODO: change this
-                c.update({'bulkAddDatasetForm': archive_add_dataset_form})
+                c.update({'archiveAddDatasetForm': archive_add_dataset_form})
                 return HttpResponse(t.render(c))
 
             # New datasets added, generate a response
-            bulk_display_results = []
+            archive_display_results = []
 
             # Fill in default values for the form fields
             for i in range(len(add_results)):
-                bulk_display_result = {}
+                archive_display_result = {}
                 uploaded_files = archive_add_dataset_form.cleaned_data["dataset_file"]
                 if isinstance(add_results[i], basestring):
-                    bulk_display_result["name"] = ""
-                    bulk_display_result["description"] = ""
-                    bulk_display_result["orig_filename"] = ""
-                    bulk_display_result["filesize"] = ""
-                    bulk_display_result["md5"] = ""
-                    bulk_display_result["id"] = ""
+                    archive_display_result["name"] = ""
+                    archive_display_result["description"] = ""
+                    archive_display_result["orig_filename"] = ""
+                    archive_display_result["filesize"] = ""
+                    archive_display_result["md5"] = ""
+                    archive_display_result["id"] = ""
                 else:
-                    bulk_display_result["name"] = add_results[i].name
-                    bulk_display_result["description"] = add_results[i].description
+                    archive_display_result["name"] = add_results[i].name
+                    archive_display_result["description"] = add_results[i].description
                     # This is the original filename as uploaded by the client, not the filename as stored
                     # on the file server.
-                    bulk_display_result["orig_filename"] = uploaded_files[i].name
-                    bulk_display_result["filesize"] = add_results[i].get_formatted_filesize()
-                    bulk_display_result["md5"] = add_results[i].compute_md5()
-                    bulk_display_result["id"] = add_results[i].id
+                    archive_display_result["orig_filename"] = uploaded_files[i].name
+                    archive_display_result["filesize"] = add_results[i].get_formatted_filesize()
+                    archive_display_result["md5"] = add_results[i].compute_md5()
+                    archive_display_result["id"] = add_results[i].id
 
-                bulk_display_results.extend([bulk_display_result])
+                archive_display_results.extend([archive_display_result])
 
-            BulkDatasetUpdateFormSet = formset_factory(form=BulkDatasetUpdateForm, max_num=len(bulk_display_results))
-            bulk_dataset_update_formset = BulkDatasetUpdateFormSet(initial=bulk_display_results)
+            BulkDatasetUpdateFormSet = formset_factory(form=BulkDatasetUpdateForm, max_num=len(archive_display_results))
+            bulk_dataset_update_formset = BulkDatasetUpdateFormSet(initial=archive_display_results)
 
             # Fill in the attributes that are not fields in the form
             # These are not set by the BulkDatasetUpdateFormSet(initial=...) parameter
@@ -286,12 +286,12 @@ def datasets_add_archive(request):
             LOGGER.exception(e.message)
             archive_add_dataset_form.add_error(None, e)
             t = loader.get_template('archive/datasets_add_archive.html')
-            c.update({'bulkAddDatasetForm': archive_add_dataset_form})
+            c.update({'archiveAddDatasetForm': archive_add_dataset_form})
 
     else:  # return an empty form for the user to fill in
         t = loader.get_template('archive/datasets_add_archive.html')
-        bulk_dataset_form = ArchiveAddDatasetForm(user=request.user)
-        c.update({'bulkAddDatasetForm': bulk_dataset_form})
+        archive_dataset_form = ArchiveAddDatasetForm(user=request.user)
+        c.update({'archiveAddDatasetForm': archive_dataset_form})
 
     return HttpResponse(t.render(c))
 
