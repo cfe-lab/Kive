@@ -1,12 +1,12 @@
 from rest_framework import serializers
-from transformation.models import TransformationXput, TransformationInput, TransformationOutput, XputStructure
+from transformation.models import TransformationXput, TransformationInput, \
+    TransformationOutput, XputStructure
 
 
 class XputStructureSerializer(serializers.ModelSerializer):
     class Meta:
         model = XputStructure
         fields = (
-            "transf_xput",
             "compounddatatype",
             "min_row",
             "max_row"
@@ -26,12 +26,10 @@ class TransformationXputSerializer(serializers.ModelSerializer):
 class TransformationInputSerializer(TransformationXputSerializer):
     class Meta:
         model = TransformationInput
-        fields = ("transformation", "dataset_name", "dataset_idx", "x", "y", "structure")
+        fields = ("dataset_name", "dataset_idx", "x", "y", "structure")
 
 
 class TransformationOutputSerializer(TransformationXputSerializer):
     class Meta:
         model = TransformationOutput
-        fields = ("transformation", "dataset_name", "dataset_idx", "x", "y", "structure")
-
-
+        fields = ("dataset_name", "dataset_idx", "x", "y", "structure")

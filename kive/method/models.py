@@ -114,8 +114,9 @@ class CodeResourceRevision(metadata.models.AccessControl):
     coderesource = models.ForeignKey(CodeResource, related_name="revisions")
 
     # revision_number is allowed to be null because it's automatically set on save
-    revision_number = models.IntegerField('Revision number', help_text="Revision number of code resource",
-                                          blank=True)
+    revision_number = models.PositiveIntegerField(
+        'Revision number', help_text="Revision number of code resource",
+        blank=True)
 
     revision_name = models.CharField(
             max_length=maxlengths.MAX_NAME_LENGTH,
@@ -146,6 +147,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
             help_text="Used to validate file contents of this resource revision")
 
     class Meta:
+        unique_together = (("coderesource", "revision_number"))
         ordering = ["coderesource__name", "-revision_number"]
 
     @property

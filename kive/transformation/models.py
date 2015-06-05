@@ -73,7 +73,7 @@ class Transformation(metadata.models.AccessControl):
                                      help_text="The name of this transformation revision",
                                      blank=True)
 
-    revision_DateTime = models.DateTimeField("Revision creation date", auto_now_add = True)
+    revision_DateTime = models.DateTimeField("Revision creation date", auto_now_add=True)
 
     revision_desc = models.TextField(
         "Transformation revision description",

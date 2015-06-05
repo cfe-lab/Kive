@@ -719,6 +719,7 @@ class Pipeline(transformation.models.Transformation):
 
         return SDs_to_remove, ERs_to_remove, runs_to_remove, pipelines_to_remove
 
+
 @python_2_unicode_compatible
 class PipelineStep(models.Model):
     """

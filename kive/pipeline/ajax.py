@@ -1,5 +1,6 @@
 from django.http import HttpResponse, Http404
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db import transaction
 
 from rest_framework import permissions
 from rest_framework.decorators import detail_route
@@ -13,7 +14,8 @@ from portal.views import developer_check, admin_check
 from metadata.models import KiveUser, AccessControl
 
 from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
-from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
+from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet,\
+    CleanCreateModelMixin
 
 
 class PipelineFamilyViewSet(RemovableModelViewSet):
@@ -38,10 +40,17 @@ class PipelineFamilyViewSet(RemovableModelViewSet):
         return Response(member_serializer.data)
 
 
-class PipelineViewSet(RemovableModelViewSet):
+class PipelineViewSet(CleanCreateModelMixin,
+                      RemovableModelViewSet):
     queryset = Pipeline.objects.all()
     serializer_class = PipelineSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+
+    # Override perform_create to call complete_clean, not just clean.
+    @transaction.atomic
+    def perform_create(self, serializer):
+        new_pipeline = serializer.save()
+        new_pipeline.complete_clean()
 
 
 @login_required

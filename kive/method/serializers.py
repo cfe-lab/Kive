@@ -3,12 +3,12 @@ from django.contrib.auth.models import User, Group
 from rest_framework import serializers
 from method.models import Method, MethodFamily, CodeResource, CodeResourceRevision, CodeResourceDependency
 from transformation.serializers import TransformationInputSerializer, TransformationOutputSerializer
+from kive.serializers import AccessControlSerializer
 
-class CodeResourceSerializer(serializers.ModelSerializer):
-    user = serializers.StringRelatedField()
+
+class CodeResourceSerializer(AccessControlSerializer,
+                             serializers.ModelSerializer):
     removal_plan = serializers.HyperlinkedIdentityField(view_name='coderesource-removal-plan')
-    users_allowed = serializers.StringRelatedField(many=True)
-    groups_allowed = serializers.StringRelatedField(many=True)
     revisions = serializers.HyperlinkedIdentityField(view_name="coderesource-revisions")
     last_revision_date = serializers.DateTimeField()
     absolute_url = serializers.SerializerMethodField()
@@ -34,31 +34,35 @@ class CodeResourceDependencySerializer(serializers.ModelSerializer):
     class Meta:
         model = CodeResourceDependency
         fields = (
-            "coderesourcerevision",
             "requirement",
             "depPath",
             "depFileName"
         )
 
 
-class CodeResourceRevisionSerializer(serializers.ModelSerializer):
-    user = serializers.SlugRelatedField(slug_field="username",
-                                        queryset=User.objects.all())
+# Note: set_context doesn't seem to appear in the documentation anywhere --
+# we had to go into the DRF source code.
+class CRRevisionNumberGetter(object):
+    """
+    Handles retrieving the default revision number for a new CodeResourceRevision.
+
+    This is defined as per
+    http://www.django-rest-framework.org/api-guide/serializers/#specifying-read-only-fields
+    """
+    def set_context(self, rev_num_field):
+        self.coderesource = CodeResource.objects.get(
+            name=rev_num_field.parent.initial_data["coderesource"]
+        )
+
+    def __call__(self):
+        return self.coderesource.num_revisions + 1
+
+
+class CodeResourceRevisionSerializer(AccessControlSerializer,
+                                     serializers.ModelSerializer):
     coderesource = serializers.SlugRelatedField(slug_field='name',
                                                 queryset=CodeResource.objects.all())
-    users_allowed = serializers.SlugRelatedField(
-        slug_field="username",
-        queryset=User.objects.all(),
-        many=True,
-        allow_null=True,
-        required=False)
-    groups_allowed = serializers.SlugRelatedField(
-        slug_field="name",
-        queryset=Group.objects.all(),
-        many=True,
-        allow_null=True,
-        required=False
-    )
+
     dependencies = CodeResourceDependencySerializer(
         many=True,
         allow_null=True,
@@ -68,30 +72,37 @@ class CodeResourceRevisionSerializer(serializers.ModelSerializer):
     removal_plan = serializers.HyperlinkedIdentityField(view_name='coderesourcerevision-removal-plan')
     absolute_url = serializers.SerializerMethodField()
 
+    # As per
+    # http://www.django-rest-framework.org/api-guide/serializers/#specifying-read-only-fields
+    # this field must be explicitly defined, with read_only=True and a default specified.
+    revision_number = serializers.IntegerField(
+        read_only=True,
+        default=CRRevisionNumberGetter()
+    )
+
     class Meta:
         model = CodeResourceRevision
-        fields = ('id',
-                  'url',
-                  "coderesource",
-                  'revision_name',
-                  'display_name',
-                  'user',
-                  'removal_plan',
-                  'users_allowed',
-                  'groups_allowed',
-                  'absolute_url',
-                  'revision_number',
-                  'revision_desc',
-                  'revision_DateTime',
-                  "content_file",
-                  "dependencies"
+        fields = (
+            'id',
+            'url',
+            "coderesource",
+            'revision_name',
+            'display_name',
+            'user',
+            'removal_plan',
+            'users_allowed',
+            'groups_allowed',
+            'absolute_url',
+            'revision_number',
+            'revision_desc',
+            'revision_DateTime',
+            "content_file",
+            "dependencies"
         )
         # revision_DateTime, removal_plan, absolute_url, and display_name are already read_only.
-        read_only_fields = (
-            "revision_number",
-        )
+
         extra_kwargs = {
-            "content_file": {"use_url": False}
+            "content_file": {"use_url": False},
         }
 
     def get_absolute_url(self, obj):
@@ -110,11 +121,10 @@ class CodeResourceRevisionSerializer(serializers.ModelSerializer):
         users_allowed = crr_data.pop("users_allowed")
         groups_allowed = crr_data.pop("groups_allowed")
         dependencies = crr_data.pop("dependencies")
-        crr = CodeResourceRevision.objects.create(**crr_data)
 
+        crr = CodeResourceRevision.objects.create(**crr_data)
         crr.users_allowed.add(*users_allowed)
         crr.groups_allowed.add(*groups_allowed)
-
         for dep_data in dependencies:
             # Note that we ignore the value of dep_data["coderesourcerevision"].
             crr.dependencies.create(
@@ -126,10 +136,8 @@ class CodeResourceRevisionSerializer(serializers.ModelSerializer):
         return crr
 
 
-class MethodFamilySerializer(serializers.ModelSerializer):
-    user = serializers.StringRelatedField()
-    users_allowed = serializers.StringRelatedField(many=True)
-    groups_allowed = serializers.StringRelatedField(many=True)
+class MethodFamilySerializer(AccessControlSerializer,
+                             serializers.ModelSerializer):
     num_revisions = serializers.SerializerMethodField()
     absolute_url = serializers.SerializerMethodField()
     removal_plan = serializers.HyperlinkedIdentityField(
@@ -154,35 +162,40 @@ class MethodFamilySerializer(serializers.ModelSerializer):
         return obj.get_absolute_url()
 
 
-class MethodSerializer(serializers.ModelSerializer):
-    user = serializers.SlugRelatedField(slug_field="username",
-                                        queryset=User.objects.all())
+# This is analogous to CRRevisionNumberGetter.
+class MethodRevisionNumberGetter(object):
+    """
+    Handles retrieving the default revision number for a new Method.
 
+    This is completely analogous to CRRevisionNumberGetter, and if that breaks
+    due to changes in the internals of DRF, this probably will too.
+    """
+    def set_context(self, rev_num_field):
+        self.methodfamily = MethodFamily.objects.get(
+            name=rev_num_field.parent.initial_data["family"]
+        )
+
+    def __call__(self):
+        return self.methodfamily.num_revisions + 1
+
+
+class MethodSerializer(AccessControlSerializer,
+                       serializers.ModelSerializer):
     family = serializers.SlugRelatedField(slug_field="name",
                                           queryset=MethodFamily.objects.all())
-
-    users_allowed = serializers.SlugRelatedField(
-        slug_field="username",
-        queryset=User.objects.all(),
-        many=True,
-        allow_null=True,
-        required=False)
-    groups_allowed = serializers.SlugRelatedField(
-        slug_field="name",
-        queryset=Group.objects.all(),
-        many=True,
-        allow_null=True,
-        required=False
-    )
 
     inputs = TransformationInputSerializer(many=True, allow_null=True, required=False)
     outputs = TransformationOutputSerializer(many=True, allow_null=True, required=False)
 
-    revision_number = serializers.IntegerField(read_only=True, required=False)
-
     absolute_url = serializers.SerializerMethodField()
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='method-removal-plan')
+
+    # This is as in CodeResourceRevisionSerializer.
+    revision_number = serializers.IntegerField(
+        read_only=True,
+        default=MethodRevisionNumberGetter()
+    )
 
     class Meta:
         model = Method
@@ -191,6 +204,8 @@ class MethodSerializer(serializers.ModelSerializer):
             "display_name",
             "revision_number",
             "revision_desc",
+            "revision_DateTime",
+            "revision_parent",
             "user",
             "users_allowed",
             "groups_allowed",
@@ -204,7 +219,6 @@ class MethodSerializer(serializers.ModelSerializer):
             "inputs",
             "outputs"
         )
-        # removal_plan, absolute_url, and display_name are already read_only.
 
     def get_absolute_url(self, obj):
         if not obj:
@@ -225,7 +239,6 @@ class MethodSerializer(serializers.ModelSerializer):
         outputs = method_data.pop("outputs")
 
         method = Method.objects.create(**method_data)
-
         method.users_allowed.add(*users_allowed)
         method.groups_allowed.add(*groups_allowed)
 

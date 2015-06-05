@@ -25,3 +25,24 @@ class UserSerializer(serializers.ModelSerializer):
         if not obj:
             return None
         return [GroupSerializer(x).data for x in obj.groups.all()]
+
+
+class AccessControlSerializer(serializers.Serializer):
+    """
+    Mixin that adds SlugRelatedFields to AccessControl-based ModelSerializers.
+    """
+    user = serializers.SlugRelatedField(slug_field="username",
+                                        queryset=User.objects.all())
+    users_allowed = serializers.SlugRelatedField(
+        slug_field="username",
+        queryset=User.objects.all(),
+        many=True,
+        allow_null=True,
+        required=False)
+    groups_allowed = serializers.SlugRelatedField(
+        slug_field="name",
+        queryset=Group.objects.all(),
+        many=True,
+        allow_null=True,
+        required=False
+    )
