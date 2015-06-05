@@ -498,6 +498,7 @@
             it('should highlight', function() {
                 this.expectedCanvas.ctx.strokeStyle = "orange";
                 this.expectedCanvas.ctx.lineWidth = 4;
+                this.expectedCanvas.ctx.lineJoin = 'bevel';
                 this.expectedCanvas.ctx.beginPath();
                 this.expectedCanvas.ctx.moveTo(77.5, 54);
                 this.expectedCanvas.ctx.lineTo(100, 65.25);

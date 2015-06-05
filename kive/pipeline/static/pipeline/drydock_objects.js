@@ -492,7 +492,7 @@ drydock_objects = (function(my) {
     my.RawNode.prototype = Object.create(my.CylinderNode.prototype);
     my.RawNode.prototype.constructor = my.RawNode;
 
-    my.CdtNode = function(pk, x, y,label) {
+    my.CdtNode = function(pk, x, y, label) {
         /*
         Node represents a Compound Datatype (CSV structured data).
         Rendered as a square shape.
@@ -525,12 +525,10 @@ drydock_objects = (function(my) {
         ctx.moveTo(cx - this.w/2, prism_base);
         ctx.lineTo(cx, prism_base + this.w/4);
         ctx.lineTo(cx + this.w/2, prism_base);
-        ctx.lineTo(cx, prism_base - this.w/4);
+        ctx.lineTo(cx + this.w/2, prism_base - this.h);
+        ctx.lineTo(cx - this.w/2, prism_base - this.h);
         ctx.closePath();
         ctx.fill();
-        
-        // draw stack 
-        ctx.fillRect(cx - this.w/2, cy - this.h/2, this.w, this.h);
         
         // draw top
         var prism_cap = cy - this.h/2;
@@ -579,7 +577,7 @@ drydock_objects = (function(my) {
             cy = this.y + this.dy;
         
         ctx.globalCompositeOperation = 'destination-over';
-    //    ctx.lineJoin = 'bevel';
+        ctx.lineJoin = 'bevel';
         
         var w2 = this.w/2,
             h2 = this.h/2,
