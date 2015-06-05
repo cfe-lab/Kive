@@ -445,37 +445,3 @@ def lookup(request):
     t = loader.get_template("archive/lookup.html")
     c = RequestContext(request, {})
     return HttpResponse(t.render(c))
-
-
-# def datasets_update_bulk(request):
-#     """
-#     Edit recently added bulk datasets in /datasets_udate_bulk.html
-#     """
-#     t = loader.get_template('archive/datasets_update_bulk.html')
-#     if request.method == 'POST':  # User wants to submit edits to to datasets
-#         try:
-#             DatasetModelFormset = modelformset_factory(model=Dataset, form=BulkDatasetUpdateForm)
-#             bulk_dataset_modelformset = DatasetModelFormset(request.POST)
-#
-#             if bulk_dataset_modelformset.is_valid():
-#                 with transaction.atomic():
-#                     bulk_dataset_modelformset.save()
-#             else:
-#                 raise ValueError("Invalid form items")
-#
-#             c = Context({'datasets.formset': bulk_dataset_modelformset})
-#
-#         except Exception, e:
-#             update_error = "Error while adding datasets.  " + str(e)
-#             c = Context({'datasets.formset': bulk_dataset_modelformset, 'update_error': update_error})
-#             LOGGER.exception(e.message)
-#
-#     else:
-#         # Prepopulate formset with the sucessfully added bulk datasets
-#         DatasetModelFormset =modelformset_factory(model=Dataset, form=BulkDatasetUpdateForm)
-#         bulk_dataset_modelformset = DatasetModelFormset(request.GET)
-#
-#         c = Context({'datasets.formset': bulk_dataset_modelformset})
-#
-#     c.update(csrf(request))
-#     return HttpResponse(t.render(c))

@@ -275,14 +275,19 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
         try:
             archive = ZipFile(self.cleaned_data["dataset_file"])
 
-            def map_f(filename):
+            def get_filestream(filename):
                 f = archive.open(filename)
                 streamable = StringIO.StringIO(f.read())
                 streamable.name = f.name.replace('/', '_')
                 f.close()
                 return streamable
 
-            files = [map_f(file_name) for file_name in archive.namelist()]
+            def should_include(filename):
+                info = archive.getinfo(file_name)
+                return '/' not in info.filename
+
+            files = [get_filestream(file_name) for file_name in archive.namelist() if should_include(file_name)]
+
         except zipfile.BadZipfile:
             raise forms.ValidationError(_('Not a zip archive'), code='invalid')
         return files
