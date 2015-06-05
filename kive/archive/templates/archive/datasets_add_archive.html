@@ -112,18 +112,17 @@
 
 <a href="usr.html" rel="prev">Back to user's portal</a>
 
-<h2>Add Bulk Datasets</h2>
+<h2>Add Datasets</h2>
 
 <form id="datasetBulkForm" name="datasetBulkForm" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
     <div style="width:100em">
         <fieldset class="multiFieldSet">
-            <legend>Bulk Add Multiple Datasets</legend>
+            <legend>Multiple Datasets from Archive</legend>
             <table>
                 <tr>
                     <td><label>{{ bulkAddDatasetForm.dataset_file.label }}</label></td>
                     <td>{{ bulkAddDatasetForm.dataset_file }}</td>
                     <td class="errortext">{{ bulkAddDatasetForm.dataset_file.errors }}</td>
-
 
                     <td><label>{{ bulkAddDatasetForm.compound_datatype.label }}</label></td>
                     <td>{{ bulkAddDatasetForm.compound_datatype }}</td>
@@ -147,7 +146,7 @@
                 </tr>
             </table>
         </fieldset>
-        <input type="submit" id="bulkSubmit" name="bulkSubmit" value="Submit Bulk Datasets" />
+        <input type="submit" id="bulkSubmit" name="bulkSubmit" value="Submit and Unarchive Datasets" />
 
     {% comment "This code may become useful again if we get to implementing a progress bar." %}
         <!--
