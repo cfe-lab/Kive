@@ -1,0 +1,188 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Datasets{% endblock %}
+<style>
+    .bar {
+        height: 18px;
+        background: green;
+    }
+
+    .bulk_dataset_table {
+        overflow:scroll;
+        height:50em;
+        clear: both;
+    }
+
+    .loading_container {
+        position:absolute;
+        top:0;
+        left:0;
+        width:100%;
+        height:100%;
+        z-index:1000;
+        background-color:grey;
+        opacity: .8;
+    }
+
+    .loading_img {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        margin-left: -32px; /* -1 * image width / 2 */
+        margin-top: -32px;  /* -1 * image height / 2 */
+        display: block;
+    }
+
+</style>
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/jquery-ui-1.10.4.custom.min.js"></script>
+    <script>
+        // Helper function that formats the file sizes
+        function formatFileSize(bytes) {
+            if (typeof bytes !== 'number') {
+                return '';
+            }
+            else if (bytes >= 1099511627776) {
+                return (bytes / 1099511627776).toFixed(2) + ' TB';
+            }
+            else if (bytes >= 1073741824) {
+                return (bytes / 1073741824).toFixed(2) + ' GB';
+            }
+            else if (bytes >= 1048576) {
+                return (bytes / 1048576).toFixed(2) + ' MB';
+            }
+            else if (bytes >= 1024) {
+                return (bytes / 1024).toFixed(2) + ' KB';
+            }
+            return bytes + ' B';
+        }
+
+        $("document").ready(function(readEvent){
+
+            if (window.File && window.FileReader && window.FileList && window.Blob) {
+              // Great success! All the File APIs are supported.
+            } else {
+              alert('Unsupported browser');
+            }
+
+            // Hide loading gif
+            $("#loading").hide();
+
+            $("#id_dataset_files").change(function(changeEvt) {
+                // clear contents of Upload Progress Table
+                $('#uploadProgressTable tbody').remove();
+
+                var fileList = $('#id_dataset_files')[0].files;
+                for (var i= 0; i < fileList.length; i++) {
+                    var f = fileList[i];
+                    var newDatasetRow =
+                        '<tr>' +
+                        '<td>' + f.name + '</td>' +
+                        '<td>' + formatFileSize(f.size) + '</td>' +
+                        '<td></td>' +  // Dataset Name
+                        '<td></td>' +  // Dataset Description
+                        '<td></td>' +  // Dataset MD5
+                        '<td></td>' +  // Dataset status
+                        '</tr>';
+                    $('#uploadProgressTable').append(newDatasetRow);
+                }
+            });
+
+            $("#archiveSubmit").submit(function(submitEvent){
+                //disable the submit button until after the files have been uploaded and the datasets have been created.
+                $("#archiveSubmit").attr("disabled", true);
+
+                // Indicate to user that we are going to wait a long time
+                $("#loading").show();
+
+                // Update mode?
+                if (!$("#editButton").is(":disabled")) {
+                    $("#datasetArchiveForm").action = "/datasets_update_bulk";
+                }
+            });
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+
+<a href="usr.html" rel="prev">Back to user's portal</a>
+
+<h2>Add Datasets</h2>
+
+<form id="datasetArchiveForm" name="datasetArchiveForm" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+    <div style="width:100em">
+        <fieldset class="multiFieldSet">
+            <legend>Multiple Datasets from Archive</legend>
+            <table>
+                <tr>
+                    <td><label>{{ archiveAddDatasetForm.dataset_file.label }}</label></td>
+                    <td>{{ archiveAddDatasetForm.dataset_file }}</td>
+                    <td class="errortext">{{ archiveAddDatasetForm.dataset_file.errors }}</td>
+
+                    <td><label>{{ archiveAddDatasetForm.compound_datatype.label }}</label></td>
+                    <td>{{ archiveAddDatasetForm.compound_datatype }}</td>
+                    <td class="errortext">{{ archiveAddDatasetForm.compound_datatype.errors }}</td>
+                </tr>
+                <tr><td><label>{{ archiveAddDatasetForm.name_prefix.label }}</label></td>
+                    <td>{{ archiveAddDatasetForm.name_prefix }}</td>
+                    <td class="errortext">{{ archiveAddDatasetForm.name_prefix.errors }}</td>
+
+                    <td><label>{{ archiveAddDatasetForm.description.label }}</label></td>
+                    <td>{{ archiveAddDatasetForm.description }}</td>
+                    <td class="errortext">{{ archiveAddDatasetForm.description.errors }}</td>
+                </tr>
+                <tr><td><label>{{ archiveAddDatasetForm.users_allowed.label }}</label></td>
+                    <td>{{ archiveAddDatasetForm.users_allowed }}</td>
+                    <td class="errortext">{{ archiveAddDatasetForm.users_allowed.errors }}</td>
+
+                    <td><label>{{ archiveAddDatasetForm.groups_allowed.label }}</label></td>
+                    <td>{{ archiveAddDatasetForm.groups_allowed }}</td>
+                    <td class="errortext">{{ archiveAddDatasetForm.groups_allowed.errors }}</td>
+                </tr>
+            </table>
+        </fieldset>
+        <input type="submit" id="archiveSubmit" name="archiveSubmit" value="Submit and Unarchive Datasets" />
+
+    {% comment "This code may become useful again if we get to implementing a progress bar." %}
+        <!--
+        <div class="bulk_dataset_table">
+            <table id="uploadProgressTable">
+                <thead>
+                    <tr>
+                        <th>File Name</th>
+                        <th>File Size</th>
+                        <th>Dataset Name</th>
+                        <th>Description</th>
+                        <th>MD5</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for bulkDisplayResult in bulkDisplayResults %}
+                        <tr>
+                            <td>{{ bulkDisplayResult.orig_filename }}</td>
+                            <td>{{ bulkDisplayResult.dataset.get_formatted_filesize }}</td>
+                            <td>{{ bulkDisplayResult.dataset.name }}</td>
+                            <td>{{ bulkDisplayResult.dataset.description }}</td>
+                            <td>{{ bulkDisplayResult.dataset.compute_md5 }}</td>
+                            <td>{{ bulkDisplayResult.status }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+         -->
+    {% endcomment %}
+
+        <div class="errorStrip errortext">{{ bulkAddDatasetForm.non_field_errors }}</div>
+        <div id="loading" class="loading_container">
+            <p><img src="loading.gif" class="loading_img"/>Please Wait...</p>
+        </div>
+    </div>
+</form>
+{% endblock %}

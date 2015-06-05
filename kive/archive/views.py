@@ -14,13 +14,8 @@ from django.db import transaction
 from django.forms.formsets import formset_factory
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
-from rest_framework.authentication import SessionAuthentication, BasicAuthentication
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework import status as rf_status
 
-from archive.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm
+from archive.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm, ArchiveAddDatasetForm
 from archive.models import Dataset, MethodOutput
 from archive.serializers import DatasetSerializer
 import librarian.models
@@ -217,6 +212,91 @@ class BulkDatasetDisplay:
 
 
 @login_required
+def datasets_add_archive(request):
+    """
+    Add datasets in bulk to db.  Redirect to /datasets_bulk view so user can examine upload status of each dataset.
+    """
+    # Redirect to page to allow user to view status of added datasets.
+    c = RequestContext(request)
+    t = loader.get_template('archive/datasets_bulk.html')
+    archive_add_dataset_form = None
+
+    # If we got posted to, try to create DB entries
+    if request.method == 'POST':
+        try:
+            archive_add_dataset_form = ArchiveAddDatasetForm(
+                data=request.POST,
+                files=request.FILES,
+                user=request.user
+            )
+
+            # Try to add new datasets
+            if archive_add_dataset_form.is_valid():
+                add_results = archive_add_dataset_form.create_datasets(request.user)
+            else:
+                # TODO: change this
+                c.update({'archiveAddDatasetForm': archive_add_dataset_form})
+                return HttpResponse(t.render(c))
+
+            # New datasets added, generate a response
+            archive_display_results = []
+
+            # Fill in default values for the form fields
+            for i in range(len(add_results)):
+                archive_display_result = {}
+                uploaded_files = archive_add_dataset_form.cleaned_data["dataset_file"]
+                if isinstance(add_results[i], basestring):
+                    archive_display_result["name"] = ""
+                    archive_display_result["description"] = ""
+                    archive_display_result["orig_filename"] = ""
+                    archive_display_result["filesize"] = ""
+                    archive_display_result["md5"] = ""
+                    archive_display_result["id"] = ""
+                else:
+                    archive_display_result["name"] = add_results[i].name
+                    archive_display_result["description"] = add_results[i].description
+                    # This is the original filename as uploaded by the client, not the filename as stored
+                    # on the file server.
+                    archive_display_result["orig_filename"] = uploaded_files[i].name
+                    archive_display_result["filesize"] = add_results[i].get_formatted_filesize()
+                    archive_display_result["md5"] = add_results[i].compute_md5()
+                    archive_display_result["id"] = add_results[i].id
+
+                archive_display_results.extend([archive_display_result])
+
+            BulkDatasetUpdateFormSet = formset_factory(form=BulkDatasetUpdateForm, max_num=len(archive_display_results))
+            bulk_dataset_update_formset = BulkDatasetUpdateFormSet(initial=archive_display_results)
+
+            # Fill in the attributes that are not fields in the form
+            # These are not set by the BulkDatasetUpdateFormSet(initial=...) parameter
+            for i in range(0, len(add_results)):
+                dataset_form = bulk_dataset_update_formset[i]
+                if dataset_form.initial.get("name"):
+                    dataset_form.dataset = add_results[i]
+                    dataset_form.err_msg = ""
+                    dataset_form.status = BulkDatasetDisplay.STATUS_SUCCESS
+                else:
+                    dataset_form.dataset = Dataset()
+                    dataset_form.err_msg = add_results[i]
+                    dataset_form.status = BulkDatasetDisplay.STATUS_FAIL
+
+            c.update({"bulk_dataset_formset": bulk_dataset_update_formset})
+
+        except ValidationError as e:
+            LOGGER.exception(e.message)
+            archive_add_dataset_form.add_error(None, e)
+            t = loader.get_template('archive/datasets_add_archive.html')
+            c.update({'archiveAddDatasetForm': archive_add_dataset_form})
+
+    else:  # return an empty form for the user to fill in
+        t = loader.get_template('archive/datasets_add_archive.html')
+        archive_dataset_form = ArchiveAddDatasetForm(user=request.user)
+        c.update({'archiveAddDatasetForm': archive_dataset_form})
+
+    return HttpResponse(t.render(c))
+
+
+@login_required
 def datasets_add_bulk(request):
     """
     Add datasets in bulk to db.  Redirect to /datasets_bulk view so user can examine upload status of each dataset.
@@ -365,37 +445,3 @@ def lookup(request):
     t = loader.get_template("archive/lookup.html")
     c = RequestContext(request, {})
     return HttpResponse(t.render(c))
-
-
-# def datasets_update_bulk(request):
-#     """
-#     Edit recently added bulk datasets in /datasets_udate_bulk.html
-#     """
-#     t = loader.get_template('archive/datasets_update_bulk.html')
-#     if request.method == 'POST':  # User wants to submit edits to to datasets
-#         try:
-#             DatasetModelFormset = modelformset_factory(model=Dataset, form=BulkDatasetUpdateForm)
-#             bulk_dataset_modelformset = DatasetModelFormset(request.POST)
-#
-#             if bulk_dataset_modelformset.is_valid():
-#                 with transaction.atomic():
-#                     bulk_dataset_modelformset.save()
-#             else:
-#                 raise ValueError("Invalid form items")
-#
-#             c = Context({'datasets.formset': bulk_dataset_modelformset})
-#
-#         except Exception, e:
-#             update_error = "Error while adding datasets.  " + str(e)
-#             c = Context({'datasets.formset': bulk_dataset_modelformset, 'update_error': update_error})
-#             LOGGER.exception(e.message)
-#
-#     else:
-#         # Prepopulate formset with the sucessfully added bulk datasets
-#         DatasetModelFormset =modelformset_factory(model=Dataset, form=BulkDatasetUpdateForm)
-#         bulk_dataset_modelformset = DatasetModelFormset(request.GET)
-#
-#         c = Context({'datasets.formset': bulk_dataset_modelformset})
-#
-#     c.update(csrf(request))
-#     return HttpResponse(t.render(c))
