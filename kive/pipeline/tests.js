@@ -419,11 +419,119 @@
                 drawVertices(this.canvas, this.node, this.node.getVertices());
             });
             
-            
             it('should have label', function() {
                 this.node.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
                         {x: 100, y: 9.5, text: 'example', dir: 0, style: 'node'});
+                
+                this.node.draw(this.canvas.ctx);
+                var label = this.node.getLabel();
+                this.canvas.drawText(
+                        {x: label.x, y: label.y, text: label.label, dir:0, style: 'node'});
+            });
+        });
+        
+        describe("CdtNode", function() {
+            beforeEach(function() {
+                var x = 100,
+                    y = 40,
+                    label = 'example';
+                this.expected_cdt_pk = 1234;
+                this.node = new drydock_objects.CdtNode(
+                        this.expected_cdt_pk,
+                        x,
+                        y,
+                        label);
+            });
+            
+            it("should record compound data type's key", function() {
+                expect(this.node.pk).toBe(this.expected_cdt_pk);
+            });
+            
+            it('should draw', function() {
+                this.expectedCanvas.ctx.fillStyle = "#88D";
+                // draw base
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.moveTo(77.5, 54);
+                this.expectedCanvas.ctx.lineTo(100, 65.25);
+                this.expectedCanvas.ctx.lineTo(122.5, 54);
+                this.expectedCanvas.ctx.lineTo(122.5, 26);
+                this.expectedCanvas.ctx.lineTo(77.5, 26);
+                this.expectedCanvas.ctx.closePath();
+                this.expectedCanvas.ctx.fill();
+                // draw top
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.moveTo(77.5, 26);
+                this.expectedCanvas.ctx.lineTo(100, 37.25);
+                this.expectedCanvas.ctx.lineTo(122.5, 26);
+                this.expectedCanvas.ctx.lineTo(100, 14.75);
+                this.expectedCanvas.ctx.closePath();
+                this.expectedCanvas.ctx.fill();
+                // some shading
+                this.expectedCanvas.ctx.fillStyle = 'white';
+                this.expectedCanvas.ctx.globalAlpha = 0.35;
+                this.expectedCanvas.ctx.fill();
+                this.expectedCanvas.ctx.globalAlpha = 1.0;
+                var magnet = new drydock_objects.Magnet();
+                magnet.x = 113;
+                magnet.y = 45.625;
+                magnet.r = 5;
+                magnet.draw(this.expectedCanvas.ctx);
+                
+                this.node.draw(this.ctx);
+            });
+
+            it('should have vertices', function() {
+                drawVertices(this.expectedCanvas,
+                        this.node,
+                        [{x: 100, y: 40},
+                         {x: 77.5, y: 54},
+                         {x: 100, y: 65.25},
+                         {x: 122.5, y: 54},
+                         {x: 122.5, y: 26},
+                         {x: 100, y: 14.75},
+                         {x: 77.5, y: 26}]);
+                
+                drawVertices(this.canvas, this.node, this.node.getVertices());
+            });
+            
+            it('should highlight', function() {
+                this.expectedCanvas.ctx.strokeStyle = "orange";
+                this.expectedCanvas.ctx.lineWidth = 4;
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.moveTo(77.5, 54);
+                this.expectedCanvas.ctx.lineTo(100, 65.25);
+                this.expectedCanvas.ctx.lineTo(122.5, 54);
+                this.expectedCanvas.ctx.lineTo(122.5, 26);
+                this.expectedCanvas.ctx.lineTo(100, 14.75);
+                this.expectedCanvas.ctx.lineTo(77.5, 26);
+                this.expectedCanvas.ctx.closePath();
+                this.expectedCanvas.ctx.stroke();
+                this.node.draw(this.expectedCanvas.ctx);
+                
+                this.node.draw(this.ctx);
+                this.ctx.strokeStyle = "orange";
+                this.ctx.lineWidth = 4;
+                this.node.highlight(this.ctx);
+            });
+            
+            itContains([100, 40, true, 'centre',
+                        122, 40, true, 'right edge',
+                        123, 40, false, 'past right edge',
+                        110, 60, true, 'bottom-right edge',
+                        110, 61, false, 'past bottom-right edge',
+                        100, 65, true, 'bottom edge',
+                        100, 66, false, 'past bottom edge',
+                        78, 40, true, 'left edge',
+                        77, 40, false, 'past left edge',
+                        100, 15, true, 'top edge',
+                        100, 14, false, 'past top edge'],
+                       function(testCase) { return testCase.node; });
+            
+            it('should have label', function() {
+                this.node.draw(this.expectedCanvas.ctx);
+                this.expectedCanvas.drawText(
+                        {x: 100, y: 11, text: 'example', dir: 0, style: 'node'});
                 
                 this.node.draw(this.canvas.ctx);
                 var label = this.node.getLabel();
