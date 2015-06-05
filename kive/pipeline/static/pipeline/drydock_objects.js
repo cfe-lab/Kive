@@ -590,14 +590,8 @@ drydock_objects = (function(my) {
     my.CdtNode.prototype.getLabel = function() {
         return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
     };
-    
-    // TODO: Convert the whole file to this module, then combine all the sections.
-    return my;
-}(drydock_objects));
-var CDtNode = drydock_objects.CdtNode;
-var RawNode = drydock_objects.RawNode;
 
-function MethodNode (pk, family, x, y, fill, label, inputs, outputs, status, log_id) {
+my.MethodNode = function(pk, family, x, y, fill, label, inputs, outputs, status, log_id) {
     /*
     CONSTRUCTOR
     A MethodNode is a rectangle of constant width (w) and varying height (h)
@@ -636,17 +630,23 @@ function MethodNode (pk, family, x, y, fill, label, inputs, outputs, status, log
     this.log_id = log_id;
 
     this.in_magnets = [];
-    var sorted_in_keys = Object.keys(this.inputs).sort(function(a,b){return a-b});
+    var sorted_in_keys = Object.keys(this.inputs).sort(function(a,b){return a-b}),
+        parent = this,
+        r = 5,
+        attract = 5,
+        fill = '#fff';
     for (var keyIndex in sorted_in_keys) {
         var key = sorted_in_keys[keyIndex],
             this_input = this.inputs[key],
+            cdt = this_input['cdt_pk'],
+            magnet_label = this_input['datasetname'],
             magnet = new Magnet(
-                parent = this,
-                r = 5,
-                attract = 5,
-                fill = '#fff',
-                cdt = this_input['cdt_pk'],
-                label = this_input['datasetname'],
+                parent,
+                r,
+                attract,
+                fill,
+                cdt,
+                magnet_label,
                 null,
                 false
             );
@@ -663,13 +663,15 @@ function MethodNode (pk, family, x, y, fill, label, inputs, outputs, status, log
     for (keyIndex in sorted_out_keys) {
         var key = sorted_out_keys[keyIndex],
             this_output = this.outputs[key],
+            cdt = this_output['cdt_pk'],
+            magnet_label = this_output['datasetname'],
             magnet = new Magnet(
-                parent = this,
-                r = 5,
-                attract = 5,
-                fill = '#fff',
-                cdt = this_output['cdt_pk'],
-                label = this_output['datasetname'],
+                parent,
+                r,
+                attract,
+                fill,
+                cdt,
+                magnet_label,
                 null,
                 true
             );
@@ -682,7 +684,7 @@ function MethodNode (pk, family, x, y, fill, label, inputs, outputs, status, log
     }
 }
 
-MethodNode.prototype.draw = function(ctx) {
+my.MethodNode.prototype.draw = function(ctx) {
     ctx.fillStyle = this.fill;
     var vertices = this.getVertices();
     this.vertices = vertices;
@@ -745,20 +747,22 @@ MethodNode.prototype.draw = function(ctx) {
         x_outputs = cx + this.scoop * cos30,
         y_outputs = cy + this.scoop * .5,
         c2c = this.in_magnets[0].r * 2 + magnet_margin,
-        ipl  = (this.in_magnets.length  * c2c + magnet_margin) / 2;// distance from magnet centre to edge
+        ipl  = (this.in_magnets.length  * c2c + magnet_margin) / 2,// distance from magnet centre to edge
+        magnet,
+        pos;
 
     this.input_plane_len = ipl;
     
     for (var i = 0, len = this.in_magnets.length; i < len; i++) {
         magnet = this.in_magnets[i];
-        var pos = i - len/2 + .5;
+        pos = i - len/2 + .5;
         magnet.x = cx + pos * cos30 * c2c;
         magnet.y = y_inputs - pos * c2c/2;
         magnet.draw(ctx);
     }
     for (i = 0, len = this.out_magnets.length; i < len; i++) {
         magnet = this.out_magnets[i];
-        var pos = i - len/2 + .5;
+        pos = i - len/2 + .5;
         magnet.x = x_outputs + pos * cos30 * c2c;
         magnet.y = y_outputs - pos * c2c/2;
         magnet.draw(ctx);
@@ -789,7 +793,7 @@ MethodNode.prototype.draw = function(ctx) {
     }
 };
 
-MethodNode.prototype.highlight = function(ctx, dragging) {
+my.MethodNode.prototype.highlight = function(ctx, dragging) {
     // highlight this node shape
     var vertices = this.getVertices();
     ctx.globalCompositeOperation = 'destination-over';
@@ -837,7 +841,7 @@ MethodNode.prototype.highlight = function(ctx, dragging) {
     }
 }
 
-MethodNode.prototype.contains = function(mx, my) {
+my.MethodNode.prototype.contains = function(mx, my) {
     var vertices = this.getVertices();
     var polygon = [ 1,2,3,8,4,5,6,10 ];
     var shape = [];
@@ -847,7 +851,7 @@ MethodNode.prototype.contains = function(mx, my) {
     return Geometry.inPolygon(mx, my, shape);
 };
 
-MethodNode.prototype.getVertices = function() {
+my.MethodNode.prototype.getVertices = function() {
     var cx = this.x + this.dx,
         cy = this.y + this.dy;
     
@@ -914,12 +918,10 @@ MethodNode.prototype.getVertices = function() {
     return this.vertices;
 };
 
-MethodNode.prototype.getLabel = function() {
+my.MethodNode.prototype.getLabel = function() {
     return new NodeLabel(this.label, this.x + this.dx + this.scoop/4, this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset);
 };
 
-drydock_objects = (function(my) {
-    "use strict";
     my.Magnet = function(parent, r, attract, fill, cdt, label, offset, isOutput) {
         /*
         CONSTRUCTOR
@@ -1303,8 +1305,11 @@ drydock_objects = (function(my) {
     // TODO: Convert the whole file to this module, then combine all the sections.
     return my;
 }(drydock_objects));
-var Magnet = drydock_objects.Magnet;
+var CDtNode = drydock_objects.CdtNode;
 var Connector = drydock_objects.Connector;
+var Magnet = drydock_objects.Magnet;
+var MethodNode = drydock_objects.MethodNode;
+var RawNode = drydock_objects.RawNode;
 
 function NodeLabel (label, x, y) {
     this.label = label || '';
