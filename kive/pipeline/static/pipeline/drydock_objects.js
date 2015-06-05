@@ -295,31 +295,6 @@ var Geometry = {
     }
 };
 
-/*
-To be implemented in the future:
-Parent classes from which RawNode, CDtNode, MethodNode, and OutputNode will stem.
-*/
-function Node(pk, label, x, y, w, h, inset, offset, fill) {
-    this.pk = pk;
-    this.label = label || '';
-    this.x = x || 0; // defaults to top left corner
-    this.y = y || 0;
-    this.w = w || 25; // defaults to top left corner
-    this.h = h || 25;
-    this.inset = inset || 10; // distance of magnet from center
-    this.offset = offset || 18; // distance of label from center
-    this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
-    this.dy = 0;
-    this.fill = fill || '#888';
-    this.in_magnets = [];
-    this.out_magnets = [];
-}
-function InputNode(pk, x, y, w, h, fill, inset, offset, label) {
-    Node.call(this, pk, label, x, y, w, h, inset, offset, fill);
-}
-InputNode.prototype = Object.create(Node.prototype);
-InputNode.prototype.constructor = InputNode;
-
 drydock_objects = (function(my) {
     "use strict";
     
