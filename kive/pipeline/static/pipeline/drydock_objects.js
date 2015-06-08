@@ -5,16 +5,14 @@
  */
 var drydock_objects = (function() {
     "use strict";
-    var my = {};
-    
-    // TODO: make this an internal variable once all the classes that use it are in this block
-    my.statusColorMap = {
+    var my = {},
+        statusColorMap = {
             'CLEAR': 'green',
             'FAILURE': 'red',
             'RUNNING': 'orange',
             'READY': 'orange',
-            'WAITING': 'yellow',
-    };
+            'WAITING': 'yellow'
+        };
     
     /**
      * A helper class to easily draw primitive shapes on the canvas.
@@ -207,7 +205,7 @@ var drydock_objects = (function() {
         this.magnetOffset = {x: -12, y: -this.h/2};
         this.in_magnets = [];
         this.out_magnets = [];
-    }
+    };
     
     my.CylinderNode.prototype.draw = function(ctx) {
         var cx = this.x + this.dx,
@@ -280,15 +278,15 @@ var drydock_objects = (function() {
         if (cable) {
             cable.highlight(ctx);
         }
-    }
+    };
     
     my.CylinderNode.prototype.contains = function(mx, my) {
         var cx = this.x + this.dx,
             cy = this.y + this.dy;
         // node is comprised of a rectangle and two ellipses
-        return Geometry.inRectangleFromCentre(mx, my, cx, cy, this.r, this.h/2)
-            || Geometry.inEllipse(mx, my, cx, cy - this.h/2, this.r, this.r2)
-            || Geometry.inEllipse(mx, my, cx, cy + this.h/2, this.r, this.r2);
+        return Geometry.inRectangleFromCentre(mx, my, cx, cy, this.r, this.h/2) ||
+            Geometry.inEllipse(mx, my, cx, cy - this.h/2, this.r, this.r2) ||
+            Geometry.inEllipse(mx, my, cx, cy + this.h/2, this.r, this.r2);
     };
     
     my.CylinderNode.prototype.getVertices = function() {
@@ -331,7 +329,7 @@ var drydock_objects = (function() {
         canvas.strokeEllipse({x: cx, y: cy - this.h/2, rx: this.r, ry: this.r2});
         
         ctx.globalCompositeOperation = 'source-over';
-    }
+    };
     
     my.CylinderNode.prototype.getLabel = function() {
         return new NodeLabel(
@@ -350,7 +348,7 @@ var drydock_objects = (function() {
         this.inset = 10; // distance of magnet from center
         // Input node always has one magnet
         this.out_magnets.push(new Magnet(this, 5, 2, "white", null, this.label, null, true));
-    }
+    };
     my.RawNode.prototype = Object.create(my.CylinderNode.prototype);
     my.RawNode.prototype.constructor = my.RawNode;
 
@@ -372,7 +370,7 @@ var drydock_objects = (function() {
         this.label = label || '';
         this.in_magnets = [];
         this.out_magnets = [ new Magnet(this, 5, 2, "white", this.pk, this.label, null, true) ];
-    }
+    };
     
     my.CdtNode.prototype.draw = function(ctx) {
         var cx = this.x + this.dx,
@@ -469,9 +467,9 @@ var drydock_objects = (function() {
         
         // mouse coords are within the 4 diagonal lines.
         // can be checked with 1 expression because the 4 lines are mirror images of each other
-        return this.h/2 + this.w/4 - dy > dx / 2 
+        return this.h/2 + this.w/4 - dy > dx / 2 &&
         // then check the horizontal boundaries on the sides of the hexagon
-            && dx < this.w/2;
+            dx < this.w/2;
     };
     
     my.CdtNode.prototype.getLabel = function() {
@@ -523,59 +521,61 @@ var drydock_objects = (function() {
         this.status = status;
     
         this.in_magnets = [];
-        var sorted_in_keys = Object.keys(this.inputs).sort(function(a,b){return a-b}),
+        var sorted_in_keys = Object.keys(this.inputs).sort(function(a,b){return a-b;}),
             parent = this,
             r = 5,
             attract = 5,
-            fill = '#fff';
+            magnet_fill = '#fff',
+            key,
+            cdt,
+            magnet_label,
+            magnet;
         for (var keyIndex in sorted_in_keys) {
-            var key = sorted_in_keys[keyIndex],
-                this_input = this.inputs[key],
-                cdt = this_input['cdt_pk'],
-                magnet_label = this_input['datasetname'],
-                magnet = new Magnet(
-                    parent,
-                    r,
-                    attract,
-                    fill,
-                    cdt,
-                    magnet_label,
-                    null,
-                    false
-                );
+            key = sorted_in_keys[keyIndex];
+            var this_input = this.inputs[key];
+            cdt = this_input.cdt_pk;
+            magnet_label = this_input.datasetname;
+            magnet = new Magnet(
+                parent,
+                r,
+                attract,
+                magnet_fill,
+                cdt,
+                magnet_label,
+                null,
+                false);
     
             if (this.n_inputs == 1) {
-                magnet.x -= this.h/3
+                magnet.x -= this.h/3;
             }
     
             this.in_magnets.push(magnet);
         }
     
         this.out_magnets = [];
-        var sorted_out_keys = Object.keys(outputs).sort(function(a,b){return a-b});
+        var sorted_out_keys = Object.keys(outputs).sort(function(a,b){return a-b;});
         for (keyIndex in sorted_out_keys) {
-            var key = sorted_out_keys[keyIndex],
-                this_output = this.outputs[key],
-                cdt = this_output['cdt_pk'],
-                magnet_label = this_output['datasetname'],
-                magnet = new Magnet(
-                    parent,
-                    r,
-                    attract,
-                    fill,
-                    cdt,
-                    magnet_label,
-                    null,
-                    true
-                );
+            key = sorted_out_keys[keyIndex];
+            var this_output = this.outputs[key];
+            cdt = this_output.cdt_pk;
+            magnet_label = this_output.datasetname;
+            magnet = new Magnet(
+                parent,
+                r,
+                attract,
+                magnet_fill,
+                cdt,
+                magnet_label,
+                null,
+                true);
     
             if (this.n_inputs == 1) {
-                magnet.x += this.h/3
+                magnet.x += this.h/3;
             }
     
             this.out_magnets.push(magnet);
         }
-    }
+    };
     
     my.MethodNode.prototype.buildBodyPath = function(ctx) {
         var vertices = this.getVertices();
@@ -637,7 +637,7 @@ var drydock_objects = (function() {
             magnet_margin = 6,
             y_inputs = cy - this.stack,
             x_outputs = cx + this.scoop * cos30,
-            y_outputs = cy + this.scoop * .5,
+            y_outputs = cy + this.scoop * 0.5,
             c2c = this.in_magnets[0].r * 2 + magnet_margin,
             ipl  = (this.in_magnets.length  * c2c + magnet_margin) / 2,// distance from magnet centre to edge
             magnet,
@@ -647,14 +647,14 @@ var drydock_objects = (function() {
         
         for (var i = 0, len = this.in_magnets.length; i < len; i++) {
             magnet = this.in_magnets[i];
-            pos = i - len/2 + .5;
+            pos = i - len/2 + 0.5;
             magnet.x = cx + pos * cos30 * c2c;
             magnet.y = y_inputs - pos * c2c/2;
             magnet.draw(ctx);
         }
         for (i = 0, len = this.out_magnets.length; i < len; i++) {
             magnet = this.out_magnets[i];
-            pos = i - len/2 + .5;
+            pos = i - len/2 + 0.5;
             magnet.x = x_outputs + pos * cos30 * c2c;
             magnet.y = y_outputs - pos * c2c/2;
             magnet.draw(ctx);
@@ -664,7 +664,7 @@ var drydock_objects = (function() {
         if(typeof this.status === 'string') {
             ctx.save();
     
-            ctx.strokeStyle = _statusColorMap[this.status] || 'black';
+            ctx.strokeStyle = statusColorMap[this.status] || 'black';
             ctx.lineWidth = 5;
     
             ctx.globalCompositeOperation = 'destination-over';
@@ -705,7 +705,7 @@ var drydock_objects = (function() {
                 magnet.highlight(ctx);
             }
         }
-        for (var i = 0; i < this.in_magnets.length; i++) {
+        for (i = 0; i < this.in_magnets.length; i++) {
             magnet = this.in_magnets[i];
             if (magnet.connected.length === 0) {
                 magnet.highlight(ctx);
@@ -713,7 +713,7 @@ var drydock_objects = (function() {
                 magnet.connected[0].drawLabel(ctx);
             }
         }
-    }
+    };
     
     my.MethodNode.prototype.contains = function(mx, my) {
         var vertices = this.getVertices();
@@ -744,7 +744,7 @@ var drydock_objects = (function() {
                 cosipl = cos30 * input_plane_len;
             
             var opx = cx + this.scoop * cos30,
-                opy = cy + this.scoop * .5,
+                opy = cy + this.scoop * 0.5,
                 output_plane_len = (this.n_outputs * c2c + magnet_margin) / 2,
                 cosopl = cos30 * output_plane_len; // half of the length of the parallelogram ("half hypoteneuse")
         
@@ -890,8 +890,7 @@ var drydock_objects = (function() {
     
         this.x = this.from_x; // for compatibility with shape-based functions
         this.y = this.from_y;
-            
-    }
+    };
     
     my.Connector.prototype.draw = function(ctx) {
         /*
@@ -941,8 +940,8 @@ var drydock_objects = (function() {
                 }
             }
     
-            if(_statusColorMap.hasOwnProperty(cable_stat)) {
-                 ctx.strokeStyle = _statusColorMap[cable_stat];
+            if(statusColorMap.hasOwnProperty(cable_stat)) {
+                 ctx.strokeStyle = statusColorMap[cable_stat];
             }
         }
 
@@ -969,7 +968,7 @@ var drydock_objects = (function() {
         if (this.dest !== null) {
             this.drawLabel(ctx);
         }
-    }
+    };
     
     // make an object in the format of jsBezier lib
     my.Connector.prototype.calculateCurve = function() {
@@ -989,7 +988,7 @@ var drydock_objects = (function() {
             this.prevX = this.x;
             this.prevY = this.y;
             
-            this.dx = this.x - this.fromX,
+            this.dx = this.x - this.fromX;
             this.dy = this.y - this.fromY;
             
             this.ctrl1 = {
@@ -999,8 +998,8 @@ var drydock_objects = (function() {
             - Distance of ctrl from origin is 70% of dx
             - Minimum dx is 50, so minimum distance of ctrl is 35.
                      */
-                    x: this.fromX + Math.max(this.dx, 50) * Math.sqrt(3) / 2 * .7,
-                    y: this.fromY + Math.max(this.dx, 50) / 2 * .7
+                    x: this.fromX + Math.max(this.dx, 50) * Math.sqrt(3) / 2 * 0.7,
+                    y: this.fromY + Math.max(this.dx, 50) / 2 * 0.7
             };
             this.ctrl2 = {
                     /*
@@ -1009,7 +1008,7 @@ var drydock_objects = (function() {
             - Horizontal offset is 10% of dx
                      */
                     x: this.x - this.dx / 10,
-                    y: this.y - Math.max( (this.dy > 0 ? 1 : -.6) * this.dy, 50) / 1.5
+                    y: this.y - Math.max( (this.dy > 0 ? 1 : -0.6) * this.dy, 50) / 1.5
             };
         }
         return [
@@ -1028,10 +1027,10 @@ var drydock_objects = (function() {
         }
         
         this.label_width = ctx.measureText(label).width + 10;
-        this.dx = this.x - this.fromX,
+        this.dx = this.x - this.fromX;
         this.dy = this.y - this.fromY;
         
-        if ( this.dx * this.dx + this.dy * this.dy > this.label_width * this.label_width / .49) {
+        if ( this.dx * this.dx + this.dy * this.dy > this.label_width * this.label_width / 0.49) {
             // determine the angle of the bezier at the midpoint
             var midpoint = jsBezier.nearestPointOnCurve(
                     { x: this.fromX + this.dx/2, y: this.fromY + this.dy/2 },
@@ -1050,7 +1049,7 @@ var drydock_objects = (function() {
                     {x: 0, y: 0, dir: 0, text: label, style: "connector"});
             ctx.restore();
         }
-    }
+    };
     
     my.Connector.prototype.debug = function(ctx) {
         var jsb = this.calculateCurve(),
@@ -1151,9 +1150,8 @@ var drydock_objects = (function() {
             right = Math.max.apply(null, xs),
             left = Math.min.apply(null, xs);
         
-        if (mx > left - pad && mx < right + pad
-            && my > top - pad && my < bottom + pad
-            ) {
+        if (mx > left - pad && mx < right + pad &&
+                my > top - pad && my < bottom + pad) {
             // expensive route: run bezier distance algorithm
             return pad > 
                 jsBezier.distanceFromCurve(
@@ -1169,11 +1167,11 @@ var drydock_objects = (function() {
         this.label = label || '';
         this.x = x || 0;
         this.y = y || 0;
-    }
+    };
     
     my.OutputZone = function(cw, ch, inset) {
-        this.x = cw * .82;
-        this.w = cw * .175;
+        this.x = cw * 0.82;
+        this.w = cw * 0.175;
         this.h = this.w;
         this.y = 1;
         
@@ -1182,7 +1180,7 @@ var drydock_objects = (function() {
         }
         
         this.inset = inset || 15; // distance of label from center
-    }
+    };
     
     my.OutputZone.prototype.draw = function (ctx) {
         // draw output zone
@@ -1205,10 +1203,10 @@ var drydock_objects = (function() {
     
     my.OutputZone.prototype.contains = function (mx, my) {
         return (
-            mx >= this.x 
-            && mx <= this.x + this.w 
-            && my >= this.y 
-            && my <= this.y + this.h
+            mx >= this.x &&
+            mx <= this.x + this.w &&
+            my >= this.y &&
+            my <= this.y + this.h
         );
     };
     
@@ -1230,14 +1228,14 @@ var drydock_objects = (function() {
         // was being searched for and was found
         // (when doing an md5 lookup)
         this.found_md5 = false;
-    }
+    };
     my.OutputNode.prototype = Object.create(my.CylinderNode.prototype);
     my.OutputNode.prototype.constructor = my.OutputNode;
     
     my.OutputNode.prototype.draw = function(ctx) {
         // Highlight the method based on status.
         if(typeof this.status === 'string') {
-            this.highlightStroke = my.statusColorMap[this.status] || 'black';
+            this.highlightStroke = statusColorMap[this.status] || 'black';
         }
         else {
             this.highlightStroke = undefined;
@@ -1255,7 +1253,7 @@ var drydock_objects = (function() {
         if (cable) {
             cable.highlight(ctx);
         }
-    }
+    };
 
     my.OutputNode.prototype.debug = function(ctx) {
         this.in_magnets[0].connected[0].debug(ctx);
@@ -1270,23 +1268,19 @@ var CDtNode = drydock_objects.CdtNode,
     NodeLabel = drydock_objects.NodeLabel,
     OutputNode = drydock_objects.OutputNode,
     OutputZone = drydock_objects.OutputZone,
-    RawNode = drydock_objects.RawNode,
-    _statusColorMap = drydock_objects.statusColorMap;
+    RawNode = drydock_objects.RawNode;
 
 var Geometry = {
     inEllipse: function(mx, my, cx, cy, rx, ry) {
         var dx = mx - cx,
             dy = my - cy;
-        return (dx*dx) / (rx*rx)
-             + (dy*dy) / (ry*ry) <= 1;
+        return (dx*dx) / (rx*rx) + (dy*dy) / (ry*ry) <= 1;
     },
     inRectangle: function(mx, my, x, y, w, h) {
-        return mx > x && mx < x + w
-            && my > y && my < y + h;
+        return mx > x && mx < x + w && my > y && my < y + h;
     },
     inRectangleFromCentre: function(mx, my, cx, cy, w2, h2) {
-        return Math.abs(mx - cx) < w2
-            && Math.abs(my - cy) < h2;
+        return Math.abs(mx - cx) < w2 && Math.abs(my - cy) < h2;
     },
     inCircle: function(mx, my, cx, cy, r) {
         var dx = cx - mx,
