@@ -185,15 +185,6 @@ var drydock_objects = (function() {
         }
     };
     
-    // TODO: Convert the whole file to this module, then combine all the sections.
-    return my;
-}());
-
-var _statusColorMap = drydock_objects.statusColorMap;
-
-drydock_objects = (function(my) {
-    "use strict";
-    
     /**
      * A base class for both cylindrical nodes: RawNode and OutputNode.
      */
@@ -1270,7 +1261,6 @@ drydock_objects = (function(my) {
         this.in_magnets[0].connected[0].debug(ctx);
     };
     
-    // TODO: Convert the whole file to this module, then combine all the sections.
     return my;
 }(drydock_objects));
 var CDtNode = drydock_objects.CdtNode,
@@ -1280,7 +1270,8 @@ var CDtNode = drydock_objects.CdtNode,
     NodeLabel = drydock_objects.NodeLabel,
     OutputNode = drydock_objects.OutputNode,
     OutputZone = drydock_objects.OutputZone,
-    RawNode = drydock_objects.RawNode;
+    RawNode = drydock_objects.RawNode,
+    _statusColorMap = drydock_objects.statusColorMap;
 
 var Geometry = {
     inEllipse: function(mx, my, cx, cy, rx, ry) {
