@@ -1277,23 +1277,14 @@ drydock_objects = (function(my) {
         // mx,my is outside the rectangle, don't bother computing the bezier distance
         else return false;
     };
-    
-    // TODO: Convert the whole file to this module, then combine all the sections.
-    return my;
-}(drydock_objects));
-var CDtNode = drydock_objects.CdtNode;
-var Connector = drydock_objects.Connector;
-var Magnet = drydock_objects.Magnet;
-var MethodNode = drydock_objects.MethodNode;
-var RawNode = drydock_objects.RawNode;
 
-function NodeLabel (label, x, y) {
+my.NodeLabel = function(label, x, y) {
     this.label = label || '';
     this.x = x || 0;
     this.y = y || 0;
 }
 
-function OutputZone (cw, ch, inset) {
+my.OutputZone = function(cw, ch, inset) {
     this.x = cw * .82;
     this.w = cw * .175;
     this.h = this.w;
@@ -1306,7 +1297,7 @@ function OutputZone (cw, ch, inset) {
     this.inset = inset || 15; // distance of label from center
 }
 
-OutputZone.prototype.draw = function (ctx) {
+my.OutputZone.prototype.draw = function (ctx) {
     // draw output zone
     ctx.fillStyle = this.fill;
     
@@ -1328,7 +1319,7 @@ OutputZone.prototype.draw = function (ctx) {
     ctx.fillText("create an output", this.x + this.w/2, this.y + this.inset*2);
 };
 
-OutputZone.prototype.contains = function (mx, my) {
+my.OutputZone.prototype.contains = function (mx, my) {
     return (
         mx >= this.x 
         && mx <= this.x + this.w 
@@ -1337,8 +1328,6 @@ OutputZone.prototype.contains = function (mx, my) {
     );
 };
 
-drydock_objects = (function(my) {
-    "use strict";
     my.OutputNode = function (x, y, label, pk, status, md5, dataset_id) {
         /*
         Node representing an output.
@@ -1391,4 +1380,11 @@ drydock_objects = (function(my) {
     // TODO: Convert the whole file to this module, then combine all the sections.
     return my;
 }(drydock_objects));
-var OutputNode = drydock_objects.OutputNode;
+var CDtNode = drydock_objects.CdtNode,
+    Connector = drydock_objects.Connector,
+    Magnet = drydock_objects.Magnet,
+    MethodNode = drydock_objects.MethodNode,
+    NodeLabel = drydock_objects.NodeLabel,
+    OutputNode = drydock_objects.OutputNode,
+    OutputZone = drydock_objects.OutputZone,
+    RawNode = drydock_objects.RawNode;
