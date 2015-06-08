@@ -41,7 +41,6 @@ Menu.prototype = {
         }
     }
 };
-
 jQuery.fn.extend({
     val_: function(str) {
         // wrapper function for changing <input> values with added checks. replaces .val().
@@ -115,9 +114,18 @@ jQuery.fn.extend({
     }
 });
 
-$(function() { // wait for page to finish loading before executing jQuery code
+$(function() {
+    /*
+    @todo
+    
+    - submit colour info with pipeline
+    - move as much html into html template as possible
+    - greater and greater modularization
+    
+    */
+    
     // initialize animated canvas
-    canvas = $('#pipeline_canvas')[0];
+    canvas = document.getElementById('pipeline_canvas');
     var canvasWidth  = canvas.width  = window.innerWidth,
         canvasHeight = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
     
@@ -131,117 +139,7 @@ $(function() { // wait for page to finish loading before executing jQuery code
             $btn.removeClass('pipeline-ready').addClass('pipeline-not-ready');
         }
     };
-    $('<div class="indicator-light">').text(' ').insertAfter('#id_submit_button');
-    pipelineCheckReadiness();
-    
-    // de-activate double-click selection of text on page
-    canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
-    canvas.addEventListener('mousedown',   function(e) { canvasState.doDown(e); }, true);
-    canvas.addEventListener('mousemove',   function(e) { canvasState.doMove(e); }, true);
-    canvas.addEventListener('mouseup',     function(e) { canvasState.doUp(e); pipelineCheckReadiness(e); }, true);
-    canvas.addEventListener('contextmenu', function(e) { canvasState.contextMenu(e); }, true);
-    
-    canvasState.old_width = canvasWidth;
-    canvasState.old_height = canvasHeight;
-
-    // trigger ajax on CR drop-down to populate revision select
-    $(document).ajaxSend(function(event, xhr, settings) {
-        /*
-            from https://docs.djangoproject.com/en/1.3/ref/contrib/csrf/#csrf-ajax
-            On each XMLHttpRequest, set a custom X-CSRFToken header to the value of the CSRF token.
-            ajaxSend is a function to be executed before an Ajax request is sent.
-        */
-
-        function getCookie(name) {
-            var cookieValue = null;
-            if (document.cookie && document.cookie != '') {
-                var cookies = document.cookie.split(';');
-                for (var i = 0; i < cookies.length; i++) {
-                    var cookie = jQuery.trim(cookies[i]);
-                    // Does this cookie string begin with the name we want?
-                    if (cookie.substring(0, name.length + 1) == (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
-        }
-        function sameOrigin(url) {
-            // url could be relative or scheme relative or absolute
-            var host = document.location.host, // host + port
-                protocol = document.location.protocol,
-                sr_origin = '//' + host,
-                origin = protocol + sr_origin;
-            
-            // Allow absolute or scheme relative URLs to same origin
-            return url == origin || url.slice(0, origin.length + 1) == origin + '/' ||
-                url == sr_origin || url.slice(0, sr_origin.length + 1) == sr_origin + '/' ||
-                // or any other URL that isn't scheme relative or absolute i.e relative.
-                !(/^(\/\/|http:|https:).*/.test(url));
-        }
-        function safeMethod(method) {
-            return [ 'GET', 'HEAD', 'OPTIONS', 'TRACE' ].indexOf(method) > -1;
-        }
-
-        if (!safeMethod(settings.type) && sameOrigin(settings.url)) {
-            xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
-        }
-    });
-
-    // update method drop-down
-    $("#id_select_method_family").on('change', function() {
-        mf_id = this.value;
-        if (mf_id !== '') {
-            $.ajax({
-                type: "POST",
-                url: "/get_method_revisions/",
-                data: { mf_id: mf_id }, // specify data as an object
-                datatype: "json", // type of data expected back from server
-                success: function(result) {
-                    var options = [];
-                    var arr = JSON.parse(result)
-                    $.each(arr, function(index,value) {
-                        options.push('<option value="', value.pk, '" title="', value.fields.filename, '">', value.fields.method_number, ': ', value.fields.method_name, '</option>');
-                    });
-                    $("#id_select_method").show().html(options.join('')).change();
-                }
-            });
-            
-            $('#id_method_revision_field').show().focus();
-        }
-        else {
-            $("#id_method_revision_field").hide();
-        }
-    }).change(); // trigger on load
-
-    // Pack help text into an unobtrusive icon
-    $('.helptext', 'form').each(function() {
-        $(this).wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
-    });
-    
-    // Labels go within their input fields until they are filled in
-    $('input, textarea', '#pipeline_ctrl').each(function() {
-        var lbl = $('label[for="' + this.id +'"]', '#pipeline_ctrl');
-        
-        if (lbl.length > 0) {
-            $(this).on('focus', function() {
-                if (this.value === lbl.html()) {
-                    $(this).removeClass('input-label').val('');
-                }
-            }).on('blur', function() {
-                if (this.value === '') {
-                    $(this).addClass('input-label').val(lbl.html());
-                }
-            }).data('label', lbl.html()).addClass('input-label').val(lbl.html());
-            lbl.remove();
-        }
-        
-    });
-    
-    $('.ctrl_menu').draggable();
-    
-    $('li', 'ul#id_ctrl_nav').on('click', function(e) {
+    var showMenu = function(e) {
         var $this = $(this),
             menu = $($this.data('rel')),
             inputs, input, preview_canvas, i, default_input_value
@@ -270,10 +168,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
             }
         }
         e.stopPropagation();
-    });
-
-    // Handle jQuery-UI Dialog spawned for output cable
-    $('form', '#dialog_form').on('submit', function(e) {
+    };
+    var submitOutputNodeName = function(e) {
         // override ENTER key, click Create output button on form
         e.preventDefault();
         var dialog = $(this).closest('#dialog_form'),
@@ -293,14 +189,14 @@ $(function() { // wait for page to finish loading before executing jQuery code
         canvasState.selection = [ out_node ];
         canvasState.valid = false;
         dialog.hide();
-    }).on('cancel', function() {// cancel is not a native event and can only be triggered via javascript
+    };
+    var cancelOutputNode = function() {
         $(this).closest('#dialog_form').hide();
         $('#output_name_error').hide();
         canvasState.connectors.pop();
         canvasState.valid = false;
-    });
-    
-    $('#id_select_cdt, #id_select_method').on('change', function(e) {
+    };
+    var updateCDtPreviewCanvas = function(e) {
         // Update preview picture of node to show a CDtNode or RawNode appropriately
         var preview_canvas = $(this).closest('.modal_dialog').find('canvas'),
             val = this.value,
@@ -309,51 +205,81 @@ $(function() { // wait for page to finish loading before executing jQuery code
         if (preview_canvas.length) {
             preview_canvas = preview_canvas[0];
             ctx = preview_canvas.getContext('2d');
-            if (this.id == 'id_select_cdt') {
-                ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
-                if (val === '') {
-                    (new RawNode(preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
-                } else {
-                    (new CDtNode(val, preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
-                }
-            } else if (this.id == 'id_select_method') {
-                filename = $(this).find('option:selected')[0].title;
-                colour = $(this).closest('.modal_dialog').find('#id_select_colour').val();
-                $('#id_method_name').val_(filename);
-                
-                // use AJAX to retrieve Revision inputs and outputs
-                $.ajax({
-                    type: "POST",
-                    url: "/get_method_io/",
-                    data: { mid: val }, // specify data as an object
-                    datatype: "json",
-                    success: function(result) {
-                        ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
-                        var n_outputs = Object.keys(result.outputs).length * 8,
-                            n_inputs  = Object.keys(result.inputs).length * 8;
-                        
-                        preview_canvas.height = (n_outputs + n_inputs) / 2 + 62;
-                        (new MethodNode(
-                            val,
-                            null,//family
-                            // Ensures node is centred perfectly on the preview canvas
-                            // Makes assumptions that parameters like magnet radius and scoop length are default.
-                            preview_canvas.width/2 - ( Math.min(-n_inputs - 14, 42 - n_outputs) + Math.max(n_inputs + 14, n_outputs + 48) ) * 0.4330127,// x
-                            n_inputs / 2 + 27,// y
-                            colour, 
-                            null,//label
-                            result.inputs,
-                            result.outputs
-                        )).draw(ctx);
-                    }
-                });
+            ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
+            if (val === '') {
+                (new RawNode(preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
+            } else {
+                (new CDtNode(val, preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
             }
         }
         e.stopPropagation();
-    });
-    
-    // Handle 'Inputs' menu
-    $('form','#id_input_ctrl').on('submit', function(e) {
+    };
+    var updateMethodPreviewCanvas = function(e) {
+        // Update preview picture of node to show a CDtNode or RawNode appropriately
+        var preview_canvas = $(this).closest('.modal_dialog').find('canvas'),
+            val = this.value,
+            ctx, filename, colour;
+        
+        if (preview_canvas.length) {
+            preview_canvas = preview_canvas[0];
+            ctx = preview_canvas.getContext('2d');
+            filename = $(this).find('option:selected')[0].title;
+            colour = $(this).closest('.modal_dialog').find('#id_select_colour').val();
+            $('#id_method_name').val_(filename);
+            
+            // use AJAX to retrieve Revision inputs and outputs
+            $.ajax({
+                type: "POST",
+                url: "/get_method_io/",
+                data: { mid: val }, // specify data as an object
+                datatype: "json",
+                success: function(result) {
+                    ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
+                    var n_outputs = Object.keys(result.outputs).length * 8,
+                        n_inputs  = Object.keys(result.inputs).length * 8;
+                    
+                    preview_canvas.height = (n_outputs + n_inputs) / 2 + 62;
+                    (new MethodNode(
+                        val,
+                        null,//family
+                        // Ensures node is centred perfectly on the preview canvas
+                        // Makes assumptions that parameters like magnet radius and scoop length are default.
+                        preview_canvas.width/2 - ( Math.min(-n_inputs - 14, 42 - n_outputs) + Math.max(n_inputs + 14, n_outputs + 48) ) * 0.4330127,// x
+                        n_inputs / 2 + 27,// y
+                        colour, 
+                        null,//label
+                        result.inputs,
+                        result.outputs
+                    )).draw(ctx);
+                }
+            });
+        }
+        e.stopPropagation();
+    };
+    var updateMethodRevisionsMenu = function() {
+        mf_id = this.value;
+        if (mf_id !== '') {
+            $.ajax({
+                type: "POST",
+                url: "/get_method_revisions/",
+                data: { mf_id: mf_id }, // specify data as an object
+                datatype: "json", // type of data expected back from server
+                success: function(result) {
+                    var options = [];
+                    var arr = JSON.parse(result)
+                    $.each(arr, function(index,value) {
+                        options.push('<option value="', value.pk, '" title="', value.fields.filename, '">', value.fields.method_number, ': ', value.fields.method_name, '</option>');
+                    });
+                    $("#id_select_method").show().html(options.join('')).change();
+                }
+            });
+            $('#id_method_revision_field').show().focus();
+        }
+        else {
+            $("#id_method_revision_field").hide();
+        }
+    };
+    var createNewInputNode = function(e) {
         e.preventDefault(); // stop default form submission behaviour
         
         var node_label = $('#id_datatype_name', this).val(),
@@ -397,10 +323,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
             $('#id_datatype_name').val('');  // reset text field
             dlg.removeClass('modal_dialog').hide();
         }
-    });
-
-    // Handle 'Methods' menu
-    $('form', '#id_method_ctrl').on('submit', function(e) {
+    };
+    var createOrReplaceMethodNode = function(e) {
         e.preventDefault(); // stop default form submission behaviour
         
         var method_name = $('#id_method_name', this),
@@ -472,7 +396,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
                                 new_node = new MethodNode(
                                     mid, 
                                     method_family.val(), 
-                                    old_node.x, old_node.y,
+                                    old_node.x,
+                                    old_node.y,
                                     method_colour.val(), 
                                     node_label, 
                                     inputs, 
@@ -524,63 +449,23 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 method_name.val_('');
             }
         }
-    }).on('reset', function() {
+    };
+    var resetMethodDialog = function() {
         var method_family = $('#id_select_method_family', this);
         $('#id_method_name', this).val_('');
         method_family.val(method_family.children('option').eq(0)).change();
-    });
-    
-    $('#id_revision_desc').on('keydown', function() {
-        var getHappierEachXChars = 12,
-            happy = -Math.min(15, Math.floor(this.value.length / getHappierEachXChars)) * 32;
-        
-        $('.happy_indicator').css('background-position', happy + 'px 0px');
-    })
-        .trigger('keydown')
-        .wrap('<div id="description_wrap">')
-        .after('<div class="happy_indicator">')
-        .after('<div class="happy_indicator_label">Keep typing to make me happy!</div>')
-        .on('focus keyup', function() {
-            var desc_length = this.value.length,
-                wrap = $(this).parent();
-            
-            if (desc_length == 0 || $(this).hasClass('input-label')) {
-                $('.happy_indicator, .happy_indicator_label', wrap).hide();
-            } else if (desc_length > 20) {
-                $('.happy_indicator', wrap).show();
-                $('.happy_indicator_label', wrap).hide();
-            } else {
-                $('.happy_indicator, .happy_indicator_label', wrap).show();
-            }
-        }).on('blur', function() {
-            $(this).siblings('.happy_indicator, .happy_indicator_label').hide();
-        }).blur()
-    ;
-    
-    $('.form-inline-opts').on('click', 'input', function() {
-        var $this = $(this),
-            val = $this.val(),
-            val_map = { always: true, never: false, ambiguous: undefined };
-
-        if ($this.is(':checked') && val_map.hasOwnProperty(val)) {
-            canvasState.force_show_exec_order = val_map[val];
-            canvasState.valid = false;
-        }
-    });
-    
-    $(document).on('keydown', function(e) {
+    };
+    var documentKeyHandler = function(e) {
         // backspace or delete key also removes selected object
         if ([8,46].indexOf(e.which) > -1 && !$(e.target).is("input, textarea")) {
             // prevent backspace from triggering browser to navigate back one page
             e.preventDefault();
-            
             if (canvasState.selection) {
                 canvasState.deleteObject();
                 var menus = $('.ctrl_menu, .context_menu, .modal_dialog').filter(':visible');
                 menus.trigger('cancel');
                 $('li', 'ul#id_ctrl_nav').add(menus).removeClass('clicked');
             }
-            
             pipelineCheckReadiness();
         }
         
@@ -588,22 +473,49 @@ $(function() { // wait for page to finish loading before executing jQuery code
         else if (e.which == 27) {
             $('li', 'ul#id_ctrl_nav').removeClass('clicked');
             $('.ctrl_menu:visible').trigger('cancel');
-            
             canvasState.selection = [];
             canvasState.valid = false;
         }
-    }).on('mousedown', function(e) {
+    };
+    var documentClickHandler = function(e) {
         var menus = $('.ctrl_menu, .context_menu, .modal_dialog').filter(':visible');
         if ($(e.target).closest(menus).length === 0) {
             menus.trigger('cancel');
             $('li', 'ul#id_ctrl_nav').add(menus).removeClass('clicked');
         }
-    }).on('cancel', '.context_menu, .modal_dialog, .ctrl_menu', function() {
-        $(this).hide();
-    });
-    
-    // when a context menu option is clicked
-    $('.context_menu').on('click', 'li', function(e) {
+    };
+    var documentResizeHandler = function(e) {
+        var shape, i, scale_x, scale_y, out_z;
+        canvasWidth  = canvasState.width = canvas.width  = window.innerWidth,
+        canvasHeight = canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
+        
+        scale_x = canvas.width  / canvasState.old_width;
+        scale_y = canvas.height / canvasState.old_height;
+            
+        if (scale_x == 1 && scale_y == 1) {
+            return;
+        }
+        
+        for (i=0; i < canvasState.shapes.length; i++) {
+            shape = canvasState.shapes[i];
+            shape.x *= scale_x;
+            shape.y *= scale_y;
+            shape.dx = shape.dy = 0;
+            canvasState.detectCollisions(shape);
+        }
+        
+        out_z = canvasState.outputZone;
+        out_z.x = canvasWidth * .8;
+        out_z.h = out_z.w = canvasWidth * .15;
+        while (out_z.h + out_z.y > canvasHeight) {
+            out_z.h /= 1.5;
+        }
+        
+        canvasState.old_width = canvas.width;
+        canvasState.old_height = canvas.height;
+        canvasState.valid = false;
+    };
+    var chooseContextMenuOption = function(e) {
         var $this = $(this),
             sel = canvasState.selection;
         
@@ -681,34 +593,8 @@ $(function() { // wait for page to finish loading before executing jQuery code
         }
         $('.context_menu').hide();
         e.stopPropagation();
-    });
-    
-    $('#colour_picker_pick').on('click', function() {
-        var pos = $(this).position();
-        $('#colour_picker_menu').css({ top: pos.top + 20, left: pos.left }).show();
-    });
-    
-    $('#autolayout_btn').on('click', function() {
-        canvasState.autoLayout();
-    });
-    
-    $('.align-btn').on('click', function() {
-        var axis = $(this).data('axis');
-        canvasState.alignSelection(axis);
-    });
-    
-    $('#colour_picker_menu').on('click', 'div', function() {
-        var bg_col = $(this).css('background-color');
-        $('#colour_picker_pick').css('background-color', bg_col);
-        $('#id_select_colour').val(bg_col);
-        $('#colour_picker_menu').hide();
-        $('#id_select_method').trigger('change');
-    });
-    
-    /*
-        Submit form
-    */
-    $('#id_pipeline_form').submit(function(e) {
+    };
+    var submitPipeline = function(e) {
         /*
         Trigger AJAX transaction on submitting form.
          */
@@ -796,7 +682,6 @@ $(function() { // wait for page to finish loading before executing jQuery code
             revision_desc = $('#id_revision_desc').val(),
             users_allowed = $("#id_users_allowed").val(),
             groups_allowed = $("#id_groups_allowed").val();
-
 
         // Form validation
         if (!is_revision) {
@@ -945,37 +830,162 @@ $(function() { // wait for page to finish loading before executing jQuery code
                 }
             }
         })
-    })
+    };
+    var changeExecOrderDisplayOption = function() {
+        var $this = $(this),
+            val = $this.val(),
+            val_map = { always: true, never: false, ambiguous: undefined };
+
+        if ($this.is(':checked') && val_map.hasOwnProperty(val)) {
+            canvasState.force_show_exec_order = val_map[val];
+            canvasState.valid = false;
+        }
+    };
+    var showColourPicker = function() {
+        var pos = $(this).position();
+        $('#colour_picker_menu').css({ top: pos.top + 20, left: pos.left }).show();
+    };
+    var pickColour = function() {
+        var bg_col = $(this).css('background-color');
+        $('#colour_picker_pick').css('background-color', bg_col);
+        $('#id_select_colour').val(bg_col);
+        $('#colour_picker_menu').hide();
+        $('#id_select_method').trigger('change');
+    };
+    var tuckLabelsIntoInputFields = function() {
+        var lbl = $('label[for="' + this.id +'"]', '#pipeline_ctrl');
+        
+        if (lbl.length > 0) {
+            $(this).on('focus', function() {
+                if (this.value === lbl.html()) {
+                    $(this).removeClass('input-label').val('');
+                }
+            }).on('blur', function() {
+                if (this.value === '') {
+                    $(this).addClass('input-label').val(lbl.html());
+                }
+            }).data('label', lbl.html()).addClass('input-label').val(lbl.html());
+            lbl.remove();
+        }
+    };
     
-    $(window).resize(function(e) {
-        var shape, i, scale_x, scale_y, out_z;
-        canvasWidth  = canvasState.width = canvas.width  = window.innerWidth,
-        canvasHeight = canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
-        
-        scale_x = canvas.width  / canvasState.old_width;
-        scale_y = canvas.height / canvasState.old_height;
+    $('<div class="indicator-light">').text(' ').insertAfter('#id_submit_button');
+    pipelineCheckReadiness();
+    
+    // de-activate double-click selection of text on page
+    canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
+    canvas.addEventListener('mousedown',   function(e) { canvasState.doDown(e); }, true);
+    canvas.addEventListener('mousemove',   function(e) { canvasState.doMove(e); }, true);
+    canvas.addEventListener('mouseup',     function(e) { canvasState.doUp(e); pipelineCheckReadiness(e); }, true);
+    canvas.addEventListener('contextmenu', function(e) { canvasState.contextMenu(e); }, true);
+    
+    canvasState.old_width = canvasWidth;
+    canvasState.old_height = canvasHeight;
+
+    // trigger ajax on CR drop-down to populate revision select
+    $(document).ajaxSend(function(event, xhr, settings) {
+        /*
+            from https://docs.djangoproject.com/en/1.3/ref/contrib/csrf/#csrf-ajax
+            On each XMLHttpRequest, set a custom X-CSRFToken header to the value of the CSRF token.
+            ajaxSend is a function to be executed before an Ajax request is sent.
+        */
+
+        function getCookie(name) {
+            var cookieValue = null;
+            if (document.cookie && document.cookie != '') {
+                var cookies = document.cookie.split(';');
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = jQuery.trim(cookies[i]);
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) == (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        function sameOrigin(url) {
+            // url could be relative or scheme relative or absolute
+            var host = document.location.host, // host + port
+                protocol = document.location.protocol,
+                sr_origin = '//' + host,
+                origin = protocol + sr_origin;
             
-        if (scale_x == 1 && scale_y == 1) {
-            return;
+            // Allow absolute or scheme relative URLs to same origin
+            return url == origin || url.slice(0, origin.length + 1) == origin + '/' ||
+                url == sr_origin || url.slice(0, sr_origin.length + 1) == sr_origin + '/' ||
+                // or any other URL that isn't scheme relative or absolute i.e relative.
+                !(/^(\/\/|http:|https:).*/.test(url));
         }
-        
-        for (i=0; i < canvasState.shapes.length; i++) {
-            shape = canvasState.shapes[i];
-            shape.x *= scale_x;
-            shape.y *= scale_y;
-            shape.dx = shape.dy = 0;
-            canvasState.detectCollisions(shape);
+        function safeMethod(method) {
+            return [ 'GET', 'HEAD', 'OPTIONS', 'TRACE' ].indexOf(method) > -1;
         }
-        
-        out_z = canvasState.outputZone;
-        out_z.x = canvasWidth * .8;
-        out_z.h = out_z.w = canvasWidth * .15;
-        while (out_z.h + out_z.y > canvasHeight) {
-            out_z.h /= 1.5;
+
+        if (!safeMethod(settings.type) && sameOrigin(settings.url)) {
+            xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
         }
-        
-        canvasState.old_width = canvas.width;
-        canvasState.old_height = canvas.height;
-        canvasState.valid = false;
     });
+
+    // Pack help text into an unobtrusive icon
+    $('.helptext', 'form').each(function() {
+        $(this).wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
+    });
+    
+    // Labels go within their input fields until they are filled in
+    $('input, textarea', '#pipeline_ctrl').each(tuckLabelsIntoInputFields);
+    
+    /* ------------------------------------------------------------------------
+     ELEMENT                        EVENT          FUNCTION TRIGGER
+    ------------------------------------------------------------------------ */
+    $(window)                   .on('resize',      documentResizeHandler);
+    $(document)                 .on('keydown',     documentKeyHandler)
+                                .on('mousedown',   documentClickHandler)
+                                .on('cancel', '.context_menu, .modal_dialog, .ctrl_menu', function() { $(this).hide(); });
+    $('form', '#dialog_form')   .on('submit',      submitOutputNodeName)        // Handle jQuery-UI Dialog spawned for output cable
+                                .on('cancel',      cancelOutputNode);           // Cancel is not a native event and can only be triggered via javascript
+    $('#id_select_cdt')         .on('change',      updateCDtPreviewCanvas);
+    $('#id_select_method')      .on('change',      updateMethodPreviewCanvas);
+    $("#id_select_method_family").on('change',     updateMethodRevisionsMenu)   // Update method drop-down
+                                .trigger('change');                             // Trigger on load
+    $('form','#id_input_ctrl')  .on('submit',      createNewInputNode);         // Handle 'Inputs' menu
+    $('form', '#id_method_ctrl').on('submit',      createOrReplaceMethodNode)   // Handle 'Methods' menu
+                                .on('reset',       resetMethodDialog);
+    $('#id_pipeline_form')      .on('submit',      submitPipeline);
+    $('li', 'ul#id_ctrl_nav')   .on('click',       showMenu);
+    $('.context_menu')          .on('click', 'li', chooseContextMenuOption);    // when a context menu option is clicked
+    $('#autolayout_btn')        .on('click',       function() { canvasState.autoLayout(); });
+    $('.align-btn')             .on('click',       function() { canvasState.alignSelection($(this).data('axis')); });
+    $('.form-inline-opts')      .on('click', 'input', changeExecOrderDisplayOption);
+    $('#colour_picker_pick')    .on('click',          showColourPicker);
+    $('#colour_picker_menu')    .on('click', 'div',   pickColour);
+    
+    $('.ctrl_menu').draggable();
+    
+    $('#id_revision_desc').on('keydown', function() {
+        var getHappierEachXChars = 12,
+            happy = -Math.min(15, Math.floor(this.value.length / getHappierEachXChars)) * 32;
+        
+        $('.happy_indicator').css('background-position', happy + 'px 0px');
+    })
+        .trigger('keydown')
+        .wrap('<div id="description_wrap">')
+        .after('<div class="happy_indicator">')
+        .after('<div class="happy_indicator_label">Keep typing to make me happy!</div>')
+        .on('focus keyup', function() {
+            var desc_length = this.value.length,
+                wrap = $(this).parent();
+            
+            if (desc_length == 0 || $(this).hasClass('input-label')) {
+                $('.happy_indicator, .happy_indicator_label', wrap).hide();
+            } else if (desc_length > 20) {
+                $('.happy_indicator', wrap).show();
+                $('.happy_indicator_label', wrap).hide();
+            } else {
+                $('.happy_indicator, .happy_indicator_label', wrap).show();
+            }
+        }).on('blur', function() {
+            $(this).siblings('.happy_indicator, .happy_indicator_label').hide();
+        }).blur()
+    ;
 });// end of document.ready()
