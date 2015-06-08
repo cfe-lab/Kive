@@ -111,6 +111,12 @@ var drydock_objects = (function() {
             textFill = "white";
             this.ctx.globalAlpha = 1;
             break;
+        case 'outputZone':
+            this.ctx.font = 'bold 10pt Lato, sans-serif';
+            this.ctx.textBaseline = 'alphabetic';
+            textFill = '#aaa';
+            rectArgs = undefined;
+            break;
         default:
             this.ctx.font = '9pt Lato, sans-serif';
             this.ctx.textBaseline = 'middle';
@@ -118,16 +124,18 @@ var drydock_objects = (function() {
             rectArgs.y -= 7.5;
         }
         this.ctx.textAlign = dir === 1 ? 'left' : dir === 0 ? 'center' : 'right';
-        // make a backing box so the label is on the fill colour
-        rectArgs.width = 2*margin + this.ctx.measureText(args.text).width;
-        if (dir === 0) {
-            rectArgs.x -= rectArgs.width/2;
+        if (rectArgs !== undefined) {
+            // make a backing box so the label is on the fill colour
+            rectArgs.width = 2*margin + this.ctx.measureText(args.text).width;
+            if (dir === 0) {
+                rectArgs.x -= rectArgs.width/2;
+            }
+            else {
+                rectArgs.x -= dir * margin;
+                rectArgs.width *= dir;
+            }
+            this.fillRect(rectArgs);
         }
-        else {
-            rectArgs.x -= dir * margin;
-            rectArgs.width *= dir;
-        }
-        this.fillRect(rectArgs);
         this.ctx.globalAlpha = 1;
         this.ctx.fillStyle = textFill;
         this.ctx.fillText(args.text, args.x, args.y);

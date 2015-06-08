@@ -1101,5 +1101,41 @@
                 return testCase.connector;
             });
         });
+        
+        describe("OutputZone", function() {
+            beforeEach(function() {
+                var canvas_width = 600,
+                    canvas_height = 150;
+                this.expectedRawCanvas.width = canvas_width;
+                this.rawCanvas.width = canvas_width;
+                this.zone = new drydock_objects.OutputZone(
+                        canvas_width,
+                        canvas_height);
+            });
+            
+            it('should draw', function() {
+                this.expectedCanvas.ctx.strokeStyle = "#aaa";
+                this.expectedCanvas.ctx.setLineDash([5]);
+                this.expectedCanvas.ctx.lineWidth = 1;
+                this.expectedCanvas.ctx.strokeRect(492, 1, 105, 105);
+                this.expectedCanvas.drawText(
+                        {x: 544.5, y: 16, text:"Drag here to", style:"outputZone", dir: 0});
+                this.expectedCanvas.drawText(
+                        {x: 544.5, y: 31, text:"create an output", style:"outputZone", dir: 0});
+                
+                this.zone.draw(this.ctx);
+            });
+            
+            itContains([550, 50, true, 'centre',
+                        550, 1, true, 'upper centre',
+                        550, 0, false, 'above centre',
+                        550, 106, true, 'lower centre',
+                        550, 107, false, 'below centre',
+                        597, 50, true, 'right',
+                        598, 50, false, 'beyond right',
+                        492, 50, true, 'left',
+                        491, 50, false, 'beyond left'],
+                       function(testCase) { return testCase.zone; });
+        });
     });
 })();
