@@ -541,6 +541,316 @@
             });
         });
         
+        describe("MethodNode", function() {
+            beforeEach(function() {
+                var method_pk = 37,
+                    family_pk = 7,
+                    x = 150,
+                    y = 35,
+                    fill = "#999",
+                    label = "example",
+                    inputs = { 1: { cdt_pk: 7, datasetname: "in" } },
+                    outputs = { 1: { cdt_pk: 7, datasetname: "out" } };
+
+                this.node = new drydock_objects.MethodNode(
+                        method_pk,
+                        family_pk,
+                        x,
+                        y,
+                        fill,
+                        label,
+                        inputs,
+                        outputs);
+            });
+            
+            function buildMethodBodyPath(ctx) {
+                ctx.beginPath();
+                ctx.moveTo(179.44486372867092, 74);
+                ctx.lineTo(198.49742261192856, 63);
+                ctx.lineTo(198.49742261192856, 41);
+                ctx.bezierCurveTo(
+                        169.05255888325766, 25.473720558371177,
+                        169.05255888325766, 25.473720558371177,
+                        169.05255888325766, 15);
+                ctx.lineTo(150, 4);
+                ctx.lineTo(130.94744111674234, 15);
+                ctx.bezierCurveTo(
+                        130.94744111674234, 44.52627944162882,
+                        130.94744111674234, 44.52627944162882,
+                        179.44486372867092, 74);
+                ctx.closePath();
+            }
+            
+            it('should draw', function() {
+                this.expectedCanvas.ctx.save();
+                this.expectedCanvas.ctx.fillStyle = "#999";
+                
+                // body
+                buildMethodBodyPath(this.expectedCanvas.ctx);
+                this.expectedCanvas.ctx.fill();
+                
+                // input plane (shading)
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.moveTo(150, 26);
+                this.expectedCanvas.ctx.lineTo(169.05255888325766, 15);
+                this.expectedCanvas.ctx.lineTo(150, 4);
+                this.expectedCanvas.ctx.lineTo(130.94744111674234, 15);
+                this.expectedCanvas.ctx.fillStyle = '#fff';
+                this.expectedCanvas.ctx.globalAlpha = 0.35;
+                this.expectedCanvas.ctx.fill();
+                
+                // top bend (shading)
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.moveTo(198.49742261192856, 41);
+                this.expectedCanvas.ctx.lineTo(179.44486372867092, 52);
+                this.expectedCanvas.ctx.bezierCurveTo(
+                        150, 36.47372055837118,
+                        150, 36.47372055837118,
+                        150, 26);
+                this.expectedCanvas.ctx.lineTo(169.05255888325766, 15);
+                this.expectedCanvas.ctx.bezierCurveTo(
+                        169.05255888325766, 25.473720558371177,
+                        169.05255888325766, 25.473720558371177,
+                        198.49742261192856, 41);
+                this.expectedCanvas.ctx.globalAlpha = 0.12;
+                this.expectedCanvas.ctx.fill();
+                this.expectedCanvas.ctx.restore();
+                
+                // in magnet
+                var magnet = new drydock_objects.Magnet();
+                magnet.x = 150;
+                magnet.y = 15;
+                magnet.r = 5;
+                magnet.draw(this.expectedCanvas.ctx);
+                
+                // out magnet
+                magnet.x = 188.97114317029974;
+                magnet.y = 57.5;
+                magnet.draw(this.expectedCanvas.ctx);
+                
+                this.node.draw(this.ctx);
+            });
+            
+            it('should draw with status', function() {
+                this.expectedCanvas.ctx.strokeStyle = "green";
+                this.expectedCanvas.ctx.lineWidth = 5;
+                buildMethodBodyPath(this.expectedCanvas.ctx);
+                this.expectedCanvas.ctx.stroke();
+                this.node.draw(this.expectedCanvas.ctx);
+                
+                this.node.status = "CLEAR";
+                this.node.draw(this.ctx);
+            });
+            
+            it('should highlight', function() {
+                this.expectedCanvas.ctx.strokeStyle = "#7bf";
+                this.expectedCanvas.ctx.lineWidth = 4;
+                buildMethodBodyPath(this.expectedCanvas.ctx);
+                this.expectedCanvas.ctx.stroke();
+                this.node.draw(this.expectedCanvas.ctx);
+                // in magnet
+                var magnet = new drydock_objects.Magnet();
+                magnet.x = 150;
+                magnet.y = 15;
+                magnet.r = 5;
+                magnet.label = "in";
+                magnet.highlight(this.expectedCanvas.ctx);
+                
+                // out magnet
+                magnet.x = 188.97114317029974;
+                magnet.y = 57.5;
+                magnet.label = "out";
+                magnet.isOutput = true;
+                magnet.highlight(this.expectedCanvas.ctx);
+                
+                this.ctx.strokeStyle = "#7bf";
+                this.ctx.lineWidth = 4;
+                this.node.draw(this.ctx);
+                this.node.highlight(this.ctx);
+            });
+            
+            it('should highlight with input cable', function() {
+                this.expectedCanvas.ctx.strokeStyle = "#7bf";
+                this.expectedCanvas.ctx.lineWidth = 4;
+                buildMethodBodyPath(this.expectedCanvas.ctx);
+                this.expectedCanvas.ctx.stroke();
+                this.node.draw(this.expectedCanvas.ctx);
+                // source magnet
+                var sourceParent = {label: "in"},
+                    source = new drydock_objects.Magnet(sourceParent);
+                source.x = 50;
+                source.y = 10;
+                source.label = "in";
+                
+                // in magnet
+                var in_magnet = new drydock_objects.Magnet(),
+                    expectedCable = new drydock_objects.Connector(source);
+                in_magnet.x = 150;
+                in_magnet.y = 15;
+                in_magnet.r = 5;
+                in_magnet.label = "in";
+                expectedCable.dest = in_magnet;
+                in_magnet.connected.push(expectedCable);
+                expectedCable.draw(this.expectedCanvas.ctx);
+                expectedCable.drawLabel(this.expectedCanvas.ctx);
+                
+                // out magnet
+                var out_magnet = new drydock_objects.Magnet();
+                out_magnet.x = 188.97114317029974;
+                out_magnet.y = 57.5;
+                out_magnet.r = 5;
+                out_magnet.label = "out";
+                out_magnet.isOutput = true;
+                out_magnet.highlight(this.expectedCanvas.ctx);
+                
+                var actualCable = new drydock_objects.Connector(source);
+                actualCable.dest = this.node.in_magnets[0];
+                this.node.in_magnets[0].connected.push(actualCable);
+                this.node.draw(this.ctx);
+                actualCable.draw(this.ctx);
+                this.ctx.strokeStyle = "#7bf";
+                this.ctx.lineWidth = 4;
+                this.node.highlight(this.ctx);
+            });
+            
+            it('should highlight with output cable', function() {
+                this.expectedCanvas.ctx.strokeStyle = "#7bf";
+                this.expectedCanvas.ctx.lineWidth = 4;
+                buildMethodBodyPath(this.expectedCanvas.ctx);
+                this.expectedCanvas.ctx.stroke();
+                this.node.draw(this.expectedCanvas.ctx);
+                // dest magnet
+                var destParent = {label: "out"},
+                dest = new drydock_objects.Magnet(destParent);
+                dest.x = 250;
+                dest.y = 75;
+                dest.label = "out";
+                
+                // in magnet
+                var in_magnet = new drydock_objects.Magnet();
+                in_magnet.x = 150;
+                in_magnet.y = 15;
+                in_magnet.r = 5;
+                in_magnet.label = "in";
+                in_magnet.highlight(this.expectedCanvas.ctx);
+                
+                // out magnet
+                var out_magnet = new drydock_objects.Magnet(this.node),
+                    expectedCable = new drydock_objects.Connector(out_magnet);
+                out_magnet.x = 188.97114317029974;
+                out_magnet.y = 57.5;
+                out_magnet.r = 5;
+                out_magnet.label = "out";
+                out_magnet.isOutput = true;
+                expectedCable.dest = dest;
+                out_magnet.connected.push(expectedCable);
+                expectedCable.draw(this.expectedCanvas.ctx);
+                expectedCable.drawLabel(this.expectedCanvas.ctx);
+                
+                var actualCable = new drydock_objects.Connector(
+                        this.node.out_magnets[0]);
+                actualCable.dest = dest;
+                this.node.out_magnets[0].connected.push(actualCable);
+                this.node.draw(this.ctx);
+                actualCable.draw(this.ctx);
+                this.ctx.strokeStyle = "#7bf";
+                this.ctx.lineWidth = 4;
+                this.node.highlight(this.ctx);
+            });
+            
+            it('should highlight with output cable to output node', function() {
+                this.expectedCanvas.ctx.strokeStyle = "#7bf";
+                this.expectedCanvas.ctx.lineWidth = 4;
+                buildMethodBodyPath(this.expectedCanvas.ctx);
+                this.expectedCanvas.ctx.stroke();
+                this.node.draw(this.expectedCanvas.ctx);
+                // dest magnet
+                var expectedOutput = new drydock_objects.OutputNode(250, 75, "out");
+                
+                // in magnet
+                var in_magnet = new drydock_objects.Magnet();
+                in_magnet.x = 150;
+                in_magnet.y = 15;
+                in_magnet.r = 5;
+                in_magnet.label = "in";
+                in_magnet.highlight(this.expectedCanvas.ctx);
+                
+                // out magnet
+                var out_magnet = new drydock_objects.Magnet(this.node),
+                expectedCable = new drydock_objects.Connector(out_magnet);
+                out_magnet.x = 188.97114317029974;
+                out_magnet.y = 57.5;
+                out_magnet.r = 5;
+                out_magnet.label = "out";
+                out_magnet.isOutput = true;
+                expectedCable.dest = expectedOutput.in_magnets[0];
+                out_magnet.connected.push(expectedCable);
+                expectedOutput.draw(this.expectedCanvas.ctx);
+                expectedOutput.highlight(this.expectedCanvas.ctx);
+                expectedCable.draw(this.expectedCanvas.ctx);
+                expectedCable.drawLabel(this.expectedCanvas.ctx);
+                
+                var actualCable = new drydock_objects.Connector(
+                    this.node.out_magnets[0]),
+                    actualOutput = new drydock_objects.OutputNode(250, 75, "out");
+                actualCable.dest = actualOutput.in_magnets[0];
+                this.node.out_magnets[0].connected.push(actualCable);
+                this.node.draw(this.ctx);
+                actualOutput.draw(this.ctx);
+                actualCable.draw(this.ctx);
+                this.ctx.strokeStyle = "#7bf";
+                this.ctx.lineWidth = 4;
+                this.node.highlight(this.ctx);
+            });
+            
+            itContains([150, 35, true, 'centre',
+                        150, 4, true, 'top',
+                        150, 3, false, 'beyond top',
+                        131, 15, true, 'left',
+                        130, 15, false, 'beyond left',
+                        135, 46, true, 'bottom left',
+                        135, 47, false, 'beyond bottom left',
+                        179, 73, true, 'bottom',
+                        179, 74, false, 'beyond bottom',
+                        198, 63, true, 'bottom right',
+                        199, 63, false, 'beyond bottom right',
+                        198, 41, true, 'right',
+                        198, 40, false, 'beyond right',
+                        175, 29, true, 'top right',
+                        175, 28, false, 'beyond top right'],
+                       function(testCase) { return testCase.node; });
+
+            it('should have vertices', function() {
+                drawVertices(this.expectedCanvas,
+                        this.node,
+                        [{x: 150, y: 26},
+                         {x: 169.1, y: 15},
+                         {x: 150, y: 4},
+                         {x: 130.9, y: 15},
+                         {x: 179.4, y: 74},
+                         {x: 198.5, y: 63},
+                         {x: 198.5, y: 41},
+                         {x: 179.4, y: 52},
+                         {x: 130.95, y: 44.53},
+                         {x: 150, y: 36.5},
+                         {x: 169.1, y: 25.5}]);
+                
+                drawVertices(this.canvas, this.node, this.node.getVertices());
+            });
+            
+            it('should have label', function() {
+                this.node.y += 20;
+                this.node.draw(this.expectedCanvas.ctx);
+                this.expectedCanvas.drawText(
+                        {x: 161.25, y: 19.5, text: 'example', dir: 0, style: 'node'});
+                
+                this.node.draw(this.canvas.ctx);
+                var label = this.node.getLabel();
+                this.canvas.drawText(
+                        {x: label.x, y: label.y, text: label.label, dir:0, style: 'node'});
+            });
+        });
+        
         describe("Connector", function() {
             beforeEach(function() {
                 var r = 5,
@@ -683,6 +993,33 @@
                 this.connector.draw(this.ctx);
                 this.ctx.strokeStyle = 'blue';
                 this.connector.highlight(this.ctx);
+            });
+            
+            it('should draw label', function() {
+                this.expectedCanvas.ctx.strokeStyle = '#abc';
+                this.expectedCanvas.ctx.lineWidth = 6;
+                this.expectedCanvas.ctx.lineCap = 'round';
+                this.expectedCanvas.ctx.beginPath();
+                this.expectedCanvas.ctx.moveTo(50, 10);
+                this.expectedCanvas.ctx.bezierCurveTo(
+                        110.6218,
+                        45,
+                        140,
+                        -18.3333,
+                        150,
+                        15);
+                this.expectedCanvas.ctx.stroke();
+                // draw label
+                this.expectedCanvas.ctx.fillStyle = "#aaa";
+                this.expectedCanvas.ctx.translate(101.5519, 19.2424);
+                this.expectedCanvas.ctx.rotate(-0.2262);
+                this.expectedCanvas.drawText(
+                        {x: 0, y: 0, text: "example", dir: 0, style: "connector"});
+                
+                this.connector.dest = this.dest;
+                this.connector.draw(this.ctx);
+                this.ctx.strokeStyle = 'blue';
+                this.connector.drawLabel(this.ctx);
             });
             
             it('should draw with clear status', function() {
