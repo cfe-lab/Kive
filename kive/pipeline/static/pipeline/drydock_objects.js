@@ -1307,24 +1307,21 @@ drydock_objects = (function(my) {
     
     my.OutputZone.prototype.draw = function (ctx) {
         // draw output zone
-        ctx.fillStyle = this.fill;
-        
-        ctx.beginPath();
         ctx.strokeStyle = "#aaa";
         ctx.setLineDash([5]);
         ctx.lineWidth = 1;
-        ctx.rect(this.x, this.y, this.w, this.h);
-        ctx.closePath();
-        ctx.stroke();
-        ctx.setLineDash([0]);
+        ctx.strokeRect(this.x, this.y, this.w, this.h);
+        ctx.setLineDash([]);
     
         // draw label
-        ctx.fillStyle = '#aaa';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'alphabetic';
-        ctx.font = 'bold 10pt Lato, sans-serif';
-        ctx.fillText("Drag here to", this.x + this.w/2, this.y + this.inset);
-        ctx.fillText("create an output", this.x + this.w/2, this.y + this.inset*2);
+        var canvas = new my.CanvasWrapper(undefined, ctx),
+            textParams = {x: this.x + this.w/2, y: this.y + this.inset, dir: 0};
+        textParams.style = "outputZone";
+        textParams.text = "Drag here to";
+        canvas.drawText(textParams);
+        textParams.text = "create an output";
+        textParams.y += this.inset;
+        canvas.drawText(textParams);
     };
     
     my.OutputZone.prototype.contains = function (mx, my) {
