@@ -591,15 +591,22 @@ drydock_objects = (function(my) {
         return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
     };
 
-    my.MethodNode = function(pk, family, x, y, fill, label, inputs, outputs, status, log_id) {
-        /*
-        CONSTRUCTOR
-        A MethodNode is a rectangle of constant width (w) and varying height (h)
-        where h is proportional to the maximum number of xputs (inputs or outputs).
-        h = max(n_inputs, n_ouputs) * spacing
-        Holes for inputs and outputs are drawn at some (inset) into the left
-        and right sides, respectively.  The width must be greater than 2 * inset.
-        */
+    /**
+     * A whistle-shaped object with anchors for all the inputs and outputs.
+     * 
+     * The top and bottom sides expand to fit the number of inputs or outputs.
+     * @param pk: the method key
+     * @param family: the method family key
+     * @param x, y: position of the method on the screen
+     * @param fill: colour to draw the method with
+     * @param label: string value
+     * @param inputs: map of input index to input details
+     *  { index: { cdt_pk: pk, datasetname: name } } 
+     * @param outputs: map of output index to output details, same structure
+     * @param status: describes progress during a run, possible values are the
+     *  keys in statusColorMap
+     */
+    my.MethodNode = function(pk, family, x, y, fill, label, inputs, outputs, status) {
         this.pk = pk;
         this.family = family; // can be passed from database
     
@@ -627,7 +634,6 @@ drydock_objects = (function(my) {
     
         // Members for instances of methods in runs
         this.status = status;
-        this.log_id = log_id;
     
         this.in_magnets = [];
         var sorted_in_keys = Object.keys(this.inputs).sort(function(a,b){return a-b}),
@@ -684,20 +690,33 @@ drydock_objects = (function(my) {
         }
     }
     
-    my.MethodNode.prototype.draw = function(ctx) {
-        ctx.fillStyle = this.fill;
+    my.MethodNode.prototype.buildBodyPath = function(ctx) {
         var vertices = this.getVertices();
-        this.vertices = vertices;
         ctx.beginPath();
         
         // body
         ctx.moveTo( vertices[4].x, vertices[4].y );
         ctx.lineTo( vertices[5].x, vertices[5].y );
         ctx.lineTo( vertices[6].x, vertices[6].y );
-        ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[1].x, vertices[1].y );
+        ctx.bezierCurveTo(
+                vertices[10].x, vertices[10].y,
+                vertices[10].x, vertices[10].y,
+                vertices[1].x, vertices[1].y );
         ctx.lineTo( vertices[2].x, vertices[2].y );
         ctx.lineTo( vertices[3].x, vertices[3].y );
-        ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
+        ctx.bezierCurveTo(
+                vertices[8].x, vertices[8].y,
+                vertices[8].x, vertices[8].y,
+                vertices[4].x, vertices[4].y );
+        ctx.closePath();
+    };
+    
+    my.MethodNode.prototype.draw = function(ctx) {
+        ctx.fillStyle = this.fill;
+        var vertices = this.getVertices();
+        
+        // body
+        this.buildBodyPath(ctx);
         ctx.fill();
         
         // input plane (shading)
@@ -723,20 +742,6 @@ drydock_objects = (function(my) {
         ctx.fillStyle = this.fill;
         ctx.globalAlpha = 1.0;
         
-    /*  // output plane
-        ctx.moveTo( vertices[4].x, vertices[4].y );
-        ctx.lineTo( vertices[5].x, vertices[5].y );
-        ctx.lineTo( vertices[6].x, vertices[6].y );
-        ctx.lineTo( vertices[7].x, vertices[7].y );
-    
-        // side bend
-        ctx.moveTo( vertices[4].x, vertices[4].y );
-        ctx.lineTo( vertices[7].x, vertices[7].y );
-        ctx.bezierCurveTo( vertices[9].x, vertices[9].y, vertices[9].x, vertices[9].y, vertices[0].x, vertices[0].y );
-        ctx.lineTo( vertices[3].x, vertices[3].y );
-        ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
-        */
-    
         // draw magnets
         var cx = this.x + this.dx,
             cy = this.y + this.dy,
@@ -778,16 +783,7 @@ drydock_objects = (function(my) {
             ctx.globalCompositeOperation = 'destination-over';
     
             // body
-            ctx.beginPath();
-            ctx.moveTo( vertices[4].x, vertices[4].y );
-            ctx.lineTo( vertices[5].x, vertices[5].y );
-            ctx.lineTo( vertices[6].x, vertices[6].y );
-            ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[1].x, vertices[1].y );
-            ctx.lineTo( vertices[2].x, vertices[2].y );
-            ctx.lineTo( vertices[3].x, vertices[3].y );
-            ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
-            ctx.closePath();
-    
+            this.buildBodyPath(ctx);
             ctx.stroke();
             ctx.restore();
         }
@@ -799,16 +795,7 @@ drydock_objects = (function(my) {
         ctx.globalCompositeOperation = 'destination-over';
     
         // body
-        ctx.beginPath();
-        ctx.moveTo( vertices[4].x, vertices[4].y );
-        ctx.lineTo( vertices[5].x, vertices[5].y );
-        ctx.lineTo( vertices[6].x, vertices[6].y );
-        ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[1].x, vertices[1].y );
-        ctx.lineTo( vertices[2].x, vertices[2].y );
-        ctx.lineTo( vertices[3].x, vertices[3].y );
-        ctx.bezierCurveTo( vertices[8].x, vertices[8].y, vertices[8].x, vertices[8].y, vertices[4].x, vertices[4].y );
-        ctx.closePath();
-        
+        this.buildBodyPath(ctx);
         ctx.stroke();
         ctx.globalCompositeOperation = 'source-over';
         
@@ -854,23 +841,20 @@ drydock_objects = (function(my) {
     my.MethodNode.prototype.getVertices = function() {
         var cx = this.x + this.dx,
             cy = this.y + this.dy;
-        
-        // experimental draw
-        var cos30 = Math.sqrt(3)/2,
-         // sin30 = 0.5 (this is trivial)
-            magnet_radius = this.in_magnets[0].r, 
-            magnet_margin = 6,
-            dmc = magnet_radius + magnet_margin,// distance from magnet centre to edge
-            c2c = dmc + magnet_radius,//centre 2 centre of adjacent magnets
-            cosdmc = cos30 * dmc,
-            ipy = cy - this.stack,
-            input_plane_len  = (this.n_inputs * c2c + magnet_margin) / 2,
-            cosipl = cos30 * input_plane_len;
-        
-        if (typeof this.vertices == 'undefined' 
-            || this.vertices[1].x != cx + cosdmc + cosipl 
-            || this.vertices[1].y != ipy + (dmc - input_plane_len) / 2
-            ) {
+        if (this.vertices === undefined ||
+                cx !== this.prevX ||
+                cy !== this.prevY) {
+            // experimental draw
+            var cos30 = Math.sqrt(3)/2,
+             // sin30 = 0.5 (this is trivial)
+                magnet_radius = this.in_magnets[0].r, 
+                magnet_margin = 6,
+                dmc = magnet_radius + magnet_margin,// distance from magnet centre to edge
+                c2c = dmc + magnet_radius,//centre 2 centre of adjacent magnets
+                cosdmc = cos30 * dmc,
+                ipy = cy - this.stack,
+                input_plane_len  = (this.n_inputs * c2c + magnet_margin) / 2,
+                cosipl = cos30 * input_plane_len;
             
             var opx = cx + this.scoop * cos30,
                 opy = cy + this.scoop * .5,
@@ -893,25 +877,17 @@ drydock_objects = (function(my) {
                     { x: cx - cosdmc - cosopl, y: cy + (dmc + output_plane_len) / 2 },
                     { x: cx + cosdmc - cosopl, y: cy - (dmc - output_plane_len) / 2 },
                     { x: cx + cosdmc + cosopl, y: cy - (dmc + output_plane_len) / 2 }
-        //            { x: cx + cosdmc - cosopl, y: cy + dmc * 1.5 + output_plane_len / 2 },
-        //            { x: cx + cosdmc + cosopl, y: cy + dmc * 1.5 - output_plane_len / 2 },
-        //            { x: cx - cosdmc + cosopl, y: cy + (dmc - output_plane_len) / 2 },
-        //            { x: cx - cosdmc + cosopl, y: cy - dmc * 1.5 - output_plane_len / 2 },
-        //            { x: cx - cosdmc - cosopl, y: cy - dmc * 1.5 + output_plane_len / 2 }
                 );
             } else { 
                 vertices.push(
                     { x: cx - cosdmc - cosipl, y: cy + cosdmc - (dmc - input_plane_len) / 2 },
                     { x: cx + cosdmc - cosipl, y: cy - cosdmc + (dmc + input_plane_len) / 2 },
                     { x: cx + cosdmc + cosipl, y: cy - cosdmc + (dmc - input_plane_len) / 2 }
-        //            { x: cx + cosdmc - cosipl, y: cy + cosdmc + (dmc + input_plane_len) / 2 },
-        //            { x: cx + cosdmc + cosipl, y: cy + cosdmc + (dmc - input_plane_len) / 2 },
-        //            { x: cx - cosdmc + cosipl, y: cy + cosdmc - (dmc + input_plane_len) / 2 },
-        //            { x: cx - cosdmc + cosipl, y: cy - cosdmc - (dmc + input_plane_len) / 2 },
-        //            { x: cx - cosdmc - cosipl, y: cy - cosdmc - (dmc - input_plane_len) / 2 }
                 );
             }
-            
+
+            this.prevX = cx;
+            this.prevY = cy;
             this.vertices = vertices;
         }
         
