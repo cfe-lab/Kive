@@ -1277,57 +1277,57 @@ drydock_objects = (function(my) {
         // mx,my is outside the rectangle, don't bother computing the bezier distance
         else return false;
     };
-
-my.NodeLabel = function(label, x, y) {
-    this.label = label || '';
-    this.x = x || 0;
-    this.y = y || 0;
-}
-
-my.OutputZone = function(cw, ch, inset) {
-    this.x = cw * .82;
-    this.w = cw * .175;
-    this.h = this.w;
-    this.y = 1;
     
-    while (this.h + this.y > ch) {
-        this.h /= 1.5;
+    my.NodeLabel = function(label, x, y) {
+        this.label = label || '';
+        this.x = x || 0;
+        this.y = y || 0;
     }
     
-    this.inset = inset || 15; // distance of label from center
-}
-
-my.OutputZone.prototype.draw = function (ctx) {
-    // draw output zone
-    ctx.fillStyle = this.fill;
+    my.OutputZone = function(cw, ch, inset) {
+        this.x = cw * .82;
+        this.w = cw * .175;
+        this.h = this.w;
+        this.y = 1;
+        
+        while (this.h + this.y > ch) {
+            this.h /= 1.5;
+        }
+        
+        this.inset = inset || 15; // distance of label from center
+    }
     
-    ctx.beginPath();
-    ctx.strokeStyle = "#aaa";
-    ctx.setLineDash([5]);
-    ctx.lineWidth = 1;
-    ctx.rect(this.x, this.y, this.w, this.h);
-    ctx.closePath();
-    ctx.stroke();
-    ctx.setLineDash([0]);
-
-    // draw label
-    ctx.fillStyle = '#aaa';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'alphabetic';
-    ctx.font = 'bold 10pt Lato, sans-serif';
-    ctx.fillText("Drag here to", this.x + this.w/2, this.y + this.inset);
-    ctx.fillText("create an output", this.x + this.w/2, this.y + this.inset*2);
-};
-
-my.OutputZone.prototype.contains = function (mx, my) {
-    return (
-        mx >= this.x 
-        && mx <= this.x + this.w 
-        && my >= this.y 
-        && my <= this.y + this.h
-    );
-};
-
+    my.OutputZone.prototype.draw = function (ctx) {
+        // draw output zone
+        ctx.fillStyle = this.fill;
+        
+        ctx.beginPath();
+        ctx.strokeStyle = "#aaa";
+        ctx.setLineDash([5]);
+        ctx.lineWidth = 1;
+        ctx.rect(this.x, this.y, this.w, this.h);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.setLineDash([0]);
+    
+        // draw label
+        ctx.fillStyle = '#aaa';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'alphabetic';
+        ctx.font = 'bold 10pt Lato, sans-serif';
+        ctx.fillText("Drag here to", this.x + this.w/2, this.y + this.inset);
+        ctx.fillText("create an output", this.x + this.w/2, this.y + this.inset*2);
+    };
+    
+    my.OutputZone.prototype.contains = function (mx, my) {
+        return (
+            mx >= this.x 
+            && mx <= this.x + this.w 
+            && my >= this.y 
+            && my <= this.y + this.h
+        );
+    };
+    
     my.OutputNode = function (x, y, label, pk, status, md5, dataset_id) {
         /*
         Node representing an output.
