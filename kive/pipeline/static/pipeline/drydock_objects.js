@@ -191,118 +191,6 @@ var drydock_objects = (function() {
 
 var _statusColorMap = drydock_objects.statusColorMap;
 
-var Geometry = {
-    inEllipse: function(mx, my, cx, cy, rx, ry) {
-        var dx = mx - cx,
-            dy = my - cy;
-        return (dx*dx) / (rx*rx)
-             + (dy*dy) / (ry*ry) <= 1;
-    },
-    inRectangle: function(mx, my, x, y, w, h) {
-        return mx > x && mx < x + w
-            && my > y && my < y + h;
-    },
-    inRectangleFromCentre: function(mx, my, cx, cy, w2, h2) {
-        return Math.abs(mx - cx) < w2
-            && Math.abs(my - cy) < h2;
-    },
-    inCircle: function(mx, my, cx, cy, r) {
-        var dx = cx - mx,
-            dy = cy - my;
-        return Math.sqrt(dx*dx + dy*dy) <= r;
-    },
-    ltLine: function(mx, my, x1, y1, x2, y2) {
-        return x2 != x1 ? (y2 - y1) / (x2 - x1) * (mx - x1) > my - y1 : null;
-    },
-    inPolygon: function(mx, my, shape) {
-        // ray casting algorithm
-        // argument 'shape' is an array of objects each with properties x and y
-        var o = [ -300, -300 ],
-            line, s1_x, s1_y, s, t,
-            s2_x = mx - o[0],
-            s2_y = my - o[1],
-            intersections = 0;
-        
-        for (var j = 0; j < shape.length; j++) {
-            line = shape.slice(j, j+2);
-            if (line.length == 1) line.push(shape[0]);
-            
-            s1_x = line[1].x - line[0].x;
-            s1_y = line[1].y - line[0].y;
-            s = (-s1_y * (line[0].x - o[0]) + s1_x * (line[0].y - o[1])) / (-s2_x * s1_y + s1_x * s2_y);
-            t = ( s2_x * (line[0].y - o[1]) - s2_y * (line[0].x - o[0])) / (-s2_x * s1_y + s1_x * s2_y);
-            
-            if (s >= 0 && s <= 1 && t >= 0 && t <= 1)
-                intersections++;
-//            console.log('line', line[0].x, line[0].y, line[1].x, line[1].y, 's-t', s,t, 'x', intersections);
-        }
-    
-        return intersections % 2;
-    },
-    isometricXCoord: function(x,y) {
-        // isometric x-coordinate is explained in issue #277.
-        // using a -30° line that intersects (0,0) and a 30° line that intersects (x,y), find the intersection of the two.
-        // then compute the distance from this intersection to (x,y). tan(pi/6) = 1/sqrt(3) ~ 0.577350269
-        return x * 0.577350269 - y;
-    },
-    isometricYCoord: function(x,y) {
-        // isometric y-coordinate is explained in issue #277.
-        // using a 30° line that intersects (0,0) and a -30° line that intersects (x,y), find the intersection of the two.
-        // then compute the distance from this intersection to (x,y). tan(pi/6) = 1/sqrt(3) ~ 0.577350269
-        return x * 0.577350269 + y;
-        
-        /*
-         * unabridged version:
-         
-        var tan30 = Math.tan(Math.PI/6),
-            // (x0, y0) is the coordinate of the intersection
-            x0 = (x * tan30 - y) / (2 * tan30),
-            y0 = - x0 * tan30,
-            dx = x - x0,
-            dy = y - y0,
-            // dh is the distance from (x0,y0) to (x,y). it is a 30° line.
-            dh = Math.sqrt(dx*dx + dy*dy);
-        return dh;
-        
-         */
-    },
-    iso2twodim: function(iso_x, iso_y) {
-        // inverse of [ isometricXCoord, isometricYCoord ]
-        return {
-            x: (iso_y + iso_x) / 1.154700538, 
-            y: (iso_y - iso_x) / 2
-        };
-    },
-    isometricSort: function(x1,y1,x2,y2) {
-        // returns 1 if the first set of coordinates is after the second,
-        // -1 if the reverse is true, 0 if it's a tie. order goes left-to-right,
-        // top-to-bottom if you sort of rotate your screen 30° clockwise and get
-        // in the isometric plane.
-        // includes ±7 pixels of fuzziness in the top-to-bottom decision. 
-        
-        if (x1 instanceof Object && y1 instanceof Object && [ x1.x, x1.y, y1.x, y1.y ].indexOf(undefined) === -1) {
-            // transform alternative syntax
-            return Geometry.isometricSort(x1.x, x1.y, y1.x, y1.y);
-        }
-        
-        var y_diff = (x1 - x2) * 0.577350269 + y1 - y2; //tan(pi/6) = 1/sqrt(3) ~ 0.577350269
-        if (y_diff > 7) {
-            return 1;
-        } else if (y_diff < -7) {
-            return -1;
-        } else {
-            var x_diff = y_diff + (y2 - y1) * 2;
-            if (x_diff > 0) {
-                return 1;
-            } else if (x_diff < 0) {
-                return -1;
-            } else {
-                return 0;
-            }
-        }
-    }
-};
-
 drydock_objects = (function(my) {
     "use strict";
     
@@ -1393,3 +1281,115 @@ var CDtNode = drydock_objects.CdtNode,
     OutputNode = drydock_objects.OutputNode,
     OutputZone = drydock_objects.OutputZone,
     RawNode = drydock_objects.RawNode;
+
+var Geometry = {
+    inEllipse: function(mx, my, cx, cy, rx, ry) {
+        var dx = mx - cx,
+            dy = my - cy;
+        return (dx*dx) / (rx*rx)
+             + (dy*dy) / (ry*ry) <= 1;
+    },
+    inRectangle: function(mx, my, x, y, w, h) {
+        return mx > x && mx < x + w
+            && my > y && my < y + h;
+    },
+    inRectangleFromCentre: function(mx, my, cx, cy, w2, h2) {
+        return Math.abs(mx - cx) < w2
+            && Math.abs(my - cy) < h2;
+    },
+    inCircle: function(mx, my, cx, cy, r) {
+        var dx = cx - mx,
+            dy = cy - my;
+        return Math.sqrt(dx*dx + dy*dy) <= r;
+    },
+    ltLine: function(mx, my, x1, y1, x2, y2) {
+        return x2 != x1 ? (y2 - y1) / (x2 - x1) * (mx - x1) > my - y1 : null;
+    },
+    inPolygon: function(mx, my, shape) {
+        // ray casting algorithm
+        // argument 'shape' is an array of objects each with properties x and y
+        var o = [ -300, -300 ],
+            line, s1_x, s1_y, s, t,
+            s2_x = mx - o[0],
+            s2_y = my - o[1],
+            intersections = 0;
+        
+        for (var j = 0; j < shape.length; j++) {
+            line = shape.slice(j, j+2);
+            if (line.length == 1) line.push(shape[0]);
+            
+            s1_x = line[1].x - line[0].x;
+            s1_y = line[1].y - line[0].y;
+            s = (-s1_y * (line[0].x - o[0]) + s1_x * (line[0].y - o[1])) / (-s2_x * s1_y + s1_x * s2_y);
+            t = ( s2_x * (line[0].y - o[1]) - s2_y * (line[0].x - o[0])) / (-s2_x * s1_y + s1_x * s2_y);
+            
+            if (s >= 0 && s <= 1 && t >= 0 && t <= 1)
+                intersections++;
+//            console.log('line', line[0].x, line[0].y, line[1].x, line[1].y, 's-t', s,t, 'x', intersections);
+        }
+    
+        return intersections % 2;
+    },
+    isometricXCoord: function(x,y) {
+        // isometric x-coordinate is explained in issue #277.
+        // using a -30° line that intersects (0,0) and a 30° line that intersects (x,y), find the intersection of the two.
+        // then compute the distance from this intersection to (x,y). tan(pi/6) = 1/sqrt(3) ~ 0.577350269
+        return x * 0.577350269 - y;
+    },
+    isometricYCoord: function(x,y) {
+        // isometric y-coordinate is explained in issue #277.
+        // using a 30° line that intersects (0,0) and a -30° line that intersects (x,y), find the intersection of the two.
+        // then compute the distance from this intersection to (x,y). tan(pi/6) = 1/sqrt(3) ~ 0.577350269
+        return x * 0.577350269 + y;
+        
+        /*
+         * unabridged version:
+         
+        var tan30 = Math.tan(Math.PI/6),
+            // (x0, y0) is the coordinate of the intersection
+            x0 = (x * tan30 - y) / (2 * tan30),
+            y0 = - x0 * tan30,
+            dx = x - x0,
+            dy = y - y0,
+            // dh is the distance from (x0,y0) to (x,y). it is a 30° line.
+            dh = Math.sqrt(dx*dx + dy*dy);
+        return dh;
+        
+         */
+    },
+    iso2twodim: function(iso_x, iso_y) {
+        // inverse of [ isometricXCoord, isometricYCoord ]
+        return {
+            x: (iso_y + iso_x) / 1.154700538, 
+            y: (iso_y - iso_x) / 2
+        };
+    },
+    isometricSort: function(x1,y1,x2,y2) {
+        // returns 1 if the first set of coordinates is after the second,
+        // -1 if the reverse is true, 0 if it's a tie. order goes left-to-right,
+        // top-to-bottom if you sort of rotate your screen 30° clockwise and get
+        // in the isometric plane.
+        // includes ±7 pixels of fuzziness in the top-to-bottom decision. 
+        
+        if (x1 instanceof Object && y1 instanceof Object && [ x1.x, x1.y, y1.x, y1.y ].indexOf(undefined) === -1) {
+            // transform alternative syntax
+            return Geometry.isometricSort(x1.x, x1.y, y1.x, y1.y);
+        }
+        
+        var y_diff = (x1 - x2) * 0.577350269 + y1 - y2; //tan(pi/6) = 1/sqrt(3) ~ 0.577350269
+        if (y_diff > 7) {
+            return 1;
+        } else if (y_diff < -7) {
+            return -1;
+        } else {
+            var x_diff = y_diff + (y2 - y1) * 2;
+            if (x_diff > 0) {
+                return 1;
+            } else if (x_diff < 0) {
+                return -1;
+            } else {
+                return 0;
+            }
+        }
+    }
+};
