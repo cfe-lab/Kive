@@ -28,10 +28,18 @@ var drydock = (function() {
         this.styleBorderLeft = 0;
         this.styleBorderTop = 0;
         if (window.getComputedStyle) {
-            this.stylePaddingLeft = parseInt(getComputedStyle(canvas, null).getPropertyValue('padding-left'));
-            this.stylePaddingTop = parseInt(getComputedStyle(canvas, null).getPropertyValue('padding-top'));
-            this.styleBorderLeft = parseInt(getComputedStyle(canvas, null).getPropertyValue('border-left-width'));
-            this.styleBorderTop = parseInt(getComputedStyle(canvas, null).getPropertyValue('border-top-width'));
+            function getStyle(css, name) {
+                var value = css.getPropertyValue(name);
+                if (value === '') {
+                    return 0;
+                }
+                return parseInt(value);
+            }
+            var css = getComputedStyle(canvas, null);
+            this.stylePaddingLeft = getStyle(css, 'padding-left');
+            this.stylePaddingTop = getStyle(css, 'padding-top');
+            this.styleBorderLeft = getStyle(css, 'border-left-width');
+            this.styleBorderTop = getStyle(css, 'border-top-width');
         }
         
         this.scale = 1;
@@ -709,8 +717,21 @@ var drydock = (function() {
     
     my.CanvasState.prototype.doUp = function(e) {
         this.valid = false;
-        var dialog = $("#dialog_form"),
-            index, sel, i, j, connector, suffix, new_output_label, out_node, shape, in_magnet;
+        if (this.$dialog === undefined) {
+            this.$dialog = $("#dialog_form");
+        }
+        var index,
+            sel,
+            i,
+            j,
+            connector,
+            suffix,
+            new_output_label,
+            out_node,
+            shape,
+            in_magnet,
+            dialog_height = this.$dialog[0].offsetHeight,
+            dialog_width = this.$dialog[0].offsetWidth;
         $(this.canvas).css("cursor", "auto");
         
         // Collision detection!
@@ -780,12 +801,12 @@ var drydock = (function() {
                         this.valid = false;
     
                         // spawn dialog for output label
-                        dialog
+                        this.$dialog
                             .data('node', out_node)
                             .show()
                             .css({
-                                left: Math.min(connector.x, this.outputZone.x + this.outputZone.w/2 - dialog[0].offsetWidth/2 ) + this.pos_x,
-                                top:  Math.min(connector.y - dialog[0].offsetHeight/2, this.canvas.height - dialog[0].offsetHeight) + this.pos_y
+                                left: Math.min(connector.x, this.outputZone.x + this.outputZone.w/2 - dialog_width/2 ) + this.pos_x,
+                                top:  Math.min(connector.y - dialog_height/2, this.canvas.height - dialog_height) + this.pos_y
                             })
                         .find('#output_name')
                             .val(new_output_label)
@@ -1121,11 +1142,11 @@ var drydock = (function() {
                 // to minimize canvas state changes, loop twice.
                 // canvas state changes are computationally expensive.
                 ctx.fillStyle = '#fff';
-                ctx.globalAlpha = 0.4;
+                ctx.globalAlpha = 0.5;
                 for (i = 0; i < labels.length; i++) {
                     l = labels[i],
                     textWidth = ctx.measureText(l.label).width;
-                    ctx.fillRect(l.x - textWidth/2 - 1, l.y - 11, textWidth + 2, 14);
+                    ctx.fillRect(l.x - textWidth/2 - 2, l.y - 11, textWidth + 4, 14);
                 }
                 ctx.fillStyle = '#000';
                 ctx.globalAlpha = 1.0;

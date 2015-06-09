@@ -1137,5 +1137,189 @@
                         491, 50, false, 'beyond left'],
                        function(testCase) { return testCase.zone; });
         });
+        
+        describe("CanvasState", function() {
+            beforeEach(function() {
+                this.state = new drydock.CanvasState(this.rawCanvas);
+                
+                this.expectedInput = new drydock_objects.RawNode(30, 50, "in");
+                this.actualInput = new drydock_objects.RawNode(30, 50, "in");
+                this.state.addShape(this.actualInput);
+            });
+            
+            it('should draw', function() {
+                this.expectedInput.draw(this.expectedCanvas.ctx);
+                this.expectedCanvas.drawText(
+                        {x: 30, y: 19.5, text: "in", style: "node", dir: 0});
+                
+                this.state.draw(this.ctx);
+            });
+            
+            it('should move', function() {
+                this.expectedInput.x += 10;
+                this.expectedInput.draw(this.expectedCanvas.ctx);
+                this.expectedCanvas.ctx.strokeStyle = "#7bf";
+                this.expectedCanvas.ctx.lineWidth = 4;
+                this.expectedInput.highlight(this.expectedCanvas.ctx);
+                this.expectedCanvas.drawText(
+                        {x: 40, y: 19.5, text: "in", style: "node", dir: 0});
+                
+                this.state.doDown({pageX: 30, pageY: 50});
+                this.state.doMove({pageX: 40, pageY: 50});
+                this.state.draw(this.ctx);
+            });
+            
+            describe("with input and method", function() {
+                beforeEach(function() {
+                    this.methodId = 27;
+                    this.methodFamilyId = 13;
+                    this.methodInputs = {1: {cdt_pk: 16, datasetname: "in"}};
+                    this.methodOutputs = {1: {cdt_pk: 17, datasetname: "out"}};
+                    this.expectedMethod = new drydock_objects.MethodNode(
+                            this.methodId,
+                            this.methodFamilyId,
+                            100,
+                            50,
+                            null,
+                            "example",
+                            this.methodInputs,
+                            this.methodOutputs);
+                    this.actualMethod = new drydock_objects.MethodNode(
+                            this.methodId,
+                            this.methodFamilyId,
+                            100,
+                            50,
+                            null,
+                            "example",
+                            this.methodInputs,
+                            this.methodOutputs);
+                    this.expectedConnector = new drydock_objects.Connector(
+                            this.expectedMethod.out_magnets[0]);
+                    this.expectedOutputZone = new drydock_objects.OutputZone(
+                            this.expectedRawCanvas.width,
+                            this.expectedRawCanvas.height);
+                    this.expectedOutput = new drydock_objects.OutputNode(
+                            250,
+                            76,
+                            "out");
+                    this.state.$dialog = $('<p>Dialog</p>');
+                    this.state.addShape(this.actualMethod);
+                });
+                
+                function drawStartingPipeline(testCase) {
+                    testCase.expectedInput.draw(testCase.expectedCanvas.ctx);
+                    testCase.expectedCanvas.drawText(
+                            {x: 30, y: 19.5, text: "in", style: "node", dir: 0});
+                    testCase.expectedMethod.draw(testCase.expectedCanvas.ctx);
+                    testCase.expectedCanvas.drawText(
+                            {x: 111.25, y: 14.5, text: "example", style: "node", dir: 0});
+                    
+                }
+                
+                it('should draw', function() {
+                    drawStartingPipeline(this);
+                    
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should highlight clicked input', function() {
+                    drawStartingPipeline(this);
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedInput.highlight(this.expectedCanvas.ctx);
+                    
+                    this.state.doDown({
+                        pageX: this.expectedInput.x,
+                        pageY: this.expectedInput.y
+                    });
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should highlight clicked method', function() {
+                    drawStartingPipeline(this);
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedMethod.highlight(this.expectedCanvas.ctx);
+                    
+                    this.state.doDown({
+                        pageX: this.expectedMethod.x,
+                        pageY: this.expectedMethod.y
+                    });
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should drag output', function() {
+                    drawStartingPipeline(this);
+                    this.expectedOutputZone.draw(this.expectedCanvas.ctx);
+                    this.expectedConnector.x = 250;
+                    this.expectedConnector.y = 20;
+                    this.expectedCanvas.ctx.globalAlpha = 0.75;
+                    this.expectedConnector.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.ctx.globalAlpha = 1.0;
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                    var magnet = this.expectedMethod.out_magnets[0];
+                    
+                    this.state.draw(this.ctx);
+                    this.state.doDown({pageX: magnet.x, pageY: magnet.y});
+                    this.state.doMove({pageX: 250, pageY: 20});
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should create output', function() {
+                    drawStartingPipeline(this);
+                    this.expectedOutput.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 250, y: 45.5, text: "out", style: "node", dir: 0});
+                    // connector
+                    this.expectedConnector.dest = this.expectedOutput.in_magnets[0];
+                    this.expectedCanvas.ctx.globalAlpha = 0.75;
+                    this.expectedConnector.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.ctx.globalAlpha = 1.0;
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                    var magnet = this.expectedMethod.out_magnets[0];
+                    
+                    this.state.draw(this.ctx);
+                    this.state.doDown({pageX: magnet.x, pageY: magnet.y});
+                    this.state.doMove({pageX: 250, pageY: 20});
+                    this.state.doUp({pageX: 250, pageY: 20}); // in output zone
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should create and delete output', function() {
+                    drawStartingPipeline(this);
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedMethod.highlight(this.expectedCanvas.ctx);
+                    var magnet = this.expectedMethod.out_magnets[0];
+                    
+                    this.state.draw(this.ctx);
+                    // drag to create output
+                    this.state.doDown({pageX: magnet.x, pageY: magnet.y});
+                    this.state.doMove({pageX: 250, pageY: 20});
+                    this.state.doUp({pageX: 250, pageY: 20}); // in output zone
+                    this.state.draw(this.ctx);
+                    // select output and delete it
+                    this.state.doDown({
+                        pageX: this.expectedOutput.x,
+                        pageY: this.expectedOutput.y
+                    });
+                    this.state.doUp({
+                        pageX: this.expectedOutput.x,
+                        pageY: this.expectedOutput.y
+                    });
+                    this.state.deleteObject();
+                    // select method
+                    this.state.doDown({
+                        pageX: this.expectedMethod.x,
+                        pageY: this.expectedMethod.y
+                    });
+                    this.state.draw(this.ctx);
+                });
+            });
+        });
     });
 })();
