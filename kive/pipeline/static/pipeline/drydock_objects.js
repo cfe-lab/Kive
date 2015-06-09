@@ -1261,6 +1261,7 @@ var drydock_objects = (function() {
     
     return my;
 }(drydock_objects));
+// TODO: Scope all calls to these objects, then remove aliases.
 var CDtNode = drydock_objects.CdtNode,
     Connector = drydock_objects.Connector,
     Magnet = drydock_objects.Magnet,

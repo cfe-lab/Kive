@@ -5,8 +5,11 @@
  *   Based on the canvas interactivity example by Simon
  *   Sarris, HTML5 Unleashed (2014) Pearson Education Inc.
  */
+var drydock = (function() {
+    "use strict";
+    var my = {};
 
-function CanvasState (canvas) {
+my.CanvasState = function(canvas) {
     /*
     keeps track of canvas state (mouse drag, etc.)
      */
@@ -67,12 +70,12 @@ function CanvasState (canvas) {
     this.can_edit = !($(canvas).data('editable') === false);
 }
 
-CanvasState.prototype.setScale = function(factor) {
+my.CanvasState.prototype.setScale = function(factor) {
     this.scale = factor;
     this.ctx.scale(factor, factor);
 };
 
-CanvasState.prototype.getMouseTarget = function(mx, my) {
+my.CanvasState.prototype.getMouseTarget = function(mx, my) {
     var shape, shapes = this.shapes;
     var connectors = this.connectors;
 
@@ -110,7 +113,7 @@ CanvasState.prototype.getMouseTarget = function(mx, my) {
     return false;
 };
 
-CanvasState.prototype.doDown = function(e) {
+my.CanvasState.prototype.doDown = function(e) {
     var pos = this.getPos(e),
         mx = pos.x, my = pos.y,
         shift = e.shiftKey,
@@ -169,7 +172,7 @@ CanvasState.prototype.doDown = function(e) {
 
         if ((!shift || this.selection.length == 0) && this.can_edit) {
             // create Connector from this out-magnet
-            conn = new Connector(mySel);
+            var conn = new Connector(mySel);
             this.connectors.push(conn);
             mySel.connected.push(conn);
             this.selection = [ conn ];
@@ -195,7 +198,7 @@ CanvasState.prototype.doDown = function(e) {
     return;
 };
 
-CanvasState.prototype.doMove = function(e) {
+my.CanvasState.prototype.doMove = function(e) {
     /*
      event handler for mouse motion over canvas
      */
@@ -315,7 +318,7 @@ CanvasState.prototype.doMove = function(e) {
     
 };
 
-CanvasState.prototype.scaleToCanvas = function(maintain_aspect_ratio) {
+my.CanvasState.prototype.scaleToCanvas = function(maintain_aspect_ratio) {
     // general strategy: get the x and y coords of every shape, then get the max and mins of these sets.
     var x_ar = [], y_ar = [],
         margin = {
@@ -366,7 +369,7 @@ CanvasState.prototype.scaleToCanvas = function(maintain_aspect_ratio) {
     this.valid = false;
 };
 
-CanvasState.prototype.centreCanvas = function() {
+my.CanvasState.prototype.centreCanvas = function() {
     var x_ar = [], y_ar = [],
         shapes = this.shapes,
         xmove, ymove;
@@ -387,7 +390,7 @@ CanvasState.prototype.centreCanvas = function() {
     this.valid = false;
 };
 
-CanvasState.prototype.autoLayout = function() {
+my.CanvasState.prototype.autoLayout = function() {
     var x_spacing = 60,
         y_spacing = 130,
         z_drop = 20,// not implemented yet. intent is for nodes to cascade down into each other like a series of waterfalls!
@@ -464,7 +467,7 @@ CanvasState.prototype.autoLayout = function() {
         // * If `node` is a method which is not the next method in exec_order, insertion is deferred
         // * If `node` -is- the next method in exec_order, insert all the method nodes that were deferred.
         var i, method_nodes,
-            queue = this.method_node_queue = this.method_node_queue || []; // queue is a static variable that persists across function calls
+            queue = my.CanvasState.method_node_queue = my.CanvasState.method_node_queue || []; // queue is a static variable that persists across function calls
         if (list.indexOf(node) === -1) {
             if (node instanceof MethodNode && 
                     typeof exec_order !== 'undefined' &&
@@ -556,7 +559,7 @@ CanvasState.prototype.autoLayout = function() {
     this.valid = false;
 };
 
-CanvasState.prototype.alignSelection = function(axis) {
+my.CanvasState.prototype.alignSelection = function(axis) {
     /* @todo
      * if nodes are too close together then they will collide and then get pushed back out.
      * when this "push back out" happens, it should happen -only- on the axis of alignment.
@@ -600,7 +603,7 @@ CanvasState.prototype.alignSelection = function(axis) {
     }
 }
 
-CanvasState.prototype.detectCollisions = function(myShape, bias) {
+my.CanvasState.prototype.detectCollisions = function(myShape, bias) {
     var followups = [],
         vertices = myShape.getVertices(),
         scale_width = this.canvas.width / this.scale,
@@ -704,7 +707,7 @@ CanvasState.prototype.detectCollisions = function(myShape, bias) {
     }
 }
 
-CanvasState.prototype.doUp = function(e) {
+my.CanvasState.prototype.doUp = function(e) {
     this.valid = false;
     var dialog = $("#dialog_form"),
         index, sel, i, j, connector, suffix, new_output_label, out_node, shape, in_magnet;
@@ -828,7 +831,7 @@ CanvasState.prototype.doUp = function(e) {
     }
 };
 
-CanvasState.prototype.contextMenu = function(e) {
+my.CanvasState.prototype.contextMenu = function(e) {
     var pos = this.getPos(e),
         mcm = $('#method_context_menu'),
         sel = this.selection,
@@ -869,7 +872,7 @@ CanvasState.prototype.contextMenu = function(e) {
     e.preventDefault();
 };
 
-CanvasState.prototype.addShape = function(shape) {
+my.CanvasState.prototype.addShape = function(shape) {
     this.shapes.push(shape);
     if (shape instanceof MethodNode) {
         this.testExecutionOrder();
@@ -879,7 +882,7 @@ CanvasState.prototype.addShape = function(shape) {
 };
 
 // Returns nothing, but sets CanvasState.exec_order and CanvasState.exec_order_is_ambiguous
-CanvasState.prototype.testExecutionOrder = function() {
+my.CanvasState.prototype.testExecutionOrder = function() {
     /*
         gather method nodes which have no method-node parents
         set as phase 0
@@ -1009,7 +1012,7 @@ CanvasState.prototype.testExecutionOrder = function() {
     }
 };
 
-CanvasState.prototype.disambiguateExecutionOrder = function() {
+my.CanvasState.prototype.disambiguateExecutionOrder = function() {
     for ( k=0; k < this.exec_order.length; k++ ) {
         // @note: nodes also have dx and dy properties which are !== 0 when collisions were detected.
         // I have not accounted for these properties in this method because they could shift around
@@ -1018,14 +1021,14 @@ CanvasState.prototype.disambiguateExecutionOrder = function() {
     }
 }
 
-CanvasState.prototype.clear = function() {
+my.CanvasState.prototype.clear = function() {
     // wipe canvas content clean before redrawing
     this.ctx.clearRect(0, 0, this.width / this.scale, this.height / this.scale);
     this.ctx.textAlign = 'center';
     this.ctx.font = '12pt Lato, sans-serif';
 };
 
-CanvasState.prototype.reset = function() {
+my.CanvasState.prototype.reset = function() {
     // remove all objects from canvas
     this.clear();
     // reset containers to reflect canvas
@@ -1035,7 +1038,7 @@ CanvasState.prototype.reset = function() {
     this.selection = [];
 };
 
-CanvasState.prototype.draw = function() {
+my.CanvasState.prototype.draw = function() {
     /*
     Render pipeline objects to Canvas.
      */
@@ -1136,7 +1139,7 @@ CanvasState.prototype.draw = function() {
     }
 };
 
-CanvasState.prototype.getPos = function(e) {
+my.CanvasState.prototype.getPos = function(e) {
     // returns an object with x, y coordinates defined
     var element = this.canvas, offsetX = 0, offsetY = 0, mx, my;
 
@@ -1156,7 +1159,7 @@ CanvasState.prototype.getPos = function(e) {
     return { x: mx, y: my };
 };
 
-CanvasState.prototype.deleteObject = function(objectToDelete) {
+my.CanvasState.prototype.deleteObject = function(objectToDelete) {
     // delete selected object
     // @param objectToDelete optionally specifies which object should be deleted.
     // Otherwise just go with the current selection.
@@ -1257,7 +1260,7 @@ CanvasState.prototype.deleteObject = function(objectToDelete) {
     }
 };
 
-CanvasState.prototype.findMethodNode = function(method_pk) {
+my.CanvasState.prototype.findMethodNode = function(method_pk) {
     var shapes = this.shapes;
     for(var i = 0; i < shapes.length; i++)
         if (shapes[i] instanceof MethodNode && shapes[i].pk == method_pk)
@@ -1265,10 +1268,14 @@ CanvasState.prototype.findMethodNode = function(method_pk) {
     return null;
 }
 
-CanvasState.prototype.findOutputNode = function(pk) {
+my.CanvasState.prototype.findOutputNode = function(pk) {
     var shapes = this.shapes;
     for(var i = 0; i < shapes.length; i++)
         if (shapes[i] instanceof OutputNode && shapes[i].pk == pk)
             return shapes[i];
     return null;
 }
+    
+    return my;
+}(drydock));
+var CanvasState = drydock.CanvasState; // TODO: scope all calls, remove alias
