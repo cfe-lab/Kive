@@ -172,8 +172,8 @@ $(function() {
     var submitOutputNodeName = function(e) {
         // override ENTER key, click Create output button on form
         e.preventDefault();
-        var dialog = $(this).closest('#dialog_form'),
-            out_node = dialog.data('node'),
+        var $dialog = $(this).closest('#dialog_form'),
+            out_node = $dialog.data('node'),
             label = $('#output_name').val(),
             shape;
         for (var i = 0; i < canvasState.shapes.length; i++) {
@@ -188,7 +188,7 @@ $(function() {
         out_node.label = label;
         canvasState.selection = [ out_node ];
         canvasState.valid = false;
-        dialog.hide();
+        $dialog.hide();
     };
     var cancelOutputNode = function() {
         $(this).closest('#dialog_form').hide();
@@ -199,17 +199,16 @@ $(function() {
     var updateCDtPreviewCanvas = function(e) {
         // Update preview picture of node to show a CDtNode or RawNode appropriately
         var preview_canvas = $(this).closest('.modal_dialog').find('canvas'),
-            val = this.value,
-            ctx, filename, colour;
+            ctx;
         
-        if (preview_canvas.length) {
+        if (preview_canvas.length > 0) {
             preview_canvas = preview_canvas[0];
             ctx = preview_canvas.getContext('2d');
             ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
-            if (val === '') {
+            if (this.value === '') {
                 (new RawNode(preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
             } else {
-                (new CDtNode(val, preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
+                (new CDtNode(this.value, preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
             }
         }
         e.stopPropagation();
@@ -869,7 +868,6 @@ $(function() {
         }
     };
     
-    $('<div class="indicator-light">').text(' ').insertAfter('#id_submit_button');
     pipelineCheckReadiness();
     
     // de-activate double-click selection of text on page
