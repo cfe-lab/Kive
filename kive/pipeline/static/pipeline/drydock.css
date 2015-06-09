@@ -1,5 +1,5 @@
 /* Pipeline-specific formatting. */
-body {
+html body {
     background-image: url("/static/pipeline/isogrid.png");
 }
 #inner_wrap {

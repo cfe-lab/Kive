@@ -1,89 +1,10 @@
 // place in global namespace to access from other files
-var canvas,
-    canvasState,
-    submit_to_url = '/pipeline_add',
-    submitError = function(error) {
-        $('#id_submit_error').show().text(error);
-    };
-
-jQuery.fn.extend({
-    val_: function(str) {
-        // wrapper function for changing <input> values with added checks. replaces .val().
-        this.val(str);
-        
-        if (this.is('input, textarea') && this.closest('#pipeline_ctrl').length > 0) {
-            var data_lbl = this.data('label'),
-                lbl;
-            
-            if (typeof data_lbl !== 'undefined') {
-                lbl = data_lbl;
-            } else {
-                lbl = $('label[for="' + this[0].id +'"]', '#pipeline_ctrl');
-                if (lbl.length === 0) {
-                    return this;
-                } else {
-                    lbl = lbl.html();
-                }
-                this.data('label', lbl);
-            }
-            if (str === lbl) {
-                this.addClass('input-label');
-            } else {
-                this.removeClass('input-label');
-            }
-        }
-        return this;
-    },
-    draggable: function(opt) {
-        opt = $.extend({ handle: '', cursor: 'normal' }, opt);
-        var $el = opt.handle === '' ? this : this.find(opt.handle);
-        
-        $el.find('input, select, textarea').on('mousedown', function(e) {
-            e.stopPropagation();
-        });
-        
-        $el.css('cursor', opt.cursor).on("mousedown", function(e) {
-            var $drag;
-            if (opt.handle === '') {
-                $drag = $(this).addClass('draggable');
-            } else {
-                $drag = $(this).addClass('active-handle').parent().addClass('draggable');
-            }  
-            
-            $drag.data('z', $drag.data('z') || $drag.css('z-index'));
-            
-            var z = $drag.data('z'),
-                pos = $drag.offset(),
-                pos_y = pos.top - e.pageY,
-                pos_x = pos.left - e.pageX;
-            
-            $drag.css('z-index', 1000).parents().off('mousemove mouseup').on("mousemove", function(e) {
-                $('.draggable').offset({
-                    top:  e.pageY + pos_y,
-                    left: e.pageX + pos_x
-                });
-            }).on("mouseup", function() {
-                $(this).removeClass('draggable').css('z-index', z);
-            });
-            
-            e.preventDefault(); // disable selection
-        }).on("mouseup", function() {
-            if (opt.handle === "") {
-                $(this).removeClass('draggable');
-            } else {
-                $(this).removeClass('active-handle').parent().removeClass('draggable');
-            }
-        });
-        
-        return $el;
-    }
-});
+var canvas, canvasState;
 
 $(function() {
     /*
     @todo
     
-    - submit colour info with pipeline
     - move as much html into html template as possible
     - greater and greater modularization
     
@@ -95,16 +16,19 @@ $(function() {
         canvasHeight = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
     
     canvasState = new CanvasState(canvas);
+    var submit_to_url = '/pipeline_add',
+        submitError = function(error) { $('#id_submit_error').show().text(error); };
     
     var pipelineCheckReadiness = function() {
         var $btn = $('#id_submit_button');
-        if (!!canvasState.exec_order) {
+        if (!!canvasState.exec_order) {// exec_order is a 2D array if pipeline is executable, otherwise false
             $btn.addClass('pipeline-ready').removeClass('pipeline-not-ready');
         } else {
             $btn.removeClass('pipeline-ready').addClass('pipeline-not-ready');
         }
     };
     var showMenu = function(e) {
+        e.stopPropagation();
         var $this = $(this),
             menu = $($this.data('rel')),
             inputs, input, preview_canvas, i, default_input_value;
@@ -125,14 +49,12 @@ $(function() {
         $('form', menu).trigger('reset');
         inputs = menu.find('input');
         for (i = 0; i < inputs.length; i++) {
-            input = inputs[i];
-            default_input_value = $('label[for="' + input.id +'"]', '#pipeline_ctrl').html();
-            if (input.value === '' || input.value === default_input_value) {
-                $(input).val_('').focus();
+            input = inputs.eq(i);
+            if (input.val_() === '') {
+                input.val_('').focus();
                 break;
             }
         }
-        e.stopPropagation();
     };
     var submitOutputNodeName = function(e) {
         // override ENTER key, click Create output button on form
@@ -140,8 +62,8 @@ $(function() {
         var $dialog = $(this).closest('#dialog_form'),
             out_node = $dialog.data('node'),
             label = $('#output_name').val(),
-            shape;
-        for (var i = 0; i < canvasState.shapes.length; i++) {
+            shape, i;
+        for (i = 0; i < canvasState.shapes.length; i++) {
             shape = canvasState.shapes[i];
             if (shape == out_node) continue;
             if (shape instanceof OutputNode && shape.label == label) {
@@ -288,7 +210,42 @@ $(function() {
             dlg.removeClass('modal_dialog').hide();
         }
     };
-    var createOrReplaceMethodNode = function(e) {
+    var migrateConnectors = function(from_node, to_node) {
+        if (!(from_node instanceof MethodNode && to_node instanceof MethodNode)) {
+            return false;
+        }
+        var idx, new_xput, old_xput, connector, i;
+        for (idx in from_node.inputs) if (from_node.inputs.propertyIsEnumerable(idx)) {
+            old_xput = from_node.inputs[idx];
+            if (to_node.inputs.hasOwnProperty(idx)) {
+                new_xput = to_node.inputs[idx];
+                if (new_xput.cdt_pk === old_xput.cdt_pk &&
+                        from_node.in_magnets[idx-1].connected.length) {
+                    // re-attach Connector
+                    connector = from_node.in_magnets[idx-1].connected.pop();
+                    connector.dest = to_node.in_magnets[idx-1];
+                    to_node.in_magnets[idx-1].connected.push(connector);
+                }
+            }
+        }
+        for (idx in from_node.outputs) if (from_node.outputs.propertyIsEnumerable(idx)) {
+            old_xput = from_node.outputs[idx];
+            if (to_node.outputs.hasOwnProperty(idx)) {
+                new_xput = to_node.outputs[idx];
+                if (new_xput.cdt_pk === old_xput.cdt_pk) {
+                    // re-attach all Connectors - note this does not reverse order any longer
+                    for (i = 0; i < from_node.out_magnets[idx-1].connected.length; i++) {
+                        while (from_node.out_magnets[idx-1].connected.length) {
+                            connector = from_node.out_magnets[idx-1].connected.pop();
+                            connector.source = to_node.out_magnets[idx-1];
+                            to_node.out_magnets[idx-1].connected.unshift(connector);
+                        }
+                    }
+                }
+            }
+        }
+    };
+    var submitMethodDialog = function(e) {
         e.preventDefault(); // stop default form submission behaviour
         
         var method_name = $('#id_method_name', this),
@@ -301,6 +258,47 @@ $(function() {
             dlg = $(this).closest('.modal_dialog'),
             preview_canvas = dlg.find('canvas');
         
+        // locally-defined function has access to all variables in parent function scope
+        var createOrReplaceMethodNode = function(result) {
+            var inputs = result.inputs,
+                outputs = result.outputs;
+
+            if (document.getElementById('id_method_button').value == 'Add Method') {
+                // create new MethodNode
+                canvasState.addShape(new MethodNode(
+                    mid, 
+                    method_family.val(), 
+                    pos.left, pos.top,
+                    method_colour.val(), 
+                    node_label,
+                    inputs, outputs
+                ));
+            } else {
+                // replace the selected MethodNode
+                // if user clicks anywhere else, MethodNode is deselected
+                // and Methods menu closes
+
+                // draw new node over old node
+                var old_node = canvasState.selection[0],
+                    new_node = new MethodNode(
+                        mid, 
+                        method_family.val(), 
+                        old_node.x, old_node.y,
+                        method_colour.val(), 
+                        node_label, 
+                        inputs, outputs
+                    );
+
+                // check if we can re-use any Connectors
+                migrateConnectors(old_node, new_node);
+                canvasState.deleteObject(); // delete selected (old Method)
+                canvasState.addShape(new_node);
+                canvasState.selection = [ new_node ];
+            }
+            
+            dlg.removeClass('modal_dialog').hide();
+        };
+
         if (dlg.length) {
             pos = preview_canvas.offset();
             pos.left += preview_canvas[0].width/2  - canvas.offsetLeft;
@@ -336,78 +334,7 @@ $(function() {
                     url: "/get_method_io/",
                     data: { mid: mid }, // specify data as an object
                     datatype: "json", // type of data expected back from server
-                    success: function(result) {
-                        var inputs = result.inputs,
-                            outputs = result.outputs;
-
-                        if (document.getElementById('id_method_button').value == 'Add Method') {
-                            // create new MethodNode
-                            canvasState.addShape(new MethodNode(
-                                mid, 
-                                method_family.val(), 
-                                pos.left, pos.top,
-                                method_colour.val(), 
-                                node_label,
-                                inputs, outputs
-                            ));
-                        } else {
-                            // replace the selected MethodNode
-                            // if user clicks anywhere else, MethodNode is deselected
-                            // and Methods menu closes
-
-                            // draw new node over old node
-                            var old_node = canvasState.selection[0],
-                                new_node = new MethodNode(
-                                    mid, 
-                                    method_family.val(), 
-                                    old_node.x,
-                                    old_node.y,
-                                    method_colour.val(), 
-                                    node_label, 
-                                    inputs, 
-                                    outputs
-                                ),
-                                // check if we can re-use any Connectors
-                                idx, new_xput, old_xput, connector;
-
-                            for (idx in old_node.inputs) if (old_node.inputs.propertyIsEnumerable(idx)) {
-                                old_xput = old_node.inputs[idx];
-                                if (inputs.hasOwnProperty(idx)) {
-                                    new_xput = inputs[idx];
-                                    if (new_xput.cdt_pk === old_xput.cdt_pk &&
-                                            old_node.in_magnets[idx-1].connected.length) {
-                                        // re-attach Connector
-                                        connector = old_node.in_magnets[idx-1].connected.pop();
-                                        connector.dest = new_node.in_magnets[idx-1];
-                                        new_node.in_magnets[idx-1].connected.push(connector);
-                                    }
-                                }
-                            }
-
-                            for (idx in old_node.outputs) if (old_node.outputs.propertyIsEnumerable(idx)) {
-                                old_xput = old_node.outputs[idx];
-                                if (outputs.hasOwnProperty(idx)) {
-                                    new_xput = outputs[idx];
-                                    if (new_xput.cdt_pk === old_xput.cdt_pk) {
-                                        // re-attach all Connectors - note this does not reverse order any longer
-                                        for (var i = 0; i < old_node.out_magnets[idx-1].connected.length; i++) {
-                                            while (old_node.out_magnets[idx-1].connected.length) {
-                                                connector = old_node.out_magnets[idx-1].connected.pop();
-                                                connector.source = new_node.out_magnets[idx-1];
-                                                new_node.out_magnets[idx-1].connected.unshift(connector);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            canvasState.deleteObject();  // delete selected (old Method)
-                            canvasState.addShape(new_node);
-                            canvasState.selection = [ new_node ];
-                        }
-                        
-                        dlg.removeClass('modal_dialog').hide();
-                    }
+                    success: createOrReplaceMethodNode
                 });
 
                 method_name.val_('');
@@ -481,28 +408,31 @@ $(function() {
         canvasState.valid = false;
     };
     var chooseContextMenuOption = function(e) {
+        e.stopPropagation();
+
         var $this = $(this),
             sel = canvasState.selection;
         
         // if there's a current node selected on the canvas
-        if (sel) {
+        if (sel && sel.length > 0) {
             var action = $this.data('action');
             
             if (action == 'edit' && sel.length == 1) {
                 sel = sel[0];
                 
-                if (sel.constructor == MethodNode) {
+                if (sel instanceof MethodNode) {
                     /*
                         Open the edit dialog (rename, method selection, colour picker...)
                     */
                     var menu = $('#id_method_ctrl').show().addClass('modal_dialog'),
-                        preview_canvas = $('canvas', menu)[0];
+                        preview_canvas = $('canvas', menu)[0],
+                        inputs_width = sel.n_inputs * 4 + 7,
+                        outputs_width = sel.n_outputs * 4 + 24;
+
                     preview_canvas.width = menu.innerWidth();
                     menu.css({
-                        top:  sel.y + sel.dy - sel.n_inputs * 4 + canvas.offsetTop - 36,
-                        left: sel.x + sel.dx - (
-                            preview_canvas.width/2 - Math.sqrt(3) * ( Math.min(- ( sel.n_inputs * 8 + 14 ), 42 - sel.n_outputs * 8) + Math.max( sel.n_inputs  * 8 + 14, sel.n_outputs * 8 + 48 ) ) /4
-                        ) + canvas.offsetLeft - 9
+                        top:  sel.y + sel.dy - inputs_width + canvas.offsetTop - 29,
+                        left: sel.x + sel.dx - preview_canvas.width/2 + 0.8660254 * Math.min(Math.max(outputs_width - inputs_width, 0), 45) + canvas.offsetLeft - 9
                     });
                     $('#id_select_colour').val(sel.fill);
                     $('#colour_picker_pick').css('background-color', sel.fill);
@@ -557,7 +487,6 @@ $(function() {
             }
         }
         $('.context_menu').hide();
-        e.stopPropagation();
     };
     var submitPipeline = function(e) {
         /*
@@ -572,10 +501,8 @@ $(function() {
                 this.value = '';
         });
         
-        var shapes = canvasState.shapes;
-
-        // check graph integrity
-        var this_shape,
+        var shapes = canvasState.shapes,
+            this_shape,
             magnets,
             this_magnet,
             this_connector,
@@ -587,6 +514,7 @@ $(function() {
 
         document.getElementById('id_submit_error').innerHTML = '';
 
+        // check graph integrity
         for (i = 0; i < shapes.length; i++) {
             this_shape = shapes[i];
             if (this_shape instanceof MethodNode) {
@@ -664,7 +592,6 @@ $(function() {
         $('#id_revision_name, #id_revision_desc').css('background-color', '#fff');
         
         // Now we're ready to start
-        // @note: shorthand object notation { val } is shorthand for { "val": val }
         var form_data = {
             users_allowed: users_allowed,
             groups_allowed: groups_allowed,
@@ -720,6 +647,7 @@ $(function() {
                 x: this_step.x / canvas.width,
                 y: this_step.y / canvas.height,
                 name: this_step.label,
+                fill_colour: this_step.fill,
                 cables_in: [],
                 outputs_to_delete: [] // not yet implemented
             };
@@ -898,30 +826,36 @@ $(function() {
     // Labels go within their input fields until they are filled in
     $('input, textarea', '#pipeline_ctrl').each(tuckLabelsIntoInputFields);
     
-    /* ------------------------------------------------------------------------
-     ELEMENT                        EVENT          FUNCTION TRIGGER
-    ------------------------------------------------------------------------ */
-    $(window)                   .on('resize',      documentResizeHandler);
-    $(document)                 .on('keydown',     documentKeyHandler)
-                                .on('mousedown',   documentClickHandler)
-                                .on('cancel', '.context_menu, .modal_dialog, .ctrl_menu', function() { $(this).hide(); });
-    $('form', '#dialog_form')   .on('submit',      submitOutputNodeName)        // Handle jQuery-UI Dialog spawned for output cable
-                                .on('cancel',      cancelOutputNode);           // Cancel is not a native event and can only be triggered via javascript
-    $('#id_select_cdt')         .on('change',      updateCDtPreviewCanvas);
-    $('#id_select_method')      .on('change',      updateMethodPreviewCanvas);
-    $("#id_select_method_family").on('change',     updateMethodRevisionsMenu)   // Update method drop-down
-                                .trigger('change');                             // Trigger on load
-    $('form','#id_input_ctrl')  .on('submit',      createNewInputNode);         // Handle 'Inputs' menu
-    $('form', '#id_method_ctrl').on('submit',      createOrReplaceMethodNode)   // Handle 'Methods' menu
-                                .on('reset',       resetMethodDialog);
-    $('#id_pipeline_form')      .on('submit',      submitPipeline);
-    $('li', 'ul#id_ctrl_nav')   .on('click',       showMenu);
-    $('.context_menu')          .on('click', 'li', chooseContextMenuOption);    // when a context menu option is clicked
-    $('#autolayout_btn')        .on('click',       function() { canvasState.autoLayout(); });
-    $('.align-btn')             .on('click',       function() { canvasState.alignSelection($(this).data('axis')); });
-    $('.form-inline-opts')      .on('click', 'input', changeExecOrderDisplayOption);
-    $('#colour_picker_pick')    .on('click',          showColourPicker);
-    $('#colour_picker_menu')    .on('click', 'div',   pickColour);
+    /*
+    EVENT BINDINGS TABLE
+    --------------------------------------------------------------------------
+     ELEMENT                         EVENT             FUNCTION CALLBACK
+    --------------------------------------------------------------------------
+    */
+    $(window)                    .on('resize',         documentResizeHandler);
+    $(document)                  .on('keydown',        documentKeyHandler)
+                                 .on('mousedown',      documentClickHandler)
+                                 .on('cancel', '.context_menu, .modal_dialog, .ctrl_menu', function() { $(this).hide(); });
+    $('form', '#dialog_form')    .on('submit',         submitOutputNodeName)        // Handle jQuery-UI Dialog spawned for output cable
+                                 .on('cancel',         cancelOutputNode);           // Cancel is not a native event and can only be triggered via javascript
+    $('#id_select_cdt')          .on('change',         updateCDtPreviewCanvas);
+    $('#id_select_method')       .on('change',         updateMethodPreviewCanvas);
+    $("#id_select_method_family").on('change',         updateMethodRevisionsMenu)   // Update method drop-down
+                                 .trigger('change');                             // Trigger on load
+    $('form','#id_input_ctrl')   .on('submit',         createNewInputNode);         // Handle 'Inputs' menu
+    $('form', '#id_method_ctrl') .on('submit',         submitMethodDialog)          // Handle 'Methods' menu
+                                 .on('reset',          resetMethodDialog);
+    $('#id_pipeline_form')       .on('submit',         submitPipeline);
+    $('li', 'ul#id_ctrl_nav')    .on('click',          showMenu);
+    $('.context_menu')           .on('click', 'li',    chooseContextMenuOption);    // when a context menu option is clicked
+    $('#autolayout_btn')         .on('click',          function() { canvasState.autoLayout(); });
+    $('.align-btn')              .on('click',          function() { canvasState.alignSelection($(this).data('axis')); });
+    $('.form-inline-opts')       .on('click', 'input', changeExecOrderDisplayOption);
+    $('#colour_picker_pick')     .on('click',          showColourPicker);
+    $('#colour_picker_menu')     .on('click', 'div',   pickColour);
+    /*
+    --------------------------------------------------------------------------
+    */
     
     $('.ctrl_menu').draggable();
     
@@ -952,3 +886,84 @@ $(function() {
         }).blur()
     ;
 });// end of document.ready()
+
+
+jQuery.fn.extend({
+    val_: function(str) {
+        // wrapper function for changing <input> values with added checks. replaces .val().
+        
+        if (typeof str == 'undefined') {
+            if (this.val() == $('label[for="' + this[0].id +'"]', '#pipeline_ctrl').html()) {
+                return "";
+            } else {
+                return this.val();
+            }
+        } else {
+            this.val(str);
+            if (this.is('input, textarea') && this.closest('#pipeline_ctrl').length > 0) {
+                var data_lbl = this.data('label'),
+                    lbl;
+                if (typeof data_lbl !== 'undefined') {
+                    lbl = data_lbl;
+                } else {
+                    lbl = $('label[for="' + this[0].id +'"]', '#pipeline_ctrl');
+                    if (lbl.length === 0) {
+                        return this;
+                    } else {
+                        lbl = lbl.html();
+                    }
+                    this.data('label', lbl);
+                }
+                if (str === lbl) {
+                    this.addClass('input-label');
+                } else {
+                    this.removeClass('input-label');
+                }
+            }
+            return this;
+        }
+    },
+    draggable: function(opt) {
+        opt = $.extend({ handle: '', cursor: 'normal' }, opt);
+        var $el = opt.handle === '' ? this : this.find(opt.handle);
+        
+        $el.find('input, select, textarea').on('mousedown', function(e) {
+            e.stopPropagation();
+        });
+        
+        $el.css('cursor', opt.cursor).on("mousedown", function(e) {
+            var $drag;
+            if (opt.handle === '') {
+                $drag = $(this).addClass('draggable');
+            } else {
+                $drag = $(this).addClass('active-handle').parent().addClass('draggable');
+            }  
+            
+            $drag.data('z', $drag.data('z') || $drag.css('z-index'));
+            
+            var z = $drag.data('z'),
+                pos = $drag.offset(),
+                pos_y = pos.top - e.pageY,
+                pos_x = pos.left - e.pageX;
+            
+            $drag.css('z-index', 1000).parents().off('mousemove mouseup').on("mousemove", function(e) {
+                $('.draggable').offset({
+                    top:  e.pageY + pos_y,
+                    left: e.pageX + pos_x
+                });
+            }).on("mouseup", function() {
+                $(this).removeClass('draggable').css('z-index', z);
+            });
+            
+            e.preventDefault(); // disable selection
+        }).on("mouseup", function() {
+            if (opt.handle === "") {
+                $(this).removeClass('draggable');
+            } else {
+                $(this).removeClass('active-handle').parent().removeClass('draggable');
+            }
+        });
+        
+        return $el;
+    }
+});
