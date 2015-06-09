@@ -109,7 +109,7 @@ $(function() {
         if (preview_canvas.length) {
             preview_canvas = preview_canvas[0];
             ctx = preview_canvas.getContext('2d');
-            filename = $(this).find('option:selected')[0].title;
+            filename = $(this).find('option:selected').attr('title');
             colour = $(this).closest('.modal_dialog').find('#id_select_colour').val();
             $('#id_method_name').val_(filename);
             
@@ -151,12 +151,19 @@ $(function() {
                 data: { mf_id: mf_id }, // specify data as an object
                 datatype: "json", // type of data expected back from server
                 success: function(result) {
-                    var options = [];
+                    var options = $();
                     var arr = JSON.parse(result);
                     $.each(arr, function(index,value) {
-                        options.push('<option value="', value.pk, '" title="', value.fields.filename, '">', value.fields.method_number, ': ', value.fields.method_name, '</option>');
+                        var option = $("<option>");
+                        option.attr({
+                            value: value.pk,
+                            title: value.fields.filename
+                        }).text(
+                            value.fields.method_number + ': ' + value.fields.method_name
+                        );
+                        options = options.add(option);
                     });
-                    $("#id_select_method").show().html(options.join('')).change();
+                    $("#id_select_method").show().empty().append(options).change();
                 }
             });
             $('#id_method_revision_field').show().focus();
@@ -745,18 +752,19 @@ $(function() {
         $('#id_select_method').trigger('change');
     };
     var tuckLabelsIntoInputFields = function() {
-        var lbl = $('label[for="' + this.id +'"]', '#pipeline_ctrl');
+        var lbl = $('label[for="' + this.id +'"]', '#pipeline_ctrl'),
+            lbl_txt = lbl.text();
         
         if (lbl.length > 0) {
             $(this).on('focus', function() {
-                if (this.value === lbl.html()) {
+                if (this.value === lbl_txt) {
                     $(this).removeClass('input-label').val('');
                 }
             }).on('blur', function() {
                 if (this.value === '') {
-                    $(this).addClass('input-label').val(lbl.html());
+                    $(this).addClass('input-label').val(lbl_txt);
                 }
-            }).data('label', lbl.html()).addClass('input-label').val(lbl.html());
+            }).data('label', lbl_txt).addClass('input-label').val(lbl_txt);
             lbl.remove();
         }
     };
