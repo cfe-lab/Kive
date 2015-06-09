@@ -56,6 +56,9 @@ ul#id_ctrl_nav li:hover {
     background: #fff;
     width: 250px;
 }
+.ctrl_menu#id_view_ctrl {
+    width: auto;
+}
 .input-label { color: #ccc; }
 .image-button { border: 1px dotted #888; cursor: pointer; }
 
@@ -76,6 +79,7 @@ ul#id_ctrl_nav li:hover {
     font-size: 0.9em;
     font-style:italic;
     margin: .5em 0 1em;
+    white-space: nowrap;
 }
 #pipeline_ctrl .form-inline-opts input {
     display: inline;
