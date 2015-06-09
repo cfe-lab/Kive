@@ -170,6 +170,8 @@ class CodeResourceRevision(metadata.models.AccessControl):
         """Represent a resource revision by its revision name"""
         if self.revision_name == "":
             return "[no revision name]"
+        elif not hasattr(self, "coderesource"):
+            return self.revision_name
         else:
             return "{}:{} ({})".format(self.coderesource.name, self.revision_number, self.revision_name)
 

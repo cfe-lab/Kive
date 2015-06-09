@@ -814,7 +814,7 @@ class CodeResourceRevisionTests(MethodTestCase):
         Or, if no CodeResource has been linked, should display a placeholder.
         """
         # Valid crRev should return it's cr.name and crRev.revision_name
-        self.assertEquals(unicode(self.compv1_crRev), "v1")
+        self.assertEquals(unicode(self.compv1_crRev), "complement:1 (v1)")
 
         # Define a crRev without a linking cr, or a revision_name
         no_cr_set = CodeResourceRevision()
@@ -1629,8 +1629,9 @@ class CodeResourceDependencyTests(MethodTestCase):
                                           depFileName="foo.py")
 
         # Display unicode for this dependency under valid conditions
-        self.assertEquals(unicode(test_crd),
-                "complement v1 requires complement v2 as subdir/foo.py")
+        self.assertEquals(
+            unicode(test_crd),
+            "complement complement:1 (v1) requires complement complement:2 (v2) as subdir/foo.py")
 
     def test_invalid_dotdot_path_clean(self):
         """

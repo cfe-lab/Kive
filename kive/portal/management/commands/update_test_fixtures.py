@@ -73,6 +73,7 @@ class ArchiveTestEnvironmentBuilder(FixtureBuilder):
     def build(self):
         create_archive_test_environment(self)
 
+
 class SimpleRunBuilder(FixtureBuilder):
     def get_name(self):
         return 'simple_run.json'
@@ -97,6 +98,7 @@ class SimpleRunBuilder(FixtureBuilder):
                                               [self.symds_words],
                                               groups_allowed=[everyone_group()])
         run_sandbox.execute_pipeline()
+
 
 class DeepNestedRunBuilder(FixtureBuilder):
     def get_name(self):
