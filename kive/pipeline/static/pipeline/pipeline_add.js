@@ -6,41 +6,6 @@ var canvas,
         $('#id_submit_error').show().text(error);
     };
 
-function Menu(selector, button) {
-    this.dialog = $(selector);
-    this.button = button ? $(button) : $('#id_ctrl_nav li').filter(function() { return $(this).data('rel') === selector; });
-    this.form = $('form', this.dialog);
-    this.elements = $('input, select, textarea', this.form);
-    this.is_modal = false;
-
-    var menu = this;
-    this.form.on('submit', function(e) { e.preventDefault(); menu.submit(e); })
-}
-Menu.prototype = {
-    open: function() {
-        var i, inputs, input, default_input_value, preview_canvas;
-        this.button.addClass('clicked');
-        this.dialog.show();
-        this.form.trigger('reset');
-
-        if (this.is_modal) {
-            this.dialog.css({ left: 100, top: 350 });
-            preview_canvas = $('canvas', this.dialog)[0];
-            preview_canvas.width = this.dialog.innerWidth();
-            preview_canvas.height = 60;
-            $('#id_select_cdt').change();
-        }
-        inputs = $('input', this.dialog);
-        for (i = 0; i < inputs.length; i++) {
-            input = inputs[i];
-            default_input_value = $('label[for="' + input.id +'"]', '#pipeline_ctrl').html();
-            if (input.value === '' || input.value === default_input_value) {
-                $(input).val_('').focus();
-                break;
-            }
-        }
-    }
-};
 jQuery.fn.extend({
     val_: function(str) {
         // wrapper function for changing <input> values with added checks. replaces .val().
@@ -54,7 +19,7 @@ jQuery.fn.extend({
                 lbl = data_lbl;
             } else {
                 lbl = $('label[for="' + this[0].id +'"]', '#pipeline_ctrl');
-                if (lbl.length == 0) {
+                if (lbl.length === 0) {
                     return this;
                 } else {
                     lbl = lbl.html();
@@ -104,7 +69,7 @@ jQuery.fn.extend({
             e.preventDefault(); // disable selection
         }).on("mouseup", function() {
             if (opt.handle === "") {
-                $(this).removeClass('draggable')
+                $(this).removeClass('draggable');
             } else {
                 $(this).removeClass('active-handle').parent().removeClass('draggable');
             }
@@ -131,7 +96,7 @@ $(function() {
     
     canvasState = new CanvasState(canvas);
     
-    var pipelineCheckReadiness = function(e) {
+    var pipelineCheckReadiness = function() {
         var $btn = $('#id_submit_button');
         if (!!canvasState.exec_order) {
             $btn.addClass('pipeline-ready').removeClass('pipeline-not-ready');
@@ -142,7 +107,7 @@ $(function() {
     var showMenu = function(e) {
         var $this = $(this),
             menu = $($this.data('rel')),
-            inputs, input, preview_canvas, i, default_input_value
+            inputs, input, preview_canvas, i, default_input_value;
         $('li', 'ul#id_ctrl_nav').not(this).removeClass('clicked');
         $this.addClass('clicked');
         $('.ctrl_menu', '#pipeline_ctrl').hide();
@@ -256,7 +221,7 @@ $(function() {
         e.stopPropagation();
     };
     var updateMethodRevisionsMenu = function() {
-        mf_id = this.value;
+        var mf_id = this.value;
         if (mf_id !== '') {
             $.ajax({
                 type: "POST",
@@ -265,7 +230,7 @@ $(function() {
                 datatype: "json", // type of data expected back from server
                 success: function(result) {
                     var options = [];
-                    var arr = JSON.parse(result)
+                    var arr = JSON.parse(result);
                     $.each(arr, function(index,value) {
                         options.push('<option value="', value.pk, '" title="', value.fields.filename, '">', value.fields.method_number, ': ', value.fields.method_name, '</option>');
                     });
@@ -344,7 +309,7 @@ $(function() {
             pos = { left: 100, top: 200 + Math.round(50 * Math.random()) };
         }
         
-        if (mid === undefined || method_family.val() == '') {
+        if (mid === undefined || method_family.val() === '') {
             method_error[0].innerHTML = "Select a Method";
             
             if (method.is(':visible')) {
@@ -372,8 +337,8 @@ $(function() {
                     data: { mid: mid }, // specify data as an object
                     datatype: "json", // type of data expected back from server
                     success: function(result) {
-                        var inputs = result['inputs'],
-                            outputs = result['outputs'];
+                        var inputs = result.inputs,
+                            outputs = result.outputs;
 
                         if (document.getElementById('id_method_button').value == 'Add Method') {
                             // create new MethodNode
@@ -405,12 +370,12 @@ $(function() {
                                 // check if we can re-use any Connectors
                                 idx, new_xput, old_xput, connector;
 
-                            for (idx in old_node.inputs) {
+                            for (idx in old_node.inputs) if (old_node.inputs.propertyIsEnumerable(idx)) {
                                 old_xput = old_node.inputs[idx];
                                 if (inputs.hasOwnProperty(idx)) {
                                     new_xput = inputs[idx];
-                                    if (new_xput.cdt_pk === old_xput.cdt_pk
-                                            && old_node.in_magnets[idx-1].connected.length) {
+                                    if (new_xput.cdt_pk === old_xput.cdt_pk &&
+                                            old_node.in_magnets[idx-1].connected.length) {
                                         // re-attach Connector
                                         connector = old_node.in_magnets[idx-1].connected.pop();
                                         connector.dest = new_node.in_magnets[idx-1];
@@ -483,9 +448,10 @@ $(function() {
             $('li', 'ul#id_ctrl_nav').add(menus).removeClass('clicked');
         }
     };
-    var documentResizeHandler = function(e) {
-        var shape, i, scale_x, scale_y, out_z;
-        canvasWidth  = canvasState.width = canvas.width  = window.innerWidth,
+    var documentResizeHandler = function() {
+        var shape, i, scale_x, scale_y, out_z,
+            canvasWidth, canvasHeight;
+        canvasWidth  = canvasState.width = canvas.width  = window.innerWidth;
         canvasHeight = canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
         
         scale_x = canvas.width  / canvasState.old_width;
@@ -504,8 +470,8 @@ $(function() {
         }
         
         out_z = canvasState.outputZone;
-        out_z.x = canvasWidth * .8;
-        out_z.h = out_z.w = canvasWidth * .15;
+        out_z.x = canvasWidth * 0.8;
+        out_z.h = out_z.w = canvasWidth * 0.15;
         while (out_z.h + out_z.y > canvasHeight) {
             out_z.h /= 1.5;
         }
@@ -612,6 +578,7 @@ $(function() {
         var this_shape,
             magnets,
             this_magnet,
+            this_connector,
             i, j,
             pipeline_inputs = [],  // collect data nodes
             pipeline_outputs = [],
@@ -694,8 +661,6 @@ $(function() {
             $('#id_family_name, #id_family_desc').css('background-color', '#fff');
         }
 
-        // FIXME: This is fragile if we add a menu to either page
-        var meta_menu_index = !is_revision;
         $('#id_revision_name, #id_revision_desc').css('background-color', '#fff');
         
         // Now we're ready to start
@@ -733,7 +698,7 @@ $(function() {
                 y: this_input.y / canvas.height,
                 min_row: null, // in the future these can be more detailed
                 max_row: null
-            }
+            };
         }
 
         // MethodNodes are now sorted live, prior to pipeline submission —JN
@@ -820,15 +785,15 @@ $(function() {
             data: JSON.stringify(form_data),
             datatype: 'json',
             success: function(result) {
-                if (result['status'] == 'failure') {
-                    submitError(result['error_msg']);
+                if (result.status == 'failure') {
+                    submitError(result.error_msg);
                 }
-                else if (result['status'] == 'success') {
+                else if (result.status == 'success') {
                     $('#id_submit_error').html('').hide();
                     window.location.href = '/pipelines';
                 }
             }
-        })
+        });
     };
     var changeExecOrderDisplayOption = function() {
         var $this = $(this),
@@ -890,7 +855,7 @@ $(function() {
 
         function getCookie(name) {
             var cookieValue = null;
-            if (document.cookie && document.cookie != '') {
+            if (document.cookie && document.cookie !== '') {
                 var cookies = document.cookie.split(';');
                 for (var i = 0; i < cookies.length; i++) {
                     var cookie = jQuery.trim(cookies[i]);
@@ -974,7 +939,7 @@ $(function() {
             var desc_length = this.value.length,
                 wrap = $(this).parent();
             
-            if (desc_length == 0 || $(this).hasClass('input-label')) {
+            if (desc_length === 0 || $(this).hasClass('input-label')) {
                 $('.happy_indicator, .happy_indicator_label', wrap).hide();
             } else if (desc_length > 20) {
                 $('.happy_indicator', wrap).show();
