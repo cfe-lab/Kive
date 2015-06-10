@@ -148,9 +148,9 @@ var drydock = (function() {
         if (mySel instanceof Magnet) {
             if (mySel.isInput) {
                 if (mySel.connected.length > 0) {
-                    mySel = mySel.connected[0];
+                    mySel = mySel.connected[0]; // select connector instead
                 } else {
-                    mySel = mySel.parent;
+                    mySel = mySel.parent; // select magnet's parent instead
                 }
             }
             else if (shift && this.selection.length !== 0 || ! this.can_edit){
@@ -158,7 +158,28 @@ var drydock = (function() {
                 mySel = mySel.parent;
             }
         }
-        if ([ MethodNode, RawNode, CDtNode, OutputNode ].indexOf(mySel.constructor) > -1) {
+        if (mySel instanceof Magnet) {
+            // The only way to get here is with an out magnet we want to create
+            // a connector for.
+            var conn = new Connector(mySel);
+            this.connectors.push(conn);
+            mySel.connected.push(conn);
+            this.selection = [ conn ];
+            this.dragoffx = mx - conn.fromX;
+            this.dragoffy = my - conn.fromY;
+        }
+        else if (mySel instanceof Connector) {
+            if (!shift || this.selection.length == 0) {
+                this.selection = [ mySel ];
+                if(this.can_edit){
+                    this.dragoffx = this.dragoffy = 0;
+                } else {
+                    this.dragging = false;
+                    return;
+                }
+            }
+        }
+        else if ([ MethodNode, RawNode, CDtNode, OutputNode ].indexOf(mySel.constructor) > -1) {
             // this shape is now on top.
             var i = this.shapes.indexOf(mySel);
             this.shapes.push(this.shapes.splice(i,1)[0]);
@@ -179,27 +200,6 @@ var drydock = (function() {
         
             if (mySel instanceof MethodNode) {
                 $('#id_method_button').val('Revise Method');
-            }
-        }
-        else if (mySel instanceof Magnet) {
-            // The only way to get here is with an out magnet we want to create
-            // a connector for.
-            var conn = new Connector(mySel);
-            this.connectors.push(conn);
-            mySel.connected.push(conn);
-            this.selection = [ conn ];
-            this.dragoffx = mx - conn.fromX;
-            this.dragoffy = my - conn.fromY;
-        }
-        else if (mySel instanceof Connector) {
-            if (!shift || this.selection.length == 0) {
-                this.selection = [ mySel ];
-                if(this.can_edit){
-                    this.dragoffx = this.dragoffy = 0;
-                } else {
-                    this.dragging = false;
-                    return;
-                }
             }
         }
         
