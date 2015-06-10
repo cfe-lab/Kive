@@ -145,10 +145,16 @@ var drydock = (function() {
             return;
         }
         
-        if (mySel instanceof Magnet && mySel.isInput) {
-            if (mySel.connected.length > 0) {
-                mySel = mySel.connected[0];
-            } else {
+        if (mySel instanceof Magnet) {
+            if (mySel.isInput) {
+                if (mySel.connected.length > 0) {
+                    mySel = mySel.connected[0];
+                } else {
+                    mySel = mySel.parent;
+                }
+            }
+            else if (shift && this.selection.length !== 0 || ! this.can_edit){
+                // out magnet that can't create a connector
                 mySel = mySel.parent;
             }
         }
@@ -175,18 +181,15 @@ var drydock = (function() {
                 $('#id_method_button').val('Revise Method');
             }
         }
-    
-        else if (mySel instanceof Magnet && mySel.isOutput) {
-    
-            if ((!shift || this.selection.length == 0) && this.can_edit) {
-                // create Connector from this out-magnet
-                var conn = new Connector(mySel);
-                this.connectors.push(conn);
-                mySel.connected.push(conn);
-                this.selection = [ conn ];
-                this.dragoffx = mx - conn.fromX;
-                this.dragoffy = my - conn.fromY;
-            }
+        else if (mySel instanceof Magnet) {
+            // The only way to get here is with an out magnet we want to create
+            // a connector for.
+            var conn = new Connector(mySel);
+            this.connectors.push(conn);
+            mySel.connected.push(conn);
+            this.selection = [ conn ];
+            this.dragoffx = mx - conn.fromX;
+            this.dragoffy = my - conn.fromY;
         }
         else if (mySel instanceof Connector) {
             if (!shift || this.selection.length == 0) {

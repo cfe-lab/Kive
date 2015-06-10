@@ -1403,7 +1403,7 @@
                     this.state.draw(this.ctx);
                 });
                 
-                xit('should drag two objects with shift click on magnet', function() {
+                it('should drag two objects with shift click on magnet', function() {
                     this.expectedInput.y += 50;
                     this.expectedMethod.y += 50;
                     this.expectedInput.draw(this.expectedCanvas.ctx);
