@@ -71,6 +71,7 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
 
     removal_plan = serializers.HyperlinkedIdentityField(view_name='coderesourcerevision-removal-plan')
     absolute_url = serializers.SerializerMethodField()
+    view_url = serializers.SerializerMethodField()
 
     # As per
     # http://www.django-rest-framework.org/api-guide/serializers/#specifying-read-only-fields
@@ -93,6 +94,7 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
             'users_allowed',
             'groups_allowed',
             'absolute_url',
+            'view_url',
             'revision_number',
             'revision_desc',
             'revision_DateTime',
@@ -109,6 +111,11 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
         if not obj:
             return None
         return obj.get_absolute_url()
+
+    def get_view_url(self, obj):
+        if not obj:
+            return None
+        return obj.get_view_url()
 
     # This is a nested serializer so we need to customize the create method.
     def create(self, validated_data):
