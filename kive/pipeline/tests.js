@@ -1403,6 +1403,39 @@
                     this.state.draw(this.ctx);
                 });
                 
+                xit('should drag two objects with shift click on magnet', function() {
+                    this.expectedInput.y += 50;
+                    this.expectedMethod.y += 50;
+                    this.expectedInput.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 30, y: 69.5, text: "in", style: "node", dir: 0});
+                    this.expectedMethod.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 111.25, y: 64.5, text: "example", style: "node", dir: 0});
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedInput.highlight(this.expectedCanvas.ctx);
+                    this.expectedMethod.highlight(this.expectedCanvas.ctx);
+                    
+                    this.state.draw(this.ctx);
+                    // click input
+                    this.state.doDown(
+                            {pageX: this.actualInput.x, pageY: this.actualInput.y});
+                    this.state.doUp(
+                            {pageX: this.actualInput.x, pageY: this.actualInput.y});
+                    // shift click method and drag
+                    this.state.doDown({
+                        pageX: this.actualMethod.out_magnets[0].x,
+                        pageY: this.actualMethod.out_magnets[0].y,
+                        shiftKey: true
+                    });
+                    this.state.doMove({
+                        pageX: this.expectedMethod.out_magnets[0].x,
+                        pageY: this.expectedMethod.out_magnets[0].y
+                    });
+                    this.state.draw(this.ctx);
+                });
+                
                 it('should drag output', function() {
                     drawStartingPipeline(this);
                     this.expectedOutputZone.draw(this.expectedCanvas.ctx);
