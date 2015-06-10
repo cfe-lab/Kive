@@ -86,8 +86,10 @@
             target.draw(ctx);
             ctx.fillStyle = "green";
             for (var i = 0; i < vertices.length; i++) {
-                var vertex = vertices[i];
-                canvas.drawCircle({x: vertex.x, y: vertex.y, r: 2});
+                var vertex = vertices[i],
+                    roundedX = Math.round(vertex.x),
+                    roundedY = Math.round(vertex.y);
+                canvas.drawCircle({x: roundedX, y: roundedY, r: 2});
             }
         }
         
@@ -824,16 +826,16 @@
                 drawVertices(this.expectedCanvas,
                         this.node,
                         [{x: 150, y: 26},
-                         {x: 169.1, y: 15},
+                         {x: 169, y: 15},
                          {x: 150, y: 4},
-                         {x: 130.9, y: 15},
-                         {x: 179.4, y: 74},
-                         {x: 198.5, y: 63},
-                         {x: 198.5, y: 41},
-                         {x: 179.4, y: 52},
-                         {x: 130.95, y: 44.53},
-                         {x: 150, y: 36.5},
-                         {x: 169.1, y: 25.5}]);
+                         {x: 131, y: 15},
+                         {x: 179, y: 74},
+                         {x: 198, y: 63},
+                         {x: 198, y: 41},
+                         {x: 179, y: 52},
+                         {x: 131, y: 45},
+                         {x: 150, y: 36},
+                         {x: 169, y: 25}]);
                 
                 drawVertices(this.canvas, this.node, this.node.getVertices());
             });
@@ -1173,7 +1175,7 @@
                 beforeEach(function() {
                     this.methodId = 27;
                     this.methodFamilyId = 13;
-                    this.methodInputs = {1: {cdt_pk: 16, datasetname: "in"}};
+                    this.methodInputs = {1: {datasetname: "in"}};
                     this.methodOutputs = {1: {cdt_pk: 17, datasetname: "out"}};
                     this.expectedMethod = new drydock_objects.MethodNode(
                             this.methodId,
@@ -1242,6 +1244,159 @@
                     this.expectedMethod.highlight(this.expectedCanvas.ctx);
                     
                     this.state.doDown({
+                        pageX: this.expectedMethod.x,
+                        pageY: this.expectedMethod.y
+                    });
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should remove highlight with shift click', function() {
+                    drawStartingPipeline(this);
+                    
+                    this.state.doDown({
+                        pageX: this.expectedMethod.x,
+                        pageY: this.expectedMethod.y
+                    });
+                    this.state.doUp({
+                        pageX: this.expectedMethod.x,
+                        pageY: this.expectedMethod.y
+                    });
+                    this.state.doDown({
+                        pageX: this.expectedMethod.x,
+                        pageY: this.expectedMethod.y,
+                        shiftKey: true
+                    });
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should remove highlight when clicking background', function() {
+                    drawStartingPipeline(this);
+
+                    // click method
+                    this.state.doDown({
+                        pageX: this.expectedMethod.x,
+                        pageY: this.expectedMethod.y
+                    });
+                    this.state.doUp({
+                        pageX: this.expectedMethod.x,
+                        pageY: this.expectedMethod.y
+                    });
+                    // click background
+                    this.state.doDown({ pageX: 250, pageY: 100 });
+                    
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should not remove highlight when shift clicking background', function() {
+                    drawStartingPipeline(this);
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedMethod.highlight(this.expectedCanvas.ctx);
+                     
+                    // click method
+                    this.state.doDown({
+                        pageX: this.expectedMethod.x,
+                        pageY: this.expectedMethod.y
+                    });
+                    this.state.doUp({
+                        pageX: this.expectedMethod.x,
+                        pageY: this.expectedMethod.y
+                    });
+                    // click background
+                    this.state.doDown({ pageX: 250, pageY: 100, shiftKey: true });
+                    
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should drag input', function() {
+                    this.expectedInput.y += 50;
+                    this.expectedInput.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 30, y: 69.5, text: "in", style: "node", dir: 0});
+                    this.expectedMethod.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 111.25, y: 14.5, text: "example", style: "node", dir: 0});
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedInput.highlight(this.expectedCanvas.ctx);
+                    
+                    this.state.draw(this.ctx);
+                    this.state.doDown(
+                            {pageX: this.actualInput.x, pageY: this.actualInput.y});
+                    this.state.doMove(
+                            {pageX: this.expectedInput.x, pageY: this.expectedInput.y});
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should drag two objects with shift click', function() {
+                    this.expectedInput.y += 50;
+                    this.expectedMethod.y += 50;
+                    this.expectedInput.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 30, y: 69.5, text: "in", style: "node", dir: 0});
+                    this.expectedMethod.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 111.25, y: 64.5, text: "example", style: "node", dir: 0});
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedInput.highlight(this.expectedCanvas.ctx);
+                    this.expectedMethod.highlight(this.expectedCanvas.ctx);
+                    
+                    this.state.draw(this.ctx);
+                    // click input
+                    this.state.doDown(
+                            {pageX: this.actualInput.x, pageY: this.actualInput.y});
+                    this.state.doUp(
+                            {pageX: this.actualInput.x, pageY: this.actualInput.y});
+                    // shift click method and drag
+                    this.state.doDown({
+                        pageX: this.actualMethod.x,
+                        pageY: this.actualMethod.y,
+                        shiftKey: true
+                    });
+                    this.state.doMove({
+                        pageX: this.expectedMethod.x,
+                        pageY: this.expectedMethod.y
+                    });
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should drag two objects with click', function() {
+                    this.expectedInput.y += 50;
+                    this.expectedMethod.y += 50;
+                    this.expectedInput.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 30, y: 69.5, text: "in", style: "node", dir: 0});
+                    this.expectedMethod.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 111.25, y: 64.5, text: "example", style: "node", dir: 0});
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedInput.highlight(this.expectedCanvas.ctx);
+                    this.expectedMethod.highlight(this.expectedCanvas.ctx);
+                    
+                    this.state.draw(this.ctx);
+                    // click input
+                    this.state.doDown(
+                            {pageX: this.actualInput.x, pageY: this.actualInput.y});
+                    this.state.doUp(
+                            {pageX: this.actualInput.x, pageY: this.actualInput.y});
+                    // shift click method
+                    this.state.doDown({
+                        pageX: this.actualMethod.x,
+                        pageY: this.actualMethod.y,
+                        shiftKey: true
+                    });
+                    this.state.doUp({
+                        pageX: this.actualMethod.x,
+                        pageY: this.actualMethod.y
+                    });
+                    // click method and drag
+                    this.state.doDown({
+                        pageX: this.actualMethod.x,
+                        pageY: this.actualMethod.y
+                    });
+                    this.state.doMove({
                         pageX: this.expectedMethod.x,
                         pageY: this.expectedMethod.y
                     });
@@ -1317,6 +1472,91 @@
                         pageX: this.expectedMethod.x,
                         pageY: this.expectedMethod.y
                     });
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should not create connector when read-only', function() {
+                    drawStartingPipeline(this);
+                    var magnet = this.expectedMethod.out_magnets[0];
+
+                    this.state.can_edit = false;
+                    this.state.draw(this.ctx);
+                    this.state.doDown({pageX: magnet.x, pageY: magnet.y});
+                    expect(this.actualMethod.out_magnets[0].connected.length).toBe(0);
+                });
+                
+                it('should start input connector', function() {
+                    this.expectedMethod.in_magnets[0].acceptingConnector = true;
+                    this.expectedMethod.in_magnets[0].fill = '#ff8';
+                    drawStartingPipeline(this);
+                    // connector
+                    this.expectedConnector.source = this.expectedInput.out_magnets[0];
+                    this.expectedConnector.x = 100;
+                    this.expectedConnector.y = 100;
+                    this.expectedCanvas.ctx.globalAlpha = 0.75;
+                    this.expectedConnector.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.ctx.globalAlpha = 1.0;
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                    var fromMagnet = this.expectedConnector.source;
+                    
+                    this.state.draw(this.ctx);
+                    this.state.doDown({pageX: fromMagnet.x, pageY: fromMagnet.y});
+                    this.state.doMove({pageX: 100, pageY: 100});
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should create input connector', function() {
+                    drawStartingPipeline(this);
+                    // connector
+                    this.expectedConnector.source = this.expectedInput.out_magnets[0];
+                    this.expectedConnector.dest = this.expectedMethod.in_magnets[0];
+                    this.expectedCanvas.ctx.globalAlpha = 0.75;
+                    this.expectedConnector.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.ctx.globalAlpha = 1.0;
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                    var fromMagnet = this.expectedConnector.source,
+                        toMagnet = this.expectedConnector.dest;
+                    
+                    this.state.draw(this.ctx);
+                    this.state.doDown({pageX: fromMagnet.x, pageY: fromMagnet.y});
+                    this.state.doMove({pageX: toMagnet.x, pageY: toMagnet.y});
+                    this.state.doUp({pageX: toMagnet.x, pageY: toMagnet.y});
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should create input connector and move it', function() {
+                    this.expectedMethod.in_magnets[0].acceptingConnector = true;
+                    this.expectedMethod.in_magnets[0].fill = '#ff8';
+                    drawStartingPipeline(this);
+                    // connector
+                    this.expectedConnector.source = this.expectedInput.out_magnets[0];
+                    this.expectedConnector.x = 100;
+                    this.expectedConnector.y = 100;
+                    this.expectedCanvas.ctx.globalAlpha = 0.75;
+                    this.expectedConnector.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.ctx.globalAlpha = 1.0;
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                    var fromMagnet = this.expectedInput.out_magnets[0],
+                        toMagnet = this.expectedMethod.in_magnets[0];
+                    
+                    this.state.draw(this.ctx);
+                    // drag from input to method
+                    this.state.doDown({pageX: fromMagnet.x, pageY: fromMagnet.y});
+                    this.state.doMove({pageX: toMagnet.x, pageY: toMagnet.y});
+                    this.state.doUp({pageX: toMagnet.x, pageY: toMagnet.y});
+                    // click background to clear selection
+                    this.state.doDown({pageX: 100, pageY: 100});
+                    this.state.doMove({pageX: 100, pageY: 100});
+                    // drag away from method
+                    this.state.doDown({pageX: toMagnet.x + 6, pageY: toMagnet.y});
+                    this.state.doMove({pageX: 100, pageY: 100});
+                    
                     this.state.draw(this.ctx);
                 });
             });

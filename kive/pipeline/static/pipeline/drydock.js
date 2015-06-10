@@ -137,7 +137,7 @@ var drydock = (function() {
             return false;
         }
         
-        //
+        // Clicking on an object that is already selected? Start dragging.
         if (!shift && this.selection.indexOf(mySel) > -1) {
             this.dragstart = { x: mx, y: my };
             this.dragging = true;
