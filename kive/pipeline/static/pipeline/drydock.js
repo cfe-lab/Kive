@@ -179,7 +179,7 @@ var drydock = (function() {
                 }
             }
         }
-        else if ([ MethodNode, RawNode, CDtNode, OutputNode ].indexOf(mySel.constructor) > -1) {
+        else {
             // this shape is now on top.
             var i = this.shapes.indexOf(mySel);
             this.shapes.push(this.shapes.splice(i,1)[0]);
