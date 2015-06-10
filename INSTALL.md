@@ -8,7 +8,7 @@ Before installing Kive, you need to install some other software.
 
 * Python 2.x (version 2.7 or higher) - unfortunately we do not support Python 3.x.
 * Django (version 1.7 or higher)
-* the Django REST framework
+* the Django REST framework (version 3.1 or higher)
 * PostgreSQL
 * psycopg2 (Python library for interfacing with PostgreSQL)
 * OpenMPI (optional, for running Kive on a cluster)
