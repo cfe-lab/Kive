@@ -1033,7 +1033,7 @@ var drydock = (function() {
     };
     
     my.CanvasState.prototype.disambiguateExecutionOrder = function() {
-        for ( k=0; k < this.exec_order.length; k++ ) {
+        for (var k=0; k < this.exec_order.length; k++ ) {
             // @note: nodes also have dx and dy properties which are !== 0 when collisions were detected.
             // I have not accounted for these properties in this method because they could shift around
             // on window resize, and it makes no sense for the pipeline to change on window resize.
