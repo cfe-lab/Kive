@@ -221,108 +221,105 @@ var drydock = (function() {
         
         if (this.dragging) {
             // are we carrying a shape or Connector?
-            if (this.selection.length > 0) {
-                for (j = 0; j < this.selection.length; j++) {
-                    sel = this.selection[j];
+            for (j = 0; j < this.selection.length; j++) {
+                sel = this.selection[j];
+                
+                // update coordinates of this shape/connector
+                sel.x += dx;
+                sel.y += dy;
+                
+                // any changes made by the collision detection algorithm on this shape are now made "official"
+                if (sel.dx != 0) {
+                    sel.x += sel.dx;
+                    sel.dx = 0;
+                }
+                if (sel.dy != 0) {
+                    sel.y += sel.dy;
+                    sel.dy = 0;
+                }
+                
+                this.valid = false; // redraw
+
+                // are we carrying a connector?
+                if (sel instanceof Connector && this.can_edit) {
+                    // reset to allow mouse to disengage Connector from a magnet
                     
-                    // update coordinates of this shape/connector
-                    sel.x += dx;
-                    sel.y += dy;
+                    sel.x = mouse.x;
+                    sel.y = mouse.y;
                     
-                    // any changes made by the collision detection algorithm on this shape are now made "official"
-                    if (sel.dx != 0) {
-                        sel.x += sel.dx;
-                        sel.dx = 0;
-                    }
-                    if (sel.dy != 0) {
-                        sel.y += sel.dy;
-                        sel.dy = 0;
-                    }
-                    
-                    this.valid = false; // redraw
-    
-                    // are we carrying a connector?
-                    if (sel instanceof Connector && this.can_edit) {
-                        // reset to allow mouse to disengage Connector from a magnet
-                        
-                        sel.x = mouse.x;
-                        sel.y = mouse.y;
-                        
-                        if (sel.dest) {
-                            if (sel.dest.parent instanceof OutputNode) {
-                                // if the cable leads to an output node, then act as if
-                                // the output node itself was clicked...
-                                // not sure if this is the ideal behaviour...
-                                // maybe output nodes should just disappear when they are
-                                // disconnected? -JN
-                                this.selection = [ sel.dest.parent ];
-                                return;
-                            }
-                            else if (sel.dest instanceof Magnet) {
-                                sel.dest.connected = [];
-                                sel.dest = null;
-                            }
+                    if (sel.dest) {
+                        if (sel.dest.parent instanceof OutputNode) {
+                            // if the cable leads to an output node, then act as if
+                            // the output node itself was clicked...
+                            // not sure if this is the ideal behaviour...
+                            // maybe output nodes should just disappear when they are
+                            // disconnected? -JN
+                            this.selection = [ sel.dest.parent ];
+                            return;
                         }
-    
-                        // get this connector's shape
-                        if (sel.source !== null) {
-                            var own_shape = sel.source.parent;
+                        else if (sel.dest instanceof Magnet) {
+                            sel.dest.connected = [];
+                            sel.dest = null;
                         }
-    
-                        // check if connector has been dragged to an in-magnet
-                        for (i = 0; i < shapes.length; i++) {
-                            shape = shapes[i];
-                        
-                            // ignore Connectors, RawNodes, CDtNodes
-                            // and disallow self-referential connections
-                            if (typeof shape.in_magnets === 'undefined' 
-                                    || shape.in_magnets.length === 0
-                                    || typeof own_shape !== 'undefined'
-                                    && shape === own_shape) {
-                                continue;
+                    }
+
+                    // get this connector's shape
+                    if (sel.source !== null) {
+                        var own_shape = sel.source.parent;
+                    }
+
+                    // check if connector has been dragged to an in-magnet
+                    for (i = 0; i < shapes.length; i++) {
+                        shape = shapes[i];
+                    
+                        // ignore Connectors, RawNodes, CDtNodes
+                        // and disallow self-referential connections
+                        if (typeof shape.in_magnets === 'undefined' 
+                                || shape.in_magnets.length === 0
+                                || typeof own_shape !== 'undefined'
+                                && shape === own_shape) {
+                            continue;
+                        }
+
+                        // shape is a Method, check its in-magnets
+                        var in_magnets = shape.in_magnets,
+                            connector_carrying_cdt;
+                    
+                        for (var j = 0; j < in_magnets.length; j++) {
+                            var in_magnet = in_magnets[j];
+
+                            // retrieve CompoundDatatype of out-magnet
+                            if (own_shape instanceof RawNode) {
+                                connector_carrying_cdt = null;
+                            } else {
+                                connector_carrying_cdt = sel.source.cdt;
                             }
-    
-                            // shape is a Method, check its in-magnets
-                            var in_magnets = shape.in_magnets,
-                                connector_carrying_cdt;
-                        
-                            for (var j = 0; j < in_magnets.length; j++) {
-                                var in_magnet = in_magnets[j];
-    
-                                // retrieve CompoundDatatype of out-magnet
-                                if (own_shape instanceof RawNode) {
-                                    connector_carrying_cdt = null;
-                                } else {
-                                    connector_carrying_cdt = sel.source.cdt;
-                                }
-                                // does this in-magnet accept this CompoundDatatype?
-                                if (shape instanceof MethodNode &&
-                                    connector_carrying_cdt == in_magnet.cdt) {
-                                    // light up magnet
-                                    in_magnet.fill = '#ff8';
-                                    in_magnet.acceptingConnector = true;
-                                    if (in_magnet.connected.length == 0 
-                                            && in_magnet.contains(sel.x, sel.y)) {
-                                        // jump to magnet
-                                        sel.x = in_magnet.x;
-                                        sel.y = in_magnet.y;
-                                        in_magnet.connected = [ sel ];
-                                        sel.dest = in_magnet;
-                                    }
+                            // does this in-magnet accept this CompoundDatatype?
+                            if (shape instanceof MethodNode &&
+                                connector_carrying_cdt == in_magnet.cdt) {
+                                // light up magnet
+                                in_magnet.fill = '#ff8';
+                                in_magnet.acceptingConnector = true;
+                                if (in_magnet.connected.length == 0 
+                                        && in_magnet.contains(sel.x, sel.y)) {
+                                    // jump to magnet
+                                    sel.x = in_magnet.x;
+                                    sel.y = in_magnet.y;
+                                    in_magnet.connected = [ sel ];
+                                    sel.dest = in_magnet;
                                 }
                             }
                         }
-                    } else {
-                        // carrying a shape
-                        // if execution order is ambiguous, the tiebreaker is the y-position.
-                        // dragging a method node needs to calculate this in real-time.
-                        if (this.exec_order_is_ambiguous && sel instanceof MethodNode) {
-                            this.disambiguateExecutionOrder();
-                        }
+                    }
+                } else {
+                    // carrying a shape
+                    // if execution order is ambiguous, the tiebreaker is the y-position.
+                    // dragging a method node needs to calculate this in real-time.
+                    if (this.exec_order_is_ambiguous && sel instanceof MethodNode) {
+                        this.disambiguateExecutionOrder();
                     }
                 }
             }
-            // TODO: else dragging on canvas - we could implement block selection here
             
             this.dragstart = mouse;
         }
