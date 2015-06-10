@@ -794,7 +794,6 @@ var drydock = (function() {
                     
                         connector.dest = out_node.in_magnets[0];
                         connector.dest.connected = [ connector ];
-                        connector.source.connected.push(connector);
                     
                         out_node.y = this.outputZone.y + this.outputZone.h + out_node.h/2 + out_node.r2;// push out of output zone
                         out_node.x = connector.x;
