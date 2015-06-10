@@ -16,8 +16,10 @@ $(function() {
         canvasHeight = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
     
     canvasState = new CanvasState(canvas);
-    var submit_to_url = '/pipeline_add',
-        submitError = function(error) { $('#id_submit_error').show().text(error); };
+
+    // TODO: Move this into a parameter for the submit method
+    window.submit_to_url = '/pipeline_add';
+    var submitError = function(error) { $('#id_submit_error').show().text(error); };
     
     var pipelineCheckReadiness = function() {
         var $btn = $('#id_submit_button');
@@ -716,7 +718,7 @@ $(function() {
         // do AJAX transaction
         $.ajax({
             type: 'POST',
-            url: submit_to_url,
+            url: window.submit_to_url,
             data: JSON.stringify(form_data),
             datatype: 'json',
             success: function(result) {
