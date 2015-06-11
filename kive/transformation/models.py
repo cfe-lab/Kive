@@ -8,7 +8,7 @@ from __future__ import unicode_literals
 
 from django.db import models
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator, validate_slug
 from django.db import transaction
 from django.utils.encoding import python_2_unicode_compatible
 
@@ -441,7 +441,8 @@ class TransformationInput(TransformationXput):
     dataset_name = models.CharField(
         "input name",
         max_length=maxlengths.MAX_NAME_LENGTH,
-        help_text="Name for input as an alternative to index")
+        help_text="Name for input as an alternative to index",
+        validators=[validate_slug])
 
     # Input index on the transformation.
     dataset_idx = models.PositiveIntegerField(
@@ -466,7 +467,8 @@ class TransformationOutput(TransformationXput):
     dataset_name = models.CharField(
         "output name",
         max_length=maxlengths.MAX_NAME_LENGTH,
-        help_text="Name for output as an alternative to index")
+        help_text="Name for output as an alternative to index",
+        validators=[validate_slug])
 
     dataset_idx = models.PositiveIntegerField(
         "output index",

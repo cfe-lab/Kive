@@ -830,8 +830,10 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         # The code to be executed sits in 
         # [run_path]/[driver.coderesource.name],
         # and is executable.
-        code_to_run = os.path.join(run_path,
-            self.driver.coderesource.filename)
+        code_to_run = os.path.join(
+            run_path,
+            self.driver.coderesource.filename
+        )
 
         command = [code_to_run] + input_paths + output_paths
         self.logger.debug("subprocess.Popen({})".format(command))
