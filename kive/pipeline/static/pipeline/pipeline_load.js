@@ -173,7 +173,7 @@ var pipeline = (function(exports){
 
             var method_node = new MethodNode(
                     node.transformation,
-                    node.family_pk,
+                    node.transformation_family,
                     node.x * canvas_x_ratio,
                     node.y * canvas_y_ratio,
                     null, // fill
@@ -226,12 +226,10 @@ var pipeline = (function(exports){
                     // cable from another MethodNode
 
                     // this requires that pipeline_steps in JSON is sorted by step_num
-                    // TODO: Check "(adjust for 0-index)" In the serializer, the
-                    // index looks zero based already
                     source = self.canvasState.shapes[method_node_offset + cable.source_step - 1];
 
                     // find the correct out-magnet
-                    $.each(source.out_magnets, function(_, magnet){
+                    $.each(source.out_magnets, function(j, magnet){
 
                         // TODO: Should we be using PKs here?
                         if(magnet.label === cable.source_dataset_name) {
@@ -241,7 +239,7 @@ var pipeline = (function(exports){
                             connector.y = magnet.y;
                             connector.dest = magnet;
 
-                            magnet.connected.push(connector);
+                            source.out_magnets[j].connected.push(connector);
                             method_node.in_magnets[cable_idx].connected.push(connector);
                             self.canvasState.connectors.push(connector);
                             return false; // break;
