@@ -25,7 +25,7 @@ $(function() {
 //                );
 //            }
 //        });
-
+//
         $.ajax({
             type: "POST",
             url: "/get_pipeline/",
