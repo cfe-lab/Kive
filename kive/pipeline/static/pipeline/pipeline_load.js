@@ -264,7 +264,7 @@ var pipeline = (function(exports){
             var source = self.canvasState.shapes[method_node_offset + this_output.source_step - 1];
 
             // Over each out magnet for that source
-            $.each(source.out_magnets, function(_, magnet) {
+            $.each(source.out_magnets, function(j, magnet) {
                 if(magnet.label === this_output.source_dataset_name) {
                     var connector = new Connector(magnet),
                         output = self.pipeline.outputs[this_output.output_idx - 1],
@@ -272,7 +272,7 @@ var pipeline = (function(exports){
                             output.x * canvas_x_ratio,
                             output.y * canvas_y_ratio,
                             this_output.output_name,
-                            this_output.id
+                            this_output.pk
                          );
 
                     self.canvasState.addShape(output_node);
@@ -284,7 +284,7 @@ var pipeline = (function(exports){
                     connector.dest.connected = [connector];  // bind cable to output node
                     connector.source = magnet;
 
-                    magnet.connected.push(connector);  // bind cable to source Method
+                    source.out_magnets[j].connected.push(connector);  // bind cable to source Method
                     self.canvasState.connectors.push(connector);
                     return false; // break
                 }
@@ -488,7 +488,9 @@ function update_status(canvasState, run, look_for_md5) {
     // Update all outputs
     for (output_pk in outputs) if (outputs.propertyIsEnumerable(output_pk)) {
         shape = canvasState.findOutputNode(output_pk);
+            debugger;
         if (shape instanceof OutputNode) {
+            debugger;
             shape.status = outputs[output_pk].status;
             shape.md5 = outputs[output_pk].md5;
             shape.dataset_id = outputs[output_pk].dataset_id;
