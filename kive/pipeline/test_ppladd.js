@@ -42,9 +42,6 @@
 
         afterEach(function() {
             expect('Suppress SPEC HAS NO EXPECTATIONS').toBeDefined();
-//            expect(this.rawCanvas).toImageDiffEqual(
-//                    this.expectedRawCanvas,
-//                    this.rgb_tolerance);
         });
 
         function loadPipeline(canvasState, pipeline){
@@ -58,13 +55,53 @@
             canvasState.draw();
         };
 
+        function loadApiPipeline(canvasState, pipeline){
+            var ppln = new Pipeline(canvasState);
+            ppln.load(pipeline);
+            return ppln;
+        };
+
         describe('Load', function(){
             it('should load pipeline', function() {
                 loadPipeline(this.canvasState, this.example_pipeline);
             });
 
+            it('should load pipeline from API', function() {
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            });
+
+            it('should draw pipeline from API', function() {
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+                pipeline.draw();
+            });
+
             it('should find pipeline nodes', function() {
                 loadPipeline(this.canvasState, this.example_pipeline);
+
+                var input1  = this.canvasState.findNodeByLabel('input1'),
+                    input2  = this.canvasState.findNodeByLabel('input2'),
+                    prelim  = this.canvasState.findNodeByLabel('prelim_map.py'),
+                    remap   = this.canvasState.findNodeByLabel('remap.py'),
+                    remapc  = this.canvasState.findNodeByLabel('remap_counts'),
+                    remapcs = this.canvasState.findNodeByLabel('remap_conseq'),
+                    remapp  = this.canvasState.findNodeByLabel('remap'),
+                    umfasq1 = this.canvasState.findNodeByLabel('unmapped2_fastq'),
+                    umfasq2 = this.canvasState.findNodeByLabel('unmapped1_fastq'),
+                    jmguire = this.canvasState.findNodeByLabel('Jerry Maguire');
+
+                expect(input1).not.toBe(null);
+                expect(input2).not.toBe(null);
+                expect(prelim).not.toBe(null);
+                expect(remap).not.toBe(null);
+                expect(remapc).not.toBe(null);
+                expect(remapp).not.toBe(null);
+                expect(umfasq1).not.toBe(null);
+                expect(umfasq2).not.toBe(null);
+                expect(jmguire).toBe(null);
+            });
+
+            it('should find pipeline nodes from API', function() {
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
 
                 var input1  = this.canvasState.findNodeByLabel('input1'),
                     input2  = this.canvasState.findNodeByLabel('input2'),
@@ -105,8 +142,32 @@
                 expect(this.canvasState.isConnectedTo(input2, remap)).toBe(true);
             });
 
+            it('should connect inputs to methods API', function(){
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+
+                var input1 = this.canvasState.findNodeByLabel('input1'),
+                    input2 = this.canvasState.findNodeByLabel('input2'),
+                    prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
+                    remap  = this.canvasState.findNodeByLabel('remap.py');
+
+                expect(this.canvasState.isConnectedTo(input1, input2)).toBe(false);
+                expect(this.canvasState.isConnectedTo(input1, prelim)).toBe(true);
+                expect(this.canvasState.isConnectedTo(input2, prelim)).toBe(true);
+                expect(this.canvasState.isConnectedTo(input1, remap)).toBe(true);
+                expect(this.canvasState.isConnectedTo(input2, remap)).toBe(true);
+            });
+
             it('should connect methods', function(){
                 loadPipeline(this.canvasState, this.example_pipeline);
+
+                var prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
+                    remap  = this.canvasState.findNodeByLabel('remap.py');
+
+                expect(this.canvasState.isConnectedTo(prelim, remap)).toBe(true);
+            });
+
+            it('should connect methods API', function(){
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
 
                 var prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
                     remap  = this.canvasState.findNodeByLabel('remap.py');
@@ -131,6 +192,25 @@
                 expect(this.canvasState.isConnectedTo(umfasq2, remap)).toBe(true);
                 expect(this.canvasState.isConnectedTo(remapc, umfasq2)).toBe(false);
             });
+
+            it('should connect methods to outputs API', function(){
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+
+                var remap   = this.canvasState.findNodeByLabel('remap.py'),
+                    remapc  = this.canvasState.findNodeByLabel('remap_counts'),
+                    remapcs = this.canvasState.findNodeByLabel('remap_conseq'),
+                    remapp  = this.canvasState.findNodeByLabel('remap'),
+                    umfasq1 = this.canvasState.findNodeByLabel('unmapped2_fastq'),
+                    umfasq2 = this.canvasState.findNodeByLabel('unmapped1_fastq');
+
+                expect(this.canvasState.isConnectedTo(remapc, remap)).toBe(true);
+                expect(this.canvasState.isConnectedTo(remapcs, remap)).toBe(true);
+                expect(this.canvasState.isConnectedTo(remapp, remap)).toBe(true);
+                expect(this.canvasState.isConnectedTo(umfasq1, remap)).toBe(true);
+                expect(this.canvasState.isConnectedTo(umfasq2, remap)).toBe(true);
+                expect(this.canvasState.isConnectedTo(remapc, umfasq2)).toBe(false);
+            });
+
         });
     });
 })();

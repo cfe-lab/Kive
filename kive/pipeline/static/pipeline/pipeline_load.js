@@ -22,6 +22,10 @@ var pipeline = (function(exports){
          * @param pipeline: serialized pipeline array
          */
          this.pipeline = pipeline;
+        this.canvasState.reset();
+        this.draw_inputs();
+        this.draw_steps();
+        this.draw_outputs();
     }
 
     Pipeline.prototype.serialize = function(patch) {
@@ -86,11 +90,6 @@ var pipeline = (function(exports){
         /**
          * Forces a redraw of this pipeline on its associated canvas
          */
-
-        this.canvasState.reset();
-        this.draw_inputs();
-        this.draw_steps();
-        this.draw_outputs();
 
         this.canvasState.testExecutionOrder();
 
