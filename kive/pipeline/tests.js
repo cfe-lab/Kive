@@ -14,9 +14,19 @@
             this.ctx = this.canvas.ctx;
             this.expectedCanvas.ctx.fillStyle = "white";
             this.rgb_tolerance = 16; // max 255
+            
+            this.allowedGlobals = {};
+            for (var key in window) {
+                this.allowedGlobals[key] = true;
+            }
         });
         
         afterEach(function() {
+            for (var key in window) {
+                if ( ! (key in this.allowedGlobals)) {
+                    fail('leaked global ' + key);
+                }
+            }
             expect(this.rawCanvas).toImageDiffEqual(
                     this.expectedRawCanvas,
                     this.rgb_tolerance);
@@ -1508,6 +1518,37 @@
                     this.state.draw(this.ctx);
                 });
                 
+                it('should create and move output', function() {
+                    drawStartingPipeline(this);
+                    this.expectedOutput.y -= 20;
+                    this.expectedOutput.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 250, y: 25.5, text: "out", style: "node", dir: 0});
+                    // connector
+                    this.expectedConnector.dest = this.expectedOutput.in_magnets[0];
+                    this.expectedCanvas.ctx.globalAlpha = 0.75;
+                    this.expectedConnector.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.ctx.globalAlpha = 1.0;
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedOutput.highlight(this.expectedCanvas.ctx);
+                    this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                    var magnet = this.expectedMethod.out_magnets[0];
+                    
+                    this.state.draw(this.ctx);
+                    // drag to create output
+                    this.state.doDown({pageX: magnet.x, pageY: magnet.y});
+                    this.state.doMove({pageX: 250, pageY: 20});
+                    this.state.doUp({pageX: 250, pageY: 20}); // in output zone
+                    this.state.draw(this.ctx);
+                    // select connector and move it
+                    var startX = this.actualMethod.out_magnets[0].connected[0].x,
+                        startY = this.actualMethod.out_magnets[0].connected[0].y;
+                    this.state.doDown({ pageX: startX, pageY: startY });
+                    this.state.doMove({ pageX: startX, pageY: startY-20 });
+                    this.state.draw(this.ctx);
+                });
+                
                 it('should not create connector when read-only', function() {
                     drawStartingPipeline(this);
                     var magnet = this.expectedMethod.out_magnets[0];
@@ -1540,6 +1581,28 @@
                     this.state.draw(this.ctx);
                 });
                 
+                it('should start input connector of wrong type', function() {
+                    drawStartingPipeline(this);
+                    // connector
+                    this.expectedConnector.source = this.expectedInput.out_magnets[0];
+                    this.expectedConnector.x = 100;
+                    this.expectedConnector.y = 100;
+                    this.expectedCanvas.ctx.globalAlpha = 0.75;
+                    this.expectedConnector.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.ctx.globalAlpha = 1.0;
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                    var fromMagnet = this.expectedConnector.source;
+                    
+                    this.actualMethod.in_magnets[0].cdt = 14; // won't match raw
+                    
+                    this.state.draw(this.ctx);
+                    this.state.doDown({pageX: fromMagnet.x, pageY: fromMagnet.y});
+                    this.state.doMove({pageX: 100, pageY: 100});
+                    this.state.draw(this.ctx);
+                });
+                
                 it('should create input connector', function() {
                     drawStartingPipeline(this);
                     // connector
@@ -1561,36 +1624,154 @@
                     this.state.draw(this.ctx);
                 });
                 
-                it('should create input connector and move it', function() {
-                    this.expectedMethod.in_magnets[0].acceptingConnector = true;
-                    this.expectedMethod.in_magnets[0].fill = '#ff8';
-                    drawStartingPipeline(this);
-                    // connector
-                    this.expectedConnector.source = this.expectedInput.out_magnets[0];
-                    this.expectedConnector.x = 100;
-                    this.expectedConnector.y = 100;
-                    this.expectedCanvas.ctx.globalAlpha = 0.75;
-                    this.expectedConnector.draw(this.expectedCanvas.ctx);
-                    this.expectedCanvas.ctx.globalAlpha = 1.0;
-                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
-                    this.expectedCanvas.ctx.lineWidth = 4;
-                    this.expectedConnector.highlight(this.expectedCanvas.ctx);
-                    var fromMagnet = this.expectedInput.out_magnets[0],
-                        toMagnet = this.expectedMethod.in_magnets[0];
+                it('should scale to canvas', function() {
+                    this.expectedInput.x = 45;
+                    this.expectedInput.y = 127.5;
+                    this.expectedMethod.x = 255;
+                    this.expectedMethod.y = 22.5;
                     
-                    this.state.draw(this.ctx);
-                    // drag from input to method
-                    this.state.doDown({pageX: fromMagnet.x, pageY: fromMagnet.y});
-                    this.state.doMove({pageX: toMagnet.x, pageY: toMagnet.y});
-                    this.state.doUp({pageX: toMagnet.x, pageY: toMagnet.y});
-                    // click background to clear selection
-                    this.state.doDown({pageX: 100, pageY: 100});
-                    this.state.doMove({pageX: 100, pageY: 100});
-                    // drag away from method
-                    this.state.doDown({pageX: toMagnet.x + 6, pageY: toMagnet.y});
-                    this.state.doMove({pageX: 100, pageY: 100});
+                    this.expectedInput.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 45, y: 97, text: "in", style: "node", dir: 0});
+                    this.expectedMethod.draw(this.expectedCanvas.ctx);
+                    this.actualInput.x = 100;
+                    this.actualInput.y = 310;
+                    this.actualMethod.x = 520;
+                    this.actualMethod.y = 100;
                     
+                    this.state.scaleToCanvas();
                     this.state.draw(this.ctx);
+                });
+                
+                it('should delete the input', function() {
+                    this.expectedMethod.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 111.25, y: 14.5, text: "example", style: "node", dir: 0});
+                    
+                    this.state.deleteObject(this.actualInput);
+                    this.state.draw(this.ctx);
+                });
+                
+                describe('and connector', function() {
+                    beforeEach(function() {
+                        this.actualConnector = new drydock_objects.Connector(
+                                this.actualInput.out_magnets[0]);
+                        this.actualInput.out_magnets.push(this.actualConnector);
+                        this.actualConnector.dest = this.actualMethod.in_magnets[0];
+                        this.actualMethod.in_magnets[0].connected.push(
+                                this.actualConnector);
+                        this.state.connectors.push(this.actualConnector);
+                    });
+                    
+                    it('should move connector', function() {
+                        this.expectedMethod.in_magnets[0].acceptingConnector = true;
+                        this.expectedMethod.in_magnets[0].fill = '#ff8';
+                        drawStartingPipeline(this);
+                        // connector
+                        this.expectedConnector.source = this.expectedInput.out_magnets[0];
+                        this.expectedConnector.x = 100;
+                        this.expectedConnector.y = 100;
+                        this.expectedCanvas.ctx.globalAlpha = 0.75;
+                        this.expectedConnector.draw(this.expectedCanvas.ctx);
+                        this.expectedCanvas.ctx.globalAlpha = 1.0;
+                        this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                        this.expectedCanvas.ctx.lineWidth = 4;
+                        this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                        var fromMagnet = this.expectedMethod.in_magnets[0];
+                        
+                        this.state.draw(this.ctx);
+                        // drag away from method
+                        this.state.doDown(
+                                {pageX: fromMagnet.x + 6, pageY: fromMagnet.y});
+                        this.state.doMove({pageX: 100, pageY: 100});
+                        
+                        this.state.draw(this.ctx);
+                    });
+                    
+                    it('shift click should move connector when nothing selected', function() {
+                        this.expectedMethod.in_magnets[0].acceptingConnector = true;
+                        this.expectedMethod.in_magnets[0].fill = '#ff8';
+                        drawStartingPipeline(this);
+                        // connector
+                        this.expectedConnector.source = this.expectedInput.out_magnets[0];
+                        this.expectedConnector.x = 100;
+                        this.expectedConnector.y = 100;
+                        this.expectedCanvas.ctx.globalAlpha = 0.75;
+                        this.expectedConnector.draw(this.expectedCanvas.ctx);
+                        this.expectedCanvas.ctx.globalAlpha = 1.0;
+                        this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                        this.expectedCanvas.ctx.lineWidth = 4;
+                        this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                        var fromMagnet = this.expectedMethod.in_magnets[0];
+                        
+                        this.state.draw(this.ctx);
+                        // drag away from method
+                        this.state.doDown({
+                            pageX: fromMagnet.x,
+                            pageY: fromMagnet.y,
+                            shiftKey: true
+                        });
+                        this.state.doMove({pageX: 100, pageY: 100});
+                        
+                        this.state.draw(this.ctx);
+                    });
+                    
+                    it('shift click on connector should move input', function() {
+                        this.expectedMethod.in_magnets[0].acceptingConnector = true;
+                        this.expectedMethod.in_magnets[0].fill = '#ff8';
+                        drawStartingPipeline(this);
+                        // connector
+                        this.expectedConnector.source = this.expectedInput.out_magnets[0];
+                        this.expectedConnector.x = 100;
+                        this.expectedConnector.y = 100;
+                        this.expectedCanvas.ctx.globalAlpha = 0.75;
+                        this.expectedConnector.draw(this.expectedCanvas.ctx);
+                        this.expectedCanvas.ctx.globalAlpha = 1.0;
+                        this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                        this.expectedCanvas.ctx.lineWidth = 4;
+                        this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                        var fromMagnet = this.expectedMethod.in_magnets[0];
+                        
+                        this.state.draw(this.ctx);
+                        // select input node
+                        this.state.doDown({
+                            pageX: this.actualInput.x,
+                            pageY: this.actualInput.y
+                        });
+                        this.state.doUp({
+                            pageX: this.actualInput.x,
+                            pageY: this.actualInput.y
+                        });
+                        // drag away from method
+                        this.state.doDown({
+                            pageX: fromMagnet.x,
+                            pageY: fromMagnet.y
+                        });
+                        this.state.doMove({ pageX: 100, pageY: 100 });
+                        
+                        this.state.draw(this.ctx);
+                    });
+                    
+                    it('should not move connector when read-only', function() {
+                        drawStartingPipeline(this);
+                        // connector
+                        this.expectedConnector.source = this.expectedInput.out_magnets[0];
+                        this.expectedConnector.dest = this.expectedMethod.in_magnets[0];
+                        this.expectedCanvas.ctx.globalAlpha = 0.75;
+                        this.expectedConnector.draw(this.expectedCanvas.ctx);
+                        var fromMagnet = this.expectedMethod.in_magnets[0];
+
+                        this.state.can_edit = false;
+                        this.state.draw(this.ctx);
+                        // drag away from method
+                        this.state.doDown({
+                            pageX: fromMagnet.x,
+                            pageY: fromMagnet.y
+                        });
+                        this.state.doMove({ pageX: 100, pageY: 100 });
+                        
+                        this.state.draw(this.ctx);
+                    });
                 });
             });
         });

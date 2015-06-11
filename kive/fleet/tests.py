@@ -391,11 +391,12 @@ class RunApiTests(ExecuteTestsBase):
         data = response.render().data
 
         # Check that the run created something sensible
-        self.assertEquals(data['id'], 1)
+        self.assertIn("id", data)
+        rtp_pk = data["id"]
         self.assertIn('run_outputs', data)
 
         # Execute the pipeline
-        rtp = RunToProcess.objects.all()[0]
+        rtp = RunToProcess.objects.get(pk=rtp_pk)
         sbox = Sandbox(rtp.user, rtp.pipeline, [x.symbolicdataset for x in rtp.inputs.order_by("index")])
         rtp.run = sbox.run
         rtp.save()
@@ -405,7 +406,7 @@ class RunApiTests(ExecuteTestsBase):
         self.test_run_index(1)
 
         # Touch the record detail page
-        path = self.run_list_path + "1/"
+        path = self.run_list_path + "{}/".format(rtp_pk)
         request = self.factory.get(path)
         force_authenticate(request, user=self.myUser)
         view, args, kwargs = resolve(path)
@@ -413,7 +414,7 @@ class RunApiTests(ExecuteTestsBase):
         data = response.render().data
 
         # Touch the run status page
-        path = self.run_list_path + "1/run_status/"
+        path = self.run_list_path + "{}/run_status/".format(rtp_pk)
         request = self.factory.get(path)
         force_authenticate(request, user=self.myUser)
         view, args, kwargs = resolve(path)
@@ -423,13 +424,13 @@ class RunApiTests(ExecuteTestsBase):
         self.assertIn('step_progress', data)
 
         # Touch the outputs
-        path = self.run_list_path + "1/run_outputs/"
+        path = self.run_list_path + "{}/run_outputs/".format(rtp_pk)
         request = self.factory.get(path)
         force_authenticate(request, user=self.myUser)
         view, args, kwargs = resolve(path)
         response = view(request, *args, **kwargs)
         data = response.render().data
-        self.assertEquals(data['id'], 1)
+        self.assertEquals(data['id'], rtp_pk)
         self.assertEquals(len(data['run']['output_summary']), 8)
 
         for output in data['run']['output_summary']:
@@ -437,7 +438,7 @@ class RunApiTests(ExecuteTestsBase):
             self.assertEquals(output['is_invalid'], False)
 
         # Touch the removal plan
-        path = self.run_list_path + "1/removal_plan/"
+        path = self.run_list_path + "{}/removal_plan/".format(rtp_pk)
         request = self.factory.get(path)
         force_authenticate(request, user=self.myUser)
         view, args, kwargs = resolve(path)
@@ -449,7 +450,7 @@ class RunApiTests(ExecuteTestsBase):
         self.assertEquals(data['Datatypes'], 0)
 
         # Delete the record
-        path = self.run_list_path + "1/"
+        path = self.run_list_path + "{}/".format(rtp_pk)
         request = self.factory.delete(path)
         force_authenticate(request, user=self.kive_user)
         view, args, kwargs = resolve(path)

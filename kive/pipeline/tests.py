@@ -150,7 +150,11 @@ class PipelineTests(PipelineTestCase):
         p = Pipeline.objects.filter(steps__isnull=True, inputs__isnull=True).first()
         p.create_input(compounddatatype=self.DNAinput_cdt, dataset_name="oneinput", dataset_idx=1)
         self.assertIsNone(p.clean())
-        self.assertRaisesRegexp(ValidationError, "Pipeline {} has no steps".format(p), p.complete_clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape("Pipeline {} has no steps".format(p)),
+            p.complete_clean
+        )
 
     def test_pipeline_one_invalid_input_clean(self):
         """A Pipeline with one input not numbered "1" is not clean."""
@@ -5523,7 +5527,7 @@ tail -n +2 "$2" >> "$3"
 
         self.assertRaisesRegexp(
             PipelineSerializationException,
-            'Pipeline "{}" has been previously run so cannot be updated'.format(my_pipeline),
+            re.escape('Pipeline "{}" has been previously run so cannot be updated'.format(my_pipeline)),
             lambda: my_pipeline.update_from_dict(complete_pipeline_dict)
         )
 
@@ -5562,7 +5566,7 @@ tail -n +2 "$2" >> "$3"
         # Try to update the first one.
         self.assertRaisesRegexp(
             PipelineSerializationException,
-            'Pipeline "{}" has been previously revised so cannot be updated'.format(my_pipeline),
+            re.escape('Pipeline "{}" has been previously revised so cannot be updated'.format(my_pipeline)),
             lambda: my_pipeline.update_from_dict(revision_pipeline_dict)
         )
 
@@ -5594,6 +5598,14 @@ class PipelineSerializerTests(TestCase):
     def setUp(self):
         self.kive_user = kive_user()
         self.everyone_group = everyone_group()
+
+        # A fake request that provides context.
+        class DuckRequest(object):
+            pass
+
+        self.duck_request = DuckRequest()
+        self.duck_request.user = kive_user()
+        self.duck_context = {"request": self.duck_request}
 
         tools.create_sandbox_testing_tools_environment(self)
 
@@ -5892,7 +5904,7 @@ class PipelineSerializerTests(TestCase):
         }
 
     def test_validate(self):
-        ps = PipelineSerializer(data=self.pipeline_dict)
+        ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)
         self.assertTrue(ps.is_valid())
 
     def test_validate_source_not_specified(self):
@@ -5901,7 +5913,7 @@ class PipelineSerializerTests(TestCase):
         """
         # We tamper with the first step's input cable.
         sds = self.pipeline_dict["steps"][0]["cables_in"][0].pop("source_dataset_name")
-        ps = PipelineSerializer(data=self.pipeline_dict)
+        ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)
         self.assertFalse(ps.is_valid())
         self.assertEquals(
             ps.errors["steps"][0]["cables_in"][0]["non_field_errors"][0],
@@ -5913,7 +5925,7 @@ class PipelineSerializerTests(TestCase):
 
         # Break another cable that is specified by source directly.
         self.pipeline_dict["steps"][1]["cables_in"][0].pop("source")
-        ps = PipelineSerializer(data=self.pipeline_dict)
+        ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)
         self.assertFalse(ps.is_valid())
         self.assertEquals(
             ps.errors["steps"][1]["cables_in"][0]["non_field_errors"][0],
@@ -5926,7 +5938,7 @@ class PipelineSerializerTests(TestCase):
         """
         incorrect_name = "foo"
         self.pipeline_dict["steps"][0]["cables_in"][0]["source_dataset_name"] = incorrect_name
-        ps = PipelineSerializer(data=self.pipeline_dict)
+        ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)
         self.assertFalse(ps.is_valid())
         self.assertEquals(
             ps.errors["non_field_errors"][0],
@@ -5937,18 +5949,19 @@ class PipelineSerializerTests(TestCase):
         """
         Test validation of a Pipeline containing custom wires.
         """
-        ps = PipelineSerializer(data=self.pipeline_cw_dict)
+        ps = PipelineSerializer(data=self.pipeline_cw_dict, context=self.duck_context)
         self.assertTrue(ps.is_valid())
 
     def test_validate_raw_input(self):
         """
         Test validation of a Pipeline that only consists of raw data.
         """
-        ps = PipelineSerializer(data=self.pipeline_raw_dict)
+        ps = PipelineSerializer(data=self.pipeline_raw_dict, context=self.duck_context)
         self.assertTrue(ps.is_valid())
 
     def test_create(self):
-        ps = PipelineSerializer(data=self.pipeline_dict)
+        ps = PipelineSerializer(data=self.pipeline_dict,
+                                context=self.duck_context)
         ps.is_valid()
         pl = ps.save()
 
@@ -5988,7 +6001,8 @@ class PipelineSerializerTests(TestCase):
         """
         Test that creation works when custom wires are used.
         """
-        ps = PipelineSerializer(data=self.pipeline_cw_dict)
+        ps = PipelineSerializer(data=self.pipeline_cw_dict,
+                                context=self.duck_context)
         ps.is_valid()
         pl = ps.save()
 
@@ -6029,7 +6043,8 @@ class PipelineSerializerTests(TestCase):
         """
         Test deserialization of a Pipeline hadnling raw data.
         """
-        raw_ps = PipelineSerializer(data=self.pipeline_raw_dict)
+        raw_ps = PipelineSerializer(data=self.pipeline_raw_dict,
+                                    context=self.duck_context)
         raw_ps.is_valid()
         raw_pl = raw_ps.save()
 

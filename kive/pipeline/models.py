@@ -145,9 +145,10 @@ class Pipeline(transformation.models.Transformation):
 
     def __str__(self):
         """Represent pipeline by revision name and pipeline family"""
+        string_rep = "{}:{}".format(self.family, self.revision_number)
         if self.revision_name:
-            return "{}: {}".format(self.revision_number, self.revision_name)
-        return str(self.revision_number)
+            string_rep += " ({})".format(self.revision_name)
+        return string_rep
 
     def save(self, *args, **kwargs):
         if not self.revision_number:

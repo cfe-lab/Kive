@@ -363,10 +363,11 @@ class ExecuteTests(ExecuteTestsBase):
         runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run); runstep.save()
 
         self.assertFalse(all(i.is_OK() for i in inputs))
-        self.assertRaisesRegexp(ValueError,
-                                ('SymbolicDataset {} passed as input {} to Pipeline "{}" is not OK'
-                                 .format(bad_input, bad_index, pipeline)),
-                                lambda: sandbox.execute_pipeline(pipeline, inputs, sandbox.sandbox_path, runstep))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('SymbolicDataset {} passed as input {} to Pipeline "{}" is not OK'
+                      .format(bad_input, bad_index, pipeline)),
+            lambda: sandbox.execute_pipeline(pipeline, inputs, sandbox.sandbox_path, runstep))
 
     def test_pipeline_inputs_not_OK_raw(self):
         """Can't execute a Pipeline with non-OK raw inputs."""
@@ -390,10 +391,11 @@ class ExecuteTests(ExecuteTestsBase):
         runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run); runstep.save()
 
         self.assertFalse(all(i.is_OK() for i in inputs))
-        self.assertRaisesRegexp(ValueError,
-                                ('SymbolicDataset {} passed as input {} to Pipeline "{}" is not OK'
-                                 .format(bad_input, bad_index, pipeline)),
-                                lambda: sandbox.execute_pipeline(pipeline, inputs, sandbox.sandbox_path, runstep))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('SymbolicDataset {} passed as input {} to Pipeline "{}" is not OK'
+                      .format(bad_input, bad_index, pipeline)),
+            lambda: sandbox.execute_pipeline(pipeline, inputs, sandbox.sandbox_path, runstep))
 
 
 class SandboxTests(ExecuteTests):
