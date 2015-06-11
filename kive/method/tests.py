@@ -2971,60 +2971,6 @@ class MethodFamilyApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(end_count, start_count - 1)
 
 
-class MethodApiTests(BaseTestCases.ApiTestCase):
-    fixtures = ['simple_run']
-    
-    def setUp(self):
-        super(MethodApiTests, self).setUp()
-
-        self.list_path = reverse("method-list")
-        self.detail_pk = 2
-        self.detail_path = reverse("method-detail",
-                                   kwargs={'pk': self.detail_pk})
-        self.removal_path = reverse("method-removal-plan",
-                                    kwargs={'pk': self.detail_pk})
-
-        # This should equal metadata.ajax.CompoundDatatypeViewSet.as_view({"get": "list"}).
-        self.list_view, _, _ = resolve(self.list_path)
-        self.detail_view, _, _ = resolve(self.detail_path)
-        self.removal_view, _, _ = resolve(self.removal_path)
-
-    def test_list(self):
-        """
-        Test the CompoundDatatype API list view.
-        """
-        request = self.factory.get(self.list_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.list_view(request, pk=None)
-
-        # There are four CDTs loaded into the Database by default.
-        self.assertEquals(len(response.data), 6)
-        self.assertEquals(response.data[0]['revision_name'], 'mC_name')
-
-    def test_detail(self):
-        request = self.factory.get(self.detail_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.data['revision_name'], 'mB_name')
-
-    def test_removal_plan(self):
-        request = self.factory.get(self.removal_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.removal_view(request, pk=self.detail_pk)
-        self.assertEquals(response.data['Methods'], 1)
-
-    def test_removal(self):
-        start_count = Method.objects.all().count()
-        
-        request = self.factory.delete(self.detail_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
-
-        end_count = Method.objects.all().count()
-        self.assertEquals(end_count, start_count - 1)
-
-
 class CodeResourceApiTests(BaseTestCases.ApiTestCase):
     fixtures = ["removal"]
 
@@ -3116,11 +3062,10 @@ class CodeResourceApiTests(BaseTestCases.ApiTestCase):
 def crr_test_setup(case):
     """
     A helper for CodeResourceRevisionApiTests and CodeResourceRevisionSerializerTests.
-
-    The test case that calls this must include the "removal" fixture.
     """
-    # This user is defined in the removal fixture.
-    case.remover = User.objects.get(pk=2)
+    # An innocent bystander.
+    case.innocent_bystander = User.objects.create_user(
+        "InnocentBystander", "innocent_bystander_1@aol.net", password="WhoMe?")
 
     # A mock request that we pass as context to our serializer.
     class DuckRequest(object):
@@ -3148,6 +3093,7 @@ echo "Hello World"
                            description="Hello World",
                            user=kive_user())
     case.cr.save()
+    case.cr.grant_everyone_access()
 
     with tempfile.TemporaryFile() as f:
         f.write("""#!/bin/bash
@@ -3164,7 +3110,8 @@ echo "Hello World"
         "coderesource": case.cr_name,
         "revision_name": "v1",
         "revision_desc": "First version",
-        "staged_file": case.staged_file.pk
+        "staged_file": case.staged_file.pk,
+        "groups_allowed": [everyone_group().name]
     }
 
     with tempfile.TemporaryFile() as f:
@@ -3176,6 +3123,7 @@ echo "Hello World"
             user=kive_user(),
             content_file=File(f))
         case.crd.save()
+        case.crd.grant_everyone_access()
 
     case.crr_data_with_dep = copy.deepcopy(case.crr_data)
     case.crr_data_with_dep["dependencies"] = [
@@ -3195,6 +3143,8 @@ class CodeResourceRevisionSerializerTests(TestCase):
     fixtures = ["removal"]
 
     def setUp(self):
+        # This user is defined in the removal fixture.
+        self.remover = User.objects.get(pk=2)
         crr_test_setup(self)
 
     def tearDown(self):
@@ -3285,6 +3235,8 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
     fixtures = ["removal"]
 
     def setUp(self):
+        # This user is defined in the removal fixture.
+        self.remover = User.objects.get(username="Rem Over")
         super(CodeResourceRevisionApiTests, self).setUp()
 
         self.list_path = reverse("coderesourcerevision-list")
@@ -3308,7 +3260,7 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         response = self.list_view(request, pk=None)
 
         self.assertItemsEqual(
-            [x.pk for x in CodeResourceRevision.objects.filter(user=self.remover)],
+            [x.pk for x in CodeResourceRevision.filter_by_user(user=self.remover)],
             [x["id"] for x in response.data]
         )
 
@@ -3385,60 +3337,69 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         )
 
 
+def method_test_setup(case):
+    """
+    Helper to set up MethodSerializerTests and MethodApiTests.
+    """
+    crr_test_setup(case)
+
+    # We need a CodeResourceRevision to create a Method from.
+    crr_s = CodeResourceRevisionSerializer(data=case.crr_data, context=case.duck_context)
+    crr_s.is_valid()
+    case.crr = crr_s.save()
+
+    # We need a MethodFamily to add the Method to.
+    case.dtf_mf = MethodFamily(
+        name="Deserialization Test Family Methods",
+        description="For testing the Method serializer.",
+        user=kive_user()
+    )
+    case.dtf_mf.save()
+    case.dtf_mf.users_allowed.add(case.innocent_bystander)
+    case.dtf_mf.grant_everyone_access()
+    case.dtf_mf.save()
+
+    case.method_data = {
+        "family": case.dtf_mf.name,
+        "revision_name": "v1",
+        "revision_desc": "First version",
+        "users_allowed": [case.innocent_bystander.username],
+        "groups_allowed": [everyone_group().name],
+        "driver": case.crr.pk,
+        "inputs": [
+            {
+                "dataset_name": "ignored_input",
+                "dataset_idx": 1,
+                "x": 0.1,
+                "y": 0.1
+            },
+            {
+                "dataset_name": "another_ignored_input",
+                "dataset_idx": 2,
+                "x": 0.1,
+                "y": 0.2
+            }
+        ],
+        "outputs": [
+            {
+                "dataset_name": "empty_output",
+                "dataset_idx": 1
+            }
+        ]
+    }
+
+
 class MethodSerializerTests(TestCase):
     fixtures = ["removal"]
 
     def setUp(self):
-        crr_test_setup(self)
-
-        # We need a CodeResourceRevision to create a Method from.
-        crr_s = CodeResourceRevisionSerializer(data=self.crr_data, context=self.duck_context)
-        crr_s.is_valid()
-        self.crr = crr_s.save()
-
-        # We need a MethodFamily to add the Method to.
-        self.dtf_mf = MethodFamily(
-            name="Deserialization Test Family Methods",
-            description="For testing the Method serializer.",
-            user=kive_user()
-        )
-        self.dtf_mf.save()
-        self.dtf_mf.users_allowed.add(self.remover)
-        self.dtf_mf.grant_everyone_access()
-        self.dtf_mf.save()
+        method_test_setup(self)
 
     def tearDown(self):
         metadata.tests.clean_up_all_files()
 
     def test_create(self):
-        method_data = {
-            "family": self.dtf_mf.name,
-            "users_allowed": [self.remover.username],
-            "groups_allowed": [everyone_group().name],
-            "driver": self.crr.pk,
-            "inputs": [
-                {
-                    "dataset_name": "ignored_input",
-                    "dataset_idx": 1,
-                    "x": 0.1,
-                    "y": 0.1
-                },
-                {
-                    "dataset_name": "another_ignored_input",
-                    "dataset_idx": 2,
-                    "x": 0.1,
-                    "y": 0.2
-                }
-            ],
-            "outputs": [
-                {
-                    "dataset_name": "empty_output",
-                    "dataset_idx": 1
-                }
-            ]
-        }
-
-        method_s = MethodSerializer(data=method_data, context=self.duck_context)
+        method_s = MethodSerializer(data=self.method_data, context=self.duck_context)
         self.assertTrue(method_s.is_valid())
         new_method = method_s.save()
 
@@ -3452,3 +3413,71 @@ class MethodSerializerTests(TestCase):
 
         self.assertEquals(new_method.outputs.count(), 1)
         self.assertEquals(new_method.outputs.first().dataset_name, "empty_output")
+
+
+class MethodApiTests(BaseTestCases.ApiTestCase):
+    fixtures = ['simple_run']
+
+    def setUp(self):
+        super(MethodApiTests, self).setUp()
+
+        self.list_path = reverse("method-list")
+        self.detail_pk = 2
+        self.detail_path = reverse("method-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("method-removal-plan",
+                                    kwargs={'pk': self.detail_pk})
+
+        # This should equal metadata.ajax.CompoundDatatypeViewSet.as_view({"get": "list"}).
+        self.list_view, _, _ = resolve(self.list_path)
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+        method_test_setup(self)
+
+    def test_list(self):
+        """
+        Test the CompoundDatatype API list view.
+        """
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        # There are four CDTs loaded into the Database by default.
+        self.assertEquals(len(response.data), 6)
+        self.assertEquals(response.data[0]['revision_name'], 'mC_name')
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['revision_name'], 'mB_name')
+
+    def test_removal_plan(self):
+        request = self.factory.get(self.removal_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.removal_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['Methods'], 1)
+
+    def test_removal(self):
+        start_count = Method.objects.all().count()
+
+        request = self.factory.delete(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        end_count = Method.objects.all().count()
+        self.assertEquals(end_count, start_count - 1)
+
+    def test_create(self):
+        request = self.factory.post(self.list_path, self.method_data, format="json")
+        force_authenticate(request, user=self.kive_user)
+        self.list_view(request)
+
+        # Probe the resulting method.
+        new_method = self.dtf_mf.members.get(revision_name=self.method_data["revision_name"])
+
+        self.assertEquals(new_method.inputs.count(), 2)
+        self.assertEquals(new_method.outputs.count(), 1)
+
