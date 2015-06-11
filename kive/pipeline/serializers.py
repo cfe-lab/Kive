@@ -28,8 +28,8 @@ class CustomCableWireSerializer(serializers.ModelSerializer):
 
 class PipelineStepInputCableSerializer(serializers.ModelSerializer):
 
-    source_dataset_name = serializers.CharField(write_only=True, required=False)
-    dest_dataset_name = serializers.CharField(source="dest.dataset_name", read_only=True)
+    source_dataset_name = serializers.CharField(source="source.definite.dataset_name", read_only=True, required=False)
+    dest_dataset_name = serializers.CharField(source="dest.definite.dataset_name", read_only=True)
     custom_wires = CustomCableWireSerializer(many=True, allow_null=True, required=False)
 
     class Meta:
@@ -61,6 +61,8 @@ class PipelineStepSerializer(serializers.ModelSerializer):
         source="transformation.definite.family.pk",
         read_only=True
     )
+    inputs = TransformationInputSerializer(many=True)
+    outputs = TransformationOutputSerializer(many=True, read_only=True)
 
     class Meta:
         model = PipelineStep
@@ -72,7 +74,9 @@ class PipelineStepSerializer(serializers.ModelSerializer):
             "x",
             "y",
             "name",
-            "cables_in"
+            "cables_in",
+            "outputs",
+            "inputs"
         )
 
 
@@ -81,8 +85,8 @@ class PipelineOutputCableSerializer(serializers.ModelSerializer):
     source_dataset_name = serializers.CharField(source="source.dataset_name", read_only=True)
     custom_wires = CustomCableWireSerializer(many=True, allow_null=True, required=False)
 
-    x = serializers.FloatField(write_only=True)
-    y = serializers.FloatField(write_only=True)
+    x = serializers.FloatField(read_only=True)
+    y = serializers.FloatField(read_only=True)
 
     class Meta:
         model = PipelineOutputCable
