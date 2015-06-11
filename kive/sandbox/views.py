@@ -19,6 +19,7 @@ from fleet.models import RunToProcess
 
 def _prepare_pipeline_selection_forms(user):
     user = KiveUser.kiveify(user)
+    # retrieve all PipelineFamily objects with at least one member that the user has access to
     families = pipeline.models.PipelineFamily.objects\
         .annotate(member_count=Count('members'))\
         .filter(user.access_query(), member_count__gt=0)
@@ -70,6 +71,7 @@ def choose_inputs(request):
     template = loader.get_template("sandbox/choose_inputs.html")
     pipeline_pk = int(request.GET.get("pipeline"))
     pipeline_qs = pipeline.models.Pipeline.filter_by_user(request.user).filter(pk=pipeline_pk)
+
     if not pipeline_qs.exists():
         raise Http404("ID {} is not accessible".format(pipeline_pk))
 
@@ -77,7 +79,8 @@ def choose_inputs(request):
 
     context.update({"input_data": _assemble_inputs(pipeline_qs.first(), request.user),
                     "run_submission_form": rsf,
-                    "input_error_msg": ""})
+                    "input_error_msg": "",
+                    "pipeline": pipeline_qs.first()})
     return HttpResponse(template.render(context))
 
 
