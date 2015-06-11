@@ -18,7 +18,7 @@ $(function() {
     canvasState = new CanvasState(canvas);
 
     // TODO: Move this into a parameter for the submit method
-    window.submit_to_url = '/pipeline_add';
+    //window.submit_to_url = '/pipeline_add';
     var submitError = function(error) { $('#id_submit_error').show().text(error); };
     
     var pipelineCheckReadiness = function() {

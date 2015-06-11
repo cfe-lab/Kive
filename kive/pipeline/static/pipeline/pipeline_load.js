@@ -1,5 +1,5 @@
 // place in global namespace to access from other files
-var submit_to_url = '/pipeline_add';
+//var submit_to_url = '/pipeline_add';
 
 var pipeline = (function(exports){
     "use strict";
@@ -231,7 +231,6 @@ var pipeline = (function(exports){
                     // find the correct out-magnet
                     $.each(source.out_magnets, function(j, magnet){
 
-                        // TODO: Should we be using PKs here?
                         if(magnet.label === cable.source_dataset_name) {
                             connector = new Connector(magnet);
                             magnet = method_node.in_magnets[cable_idx];
