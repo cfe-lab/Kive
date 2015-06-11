@@ -46,6 +46,36 @@ class PipelineViewSet(CleanCreateModelMixin,
     serializer_class = PipelineSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
 
+    def get_queryset(self):
+        prefetchd = Pipeline.objects.prefetch_related(
+            'steps__transformation__method__family',
+            'steps__transformation__pipeline__family',
+            'steps__transformation__method__inputs__structure__compounddatatype__members__datatype',
+            'steps__transformation__method__outputs__structure__compounddatatype__members__datatype',
+            'steps__transformation__method__family',
+            'steps__cables_in__custom_wires',
+            'steps__cables_in__dest__transformationinput',
+            'steps__cables_in__dest__transformationoutput',
+            'steps__cables_in__source__transformationinput',
+            'steps__cables_in__source__transformationoutput',
+            'steps__outputs_to_delete',
+            'inputs__structure',
+            'outcables__source__structure',
+            'outcables__source__transformationinput',
+            'outcables__source__transformationoutput',
+            'outcables__custom_wires__source_pin',
+            'outcables__custom_wires__dest_pin').\
+            select_related(
+            'steps__transformation__pipeline',
+            'steps__transformation__method',
+            'outcables__pipeline',
+            'outcables__output_cdt',
+            'outcables__source'
+            'inputs__transformation'
+        )
+
+        return prefetchd
+
     # Override perform_create to call complete_clean, not just clean.
     @transaction.atomic
     def perform_create(self, serializer):

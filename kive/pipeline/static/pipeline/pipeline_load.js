@@ -21,7 +21,7 @@ var pipeline = (function(exports){
          *
          * @param pipeline: serialized pipeline array
          */
-         this.pipeline = pipeline;
+        this.pipeline = pipeline;
         this.canvasState.reset();
         this.draw_inputs();
         this.draw_steps();
