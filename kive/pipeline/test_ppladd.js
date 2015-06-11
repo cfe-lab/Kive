@@ -44,17 +44,6 @@
             expect('Suppress SPEC HAS NO EXPECTATIONS').toBeDefined();
         });
 
-        function loadPipeline(canvasState, pipeline){
-            canvasState.reset();
-            draw_pipeline(canvasState, pipeline);
-            canvasState.testExecutionOrder();
-
-            for (var i = 0; i < canvasState.shapes.length; i++) {
-                canvasState.detectCollisions(canvasState.shapes[i], 0.5);
-            }
-            canvasState.draw();
-        };
-
         function loadApiPipeline(canvasState, pipeline){
             var ppln = new Pipeline(canvasState);
             ppln.load(pipeline);
@@ -62,10 +51,6 @@
         };
 
         describe('Load', function(){
-            it('should load pipeline', function() {
-                loadPipeline(this.canvasState, this.example_pipeline);
-            });
-
             it('should load pipeline from API', function() {
                 var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             });
@@ -75,40 +60,11 @@
                 pipeline.draw();
             });
 
-            it('should auto-layout pipeline', function() {
-                loadPipeline(this.canvasState, this.example_pipeline);
-                this.canvasState.autoLayout();
-            });
 
             it('should autolayout from API', function() {
                 var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
                 pipeline.draw();
                 this.canvasState.autoLayout();
-            });
-
-            it('should find pipeline nodes', function() {
-                loadPipeline(this.canvasState, this.example_pipeline);
-
-                var input1  = this.canvasState.findNodeByLabel('input1'),
-                    input2  = this.canvasState.findNodeByLabel('input2'),
-                    prelim  = this.canvasState.findNodeByLabel('prelim_map.py'),
-                    remap   = this.canvasState.findNodeByLabel('remap.py'),
-                    remapc  = this.canvasState.findNodeByLabel('remap_counts'),
-                    remapcs = this.canvasState.findNodeByLabel('remap_conseq'),
-                    remapp  = this.canvasState.findNodeByLabel('remap'),
-                    umfasq1 = this.canvasState.findNodeByLabel('unmapped2_fastq'),
-                    umfasq2 = this.canvasState.findNodeByLabel('unmapped1_fastq'),
-                    jmguire = this.canvasState.findNodeByLabel('Jerry Maguire');
-
-                expect(input1).not.toBe(null);
-                expect(input2).not.toBe(null);
-                expect(prelim).not.toBe(null);
-                expect(remap).not.toBe(null);
-                expect(remapc).not.toBe(null);
-                expect(remapp).not.toBe(null);
-                expect(umfasq1).not.toBe(null);
-                expect(umfasq2).not.toBe(null);
-                expect(jmguire).toBe(null);
             });
 
             it('should find pipeline nodes from API', function() {
@@ -138,20 +94,7 @@
         });
 
         describe('Connections', function(){
-            it('should connect inputs to methods', function(){
-                loadPipeline(this.canvasState, this.example_pipeline);
 
-                var input1 = this.canvasState.findNodeByLabel('input1'),
-                    input2 = this.canvasState.findNodeByLabel('input2'),
-                    prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
-                    remap  = this.canvasState.findNodeByLabel('remap.py');
-
-                expect(this.canvasState.isConnectedTo(input1, input2)).toBe(false);
-                expect(this.canvasState.isConnectedTo(input1, prelim)).toBe(true);
-                expect(this.canvasState.isConnectedTo(input2, prelim)).toBe(true);
-                expect(this.canvasState.isConnectedTo(input1, remap)).toBe(true);
-                expect(this.canvasState.isConnectedTo(input2, remap)).toBe(true);
-            });
 
             it('should connect inputs to methods API', function(){
                 var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
@@ -168,14 +111,6 @@
                 expect(this.canvasState.isConnectedTo(input2, remap)).toBe(true);
             });
 
-            it('should connect methods', function(){
-                loadPipeline(this.canvasState, this.example_pipeline);
-
-                var prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
-                    remap  = this.canvasState.findNodeByLabel('remap.py');
-
-                expect(this.canvasState.isConnectedTo(prelim, remap)).toBe(true);
-            });
 
             it('should connect methods API', function(){
                 var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
@@ -186,23 +121,7 @@
                 expect(this.canvasState.isConnectedTo(prelim, remap)).toBe(true);
             });
 
-            it('should connect methods to outputs', function(){
-                loadPipeline(this.canvasState, this.example_pipeline);
 
-                var remap   = this.canvasState.findNodeByLabel('remap.py'),
-                    remapc  = this.canvasState.findNodeByLabel('remap_counts'),
-                    remapcs = this.canvasState.findNodeByLabel('remap_conseq'),
-                    remapp  = this.canvasState.findNodeByLabel('remap'),
-                    umfasq1 = this.canvasState.findNodeByLabel('unmapped2_fastq'),
-                    umfasq2 = this.canvasState.findNodeByLabel('unmapped1_fastq');
-
-                expect(this.canvasState.isConnectedTo(remapc, remap)).toBe(true);
-                expect(this.canvasState.isConnectedTo(remapcs, remap)).toBe(true);
-                expect(this.canvasState.isConnectedTo(remapp, remap)).toBe(true);
-                expect(this.canvasState.isConnectedTo(umfasq1, remap)).toBe(true);
-                expect(this.canvasState.isConnectedTo(umfasq2, remap)).toBe(true);
-                expect(this.canvasState.isConnectedTo(remapc, umfasq2)).toBe(false);
-            });
 
             it('should connect methods to outputs API', function(){
                 var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
@@ -226,20 +145,7 @@
 
         describe('Structure', function(){
 
-            it('shoud have correct properties for inputs', function(){
-                loadPipeline(this.canvasState, this.example_pipeline);
 
-                var input1 = this.canvasState.findNodeByLabel('input1'),
-                    input2 = this.canvasState.findNodeByLabel('input2');
-
-                var i1keys = Object.keys(input1),
-                    i2keys = Object.keys(input2);
-
-                $.each(['x', 'y', 'dx', 'dy', 'fill', 'label'], function(_, key){
-                    expect(i1keys).toContain(key);
-                    expect(i2keys).toContain(key);
-                });
-            });
 
             it('shoud have correct properties for inputs API', function(){
                 var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
@@ -257,27 +163,7 @@
                 });
             });
 
-            it('shoud have correct properties for methods', function(){
-                loadPipeline(this.canvasState, this.example_pipeline);
 
-                var prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
-                    remap  = this.canvasState.findNodeByLabel('remap.py');
-
-                var i1keys = Object.keys(prelim),
-                    i2keys = Object.keys(remap);
-
-                $.each(['x', 'y', 'dx', 'dy', 'fill', 'label', 'family'], function(_, key){
-                    expect(i1keys).toContain(key);
-                    expect(i2keys).toContain(key);
-                });
-
-
-                expect(prelim.family).toBe(3);
-                expect(remap.family).toBe(4);
-
-                expect(prelim.out_magnets[0].connected.length).toBe(1);
-                expect(remap.out_magnets[0].connected.length).toBe(1);
-            });
 
             it('shoud have correct properties for inputs API', function(){
                 var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
@@ -302,21 +188,6 @@
             });
 
 
-            it('shoud have correct properties for output', function(){
-                loadPipeline(this.canvasState, this.example_pipeline);
-
-                var remapc  = this.canvasState.findNodeByLabel('remap_counts'),
-                    remapcs = this.canvasState.findNodeByLabel('remap_conseq');
-
-                var i1keys = Object.keys(remapc),
-                    i2keys = Object.keys(remapcs);
-
-                $.each(['x', 'y', 'dx', 'dy', 'fill', 'label'], function(_, key){
-                    expect(i1keys).toContain(key);
-                    expect(i2keys).toContain(key);
-                });
-
-            });
 
             it('shoud have correct properties for output API', function(){
                 var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);

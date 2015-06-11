@@ -48,33 +48,9 @@ function setupRunView(rtp_id, pipeline_id, md5) {
         url: "/api/pipelines/" + pipeline_id + "/",
         datatype: "json",
         success: function(pipeline_raw) {
-//            submit_to_url = pipeline_raw['family_pk'];
             pipeline.load(pipeline_raw);
             pipeline.draw();
             grabStatus();
         }
     });
-
-
-//    $.ajax({
-//        type: "POST",
-//        url: "/get_pipeline/",
-//        data: { pipeline_id: pipeline_id },
-//        datatype: "json",
-//        success: function(result) {
-//            // prepare to redraw canvas
-//            $('#id_reset_button').click();
-//            submit_to_url = result.family_pk;
-//
-//            draw_pipeline(canvasState, result);
-//            grabStatus();
-//
-//            canvasState.testExecutionOrder();
-//
-//            for (var i = 0; i < canvasState.shapes.length; i++)
-//                canvasState.detectCollisions(canvasState.shapes[i], 0.5);
-//        }
-//    });
-}
-
-
+};
