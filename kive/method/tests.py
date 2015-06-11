@@ -9,6 +9,7 @@ import re
 import shutil
 import tempfile
 import logging
+import copy
 
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.management import update_all_contenttypes
@@ -20,18 +21,20 @@ from django.core.urlresolvers import resolve
 from django.test import TestCase, TransactionTestCase
 from rest_framework import status
 from rest_framework.reverse import reverse
-from rest_framework.test import force_authenticate
-
+from rest_framework.test import force_authenticate, APIRequestFactory
 
 from constants import datatypes
 from kive.tests import BaseTestCases
 import librarian.models
-from metadata.models import CompoundDatatype, Datatype, everyone_group
+from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
 import metadata.tests
 from method.models import CodeResource, CodeResourceDependency, \
     CodeResourceRevision, Method, MethodFamily
 import sandbox.testing_utils as tools
 import sandbox.execute
+import portal.models
+
+from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
 
 
 # This was previously defined here but has been moved to metadata.tests.
@@ -2129,7 +2132,7 @@ class MethodTests(MethodTestCase):
 
         # DNAcompv1_m has method family DNAcomplement
         self.assertEqual(unicode(self.DNAcompv1_m),
-                         "Method DNAcomplement v1")
+                         "DNAcomplement:1 (v1)")
 
     def test_without_family_unicode(self):
         """
@@ -2138,7 +2141,7 @@ class MethodTests(MethodTestCase):
         nofamily = Method(revision_name="foo")
 
         self.assertEqual(unicode(nofamily),
-                         "Method [family unset] foo")
+                         "[family unset]:None (foo)")
 
     def test_no_inputs_checkInputIndices_good(self):
         """
@@ -3110,6 +3113,174 @@ class CodeResourceApiTests(BaseTestCases.ApiTestCase):
                              set([x["revision_number"] for x in response.data]))
 
 
+def crr_test_setup(case):
+    """
+    A helper for CodeResourceRevisionApiTests and CodeResourceRevisionSerializerTests.
+
+    The test case that calls this must include the "removal" fixture.
+    """
+    # This user is defined in the removal fixture.
+    case.remover = User.objects.get(pk=2)
+
+    # A mock request that we pass as context to our serializer.
+    class DuckRequest(object):
+        pass
+
+    case.duck_request = DuckRequest()
+    case.duck_request.user = kive_user()
+    case.duck_context = {"request": case.duck_request}
+
+    # Some stuff we need for testing creation.
+    with tempfile.TemporaryFile() as f:
+        f.write("""#!/bin/bash
+
+echo "Hello World"
+""")
+        case.staged_file = portal.models.StagedFile(
+            uploaded_file=File(f),
+            user=kive_user()
+        )
+        case.staged_file.save()
+
+    case.cr_name = "Deserialization Test Family"
+    case.cr = CodeResource(name=case.cr_name,
+                           filename="HelloWorld.py",
+                           description="Hello World",
+                           user=kive_user())
+    case.cr.save()
+
+    with tempfile.TemporaryFile() as f:
+        f.write("""#!/bin/bash
+
+echo "Hello World"
+""")
+        case.staged_file = portal.models.StagedFile(
+            uploaded_file=File(f),
+            user=kive_user()
+        )
+        case.staged_file.save()
+
+    case.crr_data = {
+        "coderesource": case.cr_name,
+        "revision_name": "v1",
+        "revision_desc": "First version",
+        "staged_file": case.staged_file.pk
+    }
+
+    with tempfile.TemporaryFile() as f:
+        f.write("""language = ENG""")
+        case.crd = CodeResourceRevision(
+            coderesource=case.cr,
+            revision_name="dependency",
+            revision_desc="Dependency",
+            user=kive_user(),
+            content_file=File(f))
+        case.crd.save()
+
+    case.crr_data_with_dep = copy.deepcopy(case.crr_data)
+    case.crr_data_with_dep["dependencies"] = [
+        {
+            "requirement": case.crd.pk,
+            "depFileName": "config.dat"
+        },
+        {
+            "requirement": case.crd.pk,
+            "depPath": "configuration.dat",
+            "depFileName": "config_2.dat"
+        }
+    ]
+
+
+class CodeResourceRevisionSerializerTests(TestCase):
+    fixtures = ["removal"]
+
+    def setUp(self):
+        crr_test_setup(self)
+
+    def tearDown(self):
+        metadata.tests.clean_up_all_files()
+
+    # Note: all validation tests are redundant.  There is no customized validation code anymore.
+    def test_validate_nodep(self):
+        """
+        Test validation of a CodeResourceRevision with no dependencies.
+        """
+        crr_s = CodeResourceRevisionSerializer(
+            data=self.crr_data,
+            context={"request": self.duck_request}
+        )
+        self.assertTrue(crr_s.is_valid())
+
+    def test_create_nodep(self):
+        """
+        Test creation of a CodeResourceRevision with no dependencies.
+        """
+        staged_file_pk = self.staged_file.pk
+
+        crr_s = CodeResourceRevisionSerializer(
+            data=self.crr_data,
+            context={"request": self.duck_request}
+        )
+        crr_s.is_valid()
+        crr_s.save()
+
+        # Inspect the revision we just added.
+        new_crr = self.cr.revisions.get(revision_name="v1")
+        self.assertEquals(new_crr.revision_desc, "First version")
+        self.assertEquals(new_crr.dependencies.count(), 0)
+
+        # Make sure the staged file was removed.
+        self.assertFalse(portal.models.StagedFile.objects.filter(pk=staged_file_pk).exists())
+
+    def test_validate_with_dep(self):
+        """
+        Test validation of a CodeResourceRevision with no dependencies.
+        """
+        crr_s = CodeResourceRevisionSerializer(
+            data=self.crr_data_with_dep,
+            context={"request": self.duck_request}
+        )
+        self.assertTrue(crr_s.is_valid())
+
+    def test_create_with_dep(self):
+        """
+        Test creation of a CodeResourceRevision with dependencies.
+        """
+        crr_s = CodeResourceRevisionSerializer(
+            data=self.crr_data_with_dep,
+            context={"request": self.duck_request}
+        )
+        crr_s.is_valid()
+        crr_s.save()
+
+        # Inspect the revision we just added.
+        new_crr = self.cr.revisions.get(revision_name="v1")
+        self.assertEquals(new_crr.revision_desc, "First version")
+        self.assertEquals(new_crr.dependencies.count(), 2)
+
+        new_dep = new_crr.dependencies.get(depFileName="config.dat")
+        self.assertEquals(new_dep.requirement, self.crd)
+        self.assertEquals(new_dep.depPath, "")
+
+        new_dep = new_crr.dependencies.get(depFileName="config_2.dat")
+        self.assertEquals(new_dep.requirement, self.crd)
+        self.assertEquals(new_dep.depPath, "configuration.dat")
+
+    def test_validate_not_your_staged_file(self):
+        """
+        If the StagedFile specified is not the user's, then complain.
+        """
+        self.duck_request.user = self.remover
+        crr_s = CodeResourceRevisionSerializer(
+            data=self.crr_data_with_dep,
+            context={"request": self.duck_request}
+        )
+        self.cr.grant_everyone_access()
+
+        self.assertFalse(crr_s.is_valid())
+        self.assertTrue("staged_file" in crr_s.errors)
+
+
 class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
     fixtures = ["removal"]
 
@@ -3119,14 +3290,17 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         self.list_path = reverse("coderesourcerevision-list")
         self.list_view, _, _ = resolve(self.list_path)
 
-        # This user is defined in the removal fixture.
-        self.remover = User.objects.get(pk=2)
         self.noop_cr = CodeResource.objects.get(name="Noop")
         self.noop_crr = self.noop_cr.revisions.get(revision_number=1)
 
         self.detail_path = reverse("coderesourcerevision-detail", kwargs={"pk": self.noop_crr.pk})
         self.detail_view, _, _ = resolve(self.detail_path)
         self.removal_plan = self.noop_crr.build_removal_plan()
+
+        crr_test_setup(self)
+
+    def tearDown(self):
+        metadata.tests.clean_up_all_files()
 
     def test_list(self):
         request = self.factory.get(self.list_path)
@@ -3172,3 +3346,109 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         end_count = CodeResourceRevision.objects.count()
         # In the above we confirmed this length is 2.
         self.assertEquals(end_count, start_count - len(self.removal_plan["CodeResourceRevisions"]))
+
+    def test_create(self):
+        """
+        Test creation of a new CodeResourceRevision via the API.
+        """
+        staged_file_pk = self.staged_file.pk
+        request = self.factory.post(self.list_path, self.crr_data)
+        force_authenticate(request, user=kive_user())
+        self.list_view(request)
+
+        # Inspect the revision we just added.
+        new_crr = self.cr.revisions.get(revision_name="v1")
+        self.assertEquals(new_crr.revision_desc, "First version")
+        self.assertEquals(new_crr.dependencies.count(), 0)
+
+        # Make sure the staged file was removed.
+        self.assertFalse(portal.models.StagedFile.objects.filter(pk=staged_file_pk).exists())
+
+    def test_create_clean_fails(self):
+        """
+        Test that clean is being called during creation.
+        """
+        # Add a bad dependency to crr_data.
+        self.crr_data["dependencies"] = [
+            {
+                "requirement": self.crd.pk,
+                "depPath": "../../jailbroken"
+            }
+        ]
+
+        request = self.factory.post(self.list_path, self.crr_data, format="json")
+        force_authenticate(request, user=kive_user())
+        self.assertRaisesRegexp(
+            ValidationError,
+            "depPath cannot reference ../",
+            lambda: self.list_view(request)
+        )
+
+
+class MethodSerializerTests(TestCase):
+    fixtures = ["removal"]
+
+    def setUp(self):
+        crr_test_setup(self)
+
+        # We need a CodeResourceRevision to create a Method from.
+        crr_s = CodeResourceRevisionSerializer(data=self.crr_data, context=self.duck_context)
+        crr_s.is_valid()
+        self.crr = crr_s.save()
+
+        # We need a MethodFamily to add the Method to.
+        self.dtf_mf = MethodFamily(
+            name="Deserialization Test Family Methods",
+            description="For testing the Method serializer.",
+            user=kive_user()
+        )
+        self.dtf_mf.save()
+        self.dtf_mf.users_allowed.add(self.remover)
+        self.dtf_mf.grant_everyone_access()
+        self.dtf_mf.save()
+
+    def tearDown(self):
+        metadata.tests.clean_up_all_files()
+
+    def test_create(self):
+        method_data = {
+            "family": self.dtf_mf.name,
+            "users_allowed": [self.remover.username],
+            "groups_allowed": [everyone_group().name],
+            "driver": self.crr.pk,
+            "inputs": [
+                {
+                    "dataset_name": "ignored_input",
+                    "dataset_idx": 1,
+                    "x": 0.1,
+                    "y": 0.1
+                },
+                {
+                    "dataset_name": "another_ignored_input",
+                    "dataset_idx": 2,
+                    "x": 0.1,
+                    "y": 0.2
+                }
+            ],
+            "outputs": [
+                {
+                    "dataset_name": "empty_output",
+                    "dataset_idx": 1
+                }
+            ]
+        }
+
+        method_s = MethodSerializer(data=method_data, context=self.duck_context)
+        self.assertTrue(method_s.is_valid())
+        new_method = method_s.save()
+
+        # Probe the new method to see that it got created correctly.
+        self.assertEquals(new_method.inputs.count(), 2)
+        in_1 = new_method.inputs.get(dataset_idx=1)
+        in_2 = new_method.inputs.get(dataset_idx=2)
+
+        self.assertEquals(in_1.dataset_name, "ignored_input")
+        self.assertEquals(in_2.dataset_name, "another_ignored_input")
+
+        self.assertEquals(new_method.outputs.count(), 1)
+        self.assertEquals(new_method.outputs.first().dataset_name, "empty_output")

@@ -19,8 +19,7 @@
         "last_login": "2015-02-26T19:00:37.768Z",
         "groups": [
             1,
-            2,
-            3
+            2
         ],
         "user_permissions": [],
         "password": "pbkdf2_sha256$15000$j8eFVzTw7H13$Tf1YK85XUCng5UN97MjMJfT5nnis3Lvk5vbakVEG+hQ=",

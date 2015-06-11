@@ -20,14 +20,15 @@ var load_preview_canvas = function() {
         this_ = this,
         pkey = $this.closest('.results').data('pkey');
     $.ajax({
-        type: "POST",
-        url: "/get_pipeline/",
-        data: { pipeline_id: $this.closest('tr').get_pkey(pkey) },
+        type: "GET",
+        url: "/api/pipelines/" + $this.closest('tr').get_pkey(pkey) + "/",
         datatype: "json",
         success: function(result) {
             this_.width  = 120,
             this_.height = 90;
             var cs = new CanvasState(this_);
+            var pipeline = new Pipeline(cs);
+
             cs.setScale(0.12);
             cs.enable_labels = false;
             // reset containers to reflect canvas
@@ -35,14 +36,8 @@ var load_preview_canvas = function() {
             cs.connectors = [];
             cs.exec_order = [];
             cs.selection = [];
-            submit_to_url = result.family_pk;
-//            var i, j, k; // counters
-//            var node, cables, cable, connector, shape, source, magnet;
-            draw_pipeline(cs, result);
-            cs.testExecutionOrder();
-            for (var i = 0; i < cs.shapes.length; i++) {
-                cs.detectCollisions(cs.shapes[i], 0.5);
-            }
+            pipeline.load(result);
+            pipeline.draw();
         }
     });
 };

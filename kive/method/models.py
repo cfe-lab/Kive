@@ -540,9 +540,9 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
     def __str__(self):
         """Represent a method by it's revision name and method family"""
-        string_rep = "Method {} {}".format("{}", self.revision_name)
+        string_rep = "{}:{} ({})".format("{}", self.revision_number, self.revision_name)
 
-        # MethodFamily may not be temporally saved in DB if created by admin
+        # MethodFamily may not be temporally saved in DB if created by the admin page.
         if hasattr(self, "family"):
             return string_rep.format(unicode(self.family))
         else:
@@ -830,8 +830,10 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         # The code to be executed sits in 
         # [run_path]/[driver.coderesource.name],
         # and is executable.
-        code_to_run = os.path.join(run_path,
-            self.driver.coderesource.filename)
+        code_to_run = os.path.join(
+            run_path,
+            self.driver.coderesource.filename
+        )
 
         command = [code_to_run] + input_paths + output_paths
         self.logger.debug("subprocess.Popen({})".format(command))
