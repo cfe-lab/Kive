@@ -158,6 +158,16 @@ var drydock = (function() {
                 mySel = mySel.parent;
             }
         }
+        if (mySel instanceof Connector &&
+                mySel.dest &&
+                mySel.dest.parent instanceof OutputNode) {
+            // if the cable leads to an output node, then act as if
+            // the output node itself was clicked...
+            // not sure if this is the ideal behaviour...
+            // maybe output nodes should just disappear when they are
+            // disconnected? -JN
+            mySel = mySel.dest.parent;
+        }
         if (mySel instanceof Magnet) {
             // The only way to get here is with an out magnet we want to create
             // a connector for.
@@ -229,14 +239,10 @@ var drydock = (function() {
                 sel.y += dy;
                 
                 // any changes made by the collision detection algorithm on this shape are now made "official"
-                if (sel.dx != 0) {
-                    sel.x += sel.dx;
-                    sel.dx = 0;
-                }
-                if (sel.dy != 0) {
-                    sel.y += sel.dy;
-                    sel.dy = 0;
-                }
+                sel.x += sel.dx;
+                sel.dx = 0;
+                sel.y += sel.dy;
+                sel.dy = 0;
                 
                 this.valid = false; // redraw
 
@@ -248,25 +254,12 @@ var drydock = (function() {
                     sel.y = mouse.y;
                     
                     if (sel.dest) {
-                        if (sel.dest.parent instanceof OutputNode) {
-                            // if the cable leads to an output node, then act as if
-                            // the output node itself was clicked...
-                            // not sure if this is the ideal behaviour...
-                            // maybe output nodes should just disappear when they are
-                            // disconnected? -JN
-                            this.selection = [ sel.dest.parent ];
-                            return;
-                        }
-                        else if (sel.dest instanceof Magnet) {
-                            sel.dest.connected = [];
-                            sel.dest = null;
-                        }
+                        sel.dest.connected = [];
+                        sel.dest = null;
                     }
 
                     // get this connector's shape
-                    if (sel.source !== null) {
-                        var own_shape = sel.source.parent;
-                    }
+                    var own_shape = sel.source.parent;
 
                     // check if connector has been dragged to an in-magnet
                     for (i = 0; i < shapes.length; i++) {
@@ -1255,7 +1248,7 @@ var drydock = (function() {
                     out_magnets = sel.out_magnets;
                     for (i = 0; i < out_magnets.length; i++) {
                         out_magnet = out_magnets[i];
-                        for (j = 0; j < out_magnet.connected.length; j++) {
+                        for (var j = 0; j < out_magnet.connected.length; j++) {
                             this_connector = out_magnets[i].connected[j];
                             index = this.connectors.indexOf(this_connector);
                             this.connectors.splice(index, 1);
