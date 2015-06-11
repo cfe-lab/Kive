@@ -8,8 +8,9 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
 
+from rest_framework.renderers import JSONRenderer
+
 from datetime import datetime
-import json
 
 import metadata.models
 from metadata.models import CompoundDatatype, AccessControl
@@ -30,8 +31,7 @@ def resources(request):
     Display a list of all code resources (parents) in database
     """
     resources = CodeResource.filter_by_user(request.user)
-
-    resource_json = json.dumps(
+    resource_json = JSONRenderer().render(
         CodeResourceSerializer(resources, many=True, context={"request": request}).data
     )
 
@@ -120,7 +120,7 @@ def resource_revisions(request, id):
                             'dep_forms': dep_forms})
         return HttpResponse(t.render(c))
         
-    revisions_json = json.dumps(
+    revisions_json = JSONRenderer().render(
         CodeResourceRevisionSerializer(revisions, context={'request': request}, many=True).data
     )
 
@@ -449,7 +449,7 @@ def method_families(request):
     Display a list of all MethodFamily objects in database.
     """
     families = MethodFamily.filter_by_user(request.user)
-    families_json = json.dumps(
+    families_json = JSONRenderer().render(
         MethodFamilySerializer(
             families,
             context={"request": request},
@@ -489,7 +489,7 @@ def methods(request, id):
         is_admin=False,
         queryset=family.members.all())
 
-    methods_json = json.dumps(
+    methods_json = JSONRenderer().render(
         MethodSerializer(member_methods, many=True, context={"request": request}).data
     )
 

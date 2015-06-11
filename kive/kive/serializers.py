@@ -32,7 +32,7 @@ class AccessControlSerializer(serializers.Serializer):
     Mixin that adds SlugRelatedFields to AccessControl-based ModelSerializers.
     """
     user = serializers.SlugRelatedField(slug_field="username",
-                                        queryset=User.objects.all())
+                                        read_only=True)
     users_allowed = serializers.SlugRelatedField(
         slug_field="username",
         queryset=User.objects.all(),

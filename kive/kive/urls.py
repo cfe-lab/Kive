@@ -7,6 +7,8 @@ from method.ajax import MethodViewSet, MethodFamilyViewSet, CodeResourceViewSet,
 from archive.ajax import DatasetViewSet, MethodOutputViewSet
 from pipeline.ajax import PipelineFamilyViewSet, PipelineViewSet
 from fleet.ajax import RunToProcessViewSet
+import portal.ajax
+
 from portal.forms import *
 
 # (Un)comment the next two lines to enable/disable the admin:
@@ -25,6 +27,7 @@ router.register(r'methods', MethodViewSet)
 router.register(r'pipelinefamilies', PipelineFamilyViewSet)
 router.register(r'pipelines', PipelineViewSet)
 router.register(r'runs', RunToProcessViewSet)
+router.register(r'stagedfiles', portal.ajax.StagedFileViewSet)
 
 urlpatterns = patterns(
     '',

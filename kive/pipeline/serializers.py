@@ -165,6 +165,17 @@ class PipelineSerializer(AccessControlSerializer,
             'removal_plan',
         )
 
+    def __init__(self, *args, **kwargs):
+        super(PipelineSerializer, self).__init__(*args, **kwargs)
+        # Set the querysets of the related model fields.
+
+        curr_user = self.context["request"].user
+        revision_parent_field = self.fields["revision_parent"]
+        revision_parent_field.queryset = Pipeline.filter_by_user(curr_user)
+
+        family_field = self.fields["family"]
+        family_field.queryset = PipelineFamily.filter_by_user(curr_user)
+
     def validate(self, data):
         """
         Check that input cables fed by Pipeline inputs are properly specified.
@@ -193,12 +204,14 @@ class PipelineSerializer(AccessControlSerializer,
         groups_allowed = validated_data.pop("groups_allowed")
 
         # First, create the Pipeline.
-        pipeline = Pipeline.objects.create(**validated_data)
+        pipeline = Pipeline.objects.create(
+            user=self.context["request"].user,
+            **validated_data
+        )
         pipeline.users_allowed.add(*users_allowed)
         pipeline.groups_allowed.add(*groups_allowed)
 
         # Create the inputs.
-        # fields = ("transformation", "dataset_name", "dataset_idx", "x", "y", "structure")
         for input_data in inputs:
             structure_data = None
             if "structure" in input_data:

@@ -1,27 +1,25 @@
-from django.contrib.auth.models import User, Group
+from django.db import transaction
+from django.core.files import File
 
 from rest_framework import serializers
+
 from method.models import Method, MethodFamily, CodeResource, CodeResourceRevision, CodeResourceDependency
 from transformation.serializers import TransformationInputSerializer, TransformationOutputSerializer
 from kive.serializers import AccessControlSerializer
+import portal.models
+from metadata.models import KiveUser
 
 
 class CodeResourceSerializer(AccessControlSerializer,
                              serializers.ModelSerializer):
     removal_plan = serializers.HyperlinkedIdentityField(view_name='coderesource-removal-plan')
     revisions = serializers.HyperlinkedIdentityField(view_name="coderesource-revisions")
-    last_revision_date = serializers.DateTimeField()
     absolute_url = serializers.SerializerMethodField()
 
     class Meta:
         model = CodeResource
         fields = ('id', 'url', 'name', 'last_revision_date', 'filename', 'description', 'user', 'revisions',
                   'removal_plan', 'users_allowed', 'groups_allowed', 'num_revisions', 'absolute_url')
-
-    def get_num_revisions(self, obj):
-        if not obj:
-            return None
-        return obj.num_revisions
 
     def get_absolute_url(self, obj):
         if not obj:
@@ -81,6 +79,12 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
         default=CRRevisionNumberGetter()
     )
 
+    staged_file = serializers.PrimaryKeyRelatedField(
+        queryset=portal.models.StagedFile.objects.all(),
+        allow_null=True,
+        write_only=True
+    )
+
     class Meta:
         model = CodeResourceRevision
         fields = (
@@ -99,13 +103,23 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
             'revision_desc',
             'revision_DateTime',
             "content_file",
+            "staged_file",
             "dependencies"
         )
         # revision_DateTime, removal_plan, absolute_url, and display_name are already read_only.
-
+        read_only_fields = ("content_file",)
         extra_kwargs = {
             "content_file": {"use_url": False},
         }
+
+    def __init__(self, *args, **kwargs):
+        super(CodeResourceRevisionSerializer, self).__init__(*args, **kwargs)
+        # Set the queryset of the coderesource field.
+        cr_field = self.fields["coderesource"]
+        cr_field.queryset = CodeResource.filter_by_user(self.context["request"].user)
+
+        staged_file_field = self.fields["staged_file"]
+        staged_file_field.queryset = portal.models.StagedFile.objects.filter(user=self.context["request"].user)
 
     def get_absolute_url(self, obj):
         if not obj:
@@ -125,20 +139,28 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
         Note that no cleaning occurs here.  That will fall to the calling method.
         """
         crr_data = validated_data
-        users_allowed = crr_data.pop("users_allowed")
-        groups_allowed = crr_data.pop("groups_allowed")
-        dependencies = crr_data.pop("dependencies")
+        users_allowed = crr_data.pop("users_allowed") if "users_allowed" in crr_data else []
+        groups_allowed = crr_data.pop("groups_allowed") if "groups_allowed" in crr_data else []
+        dependencies = crr_data.pop("dependencies") if "dependencies" in crr_data else []
+        staged_file = crr_data.pop("staged_file") if "staged_file" in crr_data else None
 
-        crr = CodeResourceRevision.objects.create(**crr_data)
-        crr.users_allowed.add(*users_allowed)
-        crr.groups_allowed.add(*groups_allowed)
-        for dep_data in dependencies:
-            # Note that we ignore the value of dep_data["coderesourcerevision"].
-            crr.dependencies.create(
-                requirement=dep_data["requirement"],
-                depPath=dep_data["depPath"],
-                depFileName=dep_data["depFileName"]
+        with transaction.atomic():
+            crr = CodeResourceRevision.objects.create(
+                user=self.context["request"].user,
+                **crr_data
             )
+            if staged_file is not None:
+                crr.content_file = File(staged_file.uploaded_file.file)
+                crr.save()
+
+            crr.users_allowed.add(*users_allowed)
+            crr.groups_allowed.add(*groups_allowed)
+
+            for dep_data in dependencies:
+                crr.dependencies.create(**dep_data)
+
+        if staged_file is not None:
+            staged_file.delete()
 
         return crr
 
@@ -227,6 +249,20 @@ class MethodSerializer(AccessControlSerializer,
             "outputs"
         )
 
+    def __init__(self, *args, **kwargs):
+        super(MethodSerializer, self).__init__(*args, **kwargs)
+        curr_user = self.context["request"].user
+
+        # Set the querysets of the related model fields.
+        revision_parent_field = self.fields["revision_parent"]
+        revision_parent_field.queryset = Method.filter_by_user(curr_user)
+
+        family_field = self.fields["family"]
+        family_field.queryset = MethodFamily.filter_by_user(curr_user)
+
+        driver_field = self.fields["driver"]
+        driver_field.queryset = CodeResourceRevision.filter_by_user(curr_user)
+
     def get_absolute_url(self, obj):
         if not obj:
             return None
@@ -245,13 +281,14 @@ class MethodSerializer(AccessControlSerializer,
         inputs = method_data.pop("inputs")
         outputs = method_data.pop("outputs")
 
-        method = Method.objects.create(**method_data)
+        method = Method.objects.create(
+            user=self.context["request"].user,
+            **method_data
+        )
         method.users_allowed.add(*users_allowed)
         method.groups_allowed.add(*groups_allowed)
 
         def create_xput(xput_data, xput_manager):
-            # Note that we ignore the value of xput_data["transformation"].
-            xput_data.pop("transformation")
             structure_data = None
             try:
                 structure_data = xput_data.pop("structure")
@@ -260,8 +297,6 @@ class MethodSerializer(AccessControlSerializer,
 
             curr_xput = xput_manager.create(**xput_data)
             if structure_data is not None:
-                # Here we ignore the transf_xput ID passed to the structure.
-                structure_data.pop("transf_xput")
                 curr_xput.structure.create(**structure_data)
 
         for input_data in inputs:

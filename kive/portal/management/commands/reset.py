@@ -22,7 +22,8 @@ class Command(BaseCommand):
                    "Logs",
                    "Sandboxes",
                    "VerificationLogs",
-                   "VerificationScripts"]
+                   "VerificationScripts",
+                   "StagedFiles"]
         for target in targets:
             target_path = os.path.join(kive.settings.MEDIA_ROOT, target)
             if os.path.isdir(target_path):

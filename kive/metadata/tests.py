@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase, TransactionTestCase
 from django.core.urlresolvers import reverse, resolve
 
+from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from metadata.models import BasicConstraint, CompoundDatatype, Datatype, everyone_group, kive_user
@@ -16,8 +17,8 @@ from method.models import CodeResourceRevision
 from archive.models import Dataset, MethodOutput
 from librarian.models import SymbolicDataset
 from datachecking.models import VerificationLog
+from portal.models import StagedFile
 from constants import datatypes, CDTs
-from rest_framework import status
 
 
 samplecode_path = "../samplecode"
@@ -270,6 +271,12 @@ def clean_up_all_files():
         vl.error_log.close()
         vl.error_log.delete()
         vl.delete()
+
+    for sf in StagedFile.objects.all():
+        sf.uploaded_file.close()
+        sf.uploaded_file.delete()
+        sf.delete()
+
 
 
 class MetadataTestCase(TestCase):
