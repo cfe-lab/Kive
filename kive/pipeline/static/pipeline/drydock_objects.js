@@ -542,11 +542,11 @@ var drydock_objects = (function() {
             if (input.structure != null)
                 cdt_pk = input.structure.compounddatatype;
 
-            magnet = new my.Magnet(this, r, attract, magnet_fill, cdt_pk, input.dataset_name, null, false);
+            magnet = new my.Magnet(self, r, attract, magnet_fill, cdt_pk, input.dataset_name, null, false);
 
             // Fudge the magnet position around, I guess?
             if (self.n_inputs == 1)
-                magnet.x -= this.h/3;
+                magnet.x -= self.h/3;
 
             self.in_magnets.push(magnet);
         });
@@ -558,11 +558,11 @@ var drydock_objects = (function() {
             if (output.structure != null)
                 cdt_pk = output.structure.compounddatatype;
 
-            magnet = new my.Magnet(this, r, attract, magnet_fill, cdt_pk, output.dataset_name, null, false);
+            magnet = new my.Magnet(self, r, attract, magnet_fill, cdt_pk, output.dataset_name, null, true);
 
             // Fudge the magnet position around, I guess?
             if (self.n_inputs == 1)
-                magnet.x += this.h/3;
+                magnet.x += self.h/3;
 
             self.out_magnets.push(magnet);
         });
