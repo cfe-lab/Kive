@@ -13,9 +13,10 @@ $(function() {
     // initialize animated canvas
     canvas = document.getElementById('pipeline_canvas');
     var canvasWidth  = canvas.width  = window.innerWidth,
-        canvasHeight = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
+        canvasHeight = canvas.height = window.innerHeight - $(canvas).offset().top - 5,
+        redrawInterval = 50; // ms
     
-    canvasState = new CanvasState(canvas);
+    canvasState = new drydock.CanvasState(canvas, redrawInterval);
 
     // TODO: Move this into a parameter for the submit method
     //window.submit_to_url = '/pipeline_add';

@@ -26,7 +26,8 @@ var load_preview_canvas = function() {
         success: function(result) {
             this_.width  = 120,
             this_.height = 90;
-            var cs = new CanvasState(this_);
+            var redrawInterval = 50, // ms
+                cs = new CanvasState(this_, redrawInterval);
             var pipeline = new Pipeline(cs);
 
             cs.setScale(0.12);
