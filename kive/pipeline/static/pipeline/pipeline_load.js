@@ -38,6 +38,207 @@ var pipeline = (function(exports){
          * @param patch: (optional) If this is only a trivial update
          *  then use this to generate the patch data for the update.
          */
+
+        var self = this,
+            method_nodes = [],
+            pipeline_outputs = [],
+            pipeline_inputs = [],
+            canvas_x_ratio = 1./self.canvasState.canvas.width,
+            canvas_y_ratio = 1./self.canvasState.canvas.height;
+
+
+        // TODO: Move check graph integrity out of Pipeline and into CanvasState
+
+        // Check graph integrity
+        $.each(self.canvasState.shapes, function(_, shape){
+            if (shape instanceof MethodNode) {
+                var num_connections = 0;
+
+                // Track all method nodes
+                method_nodes.push(shape);
+                $.each(shape.out_magnets, function(_, magnet){
+                    num_connections += magnet.connected.length;
+                });
+
+                if (num_connections === 0)
+                    throw 'MethodNode with unused outputs';
+            }
+            else if (shape instanceof OutputNode)
+                pipeline_outputs.push(shape);
+
+            else if (shape instanceof CDtNode || shape instanceof RawNode) {
+                var magnet = null;
+                pipeline_inputs.push(shape);
+
+                // all CDtNodes or RawNodes (inputs) should feed into a MethodNode and have only one magnet
+                if (shape.out_magnets.length != 0)
+                    throw 'Invalid amount of magnets for output node!';
+
+                // is this magnet connected?
+                if (shape.out_magnets[0].connected.length === 0)
+                    throw 'Unconnected input node';
+            }
+            else
+                throw 'Unknown node type encountered!';
+        });
+
+
+        // sort pipelines by their isometric position, left-to-right, top-to-bottom
+        // (sort of like reading order if you tilt your screen 30° clockwise)
+        pipeline_inputs.sort(Geometry.isometricSort);
+        pipeline_outputs.sort(Geometry.isometricSort);
+
+        // at least one Connector must terminate as pipeline output
+        if (pipeline_outputs.length === 0) {
+            submitError('Pipeline has no output');
+            return;
+        }
+
+        // TODO: This block of code needs to be pulled out of this function
+        var is_revision = $('#id_pipeline_select').length > 0;
+
+        // arguments to initialize new Pipeline Family
+        var family_name = $('#id_family_name').val(),  // hidden input if revision
+            family_desc = $('#id_family_desc').val(),
+            family_pk = $('#id_family_pk').val(),
+            revision_name = $('#id_revision_name').val(),
+            revision_desc = $('#id_revision_desc').val(),
+            users_allowed = $("#id_users_allowed").val(),
+            groups_allowed = $("#id_groups_allowed").val();
+
+        // Form validation
+        if (!is_revision) {
+            if (family_name === '') {
+                // FIXME: is there a better way to do this trigger?
+                $('li', 'ul#id_ctrl_nav')[0].click();
+                $('#id_family_name').css({'background-color': '#ffc'}).focus();
+                submitError('Pipeline family must be named');
+                return;
+            }
+            $('#id_family_name, #id_family_desc').css('background-color', '#fff');
+        }
+
+        $('#id_revision_name, #id_revision_desc').css('background-color', '#fff');
+        // TODO: END TODO
+
+
+        // Now we're ready to start
+        var form_data = {
+            users_allowed: users_allowed,
+            groups_allowed: groups_allowed,
+            // There is no PipelineFamily yet; we're going to create one.
+            family_pk: family_pk,
+            family_name: family_name,
+            family_desc: family_desc,
+            // arguments to add first pipeline revision
+            revision_name: revision_name,
+            revision_desc: revision_desc,
+            // Canvas information to store in the Pipeline object.
+            canvas_width: canvas.width,
+            canvas_height: canvas.height,
+            revision_parent_pk: is_revision ? $('#id_pipeline_select').val() : null,
+            // Arrays will be populated in the following code.
+            pipeline_steps: [],
+            pipeline_inputs: [],
+            pipeline_outputs: []
+        };
+
+        // update form data with inputs
+        $.each(pipeline_inputs, function(idx, input){
+            var structure = null;
+
+            // Setup the compound datatype
+            if(input instanceof CDtNode)
+                structure = {
+                    compounddatatype: input.pk
+                };
+
+            // Slap this input into the form data
+            form_data.pipeline_inputs[idx] = {
+                structure: structure,
+                dataset_name: input.label,
+                dataset_idx: idx + 1,
+                x: input.x * canvas_x_ratio,
+                y: input.y * canvas_y_ratio,
+                min_row: null, // in the future these can be more detailed
+                max_row: null
+            };
+        });
+
+        // MethodNodes are now sorted live, prior to pipeline submission —JN
+        var sorted_elements = [];
+        $.each(self.canvasState.exec_order, function(_, exe_order_element) {
+            sorted_elements = sorted_elements.concat(exe_order_element);
+        });
+
+        // Add arguments for input cabling
+        $.each(sorted_elements, function(idx, step){
+
+            // TODO: Make this work for nested pipelines
+
+            // Put the method in the form data
+            form_data.pipeline_steps[idx] = {
+                transf_pk: step.pk,  // to retrieve Method
+                transf_type: "Method",
+                step_num: idx + 1,  // 1-index (pipeline inputs are index 0)
+                x: step.x * canvas_x_ratio,
+                y: step.y * canvas_y_ratio,
+                name: step.label,
+                fill_colour: step.fill,
+                cables_in: [],
+                outputs_to_delete: [] // not yet implemented
+            };
+
+            // retrieve Connectors
+            $.each(step.in_magnets, function(cable_idx, magnet){
+                if (magnet.connected.length === 0)
+                    return true; // continue;
+
+                var connector = magnet.connected[0],
+                    source = magnet.connected[0].source.parent;
+
+                form_data.pipeline_steps[idx].cables_in[cable_idx] = {
+                    source_dataset_name: connector.source.label,
+                    dest_dataset_name: connector.dest.label,
+                    source_step: source instanceof MethodNode ? sorted_elements.indexOf(source)+1 : 0,
+                    keep_output: false, // in the future this can be more flexible
+                    wires: [] // no wires for a raw cable
+                };
+            });
+        });
+
+        // Construct outputs
+        $.each(pipeline_outputs, function(idx, output){
+            var connector = output.in_magnets[0].connected[0],
+                source_step = connector.source.parent,
+                structure = null;
+
+            form_data[idx] = {
+                output_name: output.label,
+                output_idx: idx + 1,
+                output_CDT_pk: connector.source.cdt, // TODO: change this to structure
+                source: source_step.pk,
+                source_step: sorted_elements.indexOf(source_step) + 1, // 1-index
+                source_dataset_name: connector.source.label, // magnet label
+                x: output.x * canvas_x_ratio,
+                y: output.y * canvas_y_ratio,
+                wires: [] // in the future we might have this
+            };
+        });
+
+        // this code written on Signal Hill, St. John's, Newfoundland
+        // May 2, 2014 - afyp
+
+        // this code modified at my desk
+        // June 18, 2014 -- RL
+
+        // I code at my desk too.
+        // July 30, 2014 - JN
+
+        // How did I even computer?
+        // April 28, 2015 - Cat
+
+        return form_data;
     };
 
     Pipeline.prototype.update = function(runstat, look_for_md5)  {
