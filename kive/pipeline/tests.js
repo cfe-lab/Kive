@@ -1338,6 +1338,26 @@
                     this.state.draw(this.ctx);
                 });
                 
+                it('should drag off edge', function() {
+                    this.expectedInput.y += 110;
+                    this.expectedInput.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 30, y: 129.5, text: "in", style: "node", dir: 0});
+                    this.expectedMethod.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 111.25, y: 14.5, text: "example", style: "node", dir: 0});
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedInput.highlight(this.expectedCanvas.ctx);
+                    
+                    this.state.draw(this.ctx);
+                    this.state.doDown(
+                            {pageX: this.actualInput.x, pageY: this.actualInput.y});
+                    this.state.doMove(
+                            {pageX: this.expectedInput.x, pageY: this.expectedInput.y});
+                    this.state.draw(this.ctx);
+                });
+                
                 it('should drag two objects with shift click', function() {
                     this.expectedInput.y += 50;
                     this.expectedMethod.y += 50;
@@ -1643,6 +1663,35 @@
                     this.state.draw(this.ctx);
                 });
                 
+                it('should align along x axis', function() {
+                    drawStartingPipeline(this);
+                    
+                    this.actualInput.y += 5;
+                    this.actualMethod.y -= 5;
+                    this.state.selection = [this.actualInput, this.actualMethod];
+                    this.state.alignSelection("x");
+                    this.state.selection = [];
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should detect collisions', function() {
+                    this.expectedInput.x = 95-19.4454;
+                    this.expectedInput.y = 55+19.4454;
+                    this.expectedMethod.x = 100+8.8388;
+                    this.expectedMethod.y = 50-8.8388;
+                    this.expectedInput.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 75.555, y: 43.945, text: "in", style: "node", dir: 0});
+                    this.expectedMethod.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 120.089, y: 5.661, text: "example", style: "node", dir: 0});
+                    
+                    this.actualInput.x = this.actualMethod.x - 5;
+                    this.actualInput.y = this.actualMethod.y + 5;
+                    this.state.detectCollisions(this.actualInput);
+                    this.state.draw(this.ctx);
+                });
+                
                 it('should delete the input', function() {
                     this.expectedMethod.draw(this.expectedCanvas.ctx);
                     this.expectedCanvas.drawText(
@@ -1770,6 +1819,26 @@
                         });
                         this.state.doMove({ pageX: 100, pageY: 100 });
                         
+                        this.state.draw(this.ctx);
+                    });
+                    
+                    it('should autolayout', function() {
+                        this.expectedInput.x = 60.10463893352559;
+                        this.expectedInput.y = 22.5;
+                        this.expectedMethod.x = 239.8953610664744;
+                        this.expectedMethod.y = 127.5;
+                        this.expectedInput.draw(this.expectedCanvas.ctx);
+                        this.expectedMethod.draw(this.expectedCanvas.ctx);
+                        this.expectedConnector.source = this.expectedInput.out_magnets[0];
+                        this.expectedConnector.dest = this.expectedMethod.in_magnets[0];
+                        this.expectedCanvas.ctx.globalAlpha = 0.75;
+                        this.expectedConnector.draw(this.expectedCanvas.ctx);
+                        this.expectedCanvas.drawText(
+                                {x: 251.1453610664744, y: 92, text: "example", style: "node", dir: 0});
+                        
+                        this.state.draw(this.ctx);
+                        this.state.testExecutionOrder();
+                        this.state.autoLayout();
                         this.state.draw(this.ctx);
                     });
                 });

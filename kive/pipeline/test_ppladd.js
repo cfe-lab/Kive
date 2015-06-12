@@ -12,7 +12,7 @@
             this.rawCanvas = imagediff.createCanvas(width, height);
             this.expectedRawCanvas = imagediff.createCanvas(width, height);
             this.canvas = new drydock_objects.CanvasWrapper(this.rawCanvas);
-            this.canvasState = new CanvasState(this.rawCanvas);
+            this.canvasState = new drydock.CanvasState(this.rawCanvas);
             this.expectedCanvas = new drydock_objects.CanvasWrapper(this.expectedRawCanvas);
             this.ctx = this.canvas.ctx;
             this.expectedCanvas.ctx.fillStyle = "white";
@@ -22,7 +22,7 @@
 
             // Throw some more functions into the CanvasState object
             // Dirty hack for now, but it works
-            CanvasState.prototype.isConnectedTo = function(node1, node2) {
+            drydock.CanvasState.prototype.isConnectedTo = function(node1, node2) {
                 var connections = this.connectors;
                 for(var i = 0; i < connections.length; i++)
                     if ((connections[i].source.parent == node1 && connections[i].dest.parent == node2) ||
@@ -31,7 +31,7 @@
                 return false;
             };
 
-            CanvasState.prototype.findNodeByLabel = function(label) {
+            drydock.CanvasState.prototype.findNodeByLabel = function(label) {
                 var shapes = this.shapes;
                 for(var i = 0; i < shapes.length; i++)
                     if (shapes[i].label != null && shapes[i].label == label)

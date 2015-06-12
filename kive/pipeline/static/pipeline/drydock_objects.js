@@ -332,7 +332,7 @@ var drydock_objects = (function() {
     };
     
     my.CylinderNode.prototype.getLabel = function() {
-        return new NodeLabel(
+        return new my.NodeLabel(
                 this.label,
                 this.x + this.dx,
                 this.y + this.dy - this.h/2 - this.offset);
@@ -347,7 +347,7 @@ var drydock_objects = (function() {
         this.magnetOffset = {x: 10, y: this.r2/2};
         this.inset = 10; // distance of magnet from center
         // Input node always has one magnet
-        this.out_magnets.push(new Magnet(this, 5, 2, "white", null, this.label, null, true));
+        this.out_magnets.push(new my.Magnet(this, 5, 2, "white", null, this.label, null, true));
     };
     my.RawNode.prototype = Object.create(my.CylinderNode.prototype);
     my.RawNode.prototype.constructor = my.RawNode;
@@ -369,7 +369,7 @@ var drydock_objects = (function() {
         this.offset = 15;
         this.label = label || '';
         this.in_magnets = [];
-        this.out_magnets = [ new Magnet(this, 5, 2, "white", this.pk, this.label, null, true, pk) ];
+        this.out_magnets = [ new my.Magnet(this, 5, 2, "white", this.pk, this.label, null, true, pk) ];
     };
     
     my.CdtNode.prototype.draw = function(ctx) {
@@ -473,7 +473,10 @@ var drydock_objects = (function() {
     };
     
     my.CdtNode.prototype.getLabel = function() {
-        return new NodeLabel(this.label, this.x + this.dx, this.y + this.dy - this.h/2 - this.offset);
+        return new my.NodeLabel(
+                this.label,
+                this.x + this.dx,
+                this.y + this.dy - this.h/2 - this.offset);
     };
 
     /**
@@ -522,7 +525,6 @@ var drydock_objects = (function() {
         this.in_magnets = [];
         this.out_magnets = [];
 
-
         // Members for instances of methods in runs
         this.status = status;
 
@@ -556,7 +558,7 @@ var drydock_objects = (function() {
             if (output.structure != null)
                 cdt_pk = output.structure.compounddatatype;
 
-            magnet = new Magnet(this, r, attract, magnet_fill, cdt_pk, output.dataset_name, null, false);
+            magnet = new my.Magnet(this, r, attract, magnet_fill, cdt_pk, output.dataset_name, null, false);
 
             // Fudge the magnet position around, I guess?
             if (self.n_inputs == 1)
@@ -681,7 +683,7 @@ var drydock_objects = (function() {
             magnet = this.out_magnets[i];
             for (j = 0; j < magnet.connected.length; j++) {
                 connected_node = magnet.connected[j].dest.parent;
-                if (connected_node.constructor == OutputNode) {
+                if (connected_node instanceof my.OutputNode) {
                     connected_node.highlight(ctx);
                 }
                 
@@ -771,7 +773,10 @@ var drydock_objects = (function() {
     };
     
     my.MethodNode.prototype.getLabel = function() {
-        return new NodeLabel(this.label, this.x + this.dx + this.scoop/4, this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset);
+        return new my.NodeLabel(
+                this.label,
+                this.x + this.dx + this.scoop/4,
+                this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset);
     };
     
     my.Magnet = function(parent, r, attract, fill, cdt, label, offset, isOutput, pk) {
@@ -1208,7 +1213,7 @@ var drydock_objects = (function() {
         this.fill = this.defaultFill = "#d40";
         this.diffFill = "blue";
         this.inset = 12; // distance of magnet from center
-        this.in_magnets.push(new Magnet(this, 5, 2, "white", null, this.label, pk));
+        this.in_magnets.push(new my.Magnet(this, 5, 2, "white", null, this.label, pk));
         this.pk = pk;
         this.status = status;
         this.md5 = md5;
@@ -1251,15 +1256,6 @@ var drydock_objects = (function() {
     
     return my;
 }(drydock_objects));
-// TODO: Scope all calls to these objects, then remove aliases.
-var CDtNode = drydock_objects.CdtNode,
-    Connector = drydock_objects.Connector,
-    Magnet = drydock_objects.Magnet,
-    MethodNode = drydock_objects.MethodNode,
-    NodeLabel = drydock_objects.NodeLabel,
-    OutputNode = drydock_objects.OutputNode,
-    OutputZone = drydock_objects.OutputZone,
-    RawNode = drydock_objects.RawNode;
 
 var Geometry = {
     inEllipse: function(mx, my, cx, cy, rx, ry) {
