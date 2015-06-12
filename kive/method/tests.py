@@ -34,7 +34,7 @@ import sandbox.testing_utils as tools
 import sandbox.execute
 import portal.models
 
-from method.serializers import CodeResourceRevisionSerializer
+from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
 
 
 # This was previously defined here but has been moved to metadata.tests.
@@ -3113,223 +3113,94 @@ class CodeResourceApiTests(BaseTestCases.ApiTestCase):
                              set([x["revision_number"] for x in response.data]))
 
 
-class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
-    fixtures = ["removal"]
+def crr_test_setup(case):
+    """
+    A helper for CodeResourceRevisionApiTests and CodeResourceRevisionSerializerTests.
 
-    def setUp(self):
-        super(CodeResourceRevisionApiTests, self).setUp()
+    The test case that calls this must include the "removal" fixture.
+    """
+    # This user is defined in the removal fixture.
+    case.remover = User.objects.get(pk=2)
 
-        self.list_path = reverse("coderesourcerevision-list")
-        self.list_view, _, _ = resolve(self.list_path)
+    # A mock request that we pass as context to our serializer.
+    class DuckRequest(object):
+        pass
 
-        # This user is defined in the removal fixture.
-        self.remover = User.objects.get(pk=2)
-        self.noop_cr = CodeResource.objects.get(name="Noop")
-        self.noop_crr = self.noop_cr.revisions.get(revision_number=1)
+    case.duck_request = DuckRequest()
+    case.duck_request.user = kive_user()
+    case.duck_context = {"request": case.duck_request}
 
-        self.detail_path = reverse("coderesourcerevision-detail", kwargs={"pk": self.noop_crr.pk})
-        self.detail_view, _, _ = resolve(self.detail_path)
-        self.removal_plan = self.noop_crr.build_removal_plan()
-
-        # Some stuff we need for testing creation.
-        with tempfile.TemporaryFile() as f:
-            f.write("""#!/bin/bash
-
-echo "Hello World"
-""")
-            self.staged_file = portal.models.StagedFile(
-                uploaded_file=File(f),
-                user=kive_user()
-            )
-            self.staged_file.save()
-
-        self.cr_name = "Deserialization Test Family"
-        self.cr = CodeResource(name=self.cr_name,
-                               filename="HelloWorld.py",
-                               description="Hello World",
-                               user=kive_user())
-        self.cr.save()
-
-        with tempfile.TemporaryFile() as f:
-            f.write("""#!/bin/bash
+    # Some stuff we need for testing creation.
+    with tempfile.TemporaryFile() as f:
+        f.write("""#!/bin/bash
 
 echo "Hello World"
 """)
-            self.staged_file = portal.models.StagedFile(
-                uploaded_file=File(f),
-                user=kive_user()
-            )
-            self.staged_file.save()
-
-        self.crr_data = {
-            "coderesource": self.cr_name,
-            "revision_name": "v1",
-            "revision_desc": "First version",
-            "staged_file": self.staged_file.pk
-        }
-
-        with tempfile.TemporaryFile() as f:
-            f.write("""language = ENG""")
-            self.crd = CodeResourceRevision(
-                coderesource=self.cr,
-                revision_name="dependency",
-                revision_desc="Dependency",
-                user=kive_user(),
-                content_file=File(f))
-            self.crd.save()
-
-    def tearDown(self):
-        metadata.tests.clean_up_all_files()
-
-    def test_list(self):
-        request = self.factory.get(self.list_path)
-        force_authenticate(request, user=self.remover)
-        response = self.list_view(request, pk=None)
-
-        self.assertItemsEqual(
-            [x.pk for x in CodeResourceRevision.objects.filter(user=self.remover)],
-            [x["id"] for x in response.data]
+        case.staged_file = portal.models.StagedFile(
+            uploaded_file=File(f),
+            user=kive_user()
         )
+        case.staged_file.save()
 
-    def test_detail(self):
-        request = self.factory.get(self.detail_path)
-        force_authenticate(request, user=self.remover)
-        response = self.detail_view(request, pk=self.noop_crr.pk)
-        detail = response.data
+    case.cr_name = "Deserialization Test Family"
+    case.cr = CodeResource(name=case.cr_name,
+                           filename="HelloWorld.py",
+                           description="Hello World",
+                           user=kive_user())
+    case.cr.save()
 
-        self.assertEquals(detail["id"], self.noop_crr.pk)
-        self.assertEquals(detail["absolute_url"], self.noop_crr.get_absolute_url())
-        self.assertEquals(detail["revision_name"], self.noop_crr.revision_name)
+    with tempfile.TemporaryFile() as f:
+        f.write("""#!/bin/bash
 
-    def test_removal_plan(self):
-        crr_removal_path = reverse("coderesourcerevision-removal-plan", kwargs={'pk': self.noop_crr.pk})
-        crr_removal_view, _, _ = resolve(crr_removal_path)
+echo "Hello World"
+""")
+        case.staged_file = portal.models.StagedFile(
+            uploaded_file=File(f),
+            user=kive_user()
+        )
+        case.staged_file.save()
 
-        request = self.factory.get(crr_removal_path)
-        force_authenticate(request, user=self.remover)
-        response = crr_removal_view(request, pk=self.noop_crr.pk)
+    case.crr_data = {
+        "coderesource": case.cr_name,
+        "revision_name": "v1",
+        "revision_desc": "First version",
+        "staged_file": case.staged_file.pk
+    }
 
-        for key in self.removal_plan:
-            self.assertEquals(response.data[key], len(self.removal_plan[key]))
-        # This CRR is a dependency of another one, so:
-        self.assertEquals(response.data["CodeResourceRevisions"], 2)
+    with tempfile.TemporaryFile() as f:
+        f.write("""language = ENG""")
+        case.crd = CodeResourceRevision(
+            coderesource=case.cr,
+            revision_name="dependency",
+            revision_desc="Dependency",
+            user=kive_user(),
+            content_file=File(f))
+        case.crd.save()
 
-    def test_removal(self):
-        start_count = CodeResourceRevision.objects.count()
-
-        request = self.factory.delete(self.detail_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.detail_view(request, pk=self.noop_crr.pk)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
-
-        end_count = CodeResourceRevision.objects.count()
-        # In the above we confirmed this length is 2.
-        self.assertEquals(end_count, start_count - len(self.removal_plan["CodeResourceRevisions"]))
-
-    def test_create(self):
-        """
-        Test creation of a new CodeResourceRevision via the API.
-        """
-        staged_file_pk = self.staged_file.pk
-        request = self.factory.post(self.list_path, self.crr_data)
-        force_authenticate(request, user=kive_user())
-        self.list_view(request)
-
-        # Inspect the revision we just added.
-        new_crr = self.cr.revisions.get(revision_name="v1")
-        self.assertEquals(new_crr.revision_desc, "First version")
-        self.assertEquals(new_crr.dependencies.count(), 0)
-
-        # Make sure the staged file was removed.
-        self.assertFalse(portal.models.StagedFile.objects.filter(pk=staged_file_pk).exists())
-
-    def test_create_clean_fails(self):
-        """
-        Test that clean is being called during creation.
-        """
-        # Add a bad dependency to crr_data.
-        self.crr_data["dependencies"] = [
-            {
-                "requirement": self.crd.pk,
-                "depPath": "../../jailbroken"
-            }
-        ]
-
-        print(self.crr_data)
-
-        request = self.factory.post(self.list_path, self.crr_data, format="json")
-        force_authenticate(request, user=kive_user())
-        response = self.list_view(request)
-        print(response.data)
+    case.crr_data_with_dep = copy.deepcopy(case.crr_data)
+    case.crr_data_with_dep["dependencies"] = [
+        {
+            "requirement": case.crd.pk,
+            "depFileName": "config.dat"
+        },
+        {
+            "requirement": case.crd.pk,
+            "depPath": "configuration.dat",
+            "depFileName": "config_2.dat"
+        }
+    ]
 
 
 class CodeResourceRevisionSerializerTests(TestCase):
     fixtures = ["removal"]
 
     def setUp(self):
-        # This user is defined in the removal fixture.
-        self.remover = User.objects.get(pk=2)
-
-        # A mock request that we pass as context to our serializer.
-        class DuckRequest(object):
-            pass
-
-        self.duck_request = DuckRequest()
-        self.duck_request.user = kive_user()
-
-        with tempfile.TemporaryFile() as f:
-            f.write("""#!/bin/bash
-
-echo "Hello World"
-""")
-            self.staged_file = portal.models.StagedFile(
-                uploaded_file=File(f),
-                user=kive_user()
-            )
-            self.staged_file.save()
-
-        self.cr_name = "Deserialization Test Family"
-        self.cr = CodeResource(name=self.cr_name,
-                               filename="HelloWorld.py",
-                               description="Hello World",
-                               user=kive_user())
-        self.cr.save()
-
-        with tempfile.TemporaryFile() as f:
-            f.write("""language = ENG""")
-            self.crd = CodeResourceRevision(
-                coderesource=self.cr,
-                revision_name="dependency",
-                revision_desc="Dependency",
-                user=kive_user(),
-                content_file=File(f))
-            self.crd.save()
-
-        # Some CRR dictionaries to deserialize.
-        self.crr_data = {
-            "coderesource": self.cr_name,
-            "revision_name": "v1",
-            "revision_desc": "First version",
-            "staged_file": self.staged_file.pk
-        }
-
-        self.crr_data_with_dep = copy.deepcopy(self.crr_data)
-        self.crr_data_with_dep["dependencies"] = [
-            {
-                "requirement": self.crd.pk,
-                "depFileName": "config.dat"
-            },
-            {
-                "requirement": self.crd.pk,
-                "depPath": "configuration.dat",
-                "depFileName": "config_2.dat"
-            }
-        ]
+        crr_test_setup(self)
 
     def tearDown(self):
         metadata.tests.clean_up_all_files()
 
-    # Note: all validation tests are redundant.  There is no customized validation code.
+    # Note: all validation tests are redundant.  There is no customized validation code anymore.
     def test_validate_nodep(self):
         """
         Test validation of a CodeResourceRevision with no dependencies.
@@ -3408,3 +3279,176 @@ echo "Hello World"
 
         self.assertFalse(crr_s.is_valid())
         self.assertTrue("staged_file" in crr_s.errors)
+
+
+class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
+    fixtures = ["removal"]
+
+    def setUp(self):
+        super(CodeResourceRevisionApiTests, self).setUp()
+
+        self.list_path = reverse("coderesourcerevision-list")
+        self.list_view, _, _ = resolve(self.list_path)
+
+        self.noop_cr = CodeResource.objects.get(name="Noop")
+        self.noop_crr = self.noop_cr.revisions.get(revision_number=1)
+
+        self.detail_path = reverse("coderesourcerevision-detail", kwargs={"pk": self.noop_crr.pk})
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.removal_plan = self.noop_crr.build_removal_plan()
+
+        crr_test_setup(self)
+
+    def tearDown(self):
+        metadata.tests.clean_up_all_files()
+
+    def test_list(self):
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.remover)
+        response = self.list_view(request, pk=None)
+
+        self.assertItemsEqual(
+            [x.pk for x in CodeResourceRevision.objects.filter(user=self.remover)],
+            [x["id"] for x in response.data]
+        )
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.remover)
+        response = self.detail_view(request, pk=self.noop_crr.pk)
+        detail = response.data
+
+        self.assertEquals(detail["id"], self.noop_crr.pk)
+        self.assertEquals(detail["absolute_url"], self.noop_crr.get_absolute_url())
+        self.assertEquals(detail["revision_name"], self.noop_crr.revision_name)
+
+    def test_removal_plan(self):
+        crr_removal_path = reverse("coderesourcerevision-removal-plan", kwargs={'pk': self.noop_crr.pk})
+        crr_removal_view, _, _ = resolve(crr_removal_path)
+
+        request = self.factory.get(crr_removal_path)
+        force_authenticate(request, user=self.remover)
+        response = crr_removal_view(request, pk=self.noop_crr.pk)
+
+        for key in self.removal_plan:
+            self.assertEquals(response.data[key], len(self.removal_plan[key]))
+        # This CRR is a dependency of another one, so:
+        self.assertEquals(response.data["CodeResourceRevisions"], 2)
+
+    def test_removal(self):
+        start_count = CodeResourceRevision.objects.count()
+
+        request = self.factory.delete(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.noop_crr.pk)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        end_count = CodeResourceRevision.objects.count()
+        # In the above we confirmed this length is 2.
+        self.assertEquals(end_count, start_count - len(self.removal_plan["CodeResourceRevisions"]))
+
+    def test_create(self):
+        """
+        Test creation of a new CodeResourceRevision via the API.
+        """
+        staged_file_pk = self.staged_file.pk
+        request = self.factory.post(self.list_path, self.crr_data)
+        force_authenticate(request, user=kive_user())
+        self.list_view(request)
+
+        # Inspect the revision we just added.
+        new_crr = self.cr.revisions.get(revision_name="v1")
+        self.assertEquals(new_crr.revision_desc, "First version")
+        self.assertEquals(new_crr.dependencies.count(), 0)
+
+        # Make sure the staged file was removed.
+        self.assertFalse(portal.models.StagedFile.objects.filter(pk=staged_file_pk).exists())
+
+    def test_create_clean_fails(self):
+        """
+        Test that clean is being called during creation.
+        """
+        # Add a bad dependency to crr_data.
+        self.crr_data["dependencies"] = [
+            {
+                "requirement": self.crd.pk,
+                "depPath": "../../jailbroken"
+            }
+        ]
+
+        request = self.factory.post(self.list_path, self.crr_data, format="json")
+        force_authenticate(request, user=kive_user())
+        self.assertRaisesRegexp(
+            ValidationError,
+            "depPath cannot reference ../",
+            lambda: self.list_view(request)
+        )
+
+
+class MethodSerializerTests(TestCase):
+    fixtures = ["removal"]
+
+    def setUp(self):
+        crr_test_setup(self)
+
+        # We need a CodeResourceRevision to create a Method from.
+        crr_s = CodeResourceRevisionSerializer(data=self.crr_data, context=self.duck_context)
+        crr_s.is_valid()
+        self.crr = crr_s.save()
+
+        # We need a MethodFamily to add the Method to.
+        self.dtf_mf = MethodFamily(
+            name="Deserialization Test Family Methods",
+            description="For testing the Method serializer.",
+            user=kive_user()
+        )
+        self.dtf_mf.save()
+        self.dtf_mf.users_allowed.add(self.remover)
+        self.dtf_mf.grant_everyone_access()
+        self.dtf_mf.save()
+
+    def tearDown(self):
+        metadata.tests.clean_up_all_files()
+
+    def test_create(self):
+        method_data = {
+            "family": self.dtf_mf.name,
+            "users_allowed": [self.remover.username],
+            "groups_allowed": [everyone_group().name],
+            "driver": self.crr.pk,
+            "inputs": [
+                {
+                    "dataset_name": "ignored_input",
+                    "dataset_idx": 1,
+                    "x": 0.1,
+                    "y": 0.1
+                },
+                {
+                    "dataset_name": "another_ignored_input",
+                    "dataset_idx": 2,
+                    "x": 0.1,
+                    "y": 0.2
+                }
+            ],
+            "outputs": [
+                {
+                    "dataset_name": "empty_output",
+                    "dataset_idx": 1
+                }
+            ]
+        }
+
+        method_s = MethodSerializer(data=method_data, context=self.duck_context)
+        self.assertTrue(method_s.is_valid())
+        new_method = method_s.save()
+
+        # Probe the new method to see that it got created correctly.
+        self.assertEquals(new_method.inputs.count(), 2)
+        in_1 = new_method.inputs.get(dataset_idx=1)
+        in_2 = new_method.inputs.get(dataset_idx=2)
+
+        self.assertEquals(in_1.dataset_name, "ignored_input")
+        self.assertEquals(in_2.dataset_name, "another_ignored_input")
+
+        self.assertEquals(new_method.outputs.count(), 1)
+        self.assertEquals(new_method.outputs.first().dataset_name, "empty_output")
