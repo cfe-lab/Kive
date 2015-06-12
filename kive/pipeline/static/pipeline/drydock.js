@@ -69,7 +69,7 @@ var drydock = (function() {
         
         this.collisions = 0;
     
-        this.outputZone = new OutputZone(this.width, this.height);
+        this.outputZone = new drydock_objects.OutputZone(this.width, this.height);
     
         // options
         this.selectionColor = '#7bf';
@@ -160,7 +160,7 @@ var drydock = (function() {
             return;
         }
         
-        if (mySel instanceof Magnet) {
+        if (mySel instanceof drydock_objects.Magnet) {
             if (mySel.isInput) {
                 if (mySel.connected.length > 0) {
                     mySel = mySel.connected[0]; // select connector instead
@@ -173,9 +173,9 @@ var drydock = (function() {
                 mySel = mySel.parent;
             }
         }
-        if (mySel instanceof Connector &&
+        if (mySel instanceof drydock_objects.Connector &&
                 mySel.dest &&
-                mySel.dest.parent instanceof OutputNode) {
+                mySel.dest.parent instanceof drydock_objects.OutputNode) {
             // if the cable leads to an output node, then act as if
             // the output node itself was clicked...
             // not sure if this is the ideal behaviour...
@@ -183,17 +183,17 @@ var drydock = (function() {
             // disconnected? -JN
             mySel = mySel.dest.parent;
         }
-        if (mySel instanceof Magnet) {
+        if (mySel instanceof drydock_objects.Magnet) {
             // The only way to get here is with an out magnet we want to create
             // a connector for.
-            var conn = new Connector(mySel);
+            var conn = new drydock_objects.Connector(mySel);
             this.connectors.push(conn);
             mySel.connected.push(conn);
             this.selection = [ conn ];
             this.dragoffx = mx - conn.fromX;
             this.dragoffy = my - conn.fromY;
         }
-        else if (mySel instanceof Connector) {
+        else if (mySel instanceof drydock_objects.Connector) {
             if (!shift || this.selection.length === 0) {
                 this.selection = [ mySel ];
                 if(this.can_edit){
@@ -223,7 +223,7 @@ var drydock = (function() {
                 this.selection = [ mySel ];
             }
         
-            if (mySel instanceof MethodNode) {
+            if (mySel instanceof drydock_objects.MethodNode) {
                 $('#id_method_button').val('Revise Method');
             }
         }
@@ -262,7 +262,7 @@ var drydock = (function() {
                 this.valid = false; // redraw
 
                 // are we carrying a connector?
-                if (sel instanceof Connector && this.can_edit) {
+                if (sel instanceof drydock_objects.Connector && this.can_edit) {
                     // reset to allow mouse to disengage Connector from a magnet
                     
                     sel.x = mouse.x;
@@ -297,13 +297,13 @@ var drydock = (function() {
                             var in_magnet = in_magnets[j];
 
                             // retrieve CompoundDatatype of out-magnet
-                            if (own_shape instanceof RawNode) {
+                            if (own_shape instanceof drydock_objects.RawNode) {
                                 connector_carrying_cdt = null;
                             } else {
                                 connector_carrying_cdt = sel.source.cdt;
                             }
                             // does this in-magnet accept this CompoundDatatype?
-                            if (shape instanceof MethodNode &&
+                            if (shape instanceof drydock_objects.MethodNode &&
                                 connector_carrying_cdt == in_magnet.cdt) {
                                 // light up magnet
                                 in_magnet.fill = '#ff8';
@@ -323,7 +323,7 @@ var drydock = (function() {
                     // carrying a shape
                     // if execution order is ambiguous, the tiebreaker is the y-position.
                     // dragging a method node needs to calculate this in real-time.
-                    if (this.exec_order_is_ambiguous && sel instanceof MethodNode) {
+                    if (this.exec_order_is_ambiguous && sel instanceof drydock_objects.MethodNode) {
                         this.disambiguateExecutionOrder();
                     }
                 }
@@ -471,7 +471,9 @@ var drydock = (function() {
             for (var i = 0; i < node.in_magnets.length; i++) {
                 for (var j = 0; j < node.in_magnets[i].connected.length; j++) {
                     connected_input = node.in_magnets[i].connected[j].source.parent;
-                    if ((connected_input instanceof RawNode || connected_input instanceof CDtNode) && matrixIndexOf(node_order, connected_input) === false) {
+                    if ((connected_input instanceof drydock_objects.RawNode || 
+                            connected_input instanceof drydock_objects.CdtNode) && 
+                            matrixIndexOf(node_order, connected_input) === false) {
                         list.push(connected_input);
                     }
                 }
@@ -485,10 +487,10 @@ var drydock = (function() {
             var i, method_nodes,
                 queue = my.CanvasState.method_node_queue = my.CanvasState.method_node_queue || []; // queue is a static variable that persists across function calls
             if (list.indexOf(node) === -1) {
-                if (node instanceof MethodNode && 
+                if (node instanceof drydock_objects.MethodNode && 
                         typeof exec_order !== 'undefined' &&
                         exec_order.indexOf(node) > -1) {
-                    method_nodes = list.filter(function(node) { return node instanceof MethodNode; });
+                    method_nodes = list.filter(function(node) { return node instanceof drydock_objects.MethodNode; });
                     if (exec_order.length <= method_nodes.length) {
                         console.error("Unexpected number of methods in method_nodes.");
                     }
@@ -509,7 +511,7 @@ var drydock = (function() {
                         queue.push(node);
                     }
                 }
-                else if (node instanceof OutputNode) {
+                else if (node instanceof drydock_objects.OutputNode) {
                     // Output nodes are not relevant to execution order.
                     list.push(node);
                 }
@@ -772,7 +774,7 @@ var drydock = (function() {
         this.dragging = false;
         
         // are we carrying a shape?
-        if (!(this.selection[0] instanceof Connector)) {
+        if (!(this.selection[0] instanceof drydock_objects.Connector)) {
             for (i = 0; i < this.selection.length; i++) {
                 sel = this.selection[i];
                 if (this.outputZone.contains(sel.x, sel.y)) {
@@ -782,15 +784,15 @@ var drydock = (function() {
             }
         }
         
-        if (this.selection[0] instanceof Connector) {
+        if (this.selection[0] instanceof drydock_objects.Connector) {
             connector = this.selection[0];
             
-            if (!(connector.dest instanceof Magnet)) {
+            if (!(connector.dest instanceof drydock_objects.Magnet)) {
                 // connector not yet linked to anything
             
                 if (this.outputZone.contains(connector.x, connector.y)) {
                     // Connector drawn into output zone
-                    if (!(connector.source.parent instanceof MethodNode)) {
+                    if (!(connector.source.parent instanceof drydock_objects.MethodNode)) {
                         // disallow Connectors from data node directly to end-zone
                         index = this.connectors.indexOf(connector);
                         this.connectors.splice(index, 1);
@@ -803,7 +805,9 @@ var drydock = (function() {
                         new_output_label = connector.source.label;
                         for (i=0; i< this.shapes.length; i++) {
                             shape = this.shapes[i];
-                            if (!(shape instanceof OutputNode)) continue;
+                            if ( ! (shape instanceof drydock_objects.OutputNode)) {
+                                continue;
+                            }
                             if (shape.label == new_output_label) {
                                 i = -1;
                                 suffix++;
@@ -811,7 +815,10 @@ var drydock = (function() {
                             }
                         }
                     
-                        out_node = new OutputNode(connector.x, connector.y, new_output_label);
+                        out_node = new drydock_objects.OutputNode(
+                                connector.x,
+                                connector.y,
+                                new_output_label);
                         this.addShape(out_node);
                     
                         connector.dest = out_node.in_magnets[0];
@@ -844,7 +851,7 @@ var drydock = (function() {
                     this.valid = false; // redraw canvas to remove this Connector
                 }
             
-            } else if (connector.dest instanceof Magnet) {
+            } else if (connector.dest instanceof drydock_objects.Magnet) {
                 // connector has been linked to an in-magnet
                 if (connector.source.connected.indexOf(connector) < 0) {
                     // this is a new Connector, update source magnet
@@ -884,9 +891,10 @@ var drydock = (function() {
     
         // Edit mode can popup the context menu to delete and edit nodes
         if(this.can_edit){
-            if (sel.length == 1 && !(sel[0] instanceof Connector) ) {
+            if (sel.length == 1 && !(sel[0] instanceof drydock_objects.Connector) ) {
                 showMenu();
-                if (sel[0] instanceof RawNode || sel[0] instanceof CDtNode) {
+                if (sel[0] instanceof drydock_objects.RawNode ||
+                        sel[0] instanceof drydock_objects.CdtNode) {
                     $('.edit', mcm).hide();
                 }
             } else if (sel.length > 1) {
@@ -896,13 +904,15 @@ var drydock = (function() {
         } else {
             // Otherwise, we're read only, so only popup the context menu for outputs with datasets
             if (sel.length == 1) {
-                if(sel[0] instanceof OutputNode && sel[0].dataset_id !== undefined) {
+                if(sel[0] instanceof drydock_objects.OutputNode &&
+                        sel[0].dataset_id !== undefined) {
                    // Context menu for pipeline outputs
                    showMenu();
                    $('.output_node', mcm).show();
                    $('.step_node', mcm).hide();
     
-                } else if(sel[0] instanceof MethodNode && sel[0].log_id !== undefined) {
+                } else if(sel[0] instanceof drydock_objects.MethodNode &&
+                        sel[0].log_id !== undefined) {
                    // Context menu for pipeline steps
                    showMenu();
                    $('.output_node', mcm).hide();
@@ -916,7 +926,7 @@ var drydock = (function() {
     
     my.CanvasState.prototype.addShape = function(shape) {
         this.shapes.push(shape);
-        if (shape instanceof MethodNode) {
+        if (shape instanceof drydock_objects.MethodNode) {
             this.testExecutionOrder();
         }
         this.valid = false;
@@ -956,7 +966,7 @@ var drydock = (function() {
         
         // count up the total number of methods
         for ( i=0; i < shapes.length; i++ ) {
-            if (shapes[i] instanceof MethodNode)
+            if (shapes[i] instanceof drydock_objects.MethodNode)
                 n_methods++;
         }
     
@@ -968,7 +978,7 @@ var drydock = (function() {
             
             check_for_shape: for ( i=0; i < shapes.length; i++ ) {
                 shape = shapes[i];
-                if (!(shape instanceof MethodNode)) {
+                if (!(shape instanceof drydock_objects.MethodNode)) {
                     continue;
                 }
                 
@@ -1005,7 +1015,7 @@ var drydock = (function() {
                     
                     parent = shape.in_magnets[j].connected[0].source.parent;
                     
-                    if (!(parent instanceof MethodNode)) {
+                    if (!(parent instanceof drydock_objects.MethodNode)) {
                         continue;
                     }
                     
@@ -1116,8 +1126,8 @@ var drydock = (function() {
             var draggingFromMethodOut = (
                     this.dragging &&
                     sel.length == 1 &&
-                    sel[0] instanceof Connector &&
-                    sel[0].source.parent instanceof MethodNode);
+                    sel[0] instanceof drydock_objects.Connector &&
+                    sel[0].source.parent instanceof drydock_objects.MethodNode);
             
             // draw output end-zone -when- dragging a connector from a MethodNode
             if (draggingFromMethodOut && this.can_edit) {
@@ -1139,7 +1149,7 @@ var drydock = (function() {
                 
                 // queue label to be drawn after
                 if (this.force_show_exec_order === false ||
-                        !(shapes[i] instanceof MethodNode) ||
+                        !(shapes[i] instanceof drydock_objects.MethodNode) ||
                         this.force_show_exec_order === undefined &&
                         !this.exec_order_is_ambiguous) {
                     labels.push(shapes[i].getLabel());
@@ -1248,11 +1258,11 @@ var drydock = (function() {
             sel = mySel[k];
             
             if (sel !== null && sel !== undefined) {
-                if (sel instanceof Connector) {
+                if (sel instanceof drydock_objects.Connector) {
                     // remove selected Connector from list
                 
                     // if a cable to an output node is severed, delete the node as well
-                    if (sel.dest.parent instanceof OutputNode) {
+                    if (sel.dest.parent instanceof drydock_objects.OutputNode) {
                         index = this.shapes.indexOf(sel.dest.parent);
                         this.shapes.splice(index, 1);
                     } else {
@@ -1269,7 +1279,7 @@ var drydock = (function() {
                     index = this.connectors.indexOf(sel);
                     this.connectors.splice(index, 1);
                 }
-                else if (sel instanceof MethodNode) {
+                else if (sel instanceof drydock_objects.MethodNode) {
                     // delete Connectors terminating in this shape
                     in_magnets = sel.in_magnets;
                     for (i = 0; i < in_magnets.length; i++) {
@@ -1290,7 +1300,7 @@ var drydock = (function() {
                     index = this.shapes.indexOf(sel);
                     this.shapes.splice(index, 1);
                 }
-                else if (sel instanceof OutputNode) {
+                else if (sel instanceof drydock_objects.OutputNode) {
                     // deleting an output node is the same as deleting the cable
                     this_connector = sel.in_magnets[0].connected[0];
                     this.deleteObject(this_connector);
@@ -1304,7 +1314,8 @@ var drydock = (function() {
                             index = this.connectors.indexOf(this_connector);
                             this.connectors.splice(index, 1);
     
-                            if (this_connector.dest !== undefined && this_connector.dest instanceof Magnet) {
+                            if (this_connector.dest !== undefined &&
+                                    this_connector.dest instanceof drydock_objects.Magnet) {
                                 // in-magnets can accept only one Connector
                                 this_connector.dest.connected = [];
                             }
@@ -1326,17 +1337,21 @@ var drydock = (function() {
     
     my.CanvasState.prototype.findMethodNode = function(method_pk) {
         var shapes = this.shapes;
-        for(var i = 0; i < shapes.length; i++)
-            if (shapes[i] instanceof MethodNode && shapes[i].pk == method_pk)
+        for(var i = 0; i < shapes.length; i++) {
+            if (shapes[i] instanceof drydock_objects.MethodNode && shapes[i].pk == method_pk) {
                 return shapes[i];
+            }
+        }
         return null;
     };
     
     my.CanvasState.prototype.findOutputNode = function(pk) {
         var shapes = this.shapes;
-        for(var i = 0; i < shapes.length; i++)
-            if (shapes[i] instanceof OutputNode && shapes[i].pk == pk)
+        for(var i = 0; i < shapes.length; i++) {
+            if (shapes[i] instanceof drydock_objects.OutputNode && shapes[i].pk == pk) {
                 return shapes[i];
+            }
+        }
         return null;
     };
     

@@ -69,7 +69,7 @@ $(function() {
         for (i = 0; i < canvasState.shapes.length; i++) {
             shape = canvasState.shapes[i];
             if (shape == out_node) continue;
-            if (shape instanceof OutputNode && shape.label == label) {
+            if (shape instanceof drydock_objects.OutputNode && shape.label == label) {
                 $('#output_name_error').show();
                 return false;
             }
@@ -96,9 +96,9 @@ $(function() {
             ctx = preview_canvas.getContext('2d');
             ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
             if (this.value === '') {
-                (new RawNode(preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
+                (new drydock_objects.RawNode(preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
             } else {
-                (new CDtNode(this.value, preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
+                (new drydock_objects.CdtNode(this.value, preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
             }
         }
         e.stopPropagation();
@@ -128,7 +128,7 @@ $(function() {
                         n_inputs  = Object.keys(result.inputs).length * 8;
                     
                     preview_canvas.height = (n_outputs + n_inputs) / 2 + 62;
-                    (new MethodNode(
+                    (new drydock_objects.MethodNode(
                         val,
                         null,//family
                         // Ensures node is centred perfectly on the preview canvas
@@ -195,7 +195,9 @@ $(function() {
         // check for duplicate names
         for (var i = 0; i < canvasState.shapes.length; i++) {
             shape = canvasState.shapes[i];
-            if ((shape instanceof RawNode || shape instanceof CDtNode) && shape.label === node_label) {
+            if ((shape instanceof drydock_objects.RawNode ||
+                    shape instanceof drydock_objects.CdtNode) &&
+                    shape.label === node_label) {
                 dt_error.innerHTML = 'That name has already been used.';
                 return false;
             }
@@ -210,9 +212,9 @@ $(function() {
                 shape;
             
             if (this_pk === ""){
-                shape = new RawNode(         pos.left, pos.top, node_label);
+                shape = new drydock_objects.RawNode(         pos.left, pos.top, node_label);
             } else {
-                shape = new CDtNode(this_pk, pos.left, pos.top, node_label);
+                shape = new drydock_objects.CdtNode(this_pk, pos.left, pos.top, node_label);
             }
             canvasState.addShape(shape);
             canvasState.detectCollisions(shape, 0);// Second arg: Upon collision, move new shape 0% and move existing objects 100%
@@ -221,7 +223,8 @@ $(function() {
         }
     };
     var migrateConnectors = function(from_node, to_node) {
-        if (!(from_node instanceof MethodNode && to_node instanceof MethodNode)) {
+        if (!(from_node instanceof drydock_objects.MethodNode &&
+                to_node instanceof drydock_objects.MethodNode)) {
             return false;
         }
         var idx, new_xput, old_xput, connector, i;
@@ -275,7 +278,7 @@ $(function() {
 
             if (document.getElementById('id_method_button').value == 'Add Method') {
                 // create new MethodNode
-                canvasState.addShape(new MethodNode(
+                canvasState.addShape(new drydock_objects.MethodNode(
                     mid, 
                     method_family.val(), 
                     pos.left, pos.top,
@@ -290,7 +293,7 @@ $(function() {
 
                 // draw new node over old node
                 var old_node = canvasState.selection[0],
-                    new_node = new MethodNode(
+                    new_node = new drydock_objects.MethodNode(
                         mid, 
                         method_family.val(), 
                         old_node.x, old_node.y,
@@ -430,7 +433,7 @@ $(function() {
             if (action == 'edit' && sel.length == 1) {
                 sel = sel[0];
                 
-                if (sel instanceof MethodNode) {
+                if (sel instanceof drydock_objects.MethodNode) {
                     /*
                         Open the edit dialog (rename, method selection, colour picker...)
                     */
@@ -457,7 +460,7 @@ $(function() {
                         $('#id_method_name').val_(sel.label).select();
                     });
                 }
-                else if (sel.constructor == OutputNode) {
+                else if (sel instanceof drydock_objects.OutputNode) {
                     /*
                         Open the renaming dialog
                     */
@@ -477,22 +480,22 @@ $(function() {
             }
             if (action == 'display') {
                 sel = sel[0];
-                if(sel instanceof OutputNode)
+                if(sel instanceof drydock_objects.OutputNode)
                     window.location = '/dataset_view/' + sel.dataset_id + '?rtp_id=' + sel.rtp_id;
             }
             if (action == 'download') {
                 sel = sel[0];
-                if(sel instanceof OutputNode)
+                if(sel instanceof drydock_objects.OutputNode)
                     window.location = '/dataset_download/' + sel.dataset_id;
             }
             if (action == 'viewlog') {
                 sel = sel[0];
-                if(sel instanceof MethodNode)
+                if(sel instanceof drydock_objects.MethodNode)
                     window.location = '/stdout_view/' + sel.log_id + '?rtp_id=' + sel.rtp_id;
             }
             if (action == 'viewerrorlog') {
                 sel = sel[0];
-                if(sel instanceof MethodNode)
+                if(sel instanceof drydock_objects.MethodNode)
                     window.location = '/stderr_view/' + sel.log_id + '?rtp_id=' + sel.rtp_id;
             }
         }
@@ -527,7 +530,7 @@ $(function() {
         // check graph integrity
         for (i = 0; i < shapes.length; i++) {
             this_shape = shapes[i];
-            if (this_shape instanceof MethodNode) {
+            if (this_shape instanceof drydock_objects.MethodNode) {
                 method_nodes.push(this_shape);
 
                 // at least one out-magnet must be occupied
@@ -542,7 +545,7 @@ $(function() {
                     return;
                 }
             }
-            else if (this_shape instanceof OutputNode) {
+            else if (this_shape instanceof drydock_objects.OutputNode) {
                 pipeline_outputs.push(this_shape);
 
                 // no need to check for connected magnets - all output nodes have
@@ -628,7 +631,7 @@ $(function() {
         for (i = 0; i < pipeline_inputs.length; i++) {
             this_input = pipeline_inputs[i];
             form_data.pipeline_inputs[i] = {
-                CDT_pk: (this_input instanceof CDtNode) ? this_input.pk : null,
+                CDT_pk: (this_input instanceof drydock_objects.CdtNode) ? this_input.pk : null,
                 dataset_name: this_input.label,
                 dataset_idx: i + 1,
                 x: this_input.x / canvas.width,
@@ -678,7 +681,10 @@ $(function() {
                     //'source_pk': this_source.constructor === RawNode ? '' : this_source.pk,
                     source_dataset_name: this_connector.source.label,
                     dest_dataset_name: this_connector.dest.label,
-                    source_step: this_source instanceof MethodNode ? sorted_elements.indexOf(this_source)+1 : 0,
+                    source_step: (
+                            this_source instanceof drydock_objects.MethodNode ?
+                            sorted_elements.indexOf(this_source)+1 :
+                            0),
                     keep_output: false, // in the future this can be more flexible
                     wires: [] // no wires for a raw cable
                 };

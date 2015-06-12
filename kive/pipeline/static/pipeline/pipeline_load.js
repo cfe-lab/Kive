@@ -53,7 +53,8 @@ var pipeline = (function(exports){
 
         // Mark all the inputs as complete
         $.each(self.canvasState.shapes, function(_, shape){
-            if(shape instanceof RawNode || shape instanceof CDtNode)
+            if(shape instanceof drydock_objects.RawNode ||
+                    shape instanceof drydock_objects.CdtNode)
                 shape.status = 'CLEAR';
         });
 
@@ -61,7 +62,7 @@ var pipeline = (function(exports){
         $.each(runstat.step_progress, function(method_pk, step){
             var shape = self.canvasState.findMethodNode(parseInt(method_pk));
 
-            if(shape instanceof MethodNode) {
+            if(shape instanceof drydock_objects.MethodNode) {
                 shape.status = step.status;
                 shape.log_id = step.log_id;
                 shape.rtp_id = step.rtp_id;
@@ -72,7 +73,7 @@ var pipeline = (function(exports){
         $.each(runstat.output_progress, function(output_pk, output) {
             var shape = self.canvasState.findOutputNode(parseInt(output_pk));
 
-            if(shape instanceof OutputNode) {
+            if(shape instanceof drydock_objects.OutputNode) {
                 shape.status = output.status;
                 shape.dataset_id = output.dataset_id;
                 shape.md5 = output.md5;
@@ -117,13 +118,13 @@ var pipeline = (function(exports){
 
             // Node has no structure => no CDT, so it's raw
             if(node.structure === null)
-                self.canvasState.addShape(new RawNode(
+                self.canvasState.addShape(new drydock_objects.RawNode(
                     node.x * canvas_x_ratio,
                     node.y * canvas_y_ratio,
                     node.dataset_name
                 ));
             else
-                self.canvasState.addShape(new CDtNode(
+                self.canvasState.addShape(new drydock_objects.CdtNode(
                     node.structure.compounddatatype,
                     node.x * canvas_x_ratio,
                     node.y * canvas_y_ratio,
@@ -172,7 +173,7 @@ var pipeline = (function(exports){
             for(var i = 0; i < output_lst.length; i++) outputs[String(output_lst[i].idx)] = output_lst[i];
             // END DIRTY HACK
 
-            var method_node = new MethodNode(
+            var method_node = new drydock_objects.MethodNode(
                     node.transformation,
                     node.transformation_family,
                     node.x * canvas_x_ratio,
@@ -199,7 +200,7 @@ var pipeline = (function(exports){
                     // Find the source for this
                     $.each(self.canvasState.shapes, function(_, shape) {
                         // TODO: Check that this is correct, shouldn't we be using PKs?
-                        if(!(shape instanceof MethodNode) && shape.label === cable.source_dataset_name) {
+                        if(!(shape instanceof drydock_objects.MethodNode) && shape.label === cable.source_dataset_name) {
                             source = shape;
                             return false; // break
                         }
@@ -212,7 +213,7 @@ var pipeline = (function(exports){
                     }
 
                     // data nodes only have one out-magnet, so use 0-index
-                    connector = new Connector(source.out_magnets[0]);
+                    connector = new drydock_objects.Connector(source.out_magnets[0]);
 
                     // connect other end of cable to the MethodNode
                     magnet = method_node.in_magnets[cable_idx];
@@ -233,7 +234,7 @@ var pipeline = (function(exports){
                     $.each(source.out_magnets, function(j, magnet){
 
                         if(magnet.label === cable.source_dataset_name) {
-                            connector = new Connector(magnet);
+                            connector = new drydock_objects.Connector(magnet);
                             magnet = method_node.in_magnets[cable_idx];
                             connector.x = magnet.x;
                             connector.y = magnet.y;
@@ -267,9 +268,9 @@ var pipeline = (function(exports){
             // Over each out magnet for that source
             $.each(source.out_magnets, function(j, magnet) {
                 if(magnet.label === this_output.source_dataset_name) {
-                    var connector = new Connector(magnet),
+                    var connector = new drydock_objects.Connector(magnet),
                         output = self.pipeline.outputs[this_output.output_idx - 1],
-                        output_node = new OutputNode(
+                        output_node = new drydock_objects.OutputNode(
                             output.x * canvas_x_ratio,
                             output.y * canvas_y_ratio,
                             this_output.output_name,
