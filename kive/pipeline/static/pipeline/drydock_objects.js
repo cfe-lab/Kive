@@ -369,7 +369,7 @@ var drydock_objects = (function() {
         this.offset = 15;
         this.label = label || '';
         this.in_magnets = [];
-        this.out_magnets = [ new Magnet(this, 5, 2, "white", this.pk, this.label, null, true) ];
+        this.out_magnets = [ new Magnet(this, 5, 2, "white", this.pk, this.label, null, true, pk) ];
     };
     
     my.CdtNode.prototype.draw = function(ctx) {
@@ -492,6 +492,8 @@ var drydock_objects = (function() {
      *  keys in statusColorMap
      */
     my.MethodNode = function(pk, family, x, y, fill, label, inputs, outputs, status) {
+        var self = this;
+
         this.pk = pk;
         this.family = family; // can be passed from database
     
@@ -516,65 +518,52 @@ var drydock_objects = (function() {
         
         this.stack = 20;
         this.scoop = 45;
-    
+
+        this.in_magnets = [];
+        this.out_magnets = [];
+
+
         // Members for instances of methods in runs
         this.status = status;
-    
-        this.in_magnets = [];
-        var sorted_in_keys = Object.keys(this.inputs).sort(function(a,b){return a-b;}),
-            parent = this,
-            r = 5,
-            attract = 5,
-            magnet_fill = '#fff',
-            key,
-            cdt,
-            magnet_label,
-            magnet;
-        for (var keyIndex in sorted_in_keys) {
-            key = sorted_in_keys[keyIndex];
-            var this_input = this.inputs[key];
-            cdt = this_input.cdt_pk;
-            magnet_label = this_input.datasetname;
-            magnet = new Magnet(
-                parent,
-                r,
-                attract,
-                magnet_fill,
-                cdt,
-                magnet_label,
-                null,
-                false);
-    
-            if (this.n_inputs == 1) {
+
+        // Sort the inputs by index
+        var sorted_inputs = this.inputs.sort(function(a,b){ return a.dataset_idx - b.dataset_idx}),
+            sorted_outputs = this.outputs.sort(function(a,b){ return a.dataset_idx - b.dataset_idx}),
+            r = 5, // Default radius
+            attract = 5, // Default attraction radius?
+            magnet_fill = '#fff'; // Default fill
+
+        $.each(sorted_inputs, function(_, input) {
+            var cdt_pk = null,
+                magnet = null;
+
+            if (input.structure != null)
+                cdt_pk = input.structure.compounddatatype;
+
+            magnet = new Magnet(this, r, attract, magnet_fill, cdt_pk, input.dataset_name, null, false);
+
+            // Fudge the magnet position around, I guess?
+            if (self.n_inputs == 1)
                 magnet.x -= this.h/3;
-            }
-    
-            this.in_magnets.push(magnet);
-        }
-    
-        this.out_magnets = [];
-        var sorted_out_keys = Object.keys(outputs).sort(function(a,b){return a-b;});
-        for (keyIndex in sorted_out_keys) {
-            key = sorted_out_keys[keyIndex];
-            var this_output = this.outputs[key];
-            cdt = this_output.cdt_pk;
-            magnet_label = this_output.datasetname;
-            magnet = new Magnet(
-                parent,
-                r,
-                attract,
-                magnet_fill,
-                cdt,
-                magnet_label,
-                null,
-                true);
-    
-            if (this.n_inputs == 1) {
+
+            self.in_magnets.push(magnet);
+        });
+
+        $.each(sorted_outputs, function(_, output) {
+            var cdt_pk = null,
+                magnet = null;
+
+            if (output.structure != null)
+                cdt_pk = output.structure.compounddatatype;
+
+            magnet = new Magnet(this, r, attract, magnet_fill, cdt_pk, output.dataset_name, null, false);
+
+            // Fudge the magnet position around, I guess?
+            if (self.n_inputs == 1)
                 magnet.x += this.h/3;
-            }
-    
-            this.out_magnets.push(magnet);
-        }
+
+            self.out_magnets.push(magnet);
+        });
     };
     
     my.MethodNode.prototype.buildBodyPath = function(ctx) {
@@ -785,7 +774,7 @@ var drydock_objects = (function() {
         return new NodeLabel(this.label, this.x + this.dx + this.scoop/4, this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset);
     };
     
-    my.Magnet = function(parent, r, attract, fill, cdt, label, offset, isOutput) {
+    my.Magnet = function(parent, r, attract, fill, cdt, label, offset, isOutput, pk) {
         /*
         CONSTRUCTOR
         A Magnet is the attachment point for a Node (shape) given a
@@ -803,6 +792,7 @@ var drydock_objects = (function() {
         this.offset = offset || 5;
         this.isOutput = isOutput || false;
         this.isInput = !this.isOutput;
+        this.pk = pk || null;
         this.connected = [];  // hold references to Connectors
         this.acceptingConnector = false; // true if a connector is being dragged
     };
@@ -1218,7 +1208,7 @@ var drydock_objects = (function() {
         this.fill = this.defaultFill = "#d40";
         this.diffFill = "blue";
         this.inset = 12; // distance of magnet from center
-        this.in_magnets.push(new Magnet(this, 5, 2, "white", null, this.label));
+        this.in_magnets.push(new Magnet(this, 5, 2, "white", null, this.label, pk));
         this.pk = pk;
         this.status = status;
         this.md5 = md5;

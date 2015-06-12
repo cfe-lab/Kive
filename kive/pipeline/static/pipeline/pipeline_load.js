@@ -283,7 +283,7 @@ var pipeline = (function(exports){
             }
         });
 
-        // Invalidate to force redraw
+        // Invalidate and force redraw
         self.canvasState.valid = false;
         self.canvasState.draw();
     };
@@ -294,10 +294,8 @@ var pipeline = (function(exports){
          */
 
         this.canvasState.testExecutionOrder();
-
         for (var i = 0; i < this.canvasState.shapes.length; i++)
           this.canvasState.detectCollisions(this.canvasState.shapes[i], 0.5);
-
         this.canvasState.draw();
     };
 
@@ -347,32 +345,6 @@ var pipeline = (function(exports){
 
         // Over each pipeline step
         $.each(self.pipeline.steps, function(_, node) {
-
-            // START DIRTY HACK
-            // Eventually the structure changes will be propogated into
-            // MethodNode, but until then, the data are reformed to fit into the
-            // old structure
-            var inputs = {}, outputs = {};
-            var input_lst = $.map(node.inputs, function(input){
-                return {
-                    datasetname: input.dataset_name,
-                    cdt_pk: input.structure !== null ? input.structure.compounddatatype : null,
-                    idx: input.dataset_idx
-                };
-            });
-
-            var output_lst = $.map(node.outputs, function(output){
-                return {
-                    datasetname: output.dataset_name,
-                    cdt_pk: output.structure !== null ? output.structure.compounddatatype : null,
-                    idx: output.dataset_idx
-                };
-            });
-
-            for(var i = 0; i < input_lst.length; i++) inputs[String(input_lst[i].idx)] = input_lst[i];
-            for(var i = 0; i < output_lst.length; i++) outputs[String(output_lst[i].idx)] = output_lst[i];
-            // END DIRTY HACK
-
             var method_node = new MethodNode(
                     node.transformation,
                     node.transformation_family,
@@ -380,8 +352,8 @@ var pipeline = (function(exports){
                     node.y * canvas_y_ratio,
                     null, // fill
                     node.name,
-                    inputs,
-                    outputs
+                    node.inputs,
+                    node.outputs
             );
 
             // Add `n draw
@@ -399,7 +371,6 @@ var pipeline = (function(exports){
 
                     // Find the source for this
                     $.each(self.canvasState.shapes, function(_, shape) {
-                        // TODO: Check that this is correct, shouldn't we be using PKs?
                         if(!(shape instanceof MethodNode) && shape.label === cable.source_dataset_name) {
                             source = shape;
                             return false; // break
