@@ -101,9 +101,9 @@ class CustomConstraintTests(TestCase):
         """
         coderev = tools.make_first_revision(name, desc, "{}.sh".format(name), script, self.user_oscar)
         method = tools.make_first_method(name, desc, coderev, self.user_oscar)
-        tools.simple_method_io(method, cdt, "in data", "out data")
+        tools.simple_method_io(method, cdt, "in_data", "out_data")
         pipeline = tools.make_first_pipeline(name, desc, self.user_oscar)
-        tools.create_linear_pipeline(pipeline, [method], "in data", "out data")
+        tools.create_linear_pipeline(pipeline, [method], "in_data", "out_data")
         pipeline.create_outputs()
         return pipeline
 

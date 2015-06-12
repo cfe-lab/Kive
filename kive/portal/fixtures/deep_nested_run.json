@@ -4627,7 +4627,7 @@
         "fields": {
             "dataset_idx": 1, 
             "transformation": 8, 
-            "dataset_name": "same raw"
+            "dataset_name": "same_raw"
         }, 
         "model": "transformation.transformationoutput", 
         "pk": 25

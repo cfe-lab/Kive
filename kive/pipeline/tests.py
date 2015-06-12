@@ -2810,7 +2810,7 @@ class RawOutputCableTests(PipelineTestCase):
         )
         unrelated_method.save()
         unrelated_method.clean()
-        unrelated_raw_output = unrelated_method.create_output(dataset_name="unrelated raw output",dataset_idx=1)
+        unrelated_raw_output = unrelated_method.create_output(dataset_name="unrelated_raw_output",dataset_idx=1)
 
         # Define 1-step pipeline with a single raw pipeline input
         self.pipeline_1 = self.test_PF.members.create(revision_name="v1", revision_desc="First version",
@@ -5634,6 +5634,8 @@ class PipelineSerializerTests(TestCase):
         self.string_singlet.grant_everyone_access()
 
         # Here is a dictionary that can be deserialized into a Pipeline.
+        self.noop_input_name = self.method_noop.inputs.first().dataset_name
+        self.noop_output_name = self.method_noop.outputs.first().dataset_name
         self.pipeline_dict = {
             "family": "test",
             "revision_name": "v1",
@@ -5670,7 +5672,7 @@ class PipelineSerializerTests(TestCase):
                             # it by name.
                             "source_dataset_name": "input_to_not_touch",
                             "source_step": 0,
-                            "dest": self.method_noop.inputs.first().pk,
+                            "dest_dataset_name": self.noop_input_name,
                             "custom_wires": [],
                             "keep_output": False
                         }
@@ -5686,9 +5688,9 @@ class PipelineSerializerTests(TestCase):
                     "cables_in": [
                         {
                             # Here we can specify source directly.
-                            "source": self.method_noop.outputs.first().pk,
+                            "source_dataset_name": self.noop_output_name,
                             "source_step": 1,
-                            "dest": self.method_noop.inputs.first().pk,
+                            "dest_dataset_name": self.noop_input_name,
                             "custom_wires": [],
                             "keep_output": False
                         }
@@ -5703,9 +5705,9 @@ class PipelineSerializerTests(TestCase):
                     "name": "step 3",
                     "cables_in": [
                         {
-                            "source": self.method_noop.outputs.first().pk,
+                            "source_dataset_name": self.noop_output_name,
                             "source_step": 2,
-                            "dest": self.method_noop.inputs.first().pk,
+                            "dest_dataset_name": self.noop_input_name,
                             "custom_wires": [],
                             "keep_output": False
                         }
@@ -5719,7 +5721,7 @@ class PipelineSerializerTests(TestCase):
                     "output_name": "untouched_output",
                     "output_cdt": self.cdt_string.pk,
                     "source_step": 3,
-                    "source": self.method_noop.outputs.first().pk,
+                    "source_dataset_name": self.noop_output_name,
                     "x": 0.85,
                     "y": 0.5,
                     "custom_wires": []
@@ -5733,7 +5735,14 @@ class PipelineSerializerTests(TestCase):
             self.coderev_noop,
             self.user_bob)
         self.method_doublet_noop.grant_everyone_access()
-        tools.simple_method_io(self.method_doublet_noop, self.string_doublet, "doublets", "untouched_doublets")
+        self.doublet_input_name = "doublets"
+        self.doublet_output_name = "untouched_doublets"
+        tools.simple_method_io(
+            self.method_doublet_noop,
+            self.string_doublet,
+            self.doublet_input_name,
+            self.doublet_output_name
+        )
 
         # This defines a pipeline with custom wiring..
         self.pipeline_cw_dict = {
@@ -5772,7 +5781,7 @@ class PipelineSerializerTests(TestCase):
                             # it by name.
                             "source_dataset_name": "input_to_not_touch",
                             "source_step": 0,
-                            "dest": self.method_doublet_noop.inputs.first().pk,
+                            "dest_dataset_name": self.doublet_input_name,
                             "custom_wires": [
                                 {
                                     "source_pin": self.cdt_string.members.first().pk,
@@ -5797,9 +5806,9 @@ class PipelineSerializerTests(TestCase):
                     "cables_in": [
                         {
                             # Here we can specify source directly.
-                            "source": self.method_doublet_noop.outputs.first().pk,
+                            "source_dataset_name": self.doublet_output_name,
                             "source_step": 1,
-                            "dest": self.method_noop.inputs.first().pk,
+                            "dest_dataset_name": self.doublet_input_name,
                             "custom_wires": [
                                 {
                                     "source_pin": self.string_doublet.members.get(column_idx=1).pk,
@@ -5818,7 +5827,7 @@ class PipelineSerializerTests(TestCase):
                     "output_name": "untouched_output",
                     "output_cdt": self.string_doublet.pk,
                     "source_step": 3,
-                    "source": self.method_noop.outputs.first().pk,
+                    "source_dataset_name": self.doublet_output_name,
                     "x": 0.85,
                     "y": 0.5,
                     "custom_wires": [
@@ -5835,7 +5844,9 @@ class PipelineSerializerTests(TestCase):
             ]
         }
 
-        # This defines a pipeline with custom wiring..
+        # This defines a pipeline that handles raw data.
+        self.raw_input_name = self.method_noop_raw.inputs.first().dataset_name
+        self.raw_output_name = self.method_noop_raw.outputs.first().dataset_name
         self.pipeline_raw_dict = {
             "family": "test",
             "revision_name": "v3_raw",
@@ -5867,7 +5878,7 @@ class PipelineSerializerTests(TestCase):
                             # it by name.
                             "source_dataset_name": "input_to_not_touch",
                             "source_step": 0,
-                            "dest": self.method_noop_raw.inputs.first().pk,
+                            "dest_dataset_name": self.raw_input_name,
                             "keep_output": False
                         }
                     ],
@@ -5882,9 +5893,9 @@ class PipelineSerializerTests(TestCase):
                     "cables_in": [
                         {
                             # Here we can specify source directly.
-                            "source": self.method_noop_raw.outputs.first().pk,
+                            "source_dataset_name": self.raw_output_name,
                             "source_step": 1,
-                            "dest": self.method_noop_raw.inputs.first().pk,
+                            "dest_dataset_name": self.raw_input_name,
                             "keep_output": False
                         }
                     ],
@@ -5896,7 +5907,7 @@ class PipelineSerializerTests(TestCase):
                     "output_idx": 1,
                     "output_name": "untouched_output",
                     "source_step": 3,
-                    "source": self.method_noop_raw.outputs.first().pk,
+                    "source_dataset_name": self.raw_output_name,
                     "x": 0.85,
                     "y": 0.5
                 }
@@ -5905,36 +5916,25 @@ class PipelineSerializerTests(TestCase):
 
     def test_validate(self):
         ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)
+        ps.is_valid()
         self.assertTrue(ps.is_valid())
 
-    def test_validate_source_not_specified(self):
+    def test_validate_dest_bad_name(self):
         """
-        A PSIC with no source specified and no source_dataset_name specified should fail to deserialize.
+        A PSIC with a destination that has a bad name should fail.
         """
-        # We tamper with the first step's input cable.
-        sds = self.pipeline_dict["steps"][0]["cables_in"][0].pop("source_dataset_name")
+        incorrect_name = "foo"
+        self.pipeline_dict["steps"][0]["cables_in"][0]["dest_dataset_name"] = incorrect_name
         ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)
         self.assertFalse(ps.is_valid())
         self.assertEquals(
-            ps.errors["steps"][0]["cables_in"][0]["non_field_errors"][0],
-            "Either a explicit source TransformationXput or the name of one must be specified"
+            ps.errors["steps"][0]["non_field_errors"][0],
+            'Step {} has no input named "{}"'.format(1, incorrect_name)
         )
 
-        # Correct the dictionary.
-        self.pipeline_dict["steps"][0]["cables_in"][0]["source_dataset_name"] = sds
-
-        # Break another cable that is specified by source directly.
-        self.pipeline_dict["steps"][1]["cables_in"][0].pop("source")
-        ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)
-        self.assertFalse(ps.is_valid())
-        self.assertEquals(
-            ps.errors["steps"][1]["cables_in"][0]["non_field_errors"][0],
-            "Either a explicit source TransformationXput or the name of one must be specified"
-        )
-
-    def test_validate_source_ill_specified(self):
+    def test_validate_pipeline_input_source_bad_name(self):
         """
-        A PSIC with source specified by name that has that name ill-specified should fail.
+        A PSIC with a Pipeline input source that has a bad name should fail.
         """
         incorrect_name = "foo"
         self.pipeline_dict["steps"][0]["cables_in"][0]["source_dataset_name"] = incorrect_name
@@ -5942,7 +5942,34 @@ class PipelineSerializerTests(TestCase):
         self.assertFalse(ps.is_valid())
         self.assertEquals(
             ps.errors["non_field_errors"][0],
-            "Cable input with name {} does not exist".format(incorrect_name)
+            'Cable input with name "{}" does not exist'.format(incorrect_name)
+        )
+
+    def test_validate_step_output_source_bad_name(self):
+        """
+        A PSIC with a step output source that has a bad name should fail.
+        """
+        incorrect_name = "foo"
+        self.pipeline_dict["steps"][1]["cables_in"][0]["source_dataset_name"] = incorrect_name
+        ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)
+        self.assertFalse(ps.is_valid())
+        print(ps.errors)
+        self.assertEquals(
+            ps.errors["non_field_errors"][0],
+            'Step {} has no output named "{}"'.format(0, incorrect_name)
+        )
+
+    def test_validate_step_output_source_bad_source_step(self):
+        """
+        A PSIC with a step output source that has a bad step number should fail.
+        """
+        bad_step_num = 100
+        self.pipeline_dict["steps"][1]["cables_in"][0]["source_step"] = bad_step_num
+        ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)
+        self.assertFalse(ps.is_valid())
+        self.assertEquals(
+            ps.errors["non_field_errors"][0],
+            "Step {} does not exist".format(bad_step_num)
         )
 
     def test_validate_custom_wires(self):

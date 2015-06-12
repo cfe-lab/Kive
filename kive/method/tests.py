@@ -494,7 +494,7 @@ def create_method_test_environment(case):
     case.script_4_1_M.grant_everyone_access()
 
     case.script_4_1_M.create_input(compounddatatype=case.triplet_cdt,
-        dataset_name="s4 input", dataset_idx = 1)
+        dataset_name="s4_input", dataset_idx = 1)
     case.script_4_1_M.full_clean()
 
     # A shorter alias
@@ -527,7 +527,7 @@ def create_method_test_environment(case):
         revision_name = "1", revision_desc = "first version",
         user=case.myUser)
     case.noop_method.save()
-    case.noop_method.create_input(compounddatatype=string_cdt, dataset_name = "noop data", dataset_idx=1)
+    case.noop_method.create_input(compounddatatype=string_cdt, dataset_name = "noop_data", dataset_idx=1)
     case.noop_method.grant_everyone_access()
     case.noop_method.full_clean()
 

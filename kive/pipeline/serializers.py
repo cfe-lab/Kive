@@ -28,8 +28,13 @@ class CustomCableWireSerializer(serializers.ModelSerializer):
 
 class PipelineStepInputCableSerializer(serializers.ModelSerializer):
 
-    source_dataset_name = serializers.CharField(source="source.definite.dataset_name", read_only=True, required=False)
-    dest_dataset_name = serializers.CharField(source="dest.definite.dataset_name", read_only=True)
+    # FIXME when deserializing, is_valid() puts source_dataset_name and dest_dataset_name into
+    # a place that is sensible but doesn't appear in the documentation.
+    # If the resulting dictionary is d, they appear in
+    # d["source"|"dest"]["definite"]["dataset_name"].
+    # We'll go with it for now but this may need to be fixed if they change it in the future.
+    source_dataset_name = serializers.CharField(source="source.definite.dataset_name", required=True)
+    dest_dataset_name = serializers.CharField(source="dest.definite.dataset_name", required=True)
     custom_wires = CustomCableWireSerializer(many=True, allow_null=True, required=False)
 
     class Meta:
@@ -43,16 +48,7 @@ class PipelineStepInputCableSerializer(serializers.ModelSerializer):
             "custom_wires",
             "keep_output"
         )
-        extra_kwargs = {
-            "source": {"required": False}
-        }
-
-    def validate(self, data):
-        if "source" not in data and "source_dataset_name" not in data:
-            raise serializers.ValidationError(
-                "Either a explicit source TransformationXput or the name of one must be specified"
-            )
-        return data
+        read_only_fields = ("source", "dest")
 
 
 class PipelineStepSerializer(serializers.ModelSerializer):
@@ -61,7 +57,7 @@ class PipelineStepSerializer(serializers.ModelSerializer):
         source="transformation.definite.family.pk",
         read_only=True
     )
-    inputs = TransformationInputSerializer(many=True)
+    inputs = TransformationInputSerializer(many=True, read_only=True)
     outputs = TransformationOutputSerializer(many=True, read_only=True)
 
     class Meta:
@@ -79,14 +75,30 @@ class PipelineStepSerializer(serializers.ModelSerializer):
             "inputs"
         )
 
+    def validate(self, data):
+        """
+        Check that the cables point to actual inputs of this PipelineStep.
+        """
+        for cable_data in data["cables_in"]:
+            # FIXME this is a workaround for weird deserialization behaviour.
+            curr_dest_name = cable_data["dest"]["definite"]["dataset_name"]
+            curr_transf = data["transformation"].definite
+            if not curr_transf.inputs.filter(dataset_name=curr_dest_name).exists():
+                raise serializers.ValidationError(
+                    'Step {} has no input named "{}"'.format(data["step_num"],
+                                                             curr_dest_name)
+                )
+
+        return data
+
 
 class PipelineOutputCableSerializer(serializers.ModelSerializer):
 
-    source_dataset_name = serializers.CharField(source="source.dataset_name", read_only=True)
+    source_dataset_name = serializers.CharField(source="source.dataset_name", required=True)
     custom_wires = CustomCableWireSerializer(many=True, allow_null=True, required=False)
 
-    x = serializers.FloatField(read_only=True)
-    y = serializers.FloatField(read_only=True)
+    x = serializers.FloatField(write_only=True)
+    y = serializers.FloatField(write_only=True)
 
     class Meta:
         model = PipelineOutputCable
@@ -102,6 +114,7 @@ class PipelineOutputCableSerializer(serializers.ModelSerializer):
             "source_dataset_name",
             "custom_wires"
         )
+        read_only_fields = ("source",)
 
 
 # This is analogous to CRRevisionNumberGetter.
@@ -119,6 +132,50 @@ class PipelineRevisionNumberGetter(object):
 
     def __call__(self):
         return self.pipelinefamily.num_revisions + 1
+
+
+def _non_pipeline_input_cable_validate_helper(step_num, dataset_name, step_data_dicts):
+    """
+    Helper that validates that cables are properly fed.
+
+    PRE: each dictionary in step_data_dicts is valid in the sense of the validated_data coming
+    from a PipelineStepSerializer.
+    """
+    found = False
+    for specified_step_data in step_data_dicts:
+        if specified_step_data["step_num"] == step_num:
+            found = True
+            break
+
+    if not found:
+        raise serializers.ValidationError(
+            "Step {} does not exist".format(step_num)
+        )
+
+    # By this point we know specified_step_data["transformation"]
+    # is well-defined.
+    step_transf = specified_step_data["transformation"].definite
+    if not step_transf.outputs.filter(dataset_name=dataset_name).exists():
+        raise serializers.ValidationError(
+            'Step {} has no output named "{}"'.format(step_num,
+                                                      dataset_name)
+        )
+
+
+def _source_transf_finder(step_num, dataset_name, step_data_dicts):
+    """
+    Get the specified input of a PipelineStep.
+
+    PRE: each step in steps is valid.
+    """
+    # This has been validated so we can be sure that the source step
+    # is well-specified.
+    for specified_step_data in step_data_dicts:
+        if specified_step_data["step_num"] == step_num:
+            break
+
+    curr_transf = specified_step_data["transformation"].definite
+    return curr_transf.inputs.get(dataset_name=dataset_name)
 
 
 class PipelineSerializer(AccessControlSerializer,
@@ -184,17 +241,41 @@ class PipelineSerializer(AccessControlSerializer,
 
     def validate(self, data):
         """
-        Check that input cables fed by Pipeline inputs are properly specified.
+        Check that cables in the Pipeline are properly specified.
         """
         input_names = [x["dataset_name"] for x in data["inputs"]]
+
         for step_data in data["steps"]:
             for cable_data in step_data["cables_in"]:
-                if cable_data["source_step"] == 0:
-                    specified_name = cable_data["source_dataset_name"]
-                    if specified_name not in input_names:
+                curr_source_step = cable_data["source_step"]
+                # FIXME this is a workaround for weird deserialization behaviour.
+                curr_source_dataset_name = cable_data["source"]["definite"]["dataset_name"]
+
+                if curr_source_step == 0:
+                    if curr_source_dataset_name not in input_names:
                         raise serializers.ValidationError(
-                            "Cable input with name {} does not exist".format(specified_name)
+                            'Cable input with name "{}" does not exist'.format(curr_source_dataset_name)
                         )
+
+                else:
+                    _non_pipeline_input_cable_validate_helper(
+                        curr_source_step, curr_source_dataset_name, data["steps"]
+                    )
+
+        for outcable_data in data["outcables"]:
+            curr_source_step = outcable_data["source_step"]
+            # FIXME this is a workaround for weird deserialization behaviour.
+            curr_source_dataset_name = outcable_data["source"]["dataset_name"]
+
+            if curr_source_step == 0:
+                raise serializers.ValidationError(
+                    "Output cable cannot be fed by a Pipeline input"
+                )
+
+            else:
+                _non_pipeline_input_cable_validate_helper(curr_source_step,
+                                                          curr_source_dataset_name,
+                                                          data["steps"])
 
         return data
 
@@ -243,14 +324,12 @@ class PipelineSerializer(AccessControlSerializer,
             for cable_data in cables:
                 custom_wires = cable_data.pop("custom_wires") if "custom_wires" in cable_data else []
 
-                # If source is specified, we ignore source_dataset_name.
-                # Otherwise we parse it.
-                if "source" in cable_data:
-                    source = cable_data.pop("source")
-                else:
-                    source_dataset_name = cable_data.pop("source_dataset_name")
-                    source = pipeline.inputs.get(dataset_name=source_dataset_name)
+                # FIXME this is a workaround for weird deserialization behaviour.
+                source_definite_dataset_name = cable_data.pop("source")
+                source_dataset_name = source_definite_dataset_name["definite"]["dataset_name"]
 
+                source = _source_transf_finder(cable_data.pop("source_step"),
+                                               source_dataset_name, steps)
                 curr_cable = curr_step.cables_in.create(source=source, **cable_data)
 
                 for wire_data in custom_wires:
@@ -261,11 +340,16 @@ class PipelineSerializer(AccessControlSerializer,
             custom_wires = outcable_data.pop("custom_wires") if "custom_wires" in outcable_data else []
             x = outcable_data.pop("x")
             y = outcable_data.pop("y")
-            curr_outcable = pipeline.outcables.create(**outcable_data)
 
+            # FIXME this is a workaround for weird deserialization behaviour.
+            source_definite_dataset_name = outcable_data.pop("source")
+            source_dataset_name = source_definite_dataset_name["definite"]["dataset_name"]
+
+            source = _source_transf_finder(outcable_data.pop("source_step"),
+                                           source_dataset_name)
+            curr_outcable = pipeline.outcables.create(source, **outcable_data)
             for wire_data in custom_wires:
                 curr_outcable.custom_wires.create(**wire_data)
-
             curr_outcable.create_output(x=x, y=y)
 
         return pipeline

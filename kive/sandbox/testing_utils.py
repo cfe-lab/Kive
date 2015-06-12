@@ -69,7 +69,7 @@ def create_sandbox_testing_tools_environment(case):
                                              case.user_bob)
     case.method_noop_raw.family.grant_everyone_access()
     case.method_noop_raw.grant_everyone_access()
-    simple_method_io(case.method_noop_raw, None, "raw", "same raw")
+    simple_method_io(case.method_noop_raw, None, "raw", "same_raw")
 
 
 def destroy_sandbox_testing_tools_environment(case):
@@ -140,13 +140,13 @@ def create_sequence_manipulation_environment(case):
     # the "complement" method into the "complement" pipeline, creates
     # the pipeline's input and output, and connects them to the inputs and
     # output of the method.
-    create_linear_pipeline(case.pipeline_complement, [case.method_complement], "lab data",
-                           "complemented lab data")
+    create_linear_pipeline(case.pipeline_complement, [case.method_complement], "lab_data",
+                           "complemented_lab_data")
     case.pipeline_complement.create_outputs()
-    create_linear_pipeline(case.pipeline_reverse, [case.method_reverse], "lab data", "reversed lab data")
+    create_linear_pipeline(case.pipeline_reverse, [case.method_reverse], "lab_data", "reversed_lab_data")
     case.pipeline_reverse.create_outputs()
-    create_linear_pipeline(case.pipeline_revcomp, [case.method_reverse, case.method_complement], "lab data",
-                           "reverse and complemented lab data")
+    create_linear_pipeline(case.pipeline_revcomp, [case.method_reverse, case.method_complement], "lab_data",
+                           "reverse_and_complemented_lab_data")
     case.pipeline_revcomp.create_outputs()
 
     # Here is some data which is sitting on Alice's hard drive.
@@ -173,8 +173,8 @@ def create_sequence_manipulation_environment(case):
     case.pipeline_complement_v2 = Pipeline(family=case.pipeline_complement.family, revision_name="2",
                                            revision_desc="second version", user=case.user_alice)
     case.pipeline_complement_v2.save()
-    create_linear_pipeline(case.pipeline_complement_v2, [case.method_complement], "lab data",
-                                "complemented lab data")
+    create_linear_pipeline(case.pipeline_complement_v2, [case.method_complement], "lab_data",
+                                "complemented_lab_data")
     case.pipeline_complement_v2.steps.last().add_deletion(case.method_complement.outputs.first())
     case.pipeline_complement_v2.outcables.first().delete()
     case.pipeline_complement_v2.create_outputs()
@@ -185,7 +185,7 @@ def create_sequence_manipulation_environment(case):
                                         revision_desc="second version", user=case.user_alice)
     case.pipeline_revcomp_v2.save()
     create_linear_pipeline(case.pipeline_revcomp_v2, [case.method_reverse, case.method_complement],
-                                 "lab data", "revcomped lab data")
+                                 "lab_data", "revcomped_lab_data")
     case.pipeline_revcomp_v2.steps.get(step_num=1).add_deletion(case.method_reverse.outputs.first())
     case.pipeline_revcomp_v2.steps.get(step_num=2).add_deletion(case.method_complement.outputs.first())
     case.pipeline_revcomp_v2.outcables.first().delete()
@@ -197,7 +197,7 @@ def create_sequence_manipulation_environment(case):
                                         revision_desc="third version", user=case.user_alice)
     case.pipeline_revcomp_v3.save()
     create_linear_pipeline(case.pipeline_revcomp_v3, [case.method_reverse, case.method_complement],
-                                 "lab data", "revcomped lab data")
+                                 "lab_data", "revcomped_lab_data")
     case.pipeline_revcomp_v3.steps.get(step_num=1).add_deletion(case.method_reverse.outputs.first())
     case.pipeline_revcomp_v3.create_outputs()
 
@@ -216,8 +216,8 @@ def create_sequence_manipulation_environment(case):
         "DNA to reversed RNA",
         "a pipeline to reverse DNA and translate it to RNA",
         case.user_alice)
-    create_linear_pipeline(case.pipeline_revRNA, [case.method_reverse, case.method_DNA2RNA], "lab data",
-                           "RNA'd lab data")
+    create_linear_pipeline(case.pipeline_revRNA, [case.method_reverse, case.method_DNA2RNA], "lab_data",
+                           "RNAd_lab_data")
     case.pipeline_revRNA.create_outputs()
 
     # Separator to print between Pipeline executions, to make viewing logs easier.
@@ -566,9 +566,9 @@ def create_grandpa_sandbox_environment(case):
         case.user_grandpa
     )
     case.method_faulty.clean()
-    simple_method_io(case.method_faulty, case.cdt_string, "strings", "i don't know")
+    simple_method_io(case.method_faulty, case.cdt_string, "strings", "i_dont_know")
     case.pipeline_faulty = make_first_pipeline("faulty pipeline", "a pipeline to do nothing", case.user_grandpa)
-    create_linear_pipeline(case.pipeline_faulty, [case.method_faulty, case.method_noop], "data", "the abyss")
+    create_linear_pipeline(case.pipeline_faulty, [case.method_faulty, case.method_noop], "data", "the_abyss")
     case.pipeline_faulty.create_outputs()
 
     # A code resource, method, and pipeline which fail.
@@ -580,7 +580,7 @@ def create_grandpa_sandbox_environment(case):
     case.method_fubar = make_first_method("fubar", "a method which always fails", case.coderev_fubar,
                                           case.user_grandpa)
     case.method_fubar.clean()
-    simple_method_io(case.method_fubar, case.cdt_string, "strings", "broken strings")
+    simple_method_io(case.method_fubar, case.cdt_string, "strings", "broken_strings")
     case.pipeline_fubar = make_first_pipeline("fubar pipeline", "a pipeline which always fails", case.user_grandpa)
     create_linear_pipeline(case.pipeline_fubar,
                            [case.method_noop, case.method_fubar, case.method_noop], "indata", "outdata")

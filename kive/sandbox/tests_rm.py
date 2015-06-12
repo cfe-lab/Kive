@@ -42,33 +42,6 @@ class ExecuteTestsRM(TestCase):
     def tearDown(self):
         tools.destroy_sequence_manipulation_environment(self)
 
-    def test_execute_pipeline_spaces_in_dataset_name(self):
-        """
-        You should be allowed to have spaces in the name of your dataset.
-        """
-        coderev = tools.make_first_revision(
-            "test",
-            "a script for testing purposes", "test.sh",
-            """#!/bin/bash
-            cat "$1" > "$2"
-            """,
-            self.user_alice)
-        method = tools.make_first_method("test", "a test method", coderev, self.user_alice)
-        tools.simple_method_io(method, self.cdt_record, "input name with spaces", "more spaces")
-        pipeline = tools.make_first_pipeline("test", "a test pipeline", self.user_alice)
-        tools.create_linear_pipeline(pipeline, [method], "in data", "out data")
-        pipeline.create_outputs()
-        
-        sandbox = Sandbox(self.user_alice, pipeline, [self.symds_labdata])
-        sandbox.execute_pipeline()
-        runstep = sandbox.run.runsteps.first()
-        execlog = runstep.log
-        log_text = execlog.methodoutput.error_log.read()
-        self.assertEqual(runstep.successful_execution(), True)
-        self.assertEqual(execlog.missing_outputs(), [])
-        self.assertEqual(execlog.methodoutput.return_code, 0)
-        self.assertSequenceEqual("", log_text)
-
     def test_execute_pipeline_run(self):
         """
         Check the coherence of Runs created when a pipeline is executed the first time.
@@ -450,7 +423,10 @@ class FindSDTests(TestCase):
         # A simple, one-step pipeline, which does nothing.
         self.pipeline_noop = tools.make_first_pipeline("simple pipeline", "a simple, one-step pipeline",
                                                        self.user_bob)
-        tools.create_linear_pipeline(self.pipeline_noop, [self.method_noop], "lab data", "complemented lab data")
+        tools.create_linear_pipeline(
+            self.pipeline_noop,
+            [self.method_noop],
+            "lab_data", "complemented_lab_data")
         self.pipeline_noop.create_outputs()
 
     def test_find_symds_pipeline_input(self):
@@ -569,7 +545,7 @@ class RawTests(SandboxRMTestCase):
         self.pipeline_raw = tools.make_first_pipeline(
             "raw noop", "a pipeline to do nothing to raw data",
             self.user_bob)
-        tools.create_linear_pipeline(self.pipeline_raw, [self.method_noop_raw], "raw in", "raw out")
+        tools.create_linear_pipeline(self.pipeline_raw, [self.method_noop_raw], "raw_in", "raw_out")
         self.pipeline_raw.create_outputs()
 
         self.symds_raw = SymbolicDataset.create_SD(
