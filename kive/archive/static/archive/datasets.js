@@ -29,6 +29,11 @@ var DatasetsTable = function($table, is_user_admin) {
 }
 DatasetsTable.prototype = Object.create(
         permissions.PermissionsTable.prototype);
+DatasetsTable.prototype.getQueryParams = function() {
+    var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
+    params.is_uploaded = true;
+    return params;
+}
 
 function datasets_main(is_user_admin, bootstrap){
     noXSS();

@@ -2083,6 +2083,9 @@ class Dataset(models.Model):
     # Datasets always have a referring SymbolicDataset
     symbolicdataset = models.OneToOneField("librarian.SymbolicDataset", related_name="dataset")
 
+    class Meta:
+        ordering = ["name"]
+        
     @property
     def user(self):
         if self.created_by is None:

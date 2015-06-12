@@ -79,7 +79,9 @@ var RunsTable = function($table, is_user_admin, $no_results) {
 }
 RunsTable.prototype = Object.create(permissions.PermissionsTable.prototype);
 RunsTable.prototype.getQueryParams = function() {
-    return { is_granted: this.is_locked, filters: get_run_filters() }
+    var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
+    params.filters = get_run_filters();
+    return params;
 }
 RunsTable.prototype.extractRows = function(response) {
     var $no_results = this.$no_results,

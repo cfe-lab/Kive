@@ -1255,7 +1255,7 @@ var drydock_objects = (function() {
     };
     
     return my;
-}(drydock_objects));
+}());
 
 var Geometry = {
     inEllipse: function(mx, my, cx, cy, rx, ry) {

@@ -60,6 +60,12 @@ class DatasetViewSet(RemovableModelViewSet, RedactModelMixin):
         return queryset.filter(
             symbolicdataset__in=SymbolicDataset.filter_by_user(self.request.user))
 
+    def get_queryset(self):
+        base_queryset = super(DatasetViewSet, self).get_queryset()
+        if self.request.QUERY_PARAMS.get('is_uploaded') == 'true':
+            return base_queryset.filter(created_by=None)
+        return base_queryset
+
     def create(self, request):
         """
         Override the create function, this allows us to POST to
