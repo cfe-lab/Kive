@@ -1137,13 +1137,6 @@ var drydock = (function() {
             // draw all shapes and magnets
             for (i = 0; i < shapes.length; i++) {
                 shape = shapes[i];
-                // skip shapes moved off the screen
-                if (shape.x > this.width / this.scale || 
-                        shape.y > this.height / this.scale ||
-                        shape.x + 2 * shape.r < 0 || 
-                        shape.y + 2 * shape.r < 0) {
-                    continue;
-                }
                 
                 shapes[i].draw(ctx);
                 

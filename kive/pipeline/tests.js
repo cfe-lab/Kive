@@ -1338,6 +1338,26 @@
                     this.state.draw(this.ctx);
                 });
                 
+                it('should drag off edge', function() {
+                    this.expectedInput.y += 110;
+                    this.expectedInput.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 30, y: 129.5, text: "in", style: "node", dir: 0});
+                    this.expectedMethod.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 111.25, y: 14.5, text: "example", style: "node", dir: 0});
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedInput.highlight(this.expectedCanvas.ctx);
+                    
+                    this.state.draw(this.ctx);
+                    this.state.doDown(
+                            {pageX: this.actualInput.x, pageY: this.actualInput.y});
+                    this.state.doMove(
+                            {pageX: this.expectedInput.x, pageY: this.expectedInput.y});
+                    this.state.draw(this.ctx);
+                });
+                
                 it('should drag two objects with shift click', function() {
                     this.expectedInput.y += 50;
                     this.expectedMethod.y += 50;
