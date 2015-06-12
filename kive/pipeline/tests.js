@@ -561,9 +561,9 @@
                     y = 35,
                     fill = "#999",
                     label = "example",
-                    inputs = { 1: { cdt_pk: 7, datasetname: "in" } },
-                    outputs = { 1: { cdt_pk: 7, datasetname: "out" } };
-
+                    inputs = [{dataset_idx: 1,dataset_name: "in", structure: {compounddatatype: 7} }],
+                    outputs = [{dataset_idx: 1,dataset_name: "out",structure: {compounddatatype: 7}}];
+                    
                 this.node = new drydock_objects.MethodNode(
                         method_pk,
                         family_pk,
@@ -1187,6 +1187,11 @@
                     this.methodFamilyId = 13;
                     this.methodInputs = {1: {datasetname: "in"}};
                     this.methodOutputs = {1: {cdt_pk: 17, datasetname: "out"}};
+
+
+                    this.methodInputs = [{dataset_idx: 1, dataset_name: "in", structure: null}];
+                    this.methodOutputs = [{dataset_idx: 1, dataset_name: "out", structure: {compounddatatype: 17}}];
+
                     this.expectedMethod = new drydock_objects.MethodNode(
                             this.methodId,
                             this.methodFamilyId,

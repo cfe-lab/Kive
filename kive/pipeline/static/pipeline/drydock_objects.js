@@ -542,7 +542,7 @@ var drydock_objects = (function() {
             if (input.structure != null)
                 cdt_pk = input.structure.compounddatatype;
 
-            magnet = new Magnet(this, r, attract, magnet_fill, cdt_pk, input.dataset_name, null, false);
+            magnet = new my.Magnet(this, r, attract, magnet_fill, cdt_pk, input.dataset_name, null, false);
 
             // Fudge the magnet position around, I guess?
             if (self.n_inputs == 1)
