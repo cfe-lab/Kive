@@ -560,6 +560,11 @@ var drydock = (function() {
         this.valid = false;
     };
     
+    /**
+     * Align selected nodes along the named axis.
+     * 
+     * @param axis: a string from ["x", "y", "iso_x", "iso_y", "iso_z"]
+     */
     my.CanvasState.prototype.alignSelection = function(axis) {
         /* @todo
          * if nodes are too close together then they will collide and then get pushed back out.
@@ -1179,8 +1184,9 @@ var drydock = (function() {
         var mySel,
             sel,
             index = -1,
-            i = 0,
-            k = 0, // loop counters
+            i,
+            j,
+            k, // loop counters
             in_magnets = [],
             in_magnet,
             out_magnets = [],
@@ -1248,7 +1254,7 @@ var drydock = (function() {
                     out_magnets = sel.out_magnets;
                     for (i = 0; i < out_magnets.length; i++) {
                         out_magnet = out_magnets[i];
-                        for (var j = 0; j < out_magnet.connected.length; j++) {
+                        for (j = 0; j < out_magnet.connected.length; j++) {
                             this_connector = out_magnets[i].connected[j];
                             index = this.connectors.indexOf(this_connector);
                             this.connectors.splice(index, 1);
