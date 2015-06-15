@@ -232,8 +232,11 @@ $(function() {
             old_xput = from_node.inputs[idx];
             if (to_node.inputs.hasOwnProperty(idx)) {
                 new_xput = to_node.inputs[idx];
-                if (new_xput.cdt_pk === old_xput.cdt_pk &&
-                        from_node.in_magnets[idx-1].connected.length) {
+                if (((new_xput.structure === null && old_xput.structure == null) ||
+                     (new_xput.structure != null && old_xput.structure != null &&
+                      new_xput.structure.compounddatatype == old_xput.structure.compounddatatype)) &&
+                      from_node.in_magnets[idx-1].connected.length) {
+
                     // re-attach Connector
                     connector = from_node.in_magnets[idx-1].connected.pop();
                     connector.dest = to_node.in_magnets[idx-1];
@@ -434,7 +437,6 @@ $(function() {
                 sel = sel[0];
                 
                 if (sel instanceof drydock_objects.MethodNode) {
-                debugger;
                     /*
                         Open the edit dialog (rename, method selection, colour picker...)
                     */
@@ -604,8 +606,10 @@ $(function() {
                 type: 'POST',
                 url: '/api/pipelinefamilies/',
                 data: {'_content': JSON.stringify({
-
-
+                    users_allowed: users_allowed || [],
+                    groups_allowed: groups_allowed || [],
+                    name: family_name,
+                    description: family_desc,
                 }),
                 "_content_type": "application/json"},
                 dataType: 'json',
