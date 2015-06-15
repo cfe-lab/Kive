@@ -117,7 +117,7 @@ def populate_method_revision_dropdown (request):
 
 @login_required
 @user_passes_test(developer_check)
-def get_method_io (request):
+def get_method_io(request):
     """
     handles ajax request from pipelines.html
     populates a dictionary with information about this method's transformation
