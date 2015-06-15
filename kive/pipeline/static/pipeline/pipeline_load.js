@@ -28,7 +28,7 @@ var pipeline = (function(exports){
         this.draw_outputs();
     }
 
-    Pipeline.prototype.serialize = function(patch) {
+    Pipeline.prototype.serialize = function(arguments, patch) {
         /**
          * This method serializes the pipeline into an object that can be
          * fed to the backend REST API.
@@ -44,14 +44,15 @@ var pipeline = (function(exports){
             pipeline_outputs = [],
             pipeline_inputs = [],
             canvas_x_ratio = 1./self.canvasState.canvas.width,
-            canvas_y_ratio = 1./self.canvasState.canvas.height;
-
+            canvas_y_ratio = 1./self.canvasState.canvas.height,
+            is_trivial = true; // This is a trivial modification until we hit a non trivial
+            // modification
 
         // TODO: Move check graph integrity out of Pipeline and into CanvasState
 
         // Check graph integrity
         $.each(self.canvasState.shapes, function(_, shape){
-            if (shape instanceof MethodNode) {
+            if (shape instanceof drydock_objects.MethodNode) {
                 var num_connections = 0;
 
                 // Track all method nodes
@@ -63,15 +64,15 @@ var pipeline = (function(exports){
                 if (num_connections === 0)
                     throw 'MethodNode with unused outputs';
             }
-            else if (shape instanceof OutputNode)
+            else if (shape instanceof drydock_objects.OutputNode)
                 pipeline_outputs.push(shape);
 
-            else if (shape instanceof CDtNode || shape instanceof RawNode) {
+            else if (shape instanceof drydock_objects.CdtNode || shape instanceof drydock_objects.RawNode) {
                 var magnet = null;
                 pipeline_inputs.push(shape);
 
                 // all CDtNodes or RawNodes (inputs) should feed into a MethodNode and have only one magnet
-                if (shape.out_magnets.length != 0)
+                if (shape.out_magnets.length != 1)
                     throw 'Invalid amount of magnets for output node!';
 
                 // is this magnet connected?
@@ -94,74 +95,31 @@ var pipeline = (function(exports){
             return;
         }
 
-        // TODO: This block of code needs to be pulled out of this function
-        var is_revision = $('#id_pipeline_select').length > 0;
-
-        // arguments to initialize new Pipeline Family
-        var family_name = $('#id_family_name').val(),  // hidden input if revision
-            family_desc = $('#id_family_desc').val(),
-            family_pk = $('#id_family_pk').val(),
-            revision_name = $('#id_revision_name').val(),
-            revision_desc = $('#id_revision_desc').val(),
-            users_allowed = $("#id_users_allowed").val(),
-            groups_allowed = $("#id_groups_allowed").val();
-
-        // Form validation
-        if (!is_revision) {
-            if (family_name === '') {
-                // FIXME: is there a better way to do this trigger?
-                $('li', 'ul#id_ctrl_nav')[0].click();
-                $('#id_family_name').css({'background-color': '#ffc'}).focus();
-                submitError('Pipeline family must be named');
-                return;
-            }
-            $('#id_family_name, #id_family_desc').css('background-color', '#fff');
-        }
-
-        $('#id_revision_name, #id_revision_desc').css('background-color', '#fff');
-        // TODO: END TODO
-
-
         // Now we're ready to start
-        var form_data = {
-            users_allowed: users_allowed,
-            groups_allowed: groups_allowed,
-            // There is no PipelineFamily yet; we're going to create one.
-            family_pk: family_pk,
-            family_name: family_name,
-            family_desc: family_desc,
-            // arguments to add first pipeline revision
-            revision_name: revision_name,
-            revision_desc: revision_desc,
-            // Canvas information to store in the Pipeline object.
-            canvas_width: canvas.width,
-            canvas_height: canvas.height,
-            revision_parent_pk: is_revision ? $('#id_pipeline_select').val() : null,
-            // Arrays will be populated in the following code.
-            pipeline_steps: [],
-            pipeline_inputs: [],
-            pipeline_outputs: []
-        };
+        var form_data = arguments;
+        form_data.steps = [];
+        form_data.inputs = [];
+        form_data.outcables = [];
 
-        // update form data with inputs
+        // Construct the input updates
         $.each(pipeline_inputs, function(idx, input){
             var structure = null;
 
             // Setup the compound datatype
-            if(input instanceof CDtNode)
+            if(input instanceof drydock_objects.CdtNode)
                 structure = {
-                    compounddatatype: input.pk
+                    compounddatatype: input.pk,
+                    min_row: null,
+                    max_row: null
                 };
 
             // Slap this input into the form data
-            form_data.pipeline_inputs[idx] = {
+            form_data.inputs[idx] = {
                 structure: structure,
                 dataset_name: input.label,
                 dataset_idx: idx + 1,
                 x: input.x * canvas_x_ratio,
                 y: input.y * canvas_y_ratio,
-                min_row: null, // in the future these can be more detailed
-                max_row: null
             };
         });
 
@@ -177,9 +135,9 @@ var pipeline = (function(exports){
             // TODO: Make this work for nested pipelines
 
             // Put the method in the form data
-            form_data.pipeline_steps[idx] = {
-                transf_pk: step.pk,  // to retrieve Method
-                transf_type: "Method",
+            form_data.steps[idx] = {
+                transformation: step.pk,  // to retrieve Method
+                transformation_type: "Method",
                 step_num: idx + 1,  // 1-index (pipeline inputs are index 0)
                 x: step.x * canvas_x_ratio,
                 y: step.y * canvas_y_ratio,
@@ -197,32 +155,32 @@ var pipeline = (function(exports){
                 var connector = magnet.connected[0],
                     source = magnet.connected[0].source.parent;
 
-                form_data.pipeline_steps[idx].cables_in[cable_idx] = {
+                form_data.steps[idx].cables_in[cable_idx] = {
                     source_dataset_name: connector.source.label,
                     dest_dataset_name: connector.dest.label,
-                    source_step: source instanceof MethodNode ? sorted_elements.indexOf(source)+1 : 0,
+                    source_step: source instanceof drydock_objects.MethodNode ? sorted_elements.indexOf(source)+1 : 0,
                     keep_output: false, // in the future this can be more flexible
-                    wires: [] // no wires for a raw cable
+                    custom_wires: [] // no wires for a raw cable
                 };
             });
         });
 
         // Construct outputs
-        $.each(pipeline_outputs, function(idx, output){
+        $.each(pipeline_outputs, function(idx, output) {
             var connector = output.in_magnets[0].connected[0],
                 source_step = connector.source.parent,
                 structure = null;
 
-            form_data[idx] = {
+            form_data.outcables[idx] = {
                 output_name: output.label,
                 output_idx: idx + 1,
-                output_CDT_pk: connector.source.cdt, // TODO: change this to structure
+                output_cdt: connector.source.cdt,
                 source: source_step.pk,
                 source_step: sorted_elements.indexOf(source_step) + 1, // 1-index
                 source_dataset_name: connector.source.label, // magnet label
                 x: output.x * canvas_x_ratio,
                 y: output.y * canvas_y_ratio,
-                wires: [] // in the future we might have this
+                custom_wires: [] // in the future we might have this
             };
         });
 
@@ -236,7 +194,7 @@ var pipeline = (function(exports){
         // July 30, 2014 - JN
 
         // How did I even computer?
-        // April 28, 2015 - Cat
+        // April 28, 2048 - Cat
 
         return form_data;
     };
