@@ -6300,3 +6300,27 @@ class PipelineFamilyApiTests(BaseTestCases.ApiTestCase):
         new_pf = PipelineFamily.objects.get(name=pf_name)
         self.assertEquals(new_pf.description, pf_description)
         self.assertEquals(new_pf.members.count(), 0)
+
+    def test_partial_update_published_version(self):
+        """
+        Test PATCHing a PipelineFamily to update its published_version.
+        """
+        # This is defined in simple_run.
+        basic_pf = PipelineFamily.objects.get(name="P_basic")
+        self.assertIsNone(basic_pf.published_version)
+
+        new_published_version = basic_pf.members.first()
+        patch_data = {
+            "published_version": new_published_version.pk
+        }
+
+        patch_path = reverse("pipelinefamily-detail",
+                             kwargs={"pk": basic_pf.pk})
+        request = self.factory.patch(patch_path, patch_data, format="json")
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=basic_pf.pk)
+        self.assertEquals(response.status_code, status.HTTP_200_OK)
+
+        # Probe basic_pf to check that it's been properly updated.
+        basic_pf = PipelineFamily.objects.get(name="P_basic")
+        self.assertEquals(basic_pf.published_version, new_published_version)

@@ -18,8 +18,21 @@ class CodeResourceSerializer(AccessControlSerializer,
 
     class Meta:
         model = CodeResource
-        fields = ('id', 'url', 'name', 'last_revision_date', 'filename', 'description', 'user', 'revisions',
-                  'removal_plan', 'users_allowed', 'groups_allowed', 'num_revisions', 'absolute_url')
+        fields = (
+            'id',
+            'url',
+            'name',
+            'last_revision_date',
+            'filename',
+            'description',
+            'user',
+            'revisions',
+            'removal_plan',
+            'users_allowed',
+            'groups_allowed',
+            'num_revisions',
+            'absolute_url'
+        )
 
     def get_absolute_url(self, obj):
         if not obj:
@@ -145,10 +158,7 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
         staged_file = crr_data.pop("staged_file") if "staged_file" in crr_data else None
 
         with transaction.atomic():
-            crr = CodeResourceRevision.objects.create(
-                user=self.context["request"].user,
-                **crr_data
-            )
+            crr = CodeResourceRevision.objects.create(**crr_data)
             if staged_file is not None:
                 crr.content_file = File(staged_file.uploaded_file.file)
                 crr.save()
@@ -176,8 +186,16 @@ class MethodFamilySerializer(AccessControlSerializer,
     class Meta:
         model = MethodFamily
         fields = (
-            "name", "description", "url", "user", "users_allowed", "groups_allowed", "num_revisions",
-            "absolute_url", "removal_plan", "methods"
+            "name",
+            "description",
+            "url",
+            "user",
+            "users_allowed",
+            "groups_allowed",
+            "num_revisions",
+            "absolute_url",
+            "removal_plan",
+            "methods"
         )
 
     def get_num_revisions(self, obj):
@@ -281,10 +299,7 @@ class MethodSerializer(AccessControlSerializer,
         inputs = method_data.pop("inputs")
         outputs = method_data.pop("outputs")
 
-        method = Method.objects.create(
-            user=self.context["request"].user,
-            **method_data
-        )
+        method = Method.objects.create(**method_data)
         method.users_allowed.add(*users_allowed)
         method.groups_allowed.add(*groups_allowed)
 
