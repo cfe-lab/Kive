@@ -11,7 +11,7 @@ import json
 from method.models import MethodFamily, Method
 from pipeline.models import Pipeline, PipelineFamily
 from portal.views import developer_check, admin_check
-from metadata.models import KiveUser, AccessControl
+from metadata.models import AccessControl
 
 from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet,\
@@ -186,44 +186,6 @@ def get_method_xputs(method):
             )
         result.append(xputs)
     return {'inputs': result[0], 'outputs': result[1]}
-
-
-@login_required
-def get_pipeline(request):
-    if request.is_ajax():
-        response = HttpResponse()
-        pipeline_revision_id = request.POST.get('pipeline_id')  # TODO: Split this off into a form?
-        user = KiveUser.kiveify(request.user)
-
-        if pipeline_revision_id != '':
-            # Get and check permissions
-            pipeline_revision = Pipeline.objects.filter(
-                user.access_query(),
-                pk=pipeline_revision_id)
-
-            if pipeline_revision.count() == 0:
-                raise Http404
-            pipeline_revision = pipeline_revision.first()
-
-            pipeline_dict = pipeline_revision.represent_as_dict()
-            steps = pipeline_revision.steps\
-                .select_related('transformation__pipeline',
-                                'transformation__method')\
-                .prefetch_related('transformation__method__inputs__structure__compounddatatype__members__datatype',
-                                  'transformation__method__outputs__structure__compounddatatype__members__datatype',
-                                  'transformation__method__family')
-
-            # Hack to reduce number of ajax calls in interface.
-            for step in steps:
-                if not step.is_subpipeline:
-                    method = step.transformation.definite
-                    pipeline_dict["pipeline_steps"][step.step_num-1].update(get_method_xputs(method))
-            # End of hack.
-
-            return HttpResponse(json.dumps(pipeline_dict), content_type='application/json')
-        return response
-    else:
-        raise Http404
 
 
 @login_required

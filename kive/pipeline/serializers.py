@@ -69,6 +69,7 @@ class PipelineStepSerializer(serializers.ModelSerializer):
             "outputs_to_delete",
             "x",
             "y",
+            "fill_colour",
             "name",
             "cables_in",
             "outputs",

@@ -20,8 +20,9 @@ from rest_framework.test import force_authenticate
 from archive.models import Dataset, ExecLog
 from constants import datatypes
 from kive.tests import BaseTestCases
-from metadata.models import CompoundDatatype, Datatype, kive_user, everyone_group
-from method.models import Method
+from metadata.models import CompoundDatatype, CompoundDatatypeMember, \
+    Datatype, kive_user, everyone_group
+from method.models import Method, MethodFamily, CodeResource
 import method.tests
 from librarian.models import SymbolicDataset
 from pipeline.models import Pipeline, PipelineFamily, \
@@ -5591,8 +5592,43 @@ tail -n +2 "$2" >> "$3"
 # of represent_as_dict and its offshoots, which will themselves be
 # obsoleted by PipelineSerializer.
 def create_pipeline_deserialization_environment(self):
+    """
+    Set up stuff that will help with testing Pipeline deserialization.
+
+    The "sandbox" testing environment must be set up already, either
+    by directly calling create_sandbox_testing_tools_environment or
+    by including a fixture that had called it.
+    """
     self.kive_user = kive_user()
     self.everyone_group = everyone_group()
+
+    # Explicitly load objects that are defined in create_sandbox_testing...
+    # in case we are using a fixture.
+    self.user_bob = User.objects.get(username="bob")
+    self.coderesource_noop = CodeResource.objects.get(
+        user=self.user_bob,
+        name="noop"
+    )
+    self.coderev_noop = self.coderesource_noop.revisions.get(revision_name="1")
+    self.noop_mf = MethodFamily.objects.get(name="string noop")
+    self.method_noop = self.noop_mf.members.get(revision_number=1)
+    self.noop_raw_mf = MethodFamily.objects.get(name="raw noop", user=self.user_bob)
+    self.method_noop_raw = self.noop_raw_mf.members.get(revision_number=1)
+
+    # Retrieve the CDT defined in create_sandbox_testing_tools_environment
+    # called "self.cdt_string", or an equivalent.
+    bob_string_dt = Datatype.objects.get(
+        user=self.user_bob,
+        name="my_string",
+        description="sequences of ASCII characters"
+    )
+    possible_cdt_string_members = CompoundDatatypeMember.objects.filter(
+        column_name="word",
+        column_idx=1,
+        datatype=bob_string_dt
+    )
+    possible_cdt_strings = [x.compounddatatype for x in possible_cdt_string_members]
+    self.cdt_string = possible_cdt_strings[0]
 
     # A fake request that provides context.
     class DuckRequest(object):
@@ -5601,8 +5637,6 @@ def create_pipeline_deserialization_environment(self):
     self.duck_request = DuckRequest()
     self.duck_request.user = kive_user()
     self.duck_context = {"request": self.duck_request}
-
-    tools.create_sandbox_testing_tools_environment(self)
 
     self.test_pf = PipelineFamily(
         user=self.kive_user,
@@ -5920,6 +5954,7 @@ class PipelineSerializerTests(TestCase):
     fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
+        tools.create_sandbox_testing_tools_environment(self)
         create_pipeline_deserialization_environment(self)
 
     def tearDown(self):
@@ -6142,6 +6177,38 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
 
         end_count = Pipeline.objects.count()
         self.assertEquals(end_count, start_count - 1)
+
+    def test_create(self):
+        # Note that the "sandbox" testing environment has already been set
+        # up in the "simple_run" fixture.
+        create_pipeline_deserialization_environment(self)
+        request = self.factory.post(self.list_path, self.pipeline_dict, format="json")
+        force_authenticate(request, user=self.kive_user)
+        self.list_view(request)
+
+        # Probe the new object.
+        new_pipeline = self.test_pf.members.get(revision_name=self.pipeline_dict["revision_name"])
+        self.assertEquals(new_pipeline.steps.count(), 3)
+        self.assertEquals(new_pipeline.outcables.count(), 1)
+        self.assertEquals(new_pipeline.outcables.first().output_name, "untouched_output")
+
+    def test_create_calls_clean(self):
+        """
+        Attempting to create a Pipeline should call complete_clean.
+        """
+        # Note that the "sandbox" testing environment has already been set
+        # up in the "simple_run" fixture.
+        create_pipeline_deserialization_environment(self)
+
+        self.pipeline_dict["steps"][0]["cables_in"] = []
+        request = self.factory.post(self.list_path, self.pipeline_dict, format="json")
+        force_authenticate(request, user=self.kive_user)
+        # This should barf.
+        self.assertRaisesRegexp(
+            ValidationError,
+            'Input "strings" to transformation at step 1 is not cabled',
+            lambda: self.list_view(request),
+        )
 
 
 class PipelineFamilyApiTests(BaseTestCases.ApiTestCase):
