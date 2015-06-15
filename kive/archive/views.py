@@ -33,7 +33,8 @@ def datasets(request):
     t = loader.get_template('archive/datasets.html')
 
     accessible_SDs = librarian.models.SymbolicDataset.filter_by_user(request.user)
-    datasets = Dataset.objects.filter(symbolicdataset__in=accessible_SDs)
+    datasets = Dataset.objects.filter(symbolicdataset__in=accessible_SDs,
+                                      created_by=None) # Uploaded
 
     c = RequestContext(request, {
         'datasets': datasets,

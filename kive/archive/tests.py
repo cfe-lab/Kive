@@ -3641,7 +3641,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         resp = self.list_view(request).data
 
         self.assertEquals(len(resp), expected_entries + self.n_prexisting_datasets)
-        self.assertEquals(resp[0]['description'],
+        self.assertEquals(resp[-1]['description'],
                           "Test data for a test that tests test data")
 
     def test_dataset_detail(self):

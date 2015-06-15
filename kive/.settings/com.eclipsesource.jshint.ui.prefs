@@ -1,2 +1,2 @@
 eclipse.preferences.version=1
-included=//tests.js\:pipeline/static/pipeline/drydock.js\:pipeline/static/pipeline/drydock_objects.js\:portal/static/portal/permissions.js
+included=//tests.js\:archive//*.js\:pipeline/static/pipeline/drydock.js\:pipeline/static/pipeline/drydock_objects.js\:portal/static/portal/permissions.js

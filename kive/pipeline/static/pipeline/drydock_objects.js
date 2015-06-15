@@ -529,8 +529,8 @@ var drydock_objects = (function() {
         this.status = status;
 
         // Sort the inputs by index
-        var sorted_inputs = this.inputs.sort(function(a,b){ return a.dataset_idx - b.dataset_idx}),
-            sorted_outputs = this.outputs.sort(function(a,b){ return a.dataset_idx - b.dataset_idx}),
+        var sorted_inputs = this.inputs.sort(function(a,b){ return a.dataset_idx - b.dataset_idx; }),
+            sorted_outputs = this.outputs.sort(function(a,b){ return a.dataset_idx - b.dataset_idx; }),
             r = 5, // Default radius
             attract = 5, // Default attraction radius?
             magnet_fill = '#fff'; // Default fill
@@ -1255,7 +1255,7 @@ var drydock_objects = (function() {
     };
     
     return my;
-}(drydock_objects));
+}());
 
 var Geometry = {
     inEllipse: function(mx, my, cx, cy, rx, ry) {

@@ -5638,6 +5638,7 @@ class PipelineSerializerTests(TestCase):
         self.noop_output_name = self.method_noop.outputs.first().dataset_name
         self.pipeline_dict = {
             "family": "test",
+            "family_pk": self.test_pf.pk,  # FIXME remove after we eliminate family_pk from the serializer
             "revision_name": "v1",
             "revision_desc": "first version",
             "revision_parent": None,
@@ -5744,9 +5745,10 @@ class PipelineSerializerTests(TestCase):
             self.doublet_output_name
         )
 
-        # This defines a pipeline with custom wiring..
+        # This defines a pipeline with custom wiring.
         self.pipeline_cw_dict = {
             "family": "test",
+            "family_pk": self.test_pf.pk,  # FIXME remove after we eliminate family_pk from the serializer
             "revision_name": "v2_c2",
             "revision_desc": "Custom wiring tester",
             "revision_parent": None,
@@ -5808,7 +5810,7 @@ class PipelineSerializerTests(TestCase):
                             # Here we can specify source directly.
                             "source_dataset_name": self.doublet_output_name,
                             "source_step": 1,
-                            "dest_dataset_name": self.doublet_input_name,
+                            "dest_dataset_name": self.noop_input_name,
                             "custom_wires": [
                                 {
                                     "source_pin": self.string_doublet.members.get(column_idx=1).pk,
@@ -5826,8 +5828,8 @@ class PipelineSerializerTests(TestCase):
                     "output_idx": 1,
                     "output_name": "untouched_output",
                     "output_cdt": self.string_doublet.pk,
-                    "source_step": 3,
-                    "source_dataset_name": self.doublet_output_name,
+                    "source_step": 2,
+                    "source_dataset_name": self.noop_output_name,
                     "x": 0.85,
                     "y": 0.5,
                     "custom_wires": [
@@ -5849,6 +5851,7 @@ class PipelineSerializerTests(TestCase):
         self.raw_output_name = self.method_noop_raw.outputs.first().dataset_name
         self.pipeline_raw_dict = {
             "family": "test",
+            "family_pk": self.test_pf.pk,  # FIXME remove after we eliminate family_pk from the serializer
             "revision_name": "v3_raw",
             "revision_desc": "Raw input tester",
             "revision_parent": None,
@@ -5906,7 +5909,7 @@ class PipelineSerializerTests(TestCase):
                 {
                     "output_idx": 1,
                     "output_name": "untouched_output",
-                    "source_step": 3,
+                    "source_step": 2,
                     "source_dataset_name": self.raw_output_name,
                     "x": 0.85,
                     "y": 0.5
@@ -5953,10 +5956,9 @@ class PipelineSerializerTests(TestCase):
         self.pipeline_dict["steps"][1]["cables_in"][0]["source_dataset_name"] = incorrect_name
         ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)
         self.assertFalse(ps.is_valid())
-        print(ps.errors)
         self.assertEquals(
             ps.errors["non_field_errors"][0],
-            'Step {} has no output named "{}"'.format(0, incorrect_name)
+            'Step {} has no output named "{}"'.format(1, incorrect_name)
         )
 
     def test_validate_step_output_source_bad_source_step(self):
@@ -5977,6 +5979,7 @@ class PipelineSerializerTests(TestCase):
         Test validation of a Pipeline containing custom wires.
         """
         ps = PipelineSerializer(data=self.pipeline_cw_dict, context=self.duck_context)
+        ps.is_valid()
         self.assertTrue(ps.is_valid())
 
     def test_validate_raw_input(self):

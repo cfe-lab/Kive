@@ -164,7 +164,7 @@ def _non_pipeline_input_cable_validate_helper(step_num, dataset_name, step_data_
 
 def _source_transf_finder(step_num, dataset_name, step_data_dicts):
     """
-    Get the specified input of a PipelineStep.
+    Get the specified output of a PipelineStep.
 
     PRE: each step in steps is valid.
     """
@@ -175,7 +175,7 @@ def _source_transf_finder(step_num, dataset_name, step_data_dicts):
             break
 
     curr_transf = specified_step_data["transformation"].definite
-    return curr_transf.inputs.get(dataset_name=dataset_name)
+    return curr_transf.outputs.get(dataset_name=dataset_name)
 
 
 class PipelineSerializer(AccessControlSerializer,
@@ -325,12 +325,22 @@ class PipelineSerializer(AccessControlSerializer,
                 custom_wires = cable_data.pop("custom_wires") if "custom_wires" in cable_data else []
 
                 # FIXME this is a workaround for weird deserialization behaviour.
-                source_definite_dataset_name = cable_data.pop("source")
-                source_dataset_name = source_definite_dataset_name["definite"]["dataset_name"]
+                source_dict = cable_data.pop("source")
+                source_dataset_name = source_dict["definite"]["dataset_name"]
+                dest_dict = cable_data.pop("dest")
+                dest_dataset_name = dest_dict["definite"]["dataset_name"]
+                dest = step_data["transformation"].inputs.get(
+                    dataset_name=dest_dataset_name
+                )
 
-                source = _source_transf_finder(cable_data.pop("source_step"),
-                                               source_dataset_name, steps)
-                curr_cable = curr_step.cables_in.create(source=source, **cable_data)
+                source_step_num = cable_data["source_step"]
+                if source_step_num == 0:
+                    source = pipeline.inputs.get(dataset_name=source_dataset_name)
+                else:
+                    source = _source_transf_finder(source_step_num,
+                                                   source_dataset_name, steps)
+
+                curr_cable = curr_step.cables_in.create(source=source, dest=dest, **cable_data)
 
                 for wire_data in custom_wires:
                     curr_cable.custom_wires.create(**wire_data)
@@ -342,12 +352,12 @@ class PipelineSerializer(AccessControlSerializer,
             y = outcable_data.pop("y")
 
             # FIXME this is a workaround for weird deserialization behaviour.
-            source_definite_dataset_name = outcable_data.pop("source")
-            source_dataset_name = source_definite_dataset_name["definite"]["dataset_name"]
+            source_dict = outcable_data.pop("source")
+            source_dataset_name = source_dict["dataset_name"]
 
-            source = _source_transf_finder(outcable_data.pop("source_step"),
-                                           source_dataset_name)
-            curr_outcable = pipeline.outcables.create(source, **outcable_data)
+            source = _source_transf_finder(outcable_data["source_step"],
+                                           source_dataset_name, steps)
+            curr_outcable = pipeline.outcables.create(source=source, **outcable_data)
             for wire_data in custom_wires:
                 curr_outcable.custom_wires.create(**wire_data)
             curr_outcable.create_output(x=x, y=y)
