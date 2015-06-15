@@ -26,9 +26,9 @@ var pipeline = (function(exports){
         this.draw_inputs();
         this.draw_steps();
         this.draw_outputs();
-    }
+    };
 
-    Pipeline.prototype.serialize = function(arguments, patch) {
+    Pipeline.prototype.serialize = function(args, patch) {
         /**
          * This method serializes the pipeline into an object that can be
          * fed to the backend REST API.
@@ -96,7 +96,7 @@ var pipeline = (function(exports){
         }
 
         // Now we're ready to start
-        var form_data = arguments;
+        var form_data = args || {};
         form_data.steps = [];
         form_data.inputs = [];
         form_data.outcables = [];

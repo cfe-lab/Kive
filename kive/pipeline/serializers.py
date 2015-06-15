@@ -127,7 +127,7 @@ class PipelineRevisionNumberGetter(object):
     """
     def set_context(self, rev_num_field):
         self.pipelinefamily = PipelineFamily.objects.get(
-            name=rev_num_field.parent.initial_data["family"]
+            name=rev_num_field.parent.initial_data.get("family")
         )
 
     def __call__(self):
@@ -185,10 +185,6 @@ class PipelineSerializer(AccessControlSerializer,
         slug_field='name',
         queryset=PipelineFamily.objects.all()
     )
-    family_pk = serializers.PrimaryKeyRelatedField(
-        source="family",
-        queryset=PipelineFamily.objects.all()
-    )
     inputs = TransformationInputSerializer(many=True)
     outputs = TransformationOutputSerializer(many=True, read_only=True)
 
@@ -211,7 +207,6 @@ class PipelineSerializer(AccessControlSerializer,
             'id',
             'url',
             'family',
-            'family_pk',
             'revision_name',
             "revision_desc",
             'revision_number',

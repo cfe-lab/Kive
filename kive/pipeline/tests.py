@@ -5638,7 +5638,7 @@ class PipelineSerializerTests(TestCase):
         self.noop_output_name = self.method_noop.outputs.first().dataset_name
         self.pipeline_dict = {
             "family": "test",
-            "family_pk": self.test_pf.pk,  # FIXME remove after we eliminate family_pk from the serializer
+            # "family_pk": self.test_pf.pk,  # FIXME remove after we eliminate family_pk from the serializer
             "revision_name": "v1",
             "revision_desc": "first version",
             "revision_parent": None,

@@ -3,7 +3,7 @@ $(function() {
     // change pipeline revision drop-down triggers ajax to redraw canvas
     $('#id_pipeline_select').on('change', function () {
         var pipeline_id = $('#id_pipeline_select').val();
-        var pipeline = new Pipeline(canvasState);
+        window.pipeline_revision = new Pipeline(canvasState);
 
         if (pipeline_id === null) {
             window.submit_to_url = $('#id_family_pk').val();
@@ -17,8 +17,8 @@ $(function() {
             success: function(pipeline_raw) {
 
                 submit_to_url = pipeline_raw['family_pk'];
-                pipeline.load(pipeline_raw);
-                pipeline.draw();
+                pipeline_revision.load(pipeline_raw);
+                pipeline_revision.draw();
 
                 $('#id_publish').val(
                     pipeline_raw['is_published_version']?

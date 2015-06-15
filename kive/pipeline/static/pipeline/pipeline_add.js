@@ -434,6 +434,7 @@ $(function() {
                 sel = sel[0];
                 
                 if (sel instanceof drydock_objects.MethodNode) {
+                debugger;
                     /*
                         Open the edit dialog (rename, method selection, colour picker...)
                     */
@@ -527,58 +528,6 @@ $(function() {
 
         document.getElementById('id_submit_error').innerHTML = '';
 
-        // check graph integrity
-        for (i = 0; i < shapes.length; i++) {
-            this_shape = shapes[i];
-            if (this_shape instanceof drydock_objects.MethodNode) {
-                method_nodes.push(this_shape);
-
-                // at least one out-magnet must be occupied
-                magnets = this_shape.out_magnets;
-                num_connections = 0;
-                for (j = 0; j < magnets.length; j++) {
-                    this_magnet = magnets[j];
-                    num_connections += this_magnet.connected.length;
-                }
-                if (num_connections === 0) {
-                    submitError('MethodNode with unused outputs');
-                    return;
-                }
-            }
-            else if (this_shape instanceof drydock_objects.OutputNode) {
-                pipeline_outputs.push(this_shape);
-
-                // no need to check for connected magnets - all output nodes have
-                // exactly 1 magnet with exactly 1 cable.
-            }
-            else {
-                // this is a data node
-                pipeline_inputs.push(this_shape);
-
-                // all CDtNodes or RawNodes (inputs) should feed into a MethodNode
-                magnets = this_shape.out_magnets;
-                this_magnet = magnets[0];  // data nodes only ever have one magnet
-
-                // is this magnet connected?
-                if (this_magnet.connected.length === 0) {
-                    // unconnected input in graph, exit
-                    submitError('Unconnected input node');
-                    return;
-                }
-            }
-        }
-
-        // sort pipelines by their isometric position, left-to-right, top-to-bottom
-        // (sort of like reading order if you tilt your screen 30° clockwise)
-        pipeline_inputs.sort(Geometry.isometricSort);
-        pipeline_outputs.sort(Geometry.isometricSort);
-
-        // at least one Connector must terminate as pipeline output
-        if (pipeline_outputs.length === 0) {
-            submitError('Pipeline has no output');
-            return;
-        }
-
         var is_revision = 0 < $('#id_pipeline_select').length;
 
         // arguments to initialize new Pipeline Family
@@ -603,141 +552,71 @@ $(function() {
         }
 
         $('#id_revision_name, #id_revision_desc').css('background-color', '#fff');
-        
+
         // Now we're ready to start
+        // TODO: We should really push this into the Pipeline class
         var form_data = {
-            users_allowed: users_allowed,
-            groups_allowed: groups_allowed,
+            users_allowed: users_allowed || [],
+            groups_allowed: groups_allowed || [],
+
             // There is no PipelineFamily yet; we're going to create one.
-            family_pk: family_pk,
-            family_name: family_name,
+            family: family_name,
             family_desc: family_desc,
+
             // arguments to add first pipeline revision
             revision_name: revision_name,
             revision_desc: revision_desc,
+            revision_parent: is_revision ? $('#id_pipeline_select').val() : null,
+
             // Canvas information to store in the Pipeline object.
             canvas_width: canvas.width,
             canvas_height: canvas.height,
-            revision_parent_pk: is_revision ? $('#id_pipeline_select').val() : null,
-            // Arrays will be populated in the following code.
-            pipeline_steps: [],
-            pipeline_inputs: [],
-            pipeline_outputs: []
         };
 
-        // update form data with inputs
-        var this_input;
-        form_data.pipeline_inputs = [];
-        for (i = 0; i < pipeline_inputs.length; i++) {
-            this_input = pipeline_inputs[i];
-            form_data.pipeline_inputs[i] = {
-                CDT_pk: (this_input instanceof drydock_objects.CdtNode) ? this_input.pk : null,
-                dataset_name: this_input.label,
-                dataset_idx: i + 1,
-                x: this_input.x / canvas.width,
-                y: this_input.y / canvas.height,
-                min_row: null, // in the future these can be more detailed
-                max_row: null
-            };
+        try {
+            window.pipeline_revision = window.pipeline_revision || new Pipeline(canvasState);
+            form_data = pipeline_revision.serialize(form_data);
+        } catch(error) {
+            submitError(error);
+            return;
         }
 
-        // MethodNodes are now sorted live, prior to pipeline submission —JN
-        var sorted_elements = [];
-        for (i = 0; i < canvasState.exec_order.length; i++) {
-            sorted_elements = sorted_elements.concat(canvasState.exec_order[i]);
-        }
-
-        // add arguments for input cabling
-        var this_step, this_source;
-
-        for (i = 0; i < sorted_elements.length; i++) {
-            this_step = sorted_elements[i];
-
-            form_data.pipeline_steps[i] = {
-                transf_pk: this_step.pk,  // to retrieve Method
-                transf_type: "Method", // in the future we can make this take Pipelines as well
-                step_num: i+1,  // 1-index (pipeline inputs are index 0)
-                x: this_step.x / canvas.width,
-                y: this_step.y / canvas.height,
-                name: this_step.label,
-                fill_colour: this_step.fill,
-                cables_in: [],
-                outputs_to_delete: [] // not yet implemented
-            };
-
-            // retrieve Connectors
-            magnets = this_step.in_magnets;
-
-            for (j = 0; j < magnets.length; j++) {
-                this_magnet = magnets[j];
-                if (this_magnet.connected.length === 0) {
-                    continue;
-                }
-                this_connector = this_magnet.connected[0];
-                this_source = this_connector.source.parent;
-
-                form_data.pipeline_steps[i].cables_in[j] = {
-                    //'source_type': this_source.constructor === RawNode ? 'raw' : 'CDT',
-                    //'source_pk': this_source.constructor === RawNode ? '' : this_source.pk,
-                    source_dataset_name: this_connector.source.label,
-                    dest_dataset_name: this_connector.dest.label,
-                    source_step: (
-                            this_source instanceof drydock_objects.MethodNode ?
-                            sorted_elements.indexOf(this_source)+1 :
-                            0),
-                    keep_output: false, // in the future this can be more flexible
-                    wires: [] // no wires for a raw cable
-                };
-            }
-        }
-
-        var this_output;
-        for (i = 0; i < pipeline_outputs.length; i++) {
-            this_output = pipeline_outputs[i];
-            this_connector = this_output.in_magnets[0].connected[0];
-            var this_source_step = this_connector.source.parent;
-            
-            form_data.pipeline_outputs[i] = {
-                output_name: this_output.label,
-                output_idx: i+1,
-                output_CDT_pk: this_connector.source.cdt,
-                source: this_source_step.pk,
-                source_step: sorted_elements.indexOf(this_source_step) + 1, // 1-index
-                source_dataset_name: this_connector.source.label,  // magnet label
-                x: this_output.x / canvas.width,
-                y: this_output.y / canvas.height,
-                wires: [] // in the future we might have this
-            };
-        }
-
-        // this code written on Signal Hill, St. John's, Newfoundland
-        // May 2, 2014 - afyp
-
-        // this code modified at my desk
-        // June 18, 2014 -- RL
-        
-        // I code at my desk too.
-        // July 30, 2014 - JN
-
-        // How did I even computer?
-        // April 28, 2015 - Cat
-
-        // do AJAX transaction
-        $.ajax({
-            type: 'POST',
-            url: window.submit_to_url,
-            data: JSON.stringify(form_data),
-            datatype: 'json',
-            success: function(result) {
-                if (result.status == 'failure') {
-                    submitError(result.error_msg);
-                }
-                else if (result.status == 'success') {
+        function submit_pipeline(){
+            $.ajax({
+                type: 'POST',
+                url: '/api/pipelines/',
+                data: {'_content': JSON.stringify(form_data), "_content_type": "application/json"},
+                dataType: 'json',
+                success: function(result) {
                     $('#id_submit_error').html('').hide();
                     window.location.href = '/pipelines';
+                },
+                error: function(xhr, status, error) {
+                    submitError(xhr.status + " - " + error);
                 }
-            }
-        });
+            });
+        }
+        if(is_revision)
+            submit_pipeline();
+
+        else // Pushing a new family
+            $.ajax({
+                type: 'POST',
+                url: '/api/pipelinefamilies/',
+                data: {'_content': JSON.stringify({
+
+
+                }),
+                "_content_type": "application/json"},
+                dataType: 'json',
+                success: function(result) {
+                    submit_pipeline();
+                },
+                error: function(xhr, status, error) {
+                    submitError(xhr.status + " - " + error);
+                }
+            });
+
     };
     var changeExecOrderDisplayOption = function() {
         var $this = $(this),
