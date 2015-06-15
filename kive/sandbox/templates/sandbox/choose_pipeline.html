@@ -27,7 +27,7 @@ var load_preview_canvas = function() {
             this_.width  = 120,
             this_.height = 90;
             var redrawInterval = 50, // ms
-                cs = new CanvasState(this_, redrawInterval);
+                cs = new drydock.CanvasState(this_, redrawInterval);
             var pipeline = new Pipeline(cs);
 
             cs.setScale(0.12);

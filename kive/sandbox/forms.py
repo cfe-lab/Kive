@@ -21,7 +21,7 @@ class PipelineSelectionForm(forms.Form):
         self.family_pk = pipeline_family_pk
         choices = [(p.pk, str(p)) for p in family.members.all()]
         self.fields["pipeline"].choices = choices
-        self.fields["pipeline"].initial = choices[-1][0]
+        self.fields["pipeline"].initial = family.published_version or choices[-1][0]
 
 
 class InputSubmissionForm(forms.Form):
