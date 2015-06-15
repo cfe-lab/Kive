@@ -278,7 +278,6 @@ def clean_up_all_files():
         sf.delete()
 
 
-
 class MetadataTestCase(TestCase):
     """
     Set up a database state for unit testing.
@@ -2481,7 +2480,7 @@ class CompoundDatatypeTests(MetadataTestCase):
             "(label: string, PBMCseq: DNANucSeq, PLAseq: RNANucSeq)")
 
     def test_cdt_four_members_short_name(self):
-        self.basic_cdt.members.all()[4].delete()
+        self.basic_cdt.members.get(column_idx=5).delete()
         self.assertEqual(
             self.basic_cdt.short_name,
             "(label: string, integer: integer, float: float, bool: boolean)")

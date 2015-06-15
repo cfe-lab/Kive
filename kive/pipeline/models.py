@@ -58,6 +58,13 @@ class PipelineFamily(transformation.models.TransformationFamily):
         Number of revisions within this TransformationFamily
         """
         return self.size
+     
+    @property
+    def published_version_display(self):
+        if self.published_version is None:
+            return None
+        return '{}: {}'.format(self.published_version.revision_number,
+                               self.published_version.revision_name) 
 
     @property
     def complete_members(self):
@@ -750,6 +757,7 @@ class PipelineStep(models.Model):
     x = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(1)])
     y = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(1)])
     name = models.CharField(default="", max_length=maxlengths.MAX_NAME_LENGTH, blank=True)
+    fill_colour = models.CharField(default="", max_length=7, blank=True)
 
     def __str__(self):
         """ Represent with the pipeline and step number """

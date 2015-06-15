@@ -20,14 +20,16 @@ from rest_framework.test import force_authenticate
 from archive.models import Dataset, ExecLog
 from constants import datatypes
 from kive.tests import BaseTestCases
-from metadata.models import CompoundDatatype, Datatype, kive_user, everyone_group
-from method.models import Method
+from metadata.models import CompoundDatatype, CompoundDatatypeMember, \
+    Datatype, kive_user, everyone_group
+from method.models import Method, MethodFamily, CodeResource
 import method.tests
 from librarian.models import SymbolicDataset
 from pipeline.models import Pipeline, PipelineFamily, \
     PipelineSerializationException, PipelineStep, PipelineStepInputCable, \
     PipelineOutputCable
 import sandbox.testing_utils as tools
+import metadata.tests
 
 from pipeline.serializers import PipelineSerializer
 
@@ -141,6 +143,19 @@ class PipelineFamilyTests(PipelineTestCase):
         """Can I delete a PipelineFamily?"""
         self.assertIsNone(PipelineFamily.objects.first().delete())
 
+    def test_published_version_display_is_none(self):
+        family = PipelineFamily.objects.get(name='DNAcomplement')
+        self.assertIsNone(family.published_version_display)
+
+    def test_published_version_display(self):
+        family = PipelineFamily.objects.get(name='DNAcomplement')
+        family.published_version = family.members.last() #oldest version
+        family.clean()
+        family.save()
+        
+        reloaded = PipelineFamily.objects.get(pk=family.pk)
+        
+        self.assertEqual("1: v1", reloaded.published_version_display)
 
 class PipelineTests(PipelineTestCase):
     """Tests for basic Pipeline functionality."""
@@ -5589,6 +5604,362 @@ tail -n +2 "$2" >> "$3"
 # June 5, 2015: this will eventually replace all of the above testing
 # of represent_as_dict and its offshoots, which will themselves be
 # obsoleted by PipelineSerializer.
+def create_pipeline_deserialization_environment(self):
+    """
+    Set up stuff that will help with testing Pipeline deserialization.
+
+    The "sandbox" testing environment must be set up already, either
+    by directly calling create_sandbox_testing_tools_environment or
+    by including a fixture that had called it.
+    """
+    self.kive_user = kive_user()
+    self.everyone_group = everyone_group()
+
+    # Explicitly load objects that are defined in create_sandbox_testing...
+    # in case we are using a fixture.
+    self.user_bob = User.objects.get(username="bob")
+    self.coderesource_noop = CodeResource.objects.get(
+        user=self.user_bob,
+        name="noop"
+    )
+    self.coderev_noop = self.coderesource_noop.revisions.get(revision_name="1")
+    self.noop_mf = MethodFamily.objects.get(name="string noop")
+    self.method_noop = self.noop_mf.members.get(revision_number=1)
+    self.noop_raw_mf = MethodFamily.objects.get(name="raw noop", user=self.user_bob)
+    self.method_noop_raw = self.noop_raw_mf.members.get(revision_number=1)
+
+    # Retrieve the CDT defined in create_sandbox_testing_tools_environment
+    # called "self.cdt_string", or an equivalent.
+    bob_string_dt = Datatype.objects.get(
+        user=self.user_bob,
+        name="my_string",
+        description="sequences of ASCII characters"
+    )
+    possible_cdt_string_members = CompoundDatatypeMember.objects.filter(
+        column_name="word",
+        column_idx=1,
+        datatype=bob_string_dt
+    )
+    possible_cdt_strings = [x.compounddatatype for x in possible_cdt_string_members]
+    self.cdt_string = possible_cdt_strings[0]
+
+    # A fake request that provides context.
+    class DuckRequest(object):
+        pass
+
+    self.duck_request = DuckRequest()
+    self.duck_request.user = kive_user()
+    self.duck_context = {"request": self.duck_request}
+
+    self.test_pf = PipelineFamily(
+        user=self.kive_user,
+        name="test",
+        description="Test family"
+    )
+    self.test_pf.save()
+    self.test_pf.groups_allowed.add(self.everyone_group)
+
+    # Set up a CDT with two elements to allow some wiring to occur.
+    self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
+
+    # A CDT composed of two builtin-STR columns.
+    self.string_doublet = CompoundDatatype(user=self.user_bob)
+    self.string_doublet.save()
+    self.string_doublet.members.create(datatype=self.STR, column_name="column1", column_idx=1)
+    self.string_doublet.members.create(datatype=self.STR, column_name="column2", column_idx=2)
+    self.string_doublet.grant_everyone_access()
+
+    # A CDT composed of one builtin-STR column.
+    self.string_singlet = CompoundDatatype(user=self.user_bob)
+    self.string_singlet.save()
+    self.string_singlet.members.create(datatype=self.STR, column_name="col1", column_idx=1)
+    self.string_singlet.grant_everyone_access()
+
+    # Here is a dictionary that can be deserialized into a Pipeline.
+    self.noop_input_name = self.method_noop.inputs.first().dataset_name
+    self.noop_output_name = self.method_noop.outputs.first().dataset_name
+    self.pipeline_dict = {
+        "family": "test",
+        "family_pk": self.test_pf.pk,  # FIXME remove after we eliminate family_pk from the serializer
+        "revision_name": "v1",
+        "revision_desc": "first version",
+        "revision_parent": None,
+
+        "user": self.kive_user.username,
+        "users_allowed": [],
+        "groups_allowed": [self.everyone_group.name],
+
+        "inputs": [
+            {
+                "dataset_name": "input_to_not_touch",
+                "dataset_idx": 1,
+                "x": 0.05,
+                "y": 0.5,
+                "structure": {
+                    "compounddatatype": self.cdt_string.pk,
+                    "min_row": None,
+                    "max_row": None
+                }
+            }
+        ],
+        "steps": [
+            {
+                "transformation": self.method_noop.pk,
+                "step_num": 1,
+                "x": 0.2,
+                "y": 0.5,
+                "name": "step 1",
+                "cables_in": [
+                    {
+                        # The pipeline input doesn't exist yet so we have to specify
+                        # it by name.
+                        "source_dataset_name": "input_to_not_touch",
+                        "source_step": 0,
+                        "dest_dataset_name": self.noop_input_name,
+                        "custom_wires": [],
+                        "keep_output": False
+                    }
+                ],
+                "outputs_to_delete": []
+            },
+            {
+                "transformation": self.method_noop.pk,
+                "step_num": 2,
+                "x": 0.4,
+                "y": 0.5,
+                "name": "step 2",
+                "cables_in": [
+                    {
+                        # Here we can specify source directly.
+                        "source_dataset_name": self.noop_output_name,
+                        "source_step": 1,
+                        "dest_dataset_name": self.noop_input_name,
+                        "custom_wires": [],
+                        "keep_output": False
+                    }
+                ],
+                "outputs_to_delete": []
+            },
+            {
+                "transformation": self.method_noop.pk,
+                "step_num": 3,
+                "x": 0.6,
+                "y": 0.5,
+                "name": "step 3",
+                "cables_in": [
+                    {
+                        "source_dataset_name": self.noop_output_name,
+                        "source_step": 2,
+                        "dest_dataset_name": self.noop_input_name,
+                        "custom_wires": [],
+                        "keep_output": False
+                    }
+                ],
+                "outputs_to_delete": []
+            }
+        ],
+        "outcables": [
+            {
+                "output_idx": 1,
+                "output_name": "untouched_output",
+                "output_cdt": self.cdt_string.pk,
+                "source_step": 3,
+                "source_dataset_name": self.noop_output_name,
+                "x": 0.85,
+                "y": 0.5,
+                "custom_wires": []
+            }
+        ]
+    }
+
+    self.method_doublet_noop = tools.make_first_method(
+        "string doublet noop",
+        "a noop on a two-column input",
+        self.coderev_noop,
+        self.user_bob)
+    self.method_doublet_noop.grant_everyone_access()
+    self.doublet_input_name = "doublets"
+    self.doublet_output_name = "untouched_doublets"
+    tools.simple_method_io(
+        self.method_doublet_noop,
+        self.string_doublet,
+        self.doublet_input_name,
+        self.doublet_output_name
+    )
+
+    # This defines a pipeline with custom wiring.
+    self.pipeline_cw_dict = {
+        "family": "test",
+        "family_pk": self.test_pf.pk,  # FIXME remove after we eliminate family_pk from the serializer
+        "revision_name": "v2_c2",
+        "revision_desc": "Custom wiring tester",
+        "revision_parent": None,
+
+        "user": self.kive_user.username,
+        "users_allowed": [self.kive_user.username],
+        "groups_allowed": [],
+
+        "inputs": [
+            {
+                "dataset_name": "input_to_not_touch",
+                "dataset_idx": 1,
+                "x": 0.05,
+                "y": 0.5,
+                "structure": {
+                    "compounddatatype": self.cdt_string.pk,
+                    "min_row": None,
+                    "max_row": None
+                }
+            }
+        ],
+        "steps": [
+            {
+                "transformation": self.method_doublet_noop.pk,
+                "step_num": 1,
+                "x": 0.2,
+                "y": 0.5,
+                "name": "step 1",
+                "cables_in": [
+                    {
+                        # The pipeline input doesn't exist yet so we have to specify
+                        # it by name.
+                        "source_dataset_name": "input_to_not_touch",
+                        "source_step": 0,
+                        "dest_dataset_name": self.doublet_input_name,
+                        "custom_wires": [
+                            {
+                                "source_pin": self.cdt_string.members.first().pk,
+                                "dest_pin": self.string_doublet.members.get(column_idx=1).pk
+                            },
+                            {
+                                "source_pin": self.cdt_string.members.first().pk,
+                                "dest_pin": self.string_doublet.members.get(column_idx=2).pk
+                            },
+                        ],
+                        "keep_output": False
+                    }
+                ],
+                "outputs_to_delete": []
+            },
+            {
+                "transformation": self.method_noop.pk,
+                "step_num": 2,
+                "x": 0.4,
+                "y": 0.5,
+                "name": "step 2",
+                "cables_in": [
+                    {
+                        # Here we can specify source directly.
+                        "source_dataset_name": self.doublet_output_name,
+                        "source_step": 1,
+                        "dest_dataset_name": self.noop_input_name,
+                        "custom_wires": [
+                            {
+                                "source_pin": self.string_doublet.members.get(column_idx=1).pk,
+                                "dest_pin": self.cdt_string.members.first().pk
+                            }
+                        ],
+                        "keep_output": False
+                    }
+                ],
+                "outputs_to_delete": []
+            }
+        ],
+        "outcables": [
+            {
+                "output_idx": 1,
+                "output_name": "untouched_output",
+                "output_cdt": self.string_doublet.pk,
+                "source_step": 2,
+                "source_dataset_name": self.noop_output_name,
+                "x": 0.85,
+                "y": 0.5,
+                "custom_wires": [
+                    {
+                        "source_pin": self.cdt_string.members.first().pk,
+                        "dest_pin": self.string_doublet.members.get(column_idx=1).pk
+                    },
+                    {
+                        "source_pin": self.cdt_string.members.first().pk,
+                        "dest_pin": self.string_doublet.members.get(column_idx=2).pk
+                    },
+                ]
+            }
+        ]
+    }
+
+    # This defines a pipeline that handles raw data.
+    self.raw_input_name = self.method_noop_raw.inputs.first().dataset_name
+    self.raw_output_name = self.method_noop_raw.outputs.first().dataset_name
+    self.pipeline_raw_dict = {
+        "family": "test",
+        "family_pk": self.test_pf.pk,  # FIXME remove after we eliminate family_pk from the serializer
+        "revision_name": "v3_raw",
+        "revision_desc": "Raw input tester",
+        "revision_parent": None,
+
+        "user": self.kive_user.username,
+        "users_allowed": [self.kive_user.username],
+        "groups_allowed": [self.everyone_group],
+
+        "inputs": [
+            {
+                "dataset_name": "input_to_not_touch",
+                "dataset_idx": 1,
+                "x": 0.05,
+                "y": 0.5
+            }
+        ],
+        "steps": [
+            {
+                "transformation": self.method_noop_raw.pk,
+                "step_num": 1,
+                "x": 0.2,
+                "y": 0.5,
+                "name": "step 1",
+                "cables_in": [
+                    {
+                        # The pipeline input doesn't exist yet so we have to specify
+                        # it by name.
+                        "source_dataset_name": "input_to_not_touch",
+                        "source_step": 0,
+                        "dest_dataset_name": self.raw_input_name,
+                        "keep_output": False
+                    }
+                ],
+                "outputs_to_delete": []
+            },
+            {
+                "transformation": self.method_noop_raw.pk,
+                "step_num": 2,
+                "x": 0.4,
+                "y": 0.5,
+                "name": "step 2",
+                "cables_in": [
+                    {
+                        # Here we can specify source directly.
+                        "source_dataset_name": self.raw_output_name,
+                        "source_step": 1,
+                        "dest_dataset_name": self.raw_input_name,
+                        "keep_output": False
+                    }
+                ],
+                "outputs_to_delete": []
+            }
+        ],
+        "outcables": [
+            {
+                "output_idx": 1,
+                "output_name": "untouched_output",
+                "source_step": 2,
+                "source_dataset_name": self.raw_output_name,
+                "x": 0.85,
+                "y": 0.5
+            }
+        ]
+    }
+
+
 class PipelineSerializerTests(TestCase):
     """
     Tests of PipelineSerializer and its offshoots.
@@ -5596,326 +5967,11 @@ class PipelineSerializerTests(TestCase):
     fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
-        self.kive_user = kive_user()
-        self.everyone_group = everyone_group()
-
-        # A fake request that provides context.
-        class DuckRequest(object):
-            pass
-
-        self.duck_request = DuckRequest()
-        self.duck_request.user = kive_user()
-        self.duck_context = {"request": self.duck_request}
-
         tools.create_sandbox_testing_tools_environment(self)
+        create_pipeline_deserialization_environment(self)
 
-        self.test_pf = PipelineFamily(
-            user=self.kive_user,
-            name="test",
-            description="Test family"
-        )
-        self.test_pf.save()
-        self.test_pf.groups_allowed.add(self.everyone_group)
-
-        # Set up a CDT with two elements to allow some wiring to occur.
-        self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
-
-        # A CDT composed of two builtin-STR columns.
-        self.string_doublet = CompoundDatatype(user=self.user_bob)
-        self.string_doublet.save()
-        self.string_doublet.members.create(datatype=self.STR, column_name="column1", column_idx=1)
-        self.string_doublet.members.create(datatype=self.STR, column_name="column2", column_idx=2)
-        self.string_doublet.grant_everyone_access()
-
-        # A CDT composed of one builtin-STR column.
-        self.string_singlet = CompoundDatatype(user=self.user_bob)
-        self.string_singlet.save()
-        self.string_singlet.members.create(datatype=self.STR, column_name="col1", column_idx=1)
-        self.string_singlet.grant_everyone_access()
-
-        # Here is a dictionary that can be deserialized into a Pipeline.
-        self.noop_input_name = self.method_noop.inputs.first().dataset_name
-        self.noop_output_name = self.method_noop.outputs.first().dataset_name
-        self.pipeline_dict = {
-            "family": "test",
-            # "family_pk": self.test_pf.pk,  # FIXME remove after we eliminate family_pk from the serializer
-            "revision_name": "v1",
-            "revision_desc": "first version",
-            "revision_parent": None,
-
-            "user": self.kive_user.username,
-            "users_allowed": [],
-            "groups_allowed": [self.everyone_group.name],
-
-            "inputs": [
-                {
-                    "dataset_name": "input_to_not_touch",
-                    "dataset_idx": 1,
-                    "x": 0.05,
-                    "y": 0.5,
-                    "structure": {
-                        "compounddatatype": self.cdt_string.pk,
-                        "min_row": None,
-                        "max_row": None
-                    }
-                }
-            ],
-            "steps": [
-                {
-                    "transformation": self.method_noop.pk,
-                    "step_num": 1,
-                    "x": 0.2,
-                    "y": 0.5,
-                    "name": "step 1",
-                    "cables_in": [
-                        {
-                            # The pipeline input doesn't exist yet so we have to specify
-                            # it by name.
-                            "source_dataset_name": "input_to_not_touch",
-                            "source_step": 0,
-                            "dest_dataset_name": self.noop_input_name,
-                            "custom_wires": [],
-                            "keep_output": False
-                        }
-                    ],
-                    "outputs_to_delete": []
-                },
-                {
-                    "transformation": self.method_noop.pk,
-                    "step_num": 2,
-                    "x": 0.4,
-                    "y": 0.5,
-                    "name": "step 2",
-                    "cables_in": [
-                        {
-                            # Here we can specify source directly.
-                            "source_dataset_name": self.noop_output_name,
-                            "source_step": 1,
-                            "dest_dataset_name": self.noop_input_name,
-                            "custom_wires": [],
-                            "keep_output": False
-                        }
-                    ],
-                    "outputs_to_delete": []
-                },
-                {
-                    "transformation": self.method_noop.pk,
-                    "step_num": 3,
-                    "x": 0.6,
-                    "y": 0.5,
-                    "name": "step 3",
-                    "cables_in": [
-                        {
-                            "source_dataset_name": self.noop_output_name,
-                            "source_step": 2,
-                            "dest_dataset_name": self.noop_input_name,
-                            "custom_wires": [],
-                            "keep_output": False
-                        }
-                    ],
-                    "outputs_to_delete": []
-                }
-            ],
-            "outcables": [
-                {
-                    "output_idx": 1,
-                    "output_name": "untouched_output",
-                    "output_cdt": self.cdt_string.pk,
-                    "source_step": 3,
-                    "source_dataset_name": self.noop_output_name,
-                    "x": 0.85,
-                    "y": 0.5,
-                    "custom_wires": []
-                }
-            ]
-        }
-
-        self.method_doublet_noop = tools.make_first_method(
-            "string doublet noop",
-            "a noop on a two-column input",
-            self.coderev_noop,
-            self.user_bob)
-        self.method_doublet_noop.grant_everyone_access()
-        self.doublet_input_name = "doublets"
-        self.doublet_output_name = "untouched_doublets"
-        tools.simple_method_io(
-            self.method_doublet_noop,
-            self.string_doublet,
-            self.doublet_input_name,
-            self.doublet_output_name
-        )
-
-        # This defines a pipeline with custom wiring.
-        self.pipeline_cw_dict = {
-            "family": "test",
-            "family_pk": self.test_pf.pk,  # FIXME remove after we eliminate family_pk from the serializer
-            "revision_name": "v2_c2",
-            "revision_desc": "Custom wiring tester",
-            "revision_parent": None,
-
-            "user": self.kive_user.username,
-            "users_allowed": [self.kive_user.username],
-            "groups_allowed": [],
-
-            "inputs": [
-                {
-                    "dataset_name": "input_to_not_touch",
-                    "dataset_idx": 1,
-                    "x": 0.05,
-                    "y": 0.5,
-                    "structure": {
-                        "compounddatatype": self.cdt_string.pk,
-                        "min_row": None,
-                        "max_row": None
-                    }
-                }
-            ],
-            "steps": [
-                {
-                    "transformation": self.method_doublet_noop.pk,
-                    "step_num": 1,
-                    "x": 0.2,
-                    "y": 0.5,
-                    "name": "step 1",
-                    "cables_in": [
-                        {
-                            # The pipeline input doesn't exist yet so we have to specify
-                            # it by name.
-                            "source_dataset_name": "input_to_not_touch",
-                            "source_step": 0,
-                            "dest_dataset_name": self.doublet_input_name,
-                            "custom_wires": [
-                                {
-                                    "source_pin": self.cdt_string.members.first().pk,
-                                    "dest_pin": self.string_doublet.members.get(column_idx=1).pk
-                                },
-                                {
-                                    "source_pin": self.cdt_string.members.first().pk,
-                                    "dest_pin": self.string_doublet.members.get(column_idx=2).pk
-                                },
-                            ],
-                            "keep_output": False
-                        }
-                    ],
-                    "outputs_to_delete": []
-                },
-                {
-                    "transformation": self.method_noop.pk,
-                    "step_num": 2,
-                    "x": 0.4,
-                    "y": 0.5,
-                    "name": "step 2",
-                    "cables_in": [
-                        {
-                            # Here we can specify source directly.
-                            "source_dataset_name": self.doublet_output_name,
-                            "source_step": 1,
-                            "dest_dataset_name": self.noop_input_name,
-                            "custom_wires": [
-                                {
-                                    "source_pin": self.string_doublet.members.get(column_idx=1).pk,
-                                    "dest_pin": self.cdt_string.members.first().pk
-                                }
-                            ],
-                            "keep_output": False
-                        }
-                    ],
-                    "outputs_to_delete": []
-                }
-            ],
-            "outcables": [
-                {
-                    "output_idx": 1,
-                    "output_name": "untouched_output",
-                    "output_cdt": self.string_doublet.pk,
-                    "source_step": 2,
-                    "source_dataset_name": self.noop_output_name,
-                    "x": 0.85,
-                    "y": 0.5,
-                    "custom_wires": [
-                        {
-                            "source_pin": self.cdt_string.members.first().pk,
-                            "dest_pin": self.string_doublet.members.get(column_idx=1).pk
-                        },
-                        {
-                            "source_pin": self.cdt_string.members.first().pk,
-                            "dest_pin": self.string_doublet.members.get(column_idx=2).pk
-                        },
-                    ]
-                }
-            ]
-        }
-
-        # This defines a pipeline that handles raw data.
-        self.raw_input_name = self.method_noop_raw.inputs.first().dataset_name
-        self.raw_output_name = self.method_noop_raw.outputs.first().dataset_name
-        self.pipeline_raw_dict = {
-            "family": "test",
-            "family_pk": self.test_pf.pk,  # FIXME remove after we eliminate family_pk from the serializer
-            "revision_name": "v3_raw",
-            "revision_desc": "Raw input tester",
-            "revision_parent": None,
-
-            "user": self.kive_user.username,
-            "users_allowed": [self.kive_user.username],
-            "groups_allowed": [self.everyone_group],
-
-            "inputs": [
-                {
-                    "dataset_name": "input_to_not_touch",
-                    "dataset_idx": 1,
-                    "x": 0.05,
-                    "y": 0.5
-                }
-            ],
-            "steps": [
-                {
-                    "transformation": self.method_noop_raw.pk,
-                    "step_num": 1,
-                    "x": 0.2,
-                    "y": 0.5,
-                    "name": "step 1",
-                    "cables_in": [
-                        {
-                            # The pipeline input doesn't exist yet so we have to specify
-                            # it by name.
-                            "source_dataset_name": "input_to_not_touch",
-                            "source_step": 0,
-                            "dest_dataset_name": self.raw_input_name,
-                            "keep_output": False
-                        }
-                    ],
-                    "outputs_to_delete": []
-                },
-                {
-                    "transformation": self.method_noop_raw.pk,
-                    "step_num": 2,
-                    "x": 0.4,
-                    "y": 0.5,
-                    "name": "step 2",
-                    "cables_in": [
-                        {
-                            # Here we can specify source directly.
-                            "source_dataset_name": self.raw_output_name,
-                            "source_step": 1,
-                            "dest_dataset_name": self.raw_input_name,
-                            "keep_output": False
-                        }
-                    ],
-                    "outputs_to_delete": []
-                }
-            ],
-            "outcables": [
-                {
-                    "output_idx": 1,
-                    "output_name": "untouched_output",
-                    "source_step": 2,
-                    "source_dataset_name": self.raw_output_name,
-                    "x": 0.85,
-                    "y": 0.5
-                }
-            ]
-        }
+    def tearDown(self):
+        metadata.tests.clean_up_all_files()
 
     def test_validate(self):
         ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)
@@ -6134,6 +6190,38 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
 
         end_count = Pipeline.objects.count()
         self.assertEquals(end_count, start_count - 1)
+
+    def test_create(self):
+        # Note that the "sandbox" testing environment has already been set
+        # up in the "simple_run" fixture.
+        create_pipeline_deserialization_environment(self)
+        request = self.factory.post(self.list_path, self.pipeline_dict, format="json")
+        force_authenticate(request, user=self.kive_user)
+        self.list_view(request)
+
+        # Probe the new object.
+        new_pipeline = self.test_pf.members.get(revision_name=self.pipeline_dict["revision_name"])
+        self.assertEquals(new_pipeline.steps.count(), 3)
+        self.assertEquals(new_pipeline.outcables.count(), 1)
+        self.assertEquals(new_pipeline.outcables.first().output_name, "untouched_output")
+
+    def test_create_calls_clean(self):
+        """
+        Attempting to create a Pipeline should call complete_clean.
+        """
+        # Note that the "sandbox" testing environment has already been set
+        # up in the "simple_run" fixture.
+        create_pipeline_deserialization_environment(self)
+
+        self.pipeline_dict["steps"][0]["cables_in"] = []
+        request = self.factory.post(self.list_path, self.pipeline_dict, format="json")
+        force_authenticate(request, user=self.kive_user)
+        # This should barf.
+        self.assertRaisesRegexp(
+            ValidationError,
+            'Input "strings" to transformation at step 1 is not cabled',
+            lambda: self.list_view(request),
+        )
 
 
 class PipelineFamilyApiTests(BaseTestCases.ApiTestCase):

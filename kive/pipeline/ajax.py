@@ -11,14 +11,15 @@ import json
 from method.models import MethodFamily, Method
 from pipeline.models import Pipeline, PipelineFamily
 from portal.views import developer_check, admin_check
-from metadata.models import KiveUser, AccessControl
+from metadata.models import AccessControl
 
 from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet,\
     CleanCreateModelMixin
 
 
-class PipelineFamilyViewSet(RemovableModelViewSet):
+class PipelineFamilyViewSet(CleanCreateModelMixin,
+                            RemovableModelViewSet):
     queryset = PipelineFamily.objects.all()
     serializer_class = PipelineFamilySerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
@@ -38,6 +39,28 @@ class PipelineFamilyViewSet(RemovableModelViewSet):
         member_serializer = PipelineSerializer(
             member_pipelines, many=True, context={"request": request})
         return Response(member_serializer.data)
+
+    def partial_update(self, request, pk=None):
+        """
+        Defines PATCH functionality on a PipelineFamily.
+        """
+        if "published_version" in request.data:
+            # This is a PATCH to change the published version.
+            return self.change_published_version(request)
+
+        return Response({"message": "No action taken."})
+
+    def change_published_version(self, request):
+        family_to_publish = self.get_object()
+        new_published_version = Pipeline.objects.get(pk=request.data["published_version"])
+        family_to_publish.published_version = new_published_version
+        family_to_publish.save()
+        response_msg = 'PipelineFamily "{}" published_version set to "{}".'.format(
+            family_to_publish,
+            new_published_version
+        )
+        return Response({'message': response_msg})
+
 
 
 class PipelineViewSet(CleanCreateModelMixin,
@@ -117,7 +140,7 @@ def populate_method_revision_dropdown (request):
 
 @login_required
 @user_passes_test(developer_check)
-def get_method_io (request):
+def get_method_io(request):
     """
     handles ajax request from pipelines.html
     populates a dictionary with information about this method's transformation
@@ -191,44 +214,6 @@ def get_method_xputs(method):
             )
         result.append(xputs)
     return {'inputs': result[0], 'outputs': result[1]}
-
-
-@login_required
-def get_pipeline(request):
-    if request.is_ajax():
-        response = HttpResponse()
-        pipeline_revision_id = request.POST.get('pipeline_id')  # TODO: Split this off into a form?
-        user = KiveUser.kiveify(request.user)
-
-        if pipeline_revision_id != '':
-            # Get and check permissions
-            pipeline_revision = Pipeline.objects.filter(
-                user.access_query(),
-                pk=pipeline_revision_id)
-
-            if pipeline_revision.count() == 0:
-                raise Http404
-            pipeline_revision = pipeline_revision.first()
-
-            pipeline_dict = pipeline_revision.represent_as_dict()
-            steps = pipeline_revision.steps\
-                .select_related('transformation__pipeline',
-                                'transformation__method')\
-                .prefetch_related('transformation__method__inputs__structure__compounddatatype__members__datatype',
-                                  'transformation__method__outputs__structure__compounddatatype__members__datatype',
-                                  'transformation__method__family')
-
-            # Hack to reduce number of ajax calls in interface.
-            for step in steps:
-                if not step.is_subpipeline:
-                    method = step.transformation.definite
-                    pipeline_dict["pipeline_steps"][step.step_num-1].update(get_method_xputs(method))
-            # End of hack.
-
-            return HttpResponse(json.dumps(pipeline_dict), content_type='application/json')
-        return response
-    else:
-        raise Http404
 
 
 @login_required

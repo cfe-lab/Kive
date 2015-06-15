@@ -69,6 +69,7 @@ class PipelineStepSerializer(serializers.ModelSerializer):
             "outputs_to_delete",
             "x",
             "y",
+            "fill_colour",
             "name",
             "cables_in",
             "outputs",
@@ -379,11 +380,16 @@ class PipelineFamilySerializer(AccessControlSerializer,
                   "users_allowed",
                   "groups_allowed",
                   'published_version',
+                  'published_version_display',
                   "absolute_url",
                   'removal_plan',
                   "num_revisions",
                   'members',
                   'members_url')
+        read_only_fields = (
+            "published_version",
+            "members"
+        )
 
     def get_absolute_url(self, obj):
         if not obj:

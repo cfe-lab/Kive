@@ -77,7 +77,6 @@ urlpatterns = patterns(
     url(r'^pipelines$', 'pipeline.views.pipelines', name='pipelines'),
     url(r'^pipeline_add$', 'pipeline.views.pipeline_add', name='pipeline_add'),
     url(r'^pipeline_revise/(?P<id>\d+)$', 'pipeline.views.pipeline_revise', name='pipeline_revise'),
-    url(r'^get_pipeline/$', 'pipeline.ajax.get_pipeline', name='get_pipeline'),
     url(r'^pipeline_exec$', 'pipeline.views.pipeline_exec', name='pipeline_exec'),
     url(r'^activate_pipeline/$', 'pipeline.ajax.activate_pipeline', name='activate_pipeline'),
 
