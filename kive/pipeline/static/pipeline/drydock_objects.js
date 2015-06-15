@@ -488,9 +488,10 @@ var drydock_objects = (function() {
      * @param x, y: position of the method on the screen
      * @param fill: colour to draw the method with
      * @param label: string value
-     * @param inputs: map of input index to input details
-     *  { index: { cdt_pk: pk, datasetname: name } } 
-     * @param outputs: map of output index to output details, same structure
+     * @param inputs: an array of input details
+     *  [ {dataset_idx: 'dataset index', dataset_name: 'name', structure: null or
+     *  {compounddatatype: pk} }]
+     * @param outputs: an array of output details, same structure
      * @param status: describes progress during a run, possible values are the
      *  keys in statusColorMap
      */
@@ -539,13 +540,13 @@ var drydock_objects = (function() {
             var cdt_pk = null,
                 magnet = null;
 
-            if (input.structure != null)
+            if (input.structure !== null)
                 cdt_pk = input.structure.compounddatatype;
 
             magnet = new my.Magnet(self, r, attract, magnet_fill, cdt_pk, input.dataset_name, null, false);
 
             // Fudge the magnet position around, I guess?
-            if (self.n_inputs == 1)
+            if (self.n_inputs === 1)
                 magnet.x -= self.h/3;
 
             self.in_magnets.push(magnet);
@@ -555,13 +556,13 @@ var drydock_objects = (function() {
             var cdt_pk = null,
                 magnet = null;
 
-            if (output.structure != null)
+            if (output.structure !== null)
                 cdt_pk = output.structure.compounddatatype;
 
             magnet = new my.Magnet(self, r, attract, magnet_fill, cdt_pk, output.dataset_name, null, true);
 
             // Fudge the magnet position around, I guess?
-            if (self.n_inputs == 1)
+            if (self.n_inputs === 1)
                 magnet.x += self.h/3;
 
             self.out_magnets.push(magnet);
