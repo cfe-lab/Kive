@@ -757,7 +757,7 @@ class PipelineStep(models.Model):
     x = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(1)])
     y = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(1)])
     name = models.CharField(default="", max_length=maxlengths.MAX_NAME_LENGTH, blank=True)
-    fill_colour = models.CharField(default="", max_length=7, blank=True)
+    fill_colour = models.CharField(default="", max_length=maxlengths.MAX_COLOUR_LENGTH, blank=True)
 
     def __str__(self):
         """ Represent with the pipeline and step number """

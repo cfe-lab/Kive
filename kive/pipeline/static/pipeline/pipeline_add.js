@@ -227,39 +227,42 @@ $(function() {
                 to_node instanceof drydock_objects.MethodNode)) {
             return false;
         }
-        var idx, new_xput, old_xput, connector, i;
-        for (idx in from_node.inputs) if (from_node.inputs.propertyIsEnumerable(idx)) {
-            old_xput = from_node.inputs[idx];
-            if (to_node.inputs.hasOwnProperty(idx)) {
-                new_xput = to_node.inputs[idx];
-                if (((new_xput.structure === null && old_xput.structure == null) ||
-                     (new_xput.structure != null && old_xput.structure != null &&
-                      new_xput.structure.compounddatatype == old_xput.structure.compounddatatype)) &&
-                      from_node.in_magnets[idx-1].connected.length) {
+
+        $.each(from_node.inputs, function(_, old_xput){
+            var old_dataset_idx = old_xput.dataset_idx,
+                new_xput = to_node.inputs[old_dataset_idx - 1];
+
+            if (((new_xput.structure === null && old_xput.structure == null) ||
+                 (new_xput.structure != null && old_xput.structure != null &&
+                  new_xput.structure.compounddatatype == old_xput.structure.compounddatatype)) &&
+                  from_node.in_magnets[old_dataset_idx - 1].connected.length) {
 
                     // re-attach Connector
-                    connector = from_node.in_magnets[idx-1].connected.pop();
-                    connector.dest = to_node.in_magnets[idx-1];
-                    to_node.in_magnets[idx-1].connected.push(connector);
-                }
+                connector = from_node.in_magnets[old_dataset_idx - 1].connected.pop();
+                connector.dest = to_node.in_magnets[old_dataset_idx - 1];
+                to_node.in_magnets[old_dataset_idx - 1].connected.push(connector);
             }
-        }
-        for (idx in from_node.outputs) if (from_node.outputs.propertyIsEnumerable(idx)) {
-            old_xput = from_node.outputs[idx];
-            if (to_node.outputs.hasOwnProperty(idx)) {
-                new_xput = to_node.outputs[idx];
-                if (new_xput.cdt_pk === old_xput.cdt_pk) {
-                    // re-attach all Connectors - note this does not reverse order any longer
-                    for (i = 0; i < from_node.out_magnets[idx-1].connected.length; i++) {
-                        while (from_node.out_magnets[idx-1].connected.length) {
-                            connector = from_node.out_magnets[idx-1].connected.pop();
-                            connector.source = to_node.out_magnets[idx-1];
-                            to_node.out_magnets[idx-1].connected.unshift(connector);
-                        }
+        });
+
+        $.each(from_node.outputs, function(_, old_xput){
+            var old_dataset_idx = old_xput.dataset_idx,
+                new_xput = to_node.outputs[old_dataset_idx - 1];
+
+            if (((new_xput.structure === null && old_xput.structure == null) ||
+                 (new_xput.structure != null && old_xput.structure != null &&
+                  new_xput.structure.compounddatatype == old_xput.structure.compounddatatype)) &&
+                  from_node.out_magnets[old_dataset_idx - 1].connected.length) {
+
+                // re-attach all Connectors - note this does not reverse order any longer
+                for (i = 0; i < from_node.out_magnets[old_dataset_idx - 1].connected.length; i++) {
+                    while (from_node.out_magnets[old_dataset_idx-1].connected.length) {
+                        connector = from_node.out_magnets[old_dataset_idx-1].connected.pop();
+                        connector.source = to_node.out_magnets[old_dataset_idx-1];
+                        to_node.out_magnets[old_dataset_idx-1].connected.unshift(connector);
                     }
                 }
             }
-        }
+        });
     };
     var submitMethodDialog = function(e) {
         e.preventDefault(); // stop default form submission behaviour

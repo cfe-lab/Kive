@@ -40,6 +40,7 @@ class MaxLengths:
 
 maxlengths = MaxLengths()
 maxlengths.MAX_FILENAME_LENGTH = 260
+maxlengths.MAX_COLOUR_LENGTH = 100
 maxlengths.MAX_NAME_LENGTH = 60
 maxlengths.MAX_DESCRIPTION_LENGTH = 1000
 

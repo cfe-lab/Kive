@@ -309,7 +309,7 @@ var pipeline = (function(exports){
                     node.transformation_family,
                     node.x * canvas_x_ratio,
                     node.y * canvas_y_ratio,
-                    null, // fill
+                    node.fill_colour, // fill
                     node.name,
                     node.inputs,
                     node.outputs
