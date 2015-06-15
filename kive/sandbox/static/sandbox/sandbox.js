@@ -319,23 +319,32 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             }
             filterTable_ajax(container.siblings('.results'));
         });
-        
-        $('.results').on('click', 'tbody tr', function() {
+
+        $(".results tbody tr").click(function () {
             var tab = $(this).closest('.results'),
                 tbselect = tab.siblings('input.tbselect-value');
-            
+
             $('tr', tab).removeClass('selected');
-            
+
             // classList.contains is faster than jQuery .hasClass or .is('.class').
             if (this.classList.contains('selected')) {
                 tbselect.val('');
             }
             else {
                 tbselect.val( $(this).get_pkey(tab.data('pkey')) );
-                $(this).addClass('selected');  
+                $(this).addClass('selected');
             }
-            
+
             tbselect.trigger('change');
+        });
+        $(".results .pipeline_selector").change(function () {
+            var tab = $(this).closest('.results'),
+                tbselect = tab.siblings('input.tbselect-value'),
+                parent_row = $(this).parent("tr");
+
+            new_pkey = parent_row.get_pkey(tab.data("pkey"))
+            tbselect.val(new_pkey)
+            tbselect.trigger("change")
         });
         
         /* Browsers will remember input values, even for hidden fields, on page refresh
