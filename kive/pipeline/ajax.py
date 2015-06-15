@@ -129,32 +129,37 @@ def get_method_io (request):
         method_id = request.POST.get('mid')
         method = Method.objects.filter(pk=method_id)[0]
 
-        inputs = {}
+        inputs = []
+
         for input in method.inputs.all():
-            if not input.has_structure:
-                # input is unstructured
-                cdt_pk = None
-                cdt_label = 'raw'
-            else:
+            strct = None
+
+            if input.has_structure:
                 structure = input.structure
                 cdt_pk = structure.compounddatatype.pk
                 cdt_label = str(structure.compounddatatype)
-            inputs.update({input.dataset_idx: {'datasetname': input.dataset_name,
-                                               'cdt_pk': cdt_pk,
-                                               'cdt_label': cdt_label}})
-        outputs = {}
+                strct = {'compounddatatype': cdt_pk, 'cdt_label': cdt_label}
+
+            inputs.append({
+                'dataset_idx': input.dataset_idx,
+                'dataset_name': input.dataset_name,
+                'structure': strct
+            })
+
+        outputs = []
         for output in method.outputs.all():
-            if not output.has_structure:
-                # output is unstructured
-                cdt_pk = None
-                cdt_label = 'raw'
-            else:
+            strct = None
+            if output.has_structure:
                 structure = output.structure
                 cdt_pk = structure.compounddatatype.pk
                 cdt_label = str(structure.compounddatatype)
-            outputs.update({output.dataset_idx: {'datasetname': output.dataset_name,
-                                                 'cdt_pk': cdt_pk,
-                                                 'cdt_label': cdt_label}})
+                strct = {'compounddatatype': cdt_pk, 'cdt_label': cdt_label}
+
+            outputs.append({
+                'dataset_idx': output.dataset_idx,
+                'dataset_name': output.dataset_name,
+                'structure': strct
+            })
 
         response_data = {'inputs': inputs, 'outputs': outputs}
         return HttpResponse(json.dumps(response_data), content_type='application/json')
