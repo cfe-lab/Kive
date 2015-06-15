@@ -368,6 +368,12 @@ class PipelineSerializer(AccessControlSerializer,
 
 class PipelineFamilySerializer(AccessControlSerializer,
                                serializers.ModelSerializer):
+    user = serializers.SlugRelatedField(
+        slug_field="username",
+        read_only=True,
+        default=serializers.CurrentUserDefault()
+    )
+
     # published_version = PipelineSerializer(allow_null=True)
     removal_plan = serializers.HyperlinkedIdentityField(view_name='pipelinefamily-removal-plan')
     absolute_url = serializers.SerializerMethodField()
@@ -405,3 +411,4 @@ class PipelineFamilySerializer(AccessControlSerializer,
         if not obj:
             return None
         return obj.num_revisions
+

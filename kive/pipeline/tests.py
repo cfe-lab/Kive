@@ -157,6 +157,7 @@ class PipelineFamilyTests(PipelineTestCase):
         
         self.assertEqual("1: v1", reloaded.published_version_display)
 
+
 class PipelineTests(PipelineTestCase):
     """Tests for basic Pipeline functionality."""
     
@@ -6280,3 +6281,22 @@ class PipelineFamilyApiTests(BaseTestCases.ApiTestCase):
 
         end_count = PipelineFamily.objects.count()
         self.assertEquals(end_count, start_count - 1)
+
+    def test_create(self):
+        pf_name = "Test PipelineFamily"
+        pf_description = "For testing the creation of a PipelineFamily through the API."
+        pf_data = {
+            "name": pf_name,
+            "description": pf_description,
+            "users_allowed": [],
+            "groups_allowed": [everyone_group().name]
+        }
+
+        request = self.factory.post(self.list_path, pf_data, format="json")
+        force_authenticate(request, user=self.kive_user)
+        self.list_view(request)
+
+        # Probe the resulting new PipelineFamily.
+        new_pf = PipelineFamily.objects.get(name=pf_name)
+        self.assertEquals(new_pf.description, pf_description)
+        self.assertEquals(new_pf.members.count(), 0)
