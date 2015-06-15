@@ -52,7 +52,11 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
 
     def change_published_version(self, request):
         family_to_publish = self.get_object()
-        new_published_version = Pipeline.objects.get(pk=request.data["published_version"])
+        if request.data.get("published_version") == "" or request.data.get("published_version") is None:
+            new_published_version = None
+        else:
+            new_published_version = Pipeline.objects.get(pk=request.data["published_version"])
+
         family_to_publish.published_version = new_published_version
         family_to_publish.save()
         response_msg = 'PipelineFamily "{}" published_version set to "{}".'.format(

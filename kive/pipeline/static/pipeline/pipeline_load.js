@@ -294,10 +294,13 @@ var pipeline = (function(exports){
         });
     };
 
-    Pipeline.prototype.draw_steps = function(canvasState, method_node_offset) {
+    Pipeline.prototype.draw_steps = function() {
+        /**
+         * Private method that sets up canvas state to draw methods
+         */
         var self = this,
-            canvas_x_ratio = this.canvasState.canvas.width / this.canvasState.scale,
-            canvas_y_ratio = this.canvasState.canvas.height / this.canvasState.scale;
+            canvas_x_ratio = self.canvasState.canvas.width / self.canvasState.scale,
+            canvas_y_ratio = self.canvasState.canvas.height / self.canvasState.scale;
 
         if(self.pipeline === null) throw "draw_inputs() called with no pipeline?";
         var method_node_offset = self.pipeline.inputs.length;
@@ -381,10 +384,13 @@ var pipeline = (function(exports){
         });
     };
 
-    Pipeline.prototype.draw_outputs = function (canvasState, pipeline, method_node_offset) {
+    Pipeline.prototype.draw_outputs = function () {
+        /**
+         * Private method that sets up canvas state to draw outputs
+         */
         var self = this,
-            canvas_x_ratio = this.canvasState.canvas.width / this.canvasState.scale,
-            canvas_y_ratio = this.canvasState.canvas.height / this.canvasState.scale;
+            canvas_x_ratio = self.canvasState.canvas.width / self.canvasState.scale,
+            canvas_y_ratio = self.canvasState.canvas.height / self.canvasState.scale;
 
         if(self.pipeline === null) throw "draw_outputs() called with no pipeline?";
 
@@ -422,6 +428,59 @@ var pipeline = (function(exports){
                 }
             });
         });
+    };
+
+
+    Pipeline.prototype.isPublished = function() {
+        /**
+         * Returns whether or not the pipeline has been published
+         */
+        return this.pipeline.is_published_version;
+    };
+
+    Pipeline.prototype.publish = function(family_pk, callback) {
+        /**
+         * Sets this pipeline as published
+         *
+         * @param family_pk: primary key of the family
+         * TODO: ^^ This should be in the serializer maybe?
+         * @param callback: Function called on success
+         */
+        var self = this;
+
+        $.ajax({
+            type: "PATCH",
+            url: "/api/pipelinefamilies/"  + family_pk,
+            data: { published_version: self.pipeline.id },
+            datatype: "json",
+            success: function(result){
+                self.pipeline.is_published_version = true;
+                callback(result);
+            }
+        });
+    };
+
+    Pipeline.prototype.unpublish =  function(family_pk, callback) {
+        /**
+         * Sets this pipeline as unpublished
+         *
+         * @param family_pk: primary key of the family
+         * TODO: ^^ This should be in the serializer maybe?
+         * @param callback: Function called on success
+         */
+        var self = this;
+
+        $.ajax({
+            type: "PATCH",
+            url: "/api/pipelinefamilies/"  + family_pk,
+            data: { published_version: null },
+            datatype: "json",
+            success: function(result){
+                self.pipeline.is_published_version = false;
+                callback(result);
+            }
+        });
+
     };
 
     // Export to the global namespace

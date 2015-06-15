@@ -36,17 +36,14 @@ $(function() {
     });
 
     $('#id_publish').on('click', function() {
-        $.ajax({
-            type: "POST",
-            url: "/activate_pipeline/",
-            data: { pipeline_id: $('#id_pipeline_select').val() },
-            datatype: "json",
-            success: function(result) {
-                $('#id_publish').val(
-                    result['is_published'] ?
-                    'Cancel publication' : 'Make published version'
-                );
-            }
-        });
+        if(pipeline_revision.isPublished()) {
+            pipeline_revision.unpublish($("#id_family_pk").val(), function() {
+                $('#id_publish').val('Make published version');
+            });
+        } else {
+            pipeline_revision.publish($("#id_family_pk").val(), function() {
+                $('#id_publish').val('Cancel publication');
+            });
+        }
     });
 });
