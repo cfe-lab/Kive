@@ -1,4 +1,6 @@
-"use strict";
+var datasets = (function() {
+    "use strict";
+    var my = {};
 
 function buildDateCreated($td, row) {
     $td.text(permissions.formatDate(row.date_created));
@@ -35,8 +37,11 @@ DatasetsTable.prototype.getQueryParams = function() {
     return params;
 }
 
-function datasets_main(is_user_admin, bootstrap){
+my.main = function(is_user_admin, bootstrap) {
     noXSS();
     var table = new DatasetsTable($('#datasets'), is_user_admin);
     table.buildTable(bootstrap);
 };
+
+    return my;
+}());

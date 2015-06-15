@@ -17,7 +17,7 @@
 
     <script type="text/javascript">
         $(function(){
-            datasets_main(
+            datasets.main(
                 {{ is_user_admin|lower }},
                 JSON.parse($('#preload_data').text()));
         });
