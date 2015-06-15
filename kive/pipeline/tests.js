@@ -1850,4 +1850,40 @@
             });
         });
     });
+    
+    describe('Pipeline families', function() {
+        beforeEach(function() {
+            this.$table = $('<table/>');
+            this.is_user_admin = false;
+            this.initial_data = [{
+                name: 'Example',
+                num_revisions: 1,
+                published_version_display: null}];
+        });
+        
+        it('should build a table', function() {
+            pipeline_families.main(
+                    this.is_user_admin,
+                    this.$table,
+                    this.initial_data);
+            
+            var $rows = this.$table.find('tr');
+            expect($rows.length).toBe(2);
+            var $cells = $rows.eq(1).find('td');
+            expect($cells.eq(0).text()).toBe('Example'); // Name
+            expect($cells.eq(3).text()).toBe('None'); // Published version
+        });
+        
+        it('should display published version', function() {
+            this.initial_data[0].published_version_display = "1: First";
+            pipeline_families.main(
+                    this.is_user_admin,
+                    this.$table,
+                    this.initial_data);
+            
+            var $rows = this.$table.find('tr');
+            var $cells = $rows.eq(1).find('td');
+            expect($cells.eq(3).text()).toBe('1: First'); // Published version
+        });
+    });
 })();

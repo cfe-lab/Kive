@@ -58,6 +58,13 @@ class PipelineFamily(transformation.models.TransformationFamily):
         Number of revisions within this TransformationFamily
         """
         return self.size
+     
+    @property
+    def published_version_display(self):
+        if self.published_version is None:
+            return None
+        return '{}: {}'.format(self.published_version.revision_number,
+                               self.published_version.revision_name) 
 
     @property
     def complete_members(self):
