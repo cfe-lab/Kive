@@ -292,10 +292,7 @@ class PipelineSerializer(AccessControlSerializer,
         groups_allowed = validated_data.pop("groups_allowed")
 
         # First, create the Pipeline.
-        pipeline = Pipeline.objects.create(
-            user=self.context["request"].user,
-            **validated_data
-        )
+        pipeline = Pipeline.objects.create(**validated_data)
         pipeline.users_allowed.add(*users_allowed)
         pipeline.groups_allowed.add(*groups_allowed)
 
@@ -368,12 +365,6 @@ class PipelineSerializer(AccessControlSerializer,
 
 class PipelineFamilySerializer(AccessControlSerializer,
                                serializers.ModelSerializer):
-    user = serializers.SlugRelatedField(
-        slug_field="username",
-        read_only=True,
-        default=serializers.CurrentUserDefault()
-    )
-
     # published_version = PipelineSerializer(allow_null=True)
     removal_plan = serializers.HyperlinkedIdentityField(view_name='pipelinefamily-removal-plan')
     absolute_url = serializers.SerializerMethodField()
@@ -406,9 +397,3 @@ class PipelineFamilySerializer(AccessControlSerializer,
         if not obj:
             return None
         return obj.get_absolute_url()
-
-    def get_num_revisions(self, obj):
-        if not obj:
-            return None
-        return obj.num_revisions
-
