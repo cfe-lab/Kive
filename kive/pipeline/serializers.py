@@ -391,6 +391,10 @@ class PipelineFamilySerializer(AccessControlSerializer,
                   "num_revisions",
                   'members',
                   'members_url')
+        read_only_fields = (
+            "published_version",
+            "members"
+        )
 
     def get_absolute_url(self, obj):
         if not obj:

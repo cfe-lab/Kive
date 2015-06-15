@@ -18,7 +18,8 @@ from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet,\
     CleanCreateModelMixin
 
 
-class PipelineFamilyViewSet(RemovableModelViewSet):
+class PipelineFamilyViewSet(CleanCreateModelMixin,
+                            RemovableModelViewSet):
     queryset = PipelineFamily.objects.all()
     serializer_class = PipelineFamilySerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
@@ -38,6 +39,28 @@ class PipelineFamilyViewSet(RemovableModelViewSet):
         member_serializer = PipelineSerializer(
             member_pipelines, many=True, context={"request": request})
         return Response(member_serializer.data)
+
+    def partial_update(self, request, pk=None):
+        """
+        Defines PATCH functionality on a PipelineFamily.
+        """
+        if "published_version" in request.data:
+            # This is a PATCH to change the published version.
+            return self.change_published_version(request)
+
+        return Response({"message": "No action taken."})
+
+    def change_published_version(self, request):
+        family_to_publish = self.get_object()
+        new_published_version = Pipeline.objects.get(pk=request.data["published_version"])
+        family_to_publish.published_version = new_published_version
+        family_to_publish.save()
+        response_msg = 'PipelineFamily "{}" published_version set to "{}".'.format(
+            family_to_publish,
+            new_published_version
+        )
+        return Response({'message': response_msg})
+
 
 
 class PipelineViewSet(CleanCreateModelMixin,

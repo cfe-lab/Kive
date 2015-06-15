@@ -96,7 +96,7 @@ class RedactModelMixin(object):
 
     Mix this in with a view set to provide default behaviour for data redaction.
     This overrides the `partial_update` method so that it automatically redacts an
-    object if it sees the  `is_redacted` flag when PATCH'd. After that, the patch_object
+    object if it sees the `is_redacted` flag when PATCH'd. After that, the patch_object
     method is called, which you should override if you want to do any proper PATCH object
     updates.
 
@@ -109,12 +109,11 @@ class RedactModelMixin(object):
         patch the object with is_redacted=true. Returns a dict: {model_name: set(instance)}
 
     """
-
     def patch_object(self, request, pk=None):
         pass
 
     def partial_update(self, request, pk=None):
-        if request.DATA.get('is_redacted', False):
+        if request.data.get('is_redacted', False):
             self.get_object().redact()
             return Response({'message': 'Object redacted.'})
         return self.patch_object(request, pk)
