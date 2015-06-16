@@ -179,8 +179,9 @@ class CodeResourceRevision(metadata.models.AccessControl):
     def save(self, *args, **kwargs):
         """Save this CodeResourceRevision, incrementing the revision number."""
         if not self.revision_number:
-            max = self.coderesource.revisions.aggregate(Max('revision_number'))
-            self.revision_number = max['revision_number__max'] + 1
+            max_rev = self.coderesource.revisions.aggregate(Max('revision_number'))['revision_number__max']
+            self.revision_number = (max_rev if max_rev is not None else 0) + 1
+
         super(CodeResourceRevision, self).save(*args, **kwargs)
 
     # This CRR includes it's own filename at the root
@@ -553,8 +554,9 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
     def save(self, *args, **kwargs):
         """Save a Method, automatically setting the revision number."""
         if not self.revision_number:
-            max = self.family.members.aggregate(Max('revision_number'))
-            self.revision_number = max['revision_number__max'] + 1
+            max_rev = self.family.members.aggregate(Max('revision_number'))['revision_number__max']
+            self.revision_number = (max_rev if max_rev is not None else 0) + 1
+
         super(Method, self).save(*args, **kwargs)
 
     def get_absolute_url(self):
