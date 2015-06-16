@@ -7,6 +7,7 @@ Pipeline.
 from __future__ import unicode_literals
 
 from django.db import models
+from django.db.models import Max
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import transaction
