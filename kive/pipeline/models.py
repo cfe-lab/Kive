@@ -58,6 +58,19 @@ class PipelineFamily(transformation.models.TransformationFamily):
         Number of revisions within this TransformationFamily
         """
         return self.size
+
+    def max_revision(self):
+        """
+        Return the maximum revision number of all member Methods.
+        """
+        return self.members.aggregate(Max('revision_number'))['revision_number__max']
+
+    def next_revision(self):
+        """
+        Return a number suitable for assigning to the next revision to be added.
+        """
+        max_rev = self.max_revision()
+        return (max_rev if max_rev is not None else 0) + 1
      
     @property
     def published_version_display(self):
@@ -159,7 +172,7 @@ class Pipeline(transformation.models.Transformation):
 
     def save(self, *args, **kwargs):
         if not self.revision_number:
-            self.revision_number = self.family.num_revisions+1
+            self.revision_number = self.family.next_revision()
         super(Pipeline, self).save(*args, **kwargs)
 
     @property

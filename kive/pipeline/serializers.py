@@ -134,8 +134,7 @@ class PipelineRevisionNumberGetter(object):
         )
 
     def __call__(self):
-        max_rev = self.pipelinefamily.members.aggregate(Max('revision_number'))['revision_number__max']
-        return (max_rev if max_rev is not None else 0) + 1
+        return self.pipelinefamily.next_revision()
 
 
 def _non_pipeline_input_cable_validate_helper(step_num, dataset_name, step_data_dicts):

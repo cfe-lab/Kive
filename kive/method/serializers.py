@@ -66,7 +66,7 @@ class CRRevisionNumberGetter(object):
         )
 
     def __call__(self):
-        return self.coderesource.num_revisions + 1
+        return self.coderesource.next_revision()
 
 
 class CodeResourceRevisionSerializer(AccessControlSerializer,
@@ -223,7 +223,7 @@ class MethodRevisionNumberGetter(object):
         )
 
     def __call__(self):
-        return self.methodfamily.num_revisions + 1
+        return self.methodfamily.next_revision()
 
 
 class MethodSerializer(AccessControlSerializer,

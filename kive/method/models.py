@@ -62,6 +62,19 @@ class CodeResource(metadata.models.AccessControl):
         """
         return self.revisions.count()
 
+    def max_revision(self):
+        """
+        Return the maximum revision number of all child revisions.
+        """
+        return self.revisions.aggregate(Max('revision_number'))['revision_number__max']
+
+    def next_revision(self):
+        """
+        Return a number suitable for assigning to the next revision to be added.
+        """
+        max_rev = self.max_revision()
+        return (max_rev if max_rev is not None else 0) + 1
+
     @property
     def last_revision_date(self):
         """
@@ -179,8 +192,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
     def save(self, *args, **kwargs):
         """Save this CodeResourceRevision, incrementing the revision number."""
         if not self.revision_number:
-            max_rev = self.coderesource.revisions.aggregate(Max('revision_number'))['revision_number__max']
-            self.revision_number = (max_rev if max_rev is not None else 0) + 1
+            self.revision_number = self.coderesource.next_revision()
 
         super(CodeResourceRevision, self).save(*args, **kwargs)
 
@@ -554,8 +566,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
     def save(self, *args, **kwargs):
         """Save a Method, automatically setting the revision number."""
         if not self.revision_number:
-            max_rev = self.family.members.aggregate(Max('revision_number'))['revision_number__max']
-            self.revision_number = (max_rev if max_rev is not None else 0) + 1
+            self.revision_number = self.family.next_revision()
 
         super(Method, self).save(*args, **kwargs)
 
@@ -909,6 +920,19 @@ class MethodFamily(transformation.models.TransformationFamily):
     def num_revisions(self):
         """Number of revisions within this family."""
         return self.members.count()
+
+    def max_revision(self):
+        """
+        Return the maximum revision number of all member Methods.
+        """
+        return self.members.aggregate(Max('revision_number'))['revision_number__max']
+
+    def next_revision(self):
+        """
+        Return a number suitable for assigning to the next revision to be added.
+        """
+        max_rev = self.max_revision()
+        return (max_rev if max_rev is not None else 0) + 1
 
     def __str__(self):
         return self.name
