@@ -21,7 +21,8 @@
             this.api_pipeline = {"id":25,"url":"http://127.0.0.1:8000/api/pipelines/25/", "family_pk": 2, "family":"Test","revision_name":"","revision_desc":"Carl Sagan's science slam-jam","revision_number":3,"revision_parent":24,"revision_DateTime":"2015-06-10T19:36:31.570191Z","user":"kive","users_allowed":[],"groups_allowed":[],"inputs":[{"dataset_name":"input2","dataset_idx":1,"x":0.176757161239191,"y":0.59464609800363,"structure":{'compounddatatype':9, min_row:null, max_row:null }},{"dataset_name":"input1","dataset_idx":2,"x":0.197340202198511,"y":0.695877476046049,"structure":null}],"outputs":[{"dataset_name":"unmapped2_fastq","dataset_idx":1,"x":0.637772562280456,"y":0.633208895290869,"structure":null},{"dataset_name":"unmapped1_fastq","dataset_idx":2,"x":0.637772562280456,"y":0.633208895290869,"structure":null},{"dataset_name":"remap_conseq","dataset_idx":3,"x":0.637772562280456,"y":0.633208895290869,"structure":{"compounddatatype":10,"min_row":null,"max_row":null}},{"dataset_name":"remap","dataset_idx":4,"x":0.637772562280456,"y":0.633208895290869,"structure":{"compounddatatype":8,"min_row":null,"max_row":null}},{"dataset_name":"remap_counts","dataset_idx":5,"x":0.637772562280456,"y":0.633208895290869,"structure":{"compounddatatype":9,"min_row":null,"max_row":null}}],"steps":[{"transformation":4,"transformation_family":3,"step_num":1,"outputs_to_delete":[],"x":0.344662650584514,"y":0.224236051141488,"name":"prelim_map.py","cables_in":[{"source_step":0,"source":143,"source_dataset_name":"input1","dest":7,"dest_dataset_name":"fastq1","custom_wires":[],"keep_output":false},{"source_step":0,"source":142,"source_dataset_name":"input2","dest":8,"dest_dataset_name":"fastq2","custom_wires":[],"keep_output":false}],"outputs":[{"dataset_name":"prelim","dataset_idx":1,"x":0.0,"y":0.0,"structure":{"compounddatatype":7,"min_row":null,"max_row":null}}],"inputs":[{"dataset_name":"fastq1","dataset_idx":1,"x":0.0,"y":0.0,"structure":null},{"dataset_name":"fastq2","dataset_idx":2,"x":0.0,"y":0.0,"structure":null}]},{"transformation":5,"transformation_family":4,"step_num":2,"outputs_to_delete":[],"x":0.450583501602465,"y":0.257130788000083,"name":"remap.py","cables_in":[{"source_step":0,"source":143,"source_dataset_name":"input1","dest":10,"dest_dataset_name":"fastq1","custom_wires":[],"keep_output":false},{"source_step":0,"source":142,"source_dataset_name":"input2","dest":11,"dest_dataset_name":"fastq2","custom_wires":[],"keep_output":false},{"source_step":1,"source":9,"source_dataset_name":"prelim","dest":12,"dest_dataset_name":"prelim","custom_wires":[],"keep_output":false}],"outputs":[{"dataset_name":"remap","dataset_idx":1,"x":0.0,"y":0.0,"structure":{"compounddatatype":8,"min_row":null,"max_row":null}},{"dataset_name":"remap_counts","dataset_idx":2,"x":0.0,"y":0.0,"structure":{"compounddatatype":9,"min_row":null,"max_row":null}},{"dataset_name":"remap_conseq","dataset_idx":3,"x":0.0,"y":0.0,"structure":{"compounddatatype":10,"min_row":null,"max_row":null}},{"dataset_name":"unmapped1_fastq","dataset_idx":4,"x":0.0,"y":0.0,"structure":null},{"dataset_name":"unmapped2_fastq","dataset_idx":5,"x":0.0,"y":0.0,"structure":null}],"inputs":[{"dataset_name":"fastq1","dataset_idx":1,"x":0.0,"y":0.0,"structure":null},{"dataset_name":"fastq2","dataset_idx":2,"x":0.0,"y":0.0,"structure":null},{"dataset_name":"prelim","dataset_idx":3,"x":0.0,"y":0.0,"structure":{"compounddatatype":7,"min_row":null,"max_row":null}}]}],"outcables":[{"pk":128,"output_idx":1,"output_name":"unmapped2_fastq","output_cdt":null,"source_step":2,"source":55,"source_dataset_name":"unmapped2_fastq","custom_wires":[]},{"pk":129,"output_idx":2,"output_name":"unmapped1_fastq","output_cdt":null,"source_step":2,"source":54,"source_dataset_name":"unmapped1_fastq","custom_wires":[]},{"pk":130,"output_idx":3,"output_name":"remap_conseq","output_cdt":10,"source_step":2,"source":15,"source_dataset_name":"remap_conseq","custom_wires":[]},{"pk":131,"output_idx":4,"output_name":"remap","output_cdt":8,"source_step":2,"source":13,"source_dataset_name":"remap","custom_wires":[]},{"pk":132,"output_idx":5,"output_name":"remap_counts","output_cdt":9,"source_step":2,"source":14,"source_dataset_name":"remap_counts","custom_wires":[]}],"removal_plan":"http://127.0.0.1:8000/api/pipelines/25/removal_plan/"};
 
             // Throw some more functions into the CanvasState object
-            // Dirty hack for now, but it works
+            // Dirty hack for now TODO: move this into CanvasState
+
             drydock.CanvasState.prototype.isConnectedTo = function(node1, node2) {
                 var connections = this.connectors;
                 for(var i = 0; i < connections.length; i++)
@@ -161,8 +162,6 @@
                 });
             });
 
-
-
             it('shoud have correct properties for inputs API', function(){
                 var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
                 pipeline.draw();
@@ -177,7 +176,6 @@
                     expect(i1keys).toContain(key);
                     expect(i2keys).toContain(key);
                 });
-
 
                 expect(prelim.family).toBe(3);
                 expect(remap.family).toBe(4);
@@ -204,16 +202,111 @@
             });
         });
 
+        function loadAndSerialize(canvasState, api_pipeline, additional_args){
+            var pipeline = loadApiPipeline(canvasState, api_pipeline);
+            pipeline.draw();
+            return pipeline.serialize(additional_args);
+        }
+
         describe('Serialize', function(){
             it('should serialize', function(){
-                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
-                pipeline.draw();
-
-                console.log(pipeline.serialize());
-
+                var test = loadAndSerialize(this.canvasState, this.api_pipeline);
             });
 
-            it('should ')
+            it('should check structure', function() {
+                var serialized = loadAndSerialize(
+                    this.canvasState,
+                    this.api_pipeline,
+                    {'pass_thru': "pass this argument thru"}
+                );
+
+                expect(serialized.pass_thru).toBe("pass this argument thru");
+                expect(serialized.steps).toBeDefined();
+                expect(serialized.inputs).toBeDefined();
+                expect(serialized.outcables).toBeDefined();
+            });
+
+            it('should match original pipeline inputs', function(){
+                var self = this,
+                    serialized = loadAndSerialize(
+                    this.canvasState,
+                    this.api_pipeline
+                );
+
+                // TODO: These (inputs) should really be sorted by dataset_idx
+                $.each(serialized.inputs, function(index, ser_input){
+                    var api_input = self.api_pipeline.inputs[index];
+
+                    expect(ser_input.dataset_name).toBe(api_input.dataset_name);
+                    expect(ser_input.dataset_idx).toBe(api_input.dataset_idx);
+                    expect(ser_input.x).toBeCloseTo(api_input.x, 8);
+                    expect(ser_input.y).toBeCloseTo(api_input.y, 8);
+
+                    if(ser_input.structure === null) {
+                        expect(ser_input.structure).toBe(api_input.structure);
+                    } else {
+                        expect(ser_input.structure.compounddatatype).toBe(api_input.structure.compounddatatype);
+                    }
+                });
+            });
+
+            it('should match original pipeline steps', function() {
+                var self = this,
+                    serialized = loadAndSerialize(
+                    this.canvasState,
+                    this.api_pipeline
+                );
+
+                // TODO: These (inputs) should really be sorted by dataset_idx
+                $.each(serialized.steps, function(index, ser_step){
+                    var api_step = self.api_pipeline.steps[index];
+
+                    expect(ser_step.name).toBe(api_step.name);
+                    expect(ser_step.step_num).toBe(api_step.step_num);
+                    expect(ser_step.transformation).toBe(api_step.transformation);
+
+                });
+            });
+
+            it('should match original pipeline steps (cables_in)', function() {
+                var self = this,
+                    serialized = loadAndSerialize(
+                    this.canvasState,
+                    this.api_pipeline
+                );
+
+                // TODO: These (inputs) should really be sorted by dataset_idx
+                $.each(serialized.steps, function(index, ser_step){
+                    var api_step = self.api_pipeline.steps[index];
+
+                    $.each(ser_step.cables_in, function(cable_index, ser_cable){
+                        var api_cable = api_step.cables_in[cable_index];
+
+                        expect(ser_cable.dest_dataset_name).toBe(api_cable.dest_dataset_name);
+                        expect(ser_cable.source_dataset_name).toBe(api_cable.source_dataset_name);
+                    });
+                });
+            });
+
+            it('should match original pipeline output', function() {
+                var self = this,
+                    serialized = loadAndSerialize(
+                    this.canvasState,
+                    this.api_pipeline
+                );
+
+                // TODO: These (inputs) should really be sorted by dataset_idx
+                $.each(serialized.outcables, function(index, ser_output){
+                    var api_output = self.api_pipeline.outcables[index];
+
+
+                    expect(ser_output.output_cdt).toBe(api_output.output_cdt);
+                    expect(ser_output.output_idx).toBe(api_output.output_idx);
+                    expect(ser_output.output_name).toBe(api_output.output_name);
+                    expect(ser_output.source_dataset_name).toBe(api_output.source_dataset_name);
+                    expect(ser_output.source_step).toBe(api_output.source_step);
+                });
+            });
         });
 
     });
