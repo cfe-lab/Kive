@@ -1,8 +1,3 @@
-import json
-
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.http.response import Http404, HttpResponse
-from django.views.decorators.http import require_POST
 from rest_framework import permissions, status
 from rest_framework.decorators import detail_route
 from rest_framework.response import Response
@@ -10,36 +5,15 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from archive.forms import DatasetForm
 from archive.serializers import DatasetSerializer, MethodOutputSerializer
-from archive.models import Dataset, MethodOutput, Run, summarize_redaction_plan
+from archive.models import Dataset, MethodOutput, summarize_redaction_plan
 from archive.views import _build_download_response
-from kive.ajax import RemovableModelViewSet, RedactModelMixin,\
-    IsGrantedReadOnly, IsGrantedReadCreate
+
+from kive.ajax import RemovableModelViewSet, RedactModelMixin, IsGrantedReadOnly, IsGrantedReadCreate
+
 from librarian.models import SymbolicDataset
-from metadata.models import deletion_order
-from portal.views import admin_check
+
 
 JSON_CONTENT_TYPE = 'application/json'
-
-
-def _load_methodoutput(request, methodoutput_id):
-    if not request.is_ajax():
-        raise Http404
-
-    try:
-        return MethodOutput.objects.get(pk=methodoutput_id)
-    except Dataset.DoesNotExist:
-        raise Http404(
-            "Method output {} cannot be accessed".format(methodoutput_id))
-
-
-def _build_run_outputs_response(run):
-    return HttpResponse(
-        json.dumps([output.__dict__ for output in run.get_output_summary()]),
-        content_type=JSON_CONTENT_TYPE)
-
-
-def _is_dry_run(request):
-    return request.POST.get('dry_run') == 'true'
 
 
 class DatasetViewSet(RemovableModelViewSet, RedactModelMixin):
@@ -150,60 +124,3 @@ class MethodOutputViewSet(ReadOnlyModelViewSet):
                                                       return_code=True)
         return Response(summarize_redaction_plan(redaction_plan))
 
-
-@login_required
-@user_passes_test(admin_check)
-@require_POST
-def remove_run(request, run_id):
-    """
-    Redact the file associated with the dataset.
-    """
-    if not request.is_ajax():
-        raise Http404
-    try:
-        run = Run.objects.get(pk=run_id)
-    except Run.DoesNotExist:
-        raise Http404("Run id {} cannot be accessed".format(run_id))
-    
-    if _is_dry_run(request):
-        plan = run.build_removal_plan()
-        keys = deletion_order[:]
-        keys.remove('ExecRecords')
-        summary = ""
-        for key in keys:
-            count = len(plan[key])
-            if count:
-                if summary:
-                    summary += ', '
-                summary += '{} {}'.format(count, key)
-        summary = "This will remove " + summary + "."
-        return HttpResponse(json.dumps(summary), content_type=JSON_CONTENT_TYPE)
-    
-    run.remove()
-    return HttpResponse()
-
-
-@login_required
-@user_passes_test(admin_check)
-@require_POST
-def stdout_redact(request, methodoutput_id):
-    methodoutput = _load_methodoutput(request, methodoutput_id)
-    if _is_dry_run(request):
-        summary = "This will redact 1 log."
-        return HttpResponse(json.dumps(summary), content_type=JSON_CONTENT_TYPE)
-    
-    methodoutput.redact_output_log()
-    return _build_run_outputs_response(methodoutput.execlog.record.parent_run)
-
-
-@login_required
-@user_passes_test(admin_check)
-@require_POST
-def stderr_redact(request, methodoutput_id):
-    methodoutput = _load_methodoutput(request, methodoutput_id)
-    if _is_dry_run(request):
-        summary = "This will redact 1 log."
-        return HttpResponse(json.dumps(summary), content_type=JSON_CONTENT_TYPE)
-    
-    methodoutput.redact_error_log()
-    return _build_run_outputs_response(methodoutput.execlog.record.parent_run)

@@ -112,7 +112,7 @@ class PipelineViewSet(CleanCreateModelMixin,
 
 @login_required
 @user_passes_test(developer_check)
-def populate_method_revision_dropdown (request):
+def populate_method_revision_dropdown(request):
     """
     copied from Method ajax.py
     """
@@ -218,30 +218,4 @@ def get_method_xputs(method):
             )
         result.append(xputs)
     return {'inputs': result[0], 'outputs': result[1]}
-
-
-@login_required
-@user_passes_test(developer_check)
-def activate_pipeline(request):
-    """
-    Make this pipeline revision the published version.
-    :param request:
-    :return:
-    """
-    if request.is_ajax():
-        #response = HttpResponse()
-        pipeline_revision_id = request.POST.get('pipeline_id')
-        if pipeline_revision_id != '':
-            pipeline_revision = Pipeline.objects.get(pk=pipeline_revision_id)
-            pipeline_family = pipeline_revision.family
-            pipeline_family.published_version = None if pipeline_revision.is_published_version else pipeline_revision
-
-            pipeline_family.full_clean()
-            pipeline_family.save()
-
-            return HttpResponse(json.dumps({'is_published': pipeline_revision.is_published_version}), content_type='application/json')
-        # else
-        return HttpResponse()
-    else:
-        return Http404
 

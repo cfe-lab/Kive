@@ -78,7 +78,6 @@ urlpatterns = patterns(
     url(r'^pipeline_add$', 'pipeline.views.pipeline_add', name='pipeline_add'),
     url(r'^pipeline_revise/(?P<id>\d+)$', 'pipeline.views.pipeline_revise', name='pipeline_revise'),
     url(r'^pipeline_exec$', 'pipeline.views.pipeline_exec', name='pipeline_exec'),
-    url(r'^activate_pipeline/$', 'pipeline.ajax.activate_pipeline', name='activate_pipeline'),
 
     url(r'^usr.html$', 'portal.views.usr', name='usr'),
 
@@ -87,10 +86,8 @@ urlpatterns = patterns(
     url(r'^dataset_view/(?P<dataset_id>\d+)$', 'archive.views.dataset_view', name='dataset_view'),
     url(r'^stdout_download/(?P<methodoutput_id>\d+)$', 'archive.views.stdout_download', name='stdout_download'),
     url(r'^stdout_view/(?P<methodoutput_id>\d+)$', 'archive.views.stdout_view', name='stdout_view'),
-    url(r'^stdout_redact/(?P<methodoutput_id>\d+)$', 'archive.ajax.stdout_redact', name='stdout_redact'),
     url(r'^stderr_download/(?P<methodoutput_id>\d+)$', 'archive.views.stderr_download', name='stderr_download'),
     url(r'^stderr_view/(?P<methodoutput_id>\d+)$', 'archive.views.stderr_view', name='stderr_view'),
-    url(r'^stderr_redact/(?P<methodoutput_id>\d+)$', 'archive.ajax.stderr_redact', name='stderr_redact'),
     url(r'^datasets_add$', 'archive.views.datasets_add', name='datasets_add'),
     url(r'^datasets_add_bulk', 'archive.views.datasets_add_bulk', name='datasets_add_bulk'),
     url(r'^datasets_bulk', 'archive.views.datasets_bulk', name='datasets_bulk'),
@@ -108,7 +105,6 @@ urlpatterns = patterns(
     url(r'^run_pipeline$', 'sandbox.views.run_pipeline', name='run_pipeline'),
     url(r'^view_run/(?P<rtp_id>\d+)$', 'sandbox.views.view_run', name='view_run'),
     url(r'^view_run/(?P<rtp_id>\d+)/(?P<md5>[0-9a-fA-F]{32})$', 'sandbox.views.view_run', name='view_run'),
-    url(r'^remove_run/(?P<run_id>\d+)$', 'archive.ajax.remove_run', name='remove_run'),
     url(r'^filter_datasets$', 'sandbox.ajax.filter_datasets', name='filter_datasets'),
     url(r'^filter_pipelines$', 'sandbox.ajax.filter_pipelines', name='filter_pipelines'),
     url(r'^get_failed_output$', 'sandbox.ajax.get_failed_output', name='get_failed_output'),
