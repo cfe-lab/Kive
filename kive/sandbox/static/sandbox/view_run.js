@@ -24,22 +24,35 @@ function setupRunView(rtp_id, pipeline_id, md5) {
         // Poll the server
         $.getJSON("/api/runs/" + rtp_id + "/run_status/", {}, function(run){
             var stat = run.status,
-                msg = '<a href="/view_results/'+run.id+'">Complete</a>';
+                $msg = $('<span class="status-message">');
+            $msg.append('<a>Complete</a>').attr(
+                    'href',
+                    '/view_results/' + parseInt(run.id));
 
             // TODO: Use a better system of reporting overall run status
-            if(stat.indexOf('?') > -1 || stat.indexOf('Too') > -1)
-                msg = 'Waiting for run to start <img src="/static/sandbox/preload.gif"/>';
-            else {
-                if(stat.indexOf('!') > -1) {
-                    msg = '<a href="/view_results/'+rtp_id+'">Failed!</a>';
-                    clearInterval(self.timer);
-                } else if(stat.indexOf('.') > -1 || stat.indexOf('+') > -1 || stat.indexOf(':') > -1)
-                    msg = 'In progress <img src="/static/sandbox/preload.gif"/>';
-                else
-                    clearInterval(self.timer);
-                    pipeline.update(run, md5);
+            if(stat.indexOf('?') >= 0) {
+                $msg.empty().text('Waiting for run to start').append(
+                        $('<img src="/static/sandbox/preload.gif"/>'));
             }
-            $('#run_status').html('<span class="status-message">'+msg+'</span>');
+            else if (stat.indexOf('Too') >= 0) {
+                $msg.empty().text(stat)
+                clearInterval(self.timer);
+            }
+            else {
+                if(stat.indexOf('!') >= 0) {
+                    $msg.empty().append($('<a>Failed!</a>').attr(
+                            'href',
+                            '/view_results/' + rtp_id));
+                    clearInterval(self.timer);
+                } else if(stat.indexOf('.') >= 0 || stat.indexOf('+') >= 0 || stat.indexOf(':') >= 0) {
+                    $msg.empty().text('In progress').append(
+                            $('<img src="/static/sandbox/preload.gif"/>'));
+                } else {
+                    clearInterval(self.timer);
+                }
+                pipeline.update(run, md5);
+            }
+            $('#run_status').empty().append($msg);
         });
     }
 

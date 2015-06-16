@@ -59,11 +59,13 @@ $(function(){
                     /* String appends are *much* faster than array joins in JS.
                      * More info at http://jsperf.com/append-string-vs-join-array
                      */
-                    var options = '';
+                    var options = [];
                     $.each(result, function(index,value) {
-                        options += '<option value="' + value.pk + '">' + value.fields.revision_name + '</option>\n';
+                        options.push($('<option>').attr('value', value.pk).text(
+                                value.fields.revision_number + ': ' +
+                                value.fields.revision_name));
                     });
-                    $("#id_revisions_" + suffix).html(options);
+                    $("#id_revisions_" + suffix).empty().append(options);
                 }
             );
         }

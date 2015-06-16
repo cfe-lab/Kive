@@ -166,7 +166,7 @@ $(function() {
                 data: { mf_id: mf_id }, // specify data as an object
                 datatype: "json", // type of data expected back from server
                 success: function(result) {
-                    var options = $();
+                    var options = [];
                     var arr = JSON.parse(result);
                     $.each(arr, function(index,value) {
                         var option = $("<option>");
@@ -176,7 +176,7 @@ $(function() {
                         }).text(
                             value.fields.method_number + ': ' + value.fields.method_name
                         );
-                        options = options.add(option);
+                        options.push(option);
                     });
                     $("#id_select_method").show().empty().append(options).change();
                 }

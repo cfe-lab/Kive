@@ -27,7 +27,7 @@
             {% if parent_revision %}
                 <th>{{ parent_revision.revision_name }} ({{ parent_revision.revision_number }})</th>
             {% endif %}
-            <th><i>Revision</i> ({{ coderesource.num_revisions|add:"1" }})</th>
+            <th><i>Revision</i></th>
         </tr>
         <tr>
             <th>{{ revision_form.content_file.label }} <div class="helptext">{{ revision_form.content_file.help_text }}</div></th>

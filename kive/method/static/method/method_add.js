@@ -52,11 +52,13 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 "/get_revisions/",
                 { cr_id: cr_id }, // specify data as an object
                 function(result) {
-                    var options = '';
+                    var options = [];
                     $.each(result, function(index,value) {
-                        options += '<option value="' + value.pk + '">' + value.fields.revision_number + ': ' + value.fields.revision_name + '</option>';
+                        options.push($('<option>').attr('value', value.pk).text(
+                                value.fields.revision_number + ': ' +
+                                value.fields.revision_name));
                     });
-                    $("#id_revisions").html(options);
+                    $("#id_revisions").empty().append(options);
                 }
             );
         }
