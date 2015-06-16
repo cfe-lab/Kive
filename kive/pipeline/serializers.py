@@ -1,4 +1,6 @@
+from django.db.models import Max
 from rest_framework import serializers
+
 from pipeline.models import PipelineFamily, Pipeline, CustomCableWire, PipelineStepInputCable,\
     PipelineStep, PipelineOutputCable
 from transformation.models import XputStructure
@@ -132,7 +134,8 @@ class PipelineRevisionNumberGetter(object):
         )
 
     def __call__(self):
-        return self.pipelinefamily.num_revisions + 1
+        max = self.pipelinefamily.members.aggregate(Max('revision_number'))
+        return max['revision_number__max'] + 1
 
 
 def _non_pipeline_input_cable_validate_helper(step_num, dataset_name, step_data_dicts):
