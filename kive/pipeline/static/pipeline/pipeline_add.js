@@ -20,7 +20,19 @@ $(function() {
 
     // TODO: Move this into a parameter for the submit method
     //window.submit_to_url = '/pipeline_add';
-    var submitError = function(error) { $('#id_submit_error').show().text(error); };
+    var submitError = function(errors) {
+        var $errorDiv = $('#id_submit_error');
+        if (errors instanceof Array) {
+            $errorDiv.empty();
+            for (var i = 0; i < errors.length; i++) {
+                $errorDiv.append($('<p/>').text(errors[i]));
+            }
+        }
+        else {
+            $errorDiv.text(errors);
+        }
+        $errorDiv.show();
+    };
     
     var pipelineCheckReadiness = function() {
         var $btn = $('#id_submit_button');
@@ -597,7 +609,16 @@ $(function() {
                     window.location.href = '/pipelines';
                 },
                 error: function(xhr, status, error) {
-                    submitError(xhr.status + " - " + error);
+                    var errors = [],
+                        json = xhr.responseJSON,
+                        serverErrors = json && json.non_field_errors || [];
+                    
+                    if (serverErrors.length === 0) {
+                        submitError(xhr.status + " - " + error);
+                    }
+                    else {
+                        submitError(serverErrors);
+                    }
                 }
             });
         }
@@ -620,7 +641,16 @@ $(function() {
                     submit_pipeline();
                 },
                 error: function(xhr, status, error) {
-                    submitError(xhr.status + " - " + error);
+                    var errors = [],
+                        json = xhr.responseJSON,
+                        serverErrors = json && json.non_field_errors || [];
+                    
+                    if (serverErrors.length === 0) {
+                        submitError(xhr.status + " - " + error);
+                    }
+                    else {
+                        submitError(serverErrors);
+                    }
                 }
             });
 

@@ -8,6 +8,7 @@ do with CodeResources.
 from __future__ import unicode_literals
 
 from django.db import models, transaction
+from django.db.models import Max
 from django.db.models.signals import post_delete
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator
@@ -178,7 +179,8 @@ class CodeResourceRevision(metadata.models.AccessControl):
     def save(self, *args, **kwargs):
         """Save this CodeResourceRevision, incrementing the revision number."""
         if not self.revision_number:
-            self.revision_number = self.coderesource.num_revisions+1
+            max = self.coderesource.revisions.aggregate(Max('revision_number'))
+            self.revision_number = max['revision_number__max'] + 1
         super(CodeResourceRevision, self).save(*args, **kwargs)
 
     # This CRR includes it's own filename at the root
@@ -551,7 +553,8 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
     def save(self, *args, **kwargs):
         """Save a Method, automatically setting the revision number."""
         if not self.revision_number:
-            self.revision_number = self.family.num_revisions + 1
+            max = self.family.members.aggregate(Max('revision_number'))
+            self.revision_number = max['revision_number__max'] + 1
         super(Method, self).save(*args, **kwargs)
 
     def get_absolute_url(self):
