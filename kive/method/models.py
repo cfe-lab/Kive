@@ -21,6 +21,7 @@ import file_access_utils
 from constants import maxlengths
 import method.signals
 from metadata.models import empty_removal_plan, remove_helper, update_removal_plan
+import kive.settings
 
 import os
 import stat
@@ -30,6 +31,8 @@ import traceback
 import threading
 import logging
 import shutil
+import grp
+
 
 @python_2_unicode_compatible
 class CodeResource(metadata.models.AccessControl):
@@ -339,8 +342,9 @@ class CodeResourceRevision(metadata.models.AccessControl):
                 with self.content_file:
                     shutil.copyfileobj(self.content_file, f)
             # Make sure this is written with read, write, and execute
-            # permission.
-            os.chmod(dest_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR )
+            # permission, and assign it the Kive group.
+            os.chown(dest_path, -1, grp.getgrnam(kive.settings.KIVE_GROUP).gr_gid)
+            os.chmod(dest_path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH)
 
         for dep in self.dependencies.all():
             # Create any necessary sub-directory.  This should never
@@ -851,7 +855,23 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             self.driver.coderesource.filename
         )
 
-        command = [code_to_run] + input_paths + output_paths
+        if kive.settings.KIVE_SANDBOX_WORKER_ACCOUNT:
+            # We have to first cd into the appropriate directory before executing the command.
+            ins_and_outs = '"{}"'.format(input_paths[0]) if len(input_paths) > 0 else ""
+            for input_path in input_paths[1:] + output_paths:
+                ins_and_outs += ' "{}"'.format(input_path)
+            full_command = '"{}" {}'.format(code_to_run, ins_and_outs)
+            ssh_command = 'cd "{}" && {}'.format(run_path, full_command)
+
+            kive_sandbox_worker_preamble = [
+                "ssh",
+                "{}@localhost".format(kive.settings.KIVE_SANDBOX_WORKER_ACCOUNT)
+            ]
+            command = kive_sandbox_worker_preamble + [ssh_command]
+
+        else:
+            command = [code_to_run] + input_paths + output_paths
+
         self.logger.debug("subprocess.Popen({})".format(command))
         code_popen = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                       cwd=run_path)

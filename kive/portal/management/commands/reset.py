@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand
 from django.core.management import call_command
 
 import kive.settings  # @UnresolvedImport
+import file_access_utils
 
 
 class Command(BaseCommand):
@@ -35,7 +36,13 @@ class Command(BaseCommand):
         call_command("loaddata", "initial_groups")
         call_command("loaddata", "initial_user")
         call_command("loaddata", "initial_data")
-        os.mkdir(os.path.join(kive.settings.MEDIA_ROOT, "Sandboxes"))
+
+        # Create the Sandboxes directory specially because it has to have
+        # special permissions added to it.
+        sandboxes_path = os.path.join(kive.settings.MEDIA_ROOT, "Sandboxes")
+        os.mkdir(sandboxes_path)
+        file_access_utils.configure_sandbox_permissions(sandboxes_path)
+
         if fixture:
             call_command("loaddata", fixture)
             fixture_folder = os.path.join("FixtureFiles", fixture)

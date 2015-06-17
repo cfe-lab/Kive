@@ -115,9 +115,12 @@ class Sandbox:
 
         # Make the sandbox directory.
         self.logger.debug("file_access_utils.set_up_directory({})".format(self.sandbox_path))
+        file_access_utils.configure_sandbox_permissions(self.sandbox_path)
         file_access_utils.set_up_directory(self.sandbox_path)
         file_access_utils.set_up_directory(in_dir)
         file_access_utils.set_up_directory(self.out_dir)
+        file_access_utils.configure_sandbox_permissions(self.out_dir)
+
 
         # Queue of RunSteps/RunCables to process.
         self.queue_for_processing = []
@@ -1403,6 +1406,7 @@ def _setup_step_paths(step_run_dir, recover):
 
     for workdir in [step_run_dir, log_dir, out_dir, in_dir]:
         file_access_utils.set_up_directory(workdir, tolerate=recover)
+        file_access_utils.configure_sandbox_permissions(workdir)
     return (in_dir, out_dir, log_dir)
 
 

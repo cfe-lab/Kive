@@ -320,6 +320,7 @@ class SymbolicDataset(metadata.models.AccessControl):
 
             if cdt is not None and check:
                 run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
+                file_access_utils.configure_sandbox_permissions(run_dir)
                 content_check = symDS.check_file_contents(
                     file_path_to_check=file_path,
                     file_handle=file_handle,

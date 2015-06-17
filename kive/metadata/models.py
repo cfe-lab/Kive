@@ -22,7 +22,7 @@ import tempfile
 import shutil
 from datetime import datetime
 
-from file_access_utils import set_up_directory
+from file_access_utils import set_up_directory, configure_sandbox_permissions
 from constants import datatypes, CDTs, maxlengths, groups, users
 
 import logging
@@ -223,6 +223,7 @@ def _setup_verification_path(column_test_path):
     logs = os.path.join(column_test_path, "logs")
     for workdir in [input_data, output_data, logs]:
         set_up_directory(workdir)
+        configure_sandbox_permissions(workdir)
 
     input_file_path = os.path.join(input_data, "to_test.csv")
     
@@ -231,6 +232,7 @@ def _setup_verification_path(column_test_path):
         verif_in_header = [m.column_name for m in verif_in.members.all()]
         writer = csv.DictWriter(f, fieldnames=verif_in_header)
         writer.writeheader()
+    configure_sandbox_permissions(input_file_path)
 
     return input_file_path
 

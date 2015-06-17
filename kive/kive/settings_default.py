@@ -230,3 +230,17 @@ SANDBOX_PURGE_MINUTES = 0
 
 # Keep this many of the most recent Sandboxes for any PipelineFamily.
 SANDBOX_KEEP_RECENT = 10
+
+# Worker account configuration
+
+# The system user that actually runs the code.  This user:
+# - should be a standard unprivileged user
+# - should have access to the sandbox directory
+# - should be made the owner of all sandboxes
+# - should be accessible via SSH by the Kive user (i.e. apache on a production machine,
+#   your user account on a developer machine) without password.
+# - should have access to any tools used in any of your CodeResources on PATH
+# - should use bash as its default shell
+# Leave blank to run as the user that launches the fleet.
+KIVE_SANDBOX_WORKER_ACCOUNT = "kiveworker"
+KIVE_GROUP = "kive"

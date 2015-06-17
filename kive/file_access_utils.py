@@ -3,8 +3,12 @@ Basic file-checking functionality used by Shipyard.
 """
 import hashlib, glob, os
 import errno
+import grp
+import stat
+
 from constants import dirnames
-from cStringIO import StringIO
+import kive.settings
+
 
 def can_create_new_file(file_to_create):
     """
@@ -55,6 +59,16 @@ def can_create_new_file(file_to_create):
             is_okay = False
 
     return (is_okay, reason)
+
+
+def configure_sandbox_permissions(path):
+    """
+    Ensure that the specified path has the correct group and permissions.
+    """
+    kive_group = grp.getgrnam(kive.settings.KIVE_GROUP)
+    os.chown(path, -1, kive_group.gr_gid)
+    os.chmod(path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH)
+
 
 def set_up_directory(directory_to_use, tolerate=False):
     """
