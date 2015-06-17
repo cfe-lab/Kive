@@ -1,26 +1,23 @@
-from django.db import transaction
-from django.core.exceptions import ValidationError
+from datetime import timedelta, datetime
 
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.db.models import Q
+from django.utils import timezone
 from rest_framework import permissions
 from rest_framework.decorators import detail_route, list_route
+from rest_framework.exceptions import APIException
 from rest_framework.response import Response
+from rest_framework.reverse import reverse
 
-from fleet.models import RunToProcess
+import fleet
+from fleet.models import RunToProcess, RunToProcessInput
 from fleet.serializers import RunToProcessSerializer,\
     RunToProcessOutputsSerializer
 from kive.ajax import IsGrantedReadCreate, RemovableModelViewSet
 from librarian.models import SymbolicDataset
 from sandbox.forms import InputSubmissionForm, RunSubmissionForm
 from sandbox.views import RunSubmissionError
-import fleet
-
-from datetime import timedelta, datetime
-from django.utils import timezone
-from django.db.models import Q
-
-from exceptions import KeyError
-from fleet.models import RunToProcessInput
-from rest_framework.reverse import reverse
 
 
 class RunToProcessViewSet(RemovableModelViewSet):
@@ -201,4 +198,4 @@ class RunToProcessViewSet(RemovableModelViewSet):
                 return runs.filter(run__end_time__gte=t)
             if key == 'endbefore':
                 return runs.filter(run__end_time__lte=t)
-        raise KeyError(key)
+        raise APIException('Unknown filter key: {}'.format(key))

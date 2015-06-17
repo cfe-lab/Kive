@@ -1914,7 +1914,7 @@
             drydock.CanvasState.prototype.findNodeByLabel = function(label) {
                 var shapes = this.shapes;
                 for(var i = 0; i < shapes.length; i++)
-                    if (shapes[i].label != null && shapes[i].label == label)
+                    if (shapes[i].label == label)
                         return shapes[i];
                 return null;
             };
@@ -1928,7 +1928,7 @@
             var ppln = new Pipeline(canvasState);
             ppln.load(pipeline);
             return ppln;
-        };
+        }
 
         describe('Load', function(){
             it('should load pipeline from API', function() {

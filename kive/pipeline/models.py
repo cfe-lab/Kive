@@ -77,8 +77,7 @@ class PipelineFamily(transformation.models.TransformationFamily):
     def published_version_display(self):
         if self.published_version is None:
             return None
-        return '{}: {}'.format(self.published_version.revision_number,
-                               self.published_version.revision_name) 
+        return self.published_version.display 
 
     @property
     def complete_members(self):
@@ -170,6 +169,10 @@ class Pipeline(transformation.models.Transformation):
         if self.revision_name:
             string_rep += " ({})".format(self.revision_name)
         return string_rep
+    
+    @property
+    def display(self):
+        return '{}: {}'.format(self.revision_number, self.revision_name)
 
     def save(self, *args, **kwargs):
         if not self.revision_number:

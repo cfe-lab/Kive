@@ -1,4 +1,3 @@
-from django.db.models import Max
 from rest_framework import serializers
 
 from pipeline.models import PipelineFamily, Pipeline, CustomCableWire, PipelineStepInputCable,\
@@ -180,6 +179,10 @@ def _source_transf_finder(step_num, dataset_name, step_data_dicts):
     curr_transf = specified_step_data["transformation"].definite
     return curr_transf.outputs.get(dataset_name=dataset_name)
 
+class PipelineSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Pipeline
+        fields = ('id', 'display', 'url')
 
 class PipelineSerializer(AccessControlSerializer,
                          serializers.ModelSerializer):
@@ -366,7 +369,7 @@ class PipelineFamilySerializer(AccessControlSerializer,
     removal_plan = serializers.HyperlinkedIdentityField(view_name='pipelinefamily-removal-plan')
     absolute_url = serializers.SerializerMethodField()
 
-    # members = PipelineSerializer(many=True, read_only=True)
+    members = PipelineSummarySerializer(many=True, read_only=True)
     members_url = serializers.HyperlinkedIdentityField(view_name='pipelinefamily-pipelines')
 
     class Meta:

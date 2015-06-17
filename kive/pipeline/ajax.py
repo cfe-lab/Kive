@@ -1,25 +1,38 @@
+import json
+
 from django.http import HttpResponse, Http404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import transaction
-
+from django.db.models import Q
 from rest_framework import permissions
 from rest_framework.decorators import detail_route
+from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
-import json
-
-from method.models import MethodFamily, Method
-from pipeline.models import Pipeline, PipelineFamily
-from portal.views import developer_check, admin_check
-from metadata.models import AccessControl
-
-from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet,\
     CleanCreateModelMixin
+from metadata.models import AccessControl
+from method.models import MethodFamily, Method
+from pipeline.models import Pipeline, PipelineFamily
+from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
+from portal.views import developer_check, admin_check
+
 
 
 class PipelineFamilyViewSet(CleanCreateModelMixin,
                             RemovableModelViewSet):
+    """ Pipeline Families that contain the different versions of each pipeline
+    
+    Query parameters for the list view:
+    * is_granted=true - For administrators, this limits the list to only include
+        records that the user has been explicitly granted access to. For other
+        users, this has no effect.
+    * filters[n][key]=x&filters[n][val]=y - Apply different filters to the
+        search for pipeline families. n starts at 0 and increases by 1 for each
+        added filter.
+    * filters[n][key]=smart&filters[n][val]=match - pipeline families where the
+        pipeline family name or description contain the value (case insensitive)
+    """
     queryset = PipelineFamily.objects.all()
     serializer_class = PipelineFamilySerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
@@ -64,8 +77,24 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
             new_published_version
         )
         return Response({'message': response_msg})
-
-
+    
+    def filter_queryset(self, queryset):
+        queryset = super(PipelineFamilyViewSet, self).filter_queryset(queryset)
+        i = 0
+        while True:
+            key = self.request.GET.get('filters[{}][key]'.format(i))
+            if key is None:
+                break
+            value = self.request.GET.get('filters[{}][val]'.format(i))
+            queryset = self._add_filter(queryset, key, value)
+            i += 1
+        return queryset
+    
+    def _add_filter(self, queryset, key, value):
+        if key == 'smart':
+            return queryset.filter(Q(name__icontains=value) |
+                                   Q(description__icontains=value))
+        raise APIException('Unknown filter key: {}'.format(key))
 
 class PipelineViewSet(CleanCreateModelMixin,
                       RemovableModelViewSet):
