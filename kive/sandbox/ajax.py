@@ -8,7 +8,6 @@ from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 
 from archive.models import Dataset, Run
-import fleet.models
 from forms import PipelineSelectionForm
 from pipeline.models import PipelineFamily
 
@@ -47,7 +46,7 @@ def _filter_datasets(request):
         key, value = filter_instance["key"], filter_instance["val"]
         if key == "Name":
             query = query.filter(name__iregex=value)
-        elif key == "Uploaded" and value:
+        elif key == "User-Uploaded" and value:
             query = query.filter(created_by__isnull=True)
         elif key == "Smart":
             query = query.filter(Q(name__iregex=value) | Q(description__iregex=value))

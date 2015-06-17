@@ -161,15 +161,20 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                 display_error("");
                 var tbody = tab.find('tbody'),
                     new_tbody = [],
+                    cols = tab.data('cols'),
+                    thumbnail_column_index = cols.indexOf('Thumbnail'),
                     bg = 'background-color';
                 
                 for (var i = 0; i < data.length; i++) {
-                    var cols = tab.data('cols'),
-                        new_row = [];
+                    var new_row = [];
                     for (var j = 0; j < cols.length; j++) {
                         new_row[j] = data[i][cols[j]];
                     }
-                    new_row[cols.indexOf('Thumbnail')] = "<canvas class=\"preview\">Warning: Kive does not support your web browser.</canvas>"; 
+                    if (thumbnail_column_index >= 0) {
+                        new_row[thumbnail_column_index] = (
+                                "<canvas class=\"preview\">Warning: Kive " +
+                                "does not support your web browser.</canvas>"); 
+                    }
                     new_tbody.push(new_row);
                 }
                 
@@ -179,7 +184,11 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                 numResults = new_tbody.length;
                 if (numResults > 0) {
                     var new_cells = tbody.html( new_tbody.join("\n") ).find('th,td');
-                    $('canvas.preview', tbody).each(load_preview_canvas).closest('td').addClass('preview-canvas');
+                    if (thumbnail_column_index >= 0) {
+                        $('canvas.preview', tbody).each(
+                                load_preview_canvas).closest('td').addClass(
+                                        'preview-canvas');
+                    }
                     columnPresentation(tab);
                 
                     // Was a row already selected, and is it still in the returned set?
