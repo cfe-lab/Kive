@@ -33,7 +33,7 @@ var datasets = (function() {
             permissions.PermissionsTable.prototype);
     DatasetsTable.prototype.getQueryParams = function() {
         var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
-        params.is_uploaded = true;
+        params.filters = [{ key: 'uploaded' }];
         return params;
     };
     

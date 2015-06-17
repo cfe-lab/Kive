@@ -115,7 +115,7 @@ class RunToProcessViewSet(RemovableModelViewSet):
             key = request.GET.get('filters[{}][key]'.format(i))
             if key is None:
                 break
-            value = request.GET.get('filters[{}][val]'.format(i))
+            value = request.GET.get('filters[{}][val]'.format(i), '')
             runs = self._add_run_filter(runs, key, value)
             i += 1
 

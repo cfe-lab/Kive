@@ -85,7 +85,7 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
             key = self.request.GET.get('filters[{}][key]'.format(i))
             if key is None:
                 break
-            value = self.request.GET.get('filters[{}][val]'.format(i))
+            value = self.request.GET.get('filters[{}][val]'.format(i), '')
             queryset = self._add_filter(queryset, key, value)
             i += 1
         return queryset
