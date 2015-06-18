@@ -2590,7 +2590,7 @@ class CompoundDatatypeTests(MetadataTestCase):
                 lambda: SymbolicDataset.create_SD(path, user=self.myUser,
                                                   cdt=self.triplet_cdt, name="DS1", description="DS1 desc"))
 
-    def test_type_contraints_row(self):
+    def test_type_constraints_row(self):
 
         # The cdt schema is (string, int, float, bool, rna)
         t1 = self.basic_cdt.check_constraints(['Once', 'upon', 'a', 'time', 'there'])

@@ -1,9 +1,12 @@
 from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 
+import unittest
+
 from librarian.models import SymbolicDataset
 from sandbox.execute import Sandbox
 import sandbox.testing_utils as tools
+import kive.settings
 
 
 # def rmf(path):
@@ -316,17 +319,21 @@ class BadRunTests(TestCase):
     def tearDown(self):
         tools.destroy_grandpa_sandbox_environment(self)
 
+    @unittest.skipIf(
+        kive.settings.KIVE_SANDBOX_WORKER_ACCOUNT,
+        "OSError will not be thrown when using SSH to the Kive sandbox worker account"
+    )
     def test_code_bad_execution(self):
         """
-        If the user's code bombs, we should get an ExecLog with a -1 return code.
+        If the user's code causes subprocess to throw an OSError, the ExecLog should have a -1 return code.
+
+        Note that this doesn't occur if using ssh to an unprivileged account for execution.
         """
         sandbox = Sandbox(self.user_grandpa, self.pipeline_faulty, [self.symds_grandpa])
         sandbox.execute_pipeline()
         runstep1 = sandbox.run.runsteps.first()
         log = runstep1.log
         interm_SD = runstep1.execrecord.execrecordouts.first().symbolicdataset
-
-        print("RETURN CODE: {}".format(log.methodoutput.return_code))
 
         self.assertEqual(log.is_successful(), False)
         self.assertEqual(log.methodoutput.return_code, -1)

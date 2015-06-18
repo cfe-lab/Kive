@@ -33,6 +33,7 @@ from method.models import CodeResource, CodeResourceDependency, \
 import sandbox.testing_utils as tools
 import sandbox.execute
 import portal.models
+import file_access_utils
 
 from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
 
@@ -532,7 +533,10 @@ def create_method_test_environment(case):
     case.noop_method.full_clean()
 
     # Some data.
-    case.scratch_dir = tempfile.mkdtemp()
+    case.scratch_dir = tempfile.mkdtemp(
+        dir=file_access_utils.sandbox_base_path()
+    )
+    file_access_utils.configure_sandbox_permissions(case.scratch_dir)
     try:
         fd, case.noop_infile = tempfile.mkstemp(dir=case.scratch_dir)
     finally:
@@ -545,6 +549,9 @@ def create_method_test_environment(case):
 
     with open(case.noop_infile, "w") as handle:
         handle.write(case.noop_indata)
+
+    file_access_utils.configure_sandbox_permissions(case.noop_infile)
+    file_access_utils.configure_sandbox_permissions(case.noop_outfile)
 
 
 def destroy_method_test_environment(case):
@@ -2601,7 +2608,10 @@ class MethodTests(MethodTestCase):
         """
         Invoke a no-output method (which just prints to stdout).
         """
-        empty_dir = tempfile.mkdtemp()
+        empty_dir = tempfile.mkdtemp(
+            dir=file_access_utils.sandbox_base_path()
+        )
+        file_access_utils.configure_sandbox_permissions(empty_dir)
 
         proc = self.noop_method.invoke_code(empty_dir, [self.noop_infile], [])
         proc_out, _ = proc.communicate()

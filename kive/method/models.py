@@ -757,7 +757,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 traceback.print_exc(file=stream)
             returncode = -1
 
-        # Succesful execution.
+        # Successful execution.
         if returncode is None:
 
             self.logger.debug("Polling Popen + displaying stdout/stderr to console")
