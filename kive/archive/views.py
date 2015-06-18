@@ -35,11 +35,10 @@ def datasets(request):
     accessible_SDs = librarian.models.SymbolicDataset.filter_by_user(request.user)
     datasets = Dataset.objects.filter(symbolicdataset__in=accessible_SDs,
                                       created_by=None) # Uploaded
-
-    c = RequestContext(request, {
-        'datasets': datasets,
-        'dataset_json':  json.dumps(DatasetSerializer(datasets, context={'request': request},  many=True).data)
-    })
+    datasets_json = json.dumps(DatasetSerializer(datasets,
+                                                 context={'request': request},
+                                                 many=True).data)
+    c = RequestContext(request, { 'dataset_json': datasets_json })
 
     c['is_user_admin'] = admin_check(request.user)
 

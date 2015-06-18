@@ -17,9 +17,11 @@
 
     <script type="text/javascript">
         $(function(){
+            var $preload_data = $('#preload_data');
+            $preload_data.detach();
             datasets.main(
                 {{ is_user_admin|lower }},
-                JSON.parse($('#preload_data').text()));
+                JSON.parse($preload_data.text()));
         });
     </script>
 

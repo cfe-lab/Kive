@@ -95,7 +95,7 @@ var drydock = (function() {
 
     my.CanvasState.prototype.setScale = function(factor) {
         this.scale = factor;
-        this.ctx.scale(factor, factor);
+        this.valid = false;
     };
     
     my.CanvasState.prototype.getMouseTarget = function(mx, my) {
@@ -1121,7 +1121,9 @@ var drydock = (function() {
                 sel = this.selection,
                 labels = [],
                 i, j, l, L, textWidth, flat_exec_order, shape;
+            ctx.save();
             this.clear();
+            ctx.scale(this.scale, this.scale);
             
             var draggingFromMethodOut = (
                     this.dragging &&
@@ -1201,6 +1203,7 @@ var drydock = (function() {
                 }
             }
             
+            ctx.restore();
             this.valid = true;
         }
     };

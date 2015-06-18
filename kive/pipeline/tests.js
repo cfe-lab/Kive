@@ -1167,6 +1167,29 @@
                 this.state.draw(this.ctx);
             });
             
+            it('should scale', function() {
+                this.expectedCanvas.ctx.scale(0.5, 0.5);
+                this.expectedInput.draw(this.expectedCanvas.ctx);
+                this.expectedCanvas.drawText(
+                        {x: 30, y: 19.5, text: "in", style: "node", dir: 0});
+                
+                this.state.setScale(0.5);
+                this.state.draw(this.ctx);
+            });
+            
+            it('should scale more than once', function() {
+                this.expectedCanvas.ctx.scale(0.5, 0.5);
+                this.expectedInput.draw(this.expectedCanvas.ctx);
+                this.expectedCanvas.drawText(
+                        {x: 30, y: 19.5, text: "in", style: "node", dir: 0});
+                
+                this.state.setScale(0.2);
+                this.state.draw(this.ctx);
+                
+                this.state.setScale(0.5);
+                this.state.draw(this.ctx);
+            });
+            
             it('should move', function() {
                 this.expectedInput.x += 10;
                 this.expectedInput.draw(this.expectedCanvas.ctx);

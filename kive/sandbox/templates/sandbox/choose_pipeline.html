@@ -5,11 +5,13 @@
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
 	<script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
 	<script src="/static/sandbox/sandbox.js"></script>
     <script src="/static/pipeline/jsBezier-0.6.js"></script>
     <script src="/static/pipeline/drydock_objects.js"></script>
     <script src="/static/pipeline/drydock.js"></script>
     <script src="/static/pipeline/pipeline_load.js"></script>
+    <script src="/static/sandbox/choose_pipeline.js"></script>
     <script type="text/javascript">
 
 // place in global namespace to access from other files
@@ -44,7 +46,23 @@ var load_preview_canvas = function() {
 };
 
 $(function() {
-    $('canvas.preview').each(load_preview_canvas);
+    if(false) {
+        
+    var $rows_json = $('#rows_json'),
+        rows = JSON.parse($rows_json.text())
+        $table = $('#pipeline_families'),
+        is_user_admin = false; // Never show admin tools on this page
+    $rows_json.detach();
+    
+    var table = new choose_pipeline.PipelineFamiliesTable(
+            $table,
+            is_user_admin,
+            rows);
+    table.drawThumbnails();
+    }
+    
+    // TODO: remove this old code
+    $('#pipeline_table canvas.preview').each(load_preview_canvas);
 });
 
     </script>
@@ -61,6 +79,14 @@ $(function() {
 Select a pipeline
 </p>
 
+<!-- 
+<table id="pipeline_families">
+</table>
+
+<div style="display:none" id="rows_json">{{rows_json}}</div>
+
+<h2>Old Analysis</h2>
+ -->
 {% if pipeline_forms|length > 0 %}
 	<div class="filter_ctrl">
 		<form class="short-filter">

@@ -16,6 +16,8 @@ from portal.views import admin_check
 from sandbox.forms import PipelineSelectionForm, InputSubmissionForm, RunSubmissionForm
 from fleet.serializers import RunToProcessOutputsSerializer
 from fleet.models import RunToProcess
+from pipeline.models import PipelineFamily
+from pipeline.serializers import PipelineFamilySerializer
 
 def _prepare_pipeline_selection_forms(user):
     user = KiveUser.kiveify(user)
@@ -30,9 +32,17 @@ def _prepare_pipeline_selection_forms(user):
 def choose_pipeline(request):
     """Create forms for all Pipelines in Shipyard."""
     template = loader.get_template("sandbox/choose_pipeline.html")
-    context = RequestContext(request, {
-        "pipeline_forms": _prepare_pipeline_selection_forms(request.user),
-        "error_msg": ""})
+    
+    families = PipelineFamily.filter_by_user(request.user)
+    families_json = json.dumps(PipelineFamilySerializer(families,
+                                                        context={'request': request},
+                                                        many=True).data)
+
+    context = RequestContext(
+        request,
+        { "pipeline_forms": _prepare_pipeline_selection_forms(request.user),
+          "error_msg": "",
+          "rows_json": families_json })
     return HttpResponse(template.render(context))
 
 
