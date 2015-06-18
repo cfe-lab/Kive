@@ -30,6 +30,8 @@ import librarian.models
 import datachecking.models
 import metadata.models
 import file_access_utils
+import kive.settings
+import file_access_utils
 
 LOGGER = logging.getLogger(__name__)
 
@@ -319,8 +321,12 @@ class SymbolicDataset(metadata.models.AccessControl):
                 symDS.set_MD5_and_count_rows(file_path, file_handle)
 
             if cdt is not None and check:
-                run_dir = tempfile.mkdtemp(prefix="SD{}".format(symDS.pk))
+                run_dir = tempfile.mkdtemp(
+                    prefix="SD{}_".format(symDS.pk),
+                    dir=file_access_utils.sandbox_base_path()
+                )
                 file_access_utils.configure_sandbox_permissions(run_dir)
+
                 content_check = symDS.check_file_contents(
                     file_path_to_check=file_path,
                     file_handle=file_handle,

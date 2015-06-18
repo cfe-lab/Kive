@@ -61,6 +61,13 @@ def can_create_new_file(file_to_create):
     return (is_okay, reason)
 
 
+def sandbox_base_path():
+    """
+    Helper that produces the name of the base directory for all sandboxes.
+    """
+    return os.path.join(kive.settings.MEDIA_ROOT, kive.settings.SANDBOX_PATH)
+
+
 def configure_sandbox_permissions(path):
     """
     Ensure that the specified path has the correct group and permissions.

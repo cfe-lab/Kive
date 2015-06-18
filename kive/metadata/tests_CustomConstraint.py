@@ -14,8 +14,10 @@ from method.models import MethodFamily, CodeResource
 from librarian.models import SymbolicDataset
 from datachecking.models import ContentCheckLog
 from sandbox.execute import Sandbox
+import kive.settings
 
 import sandbox.testing_utils as tools
+import file_access_utils
 
 from constants import datatypes, CDTs
 
@@ -30,7 +32,10 @@ class CustomConstraintTests(TestCase):
         tools.create_sandbox_testing_tools_environment(self)
         self.user_oscar = User.objects.create_user('oscar', 'oscar@thegrouch.com', 'garbage')
         self.user_oscar.groups.add(everyone_group())
-        self.workdir = tempfile.mkdtemp()
+        self.workdir = tempfile.mkdtemp(
+            dir=os.path.join(kive.settings.MEDIA_ROOT, kive.settings.SANDBOX_PATH)
+        )
+        file_access_utils.configure_sandbox_permissions(self.workdir)
 
         # A Datatype with basic constraints.
         self.dt_basic = self._setup_datatype("alpha", "strings of letters", self.user_oscar,

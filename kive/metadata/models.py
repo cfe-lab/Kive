@@ -22,6 +22,7 @@ import tempfile
 import shutil
 from datetime import datetime
 
+import kive.settings
 from file_access_utils import set_up_directory, configure_sandbox_permissions
 from constants import datatypes, CDTs, maxlengths, groups, users
 
@@ -145,6 +146,7 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
             LOGGER.debug("Setting up verification path for column {}".format(column))
             column_test_path = os.path.join(summary_path, "col{}".format(column))
             input_file_path = _setup_verification_path(column_test_path)
+            configure_sandbox_permissions(column_test_path)
             LOGGER.debug("Verification path was set up, column {} will be written to {}"
                          .format(column, input_file_path))
             column_paths[column] = column_test_path
@@ -912,7 +914,12 @@ class Datatype(AccessControl):
         1) This Datatype has a prototype, and it is clean
         """
         self.logger.debug('Checking constraints for Datatype "{}" on its prototype'.format(self))
-        summary_path = tempfile.mkdtemp(prefix="Datatype{}_".format(self.pk))
+        summary_path = tempfile.mkdtemp(
+            prefix="Datatype{}_".format(self.pk),
+            dir=os.path.join(kive.settings.MEDIA_ROOT, kive.settings.SANDBOX_PATH)
+        )
+        configure_sandbox_permissions(summary_path)
+
         with open(self.prototype.dataset_file.path) as f:
             reader = csv.reader(f)
             next(reader)  # skip header - we already know it's good from cleaning the prototype

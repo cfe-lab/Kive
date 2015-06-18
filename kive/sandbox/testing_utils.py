@@ -150,13 +150,18 @@ def create_sequence_manipulation_environment(case):
     case.pipeline_revcomp.create_outputs()
 
     # Here is some data which is sitting on Alice's hard drive.
+    random.seed("Constant seed avoids intermittent failures.")
     case.labdata = "header,sequence\n"
     for i in range(10):
         seq = "".join([random.choice("ATCG") for _ in range(10)])
         case.labdata += "patient{},{}\n".format(i, seq)
-    case.datafile = tempfile.NamedTemporaryFile(delete=False)
+    case.datafile = tempfile.NamedTemporaryFile(
+        delete=False,
+        dir=file_access_utils.sandbox_base_path()
+    )
     case.datafile.write(case.labdata)
     case.datafile.close()
+    file_access_utils.configure_sandbox_permissions(case.datafile.name)
 
     # Alice uploads the data to the system.
     case.symds_labdata = SymbolicDataset.create_SD(case.datafile.name, user=case.user_alice,
@@ -225,10 +230,12 @@ def create_sequence_manipulation_environment(case):
 
     # Figure out the MD5 of the output file created when the complement method
     # is run on Alice's data, so we can check it later.
-    tmpdir = tempfile.mkdtemp()
+    tmpdir = tempfile.mkdtemp(dir=file_access_utils.sandbox_base_path())
+    file_access_utils.configure_sandbox_permissions(tmpdir)
+
     outfile = os.path.join(tmpdir, "output")
-    case.method_complement.invoke_code(tmpdir, [case.datafile.name], [outfile])
-    time.sleep(1)
+    complement_popen = case.method_complement.invoke_code(tmpdir, [case.datafile.name], [outfile])
+    complement_popen.wait()
     case.labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
     shutil.rmtree(tmpdir)
 

@@ -7,7 +7,6 @@ from django.contrib.auth.models import User
 import archive.models
 import librarian.models
 import pipeline.models
-from kive import settings
 
 import file_access_utils
 from constants import dirnames, extensions
@@ -101,7 +100,7 @@ class Sandbox:
         # top-level Pipeline.
         self.sandbox_path = sandbox_path or tempfile.mkdtemp(
             prefix=sandbox_prefix.format(self.user, self.run.pk),
-            dir=os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH))
+            dir=file_access_utils.sandbox_base_path())
 
         in_dir = os.path.join(self.sandbox_path, dirnames.IN_DIR)
         self.out_dir = os.path.join(self.sandbox_path, dirnames.OUT_DIR)

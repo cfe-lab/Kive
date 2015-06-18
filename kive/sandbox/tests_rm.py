@@ -101,7 +101,6 @@ class ExecuteTestsRM(TestCase):
         symds = execrecord.execrecordouts.first().symbolicdataset
         ds = runstep.outputs.first()
 
-
         self.assertEqual(symds.MD5_checksum, self.labdata_compd_md5)
         self.assertEqual(symds.dataset, ds)
         self.assertEqual(hasattr(symds, "usurps"), False)
@@ -326,6 +325,9 @@ class BadRunTests(TestCase):
         runstep1 = sandbox.run.runsteps.first()
         log = runstep1.log
         interm_SD = runstep1.execrecord.execrecordouts.first().symbolicdataset
+
+        print("RETURN CODE: {}".format(log.methodoutput.return_code))
+
         self.assertEqual(log.is_successful(), False)
         self.assertEqual(log.methodoutput.return_code, -1)
         self.assertEqual(log.missing_outputs(), [interm_SD])
