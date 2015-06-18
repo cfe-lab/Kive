@@ -31,7 +31,6 @@ import traceback
 import threading
 import logging
 import shutil
-import grp
 
 
 @python_2_unicode_compatible
@@ -342,9 +341,11 @@ class CodeResourceRevision(metadata.models.AccessControl):
                 with self.content_file:
                     shutil.copyfileobj(self.content_file, f)
             # Make sure this is written with read, write, and execute
-            # permission, and assign it the Kive group.
-            os.chown(dest_path, -1, grp.getgrnam(kive.settings.KIVE_GROUP).gr_gid)
-            os.chmod(dest_path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH)
+            # permission.
+            os.chmod(dest_path, stat.S_IRWXU)
+            # This will tailor the permissions further if we are running
+            # sandboxes with another user account via SSH.
+            file_access_utils.configure_sandbox_permissions(dest_path)
 
         for dep in self.dependencies.all():
             # Create any necessary sub-directory.  This should never
@@ -797,7 +798,8 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 details_to_fill.clean()
                 details_to_fill.save()
 
-    def invoke_code(self, run_path, input_paths, output_paths):
+    def invoke_code(self, run_path, input_paths, output_paths,
+                    ssh_sandbox_worker_account=kive.settings.KIVE_SANDBOX_WORKER_ACCOUNT):
         """
         SYNOPSIS
         Runs a method using the run path and input/outputs.
@@ -808,6 +810,10 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         run_path        Directory where code will be run
         input_paths     List of input files expected by the code
         output_paths    List of where code will write results
+        ssh_sandbox_worker_account
+                        Name of the user account that the code will be invoked by
+                        (see kive.settings for more details).  If blank, code will
+                        be invoked directly by the current user
 
         OUTPUTS
         A running subprocess.Popen object which is asynchronous
@@ -855,7 +861,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             self.driver.coderesource.filename
         )
 
-        if kive.settings.KIVE_SANDBOX_WORKER_ACCOUNT:
+        if ssh_sandbox_worker_account:
             # We have to first cd into the appropriate directory before executing the command.
             ins_and_outs = '"{}"'.format(input_paths[0]) if len(input_paths) > 0 else ""
             for input_path in input_paths[1:] + output_paths:
@@ -865,7 +871,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
             kive_sandbox_worker_preamble = [
                 "ssh",
-                "{}@localhost".format(kive.settings.KIVE_SANDBOX_WORKER_ACCOUNT)
+                "{}@localhost".format(ssh_sandbox_worker_account)
             ]
             command = kive_sandbox_worker_preamble + [ssh_command]
 

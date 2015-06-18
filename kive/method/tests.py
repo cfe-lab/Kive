@@ -4,12 +4,14 @@ Unit tests for Shipyard method models.
 
 import filecmp
 import hashlib
+import os
 import os.path
 import re
 import shutil
 import tempfile
 import logging
 import copy
+import unittest
 
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.management import update_all_contenttypes
@@ -34,6 +36,7 @@ import sandbox.testing_utils as tools
 import sandbox.execute
 import portal.models
 import file_access_utils
+import kive.settings
 
 from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
 
@@ -3491,3 +3494,88 @@ class MethodApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(new_method.inputs.count(), 2)
         self.assertEquals(new_method.outputs.count(), 1)
 
+
+class InvokeCodeTests(TestCase):
+    """
+    Tests of Method.invoke_code with and without using an SSH user.
+    """
+    def setUp(self):
+        # A simple pass-through method.
+        resource = CodeResource(name="passthrough", filename="passthrough.sh", user=kive_user())
+        resource.save()
+
+        with tempfile.NamedTemporaryFile() as f:
+            f.write("#!/bin/bash\ncat $1 > $2")
+            revision = CodeResourceRevision(coderesource = resource, content_file=File(f),
+                                            user=kive_user())
+            revision.clean()
+            revision.save()
+
+        self.passthrough_mf = MethodFamily(name="passthrough", user=kive_user())
+        self.passthrough_mf.save()
+
+        self.passthrough_method = Method(
+            family=self.passthrough_mf, driver=revision,
+            revision_name="v1", revision_desc="First version",
+            user=kive_user())
+        self.passthrough_method.save()
+        self.passthrough_method.create_input(
+            compounddatatype=None, dataset_name="initial_data", dataset_idx=1)
+        self.passthrough_method.create_output(
+            compounddatatype=None, dataset_name="passthrough_data", dataset_idx=1)
+        self.passthrough_method.full_clean()
+
+        # Stake out a place on the filesystem for this file.
+        try:
+            fd, self.passthrough_input_name = tempfile.mkstemp(dir=file_access_utils.sandbox_base_path())
+        finally:
+            os.close(fd)
+
+        # Write to this file.
+        with open(self.passthrough_input_name, "w") as f:
+            f.write("fooooooo")
+        file_access_utils.configure_sandbox_permissions(self.passthrough_input_name)
+
+        self.empty_dir = tempfile.mkdtemp(
+            dir=file_access_utils.sandbox_base_path()
+        )
+        file_access_utils.configure_sandbox_permissions(self.empty_dir)
+
+    def tearDown(self):
+        metadata.tests.clean_up_all_files()
+        # if os.path.exists(self.passthrough_input_name):
+        #     os.remove(self.passthrough_input_name)
+        # shutil.rmtree(self.empty_dir)
+
+    def test_invoke_code(self, ssh_sandbox_worker_account=None):
+        """
+        Invoke a method's code.  By default this works as the normal user (i.e. without using SSH).
+        """
+        empty_dir = tempfile.mkdtemp(
+            dir=file_access_utils.sandbox_base_path()
+        )
+        file_access_utils.configure_sandbox_permissions(empty_dir)
+
+        output_filename = os.path.join(self.empty_dir, "test_output.dat")
+        passthrough_popen = self.passthrough_method.invoke_code(
+            self.empty_dir,
+            [self.passthrough_input_name],
+            [output_filename],
+            ssh_sandbox_worker_account=ssh_sandbox_worker_account
+        )
+        passthrough_out, _ = passthrough_popen.communicate()
+
+        # Check that everything worked OK.
+        self.assertEqual(passthrough_popen.returncode, 0)
+        with open(self.passthrough_input_name, "r") as f, open(output_filename, "r") as g:
+            self.assertEqual(f.read(), g.read())
+
+    @unittest.skipIf(
+        not kive.settings.KIVE_SANDBOX_WORKER_ACCOUNT,
+        "Kive is not configured to run sandboxes under another account via SSH"
+    )
+    def test_invoke_code_with_SSH(self):
+        """
+        Invoke a method as the normal user (i.e. without using SSH).
+        """
+        self.test_invoke_code(ssh_sandbox_worker_account=kive.settings.KIVE_SANDBOX_WORKER_ACCOUNT)

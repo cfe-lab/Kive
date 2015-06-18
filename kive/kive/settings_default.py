@@ -5,6 +5,8 @@
 # DATABASES: NAME, USER, and PASSWORD are site-specific
 # MEDIA_ROOT: set to the absolute path you wish to use on your system
 # STATIC_ROOT: set to the absolute path you wish to use on your system
+# KIVE_SANDBOX_WORKER_ACCOUNT: the user account used to run sandboxes
+# KIVE_GROUP: the system group containing the typical Kive user and the above
 
 
 
@@ -243,4 +245,7 @@ SANDBOX_KEEP_RECENT = 10
 # - should use bash as its default shell
 # Leave blank to run as the user that launches the fleet.
 KIVE_SANDBOX_WORKER_ACCOUNT = "kiveworker"
+
+# The system group that contains both the user that launches the fleet and
+# the sandbox worker account.  This is ignored if KIVE_SANDBOX_WORKER_ACCOUNT is blank.
 KIVE_GROUP = "kive"
