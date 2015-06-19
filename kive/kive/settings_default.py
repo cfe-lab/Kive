@@ -244,7 +244,7 @@ SANDBOX_KEEP_RECENT = 10
 # - should have access to any tools used in any of your CodeResources on PATH
 # - should use bash as its default shell
 # Leave blank to run as the user that launches the fleet.
-KIVE_SANDBOX_WORKER_ACCOUNT = "kiveworker"
+KIVE_SANDBOX_WORKER_ACCOUNT = ""
 
 # The system group that contains both the user that launches the fleet and
 # the sandbox worker account.  This is ignored if KIVE_SANDBOX_WORKER_ACCOUNT is blank.

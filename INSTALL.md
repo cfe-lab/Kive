@@ -260,6 +260,79 @@ with `psql` and then exit.
     psql kive kive
     \q
 
+Restricted user for running user-submitted code
+-----------------------------------------------
+
+By its nature, Kive runs user-submitted code under an account that does not
+necessarily belong to that user.  For example, on a development machine, this 
+code will typically run as the developer (i.e. you), and on a production 
+machine, code will run as the `apache` user (in the examples below, this user 
+is named `kiveuser`).  This poses obvious security risks.  To reduce these risks, 
+Kive supports running pipelines as another user -- preferably an unprivileged one 
+that cannot access any vital system information such as the database -- via SSH 
+on localhost.
+
+Before this can be enabled, you must create a suitable user account (let's say 
+this user is named `sandboxworker`) however is typical on your system.
+
+Next, create a system group that contains both this user and the 
+`kiveuser` user, whoever that is on your system.  In our examples below, this 
+group will be called `kive`.
+
+Third, make sure that `sandboxworker` is able to access any system software 
+required by the Methods in the system.  For example, if any Methods in your
+Kive system require Python, then `sandboxworker` needs to be able to run Python.
+This also includes any libraries, modules, or plugins to this software: Python
+modules, R libraries, Ruby gems, and the like.  This may require modifying the
+user's `.bashrc` file.
+
+Because the files created by `sandboxworker` will be owned by `sandboxworker`,
+but need to be cleaned up by Kive (running as `kiveuser`), ensure that 
+`sandboxworker` creates files that are writable by their group; Kive will make
+sure that these files belong to the `kive` group so that it can remove them.  
+To do this, include the command `umask 0002` in `sandboxworker`'s `.bashrc` 
+file.
+
+Fourth, set up passwordless SSH access to the `sandboxworker` account from the
+normal Kive account.  Typically this proceeds as follows:
+
+- Produce an SSH private/public key pair with no passphrase for `kiveuser` if 
+  that user doesn't already have one.
+  
+    (To see if you already have one, look for a file named `id_rsa.pub` in the
+  `~kiveuser/.ssh` directory.  Try skipping to the next step and see if you
+  are able to `ssh` into `sandboxworker@localhost` without a passphrase.  If so,
+  you are done; if not, you'll need to follow these instructions and set up another
+  key pair that does not have a passphrase.)
+  
+    To create this key pair, log in as `kivedev` and run the command
+
+        ssh-keygen -t rsa
+
+    When it prompts you for a passphrase, leave it blank.  Take note of where
+  it places the `id_rsa.pub` file; typically this will be in the directory
+  `~kiveuser/.ssh/id_rsa.pub`.  Make this file accessible to `sandboxworker`.
+  
+- As `sandboxworker`, add the contents of the `id_rsa.pub` file that was just 
+  created to `.ssh/authorized_keys` file:
+  
+        cat id_rsa.pub >> ~/.ssh/authorized_keys
+    
+- As `kiveuser`, attempt to SSH into the system as `sandboxworker` with the 
+  command `ssh sandboxworker@localhost`.  If this is the first time you've
+  ever done this, it will produce a prompt:
+  
+        The authenticity of host '12.34.56.78 (12.34.56.78)' can't be established.
+        RSA key fingerprint is b1:2d:33:67:ce:35:4d:5f:f3:a8:cd:c0:c4:48:86:12.
+        Are you sure you want to continue connecting (yes/no)?
+  
+  Enter `yes` to finish the setup, then log out of the SSH session.
+  
+You may wish to verify that passwordless SSH is properly set up by running
+`ssh sandboxworker@localhost` one more time.  This time, it should take you
+directly to a login shell without any prompts.
+
+Details of setting up Kive to execute code as this user may be found below.
 
 Settings
 --------
@@ -285,9 +358,8 @@ Set `STATIC_ROOT` to the absolute path of a directory that can hold static files
 for the web server to serve. You don't need this setting for a development
 server on your workstation.
 
-You may also wish to modify
-the `TIME_ZONE` setting to your region, although this localization is not
-strictly necessary.
+You may also wish to modify the `TIME_ZONE` setting to your region, although 
+this localization is not strictly necessary.
 
 Another configuration file is `hostfile` in the same folder as `settings.py`.
 Copy `hostfile_default` to `hostfile`, and uncomment the `localhost` line. If
@@ -295,6 +367,14 @@ you want to launch worker processes on multiple hosts, add a line for each host.
 Options are described in the [Open MPI FAQ][mpifaq].
 
 [mpifaq]: http://www.open-mpi.org/faq/?category=running#mpirun-hostfile
+
+#### Enabling Kive to run code as an unprivileged user
+
+Assuming that you've set up an unprivileged user as in the "Restricted user 
+for running sandboxes" section, enable running code as this user by 
+setting the value of `KIVE_SANDBOX_WORKER_ACCOUNT` and `KIVE_GROUP` to the
+appropriate values (e.g. `sandboxworker` and `kive`, if you followed the
+above instructions exactly).
 
 Creating database tables
 ------------------------
