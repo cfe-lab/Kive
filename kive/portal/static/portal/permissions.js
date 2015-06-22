@@ -194,9 +194,14 @@ var permissions = (function() {
                     var rows;
                     rows = permissions_table.extractRows(response);
                     permissions_table.buildTable(rows);
-                }).fail(function() {
+                }).fail(function(request) {
+                    var response = request.responseJSON,
+                        detail = (
+                                response ?
+                                response.detail :
+                                "Failed to reload table");
                     permissions_table.$tbody.empty();
-                    permissions_table.setCaption('Failed to reload table.');
+                    permissions_table.setCaption(detail);
                 }).always(function() {
                     permissions_table.ajax_request = undefined;
                 });

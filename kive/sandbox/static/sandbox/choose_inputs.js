@@ -41,7 +41,7 @@ var choose_inputs = (function() {
     my.DatasetsTable.prototype.getQueryParams = function() {
         var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
         params.filters = this.filterSet.getFilters();
-        params.filters.push({ key: "cdt", val: this.compound_datatype_id });
+        params.filters.push({ key: "cdt", val: this.compounddatatype_id });
         params.page_size = 10;
         return params;
     };
