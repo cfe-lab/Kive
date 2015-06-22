@@ -2084,7 +2084,7 @@ class Dataset(models.Model):
     symbolicdataset = models.OneToOneField("librarian.SymbolicDataset", related_name="dataset")
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["-date_created", "name"]
         
     @property
     def user(self):

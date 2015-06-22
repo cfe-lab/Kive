@@ -329,6 +329,78 @@ var permissions = (function() {
         return (date.getDate() + " " + monthNames[date.getMonth()] + " " + 
                 date.getFullYear() + " " + date.getHours() + ":" + min);
     };
+    
+    /**
+     * Build and apply a set of search filters.
+     * 
+     * @param $active: a jQuery object that will hold all the active filters
+     * @param onChange: a function that is called when a filter is added or
+     *  removed
+     */
+    my.FilterSet = function($active, onChange) {
+        this.$active = $active;
+        this.onChange = onChange;
+    };
+    
+    function addFilter(filterSet, key, value) {
+        var $filter,
+            $duplicates;
+        $filter = $('<div class="filter"/>').data({ key: key, val: value });
+        $filter.append(
+                $('<span class="field"/>').text(key + ':'),
+                $('<span class="value"/>').text(value));
+        $duplicates = $('div.filter', filterSet.$active).filter(function() {
+            var $f = $(this);
+            return $f.data('key') == key && $f.data('val') == value;
+        });
+        if ( ! $duplicates.length) {
+            $filter.append($('<a class="remove">&times;</a>').click(function() {
+                $filter.detach();
+                filterSet.onChange();
+            }));
+            filterSet.$active.prepend($filter);
+        }
+    }
+    
+    my.FilterSet.prototype.add = function(key, value) {
+        addFilter(this, key, value);
+        this.onChange();
+    };
+    
+    my.FilterSet.prototype.addFromForm = function(form) {
+        var filterSet = this,
+            $fields = $('input[type="text"], input:checked', form);
+        $fields = $($fields.get().reverse());
+        $fields.each(function() {
+            var $field = $(this),
+                value = $field.val();
+            if (value.length === 0) {
+                return;
+            }
+            if ($field.is('.datetime')) {
+                value = my.formatDate(value);
+            }
+            addFilter(
+                    filterSet,
+                    $field.attr('name'),
+                    $field.is(':checked') ? undefined : value);
+            if ($field.is(':checked')) {
+                $field.attr('checked', false);
+            }
+            else {
+                $field.val('');
+            }
+        });
+        this.onChange();
+    };
+    
+    my.FilterSet.prototype.getFilters = function() {
+        var filters = [];
+        this.$active.find('.filter').each(function() {
+            filters.push($(this).data());
+        });
+        return filters;
+    };
 
     return my;
 }());

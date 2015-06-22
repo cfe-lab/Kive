@@ -6,50 +6,18 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
 	<script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-	<script src="/static/sandbox/sandbox.js"></script>
     <script src="/static/pipeline/jsBezier-0.6.js"></script>
     <script src="/static/pipeline/drydock_objects.js"></script>
     <script src="/static/pipeline/drydock.js"></script>
     <script src="/static/pipeline/pipeline_load.js"></script>
     <script src="/static/sandbox/choose_pipeline.js"></script>
     <script type="text/javascript">
-
-// place in global namespace to access from other files
-var submit_to_url = '/pipeline_add';
-
-var load_preview_canvas = function() {
-    var $this = $(this),
-        this_ = this,
-        pkey = $this.closest('.results').data('pkey');
-    $.ajax({
-        type: "GET",
-        url: "/api/pipelines/" + $this.closest('tr').get_pkey(pkey) + "/",
-        datatype: "json",
-        success: function(result) {
-            this_.width  = 120,
-            this_.height = 90;
-            var redrawInterval = 50, // ms
-                cs = new drydock.CanvasState(this_, redrawInterval);
-            var pipeline = new Pipeline(cs);
-
-            cs.setScale(0.12);
-            cs.enable_labels = false;
-            // reset containers to reflect canvas
-            cs.shapes = [];
-            cs.connectors = [];
-            cs.exec_order = [];
-            cs.selection = [];
-            pipeline.load(result);
-            pipeline.draw();
-        }
-    });
-};
-
 $(function() {
-    if(false) {
-        
+    // Security stuff to prevent cross-site scripting.
+    noXSS();
+
     var $rows_json = $('#rows_json'),
-        rows = JSON.parse($rows_json.text())
+        rows = JSON.parse($rows_json.text()),
         $table = $('#pipeline_families'),
         is_user_admin = false; // Never show admin tools on this page
     $rows_json.detach();
@@ -57,14 +25,14 @@ $(function() {
     var table = new choose_pipeline.PipelineFamiliesTable(
             $table,
             is_user_admin,
-            rows);
-    table.drawThumbnails();
-    }
-    
-    // TODO: remove this old code
-    $('#pipeline_table canvas.preview').each(load_preview_canvas);
-});
+            $('#active_filters'));
+    table.buildTable(rows);
 
+    $('form.short-filter').submit(function(e) {
+        e.preventDefault();
+        table.filterSet.addFromForm(this);
+    });
+});
     </script>
 	<link rel="stylesheet" href="/static/sandbox/sandbox.css">
 {% endblock %}
@@ -79,69 +47,19 @@ $(function() {
 Select a pipeline
 </p>
 
-<!-- 
-<table id="pipeline_families">
-</table>
+<div class="filter_ctrl">
+    <form class="short-filter">
+        <input name="smart" type="text"><input type="submit" value="Filter">
+    </form>
+</div>
+<div id="active_filters"></div>
+
+<div class="results2">
+    <table id="pipeline_families">
+    </table>
+</div>
 
 <div style="display:none" id="rows_json">{{rows_json}}</div>
-
-<h2>Old Analysis</h2>
- -->
-{% if pipeline_forms|length > 0 %}
-	<div class="filter_ctrl">
-		<form class="short-filter">
-		<input name="name" type="text" data-link="Smart"><!--
-		    /* There will be a time and a place for this. That time is not now. */
-		    <input type="button" class="advanced ctrl" value="Advanced">
-		--><input type="submit" value="Filter">
-		</form>
-		
-<!--		<form class="advanced-filter">
-	    <h4>Advanced search</h4>
-		<label for="name">Name</label>
-		<input name="name" type="text" data-link="Name">
-		<input name="uploads" type="checkbox" data-link="Uploaded">
-		<label for="uploads">Show only user uploads</label>
-		<input type="submit" value="Filter">
-		</form>-->
-	</div>
-
-	<div class="active_filters"></div>
-
-	<div class="no_results">
-		<strong>No results were found.</strong>
-	</div>
-{% endif %}
-{% if pipeline_forms|length > 0 %}
-    <div class="results" data-pkey="Revision:selected" data-ajax-url="filter_pipelines">
-        <table id="pipeline_table">
-        <thead>
-            <tr>
-                <th>Pipeline Family</th>
-                <th>Thumbnail</th>
-                <th>Revision</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for form in pipeline_forms %}
-            <tr>
-                <td>{{ form.family_name }}</td>
-                <td class="preview-canvas"><canvas class="preview">Warning: Kive does not support your web browser.</canvas></td>
-                <td class="pipeline_selector">{{ form.pipeline }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-        </table>
-    </div>
-    <input type="hidden" class="tbselect-value" value="">
-    <form action="choose_inputs" method="get" id="choose_inputs">
-        <input type="submit" value="Choose inputs">
-	</form>
-{% else %}
-    <div class="greyedout">
-        There's nothing here.
-    </div>
-{% endif %}
 
 <div class="errortext">{{ error_msg }}</div>
 <div id="errors" class="errortext"></div>

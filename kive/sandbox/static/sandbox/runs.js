@@ -15,44 +15,13 @@
 var pollingInterval = 1000, // milliseconds
     runsTable;
 
-function get_run_filters() {
-    var filters = [];
-    $('#active_filters .filter').each(function() {
-        filters.push($(this).data());
-    });
-    
-    return filters;
-}
-
-function remove_handler() {
-    var $filter = $(this).closest('.filter');
-    $filter.detach();
-    runsTable.reloadTable();
-}
-
-function add_filter(key, value) {
-    var $filters = $('#active_filters'),
-        $filter,
-        $duplicates;
-    $filter = $('<div class="filter"/>').data('key', key);
-    $filter.append($('<span class="field"/>').text(key + ':'));
-    if (value != null) {
-        $filter.data('val', value);
-        $filter.append($('<span class="value"/>').text(value));
-    }
-    $duplicates = $('div.filter', $filters).filter(function() {
-        var $f = $(this);
-        return $f.data('key') == key && $f.data('val') == value;
-    });
-    if ( !$duplicates.length) {
-        $filter.append($('<a class="remove">&times;</a>').click(remove_handler));
-        $filters.prepend($filter);
-    }
-}
-
-var RunsTable = function($table, is_user_admin, $no_results) {
+var RunsTable = function($table, is_user_admin, $no_results, $active_filters) {
     permissions.PermissionsTable.call(this, $table, is_user_admin);
     this.$no_results = $no_results;
+    var runsTable = this;
+    this.filterSet = new permissions.FilterSet(
+            $active_filters,
+            function() { runsTable.reloadTable(); });
     this.list_url = "/api/runs/status/";
     this.reload_interval = pollingInterval;
     this.registerColumn("Status", function($td, run) {
@@ -78,11 +47,13 @@ var RunsTable = function($table, is_user_admin, $no_results) {
     });
 }
 RunsTable.prototype = Object.create(permissions.PermissionsTable.prototype);
+
 RunsTable.prototype.getQueryParams = function() {
     var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
-    params.filters = get_run_filters();
+    params.filters = this.filterSet.getFilters();
     return params;
-}
+};
+
 RunsTable.prototype.extractRows = function(response) {
     var $no_results = this.$no_results,
         runs;
@@ -109,7 +80,7 @@ RunsTable.prototype.extractRows = function(response) {
     this.$table.hide();
     $no_results.show();
     return []; // no runs
-}
+};
 
 $(function(){ // wait for page to finish loading before executing jQuery code
     // Security stuff to prevent cross-site scripting.
@@ -132,31 +103,14 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     });
     
     $('form.short-filter, form.advanced-filter').submit(function(e) {
-        var $fields = $('input[type="text"], input:checked', this);
         e.preventDefault();
-        $fields.each(function() {
-            var $field = $(this),
-                value = $field.val();
-            if (value.length == 0) {
-                return;
-            }
-            if ($field.is('.datetime')) {
-                value = permissions.formatDate(value);
-            }
-            add_filter(
-                    $field.attr('name'),
-                    $field.is(':checked') ? null : value);
-            if ($field.is(':checked')) {
-                $field.attr('checked', false);
-            }
-            else {
-                $field.val('');
-            }
-        });
-        runsTable.reloadTable();
+        runsTable.filterSet.addFromForm(this);
     });
     
-    add_filter('active');
-    runsTable = new RunsTable($('#runs'), is_user_admin, $('.no_results'));
-    runsTable.reloadTable();
+    runsTable = new RunsTable(
+            $('#runs'),
+            is_user_admin,
+            $('.no_results'),
+            $('#active_filters'));
+    runsTable.filterSet.add('active');
 });

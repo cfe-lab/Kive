@@ -3,11 +3,64 @@
 {% block title %}Analysis{% endblock %}
 
 {% block javascript %}
-	<script src="/static/portal/jquery-2.0.3.min.js"></script>
-	<script src="/static/portal/noxss.js"></script>
-	<script src="/static/sandbox/sandbox.js"></script>
-	<script src="/static/sandbox/jq_color_anim.min.js"></script>
-	<link rel="stylesheet" href="/static/sandbox/sandbox.css">
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script src="/static/sandbox/jq_color_anim.min.js"></script>
+    <script src="/static/sandbox/choose_inputs.js"></script>
+    <script type="text/javascript">
+$(function() {
+    // Security stuff to prevent cross-site scripting.
+    noXSS();
+
+    var is_user_admin = false; // Never show admin tools on this page
+    $('#input_forms table').each(function() {
+        var $table = $(this),
+            $li = $table.closest('li'),
+            $active_filters = $li.find('.active_filters'),
+            $forms = $li.find('form'),
+            compounddatatype_id = $table.data('compounddatatype_id'),
+            input_index = $table.data('input_index');
+        var table = new choose_inputs.DatasetsTable(
+                $table,
+                is_user_admin,
+                input_index,
+                compounddatatype_id,
+                $active_filters);
+        table.filterSet.add('uploaded');
+        $forms.submit(function(e) {
+            e.preventDefault();
+            table.filterSet.addFromForm(this);
+        });
+    });
+    
+    $('.advanced-filter').prepend(
+            '<input type="button" class="close ctrl" value="Close">');
+
+    $('input[value="Advanced"]').on('click', function() {
+        $(this).closest('.short-filter').fadeOut({ complete: function() {
+            $(this).siblings('.advanced-filter').fadeIn()
+                .closest('li').addClass('advanced');
+        } });
+    });
+
+    $('.advanced-filter input.close.ctrl').on('click', function() {
+        $(this).closest('.advanced-filter').fadeOut({ complete: function() {
+            $(this).siblings('.short-filter').fadeIn()
+                .closest('li').removeClass('advanced');
+        } });
+    });
+    
+    $('#run_pipeline').submit(function(e) {
+        var $inputs = $('#input_forms input[type="radio"]'),
+            $clones = $inputs.clone();
+        $clones.hide();
+        $(this).append($clones);
+    });
+    
+});
+    </script>
+    <link rel="stylesheet" href="/static/sandbox/sandbox.css">
 {% endblock %}
 
 {% block content %}
@@ -19,59 +72,32 @@
 <h3>Pipeline {{ pipeline }} </h3>
 
 <ul id="input_forms">
-{% for input, datasets, total in input_data %}
-	<li>
-		<h3>Input {{ input.dataset_idx }}: <code>{{ input.dataset_name }}</code></h3>
-	<div class="filter_ctrl">
-		<form class="short-filter">
-		<input name="name" type="text" data-link="Smart"><input type="button" class="advanced ctrl" value="Advanced"><input type="submit" value="Filter">
-		</form>
-		
-		<form class="advanced-filter">
-	    <h4>Advanced search</h4>
-		<label for="name">Name</label>
-		<input name="name" type="text" data-link="Name">
-		<input name="uploads" type="checkbox" data-link="User-Uploaded">
-		<label for="uploads">Show only user uploads</label>
-		<input type="submit" value="Filter">
-		</form>
-	</div>
+{% for input in inputs %}
+    <li>
+        <h3>Input {{ input.dataset_idx }}: <code>{{ input.dataset_name }}</code></h3>
+    <div class="filter_ctrl">
+        <form class="short-filter">
+        <input name="smart" type="text"
+            ><input type="button" class="advanced ctrl" value="Advanced"
+            ><input type="submit" value="Filter">
+        </form>
+        
+        <form class="advanced-filter">
+        <h4>Advanced search</h4>
+        <label>Name<input name="name" type="text"></label>
+        <label><input name="uploads" type="checkbox">Show only user uploads</label>
+        <input type="submit" value="Filter">
+        </form>
+    </div>
 
-	<div class="active_filters"></div>
+    <div class="active_filters"></div>
 
-	<div class="no_results">
-		<strong>No results were found.</strong>
-	</div>
-
-	<div
-        class="results"
-        data-pkey="symbolicdataset_id"
-        data-displaycols="2,3"
-        data-ajax-url="filter_datasets"
-        data-compounddatatype="{% if not input.is_raw %}{{ input.structure.compounddatatype.pk }}{% endif %}">
-		<table>
-                <caption>showing most recent {{ datasets|length }} datasets</caption>
-		<thead>
-			<tr>
-				<th>symbolicdataset_id</th>
-				<th>Name</th>
-				<th>Date</th>
-			</tr>
-		</thead>
-		<tbody>
-			{% for dataset in datasets %}
-			<tr>
-				<td>{{ dataset.symbolicdataset_id }}</td>
-				<td>{{ dataset.name }}</td>
-				<td>{{ dataset.date_created|date:"b d, Y, P"|capfirst}}</td>
-			</tr>
-			{% endfor %}
-		</tbody>
-		</table>
-	</div>
-	
-	<input type="hidden" name="input_{{ input.dataset_idx }}" class="tbselect-value" value="">
-	</li>
+    <div class="results2">
+        <table data-compounddatatype_id="{{ input.compounddatatype.id }}"
+            data-input_index="{{ input.dataset_idx }}"></table>
+    </div>
+    
+    </li>
 {% endfor %}
 </ul>
 

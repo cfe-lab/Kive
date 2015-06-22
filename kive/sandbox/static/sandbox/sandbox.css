@@ -17,6 +17,9 @@
     width: 100%;
 }
 
+.results2 {
+    clear: left;
+}
 .results {
     padding: 0 0 1em;
     clear: left;

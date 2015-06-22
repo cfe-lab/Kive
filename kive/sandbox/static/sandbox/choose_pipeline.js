@@ -2,29 +2,39 @@ var choose_pipeline = (function() {
     "use strict";
     var my = {};
     
-    my.PipelineFamiliesTable = function($table, is_user_admin, rows) {
+    my.PipelineFamiliesTable = function($table, is_user_admin, $active_filters) {
         permissions.PermissionsTable.call(this, $table, is_user_admin);
         this.list_url = "/api/pipelinefamilies/";
+        var pipelineFamiliesTable = this;
+        this.filterSet = new permissions.FilterSet(
+                $active_filters,
+                function() { pipelineFamiliesTable.reloadTable(); });
         this.registerColumn("Pipeline Family", "name");
         this.registerColumn("Thumbnail", buildThumbnail);
         this.registerColumn("Revision", buildMembers);
-        this.buildTable(rows);
     };
     my.PipelineFamiliesTable.prototype = Object.create(
             permissions.PermissionsTable.prototype);
     my.PipelineFamiliesTable.prototype.getQueryParams = function() {
         var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
+        params.filters = this.filterSet.getFilters();
         return params;
     };
     
-    my.PipelineFamiliesTable.prototype.drawThumbnails = function() {
-        this.$table.find('select').each(drawThumbnail);
-    }
+    my.PipelineFamiliesTable.prototype.buildTable = function(rows) {
+        permissions.PermissionsTable.prototype.buildTable.call(this, rows);
+        this.drawThumbnails();
+    };
     
-    function drawThumbnail() {
-        var $select = $(this),
+    my.PipelineFamiliesTable.prototype.drawThumbnails = function() {
+        this.$table.find('select').each(function() { drawThumbnail(this); });
+    };
+    
+    function drawThumbnail(select) {
+        var $select = $(select),
             $canvas = $select.closest('tr').find('canvas'),
-            canvas = $canvas[0];
+            canvas = $canvas[0],
+            x = arguments;
         $.ajax({
             type: "GET",
             url: "/api/pipelines/" + $select.val(),
@@ -48,7 +58,8 @@ var choose_pipeline = (function() {
     }
     
     function buildMembers($td, row) {
-        var $select = $('<select>');
+        var $form = $('<form method="GET" action="choose_inputs">'),
+            $select = $('<select name="pipeline">');
         for (var i = 0; i < row.members.length; i++) {
             var member = row.members[i],
                 $option = $('<option>').attr(
@@ -59,8 +70,10 @@ var choose_pipeline = (function() {
             }
             $select.append($option);
         }
-        $select.change(drawThumbnail);
-        $td.append($select, '&nbsp;', $('<a href="#">Choose</a>'));
+        $select.change(function() { drawThumbnail(this); });
+        $form.append($select);
+        $form.append('&nbsp;<input type="submit" value="Choose">');
+        $td.append($form);
     }
     
     return my;
