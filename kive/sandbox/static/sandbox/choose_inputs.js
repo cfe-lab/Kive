@@ -35,6 +35,14 @@ var choose_inputs = (function() {
         this.registerColumn("Name", buildRadioButton, this);
         this.registerColumn("Date", buildDateCreated);
         this.registerColumn("File Size (B)", "filesize");
+        this.$table.click(function(e) {
+            var $target = $(e.target),
+                $tr = $target.closest('tr');
+            if ( ! $target.is('input')) {
+                e.preventDefault();
+                $tr.find('input').click();
+            }
+        });
     };
     my.DatasetsTable.prototype = Object.create(
             permissions.PermissionsTable.prototype);
