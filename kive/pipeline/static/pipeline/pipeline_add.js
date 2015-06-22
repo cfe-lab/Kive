@@ -706,50 +706,6 @@ $(function() {
     canvasState.old_width = canvasWidth;
     canvasState.old_height = canvasHeight;
 
-    // trigger ajax on CR drop-down to populate revision select
-    $(document).ajaxSend(function(event, xhr, settings) {
-        /*
-            from https://docs.djangoproject.com/en/1.3/ref/contrib/csrf/#csrf-ajax
-            On each XMLHttpRequest, set a custom X-CSRFToken header to the value of the CSRF token.
-            ajaxSend is a function to be executed before an Ajax request is sent.
-        */
-
-        function getCookie(name) {
-            var cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                var cookies = document.cookie.split(';');
-                for (var i = 0; i < cookies.length; i++) {
-                    var cookie = jQuery.trim(cookies[i]);
-                    // Does this cookie string begin with the name we want?
-                    if (cookie.substring(0, name.length + 1) == (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
-        }
-        function sameOrigin(url) {
-            // url could be relative or scheme relative or absolute
-            var host = document.location.host, // host + port
-                protocol = document.location.protocol,
-                sr_origin = '//' + host,
-                origin = protocol + sr_origin;
-            
-            // Allow absolute or scheme relative URLs to same origin
-            return url == origin || url.slice(0, origin.length + 1) == origin + '/' ||
-                url == sr_origin || url.slice(0, sr_origin.length + 1) == sr_origin + '/' ||
-                // or any other URL that isn't scheme relative or absolute i.e relative.
-                !(/^(\/\/|http:|https:).*/.test(url));
-        }
-        function safeMethod(method) {
-            return [ 'GET', 'HEAD', 'OPTIONS', 'TRACE' ].indexOf(method) > -1;
-        }
-
-        if (!safeMethod(settings.type) && sameOrigin(settings.url)) {
-            xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
-        }
-    });
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
