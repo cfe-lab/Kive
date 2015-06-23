@@ -776,6 +776,9 @@ class PipelineStep(models.Model):
     name = models.CharField(default="", max_length=maxlengths.MAX_NAME_LENGTH, blank=True)
     fill_colour = models.CharField(default="", max_length=maxlengths.MAX_COLOUR_LENGTH, blank=True)
 
+    class Meta:
+        ordering = ["step_num"]
+
     def __str__(self):
         """ Represent with the pipeline and step number """
         return "{}: {}".format(self.step_num, self.name)

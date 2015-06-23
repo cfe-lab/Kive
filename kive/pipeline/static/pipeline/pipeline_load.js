@@ -312,7 +312,7 @@ var pipeline = (function(exports){
             canvas_x_ratio = self.canvasState.canvas.width / self.canvasState.scale,
             canvas_y_ratio = self.canvasState.canvas.height / self.canvasState.scale;
 
-        if (self.pipeline === null) { throw "draw_inputs() called with no pipeline?"; }
+        if (self.pipeline === null) { throw "draw_steps() called with no pipeline?"; }
         var method_node_offset = self.pipeline.inputs.length;
 
         // Over each pipeline step
