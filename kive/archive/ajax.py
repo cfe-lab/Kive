@@ -10,7 +10,8 @@ from archive.serializers import DatasetSerializer, MethodOutputSerializer
 from archive.models import Dataset, MethodOutput, summarize_redaction_plan
 from archive.views import _build_download_response
 
-from kive.ajax import RemovableModelViewSet, RedactModelMixin, IsGrantedReadOnly, IsGrantedReadCreate
+from kive.ajax import RemovableModelViewSet, RedactModelMixin, IsGrantedReadOnly, IsGrantedReadCreate,\
+    StandardPagination
 
 from librarian.models import SymbolicDataset
 
@@ -46,6 +47,7 @@ class DatasetViewSet(RemovableModelViewSet, RedactModelMixin):
     queryset = Dataset.objects.all()
     serializer_class = DatasetSerializer
     permission_classes = (permissions.IsAuthenticated, IsGrantedReadCreate)
+    pagination_class = StandardPagination
 
     def filter_granted(self, queryset):
         """ Filter a queryset to only include records explicitly granted.

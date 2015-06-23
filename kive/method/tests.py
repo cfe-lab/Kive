@@ -4,7 +4,6 @@ Unit tests for Shipyard method models.
 
 import filecmp
 import hashlib
-import os
 import os.path
 import re
 import shutil
@@ -23,7 +22,7 @@ from django.core.urlresolvers import resolve
 from django.test import TestCase, TransactionTestCase
 from rest_framework import status
 from rest_framework.reverse import reverse
-from rest_framework.test import force_authenticate, APIRequestFactory
+from rest_framework.test import force_authenticate
 
 from constants import datatypes
 from kive.tests import BaseTestCases
@@ -3343,12 +3342,11 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
 
         request = self.factory.post(self.list_path, self.crr_data, format="json")
         force_authenticate(request, user=kive_user())
-        self.assertRaisesRegexp(
-            ValidationError,
-            "depPath cannot reference ../",
-            lambda: self.list_view(request)
-        )
-
+        response = self.list_view(request)
+        
+        self.assertDictEqual(
+            response.data,
+            { 'non_field_errors': "depPath cannot reference ../" })
 
 def method_test_setup(case):
     """
@@ -3563,7 +3561,7 @@ class InvokeCodeTests(TestCase):
             [output_filename],
             ssh_sandbox_worker_account=ssh_sandbox_worker_account
         )
-        passthrough_out, _ = passthrough_popen.communicate()
+        passthrough_popen.communicate()
 
         # Check that everything worked OK.
         self.assertEqual(passthrough_popen.returncode, 0)

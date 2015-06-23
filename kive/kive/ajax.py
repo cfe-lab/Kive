@@ -1,19 +1,38 @@
+from django.core.exceptions import ValidationError as DjangoValidationError, \
+    NON_FIELD_ERRORS as DJANGO_NON_FIELD_ERRORS
 from django.db import transaction
 
-from rest_framework import permissions, mixins
+from rest_framework import permissions, mixins, serializers
 from rest_framework.decorators import detail_route
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
-
-# Have to define this before importing ReadOnlyModelViewSet.
-class StandardPagination(PageNumberPagination):
-    page_size_query_param = 'page_size'
-
+from rest_framework.settings import api_settings
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from archive.models import summarize_redaction_plan
 from metadata.models import AccessControl
 from portal.views import developer_check, admin_check
+
+def convert_validation(ex):
+    """ Convert Django validation error to REST framework validation error """
+    
+    errors = {}
+    for message in ex:
+        if message is tuple:
+            field, error = message
+            if field != DJANGO_NON_FIELD_ERRORS:
+                translated_field = field
+            else:
+                translated_field = api_settings.NON_FIELD_ERRORS_KEY
+        else:
+            translated_field = api_settings.NON_FIELD_ERRORS_KEY
+            error = message
+        errors[translated_field] = error
+    
+    return serializers.ValidationError(errors)
+
+class StandardPagination(PageNumberPagination):
+    page_size_query_param = 'page_size'
 
 class IsGrantedReadOnly(permissions.BasePermission):
     """ Custom permission for historical resources like runs.
@@ -172,5 +191,9 @@ class CleanCreateModelMixin(mixins.CreateModelMixin):
         """
         Handle creation and cleaning of a new object.
         """
-        new_obj = serializer.save()
-        new_obj.full_clean()
+        try:
+            new_obj = serializer.save()
+            new_obj.full_clean()
+        except DjangoValidationError as ex:
+            raise convert_validation(ex.messages)
+

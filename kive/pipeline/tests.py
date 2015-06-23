@@ -4644,11 +4644,11 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
         request = self.factory.post(self.list_path, self.pipeline_dict, format="json")
         force_authenticate(request, user=self.kive_user)
         # This should barf.
-        self.assertRaisesRegexp(
-            ValidationError,
-            'Input "strings" to transformation at step 1 is not cabled',
-            lambda: self.list_view(request),
-        )
+        response = self.list_view(request)
+        
+        self.assertDictEqual(
+            response.data,
+            { 'non_field_errors': 'Input "strings" to transformation at step 1 is not cabled' })
 
 
 class PipelineFamilyApiTests(BaseTestCases.ApiTestCase):
@@ -4678,8 +4678,9 @@ class PipelineFamilyApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(response.data[1]['name'], 'Pipeline_family')
 
         pf = PipelineFamily.objects.get(name="Pipeline_family")
-        revision_pks = [x.pk for x in pf.members.all()]
-        self.assertSetEqual(set(revision_pks), set(response.data[1]['members']))
+        expected_revision_pks = [x.pk for x in pf.members.all()]
+        actual_revision_pks = [x['id'] for x in response.data[1]['members']]
+        self.assertItemsEqual(expected_revision_pks, actual_revision_pks)
 
     def test_detail(self):
         request = self.factory.get(self.detail_path)
@@ -4688,9 +4689,9 @@ class PipelineFamilyApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(response.data['name'], 'P_basic')
 
         basic_family = PipelineFamily.objects.get(name="P_basic")
-        revision_pks = [x.pk for x in basic_family.members.all()]
-        self.assertSetEqual(set(revision_pks),
-                            set(response.data['members']))
+        expected_revision_pks = [x.pk for x in basic_family.members.all()]
+        actual_revision_pks = [x['id'] for x in response.data['members']]
+        self.assertItemsEqual(expected_revision_pks, actual_revision_pks)
 
     def test_removal_plan(self):
         request = self.factory.get(self.removal_path)

@@ -1,15 +1,13 @@
 from django.conf.urls import patterns, url, include
-
 from rest_framework.routers import DefaultRouter
 
+from archive.ajax import DatasetViewSet, MethodOutputViewSet
+from fleet.ajax import RunToProcessViewSet
 from metadata.ajax import DatatypeViewSet, CompoundDatatypeViewSet
 from method.ajax import MethodViewSet, MethodFamilyViewSet, CodeResourceViewSet, CodeResourceRevisionViewSet
-from archive.ajax import DatasetViewSet, MethodOutputViewSet
 from pipeline.ajax import PipelineFamilyViewSet, PipelineViewSet
-from fleet.ajax import RunToProcessViewSet
 import portal.ajax
-
-from portal.forms import *
+from portal.forms import LoginForm
 
 # (Un)comment the next two lines to enable/disable the admin:
 from django.contrib import admin
@@ -42,7 +40,9 @@ urlpatterns = patterns(
     url(r'^admin/', include(admin.site.urls)),
     url(r'^$', 'portal.views.home', name='home'),
     url(r'^login/$', 'django.contrib.auth.views.login',
-        {"template_name": "portal/login.html", "current_app": "portal"}, name='login'),
+        {"template_name": "portal/login.html",
+         "authentication_form": LoginForm,
+         "current_app": "portal"}, name='login'),
     url(r'^logout_then_login/$', 'django.contrib.auth.views.logout_then_login',
         {"current_app": "portal"}, name='logout'),
 

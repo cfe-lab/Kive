@@ -7,7 +7,6 @@ from method.models import Method, MethodFamily, CodeResource, CodeResourceRevisi
 from transformation.serializers import TransformationInputSerializer, TransformationOutputSerializer
 from kive.serializers import AccessControlSerializer
 import portal.models
-from metadata.models import KiveUser
 
 
 class CodeResourceSerializer(AccessControlSerializer,

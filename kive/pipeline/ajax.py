@@ -2,6 +2,7 @@ import json
 
 from django.http import HttpResponse, Http404
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Q
 from rest_framework import permissions
@@ -10,7 +11,7 @@ from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet,\
-    CleanCreateModelMixin
+    CleanCreateModelMixin, convert_validation
 from metadata.models import AccessControl
 from method.models import MethodFamily, Method
 from pipeline.models import Pipeline, PipelineFamily
@@ -135,8 +136,14 @@ class PipelineViewSet(CleanCreateModelMixin,
     # Override perform_create to call complete_clean, not just clean.
     @transaction.atomic
     def perform_create(self, serializer):
-        new_pipeline = serializer.save()
-        new_pipeline.complete_clean()
+        """
+        Handle creation and cleaning of a new object.
+        """
+        try:
+            new_pipeline = serializer.save()
+            new_pipeline.complete_clean()
+        except DjangoValidationError as ex:
+            raise convert_validation(ex)
 
 
 @login_required
