@@ -2,6 +2,8 @@
 var canvas, canvasState;
 
 $(function() {
+    noXSS();
+
     /*
     @todo
     
