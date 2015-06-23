@@ -208,8 +208,6 @@ LOGGING = {
     }
 }
 
-REST_FRAMEWORK = {'DEFAULT_PAGINATION_CLASS': 'kive.ajax.StandardPagination'}
-
 # The polling interval that the manager of the fleet uses between queries to the database.
 FLEET_POLLING_INTERVAL = 30  # in seconds
 
