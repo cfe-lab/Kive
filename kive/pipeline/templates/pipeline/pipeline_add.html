@@ -19,6 +19,12 @@
     <script src="/static/pipeline/pipeline_add.js"></script>
     <script src="/static/pipeline/pipeline_load.js"></script>
     <link rel="stylesheet" href="/static/pipeline/drydock.css">
+    <script type="text/javascript">
+$(function() {
+    // Security stuff to prevent cross-site scripting.
+    noXSS();
+});
+    </script>
 
 {% endblock %}
 

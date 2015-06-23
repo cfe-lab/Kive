@@ -1,4 +1,6 @@
 $(function() {
+    // Security stuff to prevent cross-site scripting.
+    noXSS();
 
     // change pipeline revision drop-down triggers ajax to redraw canvas
     $('#id_pipeline_select').on('change', function () {
