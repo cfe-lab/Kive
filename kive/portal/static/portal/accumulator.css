@@ -1,0 +1,108 @@
+.permissions-widget {
+  border: 2px solid #aaa;
+  height: 12em;
+  width: 320px;
+  cursor: default;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.permissions-widget .pw-search-wrapper {
+  width: 150px;
+  height: 100%;
+  box-sizing: border-box;
+  float: left;
+  background: #fff;
+}
+.permissions-widget .pw-users_groups {
+  width: 100%;
+  height: calc(100% - 21px);
+  overflow-y: scroll;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+.permissions-widget h5 {
+  margin: 0;
+  text-align:center;
+  background-color: #e0e0e0;
+  padding: 3px;
+  font-size: 0.65em;
+  text-transform: uppercase;
+}
+.permissions-widget .pw-users_groups > div {
+  padding: .25em 0;
+  width: 150px;
+  border: 0;
+  font-size: 0.8em;
+  margin: 0;
+  box-sizing: border-box;
+}
+.permissions-widget .pw-users_groups_allowed {
+  background: #fff;
+  height: 100%;
+  overflow-y: scroll;
+  overflow-x: hidden;
+}
+.permissions-widget .pw-users_groups_allowed .pw-inner {
+  width: 150px;
+  padding: .25em 0;
+  font-size: 0.8em;
+  border: 0;
+  box-sizing: border-box;
+}
+
+.permissions-widget .pw-option {
+  padding: 0 .5em;
+}
+.permissions-widget .pw-option.pw-selected {
+  background-color: #238;
+  color: #fff;
+}
+
+.permissions-widget .pw-accumulator-ctrl {
+  width: 20px;
+  height: 100%;
+  float: left;
+  box-sizing: border-box;
+}
+.permissions-widget .pw-accumulator-ctrl input {
+  display: block;
+  box-sizing: border-box;
+  height: 25%;
+  border: 0;
+  border-bottom: 1px solid #888;
+  color: #fff;
+  background-color: #aaa;
+  padding: auto;
+  width: 100%;
+  font-size: 1.2em;
+  line-height: 1em;
+}
+.permissions-widget .pw-accumulator-ctrl input:last-child {
+  border-bottom: 0;
+}
+.permissions-widget .pw-accumulator-ctrl .pw-clicking {
+  background-color: #888;
+}
+
+.permissions-widget .pw-user { }
+.permissions-widget .pw-group { font-weight: bold; }
+
+.permissions-widget .pw-search-container {
+  width: 150px;
+  border-top: 2px solid #aaa;
+}
+.permissions-widget .pw-search-box {
+  width: 100%;
+  box-sizing: border-box;
+  border: 0;
+  padding: 0 3px;
+  line-height: 15px;
+}
+.permissions-widget .pw-users_groups .pw-search-hidden {
+  display: none;
+}
+.permissions-widget input {
+  outline: none;
+}
