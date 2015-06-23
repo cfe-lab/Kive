@@ -890,7 +890,7 @@ var drydock = (function() {
             };
     
         // Edit mode can popup the context menu to delete and edit nodes
-        if(this.can_edit){
+        if (this.can_edit) {
             if (sel.length == 1 && !(sel[0] instanceof drydock_objects.Connector) ) {
                 showMenu();
                 if (sel[0] instanceof drydock_objects.RawNode ||
@@ -901,20 +901,26 @@ var drydock = (function() {
                 showMenu();
                 $('.edit', mcm).hide();
             }
-        } else {
+        }
+        else {
             // Otherwise, we're read only, so only popup the context menu for outputs with datasets
             if (sel.length == 1) {
-                if(sel[0] instanceof drydock_objects.OutputNode &&
-                        sel[0].dataset_id !== undefined) {
+                if (sel[0] instanceof drydock_objects.OutputNode &&
+                    sel[0].dataset_id) {
+
                    // Context menu for pipeline outputs
                    showMenu();
+
                    $('.output_node', mcm).show();
                    $('.step_node', mcm).hide();
     
-                } else if(sel[0] instanceof drydock_objects.MethodNode &&
-                        sel[0].log_id !== undefined) {
+                }
+                else if (sel[0] instanceof drydock_objects.MethodNode &&
+                         sel[0].log_id) {
+
                    // Context menu for pipeline steps
                    showMenu();
+
                    $('.output_node', mcm).hide();
                    $('.step_node', mcm).show();
                 }

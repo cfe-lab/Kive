@@ -50,7 +50,7 @@ function setupRunView(rtp_id, pipeline_id, md5) {
                 } else {
                     clearInterval(self.timer);
                 }
-                pipeline.update(run, md5);
+                pipeline.update(run, md5, rtp_id);
             }
             $('#run_status').empty().append($msg);
         });
