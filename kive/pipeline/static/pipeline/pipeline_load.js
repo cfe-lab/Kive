@@ -319,8 +319,9 @@ var pipeline = (function(exports){
         var method_node_offset = self.pipeline.inputs.length;
 
         // Over each pipeline step
-        $.each(self.pipeline.steps, function(_, node) {
-            var method_node = new drydock_objects.MethodNode(
+        $.each(self.pipeline.steps, function() {
+            var node = this,
+                method_node = new drydock_objects.MethodNode(
                     node.transformation,
                     node.transformation_family,
                     node.x * canvas_x_ratio,
@@ -336,19 +337,34 @@ var pipeline = (function(exports){
             method_node.draw(self.canvasState.ctx);
 
             // Connect method inputs
-            $.each(node.cables_in, function(cable_idx, cable) {
-                var source = null,
+            $.each(node.cables_in, function() {
+                var cable = this,
+                    source = null,
                     connector = null,
                     magnet = null;
+
+                // Find the destination for this
+                $.each(method_node.in_magnets, function() {
+                    if (this.label === cable.dest_dataset_name) {
+                        magnet = this;
+                        return false; // break
+                    }
+                });
+                
+                // Not found?
+                if (magnet === null) {
+                    console.error("Failed to redraw Pipeline: missing in_magnet");
+                    return false; // Bail
+                }
 
                 // cable from pipeline input, identified by dataset_name
                 if (cable.source_step == 0) {
 
                     // Find the source for this
-                    $.each(self.canvasState.shapes, function(_, shape) {
-                        if (!(shape instanceof drydock_objects.MethodNode) &&
-                              shape.label === cable.source_dataset_name) {
-                            source = shape;
+                    $.each(self.canvasState.shapes, function() {
+                        if (!(this instanceof drydock_objects.MethodNode) &&
+                              this.label === cable.source_dataset_name) {
+                            source = this;
                             return false; // break
                         }
                     });
@@ -358,18 +374,17 @@ var pipeline = (function(exports){
                         console.error("Failed to redraw Pipeline: missing data node");
                         return false; // Bail
                     }
-
+                    
                     // data nodes only have one out-magnet, so use 0-index
                     connector = new drydock_objects.Connector(source.out_magnets[0]);
 
                     // connect other end of cable to the MethodNode
-                    magnet = method_node.in_magnets[cable_idx];
                     connector.x = magnet.x;
                     connector.y = magnet.y;
                     connector.dest = magnet;
 
                     source.out_magnets[0].connected.push(connector);
-                    method_node.in_magnets[cable_idx].connected.push(connector);
+                    magnet.connected.push(connector);
                     self.canvasState.connectors.push(connector);
                 }
                 else {
@@ -379,17 +394,16 @@ var pipeline = (function(exports){
                     source = self.canvasState.shapes[method_node_offset + cable.source_step - 1];
 
                     // find the correct out-magnet
-                    $.each(source.out_magnets, function(j, magnet){
+                    $.each(source.out_magnets, function(){
 
-                        if (magnet.label === cable.source_dataset_name) {
-                            connector = new drydock_objects.Connector(magnet);
-                            magnet = method_node.in_magnets[cable_idx];
+                        if (this.label === cable.source_dataset_name) {
+                            connector = new drydock_objects.Connector(this);
                             connector.x = magnet.x;
                             connector.y = magnet.y;
                             connector.dest = magnet;
 
-                            source.out_magnets[j].connected.push(connector);
-                            method_node.in_magnets[cable_idx].connected.push(connector);
+                            this.connected.push(connector);
+                            magnet.connected.push(connector);
                             self.canvasState.connectors.push(connector);
                             return false; // break;
                         }
