@@ -241,13 +241,13 @@ class RunToProcess(metadata.models.AccessControl):
         """
         if self.sandbox_path == "":
             raise SandboxActiveException(
-                "Run (Pipeline={}, queued {}) has not yet started".format(
-                    self.pipeline, self.time_queued)
+                "Run (RunToProcess={}, Pipeline={}, queued {}, User={}) has not yet started".format(
+                    self.pk, self.pipeline, self.time_queued, self.user)
                 )
         elif not self.finished:
             raise SandboxActiveException(
-                "Run (Pipeline={}, queued {}) is not finished".format(
-                    self.pipeline, self.time_queued)
+                "Run (RunToProcess={}, Pipeline={}, queued {}, User={}) is not finished".format(
+                    self.pk, self.pipeline, self.time_queued, self.user)
                 )
 
         # This may raise OSError; the caller should catch it.

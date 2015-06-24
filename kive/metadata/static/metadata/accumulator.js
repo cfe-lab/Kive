@@ -1,6 +1,5 @@
 $(function() {
   var widget = $('.permissions-widget');
-  var getWidget = function(el) { return $(el).closest('.permissions-widget'); };
   var css_first = 'pw-selected pw-first-selected';
   
   $('.pw-users_groups', widget)
@@ -59,11 +58,15 @@ $(function() {
             ) {
         selectOnly(this);
       } else {
+        // nextUntil will select all siblings -after- `first` until -before- `this`.
         range = first.nextUntil(this);
+        // if `this` is not found, nextUntil will select all the next siblings, behaving identical to nextAll.
+        // this means that `this` is before `first`, and we have to go backwards instead.
         if (range.length == first.nextAll().length) {
-          range = $this.nextUntil(first);
+          range = first.prevUntil(this);
         }
-        range = range.add(this).add(first);
+        // `this` and `first` must be put back into the set.
+        range = range.addBack().add(this);
         $('.pw-selected', panel).removeClass('pw-selected');
         range.addClass('pw-selected');
       }
@@ -73,7 +76,7 @@ $(function() {
     var query = new RegExp(escapeRegExp(this.value), 'i'),
       options = $('.pw-users_groups .pw-option', getWidget(this)),
       matched_opts = options.filter(function() {
-        return $(this).data('value').search(query) > -1 ||
+        return $(this).data('value').toString().search(query) > -1 ||
           $(this).text().search(query) > -1;
       });
     options.not(matched_opts).addClass('pw-search-hidden').removeClass(css_first);
@@ -90,7 +93,7 @@ $(function() {
         .not('.pw-search-hidden')
         .removeClass(css_first);
     selected.appendTo($('.pw-users_groups_allowed .pw-inner', widget));
-    syncHiddenInput();
+    syncHiddenInput.call(this);
   }
   function removeFromSelected(e) {
     var widget = getWidget(this);
@@ -98,15 +101,17 @@ $(function() {
     selected.filter('.pw-group').appendTo($('.pw-groups_options', widget));
     selected.filter('.pw-user' ).appendTo($('.pw-users_options', widget));
     searchFilter.call(widget.find('.pw-search-box')[0]);
-    syncHiddenInput();
+    syncHiddenInput.call(this);
+  }
+  function getWidget (el) {
+    return $(el).closest('.permissions-widget');
   }
   function getPanel(elem) {
     return elem.closest('.pw-panel');
   }
   function getOtherPanel(elem) {
-    var this_panel = getPanel(elem);
     var selector = '.pw-users_groups';
-    if (this_panel.is(selector)) {
+    if (getPanel(elem).is(selector)) {
       selector = '.pw-users_groups_allowed';
     }
     return $(selector, getWidget(this));
@@ -114,35 +119,16 @@ $(function() {
   function syncHiddenInput() {
     var widget = getWidget(this);
     var selections = $(".pw-users_groups_allowed .pw-option", widget);
-    var input_val = {
-      user:  getVals('.pw-user'),
-      group: getVals('.pw-group')
-    };
-    
+    $('.pw-hidden-users', widget).val(getVals('.pw-user'));
+    $('.pw-hidden-groups', widget).val(getVals('.pw-group'));
+
     function getVals(sel) {
       var ar = [];
       selections.filter(sel).each(function() {
         ar.push($(this).data('value'));
       });
       return ar;
-    };
-
-      // Load up the #pw_users_selected and #pw_groups_selected divs.
-      $.each(input_val["user"], function (index, value) {
-          $("<input>").attr({
-              type: "hidden",
-              name: "users_allowed",
-              value: value
-          }).appendTo("div #pw_users_selected")
-      })
-
-      $.each(input_val["group"], function (index, value) {
-          $("<input>").attr({
-              type: "hidden",
-              name: "groups_allowed",
-              value: value
-          }).appendTo("div #pw_groups_selected")
-      })
+    }
   }
   function escapeRegExp(str) {
     return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");

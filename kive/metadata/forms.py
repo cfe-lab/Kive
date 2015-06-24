@@ -1,9 +1,12 @@
 """
 metadata.forms
 """
+import json
+import copy
 
 from django import forms
 from django.contrib.auth.models import User, Group
+from django.template import loader, Context
 
 from metadata.models import Datatype, BasicConstraint, CompoundDatatypeMember, CompoundDatatype
 
@@ -18,6 +21,119 @@ def setup_form_users_allowed(form, users_allowed):
 
 def setup_form_groups_allowed(form, groups_allowed):
     form.fields["groups_allowed"].queryset = groups_allowed if groups_allowed else Group.objects.all()
+
+
+class UsersAllowedWidget(forms.SelectMultiple):
+    """
+    A sub-widget of the PermissionsWidget.  This should not be created on its own.
+    """
+    class Media:
+        css = {
+            "all": ("static/metadata/accumulator.css",)
+        }
+        js = ("static/metadata/accumulator.js",)
+
+
+class GroupsAllowedWidget(forms.SelectMultiple):
+    """
+    A sub-widget of the PermissionsWidget.  This should not be created on its own.
+    """
+    class Media:
+        css = {
+            "all": ("static/metadata/accumulator.css",)
+        }
+        js = ("static/metadata/accumulator.js",)
+
+
+class PermissionsWidget(forms.MultiWidget):
+
+    def __init__(self, user_choices=None, group_choices=None, attrs=None):
+        self.user_choices = user_choices or []
+        self.group_choices = group_choices or []
+        attrs = attrs or {}
+
+        hidden_ms_class = "pw-hidden-multiselect"
+        users_attrs = copy.copy(attrs)
+        user_widget_classes = "pw-hidden-users " + hidden_ms_class
+        if "class" in users_attrs:
+            users_attrs["class"] += " " + user_widget_classes
+        else:
+            users_attrs["class"] = user_widget_classes
+
+        groups_attrs = copy.copy(attrs)
+        group_widget_classes = "pw-hidden-groups " + hidden_ms_class
+        if "class" in groups_attrs:
+            groups_attrs["class"] += " " + group_widget_classes
+        else:
+            groups_attrs["class"] = group_widget_classes
+
+        sub_widgets = [
+            UsersAllowedWidget(attrs=users_attrs, choices=self.user_choices),
+            GroupsAllowedWidget(attrs=groups_attrs, choices=self.group_choices)
+        ]
+        super(PermissionsWidget, self).__init__(sub_widgets, attrs)
+
+    def decompress(self, value):
+        """
+        Unpacks a "glommed together" value passed by MultiValueField.
+
+        value will be a JSON-encoded pair of lists: one for
+        Users allowed and one for Groups allowed.
+        """
+        if value:
+            parsed_value = json.loads(value)
+            assert isinstance(parsed_value, list)
+            assert len(parsed_value) == 2
+            return json.loads(value)
+        return [None, None]
+
+    def format_output(self, rendered_widgets):
+        pw_template = loader.get_template("metadata/permissions_widget.html")
+        users = [{"id": x[0], "username": x[1]} for x in self.user_choices]
+        groups = [{"id": x[0], "name": x[1]} for x in self.group_choices]
+        c = Context(
+            {
+                "users": users,
+                "groups": groups,
+                "users_widget": rendered_widgets[0],
+                "groups_widget": rendered_widgets[1]
+            }
+        )
+        return pw_template.render(c)
+
+
+class PermissionsField(forms.MultiValueField):
+    # The default widget for this field.  Any widget must have the same
+    # prototype as PermissionsWidget.
+    widget = PermissionsWidget
+
+    def __init__(self, users_queryset=None, groups_queryset=None, widget=None,
+                 *args, **kwargs):
+        users_queryset = users_queryset or User.objects.all()
+        groups_queryset = groups_queryset or Group.objects.all()
+        self.user_choices = [(x.id, x.username) for x in users_queryset]
+        self.group_choices = [(x.id, x.name) for x in groups_queryset]
+
+        fields = (
+            forms.ModelMultipleChoiceField(queryset=users_queryset),
+            forms.ModelMultipleChoiceField(queryset=groups_queryset)
+        )
+
+        widget = widget or self.widget()
+        if isinstance(widget, type):
+            widget = widget()
+        # As per a typical ChoiceField, we override the widget's default choices with ours.
+        widget.widgets[0].choices = self.user_choices
+        widget.widgets[1].choices = self.group_choices
+
+        super(PermissionsField, self).__init__(
+            widget=widget,
+            fields=fields,
+            *args, **kwargs
+        )
+
+    def compress(self, data_list):
+        return json.dumps(data_list)
 
 
 class AccessControlForm(forms.Form):

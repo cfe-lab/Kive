@@ -1,50 +1,37 @@
 <!-- Django template -->
 <!-- Display contents of Datatypes as a HTML table -->
 
-
 <div class="permissions-widget">
-  <div class="pw-search-wrapper">
-    <div class="pw-users_groups pw-panel">
-      <h5>Users</h5>
-      <div class="pw-users_options pw-inner">
-
+ <div class="pw-search-wrapper">
+   <div class="pw-users_groups pw-panel">
+     <h5>Users</h5>
+     <div class="pw-users_options pw-inner">
         {% for user in users %}
-        <div class="pw-option pw-user" data-value="{{ user.id }}">{{ user.name }}</div>
+        <div class="pw-option pw-user" data-value="{{ user.id }}">{{ user.username }}</div>
         {% endfor %}
-
-      </div>
-      <h5>Groups</h5>
-      <div class="pw-groups_options pw-inner">
-
-
+     </div>
+     <h5>Groups</h5>
+     <div class="pw-groups_options pw-inner">
         {% for group in groups %}
         <div class="pw-option pw-group" data-value="{{ group.id }}">{{ group.name }}</div>
         {% endfor %}
+     </div>
+   </div>
+   <div class="pw-search-container"><input class="pw-search-box" placeholder="Search..."></div>
+ </div>
+ <div class="pw-accumulator-ctrl">
+   <input type="button" class="pw-add-all" value="»">
+   <input type="button" class="pw-add-one" value="›">
+   <input type="button" class="pw-remove-one" value="‹">
+   <input type="button" class="pw-remove-all" value="«">
+ </div>
+ <div class="pw-users_groups_allowed pw-panel">
+   <h5>Selected</h5>
+   <div class="pw-inner"></div>
+ </div>
 
-      </div>
-    </div>
-    <div class="pw-search-container"><input class="pw-search-box" placeholder="Search..."></div>
-  </div>
-  <div class="pw-accumulator-ctrl">
-    <input type="button" class="pw-add-all" value="»">
-    <input type="button" class="pw-add-one" value="›">
-    <input type="button" class="pw-remove-one" value="‹">
-    <input type="button" class="pw-remove-all" value="«">
-  </div>
-  <div class="pw-users_groups_allowed pw-panel">
-    <h5>Selected</h5>
-    <div class="pw-inner"></div>
-  </div>
+{{ users_widget }}
+{{ groups_widget }}
 
-    <!-- Load this up with hidden inputs; one for each user selected. -->
-    <div id="pw_users_selected">
-    </div>
-
-    <!-- Load this up with hidden inputs; one for each group selected. -->
-    <div id="pw_groups_selected">
-    </div>
-
-    <!--
-    <input type="hidden" name="permissions_json<% (incremental integer if there is more than 1 of these on the page) %>" class="pw-hidden_permissions_input" value="">
-    -->
 </div>
+
