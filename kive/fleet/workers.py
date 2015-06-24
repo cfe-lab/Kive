@@ -425,7 +425,7 @@ class Manager:
                     mgr_logger.debug("Removing sandbox at {}".format(rtp.sandbox_path))
                     rtp.collect_garbage()
                 except fleet.models.SandboxActiveException as e:
-                    mgr_logger.warning(e)
+                    mgr_logger.debug(e)
 
             # Next, look through the sandbox directory and see if there are any orphaned sandboxes
             # to remove.
