@@ -14,7 +14,7 @@ kive/Sandboxes
 kive/kive.log*
 kive/testreport.xml
 
-#Generated files and backup files
+# Generated files and backup files
 *~
 doc/*.aux
 doc/*.dvi
@@ -23,4 +23,5 @@ doc/*.pdf
 /.idea/
 kive/.settings/org.eclipse.core.resources.prefs
 .DS_Store
+TEST-*
 
