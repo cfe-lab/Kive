@@ -47,12 +47,10 @@ class GroupsAllowedWidget(forms.SelectMultiple):
 
 class PermissionsWidget(forms.MultiWidget):
 
-    def __init__(self, users_queryset=None, groups_queryset=None, attrs=None):
-        users_queryset = users_queryset or User.objects.all()
-        groups_queryset = groups_queryset or Group.objects.all()
+    def __init__(self, user_choices=None, group_choices=None, attrs=None):
+        self.user_choices = user_choices or []
+        self.group_choices = group_choices or []
         attrs = attrs or {}
-        self.user_choices = [(x.id, x.username) for x in users_queryset]
-        self.group_choices = [(x.id, x.name) for x in groups_queryset]
 
         hidden_ms_class = "pw-hidden-multiselect"
         users_attrs = copy.copy(attrs)
@@ -105,22 +103,37 @@ class PermissionsWidget(forms.MultiWidget):
 
 
 class PermissionsField(forms.MultiValueField):
+    # The default widget for this field.  Any widget must have the same
+    # prototype as PermissionsWidget.
+    widget = PermissionsWidget
 
-    def __init__(self, users_queryset=None, groups_queryset=None, attrs=None, *args, **kwargs):
+    def __init__(self, users_queryset=None, groups_queryset=None, widget=None,
+                 *args, **kwargs):
         users_queryset = users_queryset or User.objects.all()
         groups_queryset = groups_queryset or Group.objects.all()
-        attrs = attrs or {}
         self.user_choices = [(x.id, x.username) for x in users_queryset]
         self.group_choices = [(x.id, x.name) for x in groups_queryset]
 
+        fields = (
+            forms.ModelMultipleChoiceField(queryset=users_queryset),
+            forms.ModelMultipleChoiceField(queryset=groups_queryset)
+        )
+
+        widget = widget or self.widget()
+        if isinstance(widget, type):
+            widget = widget()
+        # As per a typical ChoiceField, we override the widget's default choices with ours.
+        widget.widgets[0].choices = self.user_choices
+        widget.widgets[1].choices = self.group_choices
+
         super(PermissionsField, self).__init__(
-            widget=PermissionsWidget(
-                user_choices=self.user_choices,
-                group_choices=self.group_choices,
-                attrs=attrs
-            ),
+            widget=widget,
+            fields=fields,
             *args, **kwargs
         )
+
+    def compress(self, data_list):
+        return json.dumps(data_list)
 
 
 class AccessControlForm(forms.Form):
