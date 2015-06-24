@@ -20,7 +20,6 @@ def setup_form_groups_allowed(form, groups_allowed):
     form.fields["groups_allowed"].queryset = groups_allowed if groups_allowed else Group.objects.all()
 
 
-
 class AccessControlForm(forms.Form):
 
     users_allowed = forms.ModelMultipleChoiceField(

@@ -125,8 +125,24 @@ $(function() {
         ar.push($(this).data('value'));
       });
       return ar;
-    }
-    $('.pw-hidden_permissions_input', widget).val(JSON.stringify(input_val));
+    };
+
+      // Load up the #pw_users_selected and #pw_groups_selected divs.
+      $.each(input_val["user"], function (index, value) {
+          $("<input>").attr({
+              type: "hidden",
+              name: "users_allowed",
+              value: value
+          }).appendTo("div #pw_users_selected")
+      })
+
+      $.each(input_val["group"], function (index, value) {
+          $("<input>").attr({
+              type: "hidden",
+              name: "groups_allowed",
+              value: value
+          }).appendTo("div #pw_groups_selected")
+      })
   }
   function escapeRegExp(str) {
     return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
