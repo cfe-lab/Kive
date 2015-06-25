@@ -22,15 +22,6 @@
 
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
 
-    <table>
-        <tr>
-            <th>{{ cdt_form.permissions.label_tag }}</th>
-            <td><div class="helptext">{{ cdt_form.permissions.help_text }}</div></td>
-            <td>{{ cdt_form.permissions }}</td>
-            <td class="errortext">{{ cdt_form.permissions.errors }}</td>
-        </tr>
-    </table>
-
     {{ cdt_form.non_field_errors }}
 
     <p>
@@ -67,6 +58,10 @@
             {% endfor %}
         </tbody>
     </table>
+
+    <h3>{{ cdt_form.permissions.label_tag }} <div class="helptext">{{ cdt_form.permissions.help_text }}</div></h3>
+    {{ cdt_form.permissions }}
+    <div class="errortext">{{ cdt_form.permissions.errors }}</div>
 
     <input type="submit" value="Submit" />
 </form>

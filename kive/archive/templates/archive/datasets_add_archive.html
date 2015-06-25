@@ -119,34 +119,35 @@
 <h2>Add Datasets</h2>
 
 <form id="datasetArchiveForm" name="datasetArchiveForm" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
-    <div style="width:100em">
-        <fieldset class="multiFieldSet">
-            <legend>Multiple Datasets from Archive</legend>
-            <table>
-                <tr>
-                    <td><label>{{ archiveAddDatasetForm.dataset_file.label }}</label></td>
-                    <td>{{ archiveAddDatasetForm.dataset_file }}</td>
-                    <td class="errortext">{{ archiveAddDatasetForm.dataset_file.errors }}</td>
-
-                    <td><label>{{ archiveAddDatasetForm.compound_datatype.label }}</label></td>
-                    <td>{{ archiveAddDatasetForm.compound_datatype }}</td>
-                    <td class="errortext">{{ archiveAddDatasetForm.compound_datatype.errors }}</td>
-                </tr>
-                <tr><td><label>{{ archiveAddDatasetForm.name_prefix.label }}</label></td>
-                    <td>{{ archiveAddDatasetForm.name_prefix }}</td>
-                    <td class="errortext">{{ archiveAddDatasetForm.name_prefix.errors }}</td>
-
-                    <td><label>{{ archiveAddDatasetForm.description.label }}</label></td>
-                    <td>{{ archiveAddDatasetForm.description }}</td>
-                    <td class="errortext">{{ archiveAddDatasetForm.description.errors }}</td>
-                </tr>
-                <tr><td><label>{{ archiveAddDatasetForm.permissions.label }}</label></td>
-                    <td>{{ archiveAddDatasetForm.permissions }}</td>
-                    <td class="errortext">{{ archiveAddDatasetForm.permissions.errors }}</td>
-                </tr>
-            </table>
-        </fieldset>
-        <input type="submit" id="archiveSubmit" name="archiveSubmit" value="Submit and Unarchive Datasets" />
+    <fieldset class="multiFieldSet">
+        <legend>Multiple Datasets from Archive</legend>
+        <table>
+            <tr>
+                <td><label>{{ archiveAddDatasetForm.dataset_file.label }}</label></td>
+                <td>{{ archiveAddDatasetForm.dataset_file }}</td>
+                <td class="errortext">{{ archiveAddDatasetForm.dataset_file.errors }}</td>
+            </tr><tr>
+                <td><label>{{ archiveAddDatasetForm.compound_datatype.label }}</label></td>
+                <td>{{ archiveAddDatasetForm.compound_datatype }}</td>
+                <td class="errortext">{{ archiveAddDatasetForm.compound_datatype.errors }}</td>
+            </tr>
+            <tr>
+                <td><label>{{ archiveAddDatasetForm.name_prefix.label }}</label></td>
+                <td>{{ archiveAddDatasetForm.name_prefix }}</td>
+                <td class="errortext">{{ archiveAddDatasetForm.name_prefix.errors }}</td>
+            </tr><tr>
+                <td><label>{{ archiveAddDatasetForm.description.label }}</label></td>
+                <td>{{ archiveAddDatasetForm.description }}</td>
+                <td class="errortext">{{ archiveAddDatasetForm.description.errors }}</td>
+            </tr>
+            <tr>
+                <td><label>{{ archiveAddDatasetForm.permissions.label }}</label></td>
+                <td>{{ archiveAddDatasetForm.permissions }}</td>
+                <td class="errortext">{{ archiveAddDatasetForm.permissions.errors }}</td>
+            </tr>
+        </table>
+    </fieldset>
+    <input type="submit" id="archiveSubmit" name="archiveSubmit" value="Submit and Unarchive Datasets" />
 
     {% comment "This code may become useful again if we get to implementing a progress bar." %}
         <!--
@@ -179,10 +180,9 @@
          -->
     {% endcomment %}
 
-        <div class="errorStrip errortext">{{ bulkAddDatasetForm.non_field_errors }}</div>
-        <div id="loading" class="loading_container">
-            <p><img src="loading.gif" class="loading_img"/>Please Wait...</p>
-        </div>
+    <div class="errorStrip errortext">{{ bulkAddDatasetForm.non_field_errors }}</div>
+    <div id="loading" class="loading_container">
+        <p><img src="loading.gif" class="loading_img"/>Please Wait...</p>
     </div>
 </form>
 {% endblock %}

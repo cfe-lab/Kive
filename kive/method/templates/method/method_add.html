@@ -11,6 +11,10 @@
 <script src="/static/method/method_add.js"></script>
 {% endblock %}
 
+{% block widget_media %}
+{{ method_form.media }}
+{% endblock %}
+
 {% block content %}
 
 {% if family == None %}
@@ -56,7 +60,7 @@
 
     <tr>
         <th>{{ method_form.reusable.label }}</th>
-        <td>
+        <td colspan="3">
             {{ method_form.reusable }}
             <div class="helptext">{{ method_form.reusable.help_text|escape|linebreaks }}</div>
             <br/>
@@ -68,7 +72,7 @@
 
     <tr>
         <th>{{ method_form.threads.label }}</th>
-        <td>
+        <td colspan="3">
             {{ method_form.threads }}
             <div class="helptext">{{ method_form.threads.help_text }}</div>
             <br/>
@@ -79,17 +83,13 @@
     </tr>
 
     <tr>
-        <th>{{ method_form.users_allowed.label_tag }}</th>
-        <td><div class="helptext">{{ method_form.users_allowed.help_text }}</div></td>
-        <td>{{ method_form.users_allowed }}</td>
-        <td><div class="errortext">{{ method_form.users_allowed.errors }}</div></td>
-    </tr>
-
-    <tr>
-        <th>{{ method_form.groups_allowed.label_tag }}</th>
-        <td><div class="helptext">{{ method_form.groups_allowed.help_text }}</div></td>
-        <td>{{ method_form.groups_allowed }}</td>
-        <td><div class="errortext">{{ method_form.groups_allowed.errors }}</div></td>
+        <th>{{ method_form.permissions.label_tag }} 
+        <br>
+        <div class="helptext">{{ method_form.permissions.help_text }}</div>
+        <br/>
+        <div class="errortext">{{ method_form.permissions.errors }}</div>
+        </th>
+        <td colspan="3">{{ method_form.permissions }} </td>
     </tr>
 
     <tr>

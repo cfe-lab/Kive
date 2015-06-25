@@ -119,33 +119,35 @@
 <h2>Add Bulk Datasets</h2>
 
 <form id="datasetBulkForm" name="datasetBulkForm" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
-    <div style="width:100em">
-        <fieldset class="multiFieldSet">
-            <legend>Bulk Add Multiple Datasets</legend>
-            <table>
-                <tr><td><label>{{ bulkAddDatasetForm.dataset_files.label }}</label></td>
-                    <td>{{ bulkAddDatasetForm.dataset_files }}</td>
-                    <td class="errortext">{{ bulkAddDatasetForm.dataset_files.errors }}</td>
-
-                    <td><label>{{ bulkAddDatasetForm.compound_datatype.label }}</label></td>
-                    <td>{{ bulkAddDatasetForm.compound_datatype }}</td>
-                    <td class="errortext">{{ bulkAddDatasetForm.compound_datatype.errors }}</td>
-                </tr>
-                <tr><td><label>{{ bulkAddDatasetForm.name_prefix.label }}</label></td>
-                    <td>{{ bulkAddDatasetForm.name_prefix }}</td>
-                    <td class="errortext">{{ bulkAddDatasetForm.name_prefix.errors }}</td>
-
-                    <td><label>{{ bulkAddDatasetForm.description.label }}</label></td>
-                    <td>{{ bulkAddDatasetForm.description }}</td>
-                    <td class="errortext">{{ bulkAddDatasetForm.description.errors }}</td>
-                </tr>
-                <tr><td><label>{{ bulkAddDatasetForm.permissions.label }}</label></td>
-                    <td>{{ bulkAddDatasetForm.permissions }}</td>
-                    <td class="errortext">{{ bulkAddDatasetForm.permissions.errors }}</td>
-                </tr>
-            </table>
-        </fieldset>
-        <input type="submit" id="bulkSubmit" name="bulkSubmit" value="Submit Bulk Datasets" />
+    <fieldset class="multiFieldSet">
+        <legend>Bulk Add Multiple Datasets</legend>
+        <table>
+            <tr>
+                <td><label>{{ bulkAddDatasetForm.dataset_files.label }}</label></td>
+                <td>{{ bulkAddDatasetForm.dataset_files }}</td>
+                <td class="errortext">{{ bulkAddDatasetForm.dataset_files.errors }}</td>
+            </tr><tr>
+                <td><label>{{ bulkAddDatasetForm.compound_datatype.label }}</label></td>
+                <td>{{ bulkAddDatasetForm.compound_datatype }}</td>
+                <td class="errortext">{{ bulkAddDatasetForm.compound_datatype.errors }}</td>
+            </tr>
+            <tr>
+                <td><label>{{ bulkAddDatasetForm.name_prefix.label }}</label></td>
+                <td>{{ bulkAddDatasetForm.name_prefix }}</td>
+                <td class="errortext">{{ bulkAddDatasetForm.name_prefix.errors }}</td>
+            </tr><tr>
+                <td><label>{{ bulkAddDatasetForm.description.label }}</label></td>
+                <td>{{ bulkAddDatasetForm.description }}</td>
+                <td class="errortext">{{ bulkAddDatasetForm.description.errors }}</td>
+            </tr>
+            <tr>
+                <td><label>{{ bulkAddDatasetForm.permissions.label }}</label></td>
+                <td>{{ bulkAddDatasetForm.permissions }}</td>
+                <td class="errortext">{{ bulkAddDatasetForm.permissions.errors }}</td>
+            </tr>
+        </table>
+    </fieldset>
+    <input type="submit" id="bulkSubmit" name="bulkSubmit" value="Submit Bulk Datasets" />
 
     {% comment "This code may become useful again if we get to implementing a progress bar." %}
         <!-- 
@@ -178,10 +180,9 @@
          -->
     {% endcomment %}
 
-        <div class="errorStrip errortext">{{ bulkAddDatasetForm.non_field_errors }}</div>
-        <div id="loading" class="loading_container">
-            <p><img src="loading.gif" class="loading_img"/>Please Wait...</p>
-        </div>
+    <div class="errorStrip errortext">{{ bulkAddDatasetForm.non_field_errors }}</div>
+    <div id="loading" class="loading_container">
+        <p><img src="loading.gif" class="loading_img"/>Please Wait...</p>
     </div>
 </form>
 {% endblock %}
