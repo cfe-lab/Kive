@@ -99,11 +99,17 @@
   width: 10em;
   border-top: 1px solid #ccc;
 }
+#pipeline_ctrl .permissions-widget input {
+  margin: 0;
+}
+#pipeline_ctrl .permissions-widget .pw-search-box,
 .permissions-widget .pw-search-box {
+  display: initial;
   width: 100%;
   box-sizing: border-box;
   border: 0;
   padding: 0 3px;
+  margin: 0;
   line-height: 15px;
 }
 .permissions-widget .pw-users_groups .pw-search-hidden {
@@ -113,5 +119,5 @@
   outline: none;
 }
 .permissions-widget .pw-hidden-multiselect {
-  display: none;
+  display: none !important;
 }

@@ -67,9 +67,6 @@ $(function() {
 
                 <label for="id_family_desc" class="text-field-label">Family description</label>
                 <textarea id="id_family_desc" name="family_desc"></textarea>
-                <p>Users allowed:
-                {{ access_control_form.permissions }}
-                </p>
             </div>
 
             <div id="id_meta_ctrl" class="ctrl_menu">
@@ -79,6 +76,9 @@ $(function() {
 
                 <label for="id_revision_desc" class="text-field-label">Pipeline description</label>
                 <textarea id="id_revision_desc" name="revision_desc"></textarea>
+                
+                <h5>Users and groups allowed:</h5>
+                {{ access_control_form.permissions }}
             </div>
         </form>
         

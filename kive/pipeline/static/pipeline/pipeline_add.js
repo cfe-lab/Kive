@@ -555,8 +555,8 @@ $(function() {
             family_pk = $('#id_family_pk').val(),
             revision_name = $('#id_revision_name').val(),
             revision_desc = $('#id_revision_desc').val(),
-            users_allowed = $("#id_users_allowed").val(),
-            groups_allowed = $("#id_groups_allowed").val();
+            users_allowed = $("#id_permissions_0").val(),
+            groups_allowed = $("#id_permissions_1").val();
 
         // Form validation
         if (!is_revision) {

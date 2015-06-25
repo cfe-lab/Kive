@@ -21,6 +21,7 @@ html body {
 #pipeline_ctrl select {
     display: block;
     margin-bottom: -1px;
+    margin-top: 0;
 }
 #pipeline_ctrl #id_method_button, 
 #pipeline_ctrl #id_cdt_button {
@@ -54,10 +55,18 @@ ul#id_ctrl_nav li:hover {
     border: 1px solid #aaa;
     display: none;
     background: #fff;
-    width: 250px;
+    width: auto;
 }
+.ctrl_menu#id_meta_ctrl,
 .ctrl_menu#id_view_ctrl {
     width: auto;
+}
+.ctrl_menu#id_method_ctrl,
+.ctrl_menu#id_input_ctrl {
+    width: 250px;
+}
+.ctrl_menu h5 {
+    margin-bottom: 2px;
 }
 .input-label { color: #ccc; }
 .image-button { border: 1px dotted #888; cursor: pointer; }
@@ -74,6 +83,7 @@ ul#id_ctrl_nav li:hover {
 #pipeline_ctrl #form_ctrl input               { border-radius: 0;           padding: 0 .5em;    float: left; margin-right: -1px; margin-left: 0; }
 #pipeline_ctrl #form_ctrl input:first-of-type { border-radius: 1em 0 0 1em; padding: 0 .5em 0 1em; }
 #pipeline_ctrl #form_ctrl input:last-of-type  { border-radius: 0 1em 1em 0; padding: 0 1em 0 .5em; }
+#pipeline_ctrl #form_ctrl input:first-of-type:last-of-type  { border-radius: 1em; padding: 0 1em 0 1em; }
 
 #pipeline_ctrl .form-inline-opts {
     font-size: 0.9em;
