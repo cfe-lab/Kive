@@ -11,7 +11,7 @@ import logging
 
 from method.models import MethodFamily
 from metadata.models import CompoundDatatype
-from pipeline.models import Pipeline, PipelineFamily, PipelineSerializationException
+from pipeline.models import Pipeline, PipelineFamily
 import metadata.forms
 from portal.views import developer_check, admin_check
 from pipeline.serializers import PipelineFamilySerializer

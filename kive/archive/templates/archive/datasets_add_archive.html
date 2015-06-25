@@ -108,6 +108,10 @@
     </script>
 {% endblock %}
 
+{% block widget_media %}
+{{ archiveAddDatasetForm.media }}
+{% endblock %}
+
 {% block content %}
 
 <a href="usr.html" rel="prev">Back to user's portal</a>
@@ -136,13 +140,9 @@
                     <td>{{ archiveAddDatasetForm.description }}</td>
                     <td class="errortext">{{ archiveAddDatasetForm.description.errors }}</td>
                 </tr>
-                <tr><td><label>{{ archiveAddDatasetForm.users_allowed.label }}</label></td>
-                    <td>{{ archiveAddDatasetForm.users_allowed }}</td>
-                    <td class="errortext">{{ archiveAddDatasetForm.users_allowed.errors }}</td>
-
-                    <td><label>{{ archiveAddDatasetForm.groups_allowed.label }}</label></td>
-                    <td>{{ archiveAddDatasetForm.groups_allowed }}</td>
-                    <td class="errortext">{{ archiveAddDatasetForm.groups_allowed.errors }}</td>
+                <tr><td><label>{{ archiveAddDatasetForm.permissions.label }}</label></td>
+                    <td>{{ archiveAddDatasetForm.permissions }}</td>
+                    <td class="errortext">{{ archiveAddDatasetForm.permissions.errors }}</td>
                 </tr>
             </table>
         </fieldset>

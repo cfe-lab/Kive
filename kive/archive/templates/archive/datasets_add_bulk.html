@@ -108,6 +108,10 @@
     </script>
 {% endblock %}
 
+{% block widget_media %}
+{{ bulkAddDatasetForm.media }}
+{% endblock %}
+
 {% block content %}
 
 <a href="usr.html" rel="prev">Back to user's portal</a>
@@ -135,13 +139,9 @@
                     <td>{{ bulkAddDatasetForm.description }}</td>
                     <td class="errortext">{{ bulkAddDatasetForm.description.errors }}</td>
                 </tr>
-                <tr><td><label>{{ bulkAddDatasetForm.users_allowed.label }}</label></td>
-                    <td>{{ bulkAddDatasetForm.users_allowed }}</td>
-                    <td class="errortext">{{ bulkAddDatasetForm.users_allowed.errors }}</td>
-
-                    <td><label>{{ bulkAddDatasetForm.groups_allowed.label }}</label></td>
-                    <td>{{ bulkAddDatasetForm.groups_allowed }}</td>
-                    <td class="errortext">{{ bulkAddDatasetForm.groups_allowed.errors }}</td>
+                <tr><td><label>{{ bulkAddDatasetForm.permissions.label }}</label></td>
+                    <td>{{ bulkAddDatasetForm.permissions }}</td>
+                    <td class="errortext">{{ bulkAddDatasetForm.permissions.errors }}</td>
                 </tr>
             </table>
         </fieldset>

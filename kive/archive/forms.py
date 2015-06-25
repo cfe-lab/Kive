@@ -4,6 +4,7 @@ from django.utils.translation import ugettext_lazy as _, ungettext_lazy
 
 import logging
 from datetime import datetime
+import json
 
 from metadata.models import CompoundDatatype
 from archive.models import Dataset
@@ -49,12 +50,11 @@ class DatasetForm(metadata.forms.AccessControlForm):
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
         symbolicdataset = SymbolicDataset.create_SD(file_path=None, user=user,
-                                                    users_allowed=self.cleaned_data["users_allowed"],
-                                                    groups_allowed=self.cleaned_data["groups_allowed"],
                                                     cdt=compound_datatype_obj,
                                                     make_dataset=True, name=self.cleaned_data['name'],
                                                     description=self.cleaned_data['description'], created_by=None,
                                                     check=True, file_handle=self.cleaned_data['dataset_file'])
+        symbolicdataset.grant_from_json(self.cleaned_data["permissions"])
 
         return symbolicdataset
 
@@ -120,6 +120,7 @@ class BulkCSVDatasetForm (metadata.forms.AccessControlForm):
         if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
+        # FIXME this doesn't support PermissionsWidget.
         SymbolicDataset.create_SD_bulk(csv_file_path=None, user=user,
                                        users_allowed=self.cleaned_data["users_allowed"],
                                        groups_allowed=self.cleaned_data["groups_allowed"],
@@ -222,11 +223,11 @@ class BulkAddDatasetForm (metadata.forms.AccessControlForm):
                     auto_description = "Bulk Uploaded File " + uploaded_file.name
 
                 symbolicdataset = SymbolicDataset.create_SD(file_path=None, user=user,
-                                                            users_allowed=self.cleaned_data["users_allowed"],
-                                                            groups_allowed=self.cleaned_data["groups_allowed"],
                                                             cdt=compound_datatype_obj, make_dataset=True,
                                                             name=auto_name, description=auto_description,
                                                             created_by=None, check=True, file_handle=uploaded_file)
+                symbolicdataset.grant_from_json(self.cleaned_data["permissions"])
+
                 dataset = Dataset.objects.filter(symbolicdataset=symbolicdataset).get()
             except Exception, e:
                 error_str = str(e)
@@ -342,11 +343,11 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
                     auto_description = "Bulk Uploaded File " + uploaded_file.name
 
                 symbolicdataset = SymbolicDataset.create_SD(file_path=None, user=user,
-                                                            users_allowed=self.cleaned_data["users_allowed"],
-                                                            groups_allowed=self.cleaned_data["groups_allowed"],
                                                             cdt=compound_datatype_obj, make_dataset=True,
                                                             name=auto_name, description=auto_description,
                                                             created_by=None, check=True, file_handle=uploaded_file)
+                symbolicdataset.grant_from_json(self.cleaned_data["permissions"])
+
                 dataset = Dataset.objects.filter(symbolicdataset=symbolicdataset).get()
             except Exception, e:
                 error_str = str(e)

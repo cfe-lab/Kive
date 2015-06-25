@@ -58,8 +58,7 @@ def datatype_add(request):
     dt = Datatype(user=request.user, date_created=timezone.now())
 
     if request.method == 'POST':
-        # dt = Datatype(user=request.user, date_created=timezone.now())
-        dform = DatatypeForm(request.POST, instance=dt) #  create form bound to POST data
+        dform = DatatypeForm(request.POST, instance=dt)  # create form bound to POST data
         icform = IntegerConstraintForm(request.POST)
         scform = StringConstraintForm(request.POST)
         query = request.POST.dict()
@@ -83,7 +82,8 @@ def datatype_add(request):
         # At this point we know all the fields are valid.
         try:
             with transaction.atomic():
-                new_datatype = dform.save() #  this has to be saved to database to be passed to BasicConstraint()
+                new_datatype = dform.save()  # this has to be saved to database to be passed to BasicConstraint()
+                new_datatype.grant_from_json(dform.cleaned_data["permissions"])
 
                 # Manually create and validate BasicConstraint objects.
 
@@ -249,6 +249,7 @@ def compound_datatype_add(request):
                     raise CDTDefException()
 
                 compound_datatype = cdt_form.save()
+                compound_datatype.grant_from_json(cdt_form.cleaned_data["permissions"])
                 compound_datatype.full_clean()
 
                 # Having reached here, we can now make proper forms.

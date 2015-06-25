@@ -11,6 +11,10 @@
 <script src="static/metadata/datatype_add.js"></script><!-- MIME type is only required for inline javascript as the server should supply it in the HTTP header -->
 {% endblock %}
 
+{% block widget_media %}
+{{ datatype_form.media }}
+{% endblock %}
+
 {% block content %}
 
 <a href="/datatypes" rel="prev">return to Datatypes summary</a>
@@ -45,16 +49,10 @@
             </td>
         </tr>
         <tr>
-            <th>{{ datatype_form.users_allowed.label_tag }}</th>
-            <td><div class="helptext">{{ datatype_form.users_allowed.help_text }}</div></td>
-            <td>{{ datatype_form.users_allowed }}</td>
-            <td class="errortext">{{ datatype_form.users_allowed.errors }}</td>
-        </tr>
-        <tr>
-            <th>{{ datatype_form.groups_allowed.label_tag }}</th>
-            <td><div class="helptext">{{ datatype_form.groups_allowed.help_text }}</div></td>
-            <td>{{ datatype_form.groups_allowed }}</td>
-            <td class="errortext">{{ datatype_form.groups_allowed.errors }}</td>
+            <th>{{ datatype_form.permissions.label_tag }}</th>
+            <td><div class="helptext">{{ datatype_form.permissions.help_text }}</div></td>
+            <td>{{ datatype_form.permissions }}</td>
+            <td class="errortext">{{ datatype_form.permissions.errors }}</td>
         </tr>
     </table>
 
