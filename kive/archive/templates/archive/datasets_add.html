@@ -8,6 +8,10 @@
 {% block javascript %}
 {% endblock %}
 
+{% block widget_media %}
+{{ singleDataset.media }}
+{% endblock %}
+
 {% block content %}
 
 <a href="/datasets" rel="prev">Back to uploaded datasets</a>
@@ -34,13 +38,9 @@
                     <td>{{ singleDataset.compound_datatype }}</td>
                     <td class="errortext">{{ singleDataset.compound_datatype.errors }}</td>
                 </tr>
-                <tr><td><label>{{ singleDataset.users_allowed.label }}</label></td>
-                    <td>{{ singleDataset.users_allowed }}</td>
-                    <td class="errortext">{{ singleDataset.users_allowed.errors }}</td>
-                </tr>
-                <tr><td><label>{{ singleDataset.groups_allowed.label }}</label></td>
-                    <td>{{ singleDataset.groups_allowed }}</td>
-                    <td class="errortext">{{ singleDataset.groups_allowed.errors }}</td>
+                <tr><td><label>{{ singleDataset.permissions.label }}</label></td>
+                    <td>{{ singleDataset.permissions }}</td>
+                    <td class="errortext">{{ singleDataset.permissions.errors }}</td>
                 </tr>
             </table>
         </fieldset>
