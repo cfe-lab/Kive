@@ -21,6 +21,7 @@ import math
 import tempfile
 import shutil
 from datetime import datetime
+import json
 
 import kive.settings
 from file_access_utils import set_up_directory, configure_sandbox_permissions
@@ -460,6 +461,16 @@ class AccessControl(models.Model):
 
     def grant_everyone_access(self):
         self.groups_allowed.add(Group.objects.get(pk=groups.EVERYONE_PK))
+
+    def grant_from_json(self, permissions_json):
+        """
+        Given a JSON string as produced by a PermissionsField, add permissions to this object.
+        """
+        permissions = json.loads(permissions_json)
+        for user_pk in permissions[0]:
+            self.users_allowed.add(User.objects.get(pk=user_pk))
+        for group_pk in permissions[1]:
+            self.groups_allowed.add(Group.objects.get(pk=group_pk))
 
 
 @python_2_unicode_compatible

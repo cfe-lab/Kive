@@ -11,6 +11,10 @@
 <script src="/static/method/resource_add.js"></script>
 {% endblock %}
 
+{% block widget_media %}
+{{ resource_form.media }}
+{% endblock %}
+
 {% block content %}
 
 <a href="/resources" rel="prev">return to Code Resource summary</a>
@@ -41,16 +45,10 @@
             <td><div class="errortext">{{ resource_form.resource_desc.errors }}</div></td>
         </tr>
         <tr>
-            <th>{{ resource_form.users_allowed.label_tag }}</th>
-            <td><div class="helptext">{{ resource_form.users_allowed.help_text }}</div></td>
-            <td>{{ resource_form.users_allowed }}</td>
-            <td><div class="errortext">{{ resource_form.users_allowed.errors }}</div></td>
-        </tr>
-        <tr>
-            <th>{{ resource_form.groups_allowed.label_tag }}</th>
-            <td><div class="helptext">{{ resource_form.groups_allowed.help_text }}</div></td>
-            <td>{{ resource_form.groups_allowed }}</td>
-            <td><div class="errortext">{{ resource_form.groups_allowed.errors }}</div></td>
+            <th>{{ resource_form.permissions.label_tag }}</th>
+            <td><div class="helptext">{{ resource_form.permissions.help_text }}</div></td>
+            <td>{{ resource_form.permissions }}</td>
+            <td><div class="errortext">{{ resource_form.permissions.errors }}</div></td>
         </tr>
 
     </table>

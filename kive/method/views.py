@@ -7,10 +7,12 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
+from django.contrib.auth.models import User, Group
 
 from rest_framework.renderers import JSONRenderer
 
 from datetime import datetime
+import json
 
 import metadata.models
 from metadata.models import CompoundDatatype, AccessControl
@@ -197,10 +199,7 @@ def _make_crv(file_in_memory,
             crv_form.add_error('resource_desc', e.error_dict.get('description', []))
             raise
 
-        for user in crv_form.cleaned_data["users_allowed"]:
-            code_resource.users_allowed.add(user)
-        for group in crv_form.cleaned_data["groups_allowed"]:
-            code_resource.groups_allowed.add(group)
+        code_resource.grant_from_json(crv_form.cleaned_data["permissions"])
 
         rev_name = "Prototype"
         rev_desc = crv_form.cleaned_data["resource_desc"]
@@ -228,13 +227,7 @@ def _make_crv(file_in_memory,
         raise e
 
     revision.save()
-
-    for user in crv_form.cleaned_data["users_allowed"]:
-        revision.users_allowed.add(user)
-    for group in crv_form.cleaned_data["groups_allowed"]:
-        revision.groups_allowed.add(group)
-
-    revision.save()
+    revision.grant_from_json(crv_form.cleaned_data["permissions"])
 
     # Bind CR dependencies.
     for i in range(len(dep_forms)):
@@ -581,10 +574,7 @@ def create_method_from_forms(family_form, method_form, input_forms, output_forms
                         description=family_form.cleaned_data['description'],
                         user=creating_user)
 
-                    for user in method_form.cleaned_data["users_allowed"]:
-                        family.users_allowed.add(user)
-                    for group in method_form.cleaned_data["groups_allowed"]:
-                        family.groups_allowed.add(group)
+                    family.grant_from_json(method_form.cleaned_data["permissions"])
 
                 except ValidationError as e:
                     family_form.add_error(None, e)
@@ -601,10 +591,7 @@ def create_method_from_forms(family_form, method_form, input_forms, output_forms
             )
             new_method.save()
 
-            for user in method_form.cleaned_data["users_allowed"]:
-                new_method.users_allowed.add(user)
-            for group in method_form.cleaned_data["groups_allowed"]:
-                new_method.groups_allowed.add(group)
+            new_method.grant_from_json(method_form.cleaned_data["permissions"])
 
             # Attempt to make in/outputs.
             num_outputs = len(output_forms)

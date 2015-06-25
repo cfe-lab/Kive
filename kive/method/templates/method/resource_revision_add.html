@@ -11,6 +11,10 @@
 <script src="/static/portal/noxss.js"></script>
 {% endblock %}
 
+{% block widget_media %}
+{{ revision_form.media }}
+{% endblock %}
+
 {% block content %}
 
 <a href="/resource_revisions/{{ coderesource.id }}" rel="prev">return to Code Resource summary</a>
@@ -63,7 +67,7 @@
             </td>
         </tr>
         <tr>
-            <th>{{ revision_form.users_allowed.label }} <div class="helptext">{{ revision_form.users_allowed.help_text }}</div></th>
+            <th>{{ revision_form.permissions.label }} <div class="helptext">{{ revision_form.permissions.help_text }}</div></th>
             {% if parent_revision %}
                 <td style="font-style:italic">
                     {% if parent_revision.users_allowed.exists %}
@@ -77,27 +81,8 @@
                     {% endif %}
                 </td>
             {% endif %}
-            <td>{{ revision_form.users_allowed }}<br>
-                <div class="errortext">{{ revision_form.users_allowed.errors }}</div>
-            </td>
-        </tr>
-        <tr>
-            <th>{{ revision_form.groups_allowed.label }} <div class="helptext">{{ revision_form.groups_allowed.help_text }}</div></th>
-            {% if parent_revision %}
-                <td style="font-style:italic">
-                    {% if parent_revision.groups_allowed.exists %}
-                    <ul>
-                    {% for group in parent_revision.groups_allowed.all %}
-                        <li>{{ group }}</li>
-                    {% endfor %}
-                    </ul>
-                    {% else %}
-                        None
-                    {% endif %}
-                </td>
-            {% endif %}
-            <td>{{ revision_form.groups_allowed }}<br>
-                <div class="errortext">{{ revision_form.groups_allowed.errors }}</div>
+            <td>{{ revision_form.permissions }}<br>
+                <div class="errortext">{{ revision_form.permissions.errors }}</div>
             </td>
         </tr>
     </table>
