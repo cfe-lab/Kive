@@ -103,6 +103,7 @@ def run_pipeline(request):
                                                          "Pipeline was invalid."))
     
             rtp = rsf.save()
+            rtp.grant_from_json(rsf.cleaned_data["permissions"])
     
             # Now try and put together RunToProcessInputs from the specified inputs.
             for i in range(1, curr_pipeline.inputs.count()+1):

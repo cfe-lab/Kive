@@ -184,7 +184,7 @@ class DatatypeForm (forms.ModelForm):
 
     permissions = PermissionsField(
         label="Users and groups allowed",
-        help_text="Which users and groups are allowed access to this resource?",
+        help_text="Which users and groups are allowed access to this Datatype?",
         user_queryset=User.objects.all(),
         group_queryset=Group.objects.all(),
         required=False
@@ -253,7 +253,7 @@ class CompoundDatatypeForm(forms.ModelForm):
 
     permissions = PermissionsField(
         label="Users and groups allowed",
-        help_text="Which users and groups are allowed access to this resource?",
+        help_text="Which users and groups are allowed access to this CompoundDatatype?",
         user_queryset=User.objects.all(),
         group_queryset=Group.objects.all(),
         required=False

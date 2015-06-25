@@ -3,9 +3,11 @@ Forms for running a Pipeline.
 """
 
 from django import forms
+from django.contrib.auth.models import User, Group
 
 from pipeline.models import PipelineFamily, Pipeline
 import fleet.models
+
 import metadata.forms
 
 
@@ -39,13 +41,23 @@ class RunSubmissionForm(forms.ModelForm):
         widget=forms.HiddenInput,
         queryset=Pipeline.objects.all())
 
+    permissions = metadata.forms.PermissionsField(
+        label="Users and groups allowed",
+        help_text="Which users and groups are allowed access to this run?",
+        user_queryset=User.objects.all(),
+        group_queryset=Group.objects.all(),
+        required=False
+    )
+
     class Meta:
         model = fleet.models.RunToProcess
-        fields = ("pipeline", "users_allowed", "groups_allowed")
+        fields = ("pipeline", "permissions")
 
     def __init__(self, data=None, pipeline_qs=None, users_allowed=None, groups_allowed=None, *args, **kwargs):
         super(RunSubmissionForm, self).__init__(data, *args, **kwargs)
         if pipeline_qs is not None:
             self.fields["pipeline"].queryset = pipeline_qs
-        metadata.forms.setup_form_users_allowed(self, users_allowed)
-        metadata.forms.setup_form_groups_allowed(self, groups_allowed)
+
+        users_allowed = users_allowed or User.objects.all()
+        groups_allowed = groups_allowed or Group.objects.all()
+        self.fields["permissions"].set_users_groups_allowed(users_allowed, groups_allowed)

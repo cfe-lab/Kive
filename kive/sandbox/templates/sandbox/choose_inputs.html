@@ -63,6 +63,10 @@ $(function() {
     <link rel="stylesheet" href="/static/sandbox/sandbox.css">
 {% endblock %}
 
+{% block widget_media %}
+{{ run_submission_form.media }}
+{% endblock %}
+
 {% block content %}
 
 <a href="choose_pipeline" rel="prev">Back to pipeline selection</a>
@@ -105,13 +109,9 @@ $(function() {
 
 <form action="run_pipeline" id="run_pipeline" method="post">
 
-    <p>Users allowed:
-    {{ run_submission_form.users_allowed }}
-        <div class="errortext">{{ run_submission_form.users_allowed.errors }}</div>
-    </p>
-    <p>Groups allowed:
-    {{ run_submission_form.groups_allowed }}
-        <div class="errortext">{{ run_submission_form.groups_allowed.errors }}</div>
+    <p>{{ run_submission_form.permissions.label }}:
+    {{ run_submission_form.permissions }}
+        <div class="errortext">{{ run_submission_form.permissions.errors }}</div>
     </p>
 
     {{ run_submission_form.pipeline }}
