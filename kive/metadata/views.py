@@ -58,6 +58,8 @@ def datatype_add(request):
     dt = Datatype(user=request.user, date_created=timezone.now())
 
     if request.method == 'POST':
+        print("FOOOOO")
+        print(request.POST)
         dform = DatatypeForm(request.POST, instance=dt)  # create form bound to POST data
         icform = IntegerConstraintForm(request.POST)
         scform = StringConstraintForm(request.POST)

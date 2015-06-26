@@ -19,6 +19,7 @@ from librarian.models import SymbolicDataset
 from datachecking.models import VerificationLog
 from portal.models import StagedFile
 from constants import datatypes, CDTs
+from metadata.forms import AccessControlForm
 
 
 samplecode_path = "../samplecode"
@@ -2676,6 +2677,7 @@ class DatatypeApiTests(TestCase):
 
         end_count = Datatype.objects.all().count()
         self.assertEquals(end_count, start_count - 1)
+
 
 class CompoundDatatypeApiTests(TestCase):
     def setUp(self):

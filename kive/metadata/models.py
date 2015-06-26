@@ -467,10 +467,18 @@ class AccessControl(models.Model):
         Given a JSON string as produced by a PermissionsField, add permissions to this object.
         """
         permissions = json.loads(permissions_json)
-        for user_pk in permissions[0]:
-            self.users_allowed.add(User.objects.get(pk=user_pk))
-        for group_pk in permissions[1]:
-            self.groups_allowed.add(Group.objects.get(pk=group_pk))
+        users_to_grant = [User.objects.get(pk=x) for x in permissions[0]]
+        groups_to_grant = [Group.objects.get(pk=x) for x in permissions[1]]
+        self.grant_from_permissions_list([users_to_grant, groups_to_grant])
+
+    def grant_from_permissions_list(self, permissions_list):
+        """
+        Given a list with two entries (one list of users and one of groups), add permissions.
+        """
+        for user in permissions_list[0]:
+            self.users_allowed.add(user)
+        for group in permissions_list[1]:
+            self.groups_allowed.add(group)
 
 
 @python_2_unicode_compatible

@@ -80,12 +80,19 @@ class PermissionsWidget(forms.MultiWidget):
         value will be a JSON-encoded pair of lists: one for
         Users allowed and one for Groups allowed.
         """
+        users_allowed = []
+        groups_allowed = []
         if value:
             parsed_value = json.loads(value)
             assert isinstance(parsed_value, list)
             assert len(parsed_value) == 2
-            return json.loads(value)
-        return [None, None]
+            users_and_groups = json.loads(value)
+
+            # The internals work when passing around PKs but not the actual objects.
+            users_allowed = [x for x in users_and_groups[0]]
+            groups_allowed = [x for x in users_and_groups[1]]
+
+        return [users_allowed, groups_allowed]
 
     def format_output(self, rendered_widgets):
         pw_template = loader.get_template("metadata/permissions_widget.html")
@@ -147,6 +154,7 @@ class PermissionsField(forms.MultiValueField):
         else:
             user_pks = [x.pk for x in data_list[0]]
             group_pks = [x.pk for x in data_list[1]]
+
         return json.dumps([user_pks, group_pks])
 
     def set_users_groups_allowed(self, users_allowed, groups_allowed):
@@ -175,6 +183,11 @@ class AccessControlForm(forms.Form):
     def __init__(self, data=None, files=None, possible_users_allowed=None, possible_groups_allowed=None,
                  *args, **kwargs):
         super(AccessControlForm, self).__init__(data, files, *args, **kwargs)
+
+        for idx in (0, 1):
+            if "permissions_{}".format(idx) in self.initial:
+                self.fields["permissions"].fields[idx].initial = self.initial["permissions_{}".format(idx)]
+
         possible_users_allowed = possible_users_allowed or User.objects.all()
         possible_groups_allowed = possible_groups_allowed or Group.objects.all()
         self.fields["permissions"].set_users_groups_allowed(possible_users_allowed, possible_groups_allowed)
