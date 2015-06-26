@@ -126,12 +126,15 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
 
     def __init__(self, *args, **kwargs):
         super(CodeResourceRevisionSerializer, self).__init__(*args, **kwargs)
-        # Set the queryset of the coderesource field.
-        cr_field = self.fields["coderesource"]
-        cr_field.queryset = CodeResource.filter_by_user(self.context["request"].user)
-
-        staged_file_field = self.fields["staged_file"]
-        staged_file_field.queryset = portal.models.StagedFile.objects.filter(user=self.context["request"].user)
+        request = self.context.get("request", None)
+        if request is not None:
+            # Set the queryset of the coderesource field.
+            cr_field = self.fields["coderesource"]
+            cr_field.queryset = CodeResource.filter_by_user(request.user)
+    
+            staged_file_field = self.fields["staged_file"]
+            staged_file_field.queryset = portal.models.StagedFile.objects.filter(
+                user=request.user)
 
     def get_absolute_url(self, obj):
         if not obj:

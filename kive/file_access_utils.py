@@ -1,5 +1,5 @@
 """
-Basic file-checking functionality used by Shipyard.
+Basic file-checking functionality used by Kive.
 """
 import hashlib, glob, os
 import errno

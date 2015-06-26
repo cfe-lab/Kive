@@ -1,4 +1,25 @@
-# Deploying a Release
+# Contributing to the Kive Project #
+
+If you like this project and want to make it better, help out. You could report
+a bug, or pitch in with some development work.
+
+## Bug Reports and Enhancement Requests ##
+
+Please create issue descriptions [on GitHub][issues]. Be as specific as possible.
+Which version are you using? What did you do? What did you expect to happen? Are
+you planning to submit your own fix in a pull request?
+
+[issues]: https://github.com/cfe-lab/Kive/issues
+
+## Development ##
+You will need to follow all the installation instructions in the INSTALL file,
+then open the source code in a Python IDE.
+
+If you want to see what's currently being worked on, check out the [waffle board][waffle].
+
+[waffle]: https://waffle.io/cfe-lab/kive
+
+## Deploying a Release ##
 
 See the project wiki for instructions on how to [start a production server][wiki].
 Once you have set up your production server, this is how to deploy a new release:
@@ -38,11 +59,8 @@ Once you have set up your production server, this is how to deploy a new release
         ./manage.py migrate
         sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./manage.py collectstatic
         
-8. TODO: Check whether an apache restart is needed. What about the fleet manager?
+8. Launch the fleet.
 
-        ps aux | grep runfleet
-        sudo kill <pid for runfleet>
-        sudo /usr/sbin/apachectl restart
         sudo -u apache LD_LIBRARY_PATH=$LD_LIBRARY_PATH PATH=$PATH ./manage.py runfleet --workers 151 &>/dev/null &
 
 9. Remove the pre-release flag from the release.
@@ -52,12 +70,12 @@ Once you have set up your production server, this is how to deploy a new release
 [release]: https://help.github.com/categories/85/articles
 [wiki]: https://github.com/cfe-lab/Kive/wiki/Starting-a-production-server-for-Shipyard-(Django)
 
-# Unit tests
+## Unit tests ##
 
 To run all the unit tests, run `./manage.py test`. Note that running the
 full test suite can take around half an hour.
 
-# Faster unit tests
+### Faster unit tests ###
 
 If you want to run your unit tests faster, you can run them against an
 in-memory SQLite database with this command:
@@ -92,7 +110,7 @@ Finally, run the unit tests and the script to summarize them.
 [unit-tests]: https://docs.djangoproject.com/en/dev/topics/testing/overview/#running-tests
 [hotrunner]: https://pypi.python.org/pypi/django-hotrunner/0.2.2
 
-## Updating test fixtures
+### Updating test fixtures ###
 
 Fixtures are a Django feature which allow for test data to be
 persistently stored in the database during development, to avoid having

@@ -1881,7 +1881,7 @@
             this.initial_data = [{
                 name: 'Example',
                 num_revisions: 1,
-                published_version_display: null}];
+                published_version_display_name: null}];
         });
         
         it('should build a table', function() {
@@ -1898,7 +1898,7 @@
         });
         
         it('should display published version', function() {
-            this.initial_data[0].published_version_display = "1: First";
+            this.initial_data[0].published_version_display_name = "1: First";
             pipeline_families.main(
                     this.is_user_admin,
                     this.$table,

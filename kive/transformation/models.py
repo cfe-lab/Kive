@@ -116,6 +116,10 @@ class Transformation(metadata.models.AccessControl):
             return self.pipeline
         else:
             return self.method
+    
+    @property
+    def display_name(self):
+        return self.definite.display_name
 
     def __str__(self):
         if self.revision_name:
@@ -248,6 +252,10 @@ class Transformation(metadata.models.AccessControl):
         """Create a TransformationOutput for this Transformation."""
         return self.create_xput(dataset_name, dataset_idx, compounddatatype, (min_row, max_row), (x, y), False,
                                 clean=clean)
+
+    def find_update(self):
+        update = self.definite.family.members.latest('revision_number')
+        return update if update.pk != self.pk else None
 
 
 @python_2_unicode_compatible

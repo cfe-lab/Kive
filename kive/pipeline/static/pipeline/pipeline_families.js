@@ -8,7 +8,7 @@ var pipeline_families = (function() {
     }
     
     function format_published_version($td, pipeline_family) {
-        $td.text(pipeline_family.published_version_display || "None");
+        $td.text(pipeline_family.published_version_display_name || "None");
     }
     
     var PipelineFamiliesTable = function($table, is_user_admin) {

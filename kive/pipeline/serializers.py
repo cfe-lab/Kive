@@ -4,8 +4,10 @@ from pipeline.models import PipelineFamily, Pipeline, CustomCableWire, PipelineS
     PipelineStep, PipelineOutputCable
 from transformation.models import XputStructure
 
-from transformation.serializers import TransformationInputSerializer, TransformationOutputSerializer
+from transformation.serializers import TransformationInputSerializer, TransformationOutputSerializer,\
+    TransformationSerializer
 from kive.serializers import AccessControlSerializer
+from method.serializers import CodeResourceRevisionSerializer
 
 
 class CustomCableWireSerializer(serializers.ModelSerializer):
@@ -93,6 +95,10 @@ class PipelineStepSerializer(serializers.ModelSerializer):
 
         return data
 
+class PipelineStepUpdateSerializer(serializers.Serializer):
+    step_num = serializers.IntegerField()
+    transformation = TransformationSerializer()
+    code_resource_revision = CodeResourceRevisionSerializer()
 
 class PipelineOutputCableSerializer(serializers.ModelSerializer):
 
@@ -182,7 +188,7 @@ def _source_transf_finder(step_num, dataset_name, step_data_dicts):
 class PipelineSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Pipeline
-        fields = ('id', 'display', 'url')
+        fields = ('id', 'display_name', 'url')
 
 class PipelineSerializer(AccessControlSerializer,
                          serializers.ModelSerializer):
@@ -200,6 +206,7 @@ class PipelineSerializer(AccessControlSerializer,
     outcables = PipelineOutputCableSerializer(many=True)
 
     removal_plan = serializers.HyperlinkedIdentityField(view_name='pipeline-removal-plan')
+    step_updates = serializers.HyperlinkedIdentityField(view_name='pipeline-step-updates')
 
     # This is as per CodeResourceRevisionSerializer.
     revision_number = serializers.IntegerField(
@@ -227,6 +234,7 @@ class PipelineSerializer(AccessControlSerializer,
             "steps",
             "outcables",
             'removal_plan',
+            'step_updates'
         )
 
     def __init__(self, *args, **kwargs):
@@ -382,7 +390,7 @@ class PipelineFamilySerializer(AccessControlSerializer,
                   "users_allowed",
                   "groups_allowed",
                   'published_version',
-                  'published_version_display',
+                  'published_version_display_name',
                   "absolute_url",
                   'removal_plan',
                   "num_revisions",

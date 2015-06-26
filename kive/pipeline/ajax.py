@@ -15,7 +15,8 @@ from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet,\
 from metadata.models import AccessControl
 from method.models import MethodFamily, Method
 from pipeline.models import Pipeline, PipelineFamily
-from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
+from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer,\
+    PipelineStepUpdateSerializer
 from portal.views import developer_check, admin_check
 
 
@@ -133,6 +134,13 @@ class PipelineViewSet(CleanCreateModelMixin,
 
         return prefetchd
 
+    @detail_route(methods=['get'], suffix='Step Updates')
+    def step_updates(self, request, pk=None):
+        updates = self.get_object().find_step_updates()
+        return Response(PipelineStepUpdateSerializer(updates,
+                                                     context={'request': request},
+                                                     many=True).data)
+    
     # Override perform_create to call complete_clean, not just clean.
     @transaction.atomic
     def perform_create(self, serializer):

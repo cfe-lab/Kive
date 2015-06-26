@@ -22,16 +22,17 @@ from constants import datatypes
 from kive.tests import BaseTestCases
 from metadata.models import CompoundDatatype, CompoundDatatypeMember, \
     Datatype, kive_user, everyone_group
-from method.models import Method, MethodFamily, CodeResource
+from method.models import Method, MethodFamily, CodeResource,\
+    CodeResourceRevision
 import method.tests
-from librarian.models import SymbolicDataset
 from pipeline.models import Pipeline, PipelineFamily, \
-    PipelineSerializationException, PipelineStep, PipelineStepInputCable, \
+    PipelineStep, PipelineStepInputCable, \
     PipelineOutputCable
 import sandbox.testing_utils as tools
 import metadata.tests
 
 from pipeline.serializers import PipelineSerializer
+from django.core.files.base import File
 
 samplecode_path = "../samplecode"
 
@@ -82,15 +83,6 @@ def create_pipeline_test_environment(case):
                                      source=step1.transformation.outputs.get(dataset_name="output"),
                                      output_name="complemented_seqs", output_idx=1)
 
-    temporary_file, safe_fn = tempfile.mkstemp(dir=case.workdir)
-    os.close(temporary_file)
-    case.datafile = open(safe_fn, "w")
-    case.datafile.write(",".join([m.column_name for m in case.DNAinput_cdt.members.all()]))
-    case.datafile.write("\n")
-    case.datafile.write("ATCG\n")
-    case.datafile.close()
-    case.DNAinput_symDS = SymbolicDataset.create_SD(safe_fn, user=case.user, cdt=case.DNAinput_cdt,
-                                                    name="DNA input", description="input for DNAcomp pipeline")
 
     # Define PF in order to define pipeline
     case.test_PF = PipelineFamily(
@@ -143,11 +135,11 @@ class PipelineFamilyTests(PipelineTestCase):
         """Can I delete a PipelineFamily?"""
         self.assertIsNone(PipelineFamily.objects.first().delete())
 
-    def test_published_version_display_is_none(self):
+    def test_published_version_display_name_is_none(self):
         family = PipelineFamily.objects.get(name='DNAcomplement')
-        self.assertIsNone(family.published_version_display)
+        self.assertIsNone(family.published_version_display_name)
 
-    def test_published_version_display(self):
+    def test_published_version_display_name(self):
         family = PipelineFamily.objects.get(name='DNAcomplement')
         family.published_version = family.members.last() #oldest version
         family.clean()
@@ -155,7 +147,7 @@ class PipelineFamilyTests(PipelineTestCase):
         
         reloaded = PipelineFamily.objects.get(pk=family.pk)
         
-        self.assertEqual("1: v1", reloaded.published_version_display)
+        self.assertEqual("1: v1", reloaded.published_version_display_name)
 
 
 class PipelineTests(PipelineTestCase):
@@ -2873,6 +2865,72 @@ class RawOutputCableTests(PipelineTestCase):
         self.assertRaisesRegexp(ValidationError, error_msg,
                                 self.pipeline_1.complete_clean)
 
+class PipelineUpdateTests(PipelineTestCase):
+    def create_code_revision(self):
+        # Define compv2_crRev for comp_cr
+        fn = "complement_v2.py"
+        with open(os.path.join(samplecode_path, fn), "rb") as f:
+            self.compv3_crRev = CodeResourceRevision(coderesource=self.comp_cr, 
+                revision_name="v3", 
+                revision_desc="Third version: rounder", 
+                revision_parent=self.compv2_crRev, 
+                content_file=File(f),
+                user=self.myUser)
+        # case.compv2_crRev.content_file.save(fn, File(f))
+            self.compv3_crRev.full_clean()
+            self.compv3_crRev.save()
+        self.compv3_crRev.grant_everyone_access()
+ 
+    def create_method(self):
+        self.create_code_revision()
+        self.DNAcompv3_m = self.DNAcomp_mf.members.create(revision_name="v3", 
+            revision_desc="Third version", 
+            revision_parent=self.DNAcompv2_m, 
+            driver=self.compv3_crRev, 
+            user=self.myUser)
+        self.DNAcompv3_m.full_clean()
+        self.DNAcompv3_m.save()
+        self.DNAcompv3_m.grant_everyone_access()
+        self.DNAcompv3_m.copy_io_from_parent()
+
+    def test_find_update_not_found(self):
+        pipeline = self.DNAcomp_pf.members.get(revision_number=2)
+        update = pipeline.find_update()
+        
+        self.assertEqual(update, None)
+
+    def test_find_update(self):
+        pipeline = self.DNAcomp_pf.members.get(revision_number=1)
+        next_pipeline = self.DNAcomp_pf.members.get(revision_number=2)
+        
+        update = pipeline.find_update()
+        
+        self.assertEqual(update, next_pipeline)
+
+    def test_find_step_updates_none(self):
+        updates = self.DNAcompv1_p.find_step_updates()
+         
+        self.assertListEqual(updates, [])
+     
+    def test_find_step_updates_method(self):
+        self.create_method()
+            
+        updates = self.DNAcompv1_p.find_step_updates()
+          
+        self.assertEqual(len(updates), 1)
+        update = updates[0]
+        self.assertEqual(update.step_num, 1)
+        self.assertEqual(update.transformation, self.DNAcompv3_m)
+        self.assertEqual(update.code_resource_revision, None)
+     
+    def test_find_step_updates_code_resource(self):
+        self.create_code_revision()
+        
+        updates = self.DNAcompv1_p.find_step_updates()
+          
+        self.assertEqual(len(updates), 1)
+        update = updates[0]
+        self.assertEqual(update.code_resource_revision, self.compv3_crRev)
 
 class RawInputCableTests(PipelineTestCase):
     def test_PSIC_raw_cable_comes_from_pipeline_input_good(self):
@@ -3911,7 +3969,15 @@ class PipelineStepInputCable_tests(PipelineTestCase):
         Check the coherence of an ExecLog created by running a cable with a Dataset.
         """
         scratch_dir, output_file = self._setup_dirs()
-        log, rsic = self._make_log(self.DNAcompv1_p, output_file, self.datafile.name)
+        temporary_file, safe_fn = tempfile.mkstemp(dir=self.workdir)
+        os.close(temporary_file)
+        datafile = open(safe_fn, "w")
+        datafile.write(",".join([m.column_name for m in self.DNAinput_cdt.members.all()]))
+        datafile.write("\n")
+        datafile.write("ATCG\n")
+        datafile.close()
+        
+        log, rsic = self._make_log(self.DNAcompv1_p, output_file, datafile.name)
         self._log_checks(log, rsic)
         shutil.rmtree(scratch_dir)
 
@@ -4577,12 +4643,9 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
         self.detail_pk = 5
         self.detail_path = reverse("pipeline-detail",
                                    kwargs={'pk': self.detail_pk})
-        self.removal_path = reverse("pipeline-removal-plan",
-                                    kwargs={'pk': self.detail_pk})
 
         self.list_view, _, _ = resolve(self.list_path)
         self.detail_view, _, _ = resolve(self.detail_path)
-        self.removal_view, _, _ = resolve(self.removal_path)
 
     def test_list(self):
         request = self.factory.get(self.list_path)
@@ -4603,9 +4666,14 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(response.data['inputs'][0]['dataset_name'], 'E1_in')
 
     def test_removal_plan(self):
-        request = self.factory.get(self.removal_path)
+        removal_path = reverse("pipeline-removal-plan",
+                               kwargs={'pk': self.detail_pk})
+        removal_view, _, _ = resolve(removal_path)
+        request = self.factory.get(removal_path)
         force_authenticate(request, user=self.kive_user)
-        response = self.removal_view(request, pk=self.detail_pk)
+        
+        response = removal_view(request, pk=self.detail_pk)
+        
         self.assertEquals(response.data['Pipelines'], 1)
 
     def test_removal(self):
@@ -4617,6 +4685,18 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
 
         end_count = Pipeline.objects.count()
         self.assertEquals(end_count, start_count - 1)
+
+    def test_step_updates(self):
+        step_updates_path = reverse("pipeline-step-updates",
+                                    kwargs={'pk': self.detail_pk})
+        step_updates_view, _, _ = resolve(step_updates_path)
+        request = self.factory.get(step_updates_path)
+        force_authenticate(request, user=self.kive_user)
+        
+        response = step_updates_view(request, pk=self.detail_pk)
+        
+        update = response.data[0]
+        self.assertEqual(update['step_num'], 1)
 
     def test_create(self):
         # Note that the "sandbox" testing environment has already been set

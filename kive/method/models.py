@@ -434,6 +434,9 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
         return SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed, CRRs_listed
 
+    def find_update(self):
+        update = self.coderesource.revisions.latest('revision_number')
+        return update if update != self else None
 
 @python_2_unicode_compatible
 class CodeResourceDependency(models.Model):
@@ -548,14 +551,14 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
     
     @property
     def display_name(self):
-        return self.revision_name or self.family.name
+        return '{}: {}'.format(self.revision_number, self.revision_name)
 
     class Meta:
         unique_together = (("family", "revision_number"))
         ordering = ["family__name", "-revision_number"]
 
     def __init__(self, *args, **kwargs):
-        super(self.__class__, self).__init__(*args, **kwargs)
+        super(Method, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def __str__(self):
@@ -925,7 +928,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             pipelines_listed.update(curr_pipelines_listed)
 
         return SDs_listed, ERs_listed, runs_listed, pipelines_listed
-
 
 @python_2_unicode_compatible
 class MethodFamily(transformation.models.TransformationFamily):

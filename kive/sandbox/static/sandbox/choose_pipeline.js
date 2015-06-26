@@ -64,7 +64,7 @@ var choose_pipeline = (function() {
             var member = row.members[i],
                 $option = $('<option>').attr(
                         'value',
-                        member.id).text(member.display);
+                        member.id).text(member.display_name);
             if (member.id === row.published_version) {
                 $option.attr('selected', true);
             }

@@ -12,6 +12,7 @@ import logging
 import copy
 import unittest
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.management import update_all_contenttypes
 from django.core.exceptions import ValidationError
@@ -25,19 +26,18 @@ from rest_framework.reverse import reverse
 from rest_framework.test import force_authenticate
 
 from constants import datatypes
+import file_access_utils
 from kive.tests import BaseTestCases
 import librarian.models
 from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
 import metadata.tests
 from method.models import CodeResource, CodeResourceDependency, \
     CodeResourceRevision, Method, MethodFamily
+from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
+import portal.models
 import sandbox.testing_utils as tools
 import sandbox.execute
-import portal.models
-import file_access_utils
-import kive.settings
-
-from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
+from transformation.models import Transformation
 
 
 # This was previously defined here but has been moved to metadata.tests.
@@ -1621,6 +1621,15 @@ class CodeResourceRevisionTests(MethodTestCase):
         self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
                          [u'test_cr_1.py', u'nest_folder/test_cr_2.py'])
 
+    def test_find_update_not_found(self):
+        update = self.compv2_crRev.find_update()
+        
+        self.assertEqual(update, None)
+
+    def test_find_update(self):
+        update = self.compv1_crRev.find_update()
+        
+        self.assertEqual(update, self.compv2_crRev)
 
 class CodeResourceDependencyTests(MethodTestCase):
 
@@ -2151,6 +2160,16 @@ class MethodTests(MethodTestCase):
 
         self.assertEqual(unicode(nofamily),
                          "[family unset]:None (foo)")
+        
+    def test_display_name(self):
+        method = Method(revision_number=1, revision_name='Example')
+        
+        self.assertEqual(method.display_name, '1: Example')
+        
+    def test_display_name_without_revision_name(self):
+        method = Method(revision_number=1)
+        
+        self.assertEqual(method.display_name, '1: ')
 
     def test_no_inputs_checkInputIndices_good(self):
         """
@@ -2689,30 +2708,21 @@ class MethodTests(MethodTestCase):
         m = Method.create(names, compounddatatypes=cdts, num_inputs=1, family=family, driver=driver, user=self.myUser)
         self.assertIsNone(m.complete_clean())
 
-    # The identicality constraint has been relaxed, so this test is no longer valid.
-    # def test_create_identical(self):
-    #     """Cannot create a duplicate Method."""
-    #     m = Method.objects.filter(inputs__isnull=False, outputs__isnull=False).first()
-    #     num_inputs = m.inputs.count()
-    #
-    #     xputs = itertools.chain(m.inputs.order_by("dataset_idx"), m.outputs.order_by("dataset_idx"))
-    #     names = []
-    #     compounddatatypes = []
-    #     row_limits = []
-    #     for xput in xputs:
-    #         names.append(xput.dataset_name)
-    #         compounddatatypes.append(xput.compounddatatype)
-    #         row_limits.append((xput.get_min_row(), xput.get_max_row()))
-    #
-    #     factory = lambda: Method.create(names,
-    #             compounddatatypes=compounddatatypes,
-    #             row_limits=row_limits,
-    #             num_inputs=num_inputs,
-    #             driver=m.driver,
-    #             family=m.family,
-    #             user=self.myUser)
-    #     self.assertRaisesRegexp(ValidationError, "An identical method already exists", factory)
+    def test_find_update_not_found(self):
+        update = self.RNAcompv2_m.find_update()
+        
+        self.assertEqual(update, None)
 
+    def test_find_update(self):
+        update = self.RNAcompv1_m.find_update()
+        
+        self.assertEqual(update, self.RNAcompv2_m)
+
+    def test_find_update_not_found_from_transformation(self):
+        transformation = Transformation.objects.get(pk=self.RNAcompv2_m.pk)
+        update = transformation.find_update()
+        
+        self.assertEqual(update, None)
 
 class MethodFamilyTests(MethodTestCase):
 
@@ -3569,11 +3579,11 @@ class InvokeCodeTests(TestCase):
             self.assertEqual(f.read(), g.read())
 
     @unittest.skipIf(
-        not kive.settings.KIVE_SANDBOX_WORKER_ACCOUNT,
+        not settings.KIVE_SANDBOX_WORKER_ACCOUNT,
         "Kive is not configured to run sandboxes under another account via SSH"
     )
     def test_invoke_code_with_SSH(self):
         """
         Invoke a method as the normal user (i.e. without using SSH).
         """
-        self.test_invoke_code(ssh_sandbox_worker_account=kive.settings.KIVE_SANDBOX_WORKER_ACCOUNT)
+        self.test_invoke_code(ssh_sandbox_worker_account=settings.KIVE_SANDBOX_WORKER_ACCOUNT)

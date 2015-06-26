@@ -25,7 +25,7 @@
         });
         
         it('should build list of members', function() {
-            this.rows[0].members = [{ id: 17, display: 'first' }];
+            this.rows[0].members = [{ id: 17, display_name: 'first' }];
             var table = new choose_pipeline.PipelineFamiliesTable(
                     this.$table,
                     this.is_user_admin);
@@ -39,8 +39,8 @@
         });
         
         it('should select published version by default', function() {
-            this.rows[0].members = [{ id: 23, display: 'second' },
-                                    { id: 17, display: 'first' }];
+            this.rows[0].members = [{ id: 23, display_name: 'second' },
+                                    { id: 17, display_name: 'first' }];
             this.rows[0].published_version = 17;
             var table = new choose_pipeline.PipelineFamiliesTable(
                     this.$table,

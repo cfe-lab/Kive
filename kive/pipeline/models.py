@@ -12,17 +12,14 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import transaction
 from django.utils.encoding import python_2_unicode_compatible
-from django.contrib.auth.models import User, Group
 
 import csv
 import exceptions
 import os
 import logging
-import operator
 import sys
 import transformation.models
 
-import method.models
 import metadata.models
 import librarian.models
 from constants import maxlengths
@@ -74,10 +71,10 @@ class PipelineFamily(transformation.models.TransformationFamily):
         return (max_rev if max_rev is not None else 0) + 1
      
     @property
-    def published_version_display(self):
+    def published_version_display_name(self):
         if self.published_version is None:
             return None
-        return self.published_version.display 
+        return self.published_version.display_name
 
     @property
     def complete_members(self):
@@ -171,7 +168,7 @@ class Pipeline(transformation.models.Transformation):
         return string_rep
     
     @property
-    def display(self):
+    def display_name(self):
         return '{}: {}'.format(self.revision_number, self.revision_name)
 
     def save(self, *args, **kwargs):
@@ -406,7 +403,26 @@ class Pipeline(transformation.models.Transformation):
             pipelines_to_remove.add(ps.pipeline)
 
         return SDs_to_remove, ERs_to_remove, runs_to_remove, pipelines_to_remove
-
+    
+    def find_step_updates(self):
+        updates = []
+        for step in self.steps.all():
+            update = None
+            transformation = step.transformation.find_update()
+            if transformation is not None:
+                update = PipelineStepUpdate(step.step_num)
+                update.transformation = transformation
+                updates.append(update)
+            else:
+                driver = getattr(step.transformation.definite, 'driver', None)
+                if driver is not None:
+                    next_driver = driver.find_update()
+                    if next_driver is not None:
+                        update = PipelineStepUpdate(step.step_num)
+                        update.code_resource_revision = next_driver
+                        updates.append(update)
+                    #TODO: look for new dependencies
+        return updates
 
 @python_2_unicode_compatible
 class PipelineStep(models.Model):
@@ -605,6 +621,14 @@ class PipelineStep(models.Model):
             return self.transformation.threads_needed()
         return self.transformation.definite.threads
 
+class PipelineStepUpdate(object):
+    """ A data object to hold details about how a pipeline step can be updated.
+    """
+    def __init__(self, step_num):
+        self.step_num = step_num
+        self.transformation = None
+        self.code_resource_revision = None
+        self.dependencies = []
 
 class PipelineCable(models.Model):
     """A cable feeding into a step or out of a pipeline."""

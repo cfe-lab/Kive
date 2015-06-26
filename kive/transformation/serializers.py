@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from transformation.models import TransformationXput, TransformationInput, \
-    TransformationOutput, XputStructure
+    TransformationOutput, XputStructure, Transformation
 
 
 class XputStructureSerializer(serializers.ModelSerializer):
@@ -12,6 +12,11 @@ class XputStructureSerializer(serializers.ModelSerializer):
             "max_row"
         )
 
+class TransformationSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Transformation
+        fields = ("id", "display_name")
 
 class TransformationXputSerializer(serializers.ModelSerializer):
     structure = XputStructureSerializer(allow_null=True, required=False)
