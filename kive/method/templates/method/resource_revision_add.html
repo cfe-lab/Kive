@@ -70,10 +70,22 @@
             <th>{{ revision_form.permissions.label }} <div class="helptext">{{ revision_form.permissions.help_text }}</div></th>
             {% if parent_revision %}
                 <td style="font-style:italic">
+                    <h4>Users</h4>
                     {% if parent_revision.users_allowed.exists %}
                     <ul>
                     {% for user in parent_revision.users_allowed.all %}
                         <li>{{ user }}</li>
+                    {% endfor %}
+                    </ul>
+                    {% else %}
+                        None
+                    {% endif %}
+
+                    <h4>Groups</h4>
+                    {% if parent_revision.groups_allowed.exists %}
+                    <ul>
+                    {% for group in parent_revision.groups_allowed.all %}
+                        <li>{{ group }}</li>
                     {% endfor %}
                     </ul>
                     {% else %}

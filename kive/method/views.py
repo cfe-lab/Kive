@@ -378,7 +378,13 @@ def resource_revision_add(request, id):
 
     # Having reached here, we know that this CR is being revised.  Return a form pre-populated
     # with default info.
-    crv_form = CodeResourceRevisionForm()
+    parent_users_allowed = [x.pk for x in parent_revision.users_allowed.all()]
+    parent_groups_allowed = [x.pk for x in parent_revision.groups_allowed.all()]
+    crv_form = CodeResourceRevisionForm(
+        initial={
+            "permissions": [parent_users_allowed, parent_groups_allowed]
+        }
+    )
 
     # TODO: do not allow CR to depend on itself
     dependencies = parent_revision.dependencies.all()
@@ -817,11 +823,14 @@ def method_revise(request, id):
     else:
         # initialize forms with values of parent Method
         family_form = MethodFamilyForm(request.POST)
+        parent_users_allowed = [x.pk for x in parent_revision.users_allowed.all()]
+        parent_groups_allowed = [x.pk for x in parent_revision.groups_allowed.all()]
         method_revise_form = MethodReviseForm(
             initial={
                 'revision_desc': parent_method.revision_desc,
                 'revisions': parent_revision.pk,
-                'reusable': parent_method.reusable
+                'reusable': parent_method.reusable,
+                "permissions": [parent_users_allowed, parent_groups_allowed]
             })
         xput_forms = []
         inputs = parent_method.inputs.order_by("dataset_idx")
