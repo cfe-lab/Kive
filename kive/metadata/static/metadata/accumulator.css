@@ -111,6 +111,9 @@
   padding: 0 3px;
   margin: 0;
   line-height: 15px;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGFBMVEX////FxcfU1NXe3t/q6urz8/T7+/vi4uOIh5YnAAAAXklEQVQY022OSxLAIAhDE37e/8ZVSW2n02yQR4gAQBhpoyDVbLdSYI19LNqemH2pytAVLgvpDZKMBkPhAmcl9I9rUHfofNAzg++wW0rLfarZ40FG5E475Jz2Q/AhfgGy9gExUY8I1wAAAABJRU5ErkJggg==");/* Magnifying glass */
+  background-repeat: no-repeat;
+  background-position: 8.75em;
 }
 .permissions-widget .pw-users_groups .pw-search-hidden {
   display: none;
