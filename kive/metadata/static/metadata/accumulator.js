@@ -1,6 +1,7 @@
 $(function() {
   var widget = $('.permissions-widget');
   var css_first = 'pw-selected pw-first-selected';
+  syncDisplayFromHiddenInput.call(widget);
   
   $('.pw-users_groups', widget)
     .on('click',    '.pw-option', selectionHandler)
@@ -36,11 +37,7 @@ $(function() {
   });
   
   $('.pw-remove-one', widget).on('click', removeFromSelected);
-  $('.pw-remove-all', widget).on('click', function(e) {
-    $('.pw-users_groups_allowed .pw-option', getWidget(this)).addClass('pw-selected');
-    removeFromSelected.call(this,e);
-  });
-  
+  $('.pw-remove-all', widget).on('click', removeAllFromSelected);
   $('.pw-search-box', widget).on('keyup', searchFilter);
   
   function selectionHandler(e) {
@@ -103,6 +100,10 @@ $(function() {
     searchFilter.call(widget.find('.pw-search-box')[0]);
     syncHiddenInput.call(this);
   }
+  function removeAllFromSelected(e) {
+    $('.pw-users_groups_allowed .pw-option', getWidget(this)).addClass('pw-selected');
+    removeFromSelected.call(this,e);
+  }
   function getWidget (el) {
     return $(el).closest('.permissions-widget');
   }
@@ -129,6 +130,31 @@ $(function() {
       });
       return ar;
     }
+  }
+  function syncDisplayFromHiddenInput() {
+    var widget = getWidget(this),
+      selected_users  = $('.pw-hidden-users',  widget).val(),
+      selected_groups = $('.pw-hidden-groups', widget).val(),
+      user_opts = $('.pw-users_options .pw-option', widget),
+      group_opts = $('.pw-groups_options .pw-option', widget),
+      selectByUserId = selectByIdFnGenerator(user_opts),
+      selectByGroupId = selectByIdFnGenerator(group_opts);
+    
+    if (selected_users && selected_users.length > 0) {
+      $.each(selected_users, selectByUserId);
+    }
+    if (selected_groups && selected_groups.length > 0) {
+      $.each(selected_groups, selectByGroupId);
+    }
+    
+    function selectByIdFnGenerator(set_to_select_from) {
+      return function(i, selected_id) {
+        set_to_select_from.filter(function() {
+          return $(this).data('value') == selected_id;
+        }).addClass('pw-selected');
+      };
+    }
+    addToSelected.call(this);
   }
   function escapeRegExp(str) {
     return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
