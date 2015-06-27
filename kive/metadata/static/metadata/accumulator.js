@@ -1,7 +1,7 @@
 $(function() {
   var widget = $('.permissions-widget');
   var css_first = 'pw-selected pw-first-selected';
-  syncDisplayFromHiddenInput.call(widget);
+  initializeWidgetDisplay.call(widget);
   
   $('.pw-users_groups', widget)
     .on('click',    '.pw-option', selectionHandler)
@@ -21,7 +21,7 @@ $(function() {
   });
   
   $('h5', widget).on('dblclick', function(e) {
-    var box = $(this).next('div');
+    var box = $(this).next('.pw-inner');
     $('.pw-selected', getPanel(box)).removeClass(css_first);
     box.find('.pw-option').addClass('pw-selected');
   });
@@ -40,6 +40,44 @@ $(function() {
   $('.pw-remove-all', widget).on('click', removeAllFromSelected);
   $('.pw-search-box', widget).on('keyup', searchFilter);
   
+
+  function initializeWidgetDisplay() {
+    var widget = getWidget(this);
+    
+    initializeFor('users');
+    initializeFor('groups');
+    addToSelected.call(this);
+    
+    function initializeFor(str) {
+      /*
+      Some browsers (ie. Firefox) allow .val() and :selected to persist on 
+      page refresh, so checking the [selected] attr is the only way to see 
+      if the -server- specified it was selected.
+       */
+      var selected = $('.pw-hidden-' + str, widget).val(),
+        locked_in = $('.pw-hidden-' + str + ' option[selected]',  widget),
+        opts = $('.pw-' + str + '_options .pw-option', widget),
+        selectById = labelByIdGenerator(opts, 'pw-selected'),
+        lockById   = labelByIdGenerator(opts, 'pw-locked');
+
+      if (selected && selected.length > 0) {
+        $.each(selected, selectById);
+      }
+      if (locked_in.length > 0) {
+        $.each(locked_in, lockById);
+      }
+    }
+    function labelByIdGenerator(set_to_select_from, css_class) {
+      return function(i, selected_id) {
+        if (selected_id instanceof HTMLOptionElement) {
+          selected_id = selected_id.value;
+        }
+        set_to_select_from.filter(function() {
+          return $(this).data('value') == selected_id;
+        }).addClass(css_class);
+      };
+    }
+  }
   function selectionHandler(e) {
     var $this = $(this),
       panel = getPanel($this),
@@ -130,31 +168,6 @@ $(function() {
       });
       return ar;
     }
-  }
-  function syncDisplayFromHiddenInput() {
-    var widget = getWidget(this),
-      selected_users  = $('.pw-hidden-users',  widget).val(),
-      selected_groups = $('.pw-hidden-groups', widget).val(),
-      user_opts = $('.pw-users_options .pw-option', widget),
-      group_opts = $('.pw-groups_options .pw-option', widget),
-      selectByUserId = selectByIdFnGenerator(user_opts),
-      selectByGroupId = selectByIdFnGenerator(group_opts);
-    
-    if (selected_users && selected_users.length > 0) {
-      $.each(selected_users, selectByUserId);
-    }
-    if (selected_groups && selected_groups.length > 0) {
-      $.each(selected_groups, selectByGroupId);
-    }
-    
-    function selectByIdFnGenerator(set_to_select_from) {
-      return function(i, selected_id) {
-        set_to_select_from.filter(function() {
-          return $(this).data('value') == selected_id;
-        }).addClass('pw-selected');
-      };
-    }
-    addToSelected.call(this);
   }
   function escapeRegExp(str) {
     return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
