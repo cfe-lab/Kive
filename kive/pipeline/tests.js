@@ -1208,10 +1208,6 @@
                 beforeEach(function() {
                     this.methodId = 27;
                     this.methodFamilyId = 13;
-                    this.methodInputs = {1: {datasetname: "in"}};
-                    this.methodOutputs = {1: {cdt_pk: 17, datasetname: "out"}};
-
-
                     this.methodInputs = [{dataset_idx: 1, dataset_name: "in", structure: null}];
                     this.methodOutputs = [{dataset_idx: 1, dataset_name: "out", structure: {compounddatatype: 17}}];
 

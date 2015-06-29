@@ -11,25 +11,28 @@ $(function() {
             window.submit_to_url = $('#id_family_pk').val();
             return;
         }
+        
+        var $canvas = $(canvasState.canvas);
+        $canvas.fadeOut({ complete: function() {
+            $.ajax({
+                type: "GET",
+                url: "/api/pipelines/" + pipeline_id + "/",
+                datatype: "json",
+                success: function(pipeline_raw) {
 
-        $.ajax({
-            type: "GET",
-            url: "/api/pipelines/" + pipeline_id + "/",
-            datatype: "json",
-            success: function(pipeline_raw) {
+                    submit_to_url = pipeline_raw.family_pk;
+                    pipeline_revision.load(pipeline_raw);
+                    pipeline_revision.draw();
+                    $canvas.fadeIn();
 
-                submit_to_url = pipeline_raw['family_pk'];
-                pipeline_revision.load(pipeline_raw);
-                pipeline_revision.draw();
-
-                $('#id_publish').val(
-                    pipeline_raw['is_published_version']?
-                    'Cancel publication' :
-                    'Make published version'
-                );
-            }
-        });
-
+                    $('#id_publish').val(
+                        pipeline_raw.is_published_version ?
+                        'Cancel publication' :
+                        'Make published version'
+                    );
+                }
+            });
+        }});
     }).change();
 
     $('#id_revert').on('click', function() {
@@ -37,6 +40,13 @@ $(function() {
         $('#id_pipeline_select').change();
     });
 
+    $('#id_update').on('click', function() {
+        var pipeline_id = window.pipeline_revision.pipeline.id;
+        $.getJSON("/api/pipelines/" + pipeline_id + "/step_updates/").done(function(updates) {
+            alert(updates.length + " updates");
+        });
+    });
+    
     $('#id_publish').on('click', function() {
         if(pipeline_revision.isPublished()) {
             pipeline_revision.unpublish($("#id_family_pk").val(), function() {

@@ -131,30 +131,24 @@ $(function() {
             $('#id_method_name').val_(filename);
             
             // use AJAX to retrieve Revision inputs and outputs
-            $.ajax({
-                type: "POST",
-                url: "/get_method_io/",
-                data: { mid: val }, // specify data as an object
-                datatype: "json",
-                success: function(result) {
-                    ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
-                    var n_outputs = Object.keys(result.outputs).length * 8,
-                        n_inputs  = Object.keys(result.inputs).length * 8;
-                    
-                    preview_canvas.height = (n_outputs + n_inputs) / 2 + 62;
-                    (new drydock_objects.MethodNode(
-                        val,
-                        null,//family
-                        // Ensures node is centred perfectly on the preview canvas
-                        // Makes assumptions that parameters like magnet radius and scoop length are default.
-                        preview_canvas.width/2 - ( Math.min(-n_inputs - 14, 42 - n_outputs) + Math.max(n_inputs + 14, n_outputs + 48) ) * 0.4330127,// x
-                        n_inputs / 2 + 27,// y
-                        colour, 
-                        null,//label
-                        result.inputs,
-                        result.outputs
-                    )).draw(ctx);
-                }
+            $.getJSON("/api/methods/" + mid + "/").done(function(result) {
+                ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
+                var n_outputs = Object.keys(result.outputs).length * 8,
+                    n_inputs  = Object.keys(result.inputs).length * 8;
+                
+                preview_canvas.height = (n_outputs + n_inputs) / 2 + 62;
+                (new drydock_objects.MethodNode(
+                    val,
+                    null,//family
+                    // Ensures node is centred perfectly on the preview canvas
+                    // Makes assumptions that parameters like magnet radius and scoop length are default.
+                    preview_canvas.width/2 - ( Math.min(-n_inputs - 14, 42 - n_outputs) + Math.max(n_inputs + 14, n_outputs + 48) ) * 0.4330127,// x
+                    n_inputs / 2 + 27,// y
+                    colour, 
+                    null,//label
+                    result.inputs,
+                    result.outputs
+                )).draw(ctx);
             });
         }
         e.stopPropagation();
@@ -362,13 +356,8 @@ $(function() {
                 method_error[0].innerHTML = '';
                 
                 // use AJAX to retrieve Revision inputs and outputs
-                $.ajax({
-                    type: "POST",
-                    url: "/get_method_io/",
-                    data: { mid: mid }, // specify data as an object
-                    datatype: "json", // type of data expected back from server
-                    success: createOrReplaceMethodNode
-                });
+                $.getJSON("/api/methods/" + mid + "/").done(
+                        createOrReplaceMethodNode);
 
                 method_name.val_('');
             }

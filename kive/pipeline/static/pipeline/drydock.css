@@ -78,11 +78,29 @@ ul#id_ctrl_nav li:hover {
     width: 250px;
 }
 
-#pipeline_ctrl #form_ctrl { float: right; margin-top: -1.25em; margin-right: 9em; width: 10.7em; }
+#pipeline_ctrl #form_ctrl {
+    float: right;
+    margin-top: -1.25em;
+    margin-right: 9em;
+}
 #pipeline_ctrl #form_ctrl input[type="submit"] { font-weight: bold; }
-#pipeline_ctrl #form_ctrl input               { border-radius: 0;           padding: 0 .5em;    float: left; margin-right: -1px; margin-left: 0; }
-#pipeline_ctrl #form_ctrl input:first-of-type { border-radius: 1em 0 0 1em; padding: 0 .5em 0 1em; }
-#pipeline_ctrl #form_ctrl input:last-of-type  { border-radius: 0 1em 1em 0; padding: 0 1em 0 .5em; }
+#pipeline_ctrl #form_ctrl input {
+    border-radius: 0;
+    padding: 0 .5em;
+    float: left;
+    margin-right: -1px;
+    margin-left: 0;
+}
+#pipeline_ctrl #form_ctrl input:first-of-type {
+    border-top-left-radius: 1em;
+    border-bottom-left-radius: 1em;
+    padding-left: 1em;
+}
+#pipeline_ctrl #form_ctrl input:last-of-type  {
+    border-top-right-radius: 1em;
+    border-bottom-right-radius: 1em;
+    padding-right: 1em;
+}
 #pipeline_ctrl #form_ctrl input:first-of-type:last-of-type  { border-radius: 1em; padding: 0 1em 0 1em; }
 
 #pipeline_ctrl .form-inline-opts {
