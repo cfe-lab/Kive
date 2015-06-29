@@ -805,31 +805,12 @@ var drydock = (function() {
                     } else {
                         // valid Connector, assign non-null value
                         // make sure label is not a duplicate
-                        suffix = 0;
-                        new_output_label = connector.source.label;
-                        for (i=0; i< this.shapes.length; i++) {
-                            shape = this.shapes[i];
-                            if ( ! (shape instanceof drydock_objects.OutputNode)) {
-                                continue;
-                            }
-                            if (shape.label == new_output_label) {
-                                i = -1;
-                                suffix++;
-                                new_output_label = connector.source.label +'_'+ suffix;
-                            }
-                        }
-                    
-                        out_node = new drydock_objects.OutputNode(
-                                connector.x,
-                                connector.y,
-                                new_output_label);
+                        
+                        new_output_label = this.uniqueShapeName(connector.source.label, drydock_objects.OutputNode);
+                        out_node = connector.spawnOutputNode(new_output_label)
                         this.addShape(out_node);
-                    
-                        connector.dest = out_node.in_magnets[0];
-                        connector.dest.connected = [ connector ];
-                    
                         out_node.y = this.outputZone.y + this.outputZone.h + out_node.h/2 + out_node.r2;// push out of output zone
-                        out_node.x = connector.x;
+                        
                         this.valid = false;
     
                         // spawn dialog for output label
@@ -884,6 +865,24 @@ var drydock = (function() {
         }
     };
     
+    my.CanvasState.prototype.uniqueShapeName = function(desired_name, object_class) {
+        var suffix = 0,
+            name = desired_name,
+            shape;
+        for (var i = 0; i< this.shapes.length; i++) {
+            shape = this.shapes[i];
+            if (object_class && !(shape instanceof object_class)) {
+                continue;
+            }
+            if (shape.label == name) {
+                i = -1;
+                suffix++;
+                name = desired_name +'_'+ suffix;
+            }
+        }
+        return name;
+    }
+    
     my.CanvasState.prototype.contextMenu = function(e) {
         var pos = this.getPos(e),
             mcm = $('#method_context_menu'),
@@ -914,7 +913,6 @@ var drydock = (function() {
 
                    // Context menu for pipeline outputs
                    showMenu();
-
                    $('.output_node', mcm).show();
                    $('.step_node', mcm).hide();
     
@@ -924,7 +922,6 @@ var drydock = (function() {
 
                    // Context menu for pipeline steps
                    showMenu();
-
                    $('.output_node', mcm).hide();
                    $('.step_node', mcm).show();
                 }

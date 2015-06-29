@@ -1206,6 +1206,13 @@ var drydock_objects = (function() {
         else return false;
     };
     
+    my.Connector.prototype.spawnOutputNode = function(new_output_label) {
+        var out_node = new drydock_objects.OutputNode(this.x, this.y, new_output_label);
+        this.dest = out_node.in_magnets[0];
+        this.dest.connected = [ this ];
+        return out_node;
+    };
+    
     my.Connector.prototype.deleteFrom = function(cs) {
         // remove selected Connector from list
         var index;
