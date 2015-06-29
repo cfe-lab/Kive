@@ -398,7 +398,7 @@ class ExecuteTests(ExecuteTestsBase):
             lambda: sandbox.execute_pipeline(pipeline, inputs, sandbox.sandbox_path, runstep))
 
 
-class SandboxTests(ExecuteTests):
+class SandboxTests(ExecuteTestsBase):
     fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def test_sandbox_no_input(self):

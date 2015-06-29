@@ -365,8 +365,6 @@ class FindSDTests(TestCase):
     """
     Tests for first_generator_of_SD.
     """
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
         tools.create_word_reversal_environment(self)
 
@@ -438,10 +436,13 @@ class FindSDTests(TestCase):
             "lab_data", "complemented_lab_data")
         self.pipeline_noop.create_outputs()
 
-    def test_find_symds_pipeline_input(self):
+    def test_find_symds_pipeline_input_and_step_output(self):
         """
         Finding a SymbolicDataset which was input to a Pipeline should return None
         as the generator, and the top-level run as the run.
+
+        Finding a SymbolicDataset which was output from a step, and also input
+        to a cable, should return the step (and in particular, not the cable).
         """
         sandbox = Sandbox(self.user_bob, self.pipeline_noop, [self.symds_words])
         sandbox.execute_pipeline()
@@ -452,42 +453,18 @@ class FindSDTests(TestCase):
         self.assertEqual(run, sandbox.run)
         self.assertEqual(gen, None)
 
-    def test_find_symds_step_output(self):
-        """
-        Finding a SymbolicDataset which was output from a step, and also input
-        to a cable, should return the step (and in particular, not the cable).
-        """
-        sandbox = Sandbox(self.user_bob, self.pipeline_noop, [self.symds_words])
-        sandbox.execute_pipeline()
-        self.assertIsNone(sandbox.run.complete_clean())
-        self.assertTrue(sandbox.run.successful_execution())
+        symds_out_intermediate = sandbox.run.runsteps.first().execrecord.execrecordouts.first().symbolicdataset
+        run_2, gen_2 = sandbox.first_generator_of_SD(symds_out_intermediate)
+        self.assertEqual(run_2, sandbox.run)
+        self.assertEqual(gen_2, self.pipeline_noop.steps.first())
 
-        symds_out = sandbox.run.runsteps.first().execrecord.execrecordouts.first().symbolicdataset
-        run, gen = sandbox.first_generator_of_SD(symds_out)
-        self.assertEqual(run, sandbox.run)
-        self.assertEqual(gen, self.pipeline_noop.steps.first())
-
-    def test_find_symds_pipeline_input_custom_wire(self):
+    def test_find_symds_pipeline_input_and_intermediate_custom_wire(self):
         """
         Finding a SymbolicDataset which was passed through a custom wire to a
         Pipeline should return the cable as the generator, and the top-level
         run as the run.
-        """
-        sandbox = Sandbox(self.user_bob, self.pipeline_twostep, [self.symds_backwords])
-        sandbox.execute_pipeline()
-        self.assertIsNone(sandbox.run.complete_clean())
-        self.assertTrue(sandbox.run.successful_execution())
 
-        runcable = sandbox.run.runsteps.first().RSICs.first()
-        symds_to_find = runcable.execrecord.execrecordouts.first().symbolicdataset
-
-        run, gen = sandbox.first_generator_of_SD(symds_to_find)
-        self.assertEqual(run, sandbox.run)
-        self.assertEqual(gen, runcable.PSIC)
-
-    def test_find_symds_custom_wire(self):
-        """
-        Finding a SymbolicDataset which was produced by a custom wire as an 
+        Finding a SymbolicDataset which was produced by a custom wire as an
         intermediate step should return the cable as the generator, and the
         top-level run as the run.
         """
@@ -496,36 +473,25 @@ class FindSDTests(TestCase):
         self.assertIsNone(sandbox.run.complete_clean())
         self.assertTrue(sandbox.run.successful_execution())
 
-        runcable = sandbox.run.runsteps.get(pipelinestep__step_num=2).RSICs.first()
+        runcable = sandbox.run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
         symds_to_find = runcable.execrecord.execrecordouts.first().symbolicdataset
 
         run, gen = sandbox.first_generator_of_SD(symds_to_find)
         self.assertEqual(run, sandbox.run)
         self.assertEqual(gen, runcable.PSIC)
 
-    def test_find_symds_subpipeline(self):
+        # Testing on an intermediate SymbolicDataset.
+        runcable_2 = sandbox.run.runsteps.get(pipelinestep__step_num=2).RSICs.first()
+        symds_to_find_2 = runcable_2.execrecord.execrecordouts.first().symbolicdataset
+
+        run_2, gen_2 = sandbox.first_generator_of_SD(symds_to_find_2)
+        self.assertEqual(run_2, sandbox.run)
+        self.assertEqual(gen_2, runcable_2.PSIC)
+
+    def test_find_symds_subpipeline_input_and_intermediate(self):
         """
         Find a symbolic dataset in a sub-pipeline, which is output from a step.
-        """
-        sandbox = Sandbox(self.user_bob, self.pipeline_nested, [self.symds_backwords])
-        sandbox.execute_pipeline()
-        self.assertIsNone(sandbox.run.complete_clean())
-        self.assertTrue(sandbox.run.successful_execution())
 
-        for step in sandbox.run.runsteps.all():
-            if step.pipelinestep.step_num == 2:
-                subrun = step.child_run
-                runstep = subrun.runsteps.first()
-                outrecord = runstep.execrecord.execrecordouts.first()
-                symds_to_find = outrecord.symbolicdataset
-                break
-
-        run, gen = sandbox.first_generator_of_SD(symds_to_find)
-        self.assertEqual(run, subrun)
-        self.assertEqual(gen, runstep.pipelinestep)
-
-    def test_find_symds_subpipeline_input(self):
-        """
         Find a symbolic dataset in a sub-pipeline, which is input to the sub-pipeline
         on a custom cable.
         """
@@ -534,16 +500,22 @@ class FindSDTests(TestCase):
         self.assertIsNone(sandbox.run.complete_clean())
         self.assertTrue(sandbox.run.successful_execution())
 
-        for step in sandbox.run.runsteps.all():
-            if step.pipelinestep.step_num == 2:
-                subrun = step.child_run
-                runstep = subrun.runsteps.first()
-                cable = runstep.RSICs.first()
-                symds_to_find = runstep.execrecord.execrecordins.first().symbolicdataset
+        subpipeline_step = sandbox.run.runsteps.get(pipelinestep__step_num=2)
+        subrun = subpipeline_step.child_run
+        runstep = subrun.runsteps.first()
+        outrecord = runstep.execrecord.execrecordouts.first()
+        symds_to_find = outrecord.symbolicdataset
 
         run, gen = sandbox.first_generator_of_SD(symds_to_find)
         self.assertEqual(run, subrun)
-        self.assertEqual(gen, cable.PSIC)
+        self.assertEqual(gen, runstep.pipelinestep)
+
+        cable = runstep.RSICs.first()
+        symds_to_find_2 = runstep.execrecord.execrecordins.first().symbolicdataset
+
+        run_2, gen_2 = sandbox.first_generator_of_SD(symds_to_find_2)
+        self.assertEqual(run_2, subrun)
+        self.assertEqual(gen_2, cable.PSIC)
 
 
 class RawTests(SandboxRMTestCase):
