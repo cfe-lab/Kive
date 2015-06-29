@@ -43,7 +43,7 @@ $(function() {
     $('#id_update').on('click', function() {
         var pipeline_id = window.pipeline_revision.pipeline.id;
         $.getJSON("/api/pipelines/" + pipeline_id + "/step_updates/").done(function(updates) {
-            alert(updates.length + " updates");
+            window.pipeline_revision.applyStepUpdates(updates);
         });
     });
     

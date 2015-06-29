@@ -12,12 +12,6 @@ class XputStructureSerializer(serializers.ModelSerializer):
             "max_row"
         )
 
-class TransformationSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Transformation
-        fields = ("id", "display_name")
-
 class TransformationXputSerializer(serializers.ModelSerializer):
     structure = XputStructureSerializer(allow_null=True, required=False)
 

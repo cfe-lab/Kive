@@ -23,9 +23,9 @@ var pipeline = (function(exports){
          */
         this.pipeline = pipeline;
         this.canvasState.reset();
-        this.draw_inputs();
-        this.draw_steps();
-        this.draw_outputs();
+        this.build_inputs();
+        this.build_steps();
+        this.build_outputs();
     };
 
     Pipeline.prototype.serialize = function(args, patch) {
@@ -128,10 +128,7 @@ var pipeline = (function(exports){
         });
 
         // MethodNodes are now sorted live, prior to pipeline submission —JN
-        var sorted_elements = [];
-        $.each(self.canvasState.exec_order, function(_, exe_order_element) {
-            sorted_elements = sorted_elements.concat(exe_order_element);
-        });
+        var sorted_elements = self.canvasState.getSteps();
 
         // Add arguments for input cabling
         $.each(sorted_elements, function(idx, step) {
@@ -271,7 +268,7 @@ var pipeline = (function(exports){
 
 
     // Private members
-    Pipeline.prototype.draw_inputs = function() {
+    Pipeline.prototype.build_inputs = function() {
         /**
          * Sets up the canvas state with the inputs for a pipeline
          */
@@ -279,7 +276,7 @@ var pipeline = (function(exports){
             canvas_x_ratio = this.canvasState.canvas.width / this.canvasState.scale,
             canvas_y_ratio = this.canvasState.canvas.height / this.canvasState.scale;
 
-        if (self.pipeline === null) { throw "draw_inputs() called with no pipeline?"; }
+        if (self.pipeline === null) { throw "build_inputs() called with no pipeline?"; }
 
         // Over each input for the pipeline
         $.each(self.pipeline.inputs, function(_, node) {
@@ -307,7 +304,7 @@ var pipeline = (function(exports){
         });
     };
 
-    Pipeline.prototype.draw_steps = function() {
+    Pipeline.prototype.build_steps = function() {
         /**
          * Private method that sets up canvas state to draw methods
          */
@@ -315,7 +312,7 @@ var pipeline = (function(exports){
             canvas_x_ratio = self.canvasState.canvas.width / self.canvasState.scale,
             canvas_y_ratio = self.canvasState.canvas.height / self.canvasState.scale;
 
-        if (self.pipeline === null) { throw "draw_steps() called with no pipeline?"; }
+        if (self.pipeline === null) { throw "build_steps() called with no pipeline?"; }
         var method_node_offset = self.pipeline.inputs.length;
 
         // Over each pipeline step
@@ -334,7 +331,6 @@ var pipeline = (function(exports){
 
             // Add `n draw
             self.canvasState.addShape(method_node);
-            method_node.draw(self.canvasState.ctx);
 
             // Connect method inputs
             $.each(node.cables_in, function() {
@@ -413,7 +409,7 @@ var pipeline = (function(exports){
         });
     };
 
-    Pipeline.prototype.draw_outputs = function () {
+    Pipeline.prototype.build_outputs = function () {
         /**
          * Private method that sets up canvas state to draw outputs
          */
@@ -421,7 +417,7 @@ var pipeline = (function(exports){
             canvas_x_ratio = self.canvasState.canvas.width / self.canvasState.scale,
             canvas_y_ratio = self.canvasState.canvas.height / self.canvasState.scale;
 
-        if (self.pipeline === null) { throw "draw_outputs() called with no pipeline?"; }
+        if (self.pipeline === null) { throw "build_outputs() called with no pipeline?"; }
 
         var method_node_offset = self.pipeline.inputs.length;
 
@@ -459,6 +455,24 @@ var pipeline = (function(exports){
         });
     };
 
+    Pipeline.prototype.applyStepUpdates = function(updates) {
+        var pipeline = this,
+            steps = pipeline.canvasState.getSteps();
+        $.each(updates, function() {
+            var update = this,
+                old_method = steps[update.step_num - 1],
+                new_method = new drydock_objects.MethodNode(
+                        update.method.id,
+                        update.method.family_id,
+                        0,
+                        0,
+                        old_method.fill,
+                        old_method.label,
+                        update.method.inputs,
+                        update.method.outputs);
+            pipeline.canvasState.replaceMethod(old_method, new_method);
+        });
+    };
 
     Pipeline.prototype.isPublished = function() {
         /**

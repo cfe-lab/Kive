@@ -1,13 +1,13 @@
 from rest_framework import serializers
 
-from pipeline.models import PipelineFamily, Pipeline, CustomCableWire, PipelineStepInputCable,\
-    PipelineStep, PipelineOutputCable
+from pipeline.models import PipelineFamily, Pipeline, CustomCableWire,\
+    PipelineStepInputCable, PipelineStep, PipelineOutputCable
 from transformation.models import XputStructure
 
-from transformation.serializers import TransformationInputSerializer, TransformationOutputSerializer,\
-    TransformationSerializer
+from transformation.serializers import TransformationInputSerializer,\
+    TransformationOutputSerializer
 from kive.serializers import AccessControlSerializer
-from method.serializers import CodeResourceRevisionSerializer
+from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
 
 
 class CustomCableWireSerializer(serializers.ModelSerializer):
@@ -97,7 +97,7 @@ class PipelineStepSerializer(serializers.ModelSerializer):
 
 class PipelineStepUpdateSerializer(serializers.Serializer):
     step_num = serializers.IntegerField()
-    transformation = TransformationSerializer()
+    method = MethodSerializer()
     code_resource_revision = CodeResourceRevisionSerializer()
 
 class PipelineOutputCableSerializer(serializers.ModelSerializer):

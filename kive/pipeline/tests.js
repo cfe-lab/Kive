@@ -1729,7 +1729,8 @@
                     beforeEach(function() {
                         this.actualConnector = new drydock_objects.Connector(
                                 this.actualInput.out_magnets[0]);
-                        this.actualInput.out_magnets.push(this.actualConnector);
+                        this.actualInput.out_magnets[0].connected.push(
+                                this.actualConnector);
                         this.actualConnector.dest = this.actualMethod.in_magnets[0];
                         this.actualMethod.in_magnets[0].connected.push(
                                 this.actualConnector);
@@ -1847,9 +1848,9 @@
                     });
                     
                     it('should autolayout', function() {
-                        this.expectedInput.x = 60.10463893352559;
+                        this.expectedInput.x = 92.44925586885002;
                         this.expectedInput.y = 22.5;
-                        this.expectedMethod.x = 239.8953610664744;
+                        this.expectedMethod.x = 207.55074413115;
                         this.expectedMethod.y = 127.5;
                         this.expectedInput.draw(this.expectedCanvas.ctx);
                         this.expectedMethod.draw(this.expectedCanvas.ctx);
@@ -1858,12 +1859,122 @@
                         this.expectedCanvas.ctx.globalAlpha = 0.75;
                         this.expectedConnector.draw(this.expectedCanvas.ctx);
                         this.expectedCanvas.drawText(
-                                {x: 251.1453610664744, y: 92, text: "example", style: "node", dir: 0});
+                                {x: 218.800744131, y: 92, text: "example", style: "node", dir: 0});
                         
                         this.state.draw(this.ctx);
                         this.state.testExecutionOrder();
                         this.state.autoLayout();
                         this.state.draw(this.ctx);
+                    });
+                    
+                    describe('and output', function() {
+                        beforeEach(function() {
+                            var x = 250,
+                                y = 100,
+                                output_name = 'result.csv',
+                                output_id = 17;
+                            this.output = new drydock_objects.OutputNode(
+                                    x,
+                                    y,
+                                    output_name,
+                                    output_id);
+                            var connector = new drydock_objects.Connector(
+                                    this.actualMethod.out_magnets[0]);
+                            this.actualMethod.out_magnets[0].connected.push(
+                                    connector);
+                            connector.dest = this.output.in_magnets[0];
+                            this.output.in_magnets[0].connected.push(connector);
+                            this.state.connectors.push(connector);
+                            this.state.addShape(this.output);
+                        });
+                        
+                        it('should find by label', function() {
+                            var method = this.state.findNodeByLabel('example');
+                            
+                            expect(method).toBe(this.actualMethod);
+                        });
+                        
+                        it('should complain when finding duplicate label', function() {
+                            var canvasState = this.state;
+                            // set input label same as method label
+                            this.actualInput.label = 'example';
+                            
+                            var find = function() {
+                                canvasState.findNodeByLabel('example');
+                            };
+                            
+                            expect(find).toThrowError("Duplicate label: 'example'.");
+                        });
+                        
+                        it('should find nothing by label', function() {
+                            var method = this.state.findNodeByLabel('Rumpelstiltskin');
+                            
+                            expect(method).toBeUndefined();
+                        });
+                        
+                        it('should update a method', function() {
+                            var methodInputs = [{
+                                    dataset_idx: 1,
+                                    dataset_name: "in",
+                                    structure: null
+                                }],
+                                methodOutputs = [{
+                                    dataset_idx: 1,
+                                    dataset_name: "out",
+                                    structure: {compounddatatype: 17}
+                                }],
+                                fill = "#999",
+                                old_method_name = "example",
+                                method_name = old_method_name + " (new)",
+                                method = new drydock_objects.MethodNode(
+                                        this.methodId,
+                                        this.methodFamilyId,
+                                        0,
+                                        0,
+                                        fill,
+                                        method_name,
+                                        methodInputs,
+                                        methodOutputs),
+                                old_method = this.state.findNodeByLabel(
+                                        old_method_name);
+                            
+                            this.state.replaceMethod(old_method, method);
+                            
+                            var new_method = this.state.findNodeByLabel(
+                                    method_name),
+                                source = new_method.in_magnets[0].connected[0].source.parent,
+                                dest = new_method.out_magnets[0].connected[0].dest.parent;
+                            
+                            expect(new_method.label).toBe(method.label);
+                            expect(new_method).toBe(method);
+                            expect(method.x).toBe(old_method.x, "x");
+                            expect(method.y).toBe(old_method.y, "y");
+                            expect(source).toBe(this.actualInput);
+                            expect(dest).toBe(this.output);
+                        });
+                        
+                        it('should get a list of steps', function() {
+                            var method_id = 77,
+                                family_id = 3,
+                                fill = "#999",
+                                inputs = [],
+                                outputs = [],
+                                extra_method = new drydock_objects.MethodNode(
+                                    method_id,
+                                    family_id,
+                                    200,
+                                    100,
+                                    fill,
+                                    "extra",
+                                    inputs,
+                                    outputs);
+                            this.state.addShape(extra_method);
+                            
+                            var steps = this.state.getSteps();
+                            
+                            expect(steps[0].label).toBe("example");
+                            expect(steps[1].label).toBe("extra");
+                        });
                     });
                 });
             });
@@ -1929,14 +2040,6 @@
                         return true;
                 return false;
             };
-
-            drydock.CanvasState.prototype.findNodeByLabel = function(label) {
-                var shapes = this.shapes;
-                for(var i = 0; i < shapes.length; i++)
-                    if (shapes[i].label == label)
-                        return shapes[i];
-                return null;
-            };
         });
 
         afterEach(function() {
@@ -1980,15 +2083,15 @@
                     umfasq2 = this.canvasState.findNodeByLabel('unmapped1_fastq'),
                     jmguire = this.canvasState.findNodeByLabel('Jerry Maguire');
 
-                expect(input1).not.toBe(null);
-                expect(input2).not.toBe(null);
-                expect(prelim).not.toBe(null);
-                expect(remap).not.toBe(null);
-                expect(remapc).not.toBe(null);
-                expect(remapp).not.toBe(null);
-                expect(umfasq1).not.toBe(null);
-                expect(umfasq2).not.toBe(null);
-                expect(jmguire).toBe(null);
+                expect(input1).toBeDefined();
+                expect(input2).toBeDefined();
+                expect(prelim).toBeDefined();
+                expect(remap).toBeDefined();
+                expect(remapc).toBeDefined();
+                expect(remapp).toBeDefined();
+                expect(umfasq1).toBeDefined();
+                expect(umfasq2).toBeDefined();
+                expect(jmguire).toBeUndefined();
             });
         });
 
@@ -2051,10 +2154,10 @@
                         expectedImage);
             });
         });
-
+        
         describe('Structure', function(){
 
-            it('shoud have correct properties for inputs API', function(){
+            it('should have correct properties for inputs API', function(){
                 var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
                 pipeline.draw();
 
@@ -2091,7 +2194,7 @@
                 expect(remap.out_magnets[0].connected.length).toBe(1);
             });
 
-            it('shoud have correct properties for output API', function(){
+            it('should have correct properties for output API', function(){
                 var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
                 pipeline.draw();
 
@@ -2107,7 +2210,42 @@
                 });
             });
         });
+        
+        describe('Update steps', function(){
 
+            it('should apply update', function(){
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
+                    new_method_id = 77,
+                    step_updates = [{
+                        step_num: 1,
+                        method: {
+                            id: new_method_id,
+                            family_id: 3,
+                            inputs: [{
+                                dataset_name: "fastq1",
+                                dataset_idx: 1,
+                                structure: null
+                            },
+                            {
+                                dataset_name: "fastq2",
+                                dataset_idx: 2,
+                                structure: null
+                            }],
+                            outputs: [{
+                                dataset_name: "prelim",
+                                dataset_idx: 1,
+                                structure: { compounddatatype: 7 }
+                            }]
+                        }
+                    }];
+                pipeline.applyStepUpdates(step_updates);
+                
+                var new_method = this.canvasState.findNodeByLabel('prelim_map.py');
+                
+                expect(new_method.pk).toBe(new_method_id);
+            });
+        });
+        
         function loadAndSerialize(canvasState, api_pipeline, additional_args){
             var pipeline = loadApiPipeline(canvasState, api_pipeline);
             pipeline.draw();

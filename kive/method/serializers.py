@@ -232,6 +232,7 @@ class MethodSerializer(AccessControlSerializer,
                        serializers.ModelSerializer):
     family = serializers.SlugRelatedField(slug_field="name",
                                           queryset=MethodFamily.objects.all())
+    family_id = serializers.PrimaryKeyRelatedField(read_only=True)
 
     inputs = TransformationInputSerializer(many=True, allow_null=True, required=False)
     outputs = TransformationOutputSerializer(many=True, allow_null=True, required=False)
@@ -258,9 +259,11 @@ class MethodSerializer(AccessControlSerializer,
             "user",
             "users_allowed",
             "groups_allowed",
+            "id",
             "url",
             "absolute_url",
             "removal_plan",
+            "family_id",
             "family",
             "driver",
             "reusable",
@@ -271,17 +274,19 @@ class MethodSerializer(AccessControlSerializer,
 
     def __init__(self, *args, **kwargs):
         super(MethodSerializer, self).__init__(*args, **kwargs)
-        curr_user = self.context["request"].user
-
-        # Set the querysets of the related model fields.
-        revision_parent_field = self.fields["revision_parent"]
-        revision_parent_field.queryset = Method.filter_by_user(curr_user)
-
-        family_field = self.fields["family"]
-        family_field.queryset = MethodFamily.filter_by_user(curr_user)
-
-        driver_field = self.fields["driver"]
-        driver_field.queryset = CodeResourceRevision.filter_by_user(curr_user)
+        request = self.context.get("request")
+        if request is not None:
+            curr_user = request.user
+    
+            # Set the querysets of the related model fields.
+            revision_parent_field = self.fields["revision_parent"]
+            revision_parent_field.queryset = Method.filter_by_user(curr_user)
+    
+            family_field = self.fields["family"]
+            family_field.queryset = MethodFamily.filter_by_user(curr_user)
+    
+            driver_field = self.fields["driver"]
+            driver_field.queryset = CodeResourceRevision.filter_by_user(curr_user)
 
     def get_absolute_url(self, obj):
         if not obj:

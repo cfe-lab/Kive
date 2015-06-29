@@ -131,7 +131,7 @@ $(function() {
             $('#id_method_name').val_(filename);
             
             // use AJAX to retrieve Revision inputs and outputs
-            $.getJSON("/api/methods/" + mid + "/").done(function(result) {
+            $.getJSON("/api/methods/" + val + "/").done(function(result) {
                 ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
                 var n_outputs = Object.keys(result.outputs).length * 8,
                     n_inputs  = Object.keys(result.inputs).length * 8;
@@ -230,48 +230,6 @@ $(function() {
             dlg.removeClass('modal_dialog').hide();
         }
     };
-    var migrateConnectors = function(from_node, to_node) {
-        if (!(from_node instanceof drydock_objects.MethodNode &&
-                to_node instanceof drydock_objects.MethodNode)) {
-            return false;
-        }
-
-        $.each(from_node.inputs, function(_, old_xput){
-            var old_dataset_idx = old_xput.dataset_idx,
-                new_xput = to_node.inputs[old_dataset_idx - 1];
-
-            if (((new_xput.structure === null && old_xput.structure == null) ||
-                 (new_xput.structure != null && old_xput.structure != null &&
-                  new_xput.structure.compounddatatype == old_xput.structure.compounddatatype)) &&
-                  from_node.in_magnets[old_dataset_idx - 1].connected.length) {
-
-                    // re-attach Connector
-                connector = from_node.in_magnets[old_dataset_idx - 1].connected.pop();
-                connector.dest = to_node.in_magnets[old_dataset_idx - 1];
-                to_node.in_magnets[old_dataset_idx - 1].connected.push(connector);
-            }
-        });
-
-        $.each(from_node.outputs, function(_, old_xput){
-            var old_dataset_idx = old_xput.dataset_idx,
-                new_xput = to_node.outputs[old_dataset_idx - 1];
-
-            if (((new_xput.structure === null && old_xput.structure == null) ||
-                 (new_xput.structure != null && old_xput.structure != null &&
-                  new_xput.structure.compounddatatype == old_xput.structure.compounddatatype)) &&
-                  from_node.out_magnets[old_dataset_idx - 1].connected.length) {
-
-                // re-attach all Connectors - note this does not reverse order any longer
-                for (i = 0; i < from_node.out_magnets[old_dataset_idx - 1].connected.length; i++) {
-                    while (from_node.out_magnets[old_dataset_idx-1].connected.length) {
-                        connector = from_node.out_magnets[old_dataset_idx-1].connected.pop();
-                        connector.source = to_node.out_magnets[old_dataset_idx-1];
-                        to_node.out_magnets[old_dataset_idx-1].connected.unshift(connector);
-                    }
-                }
-            }
-        });
-    };
     var submitMethodDialog = function(e) {
         e.preventDefault(); // stop default form submission behaviour
         
@@ -288,39 +246,30 @@ $(function() {
         // locally-defined function has access to all variables in parent function scope
         var createOrReplaceMethodNode = function(result) {
             var inputs = result.inputs,
-                outputs = result.outputs;
+                outputs = result.outputs,
+                method = new drydock_objects.MethodNode(
+                        mid, 
+                        method_family.val(), 
+                        pos.left,
+                        pos.top,
+                        method_colour.val(), 
+                        node_label,
+                        inputs,
+                        outputs);
 
             if (document.getElementById('id_method_button').value == 'Add Method') {
                 // create new MethodNode
-                canvasState.addShape(new drydock_objects.MethodNode(
-                    mid, 
-                    method_family.val(), 
-                    pos.left, pos.top,
-                    method_colour.val(), 
-                    node_label,
-                    inputs, outputs
-                ));
+                canvasState.addShape(method);
             } else {
                 // replace the selected MethodNode
                 // if user clicks anywhere else, MethodNode is deselected
                 // and Methods menu closes
 
                 // draw new node over old node
-                var old_node = canvasState.selection[0],
-                    new_node = new drydock_objects.MethodNode(
-                        mid, 
-                        method_family.val(), 
-                        old_node.x, old_node.y,
-                        method_colour.val(), 
-                        node_label, 
-                        inputs, outputs
-                    );
+                var old_node = canvasState.selection[0];
+                canvasState.replaceMethod(old_node, method);
 
-                // check if we can re-use any Connectors
-                migrateConnectors(old_node, new_node);
-                canvasState.deleteObject(); // delete selected (old Method)
-                canvasState.addShape(new_node);
-                canvasState.selection = [ new_node ];
+                canvasState.selection = [ method ];
             }
             
             dlg.removeClass('modal_dialog').hide();

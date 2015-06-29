@@ -411,7 +411,7 @@ class Pipeline(transformation.models.Transformation):
             transformation = step.transformation.find_update()
             if transformation is not None:
                 update = PipelineStepUpdate(step.step_num)
-                update.transformation = transformation
+                update.method = transformation.definite
                 updates.append(update)
             else:
                 driver = getattr(step.transformation.definite, 'driver', None)
@@ -626,7 +626,7 @@ class PipelineStepUpdate(object):
     """
     def __init__(self, step_num):
         self.step_num = step_num
-        self.transformation = None
+        self.method = None
         self.code_resource_revision = None
         self.dependencies = []
 
