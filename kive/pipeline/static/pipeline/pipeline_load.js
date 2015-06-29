@@ -425,7 +425,7 @@ var pipeline = (function(exports){
 
         var method_node_offset = self.pipeline.inputs.length;
 
-        $.each(self.pipeline.outcables, function(_, this_output){
+        $.each(self.pipeline.outcables, function(_, this_output) {
 
             // identify source Method
             var source = self.canvasState.shapes[method_node_offset + this_output.source_step - 1];
