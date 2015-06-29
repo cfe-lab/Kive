@@ -1002,7 +1002,7 @@ var drydock_objects = (function() {
             cs.dragoffx = pos.x - conn.fromX;
             cs.dragoffy = pos.y - conn.fromY;
         }
-    }
+    };
     
     my.Connector = function(out_magnet) {
         /*
@@ -1343,7 +1343,7 @@ var drydock_objects = (function() {
         // remove Connector from master list
         index = cs.connectors.indexOf(this);
         cs.connectors.splice(index, 1);
-    }
+    };
     
     my.NodeLabel = function(label, x, y) {
         this.label = label || '';
