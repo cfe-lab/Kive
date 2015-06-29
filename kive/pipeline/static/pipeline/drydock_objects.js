@@ -351,6 +351,27 @@ var drydock_objects = (function() {
     };
     my.RawNode.prototype = Object.create(my.CylinderNode.prototype);
     my.RawNode.prototype.constructor = my.RawNode;
+    my.RawNode.prototype.deleteFrom = function(cs) {
+        var out_magnets = this.out_magnets,
+            out_magnet, connector, index, i, j;
+        for (i = 0; i < out_magnets.length; i++) {
+            out_magnet = out_magnets[i];
+            for (j = 0; j < out_magnet.connected.length; j++) {
+                connector = out_magnets[i].connected[j];
+                index = cs.connectors.indexOf(connector);
+                cs.connectors.splice(index, 1);
+
+                if (connector.dest !== undefined &&
+                        connector.dest instanceof drydock_objects.Magnet) {
+                    // in-magnets can accept only one Connector
+                    connector.dest.connected = [];
+                }
+            }
+            out_magnet.connected = [];
+        }
+        index = cs.shapes.indexOf(this);
+        cs.shapes.splice(index, 1);
+    };
 
     my.CdtNode = function(pk, x, y, label) {
         /*
@@ -478,6 +499,8 @@ var drydock_objects = (function() {
                 this.x + this.dx,
                 this.y + this.dy - this.h/2 - this.offset);
     };
+
+    my.CdtNode.prototype.deleteFrom = my.RawNode.prototype.deleteFrom;
 
     /**
      * A whistle-shaped object with anchors for all the inputs and outputs.
@@ -778,6 +801,30 @@ var drydock_objects = (function() {
                 this.label,
                 this.x + this.dx + this.scoop/4,
                 this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset);
+    };
+    
+    my.MethodNode.prototype.deleteFrom = function(cs) {
+        var magnet, i, j;
+        
+        // delete Connectors terminating in this shape
+        for (i = 0; i < this.in_magnets.length; i++) {
+            magnet = this.in_magnets[i];
+            if (magnet.connected.length > 0) {
+                magnet.connected[0].deleteFrom(cs);
+            }
+        }
+
+        // delete Connectors from this shape to other nodes
+        for (i = 0; i < this.out_magnets.length; i++) {
+            magnet = this.out_magnets[i];
+            for (j = magnet.connected.length - 1; j >= 0; j--) {// this loop done in reverse so that deletions do not re-index the array
+                magnet.connected[j].deleteFrom(cs);
+            }
+        }
+
+        // remove MethodNode from list and any attached Connectors
+        var index = cs.shapes.indexOf(this);
+        cs.shapes.splice(index, 1);
     };
     
     my.Magnet = function(parent, r, attract, fill, cdt, label, offset, isOutput, pk) {
@@ -1159,6 +1206,29 @@ var drydock_objects = (function() {
         else return false;
     };
     
+    my.Connector.prototype.deleteFrom = function(cs) {
+        // remove selected Connector from list
+        var index;
+        
+        // if a cable to an output node is severed, delete the node as well
+        if (this.dest.parent instanceof drydock_objects.OutputNode) {
+            index = cs.shapes.indexOf(this.dest.parent);
+            cs.shapes.splice(index, 1);
+        } else {
+            // remove connector from destination in-magnet
+            index = this.dest.connected.indexOf(this);
+            this.dest.connected.splice(index, 1);
+        }
+
+        // remove connector from source out-magnet
+        index = this.source.connected.indexOf(this);
+        this.source.connected.splice(index, 1);
+
+        // remove Connector from master list
+        index = cs.connectors.indexOf(this);
+        cs.connectors.splice(index, 1);
+    }
+    
     my.NodeLabel = function(label, x, y) {
         this.label = label || '';
         this.x = x || 0;
@@ -1250,7 +1320,15 @@ var drydock_objects = (function() {
             cable.highlight(ctx);
         }
     };
-
+    
+    my.OutputNode.prototype.deleteFrom = function(cs) {
+        // deleting an output node is the same as deleting the cable
+        var connected_cable = this.in_magnets[0].connected;
+        if (connected_cable.length > 0) {
+            connected_cable[0].deleteFrom(cs);
+        }
+    };
+    
     my.OutputNode.prototype.debug = function(ctx) {
         this.in_magnets[0].connected[0].debug(ctx);
     };
