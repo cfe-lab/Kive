@@ -407,6 +407,10 @@ var drydock = (function() {
     };
     
     my.CanvasState.prototype.autoLayout = function() {
+        if (!this.exec_order) {
+            return false;
+        }
+        
         var x_spacing = 60,
             y_spacing = 130,
             z_drop = 20,// not implemented yet. intent is for nodes to cascade down into each other like a series of waterfalls!
@@ -1238,103 +1242,23 @@ var drydock = (function() {
         // delete selected object
         // @param objectToDelete optionally specifies which object should be deleted.
         // Otherwise just go with the current selection.
-        var mySel,
-            sel,
-            index = -1,
-            i,
-            j,
-            k, // loop counters
-            in_magnets = [],
-            in_magnet,
-            out_magnets = [],
-            out_magnet,
-            this_connector = null;
+        var sel, i;
         
         if (typeof objectToDelete !== 'undefined') {
-            mySel = [ objectToDelete ];
+            sel = [ objectToDelete ];
         } else {
-            mySel = this.selection;
+            sel = this.selection;
         }
         
-        for (k=0; k < mySel.length; k++) {
-            sel = mySel[k];
-            
-            if (sel !== null && sel !== undefined) {
-                if (sel instanceof drydock_objects.Connector) {
-                    // remove selected Connector from list
-                
-                    // if a cable to an output node is severed, delete the node as well
-                    if (sel.dest.parent instanceof drydock_objects.OutputNode) {
-                        index = this.shapes.indexOf(sel.dest.parent);
-                        this.shapes.splice(index, 1);
-                    } else {
-                        // remove connector from destination in-magnet
-                        index = sel.dest.connected.indexOf(sel);
-                        sel.dest.connected.splice(index, 1);
-                    }
-    
-                    // remove connector from source out-magnet
-                    index = sel.source.connected.indexOf(sel);
-                    sel.source.connected.splice(index, 1);
-    
-                    // remove Connector from master list
-                    index = this.connectors.indexOf(sel);
-                    this.connectors.splice(index, 1);
-                }
-                else if (sel instanceof drydock_objects.MethodNode) {
-                    // delete Connectors terminating in this shape
-                    in_magnets = sel.in_magnets;
-                    for (i = 0; i < in_magnets.length; i++) {
-                        if (in_magnets[i].connected.length > 0) {
-                            this.deleteObject(in_magnets[i].connected[0]);
-                        }
-                    }
-    
-                    // delete Connectors from this shape to other nodes
-                    out_magnets = sel.out_magnets;
-                    for (i = 0; i < out_magnets.length; i++) {
-                        for (j = out_magnets[i].connected.length; j > 0; j--) {// this loop done in reverse so that deletions do not re-index the array
-                            this.deleteObject(out_magnets[i].connected[j - 1]);
-                        }
-                    }
-    
-                    // remove MethodNode from list and any attached Connectors
-                    index = this.shapes.indexOf(sel);
-                    this.shapes.splice(index, 1);
-                }
-                else if (sel instanceof drydock_objects.OutputNode) {
-                    // deleting an output node is the same as deleting the cable
-                    this_connector = sel.in_magnets[0].connected[0];
-                    this.deleteObject(this_connector);
-                }
-                else {  // CDtNode or RawNode
-                    out_magnets = sel.out_magnets;
-                    for (i = 0; i < out_magnets.length; i++) {
-                        out_magnet = out_magnets[i];
-                        for (j = 0; j < out_magnet.connected.length; j++) {
-                            this_connector = out_magnets[i].connected[j];
-                            index = this.connectors.indexOf(this_connector);
-                            this.connectors.splice(index, 1);
-    
-                            if (this_connector.dest !== undefined &&
-                                    this_connector.dest instanceof drydock_objects.Magnet) {
-                                // in-magnets can accept only one Connector
-                                this_connector.dest.connected = [];
-                            }
-                        }
-                        out_magnet.connected = [];
-                    }
-                    index = this.shapes.indexOf(sel);
-                    this.shapes.splice(index, 1);
-                }
-            
-                // see if this has changed the execution order
-                this.testExecutionOrder();
-    
-                this.selection = [];
-                this.valid = false; // re-draw canvas to make Connector disappear
+        for (i = 0; i < sel.length; i++) {
+            if (typeof sel[i] == 'object' && typeof sel[i].deleteFrom == 'function') {
+                sel[i].deleteFrom(this);
             }
         }
+        // see if this has changed the execution order
+        this.testExecutionOrder();
+        this.selection = [];
+        this.valid = false; // re-draw canvas to make Connector disappear
     };
     
     my.CanvasState.prototype.findMethodNode = function(method_pk) {
