@@ -15,7 +15,6 @@ import zipfile
 import tarfile
 import StringIO
 from zipfile import ZipFile
-from tarfile import TarFile
 
 from constants import maxlengths
 """
@@ -274,6 +273,8 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
 
     def clean_dataset_file(self):
         files = []
+
+        # First try to unzip the archive
         try:
             archive = ZipFile(self.cleaned_data["dataset_file"])
 
@@ -281,29 +282,44 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
                 f = archive.open(filename)
                 streamable = StringIO.StringIO(f.read())
                 streamable.name = f.name.replace('/', '_')
+#                streamable.name = f.name.split('/')[-1]
                 f.close()
                 return streamable
 
             def should_include(filename):
-                info = archive.getinfo(filename)
-                return '/' not in info.filename
+                # Bail on directories
+                if filename.endswith("/"):
+                    return False
+
+                # And on hidden files
+                if filename.split("/")[-1].startswith("."):
+                    return False
+
+                return True
 
             files = [get_filestream(file_name) for file_name in archive.namelist() if should_include(file_name)]
 
         except zipfile.BadZipfile:
             # Bad zip? Try tar why not
             try:
-                self.cleaned_data["dataset_file"].seek(0)
+                self.cleaned_data["dataset_file"].seek(0)  # Reset the file so we can read it again
                 archive = tarfile.open(name=None, mode='r', fileobj=self.cleaned_data["dataset_file"])
 
                 def get_filestream(archive_member):
                     xfile = archive.extractfile(archive_member)
                     if xfile is not None:
-                        xfile.name = xfile.name[2:]
+                        xfile.name = xfile.name[2:].replace('/', '_')
                     return xfile
 
                 def should_include(name):
-                    return not(name[2:].startswith('.') or '/' in name[2:])
+                    name = name[2:]
+                    if name.endswith("/"):
+                        return False
+
+                    # And on hidden files
+                    if name.split("/")[-1].startswith("."):
+                        return False
+                    return True
 
                 files = [get_filestream(member) for member in archive.getmembers() if should_include(member.name)]
                 files = filter(lambda x: x is not None, files)
