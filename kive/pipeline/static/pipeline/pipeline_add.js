@@ -493,9 +493,16 @@ $(function() {
             family_pk = $('#id_family_pk').val(),
             revision_name = $('#id_revision_name').val(),
             revision_desc = $('#id_revision_desc').val(),
-            users_allowed = $("#id_permissions_0").val(),
-            groups_allowed = $("#id_permissions_1").val();
+            users_allowed = [],
+            groups_allowed = [];
 
+        $("#id_permissions_0 option:selected").each(function() {
+            users_allowed.push($(this).text());
+        });
+        $("#id_permissions_1 option:selected").each(function() {
+            groups_allowed.push($(this).text());
+        });
+        
         // Form validation
         if (!is_revision) {
             if (family_name === '') {
