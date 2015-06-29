@@ -99,39 +99,25 @@ var drydock = (function() {
     };
     
     my.CanvasState.prototype.getMouseTarget = function(mx, my) {
-        var shape, shapes = this.shapes;
-        var connectors = this.connectors;
+        var shapes = this.shapes,
+            connectors = this.connectors;
     
         // did we click on a shape?
+        // check shapes in reverse order
         for (var i = shapes.length - 1; i >= 0; i--) {
-            shape = shapes[i];
-            
-            // check shapes in reverse order
-            if (shape.contains(mx, my)) {
-                // are we clicking on an out-magnet?
-                for (var j = 0; j < shape.out_magnets.length; j++) {
-                    if (shape.out_magnets[j].contains(mx, my)) {
-                        return shape.out_magnets[j];
-                    }
-                }
-                
-                // are we clicking an in-magnet?
-                for (j = 0; j < shape.in_magnets.length; j++) {
-                    if (shape.in_magnets[j].contains(mx, my)) {
-                        return shape.in_magnets[j];
-                    }
-                }
-                
-                // otherwise return the shape object.
-                return shape;
+            if (shapes[i].contains(mx, my)) {
+                // each shape checks to see if its own magnets were clicked
+                return shapes[i].getMouseTarget(mx, my, true);
             }
         }
         
         // did we click on a Connector?
         // check this -after- checking shapes, as the algorithm is slower.
-        for (i = connectors.length - 1; i >= 0; i--)
-            if (connectors[i].contains(mx, my, 5))
+        for (i = connectors.length - 1; i >= 0; i--) {
+            if (connectors[i].contains(mx, my, 5)) {
                 return connectors[i];
+            }
+        }
         
         return false;
     };
@@ -139,11 +125,10 @@ var drydock = (function() {
     my.CanvasState.prototype.doDown = function(e) {
         var pos = this.getPos(e),
             mx = pos.x, my = pos.y,
-            shift = e.shiftKey,
             mySel = this.getMouseTarget(mx, my);
         
         if (mySel === false) {
-            if (!shift) {
+            if (!e.shiftKey) {
                 // nothing clicked
                 this.selection = [];
                 this.valid = false;
@@ -152,86 +137,13 @@ var drydock = (function() {
             return false;
         }
         
-        // Clicking on an object that is already selected? Start dragging.
-        if (!shift && this.selection.indexOf(mySel) > -1) {
-            this.dragstart = { x: mx, y: my };
-            this.dragging = true;
-            this.valid = false; // activate canvas
-            return;
+        // Check if object is already selected (or if shift key is held)
+        if (e.shiftKey || this.selection.indexOf(mySel) == -1) {
+            mySel.doDown(this, e);
         }
-        
-        if (mySel instanceof drydock_objects.Magnet) {
-            if (mySel.isInput) {
-                if (mySel.connected.length > 0) {
-                    mySel = mySel.connected[0]; // select connector instead
-                } else {
-                    mySel = mySel.parent; // select magnet's parent instead
-                }
-            }
-            else if (shift && this.selection.length !== 0 || ! this.can_edit){
-                // out magnet that can't create a connector
-                mySel = mySel.parent;
-            }
-        }
-        if (mySel instanceof drydock_objects.Connector &&
-                mySel.dest &&
-                mySel.dest.parent instanceof drydock_objects.OutputNode) {
-            // if the cable leads to an output node, then act as if
-            // the output node itself was clicked...
-            // not sure if this is the ideal behaviour...
-            // maybe output nodes should just disappear when they are
-            // disconnected? -JN
-            mySel = mySel.dest.parent;
-        }
-        if (mySel instanceof drydock_objects.Magnet) {
-            // The only way to get here is with an out magnet we want to create
-            // a connector for.
-            var conn = new drydock_objects.Connector(mySel);
-            this.connectors.push(conn);
-            mySel.connected.push(conn);
-            this.selection = [ conn ];
-            this.dragoffx = mx - conn.fromX;
-            this.dragoffy = my - conn.fromY;
-        }
-        else if (mySel instanceof drydock_objects.Connector) {
-            if (!shift || this.selection.length === 0) {
-                this.selection = [ mySel ];
-                if(this.can_edit){
-                    this.dragoffx = this.dragoffy = 0;
-                } else {
-                    this.dragging = false;
-                    return;
-                }
-            }
-        }
-        else {
-            // this shape is now on top.
-            var i = this.shapes.indexOf(mySel);
-            this.shapes.push(this.shapes.splice(i,1)[0]);
-        
-            // moving the shape
-            this.dragoffx = mx - mySel.x;
-            this.dragoffy = my - mySel.y;
-        
-            var sel_stack_ix = this.selection.indexOf(mySel);
-        
-            if (shift && sel_stack_ix > -1) {
-                this.selection.splice(sel_stack_ix,1);
-            } else if (shift) {
-                this.selection.push(mySel);
-            } else {
-                this.selection = [ mySel ];
-            }
-        
-            if (mySel instanceof drydock_objects.MethodNode) {
-                $('#id_method_button').val('Revise Method');
-            }
-        }
-        
-        this.dragstart = { x: mx, y: my };
+        this.dragstart = pos;
         this.dragging = true;
         this.valid = false; // activate canvas
-        return;
     };
     
     my.CanvasState.prototype.doMove = function(e) {
@@ -749,9 +661,9 @@ var drydock = (function() {
     
     my.CanvasState.prototype.doUp = function(e) {
         this.valid = false;
-        if (this.$dialog === undefined) {
-            this.$dialog = $("#dialog_form");
-        }
+        this.$dialog = this.$dialog || $("#dialog_form");
+        $(this.canvas).css("cursor", "auto");
+
         var index,
             sel,
             i,
@@ -764,7 +676,6 @@ var drydock = (function() {
             in_magnet,
             dialog_height = this.$dialog[0].offsetHeight,
             dialog_width = this.$dialog[0].offsetWidth;
-        $(this.canvas).css("cursor", "auto");
         
         // Collision detection!
         if (this.dragging && this.selection.length > 0) {
@@ -801,17 +712,13 @@ var drydock = (function() {
                         index = this.connectors.indexOf(connector);
                         this.connectors.splice(index, 1);
                         this.selection = [];
-                        this.valid = false;
                     } else {
                         // valid Connector, assign non-null value
-                        // make sure label is not a duplicate
-                        
-                        new_output_label = this.uniqueShapeName(connector.source.label, drydock_objects.OutputNode);
-                        out_node = connector.spawnOutputNode(new_output_label)
-                        this.addShape(out_node);
+                        new_output_label = this.uniqueNodeName(connector.source.label, drydock_objects.OutputNode);
+                        out_node = connector.spawnOutputNode(new_output_label);
                         out_node.y = this.outputZone.y + this.outputZone.h + out_node.h/2 + out_node.r2;// push out of output zone
                         
-                        this.valid = false;
+                        this.addShape(out_node);
     
                         // spawn dialog for output label
                         this.$dialog
@@ -833,7 +740,6 @@ var drydock = (function() {
                     connector.source.connected.splice(index, 1);
                     
                     this.selection = [];
-                    this.valid = false; // redraw canvas to remove this Connector
                 }
             
             } else if (connector.dest instanceof drydock_objects.Magnet) {
@@ -855,17 +761,11 @@ var drydock = (function() {
     
         // turn off all in-magnets
         for (i = 0; i < this.shapes.length; i++) {
-            if (this.shapes[i].in_magnets instanceof Array) {
-                for (j = 0; j < this.shapes[i].in_magnets.length; j++) {
-                    in_magnet = this.shapes[i].in_magnets[j];
-                    in_magnet.fill = '#fff';
-                    in_magnet.acceptingConnector = false;
-                }
-            }
+            this.shapes[i].unlightMagnets();
         }
     };
     
-    my.CanvasState.prototype.uniqueShapeName = function(desired_name, object_class) {
+    my.CanvasState.prototype.uniqueNodeName = function(desired_name, object_class) {
         var suffix = 0,
             name = desired_name,
             shape;
@@ -881,7 +781,7 @@ var drydock = (function() {
             }
         }
         return name;
-    }
+    };
     
     my.CanvasState.prototype.contextMenu = function(e) {
         var pos = this.getPos(e),

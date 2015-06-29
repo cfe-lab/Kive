@@ -184,9 +184,68 @@ var drydock_objects = (function() {
     };
     
     /**
+     * A base class for all nodes. (RawNode, CdtNode, MethodNode, OutputNode)
+     * Doesn't do much yet.
+     */
+    my.Node = function() {};
+    my.Node.prototype.unlightMagnets = function() {
+        var in_magnet;
+        if (this.in_magnets instanceof Array) {
+            for (var j = 0; j < this.in_magnets.length; j++) {
+                in_magnet = this.in_magnets[j];
+                in_magnet.fill = '#fff';
+                in_magnet.acceptingConnector = false;
+            }
+        }
+    };
+    my.Node.prototype.getMouseTarget = function(mx, my, skip_check) {
+        if (skip_check || this.contains(mx,my)) {
+            // are we clicking on an out-magnet?
+            for (var j = 0; j < this.out_magnets.length; j++) {
+                if (this.out_magnets[j].contains(mx, my)) {
+                    return this.out_magnets[j];
+                }
+            }
+        
+            // are we clicking an in-magnet?
+            for (j = 0; j < this.in_magnets.length; j++) {
+                if (this.in_magnets[j].contains(mx, my)) {
+                    return this.in_magnets[j];
+                }
+            }
+        
+            // otherwise return the shape object.
+            return this;
+        }
+    };
+    my.Node.prototype.doDown = function(cs, e) {
+        var i = cs.shapes.indexOf(this),
+            sel = cs.selection,
+            sel_stack_ix = sel.indexOf(this),
+            pos = cs.getPos(e);
+        
+        // this shape is now on top.
+        cs.shapes.push(cs.shapes.splice(i,1)[0]);
+        
+        // moving the shape
+        cs.dragoffx = pos.x - this.x;
+        cs.dragoffy = pos.y - this.y;
+    
+        if (e.shiftKey && sel_stack_ix > -1) {
+            sel.splice(sel_stack_ix,1);
+        } else if (e.shiftKey) {
+            sel.push(this);
+        } else {
+            cs.selection = [ this ];
+        }
+    };
+    
+    /**
      * A base class for both cylindrical nodes: RawNode and OutputNode.
      */
     my.CylinderNode = function(x, y, label) {
+        my.Node.call(this);
+        
         /*
         Node representing an output.
         Rendered as a cylinder.
@@ -206,6 +265,8 @@ var drydock_objects = (function() {
         this.in_magnets = [];
         this.out_magnets = [];
     };
+    my.CylinderNode.prototype = Object.create(my.Node.prototype);
+    my.CylinderNode.prototype.constructor = my.CylinderNode;
     
     my.CylinderNode.prototype.draw = function(ctx) {
         var cx = this.x + this.dx,
@@ -374,6 +435,7 @@ var drydock_objects = (function() {
     };
 
     my.CdtNode = function(pk, x, y, label) {
+        my.Node.call(this);
         /*
         Node represents a Compound Datatype (CSV structured data).
         Rendered as a square shape.
@@ -392,6 +454,8 @@ var drydock_objects = (function() {
         this.in_magnets = [];
         this.out_magnets = [ new my.Magnet(this, 5, 2, "white", this.pk, this.label, null, true, pk) ];
     };
+    my.CdtNode.prototype = Object.create(my.Node.prototype);
+    my.CdtNode.prototype.constructor = my.CdtNode;
     
     my.CdtNode.prototype.draw = function(ctx) {
         var cx = this.x + this.dx,
@@ -519,6 +583,7 @@ var drydock_objects = (function() {
      *  keys in statusColorMap
      */
     my.MethodNode = function(pk, family, x, y, fill, label, inputs, outputs, status) {
+        my.Node.call(this);
         var self = this;
 
         this.pk = pk;
@@ -591,6 +656,8 @@ var drydock_objects = (function() {
             self.out_magnets.push(magnet);
         });
     };
+    my.MethodNode.prototype = Object.create(my.Node.prototype);
+    my.MethodNode.prototype.constructor = my.MethodNode;
     
     my.MethodNode.prototype.buildBodyPath = function(ctx) {
         var vertices = this.getVertices();
@@ -803,6 +870,11 @@ var drydock_objects = (function() {
                 this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset);
     };
     
+    my.MethodNode.prototype.doDown = function(cs, e) {
+        my.Node.prototype.doDown.call(this, cs, e);
+        $('#id_method_button').val('Revise Method');
+    };
+    
     my.MethodNode.prototype.deleteFrom = function(cs) {
         var magnet, i, j;
         
@@ -908,6 +980,29 @@ var drydock_objects = (function() {
         var dy = this.y - my;
         return Math.sqrt(dx*dx + dy*dy) <= this.r + this.attract;
     };
+    
+    my.Magnet.prototype.doDown = function(cs, e) {
+        if (this.isInput) {
+            if (this.connected.length > 0) {
+                this.connected[0].doDown(cs, e); // select connector instead
+            } else {
+                this.parent.doDown(cs, e); // select magnet's parent instead
+            }
+        } else if (e.shiftKey && cs.selection.length !== 0 || !cs.can_edit){
+            // out magnet that can't create a connector
+            this.parent.doDown(cs, e);
+        } else {
+            // The only way to get here is with an out magnet 
+            // we want to create a connector for.
+            var pos = cs.getPos(e),
+                conn = new my.Connector(this);
+            cs.connectors.push(conn);
+            this.connected.push(conn);
+            cs.selection = [ conn ];
+            cs.dragoffx = pos.x - conn.fromX;
+            cs.dragoffy = pos.y - conn.fromY;
+        }
+    }
     
     my.Connector = function(out_magnet) {
         /*
@@ -1211,6 +1306,20 @@ var drydock_objects = (function() {
         this.dest = out_node.in_magnets[0];
         this.dest.connected = [ this ];
         return out_node;
+    };
+    
+    my.Connector.prototype.doDown = function(cs, e) {
+        if (this.dest && this.dest.parent instanceof my.OutputNode) {
+            this.dest.parent.doDown(cs, e);
+        } else if (!e.shiftKey || cs.selection.length === 0) {
+            cs.selection = [ this ];
+            if (cs.can_edit) {
+                cs.dragoffx = cs.dragoffy = 0;
+            } else {
+                cs.dragging = false;
+                cs.selection = [];
+            }
+        }
     };
     
     my.Connector.prototype.deleteFrom = function(cs) {
