@@ -14,10 +14,11 @@ import portal.signals
 
 
 class StagedFile(models.Model):
+    UPLOAD_DIR = "StagedFiles"
 
     uploaded_file = models.FileField(
         "Uploaded file",
-        upload_to="StagedFiles",
+        upload_to=UPLOAD_DIR,
         help_text="Uploaded file held for further server-side processing")
 
     user = models.ForeignKey(

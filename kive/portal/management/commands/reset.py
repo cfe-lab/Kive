@@ -7,6 +7,10 @@ from django.core.management import call_command
 
 import kive.settings  # @UnresolvedImport
 import file_access_utils
+import method.models
+import archive.models
+import datachecking.models
+import portal.models
 
 
 class Command(BaseCommand):
@@ -17,14 +21,15 @@ class Command(BaseCommand):
     
     def handle(self, *args, **options):
         fixture = options['load']
-        
-        targets = ["CodeResources",
-                   "Datasets",
-                   "Logs",
-                   "Sandboxes",
-                   "VerificationLogs",
-                   "VerificationScripts",
-                   "StagedFiles"]
+
+        targets = [
+            method.models.CodeResourceRevision.UPLOAD_DIR,
+            archive.models.Dataset.UPLOAD_DIR,
+            archive.models.MethodOutput.UPLOAD_DIR,
+            datachecking.models.VerificationLog.UPLOAD_DIR,
+            portal.models.StagedFile.UPLOAD_DIR,
+            kive.settings.SANDBOX_PATH
+        ]
         for target in targets:
             target_path = os.path.join(kive.settings.MEDIA_ROOT, target)
             if os.path.isdir(target_path):
@@ -39,7 +44,7 @@ class Command(BaseCommand):
 
         # Create the Sandboxes directory specially because it has to have
         # special permissions added to it.
-        sandboxes_path = os.path.join(kive.settings.MEDIA_ROOT, "Sandboxes")
+        sandboxes_path = os.path.join(kive.settings.MEDIA_ROOT, kive.settings.SANDBOX_PATH)
         os.mkdir(sandboxes_path)
         file_access_utils.configure_sandbox_permissions(sandboxes_path)
 

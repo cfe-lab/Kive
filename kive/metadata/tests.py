@@ -19,7 +19,6 @@ from librarian.models import SymbolicDataset
 from datachecking.models import VerificationLog
 from portal.models import StagedFile
 from constants import datatypes, CDTs
-from metadata.forms import AccessControlForm
 
 
 samplecode_path = "../samplecode"

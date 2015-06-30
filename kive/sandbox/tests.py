@@ -7,7 +7,6 @@ from django.contrib.auth.models import User
 from django.core.files import File
 from django.test import TestCase
 
-from archive.models import MethodOutput, Dataset
 from constants import datatypes
 from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
 from librarian.models import SymbolicDataset, DatasetStructure
@@ -16,114 +15,106 @@ from method.models import CodeResource, CodeResourceRevision, Method, MethodFami
 from method.tests import samplecode_path
 from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
+from metadata.tests import clean_up_all_files
+
+
+def execute_tests_environment_setup(case):
+    # Users + method/pipeline families
+    case.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+    case.myUser.save()
+    case.myUser.groups.add(everyone_group())
+    case.myUser.save()
+
+    case.mf = MethodFamily(name="self.mf",description="self.mf desc", user=case.myUser)
+    case.mf.save()
+    case.pf = PipelineFamily(name="self.pf", description="self.pf desc", user=case.myUser)
+    case.pf.save()
+
+    # Code on file system
+    case.mA_cr = CodeResource(name="mA_CR", description="self.mA_cr desc", filename="mA.py", user=case.myUser)
+    case.mA_cr.save()
+    case.mA_crr = CodeResourceRevision(coderesource=case.mA_cr, revision_name="v1", revision_desc="desc",
+                                       user=case.myUser)
+    with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
+        case.mA_crr.content_file.save("generic_script.py", File(f))
+    case.mA_crr.save()
+
+    # Basic DTs
+    case.string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
+    case.int_dt = Datatype.objects.get(pk=datatypes.INT_PK)
+
+    # Basic CDTs
+    case.pX_in_cdt = CompoundDatatype(user=case.myUser)
+    case.pX_in_cdt.save()
+    case.pX_in_cdtm_1 = case.pX_in_cdt.members.create(datatype=case.int_dt, column_name="pX_a", column_idx=1)
+    case.pX_in_cdtm_2 = case.pX_in_cdt.members.create(datatype=case.int_dt, column_name="pX_b", column_idx=2)
+    case.pX_in_cdtm_3 = case.pX_in_cdt.members.create(datatype=case.string_dt, column_name="pX_c", column_idx=3)
+
+    case.mA_in_cdt = CompoundDatatype(user=case.myUser)
+    case.mA_in_cdt.save()
+    case.mA_in_cdtm_1 = case.mA_in_cdt.members.create(datatype=case.string_dt, column_name="a", column_idx=1)
+    case.mA_in_cdtm_2 = case.mA_in_cdt.members.create(datatype=case.int_dt, column_name="b", column_idx=2)
+
+    case.mA_out_cdt = CompoundDatatype(user=case.myUser)
+    case.mA_out_cdt.save()
+    case.mA_out_cdtm_1 = case.mA_out_cdt.members.create(datatype=case.int_dt, column_name="c", column_idx=1)
+    case.mA_out_cdtm_2 = case.mA_out_cdt.members.create(datatype=case.string_dt, column_name="d", column_idx=2)
+
+    case.symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
+                                                        "input_for_test_C_twostep_with_subpipeline.csv"),
+                                           user=case.myUser, cdt=case.pX_in_cdt,
+                                           name="pX_in_symDS", description="input to pipeline pX")
+    case.rawDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
+                                                        "input_for_test_C_twostep_with_subpipeline.csv"),
+                                           user=case.myUser, cdt=None, name="pX_in_symDS",
+                                           description="input to pipeline pX")
+
+    # Method + input/outputs
+    case.mA = Method(revision_name="mA", revision_desc="mA_desc", family=case.mf, driver=case.mA_crr,
+                     user=case.myUser)
+    case.mA.save()
+    case.mA_in = case.mA.create_input(compounddatatype=case.mA_in_cdt, dataset_name="mA_in", dataset_idx=1)
+    case.mA_out = case.mA.create_output(compounddatatype=case.mA_out_cdt, dataset_name="mA_out", dataset_idx=1)
+
+    # Define pipeline containing the method, and its input + outcables
+    case.pX = Pipeline(family=case.pf, revision_name="pX_revision", revision_desc="X",
+                       user=case.myUser)
+    case.pX.save()
+    case.X1_in = case.pX.create_input(compounddatatype=case.pX_in_cdt, dataset_name="pX_in", dataset_idx=1)
+    case.step_X1 = case.pX.steps.create(transformation=case.mA, step_num=1)
+
+    # Custom cable from pipeline input to method
+    case.cable_X1_A1 = case.step_X1.cables_in.create(dest=case.mA_in, source_step=0, source=case.X1_in)
+    case.wire1 = case.cable_X1_A1.custom_wires.create(source_pin=case.pX_in_cdtm_2, dest_pin=case.mA_in_cdtm_2)
+    case.wire2 = case.cable_X1_A1.custom_wires.create(source_pin=case.pX_in_cdtm_3, dest_pin=case.mA_in_cdtm_1)
+
+    # Pipeline outcables
+    case.X1_outcable = case.pX.create_outcable(output_name="pX_out", output_idx=1, source_step=1,
+                                               source=case.mA_out)
+    case.pX.create_outputs()
+
+    # Pipeline with raw input.
+    pX_raw = Pipeline(family=case.pf, revision_name="pX_raw", revision_desc="X", user=case.myUser)
+    pX_raw.save()
+    mA_raw = Method(revision_name="mA_raw", revision_desc="mA_desc", family=case.mf, driver=case.mA_crr,
+                    user=case.myUser)
+    mA_raw.save()
+    mA_in_raw = mA_raw.create_input(compounddatatype=None, dataset_name="mA_in", dataset_idx=1)
+    mA_out_raw = mA_raw.create_output(compounddatatype=case.mA_out_cdt, dataset_name="mA_out", dataset_idx=1)
+    X1_in_raw = pX_raw.create_input(compounddatatype=None, dataset_name="pX_in", dataset_idx=1)
+    step_X1_raw = pX_raw.steps.create(transformation=mA_raw, step_num=1)
+    step_X1_raw.cables_in.create(dest=mA_in_raw, source_step=0, source=X1_in_raw)
+    pX_raw.create_outcable(output_name="pX_out", output_idx=1, source_step=1, source=mA_out_raw)
+    pX_raw.create_outputs()
 
 
 class ExecuteTestsBase(TestCase):
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
-        # Users + method/pipeline families
-        self.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
-        self.myUser.save()
-        self.myUser.groups.add(everyone_group())
-        self.myUser.save()
-
-        self.mf = MethodFamily(name="self.mf",description="self.mf desc", user=self.myUser)
-        self.mf.save()
-        self.pf = PipelineFamily(name="self.pf", description="self.pf desc", user=self.myUser)
-        self.pf.save()
-
-        # Code on file system
-        self.mA_cr = CodeResource(name="mA_CR", description="self.mA_cr desc", filename="mA.py", user=self.myUser)
-        self.mA_cr.save()
-        self.mA_crr = CodeResourceRevision(coderesource=self.mA_cr, revision_name="v1", revision_desc="desc",
-                                           user=self.myUser)
-        with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
-            self.mA_crr.content_file.save("generic_script.py", File(f))
-        self.mA_crr.save()
-
-        # Basic DTs
-        self.string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
-        self.int_dt = Datatype.objects.get(pk=datatypes.INT_PK)
-
-        # Basic CDTs
-        self.pX_in_cdt = CompoundDatatype(user=self.myUser)
-        self.pX_in_cdt.save()
-        self.pX_in_cdtm_1 = self.pX_in_cdt.members.create(datatype=self.int_dt, column_name="pX_a", column_idx=1)
-        self.pX_in_cdtm_2 = self.pX_in_cdt.members.create(datatype=self.int_dt, column_name="pX_b", column_idx=2)
-        self.pX_in_cdtm_3 = self.pX_in_cdt.members.create(datatype=self.string_dt, column_name="pX_c", column_idx=3)
-
-        self.mA_in_cdt = CompoundDatatype(user=self.myUser)
-        self.mA_in_cdt.save()
-        self.mA_in_cdtm_1 = self.mA_in_cdt.members.create(datatype=self.string_dt, column_name="a", column_idx=1)
-        self.mA_in_cdtm_2 = self.mA_in_cdt.members.create(datatype=self.int_dt, column_name="b", column_idx=2)
-
-        self.mA_out_cdt = CompoundDatatype(user=self.myUser)
-        self.mA_out_cdt.save()
-        self.mA_out_cdtm_1 = self.mA_out_cdt.members.create(datatype=self.int_dt, column_name="c", column_idx=1)
-        self.mA_out_cdtm_2 = self.mA_out_cdt.members.create(datatype=self.string_dt, column_name="d", column_idx=2)
-
-        self.symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
-                                                            "input_for_test_C_twostep_with_subpipeline.csv"),
-                                               user=self.myUser, cdt=self.pX_in_cdt,
-                                               name="pX_in_symDS", description="input to pipeline pX")
-        self.rawDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
-                                                            "input_for_test_C_twostep_with_subpipeline.csv"),
-                                               user=self.myUser, cdt=None, name="pX_in_symDS",
-                                               description="input to pipeline pX")
-
-        # Method + input/outputs
-        self.mA = Method(revision_name="mA", revision_desc="mA_desc", family=self.mf, driver=self.mA_crr,
-                         user=self.myUser)
-        self.mA.save()
-        self.mA_in = self.mA.create_input(compounddatatype=self.mA_in_cdt, dataset_name="mA_in", dataset_idx=1)
-        self.mA_out = self.mA.create_output(compounddatatype=self.mA_out_cdt, dataset_name="mA_out", dataset_idx=1)
-
-        # Define pipeline containing the method, and its input + outcables
-        self.pX = Pipeline(family=self.pf, revision_name="pX_revision", revision_desc="X",
-                           user=self.myUser)
-        self.pX.save()
-        self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt, dataset_name="pX_in", dataset_idx=1)
-        self.step_X1 = self.pX.steps.create(transformation=self.mA, step_num=1)
-
-        # Custom cable from pipeline input to method
-        self.cable_X1_A1 = self.step_X1.cables_in.create(dest=self.mA_in, source_step=0, source=self.X1_in)
-        self.wire1 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_2, dest_pin=self.mA_in_cdtm_2)
-        self.wire2 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_3, dest_pin=self.mA_in_cdtm_1)
-
-        # Pipeline outcables
-        self.X1_outcable = self.pX.create_outcable(output_name="pX_out", output_idx=1, source_step=1,
-                                                   source=self.mA_out)
-        self.pX.create_outputs()
-
-        # Pipeline with raw input.
-        pX_raw = Pipeline(family=self.pf, revision_name="pX_raw", revision_desc="X", user=self.myUser)
-        pX_raw.save()
-        mA_raw = Method(revision_name="mA_raw", revision_desc="mA_desc", family=self.mf, driver=self.mA_crr,
-                        user=self.myUser)
-        mA_raw.save()
-        mA_in_raw = mA_raw.create_input(compounddatatype=None, dataset_name="mA_in", dataset_idx=1)
-        mA_out_raw = mA_raw.create_output(compounddatatype=self.mA_out_cdt, dataset_name="mA_out", dataset_idx=1)
-        X1_in_raw = pX_raw.create_input(compounddatatype=None, dataset_name="pX_in", dataset_idx=1)
-        step_X1_raw = pX_raw.steps.create(transformation=mA_raw, step_num=1)
-        step_X1_raw.cables_in.create(dest=mA_in_raw, source_step=0, source=X1_in_raw)
-        pX_raw.create_outcable(output_name="pX_out", output_idx=1, source_step=1, source=mA_out_raw)
-        pX_raw.create_outputs()
+        execute_tests_environment_setup(self)
 
     def tearDown(self):
-
-        for crr in CodeResourceRevision.objects.all():
-            crr.content_file.close()
-            crr.content_file.delete()
-
-        for method_out in MethodOutput.objects.all():
-            method_out.output_log.close()
-            method_out.output_log.delete()
-            method_out.error_log.close()
-            method_out.error_log.delete()
-
-        for dataset in Dataset.objects.all():
-            dataset.delete()
+        clean_up_all_files()
 
 
 class ExecuteTests(ExecuteTestsBase):
@@ -398,8 +389,7 @@ class ExecuteTests(ExecuteTestsBase):
             lambda: sandbox.execute_pipeline(pipeline, inputs, sandbox.sandbox_path, runstep))
 
 
-class SandboxTests(ExecuteTests):
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
+class SandboxTests(ExecuteTestsBase):
 
     def test_sandbox_no_input(self):
         """

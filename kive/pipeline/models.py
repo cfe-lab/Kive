@@ -409,7 +409,8 @@ class Pipeline(transformation.models.Transformation):
         for step in self.steps.all():
             update = None
             transformation = step.transformation.find_update()
-            if transformation is not None:
+            #TODO: handle nested pipelines
+            if transformation is not None and transformation.is_method:
                 update = PipelineStepUpdate(step.step_num)
                 update.method = transformation.definite
                 updates.append(update)

@@ -2647,6 +2647,13 @@ class PipelineOutputCableTests(PipelineTestCase):
         """Deleting a PipelineOutputCable is possible."""
         self.assertIsNone(PipelineOutputCable.objects.first().delete())
 
+    def test_pipeline_trivial_cable(self):
+        """
+        A trivial cable should have is_trivial() = True.
+        """
+        outcable = self.DNAcompv1_p.outcables.first()  # only one outcable
+        self.assertEqual(outcable.is_trivial(), True)
+
 
 class PipelineStepRawDeleteTests(PipelineTestCase):
 
