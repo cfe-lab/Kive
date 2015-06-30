@@ -202,7 +202,7 @@ def create_sequence_manipulation_environment(case):
                                         revision_desc="third version", user=case.user_alice)
     case.pipeline_revcomp_v3.save()
     create_linear_pipeline(case.pipeline_revcomp_v3, [case.method_reverse, case.method_complement],
-                                 "lab_data", "revcomped_lab_data")
+                           "lab_data", "revcomped_lab_data")
     case.pipeline_revcomp_v3.steps.get(step_num=1).add_deletion(case.method_reverse.outputs.first())
     case.pipeline_revcomp_v3.create_outputs()
 

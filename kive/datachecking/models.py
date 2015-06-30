@@ -304,6 +304,8 @@ class VerificationLog(stopwatch.models.Stopwatch):
     A record of running a verification Method to check CustomConstraints
     on a Dataset.
     """
+    UPLOAD_DIR = "VerificationLogs"
+
     # The log of the content check where we performed this verification.
     contentchecklog = models.ForeignKey("datachecking.ContentCheckLog", related_name="verification_logs")
     # The compound datatype member which was verified.
@@ -312,8 +314,8 @@ class VerificationLog(stopwatch.models.Stopwatch):
     # completed yet.
     return_code = models.IntegerField(null=True)
     # The verification method's standard output and standard error.
-    output_log = models.FileField(upload_to="VerificationLogs")
-    error_log = models.FileField(upload_to="VerificationLogs")
+    output_log = models.FileField(upload_to=UPLOAD_DIR)
+    error_log = models.FileField(upload_to=UPLOAD_DIR)
 
     # Implicit through inheritance: start_time, end_time.
 

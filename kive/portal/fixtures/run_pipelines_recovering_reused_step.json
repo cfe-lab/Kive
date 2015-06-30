@@ -1,0 +1,4026 @@
+[
+    {
+        "fields": {
+            "datatype": 8, 
+            "ruletype": "regexp", 
+            "rule": "^[ACGTacgt]*$"
+        }, 
+        "model": "metadata.basicconstraint", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "datatype": 9, 
+            "ruletype": "regexp", 
+            "rule": "^[ACGUacgu]*$"
+        }, 
+        "model": "metadata.basicconstraint", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 1, 
+            "compounddatatype": 5, 
+            "blankable": false, 
+            "column_name": "label"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "datatype": 4, 
+            "column_idx": 2, 
+            "compounddatatype": 5, 
+            "blankable": false, 
+            "column_name": "integer"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "datatype": 3, 
+            "column_idx": 3, 
+            "compounddatatype": 5, 
+            "blankable": false, 
+            "column_name": "float"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "datatype": 2, 
+            "column_idx": 4, 
+            "compounddatatype": 5, 
+            "blankable": false, 
+            "column_name": "bool"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "datatype": 9, 
+            "column_idx": 5, 
+            "compounddatatype": 5, 
+            "blankable": false, 
+            "column_name": "rna"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 1, 
+            "compounddatatype": 6, 
+            "blankable": false, 
+            "column_name": "label"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "datatype": 8, 
+            "column_idx": 2, 
+            "compounddatatype": 6, 
+            "blankable": false, 
+            "column_name": "PBMCseq"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "datatype": 9, 
+            "column_idx": 3, 
+            "compounddatatype": 6, 
+            "blankable": false, 
+            "column_name": "PLAseq"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "datatype": 8, 
+            "column_idx": 1, 
+            "compounddatatype": 7, 
+            "blankable": false, 
+            "column_name": "SeqToComplement"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 15
+    }, 
+    {
+        "fields": {
+            "datatype": 8, 
+            "column_idx": 1, 
+            "compounddatatype": 8, 
+            "blankable": false, 
+            "column_name": "ComplementedSeq"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 16
+    }, 
+    {
+        "fields": {
+            "datatype": 9, 
+            "column_idx": 1, 
+            "compounddatatype": 9, 
+            "blankable": false, 
+            "column_name": "SeqToComplement"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "datatype": 9, 
+            "column_idx": 1, 
+            "compounddatatype": 10, 
+            "blankable": false, 
+            "column_name": "ComplementedSeq"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 18
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 1, 
+            "compounddatatype": 11, 
+            "blankable": false, 
+            "column_name": "x"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 19
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 2, 
+            "compounddatatype": 11, 
+            "blankable": false, 
+            "column_name": "y"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 20
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 1, 
+            "compounddatatype": 12, 
+            "blankable": false, 
+            "column_name": "k"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 21
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 1, 
+            "compounddatatype": 13, 
+            "blankable": false, 
+            "column_name": "a"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 22
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 2, 
+            "compounddatatype": 13, 
+            "blankable": false, 
+            "column_name": "b"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 23
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 3, 
+            "compounddatatype": 13, 
+            "blankable": false, 
+            "column_name": "c"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 24
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 1, 
+            "compounddatatype": 14, 
+            "blankable": false, 
+            "column_name": "a^2"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 25
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 2, 
+            "compounddatatype": 14, 
+            "blankable": false, 
+            "column_name": "b^2"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 26
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 3, 
+            "compounddatatype": 14, 
+            "blankable": false, 
+            "column_name": "c^2"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 27
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 1, 
+            "compounddatatype": 15, 
+            "blankable": false, 
+            "column_name": "StrCol1"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 28
+    }, 
+    {
+        "fields": {
+            "datatype": 8, 
+            "column_idx": 2, 
+            "compounddatatype": 15, 
+            "blankable": false, 
+            "column_name": "DNACol2"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 29
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 3, 
+            "compounddatatype": 15, 
+            "blankable": false, 
+            "column_name": "StrCol3"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 30
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 1, 
+            "compounddatatype": 16, 
+            "blankable": false, 
+            "column_name": "x"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 31
+    }, 
+    {
+        "fields": {
+            "datatype": 1, 
+            "column_idx": 2, 
+            "compounddatatype": 16, 
+            "blankable": false, 
+            "column_name": "y"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 32
+    }, 
+    {
+        "fields": {
+            "datatype": 8, 
+            "column_idx": 1, 
+            "compounddatatype": 17, 
+            "blankable": false, 
+            "column_name": "a"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 33
+    }, 
+    {
+        "fields": {
+            "datatype": 8, 
+            "column_idx": 2, 
+            "compounddatatype": 17, 
+            "blankable": false, 
+            "column_name": "b"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 34
+    }, 
+    {
+        "fields": {
+            "datatype": 8, 
+            "column_idx": 3, 
+            "compounddatatype": 17, 
+            "blankable": false, 
+            "column_name": "c"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 35
+    }, 
+    {
+        "fields": {
+            "datatype": 8, 
+            "column_idx": 1, 
+            "compounddatatype": 18, 
+            "blankable": false, 
+            "column_name": "x"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 36
+    }, 
+    {
+        "fields": {
+            "datatype": 8, 
+            "column_idx": 2, 
+            "compounddatatype": 18, 
+            "blankable": false, 
+            "column_name": "y"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 37
+    }, 
+    {
+        "fields": {
+            "datatype": 10, 
+            "column_idx": 1, 
+            "compounddatatype": 19, 
+            "blankable": false, 
+            "column_name": "word"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 38
+    }, 
+    {
+        "fields": {
+            "execrecord": 1, 
+            "start_time": null, 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": null, 
+            "_complete": false, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "execrecord": 2, 
+            "start_time": null, 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": null, 
+            "_complete": false, 
+            "is_cancelled": false, 
+            "_successful": false
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "execrecord": 3, 
+            "start_time": null, 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": null, 
+            "_complete": false, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "execrecord": 5, 
+            "start_time": "2015-06-30T22:47:44.745Z", 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:47:45.650Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "execrecord": 4, 
+            "start_time": "2015-06-30T22:47:44.810Z", 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:47:44.964Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "execrecord": 7, 
+            "start_time": "2015-06-30T22:47:46.009Z", 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:47:46.975Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "execrecord": 6, 
+            "start_time": "2015-06-30T22:47:46.078Z", 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:47:46.229Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "execrecord": 8, 
+            "start_time": "2015-06-30T22:47:47.431Z", 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:47:47.608Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "execrecord": 5, 
+            "start_time": "2015-06-30T22:47:48.549Z", 
+            "reused": true, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:47:48.894Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "execrecord": 4, 
+            "start_time": "2015-06-30T22:47:48.616Z", 
+            "reused": true, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:47:48.701Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "execrecord": 9, 
+            "start_time": "2015-06-30T22:47:49.182Z", 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:47:50.537Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "execrecord": 6, 
+            "start_time": "2015-06-30T22:47:49.257Z", 
+            "reused": true, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:47:49.339Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "execrecord": 10, 
+            "start_time": "2015-06-30T22:47:50.974Z", 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:47:51.155Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 1, 
+            "run": 3
+        }, 
+        "model": "archive.runstep", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 2, 
+            "run": 4
+        }, 
+        "model": "archive.runstep", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 4, 
+            "run": 5
+        }, 
+        "model": "archive.runstep", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 5, 
+            "run": 7
+        }, 
+        "model": "archive.runstep", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 6, 
+            "run": 7
+        }, 
+        "model": "archive.runstep", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 7, 
+            "run": 8
+        }, 
+        "model": "archive.runstep", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 8, 
+            "run": 8
+        }, 
+        "model": "archive.runstep", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "runstep": 4, 
+            "PSIC": 12
+        }, 
+        "model": "archive.runsic", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "runstep": 6, 
+            "PSIC": 13
+        }, 
+        "model": "archive.runsic", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "runstep": 9, 
+            "PSIC": 15
+        }, 
+        "model": "archive.runsic", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "runstep": 11, 
+            "PSIC": 16
+        }, 
+        "model": "archive.runsic", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "run": 7, 
+            "pipelineoutputcable": 14
+        }, 
+        "model": "archive.runoutputcable", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "run": 8, 
+            "pipelineoutputcable": 17
+        }, 
+        "model": "archive.runoutputcable", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "name": "triplet", 
+            "date_modified": "2015-06-30T22:47:42.083Z", 
+            "symbolicdataset": 1, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:42.083Z", 
+            "dataset_file": "Datasets/2015_06/step_0_triplet.csv", 
+            "description": "lol"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "name": "doublet", 
+            "date_modified": "2015-06-30T22:47:42.145Z", 
+            "symbolicdataset": 2, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:42.145Z", 
+            "dataset_file": "Datasets/2015_06/doublet_cdt.csv", 
+            "description": "lol"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "name": "singlet", 
+            "date_modified": "2015-06-30T22:47:42.197Z", 
+            "symbolicdataset": 3, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:42.197Z", 
+            "dataset_file": "Datasets/2015_06/singlet_cdt_large.csv", 
+            "description": "lol"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "name": "singlet", 
+            "date_modified": "2015-06-30T22:47:42.240Z", 
+            "symbolicdataset": 4, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:42.240Z", 
+            "dataset_file": "Datasets/2015_06/step_0_singlet.csv", 
+            "description": "lol"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "name": "raw_DS", 
+            "date_modified": "2015-06-30T22:47:42.255Z", 
+            "symbolicdataset": 5, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:42.255Z", 
+            "dataset_file": "Datasets/2015_06/step_0_raw.fasta", 
+            "description": "lol"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "name": "C1_in_triplet", 
+            "date_modified": "2015-06-30T22:47:42.382Z", 
+            "symbolicdataset": 7, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:42.382Z", 
+            "dataset_file": "Datasets/2015_06/C1_in_triplet.csv", 
+            "description": "triplet 3 rows"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "name": "E11_32 output doublet", 
+            "date_modified": "2015-06-30T22:47:42.497Z", 
+            "symbolicdataset": 9, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:42.497Z", 
+            "dataset_file": "Datasets/2015_06/E11_32_output.csv", 
+            "description": "result of E11_32 fed by doublet_cdt.csv"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "name": "raw", 
+            "date_modified": "2015-06-30T22:47:42.540Z", 
+            "symbolicdataset": 10, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:42.540Z", 
+            "dataset_file": "Datasets/2015_06/step_0_singlet_T1GfH5Q.csv", 
+            "description": "lol"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "name": "C2_out", 
+            "date_modified": "2015-06-30T22:47:42.553Z", 
+            "symbolicdataset": 11, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:42.553Z", 
+            "dataset_file": "Datasets/2015_06/step_0_raw_fnF0doY.fasta", 
+            "description": "lol"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "name": "C3_out", 
+            "date_modified": "2015-06-30T22:47:42.561Z", 
+            "symbolicdataset": 12, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:42.561Z", 
+            "dataset_file": "Datasets/2015_06/step_0_raw_Efo97m7.fasta", 
+            "description": "lol"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "name": "triplet", 
+            "date_modified": "2015-06-30T22:47:42.648Z", 
+            "symbolicdataset": 13, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:42.648Z", 
+            "dataset_file": "Datasets/2015_06/step_0_triplet_3_rows.csv", 
+            "description": "lol"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "name": "E1_out", 
+            "date_modified": "2015-06-30T22:47:42.707Z", 
+            "symbolicdataset": 14, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:42.707Z", 
+            "dataset_file": "Datasets/2015_06/doublet_remuxed_from_t3r.csv", 
+            "description": "doublet remuxed from triplet"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "name": "DNA_triplet", 
+            "date_modified": "2015-06-30T22:47:42.885Z", 
+            "symbolicdataset": 15, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:42.885Z", 
+            "dataset_file": "Datasets/2015_06/DNA_triplet.csv", 
+            "description": "DNA triplet data"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "name": "E01_21_DNA_doublet", 
+            "date_modified": "2015-06-30T22:47:43.014Z", 
+            "symbolicdataset": 16, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:43.014Z", 
+            "dataset_file": "Datasets/2015_06/E01_21_DNA_doublet.csv", 
+            "description": "DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "name": "E21_41_DNA_doublet", 
+            "date_modified": "2015-06-30T22:47:43.158Z", 
+            "symbolicdataset": 17, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:43.158Z", 
+            "dataset_file": "Datasets/2015_06/E21_41_DNA_doublet.csv", 
+            "description": "DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 15
+    }, 
+    {
+        "fields": {
+            "name": "blahblah", 
+            "date_modified": "2015-06-30T22:47:44.695Z", 
+            "symbolicdataset": 18, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:47:44.695Z", 
+            "dataset_file": "Datasets/2015_06/tmpvYZx1B", 
+            "description": "blahblahblah"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 16
+    }, 
+    {
+        "fields": {
+            "name": "run7_step2_outputsame_strings", 
+            "date_modified": "2015-06-30T22:47:46.524Z", 
+            "symbolicdataset": 20, 
+            "created_by": 6, 
+            "date_created": "2015-06-30T22:47:46.524Z", 
+            "dataset_file": "Datasets/2015_06/step2_same_strings.csv", 
+            "description": "Generated data from a run of pipeline \"p_one:1 (v1)\" started at 2015-06-30 22:47:44.733385+00:00 by bob\nrun: 7\nuser: bob\nstep: 2\noutput: same_strings"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "name": "run8_step2_outputuntouched_strings", 
+            "date_modified": "2015-06-30T22:47:50.062Z", 
+            "symbolicdataset": 21, 
+            "created_by": 11, 
+            "date_created": "2015-06-30T22:47:50.062Z", 
+            "dataset_file": "Datasets/2015_06/step2_untouched_strings.csv", 
+            "description": "Generated data from a run of pipeline \"p_two:1 (v1)\" started at 2015-06-30 22:47:48.542374+00:00 by bob\nrun: 8\nuser: bob\nstep: 2\noutput: untouched_strings"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 18
+    }, 
+    {
+        "fields": {
+            "record": 1, 
+            "start_time": null, 
+            "invoking_record": 1, 
+            "end_time": null
+        }, 
+        "model": "archive.execlog", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "record": 2, 
+            "start_time": null, 
+            "invoking_record": 2, 
+            "end_time": null
+        }, 
+        "model": "archive.execlog", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "record": 3, 
+            "start_time": null, 
+            "invoking_record": 3, 
+            "end_time": null
+        }, 
+        "model": "archive.execlog", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "record": 5, 
+            "start_time": "2015-06-30T22:47:44.831Z", 
+            "invoking_record": 5, 
+            "end_time": "2015-06-30T22:47:44.832Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "record": 4, 
+            "start_time": "2015-06-30T22:47:45.133Z", 
+            "invoking_record": 4, 
+            "end_time": "2015-06-30T22:47:45.214Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "record": 7, 
+            "start_time": "2015-06-30T22:47:46.097Z", 
+            "invoking_record": 7, 
+            "end_time": "2015-06-30T22:47:46.098Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "record": 6, 
+            "start_time": "2015-06-30T22:47:46.406Z", 
+            "invoking_record": 6, 
+            "end_time": "2015-06-30T22:47:46.486Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "record": 8, 
+            "start_time": "2015-06-30T22:47:47.448Z", 
+            "invoking_record": 8, 
+            "end_time": "2015-06-30T22:47:47.449Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "record": 9, 
+            "start_time": "2015-06-30T22:47:49.547Z", 
+            "invoking_record": 11, 
+            "end_time": "2015-06-30T22:47:49.628Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "record": 11, 
+            "start_time": "2015-06-30T22:47:49.944Z", 
+            "invoking_record": 11, 
+            "end_time": "2015-06-30T22:47:50.024Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "record": 13, 
+            "start_time": "2015-06-30T22:47:50.998Z", 
+            "invoking_record": 13, 
+            "end_time": "2015-06-30T22:47:50.999Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "execlog": 1, 
+            "error_redacted": false, 
+            "return_code": 0, 
+            "error_log": "", 
+            "code_redacted": false, 
+            "output_redacted": false, 
+            "output_log": ""
+        }, 
+        "model": "archive.methodoutput", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "execlog": 2, 
+            "error_redacted": false, 
+            "return_code": 1, 
+            "error_log": "", 
+            "code_redacted": false, 
+            "output_redacted": false, 
+            "output_log": ""
+        }, 
+        "model": "archive.methodoutput", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "execlog": 3, 
+            "error_redacted": false, 
+            "return_code": 0, 
+            "error_log": "", 
+            "code_redacted": false, 
+            "output_redacted": false, 
+            "output_log": ""
+        }, 
+        "model": "archive.methodoutput", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "execlog": 5, 
+            "error_redacted": false, 
+            "return_code": 0, 
+            "error_log": "Logs/step1_stderr.txt", 
+            "code_redacted": false, 
+            "output_redacted": false, 
+            "output_log": "Logs/step1_stdout.txt"
+        }, 
+        "model": "archive.methodoutput", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "execlog": 7, 
+            "error_redacted": false, 
+            "return_code": 0, 
+            "error_log": "Logs/step2_stderr.txt", 
+            "code_redacted": false, 
+            "output_redacted": false, 
+            "output_log": "Logs/step2_stdout.txt"
+        }, 
+        "model": "archive.methodoutput", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "execlog": 9, 
+            "error_redacted": false, 
+            "return_code": 0, 
+            "error_log": "Logs/step1_stderr_v3KR3w5.txt", 
+            "code_redacted": false, 
+            "output_redacted": false, 
+            "output_log": "Logs/step1_stdout_W6QE6kk.txt"
+        }, 
+        "model": "archive.methodoutput", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "execlog": 10, 
+            "error_redacted": false, 
+            "return_code": 0, 
+            "error_log": "Logs/step2_stderr_l3u1IWx.txt", 
+            "code_redacted": false, 
+            "output_redacted": false, 
+            "output_log": "Logs/step2_stdout_0aGFPI8.txt"
+        }, 
+        "model": "archive.methodoutput", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "num_rows": 10, 
+            "symbolicdataset": 1, 
+            "compounddatatype": 13
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "num_rows": 3, 
+            "symbolicdataset": 2, 
+            "compounddatatype": 16
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "num_rows": 13, 
+            "symbolicdataset": 3, 
+            "compounddatatype": 12
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "num_rows": 3, 
+            "symbolicdataset": 4, 
+            "compounddatatype": 12
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "num_rows": 10, 
+            "symbolicdataset": 6, 
+            "compounddatatype": 16
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "num_rows": 3, 
+            "symbolicdataset": 7, 
+            "compounddatatype": 13
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "num_rows": 3, 
+            "symbolicdataset": 8, 
+            "compounddatatype": 16
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "num_rows": 3, 
+            "symbolicdataset": 9, 
+            "compounddatatype": 16
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "num_rows": 3, 
+            "symbolicdataset": 10, 
+            "compounddatatype": 12
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "num_rows": 3, 
+            "symbolicdataset": 13, 
+            "compounddatatype": 13
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "num_rows": 3, 
+            "symbolicdataset": 14, 
+            "compounddatatype": 16
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "num_rows": 3, 
+            "symbolicdataset": 15, 
+            "compounddatatype": 17
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "num_rows": 3, 
+            "symbolicdataset": 16, 
+            "compounddatatype": 18
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "num_rows": 3, 
+            "symbolicdataset": 17, 
+            "compounddatatype": 18
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "num_rows": 1, 
+            "symbolicdataset": 18, 
+            "compounddatatype": 19
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 15
+    }, 
+    {
+        "fields": {
+            "num_rows": 1, 
+            "symbolicdataset": 19, 
+            "compounddatatype": 19
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 16
+    }, 
+    {
+        "fields": {
+            "num_rows": 1, 
+            "symbolicdataset": 20, 
+            "compounddatatype": 19
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "num_rows": 1, 
+            "symbolicdataset": 21, 
+            "compounddatatype": 19
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 18
+    }, 
+    {
+        "fields": {
+            "generator": 1
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "generator": 2
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "generator": 3
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "generator": 4
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "generator": 5
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "generator": 6
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "generator": 7
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "generator": 8
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "generator": 10
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "generator": 11
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "execrecord": 1, 
+            "generic_input": 3, 
+            "symbolicdataset": 2
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "execrecord": 1, 
+            "generic_input": 4, 
+            "symbolicdataset": 3
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "execrecord": 2, 
+            "generic_input": 1, 
+            "symbolicdataset": 5
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "execrecord": 3, 
+            "generic_input": 6, 
+            "symbolicdataset": 1
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "execrecord": 3, 
+            "generic_input": 7, 
+            "symbolicdataset": 2
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "execrecord": 4, 
+            "generic_input": 26, 
+            "symbolicdataset": 18
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "execrecord": 5, 
+            "generic_input": 20, 
+            "symbolicdataset": 18
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "execrecord": 6, 
+            "generic_input": 21, 
+            "symbolicdataset": 19
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "execrecord": 7, 
+            "generic_input": 20, 
+            "symbolicdataset": 19
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "execrecord": 8, 
+            "generic_input": 21, 
+            "symbolicdataset": 20
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "execrecord": 9, 
+            "generic_input": 22, 
+            "symbolicdataset": 19
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "execrecord": 10, 
+            "generic_input": 23, 
+            "symbolicdataset": 21
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "execrecord": 4, 
+            "symbolicdataset": 18, 
+            "generic_output": 20
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "execrecord": 5, 
+            "symbolicdataset": 19, 
+            "generic_output": 21
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "execrecord": 6, 
+            "symbolicdataset": 19, 
+            "generic_output": 20
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "execrecord": 7, 
+            "symbolicdataset": 20, 
+            "generic_output": 21
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "execrecord": 8, 
+            "symbolicdataset": 20, 
+            "generic_output": 28
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "execrecord": 9, 
+            "symbolicdataset": 21, 
+            "generic_output": 23
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "execrecord": 10, 
+            "symbolicdataset": 21, 
+            "generic_output": 31
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 4, 
+            "name": "", 
+            "outputs_to_delete": [], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 2, 
+            "step_num": 1
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 5, 
+            "name": "", 
+            "outputs_to_delete": [], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 1, 
+            "step_num": 1
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 5, 
+            "name": "", 
+            "outputs_to_delete": [], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 4, 
+            "step_num": 2
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 5, 
+            "name": "", 
+            "outputs_to_delete": [], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 3, 
+            "step_num": 3
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 9, 
+            "name": "", 
+            "outputs_to_delete": [
+                21
+            ], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 6, 
+            "step_num": 1
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 9, 
+            "name": "", 
+            "outputs_to_delete": [], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 6, 
+            "step_num": 2
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 10, 
+            "name": "", 
+            "outputs_to_delete": [
+                21
+            ], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 6, 
+            "step_num": 1
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 10, 
+            "name": "", 
+            "outputs_to_delete": [], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 7, 
+            "step_num": 2
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 8
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 1
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 2
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 3
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 4
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 5
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 6
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 7
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 8
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 9
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 10
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 11
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 12
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 13
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 14
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 15
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 16
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 1, 
+            "dest": 3, 
+            "keep_output": false, 
+            "source_step": 0, 
+            "source": 11
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 1, 
+            "dest": 4, 
+            "keep_output": false, 
+            "source_step": 0, 
+            "source": 12
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 2, 
+            "dest": 1, 
+            "keep_output": false, 
+            "source_step": 0, 
+            "source": 15
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 3, 
+            "dest": 11, 
+            "keep_output": false, 
+            "source_step": 0, 
+            "source": 13
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 3, 
+            "dest": 12, 
+            "keep_output": false, 
+            "source_step": 0, 
+            "source": 14
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 4, 
+            "dest": 7, 
+            "keep_output": false, 
+            "source_step": 1, 
+            "source": 2
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 4, 
+            "dest": 6, 
+            "keep_output": false, 
+            "source_step": 2, 
+            "source": 16
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 5, 
+            "dest": 20, 
+            "keep_output": false, 
+            "source_step": 0, 
+            "source": 26
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 6, 
+            "dest": 20, 
+            "keep_output": false, 
+            "source_step": 1, 
+            "source": 21
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 7, 
+            "dest": 20, 
+            "keep_output": false, 
+            "source_step": 0, 
+            "source": 29
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 15
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 8, 
+            "dest": 22, 
+            "keep_output": false, 
+            "source_step": 1, 
+            "source": 21
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 16
+    }, 
+    {
+        "fields": {
+            "dest_pin": 32, 
+            "source_pin": 22, 
+            "cable": 5
+        }, 
+        "model": "pipeline.customcablewire", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "dest_pin": 31, 
+            "source_pin": 24, 
+            "cable": 5
+        }, 
+        "model": "pipeline.customcablewire", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "dest_pin": 32, 
+            "source_pin": 31, 
+            "cable": 7
+        }, 
+        "model": "pipeline.customcablewire", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "dest_pin": 31, 
+            "source_pin": 32, 
+            "cable": 7
+        }, 
+        "model": "pipeline.customcablewire", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "dest_pin": 32, 
+            "source_pin": 23, 
+            "cable": 9
+        }, 
+        "model": "pipeline.customcablewire", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "dest_pin": 31, 
+            "source_pin": 24, 
+            "cable": 9
+        }, 
+        "model": "pipeline.customcablewire", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "pipeline": 4, 
+            "output_idx": 1, 
+            "source": 5, 
+            "source_step": 1, 
+            "output_name": "D1_out", 
+            "output_cdt": 13
+        }, 
+        "model": "pipeline.pipelineoutputcable", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "pipeline": 5, 
+            "output_idx": 1, 
+            "source": 16, 
+            "source_step": 2, 
+            "output_name": "E1_out", 
+            "output_cdt": 16
+        }, 
+        "model": "pipeline.pipelineoutputcable", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "pipeline": 5, 
+            "output_idx": 2, 
+            "source": 8, 
+            "source_step": 3, 
+            "output_name": "E2_out", 
+            "output_cdt": 12
+        }, 
+        "model": "pipeline.pipelineoutputcable", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "pipeline": 5, 
+            "output_idx": 3, 
+            "source": 10, 
+            "source_step": 3, 
+            "output_name": "E3_rawout", 
+            "output_cdt": null
+        }, 
+        "model": "pipeline.pipelineoutputcable", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "pipeline": 9, 
+            "output_idx": 1, 
+            "source": 21, 
+            "source_step": 2, 
+            "output_name": "p_one_out", 
+            "output_cdt": 19
+        }, 
+        "model": "pipeline.pipelineoutputcable", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "pipeline": 10, 
+            "output_idx": 1, 
+            "source": 23, 
+            "source_step": 2, 
+            "output_name": "p_two_out", 
+            "output_cdt": 19
+        }, 
+        "model": "pipeline.pipelineoutputcable", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 15
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 16
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 18
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 19
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 20
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 21
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 22
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 23
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 24
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 25
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 26
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 28
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 29
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 31
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 2, 
+            "max_row": null, 
+            "compounddatatype": 16
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 3, 
+            "max_row": null, 
+            "compounddatatype": 16
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 4, 
+            "max_row": null, 
+            "compounddatatype": 12
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 5, 
+            "max_row": 5, 
+            "compounddatatype": 13
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 6, 
+            "max_row": null, 
+            "compounddatatype": 13
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 7, 
+            "max_row": null, 
+            "compounddatatype": 16
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 8, 
+            "max_row": null, 
+            "compounddatatype": 12
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 11, 
+            "max_row": null, 
+            "compounddatatype": 16
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 12, 
+            "max_row": null, 
+            "compounddatatype": 12
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 13, 
+            "max_row": null, 
+            "compounddatatype": 13
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "min_row": 10, 
+            "transf_xput": 14, 
+            "max_row": null, 
+            "compounddatatype": 12
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 16, 
+            "max_row": 5, 
+            "compounddatatype": 13
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 18, 
+            "max_row": null, 
+            "compounddatatype": 12
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 19, 
+            "max_row": 5, 
+            "compounddatatype": 16
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 20, 
+            "max_row": null, 
+            "compounddatatype": 19
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 15
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 21, 
+            "max_row": null, 
+            "compounddatatype": 19
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 16
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 22, 
+            "max_row": null, 
+            "compounddatatype": 19
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 23, 
+            "max_row": null, 
+            "compounddatatype": 19
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 18
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 26, 
+            "max_row": null, 
+            "compounddatatype": 19
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 19
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 28, 
+            "max_row": null, 
+            "compounddatatype": 19
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 21
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 29, 
+            "max_row": null, 
+            "compounddatatype": 19
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 22
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 31, 
+            "max_row": null, 
+            "compounddatatype": 19
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 24
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 1, 
+            "dataset_name": "A1_rawin"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 2, 
+            "dataset_name": "B1_in"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 2, 
+            "transformation": 2, 
+            "dataset_name": "B2_in"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 3, 
+            "dataset_name": "C1_in"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 2, 
+            "transformation": 3, 
+            "dataset_name": "C2_in"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 4, 
+            "dataset_name": "D1_in"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 2, 
+            "transformation": 4, 
+            "dataset_name": "D2_in"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 5, 
+            "dataset_name": "E1_in"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 2, 
+            "transformation": 5, 
+            "dataset_name": "E2_in"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 3, 
+            "transformation": 5, 
+            "dataset_name": "E3_rawin"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 15
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 6, 
+            "dataset_name": "strings"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 20
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 7, 
+            "dataset_name": "strings"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 22
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 8, 
+            "dataset_name": "raw"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 24
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 9, 
+            "dataset_name": "p_one_in"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 26
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 10, 
+            "dataset_name": "p_two_in"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 29
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 1, 
+            "dataset_name": "A1_out"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 2, 
+            "dataset_name": "B1_out"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 3, 
+            "dataset_name": "C1_out"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 2, 
+            "transformation": 3, 
+            "dataset_name": "C2_rawout"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 3, 
+            "transformation": 3, 
+            "dataset_name": "C3_rawout"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 4, 
+            "dataset_name": "D1_out"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 16
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 3, 
+            "transformation": 5, 
+            "dataset_name": "E3_rawout"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 2, 
+            "transformation": 5, 
+            "dataset_name": "E2_out"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 18
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 5, 
+            "dataset_name": "E1_out"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 19
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 6, 
+            "dataset_name": "same_strings"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 21
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 7, 
+            "dataset_name": "untouched_strings"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 23
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 8, 
+            "dataset_name": "same_raw"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 25
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 9, 
+            "dataset_name": "p_one_out"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 28
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 10, 
+            "dataset_name": "p_two_out"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 31
+    }, 
+    {
+        "fields": {
+            "username": "john", 
+            "first_name": "", 
+            "last_name": "", 
+            "is_active": true, 
+            "is_superuser": false, 
+            "is_staff": false, 
+            "last_login": "2015-06-30T22:47:40.867Z", 
+            "groups": [
+                1
+            ], 
+            "user_permissions": [], 
+            "password": "pbkdf2_sha256$15000$5iY2wKISZo1f$3DqvwDUUHJYad/J+abgrlUK5vPAHbYrPdv0pyvhSRRg=", 
+            "email": "lennon@thebeatles.com", 
+            "date_joined": "2015-06-30T22:47:40.867Z"
+        }, 
+        "model": "auth.user", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "username": "bob", 
+            "first_name": "", 
+            "last_name": "", 
+            "is_active": true, 
+            "is_superuser": false, 
+            "is_staff": false, 
+            "last_login": "2015-06-30T22:47:43.397Z", 
+            "groups": [
+                1
+            ], 
+            "user_permissions": [], 
+            "password": "pbkdf2_sha256$15000$ho0lWmmJkjLE$7e3B2Qfv/sMd/YTYWWTSfunCxNiAm8anbI7KeEga2Wk=", 
+            "email": "bob@talabs.com", 
+            "date_joined": "2015-06-30T22:47:43.397Z"
+        }, 
+        "model": "auth.user", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "description": "String consisting of ACGTacgt", 
+            "groups_allowed": [
+                1
+            ], 
+            "restricts": [
+                1
+            ], 
+            "users_allowed": [], 
+            "user": 2, 
+            "date_created": "2015-06-30T22:47:40.986Z", 
+            "prototype": null, 
+            "name": "DNANucSeq"
+        }, 
+        "model": "metadata.datatype", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "description": "String consisting of ACGUacgu", 
+            "groups_allowed": [
+                1
+            ], 
+            "restricts": [
+                1
+            ], 
+            "users_allowed": [], 
+            "user": 2, 
+            "date_created": "2015-06-30T22:47:40.997Z", 
+            "prototype": null, 
+            "name": "RNANucSeq"
+        }, 
+        "model": "metadata.datatype", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "description": "sequences of ASCII characters", 
+            "groups_allowed": [
+                1
+            ], 
+            "restricts": [
+                1
+            ], 
+            "users_allowed": [], 
+            "user": 3, 
+            "date_created": "2015-06-30T22:47:43.511Z", 
+            "prototype": null, 
+            "name": "my_string"
+        }, 
+        "model": "metadata.datatype", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 15
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 16
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 18
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 3, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 19
+    }, 
+    {
+        "fields": {
+            "pipeline": 4, 
+            "description": "", 
+            "groups_allowed": [
+                1
+            ], 
+            "start_time": null, 
+            "name": "", 
+            "users_allowed": [], 
+            "end_time": null, 
+            "parent_runstep": null, 
+            "user": 2
+        }, 
+        "model": "archive.run", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "pipeline": 5, 
+            "description": "", 
+            "groups_allowed": [
+                1
+            ], 
+            "start_time": null, 
+            "name": "pE_run", 
+            "users_allowed": [], 
+            "end_time": null, 
+            "parent_runstep": null, 
+            "user": 2
+        }, 
+        "model": "archive.run", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "pipeline": 4, 
+            "description": "", 
+            "groups_allowed": [], 
+            "start_time": null, 
+            "name": "", 
+            "users_allowed": [], 
+            "end_time": null, 
+            "parent_runstep": null, 
+            "user": 2
+        }, 
+        "model": "archive.run", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "pipeline": 5, 
+            "description": "", 
+            "groups_allowed": [], 
+            "start_time": null, 
+            "name": "", 
+            "users_allowed": [], 
+            "end_time": null, 
+            "parent_runstep": null, 
+            "user": 2
+        }, 
+        "model": "archive.run", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "pipeline": 5, 
+            "description": "", 
+            "groups_allowed": [], 
+            "start_time": null, 
+            "name": "", 
+            "users_allowed": [], 
+            "end_time": null, 
+            "parent_runstep": null, 
+            "user": 2
+        }, 
+        "model": "archive.run", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "pipeline": 5, 
+            "description": "", 
+            "groups_allowed": [
+                1
+            ], 
+            "start_time": null, 
+            "name": "", 
+            "users_allowed": [], 
+            "end_time": null, 
+            "parent_runstep": null, 
+            "user": 2
+        }, 
+        "model": "archive.run", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "pipeline": 9, 
+            "description": "", 
+            "groups_allowed": [
+                1
+            ], 
+            "start_time": "2015-06-30T22:47:44.733Z", 
+            "name": "", 
+            "users_allowed": [], 
+            "end_time": "2015-06-30T22:47:47.722Z", 
+            "parent_runstep": null, 
+            "user": 3
+        }, 
+        "model": "archive.run", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "pipeline": 10, 
+            "description": "", 
+            "groups_allowed": [
+                1
+            ], 
+            "start_time": "2015-06-30T22:47:48.542Z", 
+            "name": "", 
+            "users_allowed": [], 
+            "end_time": "2015-06-30T22:47:51.265Z", 
+            "parent_runstep": null, 
+            "user": 3
+        }, 
+        "model": "archive.run", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "ab7afe2f453d27fd168641a1f9271f26", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "02d5b66858d003b81ae3dc712b74e85c", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "29feb269edcac613d6eea432c14640bd", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "00fd50bfe7ac63e2165a442f4101e05c", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "542676b23e121d16db8d41ccdae65fd1", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "56f9e5585b9d699829e2fda931d944f8", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "10a4bd15d1300fcaf5a3bdad54ef1d28", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "10a4bd15d1300fcaf5a3bdad54ef1d28", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "00fd50bfe7ac63e2165a442f4101e05c", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "56f9e5585b9d699829e2fda931d944f8", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "83957f8aea1c75da9f7fbf9bc90da979", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "d83866e4c23cd9503aa2f9fc565502b5", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 15
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "9eab0dfed5fcc89bd581f61995816ef0", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 16
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 2, 
+            "MD5_checksum": "9b55b9431da6dba74ea61edf8e2ac044", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 3, 
+            "MD5_checksum": "092ef90fe0201f4b002cd200f7754d45", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 18
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 3, 
+            "MD5_checksum": "092ef90fe0201f4b002cd200f7754d45", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 19
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 3, 
+            "MD5_checksum": "092ef90fe0201f4b002cd200f7754d45", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 20
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 3, 
+            "MD5_checksum": "092ef90fe0201f4b002cd200f7754d45", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 21
+    }, 
+    {
+        "fields": {
+            "description": "Just a CR", 
+            "groups_allowed": [
+                1
+            ], 
+            "filename": "generic_script.py", 
+            "users_allowed": [], 
+            "user": 2, 
+            "name": "genericCR"
+        }, 
+        "model": "method.coderesource", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "description": "a script to do nothing", 
+            "groups_allowed": [
+                1
+            ], 
+            "filename": "noop.sh", 
+            "users_allowed": [], 
+            "user": 3, 
+            "name": "noop"
+        }, 
+        "model": "method.coderesource", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "revision_parent": null, 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "desc", 
+            "coderesource": 1, 
+            "MD5_checksum": "", 
+            "content_file": "CodeResources/generic_script.py", 
+            "user": 2, 
+            "revision_number": 1, 
+            "revision_DateTime": "2015-06-30T22:47:41.257Z", 
+            "users_allowed": []
+        }, 
+        "model": "method.coderesourcerevision", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "revision_name": "1", 
+            "revision_parent": null, 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "coderesource": 2, 
+            "MD5_checksum": "", 
+            "content_file": "CodeResources/fdopen", 
+            "user": 3, 
+            "revision_number": 1, 
+            "revision_DateTime": "2015-06-30T22:47:43.532Z", 
+            "users_allowed": []
+        }, 
+        "model": "method.coderesourcerevision", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "threads": 1, 
+            "revision_parent": null, 
+            "family": 1, 
+            "groups_allowed": [
+                1
+            ], 
+            "driver": 1, 
+            "tainted": false, 
+            "revision_number": 1, 
+            "users_allowed": [], 
+            "reusable": 1
+        }, 
+        "model": "method.method", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "threads": 1, 
+            "revision_parent": null, 
+            "family": 1, 
+            "groups_allowed": [
+                1
+            ], 
+            "driver": 1, 
+            "tainted": false, 
+            "revision_number": 2, 
+            "users_allowed": [], 
+            "reusable": 1
+        }, 
+        "model": "method.method", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "threads": 1, 
+            "revision_parent": null, 
+            "family": 1, 
+            "groups_allowed": [
+                1
+            ], 
+            "driver": 1, 
+            "tainted": false, 
+            "revision_number": 3, 
+            "users_allowed": [], 
+            "reusable": 1
+        }, 
+        "model": "method.method", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "threads": 1, 
+            "revision_parent": null, 
+            "family": 2, 
+            "groups_allowed": [
+                1
+            ], 
+            "driver": 2, 
+            "tainted": false, 
+            "revision_number": 1, 
+            "users_allowed": [], 
+            "reusable": 1
+        }, 
+        "model": "method.method", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "threads": 1, 
+            "revision_parent": null, 
+            "family": 3, 
+            "groups_allowed": [
+                1
+            ], 
+            "driver": 2, 
+            "tainted": false, 
+            "revision_number": 1, 
+            "users_allowed": [], 
+            "reusable": 1
+        }, 
+        "model": "method.method", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "threads": 1, 
+            "revision_parent": null, 
+            "family": 4, 
+            "groups_allowed": [
+                1
+            ], 
+            "driver": 2, 
+            "tainted": false, 
+            "revision_number": 1, 
+            "users_allowed": [], 
+            "reusable": 1
+        }, 
+        "model": "method.method", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "user": 2, 
+            "users_allowed": [], 
+            "description": "Holds methods A/B/C", 
+            "name": "method_family", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "method.methodfamily", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "user": 3, 
+            "users_allowed": [], 
+            "description": "a method to do nothing to strings", 
+            "name": "string noop", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "method.methodfamily", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "user": 3, 
+            "users_allowed": [], 
+            "description": "a TOTALLY DIFFERENT method that TOTALLY does SOMETHING to strings by leaving them alone", 
+            "name": "string trivial", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "method.methodfamily", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "user": 3, 
+            "users_allowed": [], 
+            "description": "do nothing to raw data", 
+            "name": "raw noop", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "method.methodfamily", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "description": "PF desc", 
+            "groups_allowed": [
+                1
+            ], 
+            "published_version": null, 
+            "users_allowed": [], 
+            "user": 2, 
+            "name": "Pipeline_family"
+        }, 
+        "model": "pipeline.pipelinefamily", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "description": "two no-ops", 
+            "groups_allowed": [
+                1
+            ], 
+            "published_version": null, 
+            "users_allowed": [], 
+            "user": 2, 
+            "name": "p_one"
+        }, 
+        "model": "pipeline.pipelinefamily", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "description": "one no-op then one trivial", 
+            "groups_allowed": [
+                1
+            ], 
+            "published_version": null, 
+            "users_allowed": [], 
+            "user": 2, 
+            "name": "p_two"
+        }, 
+        "model": "pipeline.pipelinefamily", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "family": 1, 
+            "users_allowed": [], 
+            "revision_parent": null, 
+            "revision_number": 1, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "pipeline.pipeline", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "family": 1, 
+            "users_allowed": [], 
+            "revision_parent": null, 
+            "revision_number": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "pipeline.pipeline", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "family": 2, 
+            "users_allowed": [], 
+            "revision_parent": null, 
+            "revision_number": 1, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "pipeline.pipeline", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "family": 3, 
+            "users_allowed": [], 
+            "revision_parent": null, 
+            "revision_number": 1, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "pipeline.pipeline", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "revision_name": "mA_name", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "A_desc", 
+            "users_allowed": [], 
+            "user": 2, 
+            "revision_DateTime": "2015-06-30T22:47:41.275Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "revision_name": "mB_name", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "B_desc", 
+            "users_allowed": [], 
+            "user": 2, 
+            "revision_DateTime": "2015-06-30T22:47:41.344Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "revision_name": "mC_name", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "C_desc", 
+            "users_allowed": [], 
+            "user": 2, 
+            "revision_DateTime": "2015-06-30T22:47:41.408Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "revision_name": "pD_name", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "D", 
+            "users_allowed": [], 
+            "user": 2, 
+            "revision_DateTime": "2015-06-30T22:47:41.503Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "revision_name": "pE_name", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "E", 
+            "users_allowed": [], 
+            "user": 2, 
+            "revision_DateTime": "2015-06-30T22:47:41.564Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 3, 
+            "revision_DateTime": "2015-06-30T22:47:43.570Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 3, 
+            "revision_DateTime": "2015-06-30T22:47:43.682Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 3, 
+            "revision_DateTime": "2015-06-30T22:47:43.797Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 2, 
+            "revision_DateTime": "2015-06-30T22:47:43.874Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 2, 
+            "revision_DateTime": "2015-06-30T22:47:44.232Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:42.025Z", 
+            "symbolicdataset": 1, 
+            "end_time": "2015-06-30T22:47:42.078Z", 
+            "user": 2
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:42.105Z", 
+            "symbolicdataset": 2, 
+            "end_time": "2015-06-30T22:47:42.141Z", 
+            "user": 2
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:42.173Z", 
+            "symbolicdataset": 3, 
+            "end_time": "2015-06-30T22:47:42.193Z", 
+            "user": 2
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:42.216Z", 
+            "symbolicdataset": 4, 
+            "end_time": "2015-06-30T22:47:42.236Z", 
+            "user": 2
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:42.269Z", 
+            "symbolicdataset": 6, 
+            "end_time": "2015-06-30T22:47:42.305Z", 
+            "user": 2
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:42.326Z", 
+            "symbolicdataset": 7, 
+            "end_time": "2015-06-30T22:47:42.377Z", 
+            "user": 2
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:42.401Z", 
+            "symbolicdataset": 8, 
+            "end_time": "2015-06-30T22:47:42.436Z", 
+            "user": 2
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:42.456Z", 
+            "symbolicdataset": 9, 
+            "end_time": "2015-06-30T22:47:42.492Z", 
+            "user": 2
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:42.515Z", 
+            "symbolicdataset": 10, 
+            "end_time": "2015-06-30T22:47:42.535Z", 
+            "user": 2
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:42.589Z", 
+            "symbolicdataset": 13, 
+            "end_time": "2015-06-30T22:47:42.643Z", 
+            "user": 2
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:42.667Z", 
+            "symbolicdataset": 14, 
+            "end_time": "2015-06-30T22:47:42.703Z", 
+            "user": 2
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:42.726Z", 
+            "symbolicdataset": 15, 
+            "end_time": "2015-06-30T22:47:42.880Z", 
+            "user": 2
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:42.904Z", 
+            "symbolicdataset": 16, 
+            "end_time": "2015-06-30T22:47:43.009Z", 
+            "user": 2
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:43.048Z", 
+            "symbolicdataset": 17, 
+            "end_time": "2015-06-30T22:47:43.154Z", 
+            "user": 2
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:47:44.636Z", 
+            "symbolicdataset": 18, 
+            "end_time": "2015-06-30T22:47:44.691Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 15
+    }, 
+    {
+        "fields": {
+            "execlog": 5, 
+            "start_time": "2015-06-30T22:47:45.543Z", 
+            "symbolicdataset": 19, 
+            "end_time": "2015-06-30T22:47:45.604Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 16
+    }, 
+    {
+        "fields": {
+            "execlog": 7, 
+            "start_time": "2015-06-30T22:47:46.864Z", 
+            "symbolicdataset": 20, 
+            "end_time": "2015-06-30T22:47:46.923Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "execlog": 10, 
+            "start_time": "2015-06-30T22:47:50.426Z", 
+            "symbolicdataset": 21, 
+            "end_time": "2015-06-30T22:47:50.486Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 18
+    }, 
+    {
+        "fields": {
+            "execlog": 4, 
+            "start_time": "2015-06-30T22:47:44.955Z", 
+            "symbolicdataset": 18, 
+            "end_time": "2015-06-30T22:47:44.955Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.integritychecklog", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "execlog": 6, 
+            "start_time": "2015-06-30T22:47:46.221Z", 
+            "symbolicdataset": 19, 
+            "end_time": "2015-06-30T22:47:46.221Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.integritychecklog", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "execlog": 8, 
+            "start_time": "2015-06-30T22:47:47.599Z", 
+            "symbolicdataset": 20, 
+            "end_time": "2015-06-30T22:47:47.599Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.integritychecklog", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "execlog": 9, 
+            "start_time": "2015-06-30T22:47:49.664Z", 
+            "symbolicdataset": 19, 
+            "end_time": "2015-06-30T22:47:49.664Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.integritychecklog", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "execlog": 11, 
+            "start_time": "2015-06-30T22:47:51.145Z", 
+            "symbolicdataset": 21, 
+            "end_time": "2015-06-30T22:47:51.145Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.integritychecklog", 
+        "pk": 5
+    }
+]

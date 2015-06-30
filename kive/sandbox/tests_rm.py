@@ -1,12 +1,21 @@
 from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
+from django.contrib.auth.models import User
 
 import unittest
+import tempfile
+import shutil
+import os.path
 
 from librarian.models import SymbolicDataset
 from sandbox.execute import Sandbox
 import sandbox.testing_utils as tools
 import kive.settings
+from pipeline.models import Pipeline, PipelineFamily
+from metadata.tests import clean_up_all_files
+from kive.tests import install_fixture_files, restore_production_files
+from method.models import Method
+import file_access_utils
 
 
 # def rmf(path):
@@ -36,22 +45,57 @@ class SandboxRMTransactionTestCase(TransactionTestCase):
         tools.destroy_sandbox_testing_tools_environment(self)
 
 
-class ExecuteTestsRM(TestCase):
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
+class ExecuteResultTestsRM(TestCase):
+    """
+    Tests on the results of executing Pipelines.
+    """
+    fixtures = ["execute_result_tests_rm.json"]
 
     def setUp(self):
-        tools.create_sequence_manipulation_environment(self)
+        install_fixture_files("execute_result_tests_rm.json")
+        self.method_complement = Method.objects.get(
+            family__name="DNA complement",
+            revision_name="v1"
+        )
+
+        self.pipeline_complement = Pipeline.objects.get(
+            family__name="DNA complement",
+            revision_name="v1"
+        )
+        self.pipeline_reverse = Pipeline.objects.get(
+            family__name="DNA reverse",
+            revision_name="v1"
+        )
+        self.pipeline_revcomp = Pipeline.objects.get(
+            family__name="DNA revcomp",
+            revision_name="v1"
+        )
+
+        self.user_alice = User.objects.get(username="alice")
+
+        self.comp_run = self.pipeline_complement.pipeline_instances.order_by("start_time").first()
+        self.comp_run_2 = self.pipeline_complement.pipeline_instances.order_by("start_time").last()
+        self.reverse_run = self.pipeline_reverse.pipeline_instances.first()
+        self.revcomp_run = self.pipeline_revcomp.pipeline_instances.first()
+
+        self.symds_labdata = SymbolicDataset.objects.get(
+            dataset__name="lab data",
+            user=self.user_alice
+        )
+
+        # Tracking down CDTs is a pain....
+        self.cdt_record = self.method_complement.inputs.first().structure.compounddatatype
 
     def tearDown(self):
-        tools.destroy_sequence_manipulation_environment(self)
+        clean_up_all_files()
+        restore_production_files()
 
     def test_execute_pipeline_run(self):
         """
         Check the coherence of Runs created when a pipeline is executed the first time.
         """
-        run = self.sandbox_complement.execute_pipeline()
+        run = self.comp_run
         self.assertEqual(run.user, self.user_alice)
-        self.assertEqual(run.start_time.date(), timezone.now().date())
         self.assertEqual(run.start_time < timezone.now(), True)
         self.assertEqual(run.is_complete(), True)
         self.assertEqual(run.parent_runstep, None)
@@ -61,12 +105,11 @@ class ExecuteTestsRM(TestCase):
         """
         Check the coherence of a RunStep created when a Pipeline is executed the first time.
         """
-        run = self.sandbox_complement.execute_pipeline()
+        run = self.comp_run
         # sandbox_complement has only one step, so this is OK.
         runstep = run.runsteps.first()
 
         self.assertEqual(runstep.run, run)
-        self.assertEqual(runstep.start_time.date(), timezone.now().date())
         self.assertEqual(runstep.start_time < timezone.now(), True)
         self.assertEqual(runstep.reused, False)
         self.assertEqual(runstep.is_complete(), True)
@@ -80,7 +123,7 @@ class ExecuteTestsRM(TestCase):
         Test that the content checks, which take place as part of Pipeline
         execution, pass in the ordinary Pipeline execution case.
         """
-        run = self.sandbox_complement.execute_pipeline() # 1 step
+        run = self.comp_run
         runstep = run.runsteps.first()
         execrecord = runstep.execrecord
         symds = execrecord.execrecordouts.first().symbolicdataset
@@ -98,13 +141,27 @@ class ExecuteTestsRM(TestCase):
         Test the integrity of a SymbolicDataset output by a PipelineStep in
         the middle of a Pipeline.
         """
-        run = self.sandbox_complement.execute_pipeline() # 1 step
+        # Figure out the MD5 of the output file created when the complement method
+        # is run on Alice's data to check against the result of the run.
+        tmpdir = tempfile.mkdtemp(dir=file_access_utils.sandbox_base_path())
+        file_access_utils.configure_sandbox_permissions(tmpdir)
+        outfile = os.path.join(tmpdir, "output")
+        complement_popen = self.method_complement.invoke_code(
+            tmpdir,
+            [self.symds_labdata.dataset.dataset_file.file.name],
+            [outfile]
+        )
+        complement_popen.wait()
+        labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
+        shutil.rmtree(tmpdir)
+
+        run = self.comp_run
         runstep = run.runsteps.first()
         execrecord = runstep.execrecord
         symds = execrecord.execrecordouts.first().symbolicdataset
         ds = runstep.outputs.first()
 
-        self.assertEqual(symds.MD5_checksum, self.labdata_compd_md5)
+        self.assertEqual(symds.MD5_checksum, labdata_compd_md5)
         self.assertEqual(symds.dataset, ds)
         self.assertEqual(hasattr(symds, "usurps"), False)
         self.assertEqual(symds.has_data(), True)
@@ -120,8 +177,9 @@ class ExecuteTestsRM(TestCase):
         Check the coherence of a RunStep's ExecRecord's ExecRecordOut, created
         when a Pipeline is executed the first time.
         """
+        run = self.comp_run
+
         pipelinestep = self.pipeline_complement.steps.first() # 1 step
-        run = self.sandbox_complement.execute_pipeline()
         runstep = run.runsteps.first()
         symds_out = runstep.outputs.first().symbolicdataset
         execlog = runstep.log
@@ -141,39 +199,25 @@ class ExecuteTestsRM(TestCase):
         Check the coherence of a RunStep's ExecRecord, created when a Pipeline
         is executed the first time.
         """
-        run = self.sandbox_complement.execute_pipeline() # 1 step
+        run = self.comp_run
         runstep = run.runsteps.first()
         execlog = runstep.log
         execrecord = runstep.execrecord
         outputs = self.method_complement.outputs.all()
 
         self.assertEqual(execrecord.generator, execlog)
-        #self.assertEqual(execrecord.runsteps.first(), runstep)
-        #self.assertEqual(execrecord.runs.first(), run)
         self.assertEqual(execrecord.complete_clean(), None)
         self.assertEqual(execrecord.general_transf(), runstep.pipelinestep.transformation.method)
         self.assertEqual(execrecord.provides_outputs(outputs), True)
         self.assertEqual(execrecord.outputs_OK(), True)
-
-    def test_execute_pipeline_twice(self):
-        """
-        You can't execute a pipeline twice in the same Sandbox.
-        """
-        run1 = self.sandbox_complement.execute_pipeline()
-        run2 = self.sandbox_complement.execute_pipeline()
-        self.assertEqual(run1 is run2, True) 
 
     def test_execute_pipeline_reuse(self):
         """
         An identical pipeline, run in a different sandbox, should reuse an ExecRecord
         and not create an ExecLog.
         """
-        self.sandbox_complement.execute_pipeline()
-        sandbox2 = Sandbox(self.user_alice, self.pipeline_complement, [self.symds_labdata])
-        sandbox2.execute_pipeline()
-
-        step1 = self.sandbox_complement.run.runsteps.first()
-        step2 = sandbox2.run.runsteps.first()
+        step1 = self.comp_run.runsteps.first()
+        step2 = self.comp_run_2.runsteps.first()
 
         self.assertEqual(step1.reused, False)
         self.assertEqual(step2.reused, True)
@@ -185,13 +229,8 @@ class ExecuteTestsRM(TestCase):
         Running an identical Pipeline where we did not keep the data around the first time
         should fill in an existing ExecRecord, but also create a new ExecLog.
         """
-
-        sandbox = Sandbox(self.user_alice, self.pipeline_complement, [self.symds_labdata])
-        sandbox.execute_pipeline()
-        self.sandbox_complement.execute_pipeline()
-
-        step1 = sandbox.run.runsteps.first()
-        step2 = self.sandbox_complement.run.runsteps.first()
+        step1 = self.comp_run.runsteps.first()
+        step2 = self.comp_run_2.runsteps.first()
 
         self.assertEqual(step1.reused, False)
         self.assertEqual(step2.reused, True)
@@ -204,13 +243,8 @@ class ExecuteTestsRM(TestCase):
         Running the same dataset through the same Method, in two different 
         pipelines, should reuse an ExecRecord.
         """
-        sandbox_reverse = Sandbox(self.user_alice, self.pipeline_reverse, [self.symds_labdata])
-        sandbox_revcomp = Sandbox(self.user_alice, self.pipeline_revcomp, [self.symds_labdata])
-        sandbox_reverse.execute_pipeline()
-        sandbox_revcomp.execute_pipeline()
-
-        step1 = sandbox_reverse.run.runsteps.first() # 1 step
-        step2 = sandbox_revcomp.run.runsteps.get(pipelinestep__step_num=1)
+        step1 = self.reverse_run.runsteps.first()  # 1 step
+        step2 = self.revcomp_run.runsteps.get(pipelinestep__step_num=1)
 
         self.assertEqual(step1.reused, False)
         self.assertEqual(step2.reused, True)
@@ -221,28 +255,18 @@ class ExecuteTestsRM(TestCase):
         """
         A Pipeline with no deleted outputs should have a SymbolicDataset as an output.
         """
-        self.sandbox_complement.execute_pipeline()
-        output = self.sandbox_complement.run.runoutputcables.first()
+        output = self.comp_run.runoutputcables.first()
         output_symds = output.execrecord.execrecordouts.first().symbolicdataset
         self.assertEqual(output_symds is not None, True)
-
-    def test_pipeline_trivial_cable(self):
-        """
-        A trivial cable should have is_trivial() = True.
-        """
-        outcable = self.pipeline_complement.outcables.first()
-        self.assertEqual(outcable.is_trivial(), True)
 
     def test_trivial_cable_num_rows(self):
         """
         A trivial cable should have the same dataset all the way through.
         """
-        self.sandbox_complement.execute_pipeline()
-
-        step = self.sandbox_complement.run.runsteps.first()
+        step = self.comp_run.runsteps.first()
         step_output_SD = step.execrecord.execrecordouts.first().symbolicdataset
 
-        outcable = self.sandbox_complement.run.runoutputcables.first()
+        outcable = self.comp_run.runoutputcables.first()
         outcable_input_SD = outcable.execrecord.execrecordins.first().symbolicdataset
         outcable_output_SD = outcable.execrecord.execrecordouts.first().symbolicdataset
 
@@ -256,17 +280,15 @@ class ExecuteTestsRM(TestCase):
         A pipeline which does not change the number of rows in a dataset,
         should have the same number of rows in all SD's along the way.
         """
-        self.sandbox_complement.execute_pipeline()
-
-        incable = self.sandbox_complement.run.runsteps.first().RSICs.first()
+        incable = self.comp_run.runsteps.first().RSICs.first()
         incable_input_SD = incable.execrecord.execrecordins.first().symbolicdataset
         incable_output_SD = incable.execrecord.execrecordins.first().symbolicdataset
 
-        step = self.sandbox_complement.run.runsteps.first()
+        step = self.comp_run.runsteps.first()
         step_input_SD = step.execrecord.execrecordins.first().symbolicdataset
         step_output_SD = step.execrecord.execrecordouts.first().symbolicdataset
 
-        outcable = self.sandbox_complement.run.runoutputcables.first()
+        outcable = self.comp_run.runoutputcables.first()
         outcable_input_SD = outcable.execrecord.execrecordins.first().symbolicdataset
         outcable_output_SD = outcable.execrecord.execrecordouts.first().symbolicdataset
 
@@ -277,16 +299,37 @@ class ExecuteTestsRM(TestCase):
         self.assertEqual(step_output_SD.num_rows(), outcable_input_SD.num_rows())
         self.assertEqual(outcable_input_SD.num_rows(), outcable_output_SD.num_rows())
 
+
+class ExecuteDiscardedIntermediateTests(TestCase):
+    fixtures = ["execute_discarded_intermediate_tests_rm.json"]
+
+    def setUp(self):
+        install_fixture_files("execute_discarded_intermediate_tests_rm.json")
+        self.revcomp_pf = PipelineFamily.objects.get(name="DNA revcomp")
+        self.pipeline_revcomp_v2 = self.revcomp_pf.members.get(revision_name="2")
+        self.pipeline_revcomp_v3 = self.revcomp_pf.members.get(revision_name="3")
+
+        self.user_alice = User.objects.get(username="alice")
+
+        self.revcomp_v2_run = self.pipeline_revcomp_v2.pipeline_instances.first()  # only one exists
+
+        self.symds_labdata = SymbolicDataset.objects.get(
+            dataset__name="lab data",
+            user=self.user_alice
+        )
+
+    def tearDown(self):
+        clean_up_all_files()
+        restore_production_files()
+
     def test_discard_intermediate_file(self):
         """
         A Pipeline which indicates one of its intermediate outputs should not be kept,
         should not create any datasets for that output.
         """
-        step = self.pipeline_revcomp_v2.steps.get(step_num=1)
-        sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v2, [self.symds_labdata])
-        sandbox.execute_pipeline()
-        runstep = sandbox.run.runsteps.get(pipelinestep__step_num=1)
+        runstep = self.revcomp_v2_run.runsteps.get(pipelinestep__step_num=1)
         output = runstep.execrecord.execrecordouts.first().symbolicdataset
+        step = self.pipeline_revcomp_v2.steps.get(step_num=1)
         self.assertEqual(runstep.pipelinestep.outputs_to_retain(), [])
         self.assertEqual(output.has_data(), False)
         self.assertNotEqual(None, step)
@@ -295,16 +338,29 @@ class ExecuteTestsRM(TestCase):
         """
         Test recovery of an intermediate dataset.
         """
-        # Don't keep the intermediate or final output.
-        sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v2, [self.symds_labdata])
+        # In the fixture, we already ran self.pipeline_revcomp_v2, which discards the intermediate
+        # output.  We now run v3, which will recover it.
+        sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v3, [self.symds_labdata])
         sandbox.execute_pipeline()
-        # steps = sandbox.run.runsteps.all()
-        # steps = sorted(steps, key = lambda step: step.pipelinestep.step_num)
 
-        # This time we need the final output - that means we have to recover the intermediate
-        # output.
-        sandbox2 = Sandbox(self.user_alice, self.pipeline_revcomp_v3, [self.symds_labdata])
-        sandbox2.execute_pipeline()
+
+class ExecuteTestsRM(TestCase):
+    """
+    Tests of actually executing Pipelines, and of the Sandboxes.
+    """
+    def setUp(self):
+        tools.create_sequence_manipulation_environment(self)
+
+    def tearDown(self):
+        tools.destroy_sequence_manipulation_environment(self)
+
+    def test_execute_pipeline_twice(self):
+        """
+        You can't execute a pipeline twice in the same Sandbox.
+        """
+        run1 = self.sandbox_complement.execute_pipeline()
+        run2 = self.sandbox_complement.execute_pipeline()
+        self.assertEqual(run1 is run2, True)
 
 
 class BadRunTests(TestCase):

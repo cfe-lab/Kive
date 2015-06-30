@@ -1,0 +1,2685 @@
+[
+    {
+        "fields": {
+            "datatype": 8, 
+            "column_idx": 1, 
+            "compounddatatype": 5, 
+            "blankable": false, 
+            "column_name": "word"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "datatype": 8, 
+            "column_idx": 1, 
+            "compounddatatype": 6, 
+            "blankable": false, 
+            "column_name": "header"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "datatype": 9, 
+            "column_idx": 2, 
+            "compounddatatype": 6, 
+            "blankable": false, 
+            "column_name": "sequence"
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "execrecord": 2, 
+            "start_time": "2015-06-30T22:48:03.178Z", 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:48:04.272Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "execrecord": 1, 
+            "start_time": "2015-06-30T22:48:03.256Z", 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:48:03.438Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "execrecord": 3, 
+            "start_time": "2015-06-30T22:48:04.878Z", 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:48:05.099Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "execrecord": 2, 
+            "start_time": "2015-06-30T22:48:05.814Z", 
+            "reused": true, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:48:06.214Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "execrecord": 1, 
+            "start_time": "2015-06-30T22:48:05.884Z", 
+            "reused": true, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:48:05.970Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "execrecord": 3, 
+            "start_time": "2015-06-30T22:48:06.575Z", 
+            "reused": true, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:48:06.647Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "execrecord": 4, 
+            "start_time": "2015-06-30T22:48:07.181Z", 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:48:08.179Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "execrecord": 1, 
+            "start_time": "2015-06-30T22:48:07.251Z", 
+            "reused": true, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:48:07.335Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "execrecord": 5, 
+            "start_time": "2015-06-30T22:48:08.593Z", 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:48:08.794Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "execrecord": 4, 
+            "start_time": "2015-06-30T22:48:09.408Z", 
+            "reused": true, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:48:09.784Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "execrecord": 1, 
+            "start_time": "2015-06-30T22:48:09.477Z", 
+            "reused": true, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:48:09.578Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "execrecord": 6, 
+            "start_time": "2015-06-30T22:48:10.142Z", 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:48:11.142Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "execrecord": 5, 
+            "start_time": "2015-06-30T22:48:10.226Z", 
+            "reused": true, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:48:10.300Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "execrecord": 7, 
+            "start_time": "2015-06-30T22:48:11.578Z", 
+            "reused": false, 
+            "_redacted": false, 
+            "end_time": "2015-06-30T22:48:11.791Z", 
+            "_complete": true, 
+            "is_cancelled": false, 
+            "_successful": true
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 1, 
+            "run": 1
+        }, 
+        "model": "archive.runstep", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 1, 
+            "run": 3
+        }, 
+        "model": "archive.runstep", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 2, 
+            "run": 4
+        }, 
+        "model": "archive.runstep", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 3, 
+            "run": 2
+        }, 
+        "model": "archive.runstep", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 4, 
+            "run": 2
+        }, 
+        "model": "archive.runstep", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "runstep": 1, 
+            "PSIC": 1
+        }, 
+        "model": "archive.runsic", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "runstep": 4, 
+            "PSIC": 1
+        }, 
+        "model": "archive.runsic", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "runstep": 7, 
+            "PSIC": 3
+        }, 
+        "model": "archive.runsic", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "runstep": 10, 
+            "PSIC": 5
+        }, 
+        "model": "archive.runsic", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "runstep": 12, 
+            "PSIC": 6
+        }, 
+        "model": "archive.runsic", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "run": 1, 
+            "pipelineoutputcable": 2
+        }, 
+        "model": "archive.runoutputcable", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "run": 3, 
+            "pipelineoutputcable": 2
+        }, 
+        "model": "archive.runoutputcable", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "run": 4, 
+            "pipelineoutputcable": 4
+        }, 
+        "model": "archive.runoutputcable", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "run": 2, 
+            "pipelineoutputcable": 7
+        }, 
+        "model": "archive.runoutputcable", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "name": "lab data", 
+            "date_modified": "2015-06-30T22:48:01.455Z", 
+            "symbolicdataset": 1, 
+            "created_by": null, 
+            "date_created": "2015-06-30T22:48:01.455Z", 
+            "dataset_file": "Datasets/2015_06/tmp_RxG3r", 
+            "description": "data from the lab"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "name": "run1_step1_outputcomplemented_DNA", 
+            "date_modified": "2015-06-30T22:48:03.745Z", 
+            "symbolicdataset": 2, 
+            "created_by": 1, 
+            "date_created": "2015-06-30T22:48:03.745Z", 
+            "dataset_file": "Datasets/2015_06/step1_complemented_DNA.csv", 
+            "description": "Generated data from a run of pipeline \"DNA complement:1 (v1)\" started at 2015-06-30 22:48:03.167558+00:00 by alice\nrun: 1\nuser: alice\nstep: 1\noutput: complemented_DNA"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "name": "run4_step1_outputreversed_DNA", 
+            "date_modified": "2015-06-30T22:48:07.680Z", 
+            "symbolicdataset": 3, 
+            "created_by": 7, 
+            "date_created": "2015-06-30T22:48:07.680Z", 
+            "dataset_file": "Datasets/2015_06/step1_reversed_DNA.csv", 
+            "description": "Generated data from a run of pipeline \"DNA reverse:1 (v1)\" started at 2015-06-30 22:48:07.169632+00:00 by alice\nrun: 4\nuser: alice\nstep: 1\noutput: reversed_DNA"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "name": "run2_step2_outputcomplemented_DNA", 
+            "date_modified": "2015-06-30T22:48:10.612Z", 
+            "symbolicdataset": 4, 
+            "created_by": 12, 
+            "date_created": "2015-06-30T22:48:10.612Z", 
+            "dataset_file": "Datasets/2015_06/step2_complemented_DNA.csv", 
+            "description": "Generated data from a run of pipeline \"DNA revcomp:1 (v1)\" started at 2015-06-30 22:48:09.402058+00:00 by alice\nrun: 2\nuser: alice\nstep: 2\noutput: complemented_DNA"
+        }, 
+        "model": "archive.dataset", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "record": 2, 
+            "start_time": "2015-06-30T22:48:03.284Z", 
+            "invoking_record": 2, 
+            "end_time": "2015-06-30T22:48:03.285Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "record": 1, 
+            "start_time": "2015-06-30T22:48:03.626Z", 
+            "invoking_record": 1, 
+            "end_time": "2015-06-30T22:48:03.708Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "record": 3, 
+            "start_time": "2015-06-30T22:48:04.892Z", 
+            "invoking_record": 3, 
+            "end_time": "2015-06-30T22:48:04.893Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "record": 7, 
+            "start_time": "2015-06-30T22:48:07.561Z", 
+            "invoking_record": 7, 
+            "end_time": "2015-06-30T22:48:07.644Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "record": 9, 
+            "start_time": "2015-06-30T22:48:08.617Z", 
+            "invoking_record": 9, 
+            "end_time": "2015-06-30T22:48:08.618Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "record": 12, 
+            "start_time": "2015-06-30T22:48:10.494Z", 
+            "invoking_record": 12, 
+            "end_time": "2015-06-30T22:48:10.576Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "record": 14, 
+            "start_time": "2015-06-30T22:48:11.595Z", 
+            "invoking_record": 14, 
+            "end_time": "2015-06-30T22:48:11.596Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "execlog": 2, 
+            "error_redacted": false, 
+            "return_code": 0, 
+            "error_log": "Logs/step1_stderr.txt", 
+            "code_redacted": false, 
+            "output_redacted": false, 
+            "output_log": "Logs/step1_stdout.txt"
+        }, 
+        "model": "archive.methodoutput", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "execlog": 4, 
+            "error_redacted": false, 
+            "return_code": 0, 
+            "error_log": "Logs/step1_stderr_Jf25bIG.txt", 
+            "code_redacted": false, 
+            "output_redacted": false, 
+            "output_log": "Logs/step1_stdout_ykzgnKT.txt"
+        }, 
+        "model": "archive.methodoutput", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "execlog": 6, 
+            "error_redacted": false, 
+            "return_code": 0, 
+            "error_log": "Logs/step2_stderr.txt", 
+            "code_redacted": false, 
+            "output_redacted": false, 
+            "output_log": "Logs/step2_stdout.txt"
+        }, 
+        "model": "archive.methodoutput", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "num_rows": 10, 
+            "symbolicdataset": 1, 
+            "compounddatatype": 6
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "num_rows": 10, 
+            "symbolicdataset": 2, 
+            "compounddatatype": 6
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "num_rows": 10, 
+            "symbolicdataset": 3, 
+            "compounddatatype": 6
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "num_rows": 10, 
+            "symbolicdataset": 4, 
+            "compounddatatype": 6
+        }, 
+        "model": "librarian.datasetstructure", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "generator": 1
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "generator": 2
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "generator": 3
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "generator": 4
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "generator": 5
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "generator": 6
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "generator": 7
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "execrecord": 1, 
+            "generic_input": 11, 
+            "symbolicdataset": 1
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "execrecord": 2, 
+            "generic_input": 7, 
+            "symbolicdataset": 1
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "execrecord": 3, 
+            "generic_input": 8, 
+            "symbolicdataset": 2
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "execrecord": 4, 
+            "generic_input": 9, 
+            "symbolicdataset": 1
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "execrecord": 5, 
+            "generic_input": 10, 
+            "symbolicdataset": 3
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "execrecord": 6, 
+            "generic_input": 7, 
+            "symbolicdataset": 3
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "execrecord": 7, 
+            "generic_input": 8, 
+            "symbolicdataset": 4
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "execrecord": 1, 
+            "symbolicdataset": 1, 
+            "generic_output": 7
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "execrecord": 2, 
+            "symbolicdataset": 2, 
+            "generic_output": 8
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "execrecord": 3, 
+            "symbolicdataset": 2, 
+            "generic_output": 13
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "execrecord": 4, 
+            "symbolicdataset": 3, 
+            "generic_output": 10
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "execrecord": 5, 
+            "symbolicdataset": 3, 
+            "generic_output": 16
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "execrecord": 6, 
+            "symbolicdataset": 4, 
+            "generic_output": 8
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "execrecord": 7, 
+            "symbolicdataset": 4, 
+            "generic_output": 19
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 4, 
+            "name": "", 
+            "outputs_to_delete": [], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 7, 
+            "step_num": 1
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 5, 
+            "name": "", 
+            "outputs_to_delete": [], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 8, 
+            "step_num": 1
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 6, 
+            "name": "", 
+            "outputs_to_delete": [], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 8, 
+            "step_num": 1
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 6, 
+            "name": "", 
+            "outputs_to_delete": [], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 7, 
+            "step_num": 2
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 9, 
+            "name": "", 
+            "outputs_to_delete": [
+                8
+            ], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 7, 
+            "step_num": 1
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 10, 
+            "name": "", 
+            "outputs_to_delete": [
+                10
+            ], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 8, 
+            "step_num": 1
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 10, 
+            "name": "", 
+            "outputs_to_delete": [
+                8
+            ], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 7, 
+            "step_num": 2
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 11, 
+            "name": "", 
+            "outputs_to_delete": [
+                10
+            ], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 8, 
+            "step_num": 1
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 11, 
+            "name": "", 
+            "outputs_to_delete": [], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 7, 
+            "step_num": 2
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 13, 
+            "name": "", 
+            "outputs_to_delete": [], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 8, 
+            "step_num": 1
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "pipeline": 13, 
+            "name": "", 
+            "outputs_to_delete": [], 
+            "y": 0.0, 
+            "x": 0.0, 
+            "transformation": 12, 
+            "step_num": 2
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 11
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 1
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 2
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 3
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 4
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 5
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 6
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 7
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 8
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 10
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 11
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 13
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 14
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 15
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 16
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 17
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 18
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 1, 
+            "dest": 7, 
+            "keep_output": false, 
+            "source_step": 0, 
+            "source": 11
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 2, 
+            "dest": 9, 
+            "keep_output": false, 
+            "source_step": 0, 
+            "source": 14
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 3, 
+            "dest": 9, 
+            "keep_output": false, 
+            "source_step": 0, 
+            "source": 17
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 4, 
+            "dest": 7, 
+            "keep_output": false, 
+            "source_step": 1, 
+            "source": 10
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 5, 
+            "dest": 7, 
+            "keep_output": false, 
+            "source_step": 0, 
+            "source": 20
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 6, 
+            "dest": 9, 
+            "keep_output": false, 
+            "source_step": 0, 
+            "source": 22
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 7, 
+            "dest": 7, 
+            "keep_output": false, 
+            "source_step": 1, 
+            "source": 10
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 8, 
+            "dest": 9, 
+            "keep_output": false, 
+            "source_step": 0, 
+            "source": 24
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 9, 
+            "dest": 7, 
+            "keep_output": false, 
+            "source_step": 1, 
+            "source": 10
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 10, 
+            "dest": 9, 
+            "keep_output": false, 
+            "source_step": 0, 
+            "source": 29
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 16
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 11, 
+            "dest": 27, 
+            "keep_output": false, 
+            "source_step": 1, 
+            "source": 10
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "pipeline": 4, 
+            "output_idx": 1, 
+            "source": 8, 
+            "source_step": 1, 
+            "output_name": "complemented_lab_data", 
+            "output_cdt": 6
+        }, 
+        "model": "pipeline.pipelineoutputcable", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "pipeline": 5, 
+            "output_idx": 1, 
+            "source": 10, 
+            "source_step": 1, 
+            "output_name": "reversed_lab_data", 
+            "output_cdt": 6
+        }, 
+        "model": "pipeline.pipelineoutputcable", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "pipeline": 6, 
+            "output_idx": 1, 
+            "source": 8, 
+            "source_step": 2, 
+            "output_name": "reverse_and_complemented_lab_data", 
+            "output_cdt": 6
+        }, 
+        "model": "pipeline.pipelineoutputcable", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "pipeline": 11, 
+            "output_idx": 1, 
+            "source": 8, 
+            "source_step": 2, 
+            "output_name": "revcomped_lab_data", 
+            "output_cdt": 6
+        }, 
+        "model": "pipeline.pipelineoutputcable", 
+        "pk": 15
+    }, 
+    {
+        "fields": {
+            "pipeline": 13, 
+            "output_idx": 1, 
+            "source": 28, 
+            "source_step": 2, 
+            "output_name": "RNAd_lab_data", 
+            "output_cdt": 6
+        }, 
+        "model": "pipeline.pipelineoutputcable", 
+        "pk": 18
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 16
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 19
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 20
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 22
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 24
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 26
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 27
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 28
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 29
+    }, 
+    {
+        "fields": {
+            "y": 0.0, 
+            "x": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 31
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 1, 
+            "max_row": null, 
+            "compounddatatype": 5
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 2, 
+            "max_row": null, 
+            "compounddatatype": 5
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 3, 
+            "max_row": null, 
+            "compounddatatype": 5
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 4, 
+            "max_row": null, 
+            "compounddatatype": 5
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 7, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 8, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 9, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 10, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 11, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 13, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 14, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 16, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 17, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 15
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 19, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 20, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 18
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 22, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 20
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 24, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 22
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 26, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 24
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 27, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 25
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 28, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 26
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 29, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 27
+    }, 
+    {
+        "fields": {
+            "min_row": null, 
+            "transf_xput": 31, 
+            "max_row": null, 
+            "compounddatatype": 6
+        }, 
+        "model": "transformation.xputstructure", 
+        "pk": 29
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 1, 
+            "dataset_name": "strings"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 2, 
+            "dataset_name": "strings"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 3, 
+            "dataset_name": "raw"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 7, 
+            "dataset_name": "DNA_to_complement"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 8, 
+            "dataset_name": "DNA_to_reverse"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 4, 
+            "dataset_name": "lab_data"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 5, 
+            "dataset_name": "lab_data"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 14
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 6, 
+            "dataset_name": "lab_data"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 17
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 9, 
+            "dataset_name": "lab_data"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 20
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 10, 
+            "dataset_name": "lab_data"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 22
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 11, 
+            "dataset_name": "lab_data"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 24
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 12, 
+            "dataset_name": "DNA_to_convert"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 27
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 13, 
+            "dataset_name": "lab_data"
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 29
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 1, 
+            "dataset_name": "same_strings"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 2, 
+            "dataset_name": "untouched_strings"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 3, 
+            "dataset_name": "same_raw"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 7, 
+            "dataset_name": "complemented_DNA"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 8, 
+            "dataset_name": "reversed_DNA"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 4, 
+            "dataset_name": "complemented_lab_data"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 5, 
+            "dataset_name": "reversed_lab_data"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 16
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 6, 
+            "dataset_name": "reverse_and_complemented_lab_data"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 19
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 11, 
+            "dataset_name": "revcomped_lab_data"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 26
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 12, 
+            "dataset_name": "RNA"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 28
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "transformation": 13, 
+            "dataset_name": "RNAd_lab_data"
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 31
+    }, 
+    {
+        "fields": {
+            "username": "bob", 
+            "first_name": "", 
+            "last_name": "", 
+            "is_active": true, 
+            "is_superuser": false, 
+            "is_staff": false, 
+            "last_login": "2015-06-30T22:47:59.502Z", 
+            "groups": [
+                1
+            ], 
+            "user_permissions": [], 
+            "password": "pbkdf2_sha256$15000$FyK1GnRtgZnW$pnUckJQ+ynPjsGDoN/NzNzfq2ZPuSM/Px7NHyqpViN4=", 
+            "email": "bob@talabs.com", 
+            "date_joined": "2015-06-30T22:47:59.502Z"
+        }, 
+        "model": "auth.user", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "username": "alice", 
+            "first_name": "", 
+            "last_name": "", 
+            "is_active": true, 
+            "is_superuser": false, 
+            "is_staff": false, 
+            "last_login": "2015-06-30T22:48:00.003Z", 
+            "groups": [
+                1
+            ], 
+            "user_permissions": [], 
+            "password": "pbkdf2_sha256$15000$8Jnz5m6WUNZZ$kc3WXZSKUO+KejLLcYwu0KnCyJbtksDPDLEmu+Zznrg=", 
+            "email": "alice@talabs.com", 
+            "date_joined": "2015-06-30T22:48:00.003Z"
+        }, 
+        "model": "auth.user", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "description": "sequences of ASCII characters", 
+            "groups_allowed": [
+                1
+            ], 
+            "restricts": [
+                1
+            ], 
+            "users_allowed": [], 
+            "user": 2, 
+            "date_created": "2015-06-30T22:47:59.619Z", 
+            "prototype": null, 
+            "name": "my_string"
+        }, 
+        "model": "metadata.datatype", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "description": "sequences of ATCG", 
+            "groups_allowed": [
+                1
+            ], 
+            "restricts": [
+                1
+            ], 
+            "users_allowed": [], 
+            "user": 3, 
+            "date_created": "2015-06-30T22:48:00.167Z", 
+            "prototype": null, 
+            "name": "DNA"
+        }, 
+        "model": "metadata.datatype", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 2, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "users_allowed": [], 
+            "user": 3, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "pipeline": 4, 
+            "description": "", 
+            "groups_allowed": [], 
+            "start_time": "2015-06-30T22:48:03.167Z", 
+            "name": "", 
+            "users_allowed": [], 
+            "end_time": "2015-06-30T22:48:05.241Z", 
+            "parent_runstep": null, 
+            "user": 3
+        }, 
+        "model": "archive.run", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "pipeline": 6, 
+            "description": "", 
+            "groups_allowed": [], 
+            "start_time": "2015-06-30T22:48:09.402Z", 
+            "name": "", 
+            "users_allowed": [], 
+            "end_time": "2015-06-30T22:48:11.914Z", 
+            "parent_runstep": null, 
+            "user": 3
+        }, 
+        "model": "archive.run", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "pipeline": 4, 
+            "description": "", 
+            "groups_allowed": [], 
+            "start_time": "2015-06-30T22:48:05.803Z", 
+            "name": "", 
+            "users_allowed": [], 
+            "end_time": "2015-06-30T22:48:06.753Z", 
+            "parent_runstep": null, 
+            "user": 3
+        }, 
+        "model": "archive.run", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "pipeline": 5, 
+            "description": "", 
+            "groups_allowed": [], 
+            "start_time": "2015-06-30T22:48:07.169Z", 
+            "name": "", 
+            "users_allowed": [], 
+            "end_time": "2015-06-30T22:48:08.915Z", 
+            "parent_runstep": null, 
+            "user": 3
+        }, 
+        "model": "archive.run", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 3, 
+            "MD5_checksum": "0082bc75b97d81a1b92adaa894fef1bd", 
+            "groups_allowed": []
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 3, 
+            "MD5_checksum": "c0d4cb49470a30a88ea5d4cf0c3324c9", 
+            "groups_allowed": []
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 3, 
+            "MD5_checksum": "c0d4cb49470a30a88ea5d4cf0c3324c9", 
+            "groups_allowed": []
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "_redacted": false, 
+            "users_allowed": [], 
+            "user": 3, 
+            "MD5_checksum": "0082bc75b97d81a1b92adaa894fef1bd", 
+            "groups_allowed": []
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "description": "a script to do nothing", 
+            "groups_allowed": [
+                1
+            ], 
+            "filename": "noop.sh", 
+            "users_allowed": [], 
+            "user": 2, 
+            "name": "noop"
+        }, 
+        "model": "method.coderesource", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "description": "a script to complement DNA", 
+            "groups_allowed": [
+                1
+            ], 
+            "filename": "complement.sh", 
+            "users_allowed": [], 
+            "user": 3, 
+            "name": "DNA complement"
+        }, 
+        "model": "method.coderesource", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "description": "a script to reverse DNA", 
+            "groups_allowed": [
+                1
+            ], 
+            "filename": "reverse.sh", 
+            "users_allowed": [], 
+            "user": 3, 
+            "name": "DNA reverse"
+        }, 
+        "model": "method.coderesource", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "description": "a script to reverse DNA", 
+            "groups_allowed": [
+                1
+            ], 
+            "filename": "DNA2RNA.sh", 
+            "users_allowed": [], 
+            "user": 3, 
+            "name": "DNA to RNA"
+        }, 
+        "model": "method.coderesource", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "revision_name": "1", 
+            "revision_parent": null, 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "coderesource": 1, 
+            "MD5_checksum": "", 
+            "content_file": "CodeResources/fdopen", 
+            "user": 2, 
+            "revision_number": 1, 
+            "revision_DateTime": "2015-06-30T22:47:59.660Z", 
+            "users_allowed": []
+        }, 
+        "model": "method.coderesourcerevision", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "revision_name": "1", 
+            "revision_parent": null, 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "coderesource": 2, 
+            "MD5_checksum": "", 
+            "content_file": "CodeResources/fdopen_PkpNPIi", 
+            "user": 3, 
+            "revision_number": 1, 
+            "revision_DateTime": "2015-06-30T22:48:00.199Z", 
+            "users_allowed": []
+        }, 
+        "model": "method.coderesourcerevision", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "revision_name": "1", 
+            "revision_parent": null, 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "coderesource": 3, 
+            "MD5_checksum": "", 
+            "content_file": "CodeResources/fdopen_v03F95g", 
+            "user": 3, 
+            "revision_number": 1, 
+            "revision_DateTime": "2015-06-30T22:48:00.226Z", 
+            "users_allowed": []
+        }, 
+        "model": "method.coderesourcerevision", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "revision_name": "1", 
+            "revision_parent": null, 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "coderesource": 4, 
+            "MD5_checksum": "", 
+            "content_file": "CodeResources/fdopen_cxFaPfz", 
+            "user": 3, 
+            "revision_number": 1, 
+            "revision_DateTime": "2015-06-30T22:48:02.514Z", 
+            "users_allowed": []
+        }, 
+        "model": "method.coderesourcerevision", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "threads": 1, 
+            "revision_parent": null, 
+            "family": 1, 
+            "groups_allowed": [
+                1
+            ], 
+            "driver": 1, 
+            "tainted": false, 
+            "revision_number": 1, 
+            "users_allowed": [], 
+            "reusable": 1
+        }, 
+        "model": "method.method", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "threads": 1, 
+            "revision_parent": null, 
+            "family": 2, 
+            "groups_allowed": [
+                1
+            ], 
+            "driver": 1, 
+            "tainted": false, 
+            "revision_number": 1, 
+            "users_allowed": [], 
+            "reusable": 1
+        }, 
+        "model": "method.method", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "threads": 1, 
+            "revision_parent": null, 
+            "family": 3, 
+            "groups_allowed": [
+                1
+            ], 
+            "driver": 1, 
+            "tainted": false, 
+            "revision_number": 1, 
+            "users_allowed": [], 
+            "reusable": 1
+        }, 
+        "model": "method.method", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "threads": 1, 
+            "revision_parent": null, 
+            "family": 4, 
+            "groups_allowed": [
+                1
+            ], 
+            "driver": 2, 
+            "tainted": false, 
+            "revision_number": 1, 
+            "users_allowed": [], 
+            "reusable": 1
+        }, 
+        "model": "method.method", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "threads": 1, 
+            "revision_parent": null, 
+            "family": 5, 
+            "groups_allowed": [
+                1
+            ], 
+            "driver": 2, 
+            "tainted": false, 
+            "revision_number": 1, 
+            "users_allowed": [], 
+            "reusable": 1
+        }, 
+        "model": "method.method", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "threads": 1, 
+            "revision_parent": null, 
+            "family": 6, 
+            "groups_allowed": [
+                1
+            ], 
+            "driver": 4, 
+            "tainted": false, 
+            "revision_number": 1, 
+            "users_allowed": [], 
+            "reusable": 1
+        }, 
+        "model": "method.method", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "user": 2, 
+            "users_allowed": [], 
+            "description": "a method to do nothing to strings", 
+            "name": "string noop", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "method.methodfamily", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "user": 2, 
+            "users_allowed": [], 
+            "description": "a TOTALLY DIFFERENT method that TOTALLY does SOMETHING to strings by leaving them alone", 
+            "name": "string trivial", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "method.methodfamily", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "user": 2, 
+            "users_allowed": [], 
+            "description": "do nothing to raw data", 
+            "name": "raw noop", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "method.methodfamily", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "user": 3, 
+            "users_allowed": [], 
+            "description": "a method to complement strings of DNA", 
+            "name": "DNA complement", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "method.methodfamily", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "user": 3, 
+            "users_allowed": [], 
+            "description": "a method to reverse strings of DNA", 
+            "name": "DNA reverse", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "method.methodfamily", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "user": 3, 
+            "users_allowed": [], 
+            "description": "a method to turn strings of DNA into RNA", 
+            "name": "DNA to RNA", 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "method.methodfamily", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "description": "a pipeline to complement DNA", 
+            "groups_allowed": [
+                1
+            ], 
+            "published_version": null, 
+            "users_allowed": [], 
+            "user": 3, 
+            "name": "DNA complement"
+        }, 
+        "model": "pipeline.pipelinefamily", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "description": "a pipeline to reverse DNA", 
+            "groups_allowed": [
+                1
+            ], 
+            "published_version": null, 
+            "users_allowed": [], 
+            "user": 3, 
+            "name": "DNA reverse"
+        }, 
+        "model": "pipeline.pipelinefamily", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "description": "a pipeline to reverse and complement DNA", 
+            "groups_allowed": [
+                1
+            ], 
+            "published_version": null, 
+            "users_allowed": [], 
+            "user": 3, 
+            "name": "DNA revcomp"
+        }, 
+        "model": "pipeline.pipelinefamily", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "description": "a pipeline to reverse DNA and translate it to RNA", 
+            "groups_allowed": [
+                1
+            ], 
+            "published_version": null, 
+            "users_allowed": [], 
+            "user": 3, 
+            "name": "DNA to reversed RNA"
+        }, 
+        "model": "pipeline.pipelinefamily", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "family": 1, 
+            "users_allowed": [], 
+            "revision_parent": null, 
+            "revision_number": 1, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "pipeline.pipeline", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "family": 2, 
+            "users_allowed": [], 
+            "revision_parent": null, 
+            "revision_number": 1, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "pipeline.pipeline", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "family": 3, 
+            "users_allowed": [], 
+            "revision_parent": null, 
+            "revision_number": 1, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "pipeline.pipeline", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "family": 1, 
+            "users_allowed": [], 
+            "revision_parent": null, 
+            "revision_number": 2, 
+            "groups_allowed": []
+        }, 
+        "model": "pipeline.pipeline", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "family": 3, 
+            "users_allowed": [], 
+            "revision_parent": null, 
+            "revision_number": 2, 
+            "groups_allowed": []
+        }, 
+        "model": "pipeline.pipeline", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "family": 3, 
+            "users_allowed": [], 
+            "revision_parent": null, 
+            "revision_number": 3, 
+            "groups_allowed": []
+        }, 
+        "model": "pipeline.pipeline", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "family": 4, 
+            "users_allowed": [], 
+            "revision_parent": null, 
+            "revision_number": 1, 
+            "groups_allowed": [
+                1
+            ]
+        }, 
+        "model": "pipeline.pipeline", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 2, 
+            "revision_DateTime": "2015-06-30T22:47:59.688Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 2, 
+            "revision_DateTime": "2015-06-30T22:47:59.828Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 2, 
+            "revision_DateTime": "2015-06-30T22:47:59.937Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 3, 
+            "revision_DateTime": "2015-06-30T22:48:00.130Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 3, 
+            "revision_DateTime": "2015-06-30T22:48:00.147Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 3, 
+            "revision_DateTime": "2015-06-30T22:48:00.161Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 3, 
+            "revision_DateTime": "2015-06-30T22:48:00.244Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 3, 
+            "revision_DateTime": "2015-06-30T22:48:00.354Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "revision_name": "2", 
+            "groups_allowed": [], 
+            "revision_desc": "second version", 
+            "users_allowed": [], 
+            "user": 3, 
+            "revision_DateTime": "2015-06-30T22:48:01.495Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "revision_name": "2", 
+            "groups_allowed": [], 
+            "revision_desc": "second version", 
+            "users_allowed": [], 
+            "user": 3, 
+            "revision_DateTime": "2015-06-30T22:48:01.731Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "revision_name": "3", 
+            "groups_allowed": [], 
+            "revision_desc": "third version", 
+            "users_allowed": [], 
+            "user": 3, 
+            "revision_DateTime": "2015-06-30T22:48:02.165Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 3, 
+            "revision_DateTime": "2015-06-30T22:48:02.532Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 12
+    }, 
+    {
+        "fields": {
+            "revision_name": "v1", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_desc": "first version", 
+            "users_allowed": [], 
+            "user": 3, 
+            "revision_DateTime": "2015-06-30T22:48:02.706Z"
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 13
+    }, 
+    {
+        "fields": {
+            "execlog": null, 
+            "start_time": "2015-06-30T22:48:01.345Z", 
+            "symbolicdataset": 1, 
+            "end_time": "2015-06-30T22:48:01.450Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "execlog": 2, 
+            "start_time": "2015-06-30T22:48:04.102Z", 
+            "symbolicdataset": 2, 
+            "end_time": "2015-06-30T22:48:04.213Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "execlog": 4, 
+            "start_time": "2015-06-30T22:48:08.008Z", 
+            "symbolicdataset": 3, 
+            "end_time": "2015-06-30T22:48:08.119Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "execlog": 6, 
+            "start_time": "2015-06-30T22:48:10.967Z", 
+            "symbolicdataset": 4, 
+            "end_time": "2015-06-30T22:48:11.081Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "execlog": 1, 
+            "start_time": "2015-06-30T22:48:03.429Z", 
+            "symbolicdataset": 1, 
+            "end_time": "2015-06-30T22:48:03.429Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.integritychecklog", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "execlog": 3, 
+            "start_time": "2015-06-30T22:48:05.085Z", 
+            "symbolicdataset": 2, 
+            "end_time": "2015-06-30T22:48:05.085Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.integritychecklog", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "execlog": 5, 
+            "start_time": "2015-06-30T22:48:08.784Z", 
+            "symbolicdataset": 3, 
+            "end_time": "2015-06-30T22:48:08.784Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.integritychecklog", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "execlog": 7, 
+            "start_time": "2015-06-30T22:48:11.781Z", 
+            "symbolicdataset": 4, 
+            "end_time": "2015-06-30T22:48:11.781Z", 
+            "user": 3
+        }, 
+        "model": "datachecking.integritychecklog", 
+        "pk": 4
+    }
+]

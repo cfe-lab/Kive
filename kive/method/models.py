@@ -120,6 +120,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
     Related to :model:`method.CodeResourceDependency`
     Related to :model:`method.Method`
     """
+    UPLOAD_DIR = "CodeResources"
 
     # Implicitly defined
     #   descendents (self/ForeignKey)
@@ -135,32 +136,33 @@ class CodeResourceRevision(metadata.models.AccessControl):
         blank=True)
 
     revision_name = models.CharField(
-            max_length=maxlengths.MAX_NAME_LENGTH,
-            help_text="A name to differentiate revisions of a CodeResource",
-            blank=True)
+        max_length=maxlengths.MAX_NAME_LENGTH,
+        help_text="A name to differentiate revisions of a CodeResource",
+        blank=True)
 
     revision_DateTime = models.DateTimeField(
-            auto_now_add=True,
-            help_text="Date this resource revision was uploaded")
+        auto_now_add=True,
+        help_text="Date this resource revision was uploaded")
 
     revision_parent = models.ForeignKey('self', related_name="descendants", null=True, blank=True,
                                         on_delete=models.SET_NULL)
     revision_desc = models.TextField(
-            "Revision description",
-            help_text="A description for this particular resource revision",
-            max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
-            blank=True)
+        "Revision description",
+        help_text="A description for this particular resource revision",
+        max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
+        blank=True)
+
     content_file = models.FileField(
-            "File contents",
-            upload_to="CodeResources",
-            null=True,
-            blank=True,
-            help_text="File contents of this code resource revision")
+        "File contents",
+        upload_to=UPLOAD_DIR,
+        null=True,
+        blank=True,
+        help_text="File contents of this code resource revision")
 
     MD5_checksum = models.CharField(
-            max_length=64,
-            blank=True,
-            help_text="Used to validate file contents of this resource revision")
+        max_length=64,
+        blank=True,
+        help_text="Used to validate file contents of this resource revision")
 
     class Meta:
         unique_together = (("coderesource", "revision_number"))

@@ -21,7 +21,7 @@ from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, SymbolicDataset
 
-from kive.tests import BaseTestCases
+from kive.tests import BaseTestCases, install_fixture_files, restore_production_files
 import librarian.tests
 import metadata.tests
 from method.models import Method
@@ -433,39 +433,39 @@ class ArchiveTestCaseHelpers:
         self.D11_21_ROC.stop(save=True)
         if bp == "subrun_complete": return
 
-    def run_pipelines_recovering_reused_step(self):
-        """
-        Setting up and running two pipelines, where the second one reuses and then recovers a step from the first.
-        """
-        p_one = tools.make_first_pipeline("p_one", "two no-ops", self.myUser)
-        p_one.family.grant_everyone_access()
-        p_one.grant_everyone_access()
-        tools.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
-        p_one.create_outputs()
-        p_one.save()
-        # Mark the output of step 1 as not retained.
-        p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
-
-        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial", self.myUser)
-        p_two.family.grant_everyone_access()
-        p_two.grant_everyone_access()
-        tools.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
-        p_two.create_outputs()
-        p_two.save()
-        # We also delete the output of step 1 so that it reuses the existing ER we'll have
-        # create for p_one.
-        p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
-
-        # Set up a words dataset.
-        tools.make_words_symDS(self)
-
-        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
-                                                   groups_allowed=[everyone_group()])
-        self.sandbox_one.execute_pipeline()
-
-        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words],
-                                                   groups_allowed=[everyone_group()])
-        self.sandbox_two.execute_pipeline()
+    # def run_pipelines_recovering_reused_step(self):
+    #     """
+    #     Setting up and running two pipelines, where the second one reuses and then recovers a step from the first.
+    #     """
+    #     p_one = tools.make_first_pipeline("p_one", "two no-ops", self.myUser)
+    #     p_one.family.grant_everyone_access()
+    #     p_one.grant_everyone_access()
+    #     tools.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
+    #     p_one.create_outputs()
+    #     p_one.save()
+    #     # Mark the output of step 1 as not retained.
+    #     p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
+    #
+    #     p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial", self.myUser)
+    #     p_two.family.grant_everyone_access()
+    #     p_two.grant_everyone_access()
+    #     tools.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
+    #     p_two.create_outputs()
+    #     p_two.save()
+    #     # We also delete the output of step 1 so that it reuses the existing ER we'll have
+    #     # create for p_one.
+    #     p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
+    #
+    #     # Set up a words dataset.
+    #     tools.make_words_symDS(self)
+    #
+    #     self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
+    #                                                groups_allowed=[everyone_group()])
+    #     self.sandbox_one.execute_pipeline()
+    #
+    #     self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words],
+    #                                                groups_allowed=[everyone_group()])
+    #     self.sandbox_two.execute_pipeline()
 
     def _setup_deep_nested_run(self, user):
         """Set up a pipeline with sub-sub-pipelines to test recursion."""
@@ -502,7 +502,6 @@ class ArchiveTestCaseHelpers:
 
 
 class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
-    # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         create_archive_test_environment(self)
@@ -652,21 +651,21 @@ class RunComponentTests(ArchiveTestCase):
 
         self.assertIsNone(self.step_E3_RS.clean())
 
-    def test_clean_execlogs_runcomponent_invoked_by_subsequent_runcomponent(self):
-        """
-        Testing clean on a RunComponent whose ExecLog was invoked by a subsequent RunComponent.
-        """
-        # Run two pipelines, where the second reuses parts from the first.
-        self.run_pipelines_recovering_reused_step()
-
-        # The ExecLog of the first RunStep in sandbox_two's run should have been invoked by
-        # the transformation of step 2.
-        run_two_step_one = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=1)
-        run_two_step_two = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
-
-        self.assertEquals(run_two_step_one.log.invoking_record.definite, run_two_step_two)
-        self.assertIsNone(run_two_step_one.clean())
-        self.assertIsNone(run_two_step_two.clean())
+    # def test_clean_execlogs_runcomponent_invoked_by_subsequent_runcomponent(self):
+    #     """
+    #     Testing clean on a RunComponent whose ExecLog was invoked by a subsequent RunComponent.
+    #     """
+    #     # Run two pipelines, where the second reuses parts from the first.
+    #     # self.run_pipelines_recovering_reused_step()
+    #
+    #     # The ExecLog of the first RunStep in sandbox_two's run should have been invoked by
+    #     # the transformation of step 2.
+    #     run_two_step_one = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=1)
+    #     run_two_step_two = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
+    #
+    #     self.assertEquals(run_two_step_one.log.invoking_record.definite, run_two_step_two)
+    #     self.assertIsNone(run_two_step_one.clean())
+    #     self.assertIsNone(run_two_step_two.clean())
 
     def test_clean_undecided_reused_invoked_logs_exist(self):
         """A RunComponent that has not decided on reuse should not have any invoked logs."""
@@ -728,6 +727,33 @@ class RunComponentTests(ArchiveTestCase):
                         rc.definite.__class__.__name__, rc.definite
                     ),
                     rc.definite.clean())
+
+
+class RunComponentInvokedBySubsequentTests(TestCase):
+    fixtures = ["run_pipelines_recovering_reused_step.json"]
+
+    def setUp(self):
+        install_fixture_files("run_pipelines_recovering_reused_step.json")
+
+    def tearDown(self):
+        restore_production_files()
+
+    def test_clean_execlogs_runcomponent_invoked_by_subsequent_runcomponent(self):
+        """
+        Testing clean on a RunComponent whose ExecLog was invoked by a subsequent RunComponent.
+        """
+        # In the fixture, we ran two pipelines, where the second reused parts from the first.
+        pipeline_two = Pipeline.objects.get(family__name="p_two", revision_name="v1")
+        run_two = pipeline_two.pipeline_instances.first()
+
+        # The ExecLog of the first RunStep in sandbox_two's run should have been invoked by
+        # the transformation of step 2.
+        run_two_step_one = run_two.runsteps.get(pipelinestep__step_num=1)
+        run_two_step_two = run_two.runsteps.get(pipelinestep__step_num=2)
+
+        self.assertEquals(run_two_step_one.log.invoking_record.definite, run_two_step_two)
+        self.assertIsNone(run_two_step_one.clean())
+        self.assertIsNone(run_two_step_two.clean())
 
 
 class RunStepTests(ArchiveTestCase):
@@ -1245,46 +1271,48 @@ class RunComponentTooManyChecks(TestCase):
     """
     Tests that check clean() on the case where a RunComponent has too much datachecking.
     """
-    # fixtures = ["initial_data", "initial_groups", "initial_user"]
+    fixtures = ["run_component_too_many_checks.json"]
 
     def setUp(self):
-        tools.create_word_reversal_environment(self)
-
-        # Set up and run a Pipeline that throws away its intermediate data.
-        self.two_step_pl = tools.make_first_pipeline("Two-step pipeline",
-                                                     "Toy pipeline for testing data check cleaning of RunSteps.",
-                                                     self.user_bob)
-        tools.create_linear_pipeline(self.two_step_pl, [self.method_noop_wordbacks, self.method_noop_wordbacks],
-                                     "data", "samedata")
-        first_step = self.two_step_pl.steps.get(step_num=1)
-        first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
-        first_step.save()
-
-        self.two_step_sdbx = sandbox.execute.Sandbox(self.user_bob, self.two_step_pl, [self.symds_wordbacks],
-                                                     groups_allowed=[everyone_group()])
-        self.two_step_sdbx.execute_pipeline()
-
-        # The second one's second step will have to recover its first step.  (Its input cable is trivial
-        # and is able to reuse the input cable from the first Pipeline's second step.)
-        self.following_pl = tools.make_first_pipeline(
-            "Pipeline that will follow the first",
-            "Toy pipeline that will need to recover its first step when following the above.",
-            self.user_bob
-        )
-        tools.create_linear_pipeline(self.following_pl, [self.method_noop_wordbacks, self.method_reverse],
-                                     "data", "reversed_data")
-        first_step = self.following_pl.steps.get(step_num=1)
-        first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
-        first_step.save()
-
-        self.following_sdbx = sandbox.execute.Sandbox(self.user_bob, self.following_pl, [self.symds_wordbacks],
-                                                      groups_allowed=[everyone_group()])
-        self.following_sdbx.execute_pipeline()
-        second_step = self.following_sdbx.run.runsteps.get(pipelinestep__step_num=2)
-        assert(second_step.invoked_logs.count() == 2)
+        # tools.create_word_reversal_environment(self)
+        #
+        # # Set up and run a Pipeline that throws away its intermediate data.
+        # self.two_step_pl = tools.make_first_pipeline("Two-step pipeline",
+        #                                              "Toy pipeline for testing data check cleaning of RunSteps.",
+        #                                              self.user_bob)
+        # tools.create_linear_pipeline(self.two_step_pl, [self.method_noop_wordbacks, self.method_noop_wordbacks],
+        #                              "data", "samedata")
+        # first_step = self.two_step_pl.steps.get(step_num=1)
+        # first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
+        # first_step.save()
+        #
+        # self.two_step_sdbx = sandbox.execute.Sandbox(self.user_bob, self.two_step_pl, [self.symds_wordbacks],
+        #                                              groups_allowed=[everyone_group()])
+        # self.two_step_sdbx.execute_pipeline()
+        #
+        # # The second one's second step will have to recover its first step.  (Its input cable is trivial
+        # # and is able to reuse the input cable from the first Pipeline's second step.)
+        # self.following_pl = tools.make_first_pipeline(
+        #     "Pipeline that will follow the first",
+        #     "Toy pipeline that will need to recover its first step when following the above.",
+        #     self.user_bob
+        # )
+        # tools.create_linear_pipeline(self.following_pl, [self.method_noop_wordbacks, self.method_reverse],
+        #                              "data", "reversed_data")
+        # first_step = self.following_pl.steps.get(step_num=1)
+        # first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
+        # first_step.save()
+        #
+        # self.following_sdbx = sandbox.execute.Sandbox(self.user_bob, self.following_pl, [self.symds_wordbacks],
+        #                                               groups_allowed=[everyone_group()])
+        # self.following_sdbx.execute_pipeline()
+        # second_step = self.following_sdbx.run.runsteps.get(pipelinestep__step_num=2)
+        # assert(second_step.invoked_logs.count() == 2)
+        install_fixture_files("run_component_too_many_checks.json")
+        self.user_bob = User.objects.get(username="bob")
 
     def tearDown(self):
-        tools.destroy_word_reversal_environment(self)
+        restore_production_files()
 
     def test_RunStep_clean_too_many_integrity_checks(self):
         """RunStep should have <=1 integrity check for each output."""

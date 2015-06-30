@@ -36,6 +36,7 @@ def empty_redaction_plan():
         "ReturnCodes": set()
     }
 
+
 def summarize_redaction_plan(redaction_plan):
     counts = {key: len(targets) for key, targets in redaction_plan.iteritems()}
     return counts
@@ -349,6 +350,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             metadata.models.update_removal_plan(removal_plan, runcomponent.build_removal_plan_h(removal_plan))
 
         return removal_plan
+
 
 class RunComponent(stopwatch.models.Stopwatch):
     """
@@ -2571,12 +2573,14 @@ class MethodOutput(models.Model):
     If the return code is None, it indicates that the code execution is
     in progress.
     """
+    UPLOAD_DIR = "Logs"
+
     execlog = models.OneToOneField(ExecLog, related_name="methodoutput")
     return_code = models.IntegerField("return code", null=True)
-    output_log = models.FileField("output log", upload_to="Logs",
+    output_log = models.FileField("output log", upload_to=UPLOAD_DIR,
                                   help_text="Terminal output of the RunStep Method, i.e. stdout.",
                                   null=True, blank=True)
-    error_log = models.FileField("error log", upload_to="Logs",
+    error_log = models.FileField("error log", upload_to=UPLOAD_DIR,
                                  help_text="Terminal error output of the RunStep Method, i.e. stderr.",
                                  null=True, blank=True)
 
