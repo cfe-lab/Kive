@@ -458,18 +458,22 @@ var pipeline = (function(exports){
     Pipeline.prototype.applyStepUpdates = function(updates) {
         var pipeline = this,
             steps = pipeline.canvasState.getSteps();
+        pipeline.canvasState.valid = false;
+        
         $.each(updates, function() {
             var update = this,
                 old_method = steps[update.step_num - 1],
                 new_method = new drydock_objects.MethodNode(
                         update.method.id,
                         update.method.family_id,
-                        0,
-                        0,
+                        0,// x
+                        0,// y
                         old_method.fill,
                         old_method.label,
                         update.method.inputs,
                         update.method.outputs);
+            
+            new_method.update_signal = new drydock_objects.NodeUpdateSignal(new_method, "updated");
             pipeline.canvasState.replaceMethod(old_method, new_method);
         });
     };

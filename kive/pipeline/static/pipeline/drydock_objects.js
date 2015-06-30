@@ -741,16 +741,21 @@ var drydock_objects = (function() {
             magnet.y = y_outputs - pos * c2c/2;
             magnet.draw(ctx);
         }
+        
+        // update signal
+        if (this.update_signal) {
+            var us = this.update_signal;
+            us.x = vertices[6].x - us.r;
+            us.y = vertices[2].y + us.r;
+            us.draw(ctx);
+        }
     
         // Highlight the method based on status.
-        if(typeof this.status === 'string') {
+        if (typeof this.status === 'string') {
             ctx.save();
-    
             ctx.strokeStyle = statusColorMap[this.status] || 'black';
             ctx.lineWidth = 5;
-    
             ctx.globalCompositeOperation = 'destination-over';
-    
             // body
             this.buildBodyPath(ctx);
             ctx.stroke();
@@ -873,6 +878,14 @@ var drydock_objects = (function() {
     my.MethodNode.prototype.doDown = function(cs, e) {
         my.Node.prototype.doDown.call(this, cs, e);
         $('#id_method_button').val('Revise Method');
+    };
+    
+    my.MethodNode.prototype.updateSignal = function(status) {
+        if (this.update_signal instanceof my.NodeUpdateSignal) {
+            this.update_signal.setStatus(status);
+        } else {
+            this.update_signal = new my.NodeUpdateSignal(this, status);
+        }
     };
     
     my.MethodNode.prototype.deleteFrom = function(cs) {
@@ -1349,6 +1362,47 @@ var drydock_objects = (function() {
         this.label = label || '';
         this.x = x || 0;
         this.y = y || 0;
+    };
+    
+    my.NodeUpdateSignal = function(node, status) {
+        if ( ! (node instanceof my.Node) ) {
+            return false;
+        }
+        this.node = node;
+        this.setStatus(status);
+        this.x = node.x + node.w/2;
+        this.y = node.y - node.h/2;
+        this.r = 8;
+    };
+    my.NodeUpdateSignal.prototype.draw = function(ctx) {
+        var canvas = new my.CanvasWrapper(undefined, ctx);
+        var status_opts = this.status_opts[this.status];
+        ctx.fillStyle = status_opts.color;
+        canvas.drawCircle(this);
+    };
+    my.NodeUpdateSignal.prototype.status_opts = {
+        "no update available": {
+            color: "#0d0"
+        },
+        "updated": {
+            color: "#0d0"
+        },
+        "updated with issues": {
+            color: "#cc0"
+        },
+        "unavailable": {
+            color: "#444"
+        },
+        "update in progress": {
+            color: "#999"
+        }
+    };
+    my.NodeUpdateSignal.prototype.setStatus = function(status) {
+        if (this.status_opts.hasOwnProperty(status)) {
+            this.status = status;
+        } else {
+            this.status = undefined;
+        }
     };
     
     my.OutputZone = function(cw, ch, inset) {
