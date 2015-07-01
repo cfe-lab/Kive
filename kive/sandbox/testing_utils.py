@@ -4,7 +4,6 @@ import random
 import shutil
 import subprocess
 import tempfile
-import time
 
 from django.contrib.auth.models import User
 from django.core.files import File

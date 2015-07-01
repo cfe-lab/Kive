@@ -9,6 +9,7 @@ import tempfile
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.files.base import File
 from django.core.urlresolvers import resolve
 from django.db.models import Count
 from django.test import TestCase
@@ -22,17 +23,15 @@ from constants import datatypes
 from kive.tests import BaseTestCases
 from metadata.models import CompoundDatatype, CompoundDatatypeMember, \
     Datatype, kive_user, everyone_group
+import metadata.tests
 from method.models import Method, MethodFamily, CodeResource,\
     CodeResourceRevision
 import method.tests
 from pipeline.models import Pipeline, PipelineFamily, \
     PipelineStep, PipelineStepInputCable, \
     PipelineOutputCable
-import sandbox.testing_utils as tools
-import metadata.tests
-
 from pipeline.serializers import PipelineSerializer
-from django.core.files.base import File
+import sandbox.testing_utils as tools
 
 samplecode_path = "../samplecode"
 
@@ -4145,7 +4144,8 @@ def create_pipeline_deserialization_environment(self):
 
     # A fake request that provides context.
     class DuckRequest(object):
-        pass
+        def build_absolute_uri(self, url):
+            return url
 
     self.duck_request = DuckRequest()
     self.duck_request.user = kive_user()
@@ -4711,13 +4711,51 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
         create_pipeline_deserialization_environment(self)
         request = self.factory.post(self.list_path, self.pipeline_dict, format="json")
         force_authenticate(request, user=self.kive_user)
-        self.list_view(request)
+        response = self.list_view(request)
 
+        if response.exception:
+            self.fail(response.data)
         # Probe the new object.
         new_pipeline = self.test_pf.members.get(revision_name=self.pipeline_dict["revision_name"])
         self.assertEquals(new_pipeline.steps.count(), 3)
         self.assertEquals(new_pipeline.outcables.count(), 1)
         self.assertEquals(new_pipeline.outcables.first().output_name, "untouched_output")
+        
+    def create_new_code_revision(self):
+        contents = "print('This is the new code.')"
+        with tempfile.TemporaryFile() as f:
+            f.write(contents)
+            revision = CodeResourceRevision(
+                coderesource=self.coderesource_noop,
+                revision_name="new",
+                revision_desc="just print a message",
+                content_file=File(f),
+                user=self.user_bob)
+            revision.save()
+            revision.clean()
+        return revision
+
+    def test_create_with_new_method(self):
+        create_pipeline_deserialization_environment(self)
+        revision = self.create_new_code_revision()
+    
+        step_dict = self.pipeline_dict['steps'][0]
+        step_dict['new_code_resource_revision_id'] = revision.id
+        request = self.factory.post(self.list_path,
+                                    self.pipeline_dict,
+                                    format="json")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request)
+
+        if response.exception:
+            self.fail(response.data)
+        # Probe the new object.
+        new_pipeline = self.test_pf.members.get(
+            revision_name=self.pipeline_dict["revision_name"])
+        method = revision.methods.first()
+        self.assertIsNotNone(method, 'method expected for new code revision')
+        step = new_pipeline.steps.get(step_num=1)
+        self.assertEqual(step.transformation.display_name, method.display_name)
 
     def test_create_calls_clean(self):
         """

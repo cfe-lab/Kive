@@ -1,13 +1,13 @@
 from rest_framework import serializers
 
+from kive.serializers import AccessControlSerializer
+from method.models import CodeResourceRevision
+from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
 from pipeline.models import PipelineFamily, Pipeline, CustomCableWire,\
     PipelineStepInputCable, PipelineStep, PipelineOutputCable
 from transformation.models import XputStructure
-
 from transformation.serializers import TransformationInputSerializer,\
     TransformationOutputSerializer
-from kive.serializers import AccessControlSerializer
-from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
 
 
 class CustomCableWireSerializer(serializers.ModelSerializer):
@@ -62,6 +62,8 @@ class PipelineStepSerializer(serializers.ModelSerializer):
     )
     inputs = TransformationInputSerializer(many=True, read_only=True)
     outputs = TransformationOutputSerializer(many=True, read_only=True)
+    new_code_resource_revision_id = serializers.IntegerField(write_only=True,
+                                                             required=False)
 
     class Meta:
         model = PipelineStep
@@ -76,7 +78,8 @@ class PipelineStepSerializer(serializers.ModelSerializer):
             "name",
             "cables_in",
             "outputs",
-            "inputs"
+            "inputs",
+            "new_code_resource_revision_id"
         )
 
     def validate(self, data):
@@ -323,6 +326,26 @@ class PipelineSerializer(AccessControlSerializer,
             # This is a ManyToManyField so it must be populated after the step
             # itself is created.
             outputs_to_delete = step_data.pop("outputs_to_delete")
+            code_resource_revision_id = step_data.pop(
+                "new_code_resource_revision_id",
+                None)
+            if code_resource_revision_id is not None:
+                code_revision = CodeResourceRevision.objects.get(
+                    id=code_resource_revision_id)
+                old_method = step_data['transformation'].definite
+                method = old_method.family.members.create(
+                    revision_name=code_revision.revision_name,
+                    revision_desc=code_revision.revision_desc,
+                    revision_parent=old_method,
+                    driver=code_revision,
+                    reusable=old_method.reusable,
+                    tainted=old_method.tainted,
+                    threads=old_method.threads,
+                    user=pipeline.user)
+                method.copy_io_from_parent()
+                method.users_allowed.add(*users_allowed)
+                method.groups_allowed.add(*groups_allowed)
+                step_data['transformation'] = method
 
             curr_step = pipeline.steps.create(**step_data)
             curr_step.outputs_to_delete.add(*outputs_to_delete)
@@ -336,8 +359,7 @@ class PipelineSerializer(AccessControlSerializer,
                 dest_dict = cable_data.pop("dest")
                 dest_dataset_name = dest_dict["definite"]["dataset_name"]
                 dest = step_data["transformation"].inputs.get(
-                    dataset_name=dest_dataset_name
-                )
+                    dataset_name=dest_dataset_name)
 
                 source_step_num = cable_data["source_step"]
                 if source_step_num == 0:
