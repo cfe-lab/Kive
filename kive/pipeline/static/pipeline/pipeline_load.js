@@ -1,18 +1,18 @@
-// place in global namespace to access from other files
-//var submit_to_url = '/pipeline_add';
-
+/**
+ * Convert between API calls and CanvasState object.
+ */
 var pipeline = (function(exports){
     "use strict";
 
-    var namespace = {};
+    var my = {};
 
     // Pipeline constructor
-    var Pipeline = function(canvasState){
+    my.Pipeline = function(canvasState){
         this.pipeline = null;
         this.canvasState = canvasState;
     };
 
-    Pipeline.prototype.load = function(pipeline) {
+    my.Pipeline.prototype.load = function(pipeline) {
         /**
          * This method loads a pipeline and sets up the canvas to
          * draw the pipeline.
@@ -28,23 +28,23 @@ var pipeline = (function(exports){
         this.build_outputs();
     };
 
-    Pipeline.prototype.serialize = function(args, patch) {
+    my.Pipeline.prototype.serialize = function(form_data) {
         /**
          * This method serializes the pipeline into an object that can be
          * fed to the backend REST API.
          *
          * See: /api/pipelines/
          *
-         * @param patch: (optional) If this is only a trivial update
-         *  then use this to generate the patch data for the update.
+         * @param form_data: starting data that all of the pipeline details
+         * will be added to. Object format matches the JSON structure of the
+         * API.
          */
 
         var self = this,
-            method_nodes = [],
             pipeline_outputs = [],
             pipeline_inputs = [],
-            canvas_x_ratio = 1./self.canvasState.canvas.width,
-            canvas_y_ratio = 1./self.canvasState.canvas.height,
+            canvas_x_ratio = 1.0/self.canvasState.canvas.width,
+            canvas_y_ratio = 1.0/self.canvasState.canvas.height,
             is_trivial = true; // This is a trivial modification until we hit a non trivial
             // modification
 
@@ -55,8 +55,6 @@ var pipeline = (function(exports){
             if (shape instanceof drydock_objects.MethodNode) {
                 var num_connections = 0;
 
-                // Track all method nodes
-                method_nodes.push(shape);
                 $.each(shape.out_magnets, function(_, magnet){
                     num_connections += magnet.connected.length;
                 });
@@ -99,7 +97,7 @@ var pipeline = (function(exports){
         }
 
         // Now we're ready to start
-        var form_data = args || {};
+        form_data = form_data || {};
         form_data.steps = [];
         form_data.inputs = [];
         form_data.outcables = [];
@@ -145,6 +143,10 @@ var pipeline = (function(exports){
                 name: step.label,
                 fill_colour: step.fill,
                 cables_in: [],
+                new_code_resource_revision_id: (
+                        step.new_code_resource_revision ?
+                                step.new_code_resource_revision.id :
+                                    null),
                 outputs_to_delete: [] // not yet implemented
             };
 
@@ -201,7 +203,7 @@ var pipeline = (function(exports){
         return form_data;
     };
 
-    Pipeline.prototype.update = function(runstat, look_for_md5, rtp_id)  {
+    my.Pipeline.prototype.update = function(runstat, look_for_md5, rtp_id)  {
         /**
          * Updates the progress of this pipeline with the status
          *
@@ -254,7 +256,7 @@ var pipeline = (function(exports){
         self.canvasState.draw();
     };
 
-    Pipeline.prototype.draw = function() {
+    my.Pipeline.prototype.draw = function() {
         /**
          * Forces a redraw of this pipeline on its associated canvas
          */
@@ -268,7 +270,7 @@ var pipeline = (function(exports){
 
 
     // Private members
-    Pipeline.prototype.build_inputs = function() {
+    my.Pipeline.prototype.build_inputs = function() {
         /**
          * Sets up the canvas state with the inputs for a pipeline
          */
@@ -304,7 +306,7 @@ var pipeline = (function(exports){
         });
     };
 
-    Pipeline.prototype.build_steps = function() {
+    my.Pipeline.prototype.build_steps = function() {
         /**
          * Private method that sets up canvas state to draw methods
          */
@@ -354,7 +356,7 @@ var pipeline = (function(exports){
                 }
 
                 // cable from pipeline input, identified by dataset_name
-                if (cable.source_step == 0) {
+                if (cable.source_step === 0) {
 
                     // Find the source for this
                     $.each(self.canvasState.shapes, function() {
@@ -409,7 +411,7 @@ var pipeline = (function(exports){
         });
     };
 
-    Pipeline.prototype.build_outputs = function () {
+    my.Pipeline.prototype.build_outputs = function () {
         /**
          * Private method that sets up canvas state to draw outputs
          */
@@ -455,7 +457,7 @@ var pipeline = (function(exports){
         });
     };
 
-    Pipeline.prototype.applyStepUpdates = function(updates) {
+    my.Pipeline.prototype.applyStepUpdates = function(updates) {
         var pipeline = this,
             steps = pipeline.canvasState.getSteps(),
             updated_step_nums = updates.map(function(update) { return update.step_num - 1; });
@@ -468,6 +470,13 @@ var pipeline = (function(exports){
         $.each(updates, function() {
             var update = this,
                 old_method = steps[update.step_num - 1],
+                new_method,
+                any_mismatch;
+            if ( ! update.method) {
+                new_method = old_method;
+                any_mismatch = false;
+            }
+            else {
                 new_method = new drydock_objects.MethodNode(
                         update.method.id,
                         update.method.family_id,
@@ -476,23 +485,32 @@ var pipeline = (function(exports){
                         old_method.fill,
                         old_method.label,
                         update.method.inputs,
-                        update.method.outputs),
-                any_mismatch = pipeline.canvasState.replaceMethod(old_method, new_method);
-            
-            new_method.updateSignal(any_mismatch ? 'updated with issues' : 'updated');
+                        update.method.outputs);
+                any_mismatch = pipeline.canvasState.replaceMethod(
+                        old_method,
+                        new_method);
+                new_method.updateSignal(
+                        any_mismatch ?
+                                'updated with issues'
+                                : 'updated');
+            }
+            if (update.code_resource_revision) {
+                new_method.new_code_resource_revision = update.code_resource_revision;
+                new_method.updateSignal(any_mismatch ? 'updated with issues' : 'updated');
+            }
         });
         
         pipeline.canvasState.valid = false;
     };
 
-    Pipeline.prototype.isPublished = function() {
+    my.Pipeline.prototype.isPublished = function() {
         /**
          * Returns whether or not the pipeline has been published
          */
         return this.pipeline.is_published_version;
     };
 
-    Pipeline.prototype.publish = function(family_pk, callback) {
+    my.Pipeline.prototype.publish = function(family_pk, callback) {
         /**
          * Sets this pipeline as published
          *
@@ -514,7 +532,7 @@ var pipeline = (function(exports){
         });
     };
 
-    Pipeline.prototype.unpublish =  function(family_pk, callback) {
+    my.Pipeline.prototype.unpublish =  function(family_pk, callback) {
         /**
          * Sets this pipeline as unpublished
          *
@@ -536,12 +554,7 @@ var pipeline = (function(exports){
         });
     };
 
-    // Export to the global namespace
-    var namespace = {
-        Pipeline: Pipeline
-    };
-
-    return namespace;
+    return my;
 })();
 
 window.Pipeline = pipeline.Pipeline;

@@ -2212,7 +2212,7 @@
         });
         
         describe('Update steps', function(){
-            it('should apply update', function(){
+            it('should apply method update', function() {
                 var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
                     new_method_id = 77,
                     step_updates = [{
@@ -2408,6 +2408,24 @@
                 var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
                 expect(updated_method.update_signal.status).toBe('updated with issues');
             });
+            
+            it('should apply code resource update', function() {
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
+                    step_updates = [{
+                        step_num: 1,
+                        code_resource_revision: {
+                            id: 77,
+                            revision_name: "new feature"
+                        }
+                    }];
+                pipeline.applyStepUpdates(step_updates);
+                
+                var new_method = this.canvasState.findNodeByLabel('prelim_map.py');
+                
+                expect(new_method.new_code_resource_revision).toBe(
+                        step_updates[0].code_resource_revision,
+                        "new_code_resource_revision");
+            });
         });
         
         function loadAndSerialize(canvasState, api_pipeline, additional_args){
@@ -2514,6 +2532,23 @@
                     expect(ser_output.source_dataset_name).toBe(api_output.source_dataset_name);
                     expect(ser_output.source_step).toBe(api_output.source_step);
                 });
+            });
+            
+            it('should submit code resource update', function() {
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
+                    method = this.canvasState.findNodeByLabel("prelim_map.py"),
+                    new_code_resource_revision_id = 72;
+                method.new_code_resource_revision = {
+                        id: new_code_resource_revision_id,
+                        name: "French"
+                };
+                pipeline.draw();
+                var data = pipeline.serialize(),
+                    step = data.steps[0];
+                
+                expect(step.new_code_resource_revision_id).toBe(
+                        new_code_resource_revision_id,
+                        "step.new_code_resource_revision_id");
             });
         });
     });

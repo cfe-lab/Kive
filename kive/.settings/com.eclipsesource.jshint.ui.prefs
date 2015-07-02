@@ -1,2 +1,2 @@
 eclipse.preferences.version=1
-included=//tests.js\:archive//*.js\:pipeline/static/pipeline/drydock.js\:pipeline/static/pipeline/drydock_objects.js\:pipeline/static/pipeline/pipeline_families.js\:pipeline/static/pipeline/pipeline_revise.js\:portal/static/portal/permissions.js\:sandbox/static/sandbox/choose*.js
+included=//tests.js\:archive//*.js\:pipeline/static/pipeline/drydock.js\:pipeline/static/pipeline/drydock_objects.js\:pipeline/static/pipeline/pipeline_families.js\:pipeline/static/pipeline/pipeline_load.js\:pipeline/static/pipeline/pipeline_revise.js\:portal/static/portal/permissions.js\:sandbox/static/sandbox/choose*.js

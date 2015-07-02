@@ -63,7 +63,8 @@ class PipelineStepSerializer(serializers.ModelSerializer):
     inputs = TransformationInputSerializer(many=True, read_only=True)
     outputs = TransformationOutputSerializer(many=True, read_only=True)
     new_code_resource_revision_id = serializers.IntegerField(write_only=True,
-                                                             required=False)
+                                                             required=False,
+                                                             allow_null=True)
 
     class Meta:
         model = PipelineStep
