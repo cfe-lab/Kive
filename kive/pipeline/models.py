@@ -9,7 +9,7 @@ from __future__ import unicode_literals
 from django.db import models
 from django.db.models import Max
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator, validate_slug
 from django.db import transaction
 from django.utils.encoding import python_2_unicode_compatible
 
@@ -425,6 +425,7 @@ class Pipeline(transformation.models.Transformation):
                     #TODO: look for new dependencies
         return updates
 
+
 @python_2_unicode_compatible
 class PipelineStep(models.Model):
     """
@@ -622,6 +623,7 @@ class PipelineStep(models.Model):
             return self.transformation.threads_needed()
         return self.transformation.definite.threads
 
+
 class PipelineStepUpdate(object):
     """ A data object to hold details about how a pipeline step can be updated.
     """
@@ -630,6 +632,7 @@ class PipelineStepUpdate(object):
         self.method = None
         self.code_resource_revision = None
         self.dependencies = []
+
 
 class PipelineCable(models.Model):
     """A cable feeding into a step or out of a pipeline."""
@@ -1298,8 +1301,11 @@ class PipelineOutputCable(PipelineCable):
     """
     pipeline = models.ForeignKey(Pipeline, related_name="outcables")
 
-    output_name = models.CharField("Output hole name", max_length=maxlengths.MAX_NAME_LENGTH, 
-            help_text="Pipeline output hole name")
+    output_name = models.CharField(
+        "Output hole name", max_length=maxlengths.MAX_NAME_LENGTH,
+        help_text="Pipeline output hole name",
+        validators=[validate_slug]
+    )
 
     # We need to specify both the output name and the output index because
     # we are defining the outputs of the Pipeline indirectly through
