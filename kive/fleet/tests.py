@@ -267,7 +267,10 @@ class GarbageCollectionTest(TestCase):
 
         self.assertRaisesRegexp(
             SandboxActiveException,
-            re.escape("Run (Pipeline={}, queued {}) has not yet started".format(self.noop_pl, rtp.time_queued)),
+            re.escape("Run (RunToProcess={}, Pipeline={}, queued {}, User=Rem Over) has not yet started".format(
+                rtp.id,
+                self.noop_pl,
+                rtp.time_queued)),
             rtp.collect_garbage
         )
 
@@ -284,7 +287,10 @@ class GarbageCollectionTest(TestCase):
 
         self.assertRaisesRegexp(
             SandboxActiveException,
-            re.escape("Run (Pipeline={}, queued {}) is not finished".format(self.noop_pl, rtp.time_queued)),
+            re.escape("Run (RunToProcess={}, Pipeline={}, queued {}, User=Rem Over) is not finished".format(
+                rtp.id,
+                self.noop_pl,
+                rtp.time_queued)),
             rtp.collect_garbage
         )
 

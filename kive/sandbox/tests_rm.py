@@ -440,7 +440,7 @@ class FindSDTests(TestCase):
 
         transforms = [self.method_noop_backwords, self.pipeline_twostep, self.method_noop_backwords]
         tools.create_linear_pipeline(self.pipeline_nested,
-            transforms, "data", "unchanged data")
+            transforms, "data", "unchanged_data")
         cable = self.pipeline_nested.steps.get(step_num=3).cables_in.first()
         tools.make_crisscross_cable(cable)
         self.pipeline_nested.create_outputs()

@@ -2926,7 +2926,7 @@ class PipelineUpdateTests(PipelineTestCase):
         self.assertEqual(len(updates), 1)
         update = updates[0]
         self.assertEqual(update.step_num, 1)
-        self.assertEqual(update.transformation, self.DNAcompv3_m)
+        self.assertEqual(update.method, self.DNAcompv3_m)
         self.assertEqual(update.code_resource_revision, None)
      
     def test_find_step_updates_code_resource(self):
