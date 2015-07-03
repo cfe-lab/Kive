@@ -52,6 +52,11 @@ $(function() {
         
         $.getJSON("/api/pipelines/" + pipeline_id + "/step_updates/").done(function(updates) {
             window.pipeline_revision.applyStepUpdates(updates);
+        }).fail(function() {
+            for (var i = 0; i < steps.length; i++) {
+                steps[i].updateSignal("unavailable");
+            }
+            pipeline.canvasState.valid = false;
         });
     });
     
