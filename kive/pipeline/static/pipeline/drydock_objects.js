@@ -888,6 +888,32 @@ var drydock_objects = (function() {
         }
     };
     
+    my.MethodNode.prototype.isFullyConnected = function() {
+        var is_fully_connected = true,
+            i,
+            magnet;
+        
+        for (i = 0; i < this.in_magnets.length; i++) {
+            magnet = this.in_magnets[i];
+            if (magnet.connected == undefined || magnet.connected.length == 0) {
+                is_fully_connected = false;
+                break;
+            }
+        }
+        
+        if (is_fully_connected) {
+            for (i = 0; i < this.out_magnets.length; i++) {
+                magnet = this.out_magnets[i];
+                if (magnet.connected == undefined || magnet.connected.length == 0) {
+                    is_fully_connected = false;
+                    break;
+                }
+            }
+        }
+        
+        return is_fully_connected;
+    };
+    
     my.MethodNode.prototype.deleteFrom = function(cs) {
         var magnet, i, j;
         
@@ -1382,7 +1408,7 @@ var drydock_objects = (function() {
     };
     my.NodeUpdateSignal.prototype.status_opts = {
         "no update available": {
-            color: "#0d0"
+            color: "#00d"
         },
         "updated": {
             color: "#0d0"

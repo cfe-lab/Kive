@@ -472,9 +472,15 @@ var pipeline = (function(exports){
                         old_method.label,
                         update.method.inputs,
                         update.method.outputs);
-            
-            new_method.update_signal = new drydock_objects.NodeUpdateSignal(new_method, "updated");
-            pipeline.canvasState.replaceMethod(old_method, new_method);
+
+            var any_mismatch = pipeline.canvasState.replaceMethod(old_method, new_method);
+            new_method.updateSignal(any_mismatch ? 'updated with issues' : 'updated');
+        });
+        
+        $.each(steps, function() {
+            if (!(this.update_signal instanceof drydock_objects.NodeUpdateSignal)) {
+                this.updateSignal('no update available');
+            }
         });
     };
 

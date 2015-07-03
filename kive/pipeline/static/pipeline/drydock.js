@@ -274,11 +274,7 @@ var drydock = (function() {
             };
             
         if (maintain_aspect_ratio) {
-            if (scale.x < scale.y) {
-                scale.y = scale.x;
-            } else {
-                scale.x = scale.y;
-            }
+            scale.y = scale.x = Math.min(scale.x, scale.y);
         }
         
         /*
@@ -840,7 +836,7 @@ var drydock = (function() {
         return shape;
     };
     
-    function migrateConnectors(from_node, to_node) {
+    function __migrateConnectors(from_node, to_node) {
         $.each(from_node.inputs, function(){
             var old_xput = this,
                 old_dataset_idx = old_xput.dataset_idx,
@@ -848,7 +844,8 @@ var drydock = (function() {
 
             if (((new_xput.structure === null && old_xput.structure === null) ||
                  (new_xput.structure !== null && old_xput.structure !== null &&
-                  new_xput.structure.compounddatatype == old_xput.structure.compounddatatype)) &&
+                  new_xput.structure.compounddatatype == old_xput.structure.compounddatatype
+                  )) &&
                   from_node.in_magnets[old_dataset_idx - 1].connected.length) {
 
                 // re-attach Connector
@@ -880,12 +877,58 @@ var drydock = (function() {
         });
     }
     
+    function migrateConnectors(from_node, to_node) {
+        var any_connection_mismatch = false,
+            was_fully_connected = from_node.isFullyConnected();
+          
+        // this will detect a mismatch if any existing xputs have changed
+        $.each(from_node.inputs,  migrateUsing('inputs',  'in_magnets',  'dest',   'push'));
+        $.each(from_node.outputs, migrateUsing('outputs', 'out_magnets', 'source', 'unshift'));
+        
+        // this will detect a mismatch if any new xputs have been added
+        if (!any_connection_mismatch && was_fully_connected !== to_node.isFullyConnected()) {
+            any_connection_mismatch = true;
+        }
+        
+        return any_connection_mismatch;
+        
+        // inner helper function does the bulk of the work 
+        // 4 arguments tell it which properties to use
+        // modifies variables in parent's scope
+        function migrateUsing(xputs_prop, magnets_prop, terminal_prop, shift_dir) {
+            return function() {
+                var old_xput = this,
+                    old_didx_s1 = old_xput.dataset_idx - 1,
+                    old_xput_connections = from_node[magnets_prop][old_didx_s1].connected,
+                    new_xput = to_node[xputs_prop][old_didx_s1],
+                    xputs_are_matching_cdts = new_xput &&
+                        new_xput.structure !== null && old_xput.structure !== null &&
+                        new_xput.structure.compounddatatype == old_xput.structure.compounddatatype,
+                    xputs_are_raw = new_xput &&
+                        new_xput.structure === null && old_xput.structure === null,
+                    connector;// temp variable
+
+                if (xputs_are_raw || xputs_are_matching_cdts) {
+                    // re-attach all Connectors
+                    while (old_xput_connections.length > 0) {
+                        connector = old_xput_connections.pop();
+                        connector[terminal_prop] = to_node[magnets_prop][old_didx_s1];
+                        connector[terminal_prop].connected[shift_dir](connector);
+                    }
+                } else {
+                    any_connection_mismatch = true;
+                }
+            };
+        }
+    }
+    
     my.CanvasState.prototype.replaceMethod = function(old_method, new_method) {
         new_method.x = old_method.x;
         new_method.y = old_method.y;
         this.addShape(new_method);
-        migrateConnectors(old_method, new_method);
+        var any_mismatch = migrateConnectors(old_method, new_method);
         this.deleteObject(old_method);
+        return any_mismatch;
     };
     
     my.CanvasState.prototype.findNodeByLabel = function(label) {

@@ -2212,7 +2212,6 @@
         });
         
         describe('Update steps', function(){
-
             it('should apply update', function(){
                 var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
                     new_method_id = 77,
@@ -2238,11 +2237,176 @@
                             }]
                         }
                     }];
+                  
                 pipeline.applyStepUpdates(step_updates);
-                
                 var new_method = this.canvasState.findNodeByLabel('prelim_map.py');
-                
                 expect(new_method.pk).toBe(new_method_id);
+            });
+
+            it('should notify the user of updates', function(){
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
+                    new_method_id = 77,
+                    step_updates = [{
+                        step_num: 1,
+                        method: {
+                            id: new_method_id,
+                            family_id: 3,
+                            inputs: [{
+                                dataset_name: "fastq1",
+                                dataset_idx: 1,
+                                structure: null
+                            },
+                            {
+                                dataset_name: "fastq2",
+                                dataset_idx: 2,
+                                structure: null
+                            }],
+                            outputs: [{
+                                dataset_name: "prelim",
+                                dataset_idx: 1,
+                                structure: { compounddatatype: 7 }
+                            }]
+                        }
+                    }];
+                  
+                pipeline.applyStepUpdates(step_updates);
+                var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
+                var no_updates_found_method = this.canvasState.findNodeByLabel('remap.py');
+                expect(updated_method.update_signal.status).toBe('updated');
+                expect(no_updates_found_method.update_signal.status).toBe('no update available');
+            });
+
+            it('should notify the user if an updated method has changed inputs', function(){
+                // changed input
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
+                    new_method_id = 78,
+                    step_updates = [{
+                        step_num: 1,
+                        method: {
+                            id: new_method_id,
+                            family_id: 3,
+                            inputs: [{
+                                dataset_name: "fastq1",
+                                dataset_idx: 1,
+                                structure: null
+                            },
+                            {
+                                dataset_name: "new_cdt",
+                                dataset_idx: 2,
+                                structure: { compounddatatype: 19 }
+                            }],
+                            outputs: [{
+                                dataset_name: "prelim",
+                                dataset_idx: 1,
+                                structure: { compounddatatype: 7 }
+                            }]
+                        }
+                    }];
+                  
+                pipeline.applyStepUpdates(step_updates);
+                var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
+                expect(updated_method.update_signal.status).toBe('updated with issues');
+            });
+
+            it('should notify the user if an updated method has changed outputs', function(){
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
+                    new_method_id = 78,
+                    step_updates = [{
+                        step_num: 1,
+                        method: {
+                            id: new_method_id,
+                            family_id: 3,
+                            inputs: [{
+                                dataset_name: "fastq1",
+                                dataset_idx: 1,
+                                structure: null
+                            },
+                            {
+                                dataset_name: "fastq2",
+                                dataset_idx: 2,
+                                structure: null
+                            }],
+                            outputs: [{
+                                dataset_name: "changed_output",
+                                dataset_idx: 1,
+                                structure: { compounddatatype: 19 }
+                            }]
+                        }
+                    }];
+                  
+                pipeline.applyStepUpdates(step_updates);
+                var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
+                expect(updated_method.update_signal.status).toBe('updated with issues');
+            });
+
+            it('should notify the user if an updated method has new inputs', function(){
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
+                    new_method_id = 78,
+                    step_updates = [{
+                        step_num: 1,
+                        method: {
+                            id: new_method_id,
+                            family_id: 3,
+                            inputs: [{
+                                dataset_name: "fastq1",
+                                dataset_idx: 1,
+                                structure: null
+                            },
+                            {
+                                dataset_name: "fastq2",
+                                dataset_idx: 2,
+                                structure: null
+                            },{
+                                dataset_name: "new_input",
+                                dataset_idx: 3,
+                                structure: null
+                            }],
+                            outputs: [{
+                                dataset_name: "prelim",
+                                dataset_idx: 1,
+                                structure: { compounddatatype: 7 }
+                            }]
+                        }
+                    }];
+                  
+                pipeline.applyStepUpdates(step_updates);
+                var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
+                expect(updated_method.update_signal.status).toBe('updated with issues');
+            });
+
+            it('should notify the user if an updated method has new outputs', function(){
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
+                    new_method_id = 78,
+                    step_updates = [{
+                        step_num: 1,
+                        method: {
+                            id: new_method_id,
+                            family_id: 3,
+                            inputs: [{
+                                dataset_name: "fastq1",
+                                dataset_idx: 1,
+                                structure: null
+                            },
+                            {
+                                dataset_name: "fastq2",
+                                dataset_idx: 2,
+                                structure: null
+                            }],
+                            outputs: [{
+                                dataset_name: "prelim",
+                                dataset_idx: 1,
+                                structure: { compounddatatype: 7 }
+                            },{
+                                dataset_name: "new_output",
+                                dataset_idx: 2,
+                                structure: { compounddatatype: 19 }
+                            }]
+                        }
+                    }];
+                  
+                pipeline.applyStepUpdates(step_updates);
+                var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
+                expect(updated_method.update_signal.status).toBe('updated with issues');
             });
         });
         
