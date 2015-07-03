@@ -837,24 +837,16 @@ var drydock = (function() {
     };
     
     function migrateConnectors(from_node, to_node) {
-        var any_connection_mismatch = false,
-            was_fully_connected = from_node.isFullyConnected();
-          
-        // this will detect a mismatch if any existing xputs have changed
-        $.each(from_node.inputs,  migrateUsing('inputs',  'in_magnets',  'dest',   'push'));
-        $.each(from_node.outputs, migrateUsing('outputs', 'out_magnets', 'source', 'unshift'));
+        var migrateInputs  = migrateFnUsing('inputs',  'in_magnets',  'dest',   'push'),
+            migrateOutputs = migrateFnUsing('outputs', 'out_magnets', 'source', 'unshift');
         
-        // this will detect a mismatch if any new xputs have been added
-        if (!any_connection_mismatch && was_fully_connected !== to_node.isFullyConnected()) {
-            any_connection_mismatch = true;
-        }
-        
-        return any_connection_mismatch;
+        $.each(from_node.inputs, migrateInputs);
+        $.each(from_node.outputs, migrateOutputs);
         
         // inner helper function does the bulk of the work 
         // 4 arguments tell it which properties to use
-        // modifies variables in parent's scope
-        function migrateUsing(xputs_prop, magnets_prop, terminal_prop, shift_dir) {
+        // modifies from_node and to_node in parent's scope
+        function migrateFnUsing(xputs_prop, magnets_prop, terminal_prop, shift_dir) {
             return function() {
                 var old_xput = this,
                     old_didx_s1 = old_xput.dataset_idx - 1,
@@ -874,20 +866,26 @@ var drydock = (function() {
                         connector[terminal_prop] = to_node[magnets_prop][old_didx_s1];
                         connector[terminal_prop].connected[shift_dir](connector);
                     }
-                } else {
-                    any_connection_mismatch = true;
                 }
+                /*
+                This code block may be useful if we want to provide 
+                more specific info about the mismatch? Variable must
+                be returned by migrateConnectors.
+                else {}
+                */
             };
         }
     }
     
     my.CanvasState.prototype.replaceMethod = function(old_method, new_method) {
+        var was_fully_connected = old_method.isFullyConnected();
         new_method.x = old_method.x;
         new_method.y = old_method.y;
         this.addShape(new_method);
-        var any_mismatch = migrateConnectors(old_method, new_method);
+        migrateConnectors(old_method, new_method);
         this.deleteObject(old_method);
-        return any_mismatch;
+        // this will detect a mismatch if any new xputs have been added
+        return was_fully_connected !== new_method.isFullyConnected();
     };
     
     my.CanvasState.prototype.findNodeByLabel = function(label) {

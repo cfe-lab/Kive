@@ -881,10 +881,14 @@ var drydock_objects = (function() {
     };
     
     my.MethodNode.prototype.updateSignal = function(status) {
-        if (this.update_signal instanceof my.NodeUpdateSignal) {
-            this.update_signal.setStatus(status);
+        if (status !== undefined) {
+            if (this.update_signal instanceof my.NodeUpdateSignal) {
+                this.update_signal.setStatus(status);
+            } else {
+                this.update_signal = new my.NodeUpdateSignal(this, status);
+            }
         } else {
-            this.update_signal = new my.NodeUpdateSignal(this, status);
+            return this.update_signal;
         }
     };
     

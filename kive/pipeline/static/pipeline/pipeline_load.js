@@ -457,9 +457,14 @@ var pipeline = (function(exports){
 
     Pipeline.prototype.applyStepUpdates = function(updates) {
         var pipeline = this,
-            steps = pipeline.canvasState.getSteps();
-        pipeline.canvasState.valid = false;
+            steps = pipeline.canvasState.getSteps(),
+            updated_step_nums = updates.map(function(update) { return update.step_num - 1; });
         
+        for (var i = 0; i < steps.length; i++) {
+            if (updated_step_nums.indexOf(i) < 0) {
+                steps[i].updateSignal('no update available');
+            }
+        }
         $.each(updates, function() {
             var update = this,
                 old_method = steps[update.step_num - 1],
@@ -471,17 +476,13 @@ var pipeline = (function(exports){
                         old_method.fill,
                         old_method.label,
                         update.method.inputs,
-                        update.method.outputs);
-
-            var any_mismatch = pipeline.canvasState.replaceMethod(old_method, new_method);
+                        update.method.outputs),
+                any_mismatch = pipeline.canvasState.replaceMethod(old_method, new_method);
+            
             new_method.updateSignal(any_mismatch ? 'updated with issues' : 'updated');
         });
         
-        $.each(steps, function() {
-            if (!(this.update_signal instanceof drydock_objects.NodeUpdateSignal)) {
-                this.updateSignal('no update available');
-            }
-        });
+        pipeline.canvasState.valid = false;
     };
 
     Pipeline.prototype.isPublished = function() {
