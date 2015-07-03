@@ -156,7 +156,8 @@ $(function() {
     var updateMethodRevisionsMenu = function() {
         var mf_id = this.value;
         if (mf_id !== '') {
-            $.ajax({
+            $('#id_method_revision_field').show().focus();
+            return $.ajax({
                 type: "POST",
                 url: "/get_method_revisions/",
                 data: { mf_id: mf_id }, // specify data as an object
@@ -177,11 +178,9 @@ $(function() {
                     $("#id_select_method").show().empty().append(options).change();
                 }
             });
-            $('#id_method_revision_field').show().focus();
         }
-        else {
-            $("#id_method_revision_field").hide();
-        }
+        $("#id_method_revision_field").hide();
+        return $.Deferred().reject(); // No method family chosen, never loads.
     };
     var createNewInputNode = function(e) {
         e.preventDefault(); // stop default form submission behaviour
@@ -407,7 +406,17 @@ $(function() {
                     });
                     $('#id_select_colour').val(sel.fill);
                     $('#colour_picker_pick').css('background-color', sel.fill);
-                    $('#id_select_method_family').val(sel.family).change();  // trigger ajax
+                    var $method_family = $('#id_select_method_family');
+                    $method_family.val(sel.family);
+                    var request = updateMethodRevisionsMenu.call($method_family[0]); // trigger ajax
+                    if (sel.new_code_resource_revision) {
+                        request.done(function() {
+                            var name = sel.new_code_resource_revision.revision_name;
+                            $("#id_select_method").prepend(
+                                    $('<option>', { value: sel.pk }).text(
+                                            'new: ' + name));
+                        });
+                    }
                     
                     // #id_method_revision_field is always populated via ajax.
                     // $.one() will run this event exactly once before killing it.
