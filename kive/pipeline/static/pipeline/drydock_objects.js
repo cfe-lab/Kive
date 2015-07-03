@@ -897,22 +897,13 @@ var drydock_objects = (function() {
             i,
             magnet;
         
-        for (i = 0; i < this.in_magnets.length; i++) {
+        for (i = 0; i < this.in_magnets.length && is_fully_connected; i++) {
             magnet = this.in_magnets[i];
-            if (magnet.connected == undefined || magnet.connected.length == 0) {
-                is_fully_connected = false;
-                break;
-            }
+            is_fully_connected = magnet.connected.length !== 0;
         }
-        
-        if (is_fully_connected) {
-            for (i = 0; i < this.out_magnets.length; i++) {
-                magnet = this.out_magnets[i];
-                if (magnet.connected == undefined || magnet.connected.length == 0) {
-                    is_fully_connected = false;
-                    break;
-                }
-            }
+        for (i = 0; i < this.out_magnets.length && is_fully_connected; i++) {
+            magnet = this.out_magnets[i];
+            is_fully_connected = magnet.connected.length !== 0;
         }
         
         return is_fully_connected;
