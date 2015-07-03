@@ -41,7 +41,15 @@ $(function() {
     });
 
     $('#id_update').on('click', function() {
-        var pipeline_id = window.pipeline_revision.pipeline.id;
+        var pipeline = window.pipeline_revision,
+            pipeline_id = pipeline.pipeline.id,
+            steps = pipeline.canvasState.getSteps();
+        
+        for (var i = 0; i < steps.length; i++) {
+            steps[i].updateSignal("update in progress");
+        }
+        pipeline.canvasState.valid = false;
+        
         $.getJSON("/api/pipelines/" + pipeline_id + "/step_updates/").done(function(updates) {
             window.pipeline_revision.applyStepUpdates(updates);
         });

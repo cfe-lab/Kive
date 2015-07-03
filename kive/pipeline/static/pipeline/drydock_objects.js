@@ -1402,31 +1402,54 @@ var drydock_objects = (function() {
         this.setStatus(status);
         this.x = node.x + node.w/2;
         this.y = node.y - node.h/2;
-        this.r = 8;
+        this.r = 10;
     };
     my.NodeUpdateSignal.prototype.draw = function(ctx) {
         var canvas = new my.CanvasWrapper(undefined, ctx);
-        var status_opts = this.status_opts[this.status];
-        ctx.fillStyle = status_opts.color;
+        var status_opt = this.status_opts[this.status];
+        ctx.fillStyle = status_opt.color;
         canvas.drawCircle(this);
+        ctx.drawImage(status_opt.icon, this.x - this.r + 2, this.y - this.r + 2);
     };
-    my.NodeUpdateSignal.prototype.status_opts = {
-        "no update available": {
-            color: "#00d"
-        },
-        "updated": {
-            color: "#0d0"
-        },
-        "updated with issues": {
-            color: "#cc0"
-        },
-        "unavailable": {
-            color: "#444"
-        },
-        "update in progress": {
-            color: "#999"
+    my.NodeUpdateSignal.prototype.status_opts = (function() {
+        var imgs = [],
+            pngprefix = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA",
+            icon64 = [
+                "NJJREFUOMuNk1EBgzAMRJGAhEpAAhKQUAmVgAMkIKUSJqESKuHtg7S7dbTj/hJyl+QapkkAzMCLC17yh+XiNAKw8kEWUYUbCcxAlmIPBIlTj7QCczMuwAlEiYNyikDZORt5lSk2mwIgAYuJ5uoJv8gP17tqrcPXh46Aa8hJX6oIncA2MHm7rbHxghnmBwJ7qSmmlyQPVlja/QF/Z2KyiVxDdj0ToxCDFesz7tJxtThZ7qgOS7dzcEi7+vbkrfWQ7k958DOljuj8TyRWh79vJNedBW/ur18z7lphtAAAAABJRU5ErkJggg==",
+                "JRJREFUOMtjYCAR/P//XwCIG4C4AMRmIMOA9f8RoIBUzQH/UUECKZoVgPg9kub9pNq+H0kzyCAFUjQXoDk9gBTNBmia12OLlvlQLIDFgPNImu9jqEFz3n40uX402x2IiZoCqLgDmng/sYnjPVTzfSSx88Qkz/f/cQMDYkLbAYfmAlKiDD3Q9pOT086TldrQDAkgVjMAJjNuohIGuawAAAAASUVORK5CYII=",
+                "JxJREFUOBGdwVtxwzAQAMCDEAiGIAiCYAiCUAhmEAiGYAiGEAiFcBC2nemHJsqjdnZjhAlX3HQ3LLjEO2hIryVKPIPqmMQUI2y6RItfuOALqVtj5F6NAZpujxHSn4wnMOv2GKFiQY0BKlK3xhEo2D0q8R8UpEctjsDi3oopjsKsq/EJFEzxCTQkEnOchdTtcRa+dVuchYIdG0q88AMpdoq3MrN2ZQAAAABJRU5ErkJggg==",
+                "HdJREFUOMutk9ENwCAIRBmBUR3BDToCI3QURnr9Ma0xrZDqJX6ox4vkUGSHAAUqUAANvKV5tT+sPPIvCGCdz0YqM8hQDFAlMPjkziTxRNo+VzyB9DqzqbxBPEooAthK8e/+fSWBu+cQsjxIO0ZZgaOtzGeydKSRLujX0LfdjICGAAAAAElFTkSuQmCC",
+                "MhJREFUOBGNwQFxgzAUANAvIRKQgAQkIAEJkVAHSEBCJSABCZEQCW/Ldb0M7tbxXlxhxIaiK9gwxCdY/W+Nb5gxxxs29xUvYzR4ODswxw/MOJzVaJBQdVtcYEF19owGWVeQ4gITHjh0ORrsuhz/QMKMIRqsuiFuwISMFA0mDHEDRt0WDRKmuAGr7hkNZt2OFXNcIKHqlmiwOqtY4hckHLqKFA12ZwULJozIKM6WePNS3bfFG0asSMio/laR4xMMyNhRULAjI8XFFxQYZKsJGVuRAAAAAElFTkSuQmCC"
+            ];
+        
+        for (var i = 0; i < 5; i++) {
+            imgs[i] = new Image();
+            imgs[i].src = pngprefix + icon64[i];
         }
-    };
+        
+        return {
+            "no update available": {
+                color: "#0b0",
+                icon: imgs[0]
+            },
+            "updated": {
+                color: "#0b0",
+                icon: imgs[1]
+            },
+            "updated with issues": {
+                color: "#aa0",
+                icon: imgs[2]
+            },
+            "unavailable": {
+                color: "#a44",
+                icon: imgs[3]
+            },
+            "update in progress": {
+                color: "#666",
+                icon: imgs[4]
+            }
+        };
+    }());
     my.NodeUpdateSignal.prototype.setStatus = function(status) {
         if (this.status_opts.hasOwnProperty(status)) {
             this.status = status;
