@@ -836,47 +836,6 @@ var drydock = (function() {
         return shape;
     };
     
-    function __migrateConnectors(from_node, to_node) {
-        $.each(from_node.inputs, function(){
-            var old_xput = this,
-                old_dataset_idx = old_xput.dataset_idx,
-                new_xput = to_node.inputs[old_dataset_idx - 1];
-
-            if (((new_xput.structure === null && old_xput.structure === null) ||
-                 (new_xput.structure !== null && old_xput.structure !== null &&
-                  new_xput.structure.compounddatatype == old_xput.structure.compounddatatype
-                  )) &&
-                  from_node.in_magnets[old_dataset_idx - 1].connected.length) {
-
-                // re-attach Connector
-                var connector = from_node.in_magnets[old_dataset_idx - 1].connected.pop();
-                connector.dest = to_node.in_magnets[old_dataset_idx - 1];
-                to_node.in_magnets[old_dataset_idx - 1].connected.push(connector);
-            }
-        });
-
-        $.each(from_node.outputs, function(){
-            var old_xput = this,
-                old_dataset_idx = old_xput.dataset_idx,
-                new_xput = to_node.outputs[old_dataset_idx - 1];
-
-            if (((new_xput.structure === null && old_xput.structure === null) ||
-                 (new_xput.structure !== null && old_xput.structure !== null &&
-                  new_xput.structure.compounddatatype == old_xput.structure.compounddatatype)) &&
-                  from_node.out_magnets[old_dataset_idx - 1].connected.length) {
-
-                // re-attach all Connectors - note this does not reverse order any longer
-                for (var i = 0; i < from_node.out_magnets[old_dataset_idx - 1].connected.length; i++) {
-                    while (from_node.out_magnets[old_dataset_idx-1].connected.length) {
-                        var connector = from_node.out_magnets[old_dataset_idx-1].connected.pop();
-                        connector.source = to_node.out_magnets[old_dataset_idx-1];
-                        to_node.out_magnets[old_dataset_idx-1].connected.unshift(connector);
-                    }
-                }
-            }
-        });
-    }
-    
     function migrateConnectors(from_node, to_node) {
         var any_connection_mismatch = false,
             was_fully_connected = from_node.isFullyConnected();
