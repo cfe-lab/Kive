@@ -322,10 +322,15 @@ var drydock = (function() {
         var x_spacing = 60,
             y_spacing = 130,
             z_drop = 20,// not implemented yet. intent is for nodes to cascade down into each other like a series of waterfalls!
-            layer = [], layer_length, max_layer = this.exec_order[0].length,
-            node, node_order = [], this_node, connected_nodes_in_order,
-            magnets_in_order = [], layer_out_magnets, num_magnets,
-            i, j, position;
+            layer = [],
+            max_layer = this.exec_order[0].length,
+            node,
+            node_order = [],
+            this_node,
+            connected_nodes_in_order,
+            magnets_in_order = [],
+            i, j,
+            state = this;
         
         for (i = 1; i < this.exec_order.length; i++) {
             if (this.exec_order[i].length > max_layer) {
@@ -336,8 +341,6 @@ var drydock = (function() {
         // First two layers are relatively easy.
         // Layer 1 is exec_order[0]. (Potentially with more input nodes which will be found later)
         // Layer 0 is any input node leading to exec_order[0].
-        magnets_in_order = [];
-        layer = [];
         for (i = 0; i < this.exec_order[0].length; i++) {
             magnets_in_order = magnets_in_order.concat(this.exec_order[0][i].in_magnets);
         }
@@ -448,45 +451,50 @@ var drydock = (function() {
         //x: x * 0.577350269 - y - i * spacing == 0
         //y: x * 0.577350269 + y - j * spacing == 0
         
-        for (j = 0; j < node_order.length; j++) {
-            layer_length = node_order[j].length;
-            layer_out_magnets = [];
-            node_order[j].center_x = node_order[j].center_x || 0;
+        $(this.canvas).fadeOut({ complete: function() {
+            var layer_length,
+                layer_out_magnets,
+                num_magnets;
+            for (j = 0; j < node_order.length; j++) {
+                layer_length = node_order[j].length;
+                layer_out_magnets = [];
+                node_order[j].center_x = node_order[j].center_x || 0;
             
-            for (i = 0; i < layer_length; i++ ) {
-                node = node_order[j][i];
-                node.x = (y_spacing * j + x_spacing * (i - layer_length/2) + node_order[j].center_x) / 1.154700538;
-                node.y = (y_spacing * j - x_spacing * (i - layer_length/2) - node_order[j].center_x) / 2;// + y_drop * j;
-                node.dx = node.dy = 0;
+                for (i = 0; i < layer_length; i++ ) {
+                    node = node_order[j][i];
+                    node.x = (y_spacing * j + x_spacing * (i - layer_length/2) + node_order[j].center_x) / 1.154700538;
+                    node.y = (y_spacing * j - x_spacing * (i - layer_length/2) - node_order[j].center_x) / 2;// + y_drop * j;
+                    node.dx = node.dy = 0;
                 
-                if (isNaN(node.x) || isNaN(node.y) ) {
-                    console.error("Autolayout failed!", node.label, j, i, layer_length, node_order[j], node_order[j].center_x);
+                    if (isNaN(node.x) || isNaN(node.y) ) {
+                        console.error("Autolayout failed!", node.label, j, i, layer_length, node_order[j], node_order[j].center_x);
+                    }
+                
+                    if (node.out_magnets.length > 0) {
+                        node.draw(state.ctx);// needed to update magnet coords
+                        layer_out_magnets = layer_out_magnets.concat(node.out_magnets);
+                    }
                 }
-                
-                if (node.out_magnets.length > 0) {
-                    node.draw(this.ctx);// needed to update magnet coords
-                    layer_out_magnets = layer_out_magnets.concat(node.out_magnets);
+            
+                // added candy: the isometric X centre of the layer after this one will be aligned with the centre of the magnets leading to its nodes.
+                if (j !== node_order.length - 1) {
+                    num_magnets = layer_out_magnets.length;
+                    var avg = averageCoordinates(layer_out_magnets);
+                    node_order[j+1].center_x = Geometry.isometricXCoord(avg.x, avg.y);
+                    if ( isNaN(node_order[j+1].center_x) ) {
+                        console.error("Autolayout failed!", layer_out_magnets, num_magnets);
+                    }
                 }
             }
-            
-            // added candy: the isometric X centre of the layer after this one will be aligned with the centre of the magnets leading to its nodes.
-            if (j !== node_order.length - 1) {
-                num_magnets = layer_out_magnets.length;
-                var avg = averageCoordinates(layer_out_magnets);
-                node_order[j+1].center_x = Geometry.isometricXCoord(avg.x, avg.y);
-                if ( isNaN(node_order[j+1].center_x) ) {
-                    console.error("Autolayout failed!", layer_out_magnets, num_magnets);
-                }
+            state.scaleToCanvas(true);// "true" to maintain aspect ratio
+            state.centreCanvas();
+        //    this.testExecutionOrder(); // should not have changed
+            for (i = 0; i < state.shapes.length; i++) {
+                state.detectCollisions(state.shapes[i]);
             }
-        }
-        
-        this.scaleToCanvas(true);// argument is to maintain aspect ratio
-        this.centreCanvas();
-    //    this.testExecutionOrder(); // should not have changed
-        for (i = 0; i < this.shapes.length; i++) {
-            this.detectCollisions(this.shapes[i]);
-        }
-        this.valid = false;
+            state.valid = false;
+            $(this).fadeIn();
+        }});
     };
     
     /**
