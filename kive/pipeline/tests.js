@@ -2426,6 +2426,24 @@
                         step_updates[0].code_resource_revision,
                         "new_code_resource_revision");
             });
+            
+            it('should apply dependency update', function() {
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
+                step_updates = [{
+                    step_num: 1,
+                    dependencies: [{
+                        id: 77,
+                        revision_name: "new feature"
+                    }]
+                }];
+                pipeline.applyStepUpdates(step_updates);
+                
+                var new_method = this.canvasState.findNodeByLabel('prelim_map.py');
+                
+                expect(new_method.new_dependencies).toBe(
+                        step_updates[0].dependencies,
+                        "new_dependencies");
+            });
         });
         
         function loadAndSerialize(canvasState, api_pipeline, additional_args){
@@ -2549,6 +2567,23 @@
                 expect(step.new_code_resource_revision_id).toBe(
                         new_code_resource_revision_id,
                         "step.new_code_resource_revision_id");
+            });
+            
+            it('should submit dependency update', function() {
+                var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
+                method = this.canvasState.findNodeByLabel("prelim_map.py"),
+                new_code_resource_revision_id = 72;
+                method.new_dependencies = [{
+                        id: new_code_resource_revision_id,
+                        name: "French"
+                }];
+                pipeline.draw();
+                var data = pipeline.serialize(),
+                step = data.steps[0];
+                
+                expect(step.new_dependency_ids).toEqual(
+                        [new_code_resource_revision_id],
+                        "step.new_dependency_ids");
             });
         });
     });

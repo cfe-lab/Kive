@@ -422,7 +422,13 @@ class Pipeline(transformation.models.Transformation):
                         update = PipelineStepUpdate(step.step_num)
                         update.code_resource_revision = next_driver
                         updates.append(update)
-                    #TODO: look for new dependencies
+                    for dependency in driver.dependencies.all():
+                        next_dependency = dependency.requirement.find_update()
+                        if next_dependency is not None:
+                            if update is None:
+                                update = PipelineStepUpdate(step.step_num)
+                                updates.append(update)
+                            update.dependencies.append(next_dependency)
         return updates
 
 

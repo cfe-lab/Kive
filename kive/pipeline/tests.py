@@ -25,16 +25,29 @@ from metadata.models import CompoundDatatype, CompoundDatatypeMember, \
     Datatype, kive_user, everyone_group
 import metadata.tests
 from method.models import Method, MethodFamily, CodeResource,\
-    CodeResourceRevision
+    CodeResourceRevision, CodeResourceDependency
 import method.tests
 from pipeline.models import Pipeline, PipelineFamily, \
     PipelineStep, PipelineStepInputCable, \
     PipelineOutputCable
-from pipeline.serializers import PipelineSerializer
+from pipeline.serializers import PipelineSerializer,\
+    PipelineStepUpdateSerializer
 import sandbox.testing_utils as tools
 
 samplecode_path = "../samplecode"
 
+class DuckRequest(object):
+    """ A fake request used to test serializers. """
+    def __init__(self):
+        self.user = kive_user()
+        
+    def build_absolute_uri(self, url):
+        return url
+    
+class DuckContext(dict):
+    """ A fake context used to test serializers. """
+    def __init__(self):
+        self['request'] = DuckRequest()
 
 def create_pipeline_test_environment(case):
     """
@@ -2872,6 +2885,34 @@ class RawOutputCableTests(PipelineTestCase):
                                 self.pipeline_1.complete_clean)
 
 class PipelineUpdateTests(PipelineTestCase):
+    def create_dependency_revision(self):
+        """ Find a dependency that is used in a pipeline.
+        
+        It should only have a single revision.
+        Add a second revision for it.
+        """
+        used_methods = Method.objects.filter(pipelinesteps__isnull=False)
+        used_code_resource_revisions = CodeResourceRevision.objects.filter(
+            methods__in=used_methods)
+        dependencies = CodeResourceDependency.objects.filter(
+            coderesourcerevision__in=used_code_resource_revisions)
+        dependency = dependencies.earliest('id') # dependency used in a pipeline
+        code_resource_revision = dependency.requirement
+        fn = "GoodRNANucSeq.csv"
+        with open(os.path.join(samplecode_path, fn), "rb") as f:
+            new_revision = CodeResourceRevision(
+                coderesource=code_resource_revision.coderesource, 
+                revision_name="rna", 
+                revision_desc="Switch to RNA", 
+                revision_parent=code_resource_revision, 
+                content_file=File(f),
+                user=self.myUser)
+            new_revision.full_clean()
+            new_revision.save()
+        new_revision.grant_everyone_access()
+        
+        return new_revision
+ 
     def create_code_revision(self):
         # Define compv2_crRev for comp_cr
         fn = "complement_v2.py"
@@ -2937,6 +2978,30 @@ class PipelineUpdateTests(PipelineTestCase):
         self.assertEqual(len(updates), 1)
         update = updates[0]
         self.assertEqual(update.code_resource_revision, self.compv3_crRev)
+     
+    def test_find_step_updates_dependency(self):
+        new_revision = self.create_dependency_revision()
+        
+        updates = self.DNAcompv1_p.find_step_updates()
+          
+        self.assertEqual(len(updates), 1)
+        update = updates[0]
+        self.assertEqual(len(update.dependencies), 1)
+        self.assertEqual(update.dependencies[0], new_revision)
+     
+    def test_serialize_step_updates_dependency(self):
+        new_revision = self.create_dependency_revision()
+        updates = self.DNAcompv1_p.find_step_updates()
+        
+        data = PipelineStepUpdateSerializer(
+            updates,
+            many=True,
+            context=DuckContext()).data
+        
+        self.assertEqual(len(data), 1)
+        update = data[0]
+        self.assertEqual(len(update['dependencies']), 1)
+        self.assertEqual(update['dependencies'][0]['id'], new_revision.id)
 
 class RawInputCableTests(PipelineTestCase):
     def test_PSIC_raw_cable_comes_from_pipeline_input_good(self):
@@ -4142,14 +4207,7 @@ def create_pipeline_deserialization_environment(self):
     possible_cdt_strings = [x.compounddatatype for x in possible_cdt_string_members]
     self.cdt_string = possible_cdt_strings[0]
 
-    # A fake request that provides context.
-    class DuckRequest(object):
-        def build_absolute_uri(self, url):
-            return url
-
-    self.duck_request = DuckRequest()
-    self.duck_request.user = kive_user()
-    self.duck_context = {"request": self.duck_request}
+    self.duck_context = DuckContext()
 
     self.test_pf = PipelineFamily(
         user=self.kive_user,
@@ -4721,12 +4779,12 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(new_pipeline.outcables.count(), 1)
         self.assertEquals(new_pipeline.outcables.first().output_name, "untouched_output")
         
-    def create_new_code_revision(self):
+    def create_new_code_revision(self, coderesource):
         contents = "print('This is the new code.')"
         with tempfile.TemporaryFile() as f:
             f.write(contents)
             revision = CodeResourceRevision(
-                coderesource=self.coderesource_noop,
+                coderesource=coderesource,
                 revision_name="new",
                 revision_desc="just print a message",
                 content_file=File(f),
@@ -4737,7 +4795,7 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
 
     def test_create_with_new_method(self):
         create_pipeline_deserialization_environment(self)
-        revision = self.create_new_code_revision()
+        revision = self.create_new_code_revision(self.coderesource_noop)
     
         step_dict = self.pipeline_dict['steps'][0]
         step_dict['new_code_resource_revision_id'] = revision.id
@@ -4754,6 +4812,35 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
             revision_name=self.pipeline_dict["revision_name"])
         method = revision.methods.first()
         self.assertIsNotNone(method, 'method expected for new code revision')
+        step = new_pipeline.steps.get(step_num=1)
+        self.assertEqual(step.transformation.display_name, method.display_name)
+
+    def test_create_with_new_method_for_dependency(self):
+        create_pipeline_deserialization_environment(self)
+        dependency_revision = CodeResourceRevision.objects.exclude(
+            coderesource=self.coderesource_noop).earliest('id')
+        new_dependency_revision = self.create_new_code_revision(
+            dependency_revision.coderesource)
+        self.coderev_noop.dependencies.create(requirement=dependency_revision)
+        
+        step_dict = self.pipeline_dict['steps'][0]
+        step_dict['new_dependency_ids'] = [new_dependency_revision.id]
+        request = self.factory.post(self.list_path,
+                                    self.pipeline_dict,
+                                    format="json")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request)
+
+        if response.exception:
+            self.fail(response.data)
+        # Probe the new object.
+        new_pipeline = self.test_pf.members.get(
+            revision_name=self.pipeline_dict["revision_name"])
+        noop_revision_dependency = new_dependency_revision.needed_by.first()
+        self.assertIsNotNone(noop_revision_dependency, 'noop_revision expected for new dependency')
+        noop_revision = noop_revision_dependency.coderesourcerevision
+        method = noop_revision.methods.first()
+        self.assertIsNotNone(method, 'method expected for noop_revision')
         step = new_pipeline.steps.get(step_num=1)
         self.assertEqual(step.transformation.display_name, method.display_name)
 

@@ -417,6 +417,19 @@ $(function() {
                                             'new: ' + name));
                         });
                     }
+                    if (sel.new_dependencies) {
+                        request.done(function() {
+                            var name = "new: ";
+                            for (var i = 0; i < sel.new_dependencies.length; i++) {
+                                if (i > 0) {
+                                    name += ", ";
+                                }
+                                name += sel.new_dependencies[i].revision_name;
+                            }
+                            $("#id_select_method").prepend(
+                                    $('<option>', { value: sel.pk }).text(name));
+                        });
+                    }
                     
                     // #id_method_revision_field is always populated via ajax.
                     // $.one() will run this event exactly once before killing it.

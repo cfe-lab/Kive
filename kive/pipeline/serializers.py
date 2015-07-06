@@ -65,6 +65,9 @@ class PipelineStepSerializer(serializers.ModelSerializer):
     new_code_resource_revision_id = serializers.IntegerField(write_only=True,
                                                              required=False,
                                                              allow_null=True)
+    new_dependency_ids = serializers.ListField(child=serializers.IntegerField(),
+                                               write_only=True,
+                                               required=False)
 
     class Meta:
         model = PipelineStep
@@ -80,7 +83,8 @@ class PipelineStepSerializer(serializers.ModelSerializer):
             "cables_in",
             "outputs",
             "inputs",
-            "new_code_resource_revision_id"
+            "new_code_resource_revision_id",
+            "new_dependency_ids"
         )
 
     def validate(self, data):
@@ -103,6 +107,8 @@ class PipelineStepUpdateSerializer(serializers.Serializer):
     step_num = serializers.IntegerField()
     method = MethodSerializer()
     code_resource_revision = CodeResourceRevisionSerializer()
+    dependencies = serializers.ListSerializer(
+        child=CodeResourceRevisionSerializer())
 
 class PipelineOutputCableSerializer(serializers.ModelSerializer):
 
@@ -330,6 +336,35 @@ class PipelineSerializer(AccessControlSerializer,
             code_resource_revision_id = step_data.pop(
                 "new_code_resource_revision_id",
                 None)
+            dependency_ids = step_data.pop("new_dependency_ids", [])
+            if dependency_ids:
+                dependency_revisions = CodeResourceRevision.objects.filter(
+                    id__in=dependency_ids)
+                revision_name = ', '.join(
+                    [d.revision_name for d in dependency_revisions])
+                revision_description = '\n---\n'.join(
+                    [d.revision_desc for d in dependency_revisions])
+                resource_map = {d.coderesource_id: d for d in dependency_revisions}
+                old_revision = step_data['transformation'].definite.driver
+                new_revision = old_revision.coderesource.revisions.create(
+                    revision_name=revision_name,
+                    revision_desc=revision_description,
+                    revision_parent=old_revision,
+                    content_file=old_revision.content_file,
+                    user=pipeline.user)
+                new_revision.users_allowed.add(*users_allowed)
+                new_revision.groups_allowed.add(*groups_allowed)
+                code_resource_revision_id = new_revision.id
+                for old_dependency in old_revision.dependencies.select_related('requirement'):
+                    dependency_revision = resource_map.get(
+                        old_dependency.requirement.coderesource_id,
+                        None)
+                    if dependency_revision is None:
+                        dependency_revision = old_dependency.requirement
+                    new_revision.dependencies.create(
+                        requirement=dependency_revision,
+                        depPath=old_dependency.depPath,
+                        depFileName=old_dependency.depFileName)
             if code_resource_revision_id is not None:
                 code_revision = CodeResourceRevision.objects.get(
                     id=code_resource_revision_id)

@@ -117,6 +117,30 @@ def create_method_test_environment(case):
         case.compv2_crRev.save()
     case.compv2_crRev.grant_everyone_access()
 
+    # Define DNA reference to use as a dependency
+    dna_resource = CodeResource(
+        name="dna_ref",
+        description="Reference DNA sequences",
+        filename="good_dna.csv",
+        user=case.myUser)
+    dna_resource.save()
+    dna_resource.grant_everyone_access()
+    fn = "GoodDNANucSeq.csv"
+    with open(os.path.join(samplecode_path, fn), "rb") as f:
+        dna_resource_revision = CodeResourceRevision(
+            coderesource=dna_resource,
+            revision_name="Prototype",
+            revision_desc="Reference DNA sequences",
+            content_file=File(f),
+            user=case.myUser)
+        # case.compv2_crRev.content_file.save(fn, File(f))
+        dna_resource_revision.full_clean()
+        dna_resource_revision.save()
+    dna_resource_revision.grant_everyone_access()
+    
+    case.compv2_crRev.dependencies.create(
+        requirement=dna_resource_revision)
+
     # The following is for testing code resource dependencies.
     case.test_cr_1 = CodeResource(name="test_cr_1",
                                   filename="test_cr_1.py",

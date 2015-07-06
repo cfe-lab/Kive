@@ -149,6 +149,13 @@ var pipeline = (function(exports){
                                     null),
                 outputs_to_delete: [] // not yet implemented
             };
+            if (step.new_dependencies && step.new_dependencies.length) {
+                var new_dependency_ids = [];
+                for (var i = 0; i < step.new_dependencies.length; i++) {
+                    new_dependency_ids.push(step.new_dependencies[i].id);
+                }
+                form_data.steps[idx].new_dependency_ids = new_dependency_ids;
+            }
 
             // retrieve Connectors
             $.each(step.in_magnets, function(cable_idx, magnet) {
@@ -496,6 +503,10 @@ var pipeline = (function(exports){
             }
             if (update.code_resource_revision) {
                 new_method.new_code_resource_revision = update.code_resource_revision;
+                new_method.updateSignal(any_mismatch ? 'updated with issues' : 'updated');
+            }
+            if (update.dependencies) {
+                new_method.new_dependencies = update.dependencies;
                 new_method.updateSignal(any_mismatch ? 'updated with issues' : 'updated');
             }
         });
