@@ -92,11 +92,16 @@ h1 {
     font-size: 3em;
     margin: 0 0 1.5em;
     line-height: .9em;
-    background: url('/static/portal/h1.png') #222 1.4em top no-repeat;
+    background: url('/static/portal/h1.png') #222 1.5em 4px no-repeat;
     text-indent: -999em;
 }
-h1:hover {
-    cursor: default;
+#wrapper #h1a {
+    font-size: 1em;
+    margin-left: 0;
+}
+#wrapper #h1a:hover,
+#wrapper #h1a:active {
+    outline: none;
 }
 h2 {
     font-size: 1.5em;
