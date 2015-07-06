@@ -1,0 +1,22 @@
+{
+  "name": "kive",
+  "version": "0.5.0",
+  "devDependencies": {
+    "grunt": "^0.4.5",
+    "grunt-contrib-jshint": "^0.11.2",
+    "grunt-contrib-uglify": "^0.9.1",
+    "grunt-regex-replace": "^0.2.6",
+    "shelljs": "^0.5.1",
+    "jshint": "^2.8.0"
+  },
+  "description": "Kive ====",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cfe-lab/Kive.git"
+  },
+  "author": "BC Centre for Excellence in HIV/AIDS",
+  "bugs": {
+    "url": "https://github.com/cfe-lab/Kive/issues"
+  },
+  "homepage": "https://github.com/cfe-lab/Kive#readme"
+}

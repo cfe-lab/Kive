@@ -126,3 +126,14 @@ are in `portal/fixtures`. If this code or
 any functions it calls are modified, the fixtures will need to be
 re-created by running `update_test_fixtures` again.
 
+### Updating embedded icon files ###
+
+Some icon files are stored as base64-encoded strings which describe PNG images inside Javascript files.
+ 
+To edit these in a convenient way, you'll need `node`, which you can get from your favourite package manager or from the [Node.js website][nodejs]. Once you have `node`, run `npm install` in the project root to install the necessary dependencies. This will install the node task runner Grunt and several Grunt modules.
+
+Now you're ready to edit the icons. Find the original icon in `raw_assets` in the project root. Make your modifications and then run `grunt pngicons` to compile them into the Javascript files.
+
+\* *Recommended*: If `pngquant` is available on your system, Grunt will use it to compress the icons.
+
+[nodejs]: https://nodejs.org/download/

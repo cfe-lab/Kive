@@ -13,6 +13,8 @@ kive/Logs
 kive/Sandboxes
 kive/kive.log*
 kive/testreport.xml
+# Ignore nodeJS modules
+node_modules/
 
 # Generated files and backup files
 *~
