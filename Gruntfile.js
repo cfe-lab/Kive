@@ -1,4 +1,5 @@
 require('shelljs/global');
+
 module.exports = function(grunt) {
 
   // Project configuration.
@@ -53,9 +54,9 @@ module.exports = function(grunt) {
                                     console.log('Inlining ' + p1 + '...');
                                 }
                                 cmd += 'base64';
-                                img = exec(cmd, { silent: true }).output.trim();
+                                img = exec(cmd, { silent: true }).output.replace(/\s/g, '');
                             } else {
-                                throw 'Error: base64 not found';
+                                img = grunt.file.read(filename, {encoding:"base64"});
                             }
                             return "\/*inline " + p1 + ":*\/\"" + img + "\"";
                         }
