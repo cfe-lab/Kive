@@ -64,6 +64,7 @@ Once you have set up your production server, this is how to deploy a new release
         sudo -u apache LD_LIBRARY_PATH=$LD_LIBRARY_PATH PATH=$PATH ./manage.py runfleet --workers 151 &>/dev/null &
         
 9. Restart apache:
+
         sudo /usr/sbin/apachectl restart
 
 10. Remove the pre-release flag from the release.
