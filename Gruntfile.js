@@ -43,10 +43,10 @@ module.exports = function(grunt) {
                     replace: function(match, p1) {
                         var filename = 'raw_assets/' + p1 + '.png';
                         if (!test('-e', filename)) {
-                            throw "Error: png file not found";
+                            grunt.fail.fatal('"' + filename + '" not found', 3);
                         } else {
-                            var cmd = 'cat "' + filename + '" | ';
                             if (which('base64')) {
+                                var cmd = 'cat "' + filename + '" | ';
                                 if (which('pngquant')) {
                                     console.log('Inlining ' + p1 + ' using pngquant...');
                                     cmd += 'pngquant -s1 - | ';
@@ -56,7 +56,8 @@ module.exports = function(grunt) {
                                 cmd += 'base64';
                                 img = exec(cmd, { silent: true }).output.replace(/\s/g, '');
                             } else {
-                                img = grunt.file.read(filename, {encoding:"base64"});
+                                console.log('Inlining ' + p1 + '...');
+                                img = grunt.file.read(filename, { encoding: "base64" });
                             }
                             return "\/*inline " + p1 + ":*\/\"" + img + "\"";
                         }
