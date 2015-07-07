@@ -52,7 +52,7 @@ Once you have set up your production server, this is how to deploy a new release
     `diff kive/settings_default.py kive/settings.py`. Do the same
     comparison of `hostfile`.
 7. Migrate the database as described in the Creating Database Tables section
-    of INSTALL.md, and deploy the static files.
+    of INSTALL.md, and deploy the static files:
     
         ssh user@server
         cd /usr/local/share/Kive/kive
@@ -62,9 +62,12 @@ Once you have set up your production server, this is how to deploy a new release
 8. Launch the fleet.
 
         sudo -u apache LD_LIBRARY_PATH=$LD_LIBRARY_PATH PATH=$PATH ./manage.py runfleet --workers 151 &>/dev/null &
+        
+9. Restart apache:
+        sudo /usr/sbin/apachectl restart
 
-9. Remove the pre-release flag from the release.
-10. Close the milestone for this release, create one for the next release, and
+10. Remove the pre-release flag from the release.
+11. Close the milestone for this release, create one for the next release, and
     decide which issues you will include in that milestone.
 
 [release]: https://help.github.com/categories/85/articles
