@@ -521,11 +521,8 @@ $(function() {
 
         document.getElementById('id_submit_error').innerHTML = '';
 
-        var parent_revision = null;
+        var is_new = e.data.action == "new";
         var is_revision = e.data.action == "revise";
-        if (is_revision) {
-            var parent_revision = JSON.parse($("#initial_data").text());
-        }
 
         // arguments to initialize new Pipeline Family
         var family_name = $('#id_family_name').val(),  // hidden input if revision
@@ -544,7 +541,7 @@ $(function() {
         });
         
         // Form validation
-        if (!is_revision) {
+        if (is_new) {
             if (family_name === '') {
                 // FIXME: is there a better way to do this trigger?
                 $('li', 'ul#id_ctrl_nav')[0].click();
@@ -570,7 +567,7 @@ $(function() {
             // arguments to add first pipeline revision
             revision_name: revision_name,
             revision_desc: revision_desc,
-            revision_parent: is_revision ? parent_revision["id"] : null,
+            revision_parent: is_revision ? JSON.parse($("#initial_data").text())["id"] : null,
 
             // Canvas information to store in the Pipeline object.
             canvas_width: canvas.width,
@@ -606,7 +603,7 @@ $(function() {
             }
         }
 
-        function submit_pipeline(){
+        function submit_pipeline(family_pk){
             $.ajax({
                 type: 'POST',
                 url: '/api/pipelines/',
@@ -614,7 +611,7 @@ $(function() {
                 dataType: 'json',
                 success: function(result) {
                     $('#id_submit_error').html('').hide();
-                    window.location.href = '/pipeline_families';
+                    window.location.href = '/pipelines/' + family_pk;
                 },
                 error: function(xhr, status, error) {
                     var json = xhr.responseJSON;
@@ -636,8 +633,8 @@ $(function() {
             });
         }
 
-        if(is_revision)
-            submit_pipeline();
+        if(!is_new)
+            submit_pipeline(family_pk);
 
         else // Pushing a new family
             $.ajax({
@@ -652,7 +649,7 @@ $(function() {
                 "_content_type": "application/json"},
                 dataType: 'json',
                 success: function(result) {
-                    submit_pipeline();
+                    submit_pipeline(result["id"]);
                 },
                 error: function(xhr, status, error) {
                     var errors = [],
@@ -667,7 +664,6 @@ $(function() {
                     }
                 }
             });
-
     };
 
     var changeExecOrderDisplayOption = function() {
@@ -752,6 +748,8 @@ $(function() {
     $('form','#id_input_ctrl')   .on('submit',         createNewInputNode);         // Handle 'Inputs' menu
     $('form', '#id_method_ctrl') .on('submit',         submitMethodDialog)          // Handle 'Methods' menu
                                  .on('reset',          resetMethodDialog);
+    $('#id_pipeline_new_form')   .submit({"action": "new"},
+                                                       submitPipeline);
     $('#id_pipeline_add_form')   .submit({"action": "add"},
                                                        submitPipeline);
     $('#id_pipeline_revise_form').submit({"action": "revise"},

@@ -9,23 +9,23 @@
     <style>
         #canvas{}
     </style>
-
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/portal/noxss.js"></script>
     <script src="/static/pipeline/jsBezier-0.6.js"></script>
-<!--<script src="/static/portal/jquery-ui-1.10.4.custom.min.js"></script>-->
+    <script src="/static/portal/noxss.js"></script>
     <script src="/static/pipeline/drydock_objects.js"></script>
     <script src="/static/pipeline/drydock.js"></script>
     <script src="/static/pipeline/pipeline_add.js"></script>
     <script src="/static/pipeline/pipeline_load.js"></script>
+    <script src="/static/pipeline/pipeline_revise.js"></script>
+
     <link rel="stylesheet" href="/static/pipeline/drydock.css">
+
     <script type="text/javascript">
 $(function() {
     // Security stuff to prevent cross-site scripting.
     noXSS();
 });
     </script>
-
 {% endblock %}
 
 {% block widget_media %}
@@ -34,13 +34,19 @@ $(function() {
 
 {% block content %}
 
-<a href="pipelines" rel="prev">Back to pipeline summary</a>
+    {% if not family and not parent_revision %}
+    <a href="pipeline_families" rel="prev">Back to pipelines</a>
+    {% else %}
+    <a href="/pipelines/{{ family.pk }}" rel="prev">Back to pipeline summary</a>
+    {% endif %}
+
+    <!-- Stash the parent revision's representation here. -->
+    <div id="initial_data" style="display:none">{{ parent_revision_json|escape }}</div>
 
     <!-- CANVAS -->
     <div>
     <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
     <div id="method_context_menu" class="context_menu"><ul><li data-action="edit" class="edit">Edit</li><li data-action="delete" class="delete">Delete</li></ul></div>
-    </div>
     </div>
 
     <!-- Method selector -->
@@ -52,9 +58,19 @@ $(function() {
             <li data-rel="#id_method_ctrl" class="new_ctrl">Add Method</li>
             <li data-rel="#id_view_ctrl">View</li>
         </ul>
-        
+
+        {% if parent_revision %}
+        <form id="id_pipeline_revise_form" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+        {% elif family %}
         <form id="id_pipeline_add_form" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+        {% else %}
+        <form id="id_pipeline_new_form" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+        {% endif %}
             <div id="form_ctrl">
+                {% if parent_revision %}
+                <input type="button" id="id_revert" value="Revert">
+                <input type="button" id="id_update" value="Check for Updates">
+                {% endif %}
                 <input type="submit" id="id_submit_button" value="Submit">
                 <div class="indicator-light"> </div>
                 <div class="errortext" id="id_submit_error"></div>
@@ -62,21 +78,45 @@ $(function() {
 
             <div id="id_family_ctrl" class="ctrl_menu">
                 <h3>Family</h3>
+                {% if family %}  <!-- family is set if parent_revision is passed -->
+                <h5>Family:</h5>
+                {{ family.name }}
+                {% else %}
                 <label for="id_family_name" class="text-field-label">Family name</label>
                 <input id="id_family_name" maxlength="128" name="family_name" type="text" />
+                {% endif %}
 
+                {% if family %}
+                <h5>Description:</h5>
+                {{ family.description }}
+                {% else %}
                 <label for="id_family_desc" class="text-field-label">Family description</label>
                 <textarea id="id_family_desc" name="family_desc"></textarea>
+                {% endif %}
             </div>
 
             <div id="id_meta_ctrl" class="ctrl_menu">
                 <h3>Pipeline</h3>
-                <label for="id_revision_name" class="text-field-label">Pipeline name</label>
+
+                {% if family %}
+                <h5>Parent revision:</h5>
+                {% if parent_revision %}
+                {{ parent_revision }}
+                {% else %}
+                None
+                {% endif %}
+                {% endif %}
+
+                <input type="hidden" id="id_family_pk" value="{{ family.pk }}"/>
+                <input type="hidden" id="id_family_name" value="{{ family.name }}"/>
+                <input type="hidden" id="id_family_desc" value="{{ family.desc }}"/>
+
+                <label for="id_revision_name" class="text-field-label">Revision name</label>
                 <input id="id_revision_name" maxlength="128" name="revision_name" type="text" />
 
-                <label for="id_revision_desc" class="text-field-label">Pipeline description</label>
+                <label for="id_revision_desc" class="text-field-label">Description</label>
                 <textarea id="id_revision_desc" name="revision_desc"></textarea>
-                
+
                 <h5>Users and groups allowed:</h5>
                 {{ access_control_form.permissions }}
             </div>
@@ -106,18 +146,18 @@ $(function() {
         <div id="id_input_ctrl" class="ctrl_menu">
             <canvas width="100%" height="60"></canvas>
             <h3>Inputs</h3>
-            
+
             <form>
             <label for="id_datatype_name" class="text-field-label">Label</label>
             <input id="id_datatype_name" maxlength="128" name="datatype_name" type="text" />
-            
+
             <select id="id_select_cdt" name="select_cdt" class="select-label">
                 <option value="">Raw</option>
                 {% for cdt in compound_datatypes %}
                     <option value="{{ cdt.pk }}">{{ cdt }}</option>
                 {% endfor %}
             </select>
-        
+
             <input type="submit" id="id_cdt_button" value="Add Input">
             <div class="errortext" id="id_dt_error"></div>
             </form>
@@ -143,14 +183,14 @@ $(function() {
             
             <label for="id_method_name" class="text-field-label">Label</label>
             <input id="id_method_name" maxlength="128" name="method_name" type="text" />
-            
+
             <select id="id_select_method_family" name="select_method_family">
                 <option value="" class="label">Select method family</option>
-                {% for family in method_families %}
-                    <option value="{{ family.pk }}">{{ family.name }}</option>
+                {% for mf in method_families %}
+                    <option value="{{ mf.pk }}">{{ mf.name }}</option>
                 {% endfor %}
             </select>
-            
+
             <div id="id_method_revision_field">
             <select id="id_select_method" name="select_method">
                 <!-- populated by ajax transaction -->
@@ -170,7 +210,7 @@ $(function() {
             <label for="output_name">Output name</label>
             <input type="text" name="output_name" id="output_name" class="text">
             <input type="submit" id="output_submit" value="OK">
-            <div id="output_name_error">That name has already been used.</div>
+            <div id="output_name_error"><img src="/static/pipeline/warning_icon.png"> That name has already been used.</div>
         </form>
     </div>
 

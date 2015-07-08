@@ -97,12 +97,12 @@ def prepare_pipeline_dict(request_body, user):
 
 @login_required
 @user_passes_test(developer_check)
-def pipeline_add(request):
+def pipeline_new(request):
     """
     Most of the heavy lifting is done by JavaScript and HTML5.
     I don't think we need to use forms here.
     """
-    t = loader.get_template('pipeline/pipeline_add.html')
+    t = loader.get_template('pipeline/pipeline.html')
     method_families = MethodFamily.filter_by_user(request.user).order_by('name')
     compound_datatypes = CompoundDatatype.filter_by_user(request.user)
     acf = metadata.forms.AccessControlForm()
@@ -112,89 +112,47 @@ def pipeline_add(request):
     return HttpResponse(t.render(c))
 
 
-# @login_required
-# @user_passes_test(developer_check)
-# def method_add(request, id=None):
-#     """
-#     Generate forms for adding Methods, and validate and process POST data returned
-#     by the user.  Allows for an arbitrary number of input and output forms.
-#
-#     [id] : User is adding a new Method to an existing family
-#            without a specified parent Method (different CodeResource)
-#            If id is None, then user is creating a new MethodFamily.
-#     """
-#     creating_user = request.user
-#     if id:
-#         four_oh_four = False
-#         try:
-#             this_family = MethodFamily.objects.get(pk=id)
-#             if not this_family.can_be_accessed(creating_user):
-#                 four_oh_four = True
-#         except MethodFamily.DoesNotExist:
-#             four_oh_four = True
-#         if four_oh_four:
-#             raise Http404("ID {} is inaccessible".format(id))
-#
-#         header = "Add a new Method to MethodFamily '%s'" % this_family.name
-#     else:
-#         this_family = None
-#         header = 'Start a new MethodFamily with an initial Method'
-#
-#     t = loader.get_template('method/method_add.html')
-#     c = RequestContext(request)
-#     if request.method == 'POST':
-#         family_form, method_form, input_form_tuples, output_form_tuples = create_method_forms(
-#             request.POST, creating_user, family=this_family)
-#         if not _method_forms_check_valid(family_form, method_form, input_form_tuples, output_form_tuples):
-#             # Bail out now if there are any problems.
-#             c.update(
-#                 {
-#                     'family_form': family_form,
-#                     'method_form': method_form,
-#                     'input_forms': input_form_tuples,
-#                     'output_forms': output_form_tuples,
-#                     'family': this_family,
-#                     'header': header
-#                 })
-#             return HttpResponse(t.render(c))
-#
-#         # Next, attempt to build the Method and its associated MethodFamily (if necessary),
-#         # inputs, and outputs.
-#         create_method_from_forms(
-#             family_form, method_form, input_form_tuples, output_form_tuples, creating_user,
-#             family=this_family
-#         )
-#
-#         if _method_forms_check_valid(family_form, method_form, input_form_tuples, output_form_tuples):
-#             # Success!
-#             if id:
-#                 return HttpResponseRedirect('/methods/{}'.format(id))
-#             else:
-#                 return HttpResponseRedirect('/method_families')
-#
-#     else:
-#         # Prepare a blank set of forms for rendering.
-#         family_form = MethodFamilyForm()
-#         method_form = MethodForm(user=creating_user)
-#         input_form_tuples = [
-#             (TransformationXputForm(auto_id='id_%s_in_0'), XputStructureForm(user=creating_user,
-#                                                                              auto_id='id_%s_in_0'))
-#         ]
-#         output_form_tuples = [
-#             (TransformationXputForm(auto_id='id_%s_out_0'), XputStructureForm(user=creating_user,
-#                                                                               auto_id='id_%s_out_0'))
-#         ]
-#
-#     c.update(
-#         {
-#             'family_form': family_form,
-#             'method_form': method_form,
-#             'input_forms': input_form_tuples,
-#             'output_forms': output_form_tuples,
-#             'family': this_family,
-#             'header': header
-#         })
-#     return HttpResponse(t.render(c))
+@login_required
+@user_passes_test(developer_check)
+def pipeline_add(request, id=None):
+    """
+    Creates a new Pipeline belonging to an existing PipelineFamily.
+    """
+    t = loader.get_template('pipeline/pipeline.html')
+    method_families = MethodFamily.filter_by_user(request.user).order_by('name')
+    compound_datatypes = CompoundDatatype.filter_by_user(request.user)
+
+    # Retrieve this pipeline from database.
+    four_oh_four = False
+    try:
+        family = PipelineFamily.objects.get(pk=id)
+        if not family.can_be_accessed(request.user):
+            four_oh_four = True
+    except PipelineFamily.DoesNotExist:
+        four_oh_four = True
+
+    if four_oh_four:
+        raise Http404("ID {} cannot be accessed".format(id))
+
+    family_users_allowed = [x.pk for x in family.users_allowed.all()]
+    family_groups_allowed = [x.pk for x in family.groups_allowed.all()]
+    acf = metadata.forms.AccessControlForm(
+        initial={
+            "permissions": [family_users_allowed, family_groups_allowed]
+        }
+    )
+
+    c = RequestContext(
+        request,
+        {
+            "family": family,
+            'method_families': method_families,
+            'compound_datatypes': compound_datatypes,
+            "access_control_form": acf
+        }
+    )
+
+    return HttpResponse(t.render(c))
 
 
 @login_required
@@ -207,7 +165,7 @@ def pipeline_revise(request, id):
     from the database to front-end to render as HTML5 Canvas
     objects.
     """
-    t = loader.get_template('pipeline/pipeline_revise.html')
+    t = loader.get_template('pipeline/pipeline.html')
     method_families = MethodFamily.filter_by_user(request.user).order_by('name')
     compound_datatypes = CompoundDatatype.filter_by_user(request.user)
 
@@ -240,6 +198,7 @@ def pipeline_revise(request, id):
     c = RequestContext(
         request,
         {
+            "family": parent_revision.family,
             "parent_revision": parent_revision,
             "parent_revision_json": parent_revision_json,
             'method_families': method_families,

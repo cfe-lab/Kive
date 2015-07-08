@@ -3,22 +3,15 @@ $(function() {
     noXSS();
 
     var render_pipeline = function() {
-        var pipeline_raw = JSON.parse($("#initial_data").text())
+        var $canvas = $(canvasState.canvas);
+
+        $original_pipeline = $("#initial_data").text()
+        if ($original_pipeline == "")
+            return
+
+        var pipeline_raw = JSON.parse($("#initial_data").text());
         window.pipeline_revision = new Pipeline(canvasState);
 
-//        window.submit_to_url = pipeline_raw.family_pk;
-//        window.pipeline_revision = new Pipeline(canvasState);
-//        window.pipeline_revision.load(pipeline_raw);
-//        window.pipeline_revision.draw();
-//        $canvas.fadeIn();
-//
-//        $('#id_publish').val(
-//            pipeline_raw.is_published_version ?
-//            'Cancel publication' :
-//            'Make published version'
-//        );
-
-        var $canvas = $(canvasState.canvas);
         $canvas.fadeOut(
             {
                 complete: function () {
@@ -26,49 +19,10 @@ $(function() {
                     window.pipeline_revision.load(pipeline_raw);
                     window.pipeline_revision.draw();
                     $canvas.fadeIn();
-
-//                    $('#id_publish').val(
-//                        pipeline_raw.is_published_version ?
-//                            'Cancel publication' :
-//                            'Make published version'
-//                    );
                 }
             }
         );
     };
-
-    // change pipeline revision drop-down triggers ajax to redraw canvas
-//    $('#id_pipeline_select').on('change', function () {
-//        var pipeline_id = $('#id_pipeline_select').val();
-//        window.pipeline_revision = new Pipeline(canvasState);
-//
-//        if (pipeline_id === null) {
-//            window.submit_to_url = $('#id_family_pk').val();
-//            return;
-//        }
-//
-//        var $canvas = $(canvasState.canvas);
-//        $canvas.fadeOut({ complete: function() {
-//            $.ajax({
-//                type: "GET",
-//                url: "/api/pipelines/" + pipeline_id + "/",
-//                datatype: "json",
-//                success: function(pipeline_raw) {
-//
-//                    submit_to_url = pipeline_raw.family_pk;
-//                    pipeline_revision.load(pipeline_raw);
-//                    pipeline_revision.draw();
-//                    $canvas.fadeIn();
-//
-//                    $('#id_publish').val(
-//                        pipeline_raw.is_published_version ?
-//                        'Cancel publication' :
-//                        'Make published version'
-//                    );
-//                }
-//            });
-//        }});
-//    }).change();
 
     $('#id_revert').on('click', function() {
         // Reload the current pipeline.
