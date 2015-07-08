@@ -35,7 +35,7 @@ var RunsTable = function($table, is_user_admin, $no_results, $active_filters) {
             $name = $('<span/>');
         }
         else {
-            $name = $('<a/>').attr("href", "view_results/" + run.id);
+            $name = $('<a/>').attr("href", "view_results/" + run.rtp_id);
         }
         $td.append($name.text(run.name));
     });

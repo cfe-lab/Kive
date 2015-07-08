@@ -16,6 +16,7 @@ from pipeline.serializers import PipelineFamilySerializer
 from portal.views import admin_check
 from sandbox.forms import InputSubmissionForm, RunSubmissionForm
 
+
 @login_required
 def choose_pipeline(request, error_message=''):
     """Create forms for all Pipelines in Shipyard."""
@@ -30,11 +31,13 @@ def choose_pipeline(request, error_message=''):
                                        "error_msg": error_message })
     return HttpResponse(template.render(context))
 
+
 @login_required
 @require_GET
 def choose_inputs(request):
     pipeline_pk = int(request.GET.get("pipeline"))
     return _choose_inputs_for_pipeline(request, pipeline_pk)
+
 
 def _choose_inputs_for_pipeline(request,
                                 pipeline_pk,
@@ -68,6 +71,7 @@ class RunSubmissionError(Exception):
     
     def __init__(self, response):
         self.response = response
+
 
 @login_required
 @require_POST
@@ -152,12 +156,14 @@ def runs(request):
     template = loader.get_template("sandbox/runs.html")
     return HttpResponse(template.render(context))
 
+
 @login_required
 def view_results(request, rtp_id):
     """View outputs from a pipeline run."""
     template = loader.get_template("sandbox/view_results.html")
     context = RequestContext(request)
     context['is_user_admin'] = admin_check(request.user)
+    context['back_to_view'] = request.GET.get('back_to_view', None) == 'true'
     context['rtp_id'] = rtp_id
     
     four_oh_four = False
@@ -173,7 +179,7 @@ def view_results(request, rtp_id):
 
     context["outputs"] = json.dumps(RunToProcessOutputsSerializer(
         rtp,
-        context={ 'request': request }).data)
+        context={'request': request}).data)
     return HttpResponse(template.render(context))
 
 @login_required
