@@ -48,7 +48,7 @@
                     {% if d.dataset.created_by == None %}
                         This was an upload
                     {% else %}
-                        <a href="/view_run/{{ d.dataset.created_by.parent_run.id }}/{{md5}}">View run</a>
+                        <a href="/view_run/{{ d.dataset.created_by.parent_run.runtoprocess.id }}/{{md5}}">View run</a>
                     {% endif %}
                 </td>
             </tr>
