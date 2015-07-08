@@ -210,7 +210,6 @@ def pipeline_revise(request, id):
     t = loader.get_template('pipeline/pipeline_revise.html')
     method_families = MethodFamily.filter_by_user(request.user).order_by('name')
     compound_datatypes = CompoundDatatype.filter_by_user(request.user)
-    acf = metadata.forms.AccessControlForm()
 
     # Retrieve this pipeline from database.
     four_oh_four = False
@@ -223,6 +222,14 @@ def pipeline_revise(request, id):
 
     if four_oh_four:
         raise Http404("ID {} cannot be accessed".format(id))
+
+    parent_users_allowed = [x.pk for x in parent_revision.users_allowed.all()]
+    parent_groups_allowed = [x.pk for x in parent_revision.groups_allowed.all()]
+    acf = metadata.forms.AccessControlForm(
+        initial={
+            "permissions": [parent_users_allowed, parent_groups_allowed]
+        }
+    )
 
     parent_revision_json = json.dumps(
         PipelineSerializer(
