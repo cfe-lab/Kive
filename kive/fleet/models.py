@@ -204,7 +204,8 @@ class RunToProcess(metadata.models.AccessControl):
                 cable_progress[pipeline_cable.id] = {'status': step_status, 'dataset_id': None, 'md5': None}
                 try:
                     symbolicdataset = run_cables[0].execrecord.execrecordouts.first().symbolicdataset
-                    cable_progress[pipeline_cable.id]['dataset_id'] = symbolicdataset.pk
+                    cable_progress[pipeline_cable.id]['dataset_id'] = symbolicdataset.dataset.pk \
+                        if symbolicdataset.has_data() else None
                     cable_progress[pipeline_cable.id]['md5'] = symbolicdataset.MD5_checksum
                 except:
                     pass

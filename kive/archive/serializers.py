@@ -38,6 +38,7 @@ class DatasetSerializer(serializers.ModelSerializer):
         if obj:
             return os.path.basename(obj.dataset_file.name)
 
+
 class MethodOutputSerializer(serializers.ModelSerializer):
 
     output_redaction_plan = serializers.HyperlinkedIdentityField(
@@ -57,6 +58,7 @@ class MethodOutputSerializer(serializers.ModelSerializer):
                   'output_redaction_plan',
                   'error_redaction_plan',
                   'code_redaction_plan')
+
 
 class RunOutputsSerializer(serializers.ModelSerializer):
     """ Serialize a run with a focus on the outputs. """
