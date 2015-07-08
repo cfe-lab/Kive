@@ -14,7 +14,17 @@
     "type": "git",
     "url": "git+https://github.com/cfe-lab/Kive.git"
   },
-  "author": "BC Centre for Excellence in HIV/AIDS",
+  "contributors": [
+    { "name" : "Art F.Y. Poon", "email" : "artpoon@gmail.com", "url": ""},
+    { "name" : "Richard H. Liang", "email" : "", "url": ""},
+    { "name" : "Eric Martin", "email" : "", "url": ""},
+    { "name" : "Rosemary M. McCloskey", "email" : "", "url": ""},
+    { "name" : "James Nakagawa", "email" : "", "url": ""},
+    { "name" : "T. Nguyen", "email" : "", "url": ""},
+    { "name" : "Don Kirkby", "email" : "", "url": ""},
+    { "name" : "Joshua Horacsek", "email" : "", "url": ""}
+  ],
+  "license": "BSD-3-Clause",
   "bugs": {
     "url": "https://github.com/cfe-lab/Kive/issues"
   },
