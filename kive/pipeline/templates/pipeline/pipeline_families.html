@@ -1,0 +1,33 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Pipelines{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script src="/static/pipeline/pipeline_families.js"></script>
+    <link rel="stylesheet" href="/static/portal/permissions.css">
+
+    <script type="text/javascript">
+        $(function(){
+            pipeline_families.main({{ is_user_admin|lower }},
+                    $("#pipelinefamilies"),
+                    JSON.parse($('#initial_data').text()));
+        });
+    </script>
+{% endblock %}
+
+{% block content %}
+
+<a href="dev.html" rel="prev">Back to developer's portal</a>
+
+<h2>Pipelines</h2>
+<a href="/pipeline_add" class="button">+&ensp;<span class="button-lbl">Add new</span></a>
+
+<div id="initial_data" style="display:none">{{ pipeline_families|escape }}</div>
+<p>A pipeline is the deployment of one or more Methods to process data.</p>
+
+<table id="pipelinefamilies"></table>
+
+{% endblock %}

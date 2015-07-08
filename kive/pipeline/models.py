@@ -42,9 +42,6 @@ class PipelineFamily(transformation.models.TransformationFamily):
     published_version = models.ForeignKey('Pipeline', null=True, blank=True,
                                           on_delete=models.SET_NULL)
 
-    def get_absolute_url(self):
-        return '/pipeline_revise/{}'.format(self.id)
-
     @property
     def size(self):
         """Returns size of this Pipeline's family"""

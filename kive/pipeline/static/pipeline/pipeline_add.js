@@ -44,6 +44,7 @@ $(function() {
             $btn.removeClass('pipeline-ready').addClass('pipeline-not-ready');
         }
     };
+
     var showMenu = function(e) {
         e.stopPropagation();
         var $this = $(this),
@@ -73,6 +74,7 @@ $(function() {
             }
         }
     };
+
     var submitOutputNodeName = function(e) {
         // override ENTER key, click Create output button on form
         e.preventDefault();
@@ -94,12 +96,14 @@ $(function() {
         canvasState.valid = false;
         $dialog.hide();
     };
+
     var cancelOutputNode = function() {
         $(this).closest('#dialog_form').hide();
         $('#output_name_error').hide();
         canvasState.connectors.pop();
         canvasState.valid = false;
     };
+
     var updateCDtPreviewCanvas = function(e) {
         // Update preview picture of node to show a CDtNode or RawNode appropriately
         var preview_canvas = $(this).closest('.modal_dialog').find('canvas'),
@@ -117,6 +121,7 @@ $(function() {
         }
         e.stopPropagation();
     };
+
     var updateMethodPreviewCanvas = function(e) {
         // Update preview picture of node to show a CDtNode or RawNode appropriately
         var preview_canvas = $(this).closest('.modal_dialog').find('canvas'),
@@ -153,6 +158,7 @@ $(function() {
         }
         e.stopPropagation();
     };
+
     var updateMethodRevisionsMenu = function() {
         var mf_id = this.value;
         if (mf_id !== '') {
@@ -182,6 +188,7 @@ $(function() {
         $("#id_method_revision_field").hide();
         return $.Deferred().reject(); // No method family chosen, never loads.
     };
+
     var createNewInputNode = function(e) {
         e.preventDefault(); // stop default form submission behaviour
         
@@ -229,6 +236,7 @@ $(function() {
             dlg.removeClass('modal_dialog').hide();
         }
     };
+
     var submitMethodDialog = function(e) {
         e.preventDefault(); // stop default form submission behaviour
         
@@ -311,11 +319,13 @@ $(function() {
             }
         }
     };
+
     var resetMethodDialog = function() {
         var method_family = $('#id_select_method_family', this);
         $('#id_method_name', this).val_('');
         method_family.val(method_family.children('option').eq(0)).change();
     };
+
     var documentKeyHandler = function(e) {
         // backspace or delete key also removes selected object
         if ([8,46].indexOf(e.which) > -1 && !$(e.target).is("input, textarea")) {
@@ -338,6 +348,7 @@ $(function() {
             canvasState.valid = false;
         }
     };
+
     var documentClickHandler = function(e) {
         var menus = $('.ctrl_menu, .context_menu, .modal_dialog').filter(':visible');
         if ($(e.target).closest(menus).length === 0) {
@@ -345,6 +356,7 @@ $(function() {
             $('li', 'ul#id_ctrl_nav').add(menus).removeClass('clicked');
         }
     };
+
     var documentResizeHandler = function() {
         var shape, i, scale_x, scale_y, out_z,
             canvasWidth, canvasHeight;
@@ -377,6 +389,7 @@ $(function() {
         canvasState.old_height = canvas.height;
         canvasState.valid = false;
     };
+
     var chooseContextMenuOption = function(e) {
         e.stopPropagation();
 
@@ -481,6 +494,7 @@ $(function() {
         }
         $('.context_menu').hide();
     };
+
     var submitPipeline = function(e) {
         /*
         Trigger AJAX transaction on submitting form.
@@ -507,7 +521,11 @@ $(function() {
 
         document.getElementById('id_submit_error').innerHTML = '';
 
-        var is_revision = 0 < $('#id_pipeline_select').length;
+        var parent_revision = null;
+        var is_revision = e.data.action == "revise";
+        if (is_revision) {
+            var parent_revision = JSON.parse($("#initial_data").text());
+        }
 
         // arguments to initialize new Pipeline Family
         var family_name = $('#id_family_name').val(),  // hidden input if revision
@@ -552,7 +570,7 @@ $(function() {
             // arguments to add first pipeline revision
             revision_name: revision_name,
             revision_desc: revision_desc,
-            revision_parent: is_revision ? $('#id_pipeline_select').val() : null,
+            revision_parent: is_revision ? parent_revision["id"] : null,
 
             // Canvas information to store in the Pipeline object.
             canvas_width: canvas.width,
@@ -596,7 +614,7 @@ $(function() {
                 dataType: 'json',
                 success: function(result) {
                     $('#id_submit_error').html('').hide();
-                    window.location.href = '/pipelines';
+                    window.location.href = '/pipeline_families';
                 },
                 error: function(xhr, status, error) {
                     var json = xhr.responseJSON;
@@ -617,6 +635,7 @@ $(function() {
                 }
             });
         }
+
         if(is_revision)
             submit_pipeline();
 
@@ -650,6 +669,7 @@ $(function() {
             });
 
     };
+
     var changeExecOrderDisplayOption = function() {
         var $this = $(this),
             val = $this.val(),
@@ -660,10 +680,12 @@ $(function() {
             canvasState.valid = false;
         }
     };
+
     var showColourPicker = function() {
         var pos = $(this).position();
         $('#colour_picker_menu').css({ top: pos.top + 20, left: pos.left }).show();
     };
+
     var pickColour = function() {
         var bg_col = $(this).css('background-color');
         $('#colour_picker_pick').css('background-color', bg_col);
@@ -671,6 +693,7 @@ $(function() {
         $('#colour_picker_menu').hide();
         $('#id_select_method').trigger('change');
     };
+
     var tuckLabelsIntoInputFields = function() {
         var lbl = $('label[for="' + this.id +'"]', '#pipeline_ctrl'),
             lbl_txt = lbl.text();
@@ -729,7 +752,10 @@ $(function() {
     $('form','#id_input_ctrl')   .on('submit',         createNewInputNode);         // Handle 'Inputs' menu
     $('form', '#id_method_ctrl') .on('submit',         submitMethodDialog)          // Handle 'Methods' menu
                                  .on('reset',          resetMethodDialog);
-    $('#id_pipeline_form')       .on('submit',         submitPipeline);
+    $('#id_pipeline_add_form')   .submit({"action": "add"},
+                                                       submitPipeline);
+    $('#id_pipeline_revise_form').submit({"action": "revise"},
+                                                       submitPipeline);
     $('li', 'ul#id_ctrl_nav')    .on('click',          showMenu);
     $('.context_menu')           .on('click', 'li',    chooseContextMenuOption);    // when a context menu option is clicked
     $('#autolayout_btn')         .on('click',          function() { canvasState.autoLayout(); });

@@ -103,12 +103,14 @@ class PipelineStepSerializer(serializers.ModelSerializer):
 
         return data
 
+
 class PipelineStepUpdateSerializer(serializers.Serializer):
     step_num = serializers.IntegerField()
     method = MethodSerializer()
     code_resource_revision = CodeResourceRevisionSerializer()
     dependencies = serializers.ListSerializer(
         child=CodeResourceRevisionSerializer())
+
 
 class PipelineOutputCableSerializer(serializers.ModelSerializer):
 
@@ -195,10 +197,12 @@ def _source_transf_finder(step_num, dataset_name, step_data_dicts):
     curr_transf = specified_step_data["transformation"].definite
     return curr_transf.outputs.get(dataset_name=dataset_name)
 
+
 class PipelineSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Pipeline
         fields = ('id', 'display_name', 'url')
+
 
 class PipelineSerializer(AccessControlSerializer,
                          serializers.ModelSerializer):
@@ -218,6 +222,8 @@ class PipelineSerializer(AccessControlSerializer,
     removal_plan = serializers.HyperlinkedIdentityField(view_name='pipeline-removal-plan')
     step_updates = serializers.HyperlinkedIdentityField(view_name='pipeline-step-updates')
 
+    absolute_url = serializers.SerializerMethodField()
+
     # This is as per CodeResourceRevisionSerializer.
     revision_number = serializers.IntegerField(
         read_only=True,
@@ -230,6 +236,7 @@ class PipelineSerializer(AccessControlSerializer,
             'id',
             'url',
             'family',
+            "display_name",
             'revision_name',
             "revision_desc",
             'revision_number',
@@ -244,7 +251,8 @@ class PipelineSerializer(AccessControlSerializer,
             "steps",
             "outcables",
             'removal_plan',
-            'step_updates'
+            'step_updates',
+            "absolute_url"
         )
 
     def __init__(self, *args, **kwargs):
@@ -428,6 +436,11 @@ class PipelineSerializer(AccessControlSerializer,
 
         return pipeline
 
+    def get_absolute_url(self, obj):
+        if not obj:
+            return None
+        return "/pipeline_revise/{}".format(obj.pk)
+
 
 class PipelineFamilySerializer(AccessControlSerializer,
                                serializers.ModelSerializer):
@@ -437,6 +450,8 @@ class PipelineFamilySerializer(AccessControlSerializer,
 
     members = PipelineSummarySerializer(many=True, read_only=True)
     members_url = serializers.HyperlinkedIdentityField(view_name='pipelinefamily-pipelines')
+
+    absolute_url = serializers.SerializerMethodField()
 
     class Meta:
         model = PipelineFamily
@@ -462,4 +477,4 @@ class PipelineFamilySerializer(AccessControlSerializer,
     def get_absolute_url(self, obj):
         if not obj:
             return None
-        return obj.get_absolute_url()
+        return '/pipelines/{}'.format(obj.pk)

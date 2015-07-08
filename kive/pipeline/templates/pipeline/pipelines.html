@@ -1,18 +1,22 @@
+<!-- Django template -->
+<!-- Display contents of Methods as a HTML table -->
+
 {% extends "portal/base.html" %}
 
-{% block title %}Pipelines{% endblock %}
+{% block title %}Pipeline: {{ family.name }}{% endblock %}
 
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-    <script src="/static/pipeline/pipeline_families.js"></script>
+    <script src="/static/pipeline/pipelines.js"></script>
     <link rel="stylesheet" href="/static/portal/permissions.css">
 
     <script type="text/javascript">
         $(function(){
-            pipeline_families.main({{ is_user_admin|lower }},
-                    $("#pipelinefamilies"),
+            pipelines_main({{ is_user_admin|lower }},
+                    {{ family.pk }},
+                    $("#pipelines"),
                     JSON.parse($('#initial_data').text()));
         });
     </script>
@@ -20,14 +24,22 @@
 
 {% block content %}
 
-<a href="dev.html" rel="prev">Back to developer's portal</a>
+<a href="/pipeline_families" rel="prev">Back to Pipeline Family summary</a>
 
-<h2>Pipelines</h2>
-<a href="/pipeline_add" class="button">+&ensp;<span class="button-lbl">Add new</span></a>
+<h2>Pipeline Family: {{ family.name }}</h2>
 
-<div id="initial_data" style="display:none">{{ pipeline_families|escape }}</div>
-<p>A pipeline is the deployment of one or more Methods to process data.</p>
+<p>
+{{ family.description }}
+</p>
 
-<table id="pipelinefamilies"></table>
+<div id="initial_data" style="display:none">{{ pipelines|escape }}</div>
+<p style="font-style: italic; color: gray">
+Click on 'Revise' link to revise the corresponding pipeline, or click 'Add new pipeline' to
+add a method without specifying a parent revision.
+</p>
+
+<table id="pipelines"></table>
+
+<a href="/pipeline_add/{{ family.pk }}" class="button">+&ensp;<span class="button-lbl">Add a new pipeline</span></a>
 
 {% endblock %}

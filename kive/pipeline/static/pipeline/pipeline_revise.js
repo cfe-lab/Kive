@@ -2,42 +2,77 @@ $(function() {
     // Security stuff to prevent cross-site scripting.
     noXSS();
 
-    // change pipeline revision drop-down triggers ajax to redraw canvas
-    $('#id_pipeline_select').on('change', function () {
-        var pipeline_id = $('#id_pipeline_select').val();
+    var render_pipeline = function() {
+        var pipeline_raw = JSON.parse($("#initial_data").text())
         window.pipeline_revision = new Pipeline(canvasState);
 
-        if (pipeline_id === null) {
-            window.submit_to_url = $('#id_family_pk').val();
-            return;
-        }
-        
-        var $canvas = $(canvasState.canvas);
-        $canvas.fadeOut({ complete: function() {
-            $.ajax({
-                type: "GET",
-                url: "/api/pipelines/" + pipeline_id + "/",
-                datatype: "json",
-                success: function(pipeline_raw) {
+//        window.submit_to_url = pipeline_raw.family_pk;
+//        window.pipeline_revision = new Pipeline(canvasState);
+//        window.pipeline_revision.load(pipeline_raw);
+//        window.pipeline_revision.draw();
+//        $canvas.fadeIn();
+//
+//        $('#id_publish').val(
+//            pipeline_raw.is_published_version ?
+//            'Cancel publication' :
+//            'Make published version'
+//        );
 
-                    submit_to_url = pipeline_raw.family_pk;
-                    pipeline_revision.load(pipeline_raw);
-                    pipeline_revision.draw();
+        var $canvas = $(canvasState.canvas);
+        $canvas.fadeOut(
+            {
+                complete: function () {
+                    window.submit_to_url = pipeline_raw.family_pk;
+                    window.pipeline_revision.load(pipeline_raw);
+                    window.pipeline_revision.draw();
                     $canvas.fadeIn();
 
-                    $('#id_publish').val(
-                        pipeline_raw.is_published_version ?
-                        'Cancel publication' :
-                        'Make published version'
-                    );
+//                    $('#id_publish').val(
+//                        pipeline_raw.is_published_version ?
+//                            'Cancel publication' :
+//                            'Make published version'
+//                    );
                 }
-            });
-        }});
-    }).change();
+            }
+        );
+    };
+
+    // change pipeline revision drop-down triggers ajax to redraw canvas
+//    $('#id_pipeline_select').on('change', function () {
+//        var pipeline_id = $('#id_pipeline_select').val();
+//        window.pipeline_revision = new Pipeline(canvasState);
+//
+//        if (pipeline_id === null) {
+//            window.submit_to_url = $('#id_family_pk').val();
+//            return;
+//        }
+//
+//        var $canvas = $(canvasState.canvas);
+//        $canvas.fadeOut({ complete: function() {
+//            $.ajax({
+//                type: "GET",
+//                url: "/api/pipelines/" + pipeline_id + "/",
+//                datatype: "json",
+//                success: function(pipeline_raw) {
+//
+//                    submit_to_url = pipeline_raw.family_pk;
+//                    pipeline_revision.load(pipeline_raw);
+//                    pipeline_revision.draw();
+//                    $canvas.fadeIn();
+//
+//                    $('#id_publish').val(
+//                        pipeline_raw.is_published_version ?
+//                        'Cancel publication' :
+//                        'Make published version'
+//                    );
+//                }
+//            });
+//        }});
+//    }).change();
 
     $('#id_revert').on('click', function() {
         // Reload the current pipeline.
-        $('#id_pipeline_select').change();
+        render_pipeline();
     });
 
     $('#id_update').on('click', function() {
@@ -71,4 +106,6 @@ $(function() {
             });
         }
     });
+
+    render_pipeline();
 });

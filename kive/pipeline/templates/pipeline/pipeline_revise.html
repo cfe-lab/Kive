@@ -28,7 +28,10 @@
 
 {% block content %}
 
-<a href="/pipelines" rel="prev">Back to pipeline summary</a>
+<a href="/pipelines/{{ parent_revision.family.pk }}" rel="prev">Back to pipeline summary</a>
+
+    <!-- Stash the parent revision's representation here. -->
+    <div id="initial_data" style="display:none">{{ parent_revision_json|escape }}</div>
 
     <!-- CANVAS -->
     <div>
@@ -45,7 +48,7 @@
             <li data-rel="#id_view_ctrl">View</li>
         </ul>
 
-        <form id="id_pipeline_form" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+        <form id="id_pipeline_revise_form" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
             <div id="form_ctrl">
                 <input type="button" id="id_revert" value="Revert">
                 <input type="button" id="id_update" value="Check for Updates">
@@ -57,14 +60,12 @@
             <div id="id_meta_ctrl" class="ctrl_menu">
                 <h3>Pipeline</h3>
 
-                <select id="id_pipeline_select">
-                    {% for revision in revisions %}
-                    <option value="{{ revision.id }}">{{ revision.revision_number }}: {{ revision.revision_name }}</option>
-                    {% endfor %}
-                </select>
-                <input type="hidden" id="id_family_pk" value="{{ family.pk }}"/>
-                <input type="hidden" id="id_family_name" value="{{ family.name }}"/>
-                <input type="hidden" id="id_family_desc" value="{{ family.desc }}"/>
+                <h5>Parent revision:</h5>
+                {{ parent_revision }}
+
+                <input type="hidden" id="id_family_pk" value="{{ parent_revision.family.pk }}"/>
+                <input type="hidden" id="id_family_name" value="{{ parent_revision.family.name }}"/>
+                <input type="hidden" id="id_family_desc" value="{{ parent_revision.family.desc }}"/>
 
                 <label for="id_revision_name" class="text-field-label">Revision name</label>
                 <input id="id_revision_name" maxlength="128" name="revision_name" type="text" />
@@ -75,7 +76,7 @@
                 <h5>Users and groups allowed:</h5>
                 {{ access_control_form.permissions }}
 
-                <input id="id_publish" type="button" value="Make published version">
+                <!-- <input id="id_publish" type="button" value="Make published version"> -->
             </div>
         </form>
         
