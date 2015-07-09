@@ -315,6 +315,7 @@ class PipelineSerializer(AccessControlSerializer,
         inputs = validated_data.pop("inputs")
         steps = validated_data.pop("steps")
         outcables = validated_data.pop("outcables")
+        publish_on_submit = validated_data.pop("publish_on_submit")
 
         users_allowed = validated_data.pop("users_allowed")
         groups_allowed = validated_data.pop("groups_allowed")
@@ -437,7 +438,7 @@ class PipelineSerializer(AccessControlSerializer,
             curr_outcable.create_output(x=x, y=y)
 
         # Mark this as the published version if appropriate.
-        if validated_data["publish_on_submit"]:
+        if publish_on_submit:
             pipeline.family.published_version = pipeline
             pipeline.family.save()
 
