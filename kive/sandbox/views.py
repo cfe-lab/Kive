@@ -182,6 +182,7 @@ def view_results(request, rtp_id):
         context={'request': request}).data)
     return HttpResponse(template.render(context))
 
+
 @login_required
 def view_run(request, rtp_id, md5=None):
     rtp = fleet.models.RunToProcess.objects.get(id=rtp_id)
