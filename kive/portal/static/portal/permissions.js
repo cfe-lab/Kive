@@ -194,6 +194,7 @@ var permissions = (function() {
                     var rows;
                     rows = permissions_table.extractRows(response);
                     permissions_table.buildTable(rows);
+                    permissions_table.setCaption("");
                 }).fail(function(request) {
                     var response = request.responseJSON,
                         detail = (
