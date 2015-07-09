@@ -20,11 +20,11 @@ var pipelines = (function() {
         if (pipeline.is_published_version) {
             $form.append("Published");
             $action_input.val("unpublish");
-            $input.val("Unpublish")
+            $input.val("Unpublish");
         }
         else {
             $action_input.val("publish");
-            $input.val("Publish")
+            $input.val("Publish");
         }
         $form.append($input);
         $form.submit(
@@ -36,7 +36,7 @@ var pipelines = (function() {
                     action = $publish_form.child("action").val(),
                     new_published_version = $publish_form.child("pipeline_pk").val();
 
-                if (action == "unpublish") {
+                if (action === "unpublish") {
                     new_published_version = null;
                 }
 
