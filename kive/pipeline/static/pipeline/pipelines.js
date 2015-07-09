@@ -32,12 +32,13 @@ var pipelines = (function() {
             {
                 event.preventDefault();
 
-                var publish_form = event.target,
-                    action = publish_form.elements["action"].value;
+                var $publish_form = $(event.target),
+                    action = $publish_form.child("action").val(),
+                    new_published_version = $publish_form.child("pipeline_pk").val();
 
-                var new_published_version = this.pipeline_pk.value;
-                if (action == "unpublish")
+                if (action == "unpublish") {
                     new_published_version = null;
+                }
 
                 $.ajax({
                     type: "PATCH",

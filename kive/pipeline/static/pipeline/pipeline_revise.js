@@ -5,9 +5,10 @@ $(function() {
     var render_pipeline = function() {
         var $canvas = $(canvasState.canvas);
 
-        $original_pipeline = $("#initial_data").text()
-        if ($original_pipeline == "")
-            return
+        $original_pipeline = $("#initial_data").text();
+        if ($original_pipeline === "") {
+            return;
+        }
 
         var pipeline_raw = JSON.parse($("#initial_data").text());
         window.pipeline_revision = new Pipeline(canvasState);
