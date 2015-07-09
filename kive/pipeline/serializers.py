@@ -254,7 +254,8 @@ class PipelineSerializer(AccessControlSerializer,
             "outcables",
             'removal_plan',
             'step_updates',
-            "absolute_url"
+            "absolute_url",
+            "publish_on_submit"
         )
 
     def __init__(self, *args, **kwargs):
