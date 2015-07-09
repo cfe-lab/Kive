@@ -224,6 +224,8 @@ class PipelineSerializer(AccessControlSerializer,
 
     absolute_url = serializers.SerializerMethodField()
 
+    publish_on_submit = serializers.BooleanField(default=False, write_only=True)
+
     # This is as per CodeResourceRevisionSerializer.
     revision_number = serializers.IntegerField(
         read_only=True,
@@ -433,6 +435,11 @@ class PipelineSerializer(AccessControlSerializer,
             for wire_data in custom_wires:
                 curr_outcable.custom_wires.create(**wire_data)
             curr_outcable.create_output(x=x, y=y)
+
+        # Mark this as the published version if appropriate.
+        if validated_data["publish_on_submit"]:
+            pipeline.family.published_version = pipeline
+            pipeline.family.save()
 
         return pipeline
 
