@@ -79,7 +79,7 @@ $(function() {
             <div id="id_family_ctrl" class="ctrl_menu">
                 <h3>Family</h3>
                 {% if family %}  <!-- family is set if parent_revision is passed -->
-                <h5>Family:</h5>
+                <h5 class="first">Family:</h5>
                 {{ family.name }}
                 {% else %}
                 <label for="id_family_name" class="text-field-label">Family name</label>
@@ -88,7 +88,11 @@ $(function() {
 
                 {% if family %}
                 <h5>Description:</h5>
+                {% if family.description %}
                 {{ family.description }}
+                {% else %}
+                <em>None</em>
+                {% endif %}
                 {% else %}
                 <label for="id_family_desc" class="text-field-label">Family description</label>
                 <textarea id="id_family_desc" name="family_desc"></textarea>
@@ -99,12 +103,13 @@ $(function() {
                 <h3>Pipeline</h3>
 
                 {% if family %}
-                <h5>Parent revision:</h5>
+                <h5 class="first">Parent revision:
                 {% if parent_revision %}
                 {{ parent_revision }}
                 {% else %}
                 None
                 {% endif %}
+                </h5>
                 {% endif %}
 
                 <input type="hidden" id="id_family_pk" value="{{ family.pk }}"/>
@@ -116,6 +121,8 @@ $(function() {
 
                 <label for="id_revision_desc" class="text-field-label">Description</label>
                 <textarea id="id_revision_desc" name="revision_desc"></textarea>
+                
+                <div class="form-inline-opts"><input type="checkbox" id="publish_on_submit" name="publish_on_submit"> <label for="publish_on_submit" class="checkbox-label">Publish this revision immediately on submission</label></div>
 
                 <h5>Users and groups allowed:</h5>
                 {{ access_control_form.permissions }}

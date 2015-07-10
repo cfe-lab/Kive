@@ -49,18 +49,6 @@ $(function() {
             pipeline.canvasState.valid = false;
         });
     });
-    
-    $('#id_publish').on('click', function() {
-        if(pipeline_revision.isPublished()) {
-            pipeline_revision.unpublish($("#id_family_pk").val(), function() {
-                $('#id_publish').val('Make published version');
-            });
-        } else {
-            pipeline_revision.publish($("#id_family_pk").val(), function() {
-                $('#id_publish').val('Cancel publication');
-            });
-        }
-    });
 
     render_pipeline();
 });

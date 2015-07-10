@@ -13,7 +13,6 @@ var pipelines = (function() {
             $pipeline_pk_input = $('<input>', {
                 type: 'hidden',
                 name: "pipeline_pk",
-                id: "pipeline_pk",
                 value: pipeline.id
             }),
             $action_input = $('<input type="hidden" name="action">'),

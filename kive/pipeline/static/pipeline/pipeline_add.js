@@ -530,6 +530,7 @@ $(function() {
             family_pk = $('#id_family_pk').val(),
             revision_name = $('#id_revision_name').val(),
             revision_desc = $('#id_revision_desc').val(),
+            publish_on_submit = $('#publish_on_submit').prop('checked'),
             users_allowed = [],
             groups_allowed = [];
 
@@ -567,7 +568,8 @@ $(function() {
             // arguments to add first pipeline revision
             revision_name: revision_name,
             revision_desc: revision_desc,
-            revision_parent: is_revision ? JSON.parse($("#initial_data").text())["id"] : null,
+            revision_parent: is_revision ? JSON.parse($("#initial_data").text()).id : null,
+            publish_on_submit: publish_on_submit,
 
             // Canvas information to store in the Pipeline object.
             canvas_width: canvas.width,
@@ -727,42 +729,39 @@ $(function() {
     });
     
     // Labels go within their input fields until they are filled in
-    $('input, textarea', '#pipeline_ctrl').each(tuckLabelsIntoInputFields);
+    $('input, textarea', '#pipeline_ctrl').not('[type="checkbox"],[type="radio"]').each(tuckLabelsIntoInputFields);
     
     /*
     EVENT BINDINGS TABLE
-    --------------------------------------------------------------------------
-     ELEMENT                         EVENT             FUNCTION CALLBACK
-    --------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------
+     ELEMENT                         EVENT                   FUNCTION CALLBACK
+    ------------------------------------------------------------------------------------
     */
-    $(window)                    .on('resize',         documentResizeHandler);
-    $(document)                  .on('keydown',        documentKeyHandler)
-                                 .on('mousedown',      documentClickHandler)
+    $(window)                    .on('resize',               documentResizeHandler);
+    $(document)                  .on('keydown',              documentKeyHandler)
+                                 .on('mousedown',            documentClickHandler)
                                  .on('cancel', '.context_menu, .modal_dialog, .ctrl_menu', function() { $(this).hide(); });
-    $('form', '#dialog_form')    .on('submit',         submitOutputNodeName)        // Handle jQuery-UI Dialog spawned for output cable
-                                 .on('cancel',         cancelOutputNode);           // Cancel is not a native event and can only be triggered via javascript
-    $('#id_select_cdt')          .on('change',         updateCDtPreviewCanvas);
-    $('#id_select_method')       .on('change',         updateMethodPreviewCanvas);
-    $("#id_select_method_family").on('change',         updateMethodRevisionsMenu)   // Update method drop-down
-                                 .trigger('change');                             // Trigger on load
-    $('form','#id_input_ctrl')   .on('submit',         createNewInputNode);         // Handle 'Inputs' menu
-    $('form', '#id_method_ctrl') .on('submit',         submitMethodDialog)          // Handle 'Methods' menu
-                                 .on('reset',          resetMethodDialog);
-    $('#id_pipeline_new_form')   .submit({"action": "new"},
-                                                       submitPipeline);
-    $('#id_pipeline_add_form')   .submit({"action": "add"},
-                                                       submitPipeline);
-    $('#id_pipeline_revise_form').submit({"action": "revise"},
-                                                       submitPipeline);
-    $('li', 'ul#id_ctrl_nav')    .on('click',          showMenu);
-    $('.context_menu')           .on('click', 'li',    chooseContextMenuOption);    // when a context menu option is clicked
-    $('#autolayout_btn')         .on('click',          function() { canvasState.autoLayout(); });
-    $('.align-btn')              .on('click',          function() { canvasState.alignSelection($(this).data('axis')); });
-    $('.form-inline-opts')       .on('click', 'input', changeExecOrderDisplayOption);
-    $('#colour_picker_pick')     .on('click',          showColourPicker);
-    $('#colour_picker_menu')     .on('click', 'div',   pickColour);
+    $('form', '#dialog_form')    .on('submit',               submitOutputNodeName)        // Handle jQuery-UI Dialog spawned for output cable
+                                 .on('cancel',               cancelOutputNode);           // Cancel is not a native event and can only be triggered via javascript
+    $('#id_select_cdt')          .on('change',               updateCDtPreviewCanvas);
+    $('#id_select_method')       .on('change',               updateMethodPreviewCanvas);
+    $("#id_select_method_family").on('change',               updateMethodRevisionsMenu)   // Update method drop-down
+                                 .trigger('change'); // Trigger on load
+    $('form','#id_input_ctrl')   .on('submit',               createNewInputNode);         // Handle 'Inputs' menu
+    $('form', '#id_method_ctrl') .on('submit',               submitMethodDialog)          // Handle 'Methods' menu
+                                 .on('reset',                resetMethodDialog);
+    $('#id_pipeline_new_form')   .submit({action: "new"},    submitPipeline);
+    $('#id_pipeline_add_form')   .submit({action: "add"},    submitPipeline);
+    $('#id_pipeline_revise_form').submit({action: "revise"}, submitPipeline);
+    $('li', 'ul#id_ctrl_nav')    .on('click',                showMenu);
+    $('.context_menu')           .on('click', 'li',          chooseContextMenuOption);    // when a context menu option is clicked
+    $('#autolayout_btn')         .on('click',                function() { canvasState.autoLayout(); });
+    $('.align-btn')              .on('click',                function() { canvasState.alignSelection($(this).data('axis')); });
+    $('.form-inline-opts')       .on('click', 'input',       changeExecOrderDisplayOption);
+    $('#colour_picker_pick')     .on('click',                showColourPicker);
+    $('#colour_picker_menu')     .on('click', 'div',         pickColour);
     /*
-    --------------------------------------------------------------------------
+    ------------------------------------------------------------------------------------
     */
     
     $('.ctrl_menu').draggable();

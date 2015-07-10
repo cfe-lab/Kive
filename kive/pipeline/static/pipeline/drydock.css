@@ -23,6 +23,10 @@ html body {
     margin-bottom: -1px;
     margin-top: 0;
 }
+#pipeline_ctrl input[type="checkbox"],
+#pipeline_ctrl input[type="radio"] {
+    display: inline;
+}
 #pipeline_ctrl #id_method_button, 
 #pipeline_ctrl #id_cdt_button {
     margin: .5em;
@@ -48,6 +52,10 @@ ul#id_ctrl_nav li:hover {
     background-color: #aaa;
     color: #fff;
 }
+
+#description_wrap {
+  margin-bottom: .2em;
+}
 #pipeline_ctrl .ctrl_menu {
     top: 4.3em;
     position: fixed;
@@ -56,6 +64,7 @@ ul#id_ctrl_nav li:hover {
     display: none;
     background: #fff;
     width: auto;
+    min-width: 10em;
 }
 .ctrl_menu#id_meta_ctrl,
 .ctrl_menu#id_view_ctrl {
@@ -68,8 +77,11 @@ ul#id_ctrl_nav li:hover {
 .ctrl_menu h5 {
     margin-bottom: 2px;
 }
+.ctrl_menu h5.first {
+    margin-top: 2px;
+}
 .input-label { color: #ccc; }
-.image-button { border: 1px dotted #888; cursor: pointer; }
+.image-button { border: 1px solid #ddd; cursor: pointer; padding: 2px; }
 
 #id_datatype_name, #id_select_method_family, 
 #id_select_method, #id_method_name, 
@@ -104,7 +116,7 @@ ul#id_ctrl_nav li:hover {
 #pipeline_ctrl #form_ctrl input:first-of-type:last-of-type  { border-radius: 1em; padding: 0 1em 0 1em; }
 
 #pipeline_ctrl .form-inline-opts {
-    font-size: 0.9em;
+    font-size: 0.85em;
     font-style:italic;
     margin: .5em 0 1em;
     white-space: nowrap;
