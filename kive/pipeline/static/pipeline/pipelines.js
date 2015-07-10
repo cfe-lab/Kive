@@ -10,31 +10,31 @@ var pipelines = (function() {
     function published_version($td, pipeline, data) {
         var $form = $('<form class="publish">'),
             $input = $('<input type="submit">'),
-            $pipeline_pk_input = $('<input type="hidden" name="pipeline_pk">'),
+            $pipeline_pk_input = $('<input>', {
+                type: 'hidden',
+                name: "pipeline_pk",
+                id: "pipeline_pk",
+                value: pipeline.id
+            }),
             $action_input = $('<input type="hidden" name="action">'),
             family_pk = data.family_pk;
-        $pipeline_pk_input.val(pipeline.id);
-        $form.append($pipeline_pk_input);
-        $form.append($action_input);
+        
+        $form.append($pipeline_pk_input, $action_input, $input);
 
         if (pipeline.is_published_version) {
             $form.append("Published");
             $action_input.val("unpublish");
             $input.val("Unpublish");
-        }
-        else {
+        } else {
             $action_input.val("publish");
             $input.val("Publish");
         }
-        $form.append($input);
         $form.submit(
-            function(event)
-            {
-                event.preventDefault();
+            function(e) {
+                e.preventDefault();
 
-                var $publish_form = $(event.target),
-                    action = $publish_form.child("action").val(),
-                    new_published_version = $publish_form.child("pipeline_pk").val();
+                var action = $action_input.val(),
+                    new_published_version = $pipeline_pk_input.val();
 
                 if (action === "unpublish") {
                     new_published_version = null;

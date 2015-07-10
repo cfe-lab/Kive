@@ -14,6 +14,7 @@ module.exports = function(grunt) {
             "kive/pipeline/static/pipeline/pipeline_families.js",
             "kive/pipeline/static/pipeline/pipeline_revise.js",
             "kive/pipeline/static/pipeline/pipeline_load.js",
+            "kive/pipeline/static/pipeline/pipelines.js",
             "kive/portal/static/portal/permissions.js",
             "kive/sandbox/static/sandbox/choose*.js"
         ],
