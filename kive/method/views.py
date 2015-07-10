@@ -195,9 +195,11 @@ def _make_crv(file_in_memory,
             # Skip the clean until later; after all, we're protected by a transaction here.
             code_resource.save()
         except ValidationError as e:
+            crv_form.add_error('content_file', e.error_dict.get('filename', []))
             crv_form.add_error('resource_name', e.error_dict.get('name', []))
             crv_form.add_error('resource_desc', e.error_dict.get('description', []))
-            raise
+            # crv_form.add_error('filename', e.error_dict.get('filename', []))
+            raise e
 
         code_resource.grant_from_json(crv_form.cleaned_data["permissions"])
 
