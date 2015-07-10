@@ -4168,7 +4168,7 @@ class CustomOutputWiringTests(PipelineTestCase):
         self.assertEquals(member.datatype, self.string_dt)
 
 
-def create_pipeline_deserialization_environment(self):
+def create_pipeline_deserialization_environment(case):
     """
     Set up stuff that will help with testing Pipeline deserialization.
 
@@ -4176,26 +4176,26 @@ def create_pipeline_deserialization_environment(self):
     by directly calling create_sandbox_testing_tools_environment or
     by including a fixture that had called it.
     """
-    self.kive_user = kive_user()
-    self.everyone_group = everyone_group()
+    case.kive_user = kive_user()
+    case.everyone_group = everyone_group()
 
     # Explicitly load objects that are defined in create_sandbox_testing...
     # in case we are using a fixture.
-    self.user_bob = User.objects.get(username="bob")
-    self.coderesource_noop = CodeResource.objects.get(
-        user=self.user_bob,
+    case.user_bob = User.objects.get(username="bob")
+    case.coderesource_noop = CodeResource.objects.get(
+        user=case.user_bob,
         name="noop"
     )
-    self.coderev_noop = self.coderesource_noop.revisions.get(revision_name="1")
-    self.noop_mf = MethodFamily.objects.get(name="string noop")
-    self.method_noop = self.noop_mf.members.get(revision_number=1)
-    self.noop_raw_mf = MethodFamily.objects.get(name="raw noop", user=self.user_bob)
-    self.method_noop_raw = self.noop_raw_mf.members.get(revision_number=1)
+    case.coderev_noop = case.coderesource_noop.revisions.get(revision_name="1")
+    case.noop_mf = MethodFamily.objects.get(name="string noop")
+    case.method_noop = case.noop_mf.members.get(revision_number=1)
+    case.noop_raw_mf = MethodFamily.objects.get(name="raw noop", user=case.user_bob)
+    case.method_noop_raw = case.noop_raw_mf.members.get(revision_number=1)
 
     # Retrieve the CDT defined in create_sandbox_testing_tools_environment
     # called "self.cdt_string", or an equivalent.
     bob_string_dt = Datatype.objects.get(
-        user=self.user_bob,
+        user=case.user_bob,
         name="my_string",
         description="sequences of ASCII characters"
     )
@@ -4205,47 +4205,46 @@ def create_pipeline_deserialization_environment(self):
         datatype=bob_string_dt
     )
     possible_cdt_strings = [x.compounddatatype for x in possible_cdt_string_members]
-    self.cdt_string = possible_cdt_strings[0]
+    case.cdt_string = possible_cdt_strings[0]
 
-    self.duck_context = DuckContext()
+    case.duck_context = DuckContext()
 
-    self.test_pf = PipelineFamily(
-        user=self.kive_user,
+    case.test_pf = PipelineFamily(
+        user=case.kive_user,
         name="test",
         description="Test family"
     )
-    self.test_pf.save()
-    self.test_pf.groups_allowed.add(self.everyone_group)
+    case.test_pf.save()
+    case.test_pf.groups_allowed.add(case.everyone_group)
 
     # Set up a CDT with two elements to allow some wiring to occur.
-    self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
+    case.STR = Datatype.objects.get(pk=datatypes.STR_PK)
 
     # A CDT composed of two builtin-STR columns.
-    self.string_doublet = CompoundDatatype(user=self.user_bob)
-    self.string_doublet.save()
-    self.string_doublet.members.create(datatype=self.STR, column_name="column1", column_idx=1)
-    self.string_doublet.members.create(datatype=self.STR, column_name="column2", column_idx=2)
-    self.string_doublet.grant_everyone_access()
+    case.string_doublet = CompoundDatatype(user=case.user_bob)
+    case.string_doublet.save()
+    case.string_doublet.members.create(datatype=case.STR, column_name="column1", column_idx=1)
+    case.string_doublet.members.create(datatype=case.STR, column_name="column2", column_idx=2)
+    case.string_doublet.grant_everyone_access()
 
     # A CDT composed of one builtin-STR column.
-    self.string_singlet = CompoundDatatype(user=self.user_bob)
-    self.string_singlet.save()
-    self.string_singlet.members.create(datatype=self.STR, column_name="col1", column_idx=1)
-    self.string_singlet.grant_everyone_access()
+    case.string_singlet = CompoundDatatype(user=case.user_bob)
+    case.string_singlet.save()
+    case.string_singlet.members.create(datatype=case.STR, column_name="col1", column_idx=1)
+    case.string_singlet.grant_everyone_access()
 
     # Here is a dictionary that can be deserialized into a Pipeline.
-    self.noop_input_name = self.method_noop.inputs.first().dataset_name
-    self.noop_output_name = self.method_noop.outputs.first().dataset_name
-    self.pipeline_dict = {
+    case.noop_input_name = case.method_noop.inputs.first().dataset_name
+    case.noop_output_name = case.method_noop.outputs.first().dataset_name
+    case.pipeline_dict = {
         "family": "test",
-        "family_pk": self.test_pf.pk,  # FIXME remove after we eliminate family_pk from the serializer
         "revision_name": "v1",
         "revision_desc": "first version",
         "revision_parent": None,
 
-        "user": self.kive_user.username,
+        "user": case.kive_user.username,
         "users_allowed": [],
-        "groups_allowed": [self.everyone_group.name],
+        "groups_allowed": [case.everyone_group.name],
 
         "inputs": [
             {
@@ -4254,7 +4253,7 @@ def create_pipeline_deserialization_environment(self):
                 "x": 0.05,
                 "y": 0.5,
                 "structure": {
-                    "compounddatatype": self.cdt_string.pk,
+                    "compounddatatype": case.cdt_string.pk,
                     "min_row": None,
                     "max_row": None
                 }
@@ -4262,7 +4261,7 @@ def create_pipeline_deserialization_environment(self):
         ],
         "steps": [
             {
-                "transformation": self.method_noop.pk,
+                "transformation": case.method_noop.pk,
                 "step_num": 1,
                 "x": 0.2,
                 "y": 0.5,
@@ -4273,7 +4272,7 @@ def create_pipeline_deserialization_environment(self):
                         # it by name.
                         "source_dataset_name": "input_to_not_touch",
                         "source_step": 0,
-                        "dest_dataset_name": self.noop_input_name,
+                        "dest_dataset_name": case.noop_input_name,
                         "custom_wires": [],
                         "keep_output": False
                     }
@@ -4281,7 +4280,7 @@ def create_pipeline_deserialization_environment(self):
                 "outputs_to_delete": []
             },
             {
-                "transformation": self.method_noop.pk,
+                "transformation": case.method_noop.pk,
                 "step_num": 2,
                 "x": 0.4,
                 "y": 0.5,
@@ -4289,9 +4288,9 @@ def create_pipeline_deserialization_environment(self):
                 "cables_in": [
                     {
                         # Here we can specify source directly.
-                        "source_dataset_name": self.noop_output_name,
+                        "source_dataset_name": case.noop_output_name,
                         "source_step": 1,
-                        "dest_dataset_name": self.noop_input_name,
+                        "dest_dataset_name": case.noop_input_name,
                         "custom_wires": [],
                         "keep_output": False
                     }
@@ -4299,16 +4298,16 @@ def create_pipeline_deserialization_environment(self):
                 "outputs_to_delete": []
             },
             {
-                "transformation": self.method_noop.pk,
+                "transformation": case.method_noop.pk,
                 "step_num": 3,
                 "x": 0.6,
                 "y": 0.5,
                 "name": "step 3",
                 "cables_in": [
                     {
-                        "source_dataset_name": self.noop_output_name,
+                        "source_dataset_name": case.noop_output_name,
                         "source_step": 2,
-                        "dest_dataset_name": self.noop_input_name,
+                        "dest_dataset_name": case.noop_input_name,
                         "custom_wires": [],
                         "keep_output": False
                     }
@@ -4320,9 +4319,9 @@ def create_pipeline_deserialization_environment(self):
             {
                 "output_idx": 1,
                 "output_name": "untouched_output",
-                "output_cdt": self.cdt_string.pk,
+                "output_cdt": case.cdt_string.pk,
                 "source_step": 3,
-                "source_dataset_name": self.noop_output_name,
+                "source_dataset_name": case.noop_output_name,
                 "x": 0.85,
                 "y": 0.5,
                 "custom_wires": []
@@ -4330,31 +4329,30 @@ def create_pipeline_deserialization_environment(self):
         ]
     }
 
-    self.method_doublet_noop = tools.make_first_method(
+    case.method_doublet_noop = tools.make_first_method(
         "string doublet noop",
         "a noop on a two-column input",
-        self.coderev_noop,
-        self.user_bob)
-    self.method_doublet_noop.grant_everyone_access()
-    self.doublet_input_name = "doublets"
-    self.doublet_output_name = "untouched_doublets"
+        case.coderev_noop,
+        case.user_bob)
+    case.method_doublet_noop.grant_everyone_access()
+    case.doublet_input_name = "doublets"
+    case.doublet_output_name = "untouched_doublets"
     tools.simple_method_io(
-        self.method_doublet_noop,
-        self.string_doublet,
-        self.doublet_input_name,
-        self.doublet_output_name
+        case.method_doublet_noop,
+        case.string_doublet,
+        case.doublet_input_name,
+        case.doublet_output_name
     )
 
     # This defines a pipeline with custom wiring.
-    self.pipeline_cw_dict = {
+    case.pipeline_cw_dict = {
         "family": "test",
-        "family_pk": self.test_pf.pk,  # FIXME remove after we eliminate family_pk from the serializer
         "revision_name": "v2_c2",
         "revision_desc": "Custom wiring tester",
         "revision_parent": None,
 
-        "user": self.kive_user.username,
-        "users_allowed": [self.kive_user.username],
+        "user": case.kive_user.username,
+        "users_allowed": [case.kive_user.username],
         "groups_allowed": [],
 
         "inputs": [
@@ -4364,7 +4362,7 @@ def create_pipeline_deserialization_environment(self):
                 "x": 0.05,
                 "y": 0.5,
                 "structure": {
-                    "compounddatatype": self.cdt_string.pk,
+                    "compounddatatype": case.cdt_string.pk,
                     "min_row": None,
                     "max_row": None
                 }
@@ -4372,7 +4370,7 @@ def create_pipeline_deserialization_environment(self):
         ],
         "steps": [
             {
-                "transformation": self.method_doublet_noop.pk,
+                "transformation": case.method_doublet_noop.pk,
                 "step_num": 1,
                 "x": 0.2,
                 "y": 0.5,
@@ -4383,15 +4381,15 @@ def create_pipeline_deserialization_environment(self):
                         # it by name.
                         "source_dataset_name": "input_to_not_touch",
                         "source_step": 0,
-                        "dest_dataset_name": self.doublet_input_name,
+                        "dest_dataset_name": case.doublet_input_name,
                         "custom_wires": [
                             {
-                                "source_pin": self.cdt_string.members.first().pk,
-                                "dest_pin": self.string_doublet.members.get(column_idx=1).pk
+                                "source_pin": case.cdt_string.members.first().pk,
+                                "dest_pin": case.string_doublet.members.get(column_idx=1).pk
                             },
                             {
-                                "source_pin": self.cdt_string.members.first().pk,
-                                "dest_pin": self.string_doublet.members.get(column_idx=2).pk
+                                "source_pin": case.cdt_string.members.first().pk,
+                                "dest_pin": case.string_doublet.members.get(column_idx=2).pk
                             },
                         ],
                         "keep_output": False
@@ -4400,7 +4398,7 @@ def create_pipeline_deserialization_environment(self):
                 "outputs_to_delete": []
             },
             {
-                "transformation": self.method_noop.pk,
+                "transformation": case.method_noop.pk,
                 "step_num": 2,
                 "x": 0.4,
                 "y": 0.5,
@@ -4408,13 +4406,13 @@ def create_pipeline_deserialization_environment(self):
                 "cables_in": [
                     {
                         # Here we can specify source directly.
-                        "source_dataset_name": self.doublet_output_name,
+                        "source_dataset_name": case.doublet_output_name,
                         "source_step": 1,
-                        "dest_dataset_name": self.noop_input_name,
+                        "dest_dataset_name": case.noop_input_name,
                         "custom_wires": [
                             {
-                                "source_pin": self.string_doublet.members.get(column_idx=1).pk,
-                                "dest_pin": self.cdt_string.members.first().pk
+                                "source_pin": case.string_doublet.members.get(column_idx=1).pk,
+                                "dest_pin": case.cdt_string.members.first().pk
                             }
                         ],
                         "keep_output": False
@@ -4427,19 +4425,19 @@ def create_pipeline_deserialization_environment(self):
             {
                 "output_idx": 1,
                 "output_name": "untouched_output",
-                "output_cdt": self.string_doublet.pk,
+                "output_cdt": case.string_doublet.pk,
                 "source_step": 2,
-                "source_dataset_name": self.noop_output_name,
+                "source_dataset_name": case.noop_output_name,
                 "x": 0.85,
                 "y": 0.5,
                 "custom_wires": [
                     {
-                        "source_pin": self.cdt_string.members.first().pk,
-                        "dest_pin": self.string_doublet.members.get(column_idx=1).pk
+                        "source_pin": case.cdt_string.members.first().pk,
+                        "dest_pin": case.string_doublet.members.get(column_idx=1).pk
                     },
                     {
-                        "source_pin": self.cdt_string.members.first().pk,
-                        "dest_pin": self.string_doublet.members.get(column_idx=2).pk
+                        "source_pin": case.cdt_string.members.first().pk,
+                        "dest_pin": case.string_doublet.members.get(column_idx=2).pk
                     },
                 ]
             }
@@ -4447,18 +4445,17 @@ def create_pipeline_deserialization_environment(self):
     }
 
     # This defines a pipeline that handles raw data.
-    self.raw_input_name = self.method_noop_raw.inputs.first().dataset_name
-    self.raw_output_name = self.method_noop_raw.outputs.first().dataset_name
-    self.pipeline_raw_dict = {
+    case.raw_input_name = case.method_noop_raw.inputs.first().dataset_name
+    case.raw_output_name = case.method_noop_raw.outputs.first().dataset_name
+    case.pipeline_raw_dict = {
         "family": "test",
-        "family_pk": self.test_pf.pk,  # FIXME remove after we eliminate family_pk from the serializer
         "revision_name": "v3_raw",
         "revision_desc": "Raw input tester",
         "revision_parent": None,
 
-        "user": self.kive_user.username,
-        "users_allowed": [self.kive_user.username],
-        "groups_allowed": [self.everyone_group],
+        "user": case.kive_user.username,
+        "users_allowed": [case.kive_user.username],
+        "groups_allowed": [case.everyone_group],
 
         "inputs": [
             {
@@ -4470,7 +4467,7 @@ def create_pipeline_deserialization_environment(self):
         ],
         "steps": [
             {
-                "transformation": self.method_noop_raw.pk,
+                "transformation": case.method_noop_raw.pk,
                 "step_num": 1,
                 "x": 0.2,
                 "y": 0.5,
@@ -4481,14 +4478,14 @@ def create_pipeline_deserialization_environment(self):
                         # it by name.
                         "source_dataset_name": "input_to_not_touch",
                         "source_step": 0,
-                        "dest_dataset_name": self.raw_input_name,
+                        "dest_dataset_name": case.raw_input_name,
                         "keep_output": False
                     }
                 ],
                 "outputs_to_delete": []
             },
             {
-                "transformation": self.method_noop_raw.pk,
+                "transformation": case.method_noop_raw.pk,
                 "step_num": 2,
                 "x": 0.4,
                 "y": 0.5,
@@ -4496,9 +4493,9 @@ def create_pipeline_deserialization_environment(self):
                 "cables_in": [
                     {
                         # Here we can specify source directly.
-                        "source_dataset_name": self.raw_output_name,
+                        "source_dataset_name": case.raw_output_name,
                         "source_step": 1,
-                        "dest_dataset_name": self.raw_input_name,
+                        "dest_dataset_name": case.raw_input_name,
                         "keep_output": False
                     }
                 ],
@@ -4510,7 +4507,7 @@ def create_pipeline_deserialization_environment(self):
                 "output_idx": 1,
                 "output_name": "untouched_output",
                 "source_step": 2,
-                "source_dataset_name": self.raw_output_name,
+                "source_dataset_name": case.raw_output_name,
                 "x": 0.85,
                 "y": 0.5
             }
@@ -4610,6 +4607,7 @@ class PipelineSerializerTests(TestCase):
         pl = ps.save()
 
         # Probe the Pipeline to see if things are defined correctly.
+        self.assertIsNone(self.test_pf.published_version)
         pl_input = pl.inputs.first()
         self.assertEquals(pl_input.structure.compounddatatype, self.cdt_string)
 
@@ -4696,6 +4694,20 @@ class PipelineSerializerTests(TestCase):
         self.assertTrue(pl_input.is_raw())
         pl_output = raw_pl.outputs.first()
         self.assertTrue(pl_output.is_raw())
+
+    def test_create_publish_on_submit(self):
+        """
+        Testing publishing on submission.
+        """
+        self.pipeline_dict["publish_on_submit"] = True
+        ps = PipelineSerializer(data=self.pipeline_dict,
+                                context=self.duck_context)
+        self.assertTrue(ps.is_valid())
+        pl = ps.save()
+        self.assertEquals(pl.family.published_version, pl)
+        self.test_pf = PipelineFamily.objects.get(pk=self.test_pf.pk)
+
+        self.assertEquals(self.test_pf.published_version, pl)
 
 
 class PipelineApiTests(BaseTestCases.ApiTestCase):
