@@ -447,6 +447,16 @@ input[disabled]:active {
 .errortext {
     color: #FF0000;
 }
+.errortext:empty {
+    display: none;
+}
 #errors {
     margin-top: 1em;
+}
+.placeholder {
+    font-style: italic;
+    color: #888;
+}
+a .placeholder {
+    color: inherit;
 }
