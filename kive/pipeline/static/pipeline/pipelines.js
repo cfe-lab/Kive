@@ -21,9 +21,9 @@ var pipelines = (function() {
         $form.append($pipeline_pk_input, $action_input, $input);
 
         if (pipeline.is_published_version) {
-            $form.append("Published");
+            $form.prepend('<input type="button" class="left-button" disabled value="Published">');
             $action_input.val("unpublish");
-            $input.val("Unpublish");
+            $input.val("×").addClass('right-button close-button');
         } else {
             $action_input.val("publish");
             $input.val("Publish");

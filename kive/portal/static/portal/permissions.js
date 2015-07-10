@@ -100,7 +100,7 @@ var permissions = (function() {
             this.$table.append(this.$tbody);
         }
         this.$lockImage.attr('src', lock_icon);
-        this.$lockSpan.text(this.is_locked ? '' : 'Administrator:');
+        this.$lockSpan.text(this.is_locked ? '' : 'Administrator');
         $.each(rows, function() {
             var $a,
                 row = this;
@@ -134,12 +134,12 @@ var permissions = (function() {
         });
         if (this.is_user_admin) {
             $a = ($('<a href="javascript:void(0)"/>')
-                    .append(this.$lockImage)
+                    .append(this.$lockImage, this.$lockSpan)
                     .click(this, clickLock));
 
             $tr.append($('<th colspan="2"/>')
                     .addClass('lock')
-                    .append($('<div/>').append($a, this.$lockSpan)));
+                    .append($('<div/>').append($a)));
         }
     };
     
@@ -239,7 +239,7 @@ var permissions = (function() {
     };
     
     function buildListCell($td, row, field_name) {
-        var $ul = $('<ul/>'),
+        var $ul = $('<ul/>').addClass('cell-list'),
             names = row[field_name];
         $.each(names, function() {
             $ul.append($('<li/>').text(this));

@@ -28,14 +28,13 @@
 
 <h2>Pipeline Family: {{ family.name }}</h2>
 
-<p>
-{{ family.description }}
-</p>
+{% if family.description %}
+<p>{{ family.description }}</p>
+{% endif %}
 
 <div id="initial_data" style="display:none">{{ pipelines|escape }}</div>
 <p style="font-style: italic; color: gray">
-Click on 'Revise' link to revise the corresponding pipeline, or click 'Add new pipeline' to
-add a method without specifying a parent revision.
+Click on 'Revise' link to revise the corresponding pipeline, or click 'Add new pipeline' to add a pipeline without specifying a parent revision.
 </p>
 
 <table id="pipelines"></table>

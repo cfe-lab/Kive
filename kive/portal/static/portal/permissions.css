@@ -1,16 +1,30 @@
+.lock {
+    padding-top: .25em;
+    padding-bottom: .25em;
+}
 .lock span {
-    font-size: .8em;
     font-weight: bold;
     text-transform: uppercase;
+    color: #000;
+    margin-left: .5em;
+    line-height: .8em;
 }
-.lock div {
+.lock span:empty {
+    display: none;
+}
+.lock img {
+    display: inline;
+    line-height: 1em;
+    position: relative;
+    top: 3px;
+}
+.lock a {
+    display: block;
+    font-size: .8em;
     background-color: #eef4f4;
     white-space: nowrap;
     border-radius: 15px;
-    padding: .25em .8em;
     margin-right: .5em;
-}
-.lock a {
-    padding: .5em 0 .5em .5em;
-    font-weight: bold;
+    padding: .15em 1em .25em;
+    border: 1px solid transparent;
 }

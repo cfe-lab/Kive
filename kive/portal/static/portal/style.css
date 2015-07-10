@@ -72,6 +72,20 @@ tr.inputs td {
 tr.inputs input {
     border: 0;
 }
+td ul.cell-list {
+    display: block;
+    margin: 0;
+    padding: 0;
+}
+td ul.cell-list li {
+    display: inline;
+}
+td ul.cell-list li:after {
+    content: ', ';
+}
+td ul.cell-list li:last-child:after {
+    content: '';
+}
 #wrapper > a {
     font-size: .8em;
     margin-left: 5em;
@@ -342,15 +356,24 @@ select:not([multiple]) {
     /* Create a drop-down button to replace the one we just removed. */
     background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA8AAAAOCAYAAADwikbvAAAARElEQVQoz2NgwASaUIwC/v//j4GxafSHYk1SNCNrxDAAn2ZsGlEMwKUZn0a4AcT4GScYZpopDjCyo4riREJx8iQ5YwAAg8Lgu+iiljMAAAAASUVORK5CYII=') #fff right center no-repeat;
 }
-input.add {
+input.add,
+input.left-button {
     border-radius: 1em 0 0 1em;
     font-weight: bold;
     margin-right: -1px;
 }
-input.remove {
+input.remove,
+input.right-button {
     border-radius: 0 1em 1em 0;
     font-weight: bold;
     margin-left: 0;
+}
+input.close-button {
+    padding: 0 .5em;
+}
+input[disabled],
+input[disabled]:active {
+    box-shadow: none;
 }
 
 .shortIntField{
