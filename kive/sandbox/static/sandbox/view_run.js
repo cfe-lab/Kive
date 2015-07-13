@@ -10,6 +10,7 @@
 
 function setupRunView(rtp_id, pipeline_id, md5) {
     var self = this;
+    rtp_id = parseInt(rtp_id);
 
     // Instance variables
     self.timer = null;
@@ -27,7 +28,7 @@ function setupRunView(rtp_id, pipeline_id, md5) {
                 $msg = $('<span class="status-message">');
             $msg.append($('<a>Complete</a>').attr(
                     'href',
-                    '/view_results/' + parseInt(rtp_id)));
+                    '/view_results/' + rtp_id +'?back_to_view=true'));
 
             // TODO: Use a better system of reporting overall run status
             if(stat.indexOf('?') >= 0) {
@@ -42,7 +43,7 @@ function setupRunView(rtp_id, pipeline_id, md5) {
                 if(stat.indexOf('!') >= 0) {
                     $msg.empty().append($('<a>Failed!</a>').attr(
                             'href',
-                            '/view_results/' + rtp_id));
+                            '/view_results/' + rtp_id + '?back_to_view=true'));
                     clearInterval(self.timer);
                 } else if(stat.indexOf('.') >= 0 || stat.indexOf('+') >= 0 || stat.indexOf(':') >= 0) {
                     $msg.empty().append($('<a>In progress </a> &nbsp;').attr(
