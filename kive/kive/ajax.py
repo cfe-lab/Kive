@@ -139,7 +139,10 @@ class RedactModelMixin(object):
 
     def partial_update(self, request, pk=None):
         if request.data.get('is_redacted', False):
-            self.get_object().redact()
+            try:
+                self.get_object().redact()
+            except RTPNotFinished as e:
+                raise APIException(e.msg)
             return Response({'message': 'Object redacted.'})
         return self.patch_object(request, pk)
 
