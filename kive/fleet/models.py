@@ -213,10 +213,10 @@ class RunToProcess(metadata.models.AccessControl):
     def _format_time(self, t):
         return t and timezone.localtime(t).strftime('%d %b %Y %H:%M')
 
-    def build_removal_plan(self):
+    def build_removal_plan(self, removal_accumulator=None):
         if self.run is not None:
-            return self.run.build_removal_plan()
-        plan = metadata.models.empty_removal_plan()
+            return self.run.build_removal_plan(removal_accumulator=removal_accumulator)
+        plan = removal_accumulator or metadata.models.empty_removal_plan()
         plan['Runs'].add(self)
         return plan
 
@@ -251,7 +251,7 @@ class RunToProcessInput(models.Model):
     Represents an input to a run to process.
     """
     runtoprocess = models.ForeignKey(RunToProcess, related_name="inputs")
-    symbolicdataset = models.ForeignKey(SymbolicDataset)
+    symbolicdataset = models.ForeignKey(SymbolicDataset, related_name="runtoprocessinputs")
     index = models.PositiveIntegerField()
 
     def clean(self):

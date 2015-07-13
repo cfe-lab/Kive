@@ -3,7 +3,6 @@ Defines the manager and the "workers" that manage and carry out the execution of
 """
 
 from collections import defaultdict
-from exceptions import Exception
 import logging
 from mpi4py import MPI
 import sys

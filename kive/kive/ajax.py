@@ -11,7 +11,7 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework.exceptions import APIException
 
 from archive.models import summarize_redaction_plan
-from metadata.models import AccessControl, RunNotComplete
+from metadata.models import AccessControl, RTPNotFinished
 from portal.views import developer_check, admin_check
 
 def convert_validation(ex):
@@ -148,7 +148,6 @@ class RedactModelMixin(object):
         redaction_plan = self.get_object().build_redaction_plan()
         return Response(summarize_redaction_plan(redaction_plan))
 
-
 class RemoveModelMixin(mixins.DestroyModelMixin):
     """ Remove a model instance and build a removal plan.
     
@@ -171,7 +170,7 @@ class RemoveModelMixin(mixins.DestroyModelMixin):
     def perform_destroy(self, instance):
         try:
             instance.remove()
-        except RunNotComplete as e:
+        except RTPNotFinished as e:
             raise APIException(e.msg)
 
 

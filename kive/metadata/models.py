@@ -42,7 +42,7 @@ deletion_order = [
 ]
 
 
-class RunNotComplete(Exception):
+class RTPNotFinished(Exception):
     """
     Exception raised when attempting to remove anything that affects an incomplete Run.
     """
@@ -56,14 +56,30 @@ class RunNotComplete(Exception):
 @transaction.atomic
 def remove_helper(removal_plan):
     # If we're affecting anything that's currently running, stop immediately.
-    for run in removal_plan["Runs"]:
-        if not run.is_complete():
-            raise RunNotComplete("Cannot remove: an affected run is incomplete")
+    still_in_progress = False
+    for sd in removal_plan["SymbolicDatasets"]:
+        for rtp_input in sd.runtoprocessinputs.all():
+            if not rtp_input.runtoprocess.finished:
+                still_in_progress = True
+
+    for pipeline in removal_plan["Pipelines"]:
+        for rtp in pipeline.runtoprocess_set.all():
+            if not rtp.finished:
+                still_in_progress = True
+
+    if still_in_progress:
+        raise RTPNotFinished("Cannot remove: an affected run is still in progress")
 
     # Redact any sandboxes tied to Runs that we're removing.
     for run in removal_plan["Runs"]:
         try:
-            rtp = run.runtoprocess
+            # FIXME run can be either a RunToProcess or a Run.  Clean this up later when we merge Run and RunToProcess.
+            # We're not using isinstance here because that would introduce a circular dependency.
+            rtp = run
+            if run.__class__.__name__ == "Run":
+                rtp = run.runtoprocess
+            else:
+                rtp = run
             if not rtp.purged:
                 rtp.collect_garbage()
         except ObjectDoesNotExist:
@@ -1806,6 +1822,16 @@ class CompoundDatatype(AccessControl):
     def build_removal_plan(self, removal_accumulator=None):
         removal_plan = removal_accumulator or empty_removal_plan()
         assert self not in removal_plan["CompoundDatatypes"]
+
+        builtin_pks = {
+            CDTs.VERIF_IN_PK,
+            CDTs.VERIF_OUT_PK,
+            CDTs.PROTOTYPE_PK
+        }
+        if self.pk in builtin_pks:
+            self.logger.warning("Cannot remove builtin CompoundDatatypes.")
+            return removal_plan
+
         removal_plan["CompoundDatatypes"].add(self)
 
         for ds in self.conforming_datasets.all().select_related("symbolicdataset"):

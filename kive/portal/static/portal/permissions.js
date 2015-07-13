@@ -286,7 +286,16 @@ var permissions = (function() {
                             success: function() {
                                 permissions_table.reloadTable();
                             }
-                        });
+                        }).fail(
+                            function (request) {
+                                var response = request.responseJSON,
+                                    detail = (
+                                            response ?
+                                            response.detail :
+                                            "Failed to reload table");
+                                window.alert(detail)
+                            }
+                        );
                     }
                 });
     }
