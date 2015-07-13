@@ -29,6 +29,7 @@ from constants import datatypes, CDTs, maxlengths, groups, users
 
 import logging
 from portal.views import admin_check
+from fleet.exceptions import SandboxActiveException
 
 LOGGER = logging.getLogger(__name__) # Module level logger.
 
@@ -41,8 +42,36 @@ deletion_order = [
 ]
 
 
+class RunNotComplete(Exception):
+    """
+    Exception raised when attempting to remove anything that affects an incomplete Run.
+    """
+    def __init__(self, msg):
+        self.msg = msg
+
+    def __str__(self):
+        return self.msg
+
+
 @transaction.atomic
 def remove_helper(removal_plan):
+    # If we're affecting anything that's currently running, stop immediately.
+    for run in removal_plan["Runs"]:
+        if not run.is_complete():
+            raise RunNotComplete("Cannot remove: an affected run is incomplete")
+
+    # Redact any sandboxes tied to Runs that we're removing.
+    for run in removal_plan["Runs"]:
+        try:
+            rtp = run.runtoprocess
+            if not rtp.purged:
+                rtp.collect_garbage()
+        except ObjectDoesNotExist:
+            # There's no associated RunToProcess, and therefore no sandbox path.
+            pass
+        except (SandboxActiveException, OSError) as e:
+            LOGGER.warning(e)
+
     for class_name in deletion_order:
         if class_name in removal_plan:
             for obj_to_delete in removal_plan[class_name]:

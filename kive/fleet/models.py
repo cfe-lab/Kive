@@ -11,6 +11,7 @@ from archive.models import ExecLog, Run
 from librarian.models import SymbolicDataset
 from pipeline.models import Pipeline
 import metadata.models
+import fleet.exceptions
 
 # This is an experimental replacement for the runfleet admin command.
 # Disable it by setting worker_count to 0.
@@ -25,18 +26,6 @@ if worker_count > 0 and sys.argv[-1] == "runserver":
     manager_thread = threading.Thread(target=manager.main_procedure)
     manager_thread.daemon = True
     manager_thread.start()
-
-
-class SandboxActiveException(Exception):
-    """
-    Exception raised when attempting to perform garbage collection on
-    a sandbox that is still active.
-    """
-    def __init__(self, msg):
-        self.msg = msg
-
-    def __str__(self):
-        return self.msg
 
 
 # Create your models here.
@@ -66,7 +55,7 @@ class RunToProcess(metadata.models.AccessControl):
     pipeline = models.ForeignKey(Pipeline)
     sandbox_path = models.CharField(max_length=256, default="", blank=True, null=False)
     time_queued = models.DateTimeField(auto_now_add=True)
-    run = models.ForeignKey(Run, null=True)
+    run = models.OneToOneField(Run, null=True, related_name="runtoprocess")
     purged = models.BooleanField(default=False)
 
     def clean(self):
@@ -241,12 +230,12 @@ class RunToProcess(metadata.models.AccessControl):
         Dispose of the sandbox used by the Run.
         """
         if self.sandbox_path == "":
-            raise SandboxActiveException(
+            raise fleet.exceptions.SandboxActiveException(
                 "Run (RunToProcess={}, Pipeline={}, queued {}, User={}) has not yet started".format(
                     self.pk, self.pipeline, self.time_queued, self.user)
                 )
         elif not self.finished:
-            raise SandboxActiveException(
+            raise fleet.exceptions.SandboxActiveException(
                 "Run (RunToProcess={}, Pipeline={}, queued {}, User={}) is not finished".format(
                     self.pk, self.pipeline, self.time_queued, self.user)
                 )

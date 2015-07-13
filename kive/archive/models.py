@@ -351,9 +351,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         return removal_plan
 
-    @property
-    def runtoprocess(self):
-        return self.runtoprocess_set.all()[0] if self.runtoprocess_set.count() > 0 else None
+    # @property
+    # def runtoprocess(self):
+    #     return self.runtoprocess_set.all()[0] if self.runtoprocess_set.count() > 0 else None
 
 
 class RunComponent(stopwatch.models.Stopwatch):

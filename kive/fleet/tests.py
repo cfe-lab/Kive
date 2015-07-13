@@ -10,7 +10,8 @@ from django.core.urlresolvers import reverse, resolve
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable
-from fleet.models import RunToProcess, RunToProcessInput, SandboxActiveException
+from fleet.models import RunToProcess, RunToProcessInput
+from fleet.exceptions import SandboxActiveException
 from librarian.models import ExecRecord, SymbolicDataset
 from pipeline.models import Pipeline
 from metadata.models import kive_user

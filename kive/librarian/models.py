@@ -29,9 +29,9 @@ import transformation.models
 import librarian.models
 import datachecking.models
 import metadata.models
+import fleet.exceptions
 import file_access_utils
 import kive.settings
-import file_access_utils
 
 LOGGER = logging.getLogger(__name__)
 
@@ -1005,8 +1005,26 @@ class ExecRecord(models.Model):
 
     @transaction.atomic
     def redact_this(self):
+        # Redact components that used this ExecRecord, and purge any sandboxes that still exist.
+        runs_to_purge = {}
         for rc in self.used_by_components.all():
             rc.redact()
+            if rc.top_level_run not in runs_to_purge:
+                runs_to_purge.add(rc.top_level_run)
+
+        for run in runs_to_purge:
+            try:
+                if not run.runtoprocess.purged:
+                    run.runtoprocess.collect_garbage()
+            except ObjectDoesNotExist:
+                # No RunToProcess exists.
+                pass
+            except fleet.exceptions.SandboxActiveException as e:
+                # The Run never started or hasn't finished.
+                self.logger.warning(e)
+            except OSError as e:
+                # The sandbox could not be removed.
+                self.logger.warning(e)
 
     @transaction.atomic
     def redact(self):

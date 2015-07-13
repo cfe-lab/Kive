@@ -8,9 +8,10 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
 from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework.exceptions import APIException
 
 from archive.models import summarize_redaction_plan
-from metadata.models import AccessControl
+from metadata.models import AccessControl, RunNotComplete
 from portal.views import developer_check, admin_check
 
 def convert_validation(ex):
@@ -168,7 +169,10 @@ class RemoveModelMixin(mixins.DestroyModelMixin):
         return Response(summarize_redaction_plan(removal_plan))
     
     def perform_destroy(self, instance):
-        instance.remove()
+        try:
+            instance.remove()
+        except RunNotComplete as e:
+            raise APIException(e.msg)
 
 
 class RemovableModelViewSet(RemoveModelMixin,
