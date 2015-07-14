@@ -1006,7 +1006,7 @@ class ExecRecord(models.Model):
     @transaction.atomic
     def redact_this(self):
         # Redact components that used this ExecRecord, and purge any sandboxes that still exist.
-        runs_to_purge = {}
+        runs_to_purge = set()
         for rc in self.used_by_components.all():
             rc.redact()
             if rc.top_level_run not in runs_to_purge:

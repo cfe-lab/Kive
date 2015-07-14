@@ -25,6 +25,7 @@ import stopwatch.models
 import metadata.models
 from constants import maxlengths
 import archive.signals
+import fleet.exceptions
 
 
 def empty_redaction_plan():
@@ -44,6 +45,7 @@ def summarize_redaction_plan(redaction_plan):
 
 @transaction.atomic
 def redact_helper(redaction_plan):
+    # FIXME this is going to need retooling when we merge Run and RunToProcess.
     # Check if anything that's currently running will be affected.
     still_in_progress = False
     if "SymbolicDatasets" in redaction_plan:
@@ -60,7 +62,7 @@ def redact_helper(redaction_plan):
                     still_in_progress = True
 
     if still_in_progress:
-        raise metadata.models.RTPNotFinished("Cannot redact: an affected run is still in progress")
+        raise fleet.exceptions.RTPNotFinished("Cannot redact: an affected run is still in progress")
 
     # Proceed in a fixed order.
     if "SymbolicDatasets" in redaction_plan:

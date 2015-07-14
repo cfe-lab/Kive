@@ -29,7 +29,7 @@ from constants import datatypes, CDTs, maxlengths, groups, users
 
 import logging
 from portal.views import admin_check
-from fleet.exceptions import SandboxActiveException
+from fleet.exceptions import SandboxActiveException, RTPNotFinished
 
 LOGGER = logging.getLogger(__name__) # Module level logger.
 
@@ -42,17 +42,6 @@ deletion_order = [
 ]
 
 
-class RTPNotFinished(Exception):
-    """
-    Exception raised when attempting to remove anything that affects an incomplete Run.
-    """
-    def __init__(self, msg):
-        self.msg = msg
-
-    def __str__(self):
-        return self.msg
-
-
 @transaction.atomic
 def remove_helper(removal_plan):
     # If we're affecting anything that's currently running, stop immediately.
@@ -62,10 +51,17 @@ def remove_helper(removal_plan):
             if not rtp_input.runtoprocess.finished:
                 still_in_progress = True
 
-    for pipeline in removal_plan["Pipelines"]:
-        for rtp in pipeline.runtoprocess_set.all():
-            if not rtp.finished:
-                still_in_progress = True
+    if not still_in_progress:
+        for pipeline in removal_plan["Pipelines"]:
+            for rtp in pipeline.runtoprocess_set.all():
+                if not rtp.finished:
+                    still_in_progress = True
+
+    if not still_in_progress:
+        for er in removal_plan["ExecRecords"]:
+            for affected_rc in er.used_by_components.all():
+                if not affected_rc.top_level_run.is_complete():
+                    still_in_progress = True
 
     if still_in_progress:
         raise RTPNotFinished("Cannot remove: an affected run is still in progress")

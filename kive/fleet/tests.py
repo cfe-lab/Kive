@@ -13,8 +13,8 @@ from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable
 from fleet.models import RunToProcess, RunToProcessInput
 from fleet.exceptions import SandboxActiveException
 from librarian.models import ExecRecord, SymbolicDataset
-from pipeline.models import Pipeline
-from metadata.models import kive_user
+from pipeline.models import Pipeline, PipelineFamily
+from metadata.models import kive_user, RTPNotFinished
 from metadata.tests import clean_up_all_files
 from kive import settings
 from kive.tests import install_fixture_files, restore_production_files
@@ -30,6 +30,7 @@ class RunToProcessTest(TestCase):
     Overall format is steps-outcables-displayname
     """
     fixtures = ['initial_data', "initial_groups", 'initial_user', 'converter_pipeline']
+
     def test_run_progress_no_run(self):
         run_tracker = RunToProcess()
         
@@ -59,7 +60,7 @@ class RunToProcessTest(TestCase):
         self.assertSequenceEqual('-', progress['status'])
 
     def create_with_pipeline_step(self):
-        pipeline=Pipeline.objects.get(pk=2)
+        pipeline = Pipeline.objects.get(pk=2)
         user = User.objects.first()
         run = Run(pipeline=pipeline, user=user)
         run.save()
@@ -235,6 +236,200 @@ class RunToProcessTest(TestCase):
                                  display_name)
 
 
+class RemoveRedactRunInProgress(TestCase):
+    fixtures = ["archive_test_environment"]
+
+    def setUp(self):
+        # Clear out all the Runs and ExecRecords in the environment.
+        # Run.objects.all().delete()
+        # ExecRecord.objects.all().delete()
+
+        self.pf = PipelineFamily.objects.get(name="Pipeline_family")
+        self.myUser = self.pf.user
+        self.pE = self.pf.members.get(revision_name="pE_name")
+        self.triplet_symDS = SymbolicDataset.objects.filter(dataset__name="triplet").first()
+        self.doublet_symDS = SymbolicDataset.objects.get(dataset__name="doublet")
+        self.singlet_symDS = SymbolicDataset.objects.filter(dataset__name="singlet").first()
+        self.raw_symDS = SymbolicDataset.objects.get(dataset__name="raw_DS")
+        self.step_E1 = self.pE.steps.get(step_num=1)
+        self.mA = self.step_E1.transformation.definite
+
+        # A run that's mid-progress.
+        self.run = Run(pipeline=self.pE, user=self.myUser)
+        self.run.save()
+        self.run_tracker = RunToProcess(run=self.run, user=self.myUser, pipeline=self.pE)
+        self.run_tracker.save()
+        self.run_tracker.inputs.create(
+            index=1,
+            symbolicdataset=self.triplet_symDS
+        )
+        self.run_tracker.inputs.create(
+            index=2,
+            symbolicdataset=self.singlet_symDS
+        )
+        self.run_tracker.inputs.create(
+            index=3,
+            symbolicdataset=self.raw_symDS
+        )
+
+        self.rs_1 = self.run.runsteps.create(
+            pipelinestep=self.step_E1,
+            reused=False,
+        )
+        self.rsic = self.rs_1.RSICs.create(
+            PSIC=self.step_E1.cables_in.first()
+        )
+        self.rsic.log = ExecLog.create(self.rsic, self.rsic)
+        rsic_er = ExecRecord(generator=self.rsic.log)
+        rsic_er.save()
+        self.rsic.execrecord = rsic_er
+        self.rsic.save()
+        self.rsic.execrecord.execrecordins.create(
+            generic_input=self.pE.inputs.get(dataset_idx=3),
+            symbolicdataset=self.raw_symDS
+        )
+        self.rsic.execrecord.execrecordouts.create(
+            generic_output=self.step_E1.transformation.definite.inputs.first(),
+            symbolicdataset=self.raw_symDS
+        )
+
+        self.rs_1_log = ExecLog.create(self.rs_1, self.rs_1)
+        self.rs_1_log.methodoutput.return_code = 0
+        self.rs_1_log.methodoutput.save()
+        rs_1_er = ExecRecord(generator=self.rs_1_log)
+        rs_1_er.save()
+        self.rs_1.execrecord = rs_1_er
+        self.rs_1.save()
+        self.rs_1.execrecord.execrecordins.create(
+            generic_input=self.mA.inputs.first(),
+            symbolicdataset=self.raw_symDS
+        )
+        self.rs_1.execrecord.execrecordouts.create(
+            generic_output=self.mA.outputs.first(),
+            symbolicdataset=self.doublet_symDS
+        )
+
+    def tearDown(self):
+        clean_up_all_files()
+
+    def test_remove_pipeline_fails(self):
+        """
+        Removing the Pipeline of a Run that's in progress should fail.
+        """
+        self.assertRaisesRegexp(
+            RTPNotFinished,
+            "Cannot remove: an affected run is still in progress",
+            lambda: self.pE.remove()
+        )
+
+    def test_remove_dataset_fails(self):
+        """
+        Removing a Dataset of a Run that's in progress should fail.
+        """
+        self.assertRaisesRegexp(
+            RTPNotFinished,
+            "Cannot remove: an affected run is still in progress",
+            lambda: self.triplet_symDS.remove()
+        )
+
+    def test_redact_dataset_fails(self):
+        """
+        Redacting a Dataset of a Run that's in progress should fail.
+        """
+        self.assertRaisesRegexp(
+            RTPNotFinished,
+            "Cannot redact: an affected run is still in progress",
+            lambda: self.triplet_symDS.redact()
+        )
+
+    def test_remove_execrecord_fails(self):
+        """
+        Removing an ExecRecord of a Run that's in progress should fail.
+        """
+        self.assertRaisesRegexp(
+            RTPNotFinished,
+            "Cannot remove: an affected run is still in progress",
+            lambda: self.rs_1.execrecord.remove()
+        )
+
+    def test_redact_execrecord_fails(self):
+        """
+        Redacting an ExecRecord of a Run that's in progress should fail.
+        """
+        self.assertRaisesRegexp(
+            RTPNotFinished,
+            "Cannot redact: an affected run is still in progress",
+            lambda: self.rs_1.execrecord.redact()
+        )
+
+
+class RemoveRedactRunJustStarting(TestCase):
+    """
+    Testing of removal/redaction of stuff used in a run that's just starting.
+
+    FIXME this might be eliminated when we merge Run and RunToProcess.
+    """
+    fixtures = ["archive_test_environment"]
+
+    def setUp(self):
+        self.pf = PipelineFamily.objects.get(name="Pipeline_family")
+        self.myUser = self.pf.user
+        self.pE = self.pf.members.get(revision_name="pE_name")
+        self.triplet_symDS = SymbolicDataset.objects.filter(dataset__name="triplet").first()
+        self.doublet_symDS = SymbolicDataset.objects.get(dataset__name="doublet")
+        self.singlet_symDS = SymbolicDataset.objects.filter(dataset__name="singlet").first()
+        self.raw_symDS = SymbolicDataset.objects.get(dataset__name="raw_DS")
+
+        # A run that's just starting, to the point that no Run exists yet.
+        self.rtp_just_starting = RunToProcess(user=self.myUser, pipeline=self.pE)
+        self.rtp_just_starting.save()
+        self.rtp_just_starting.inputs.create(
+            index=1,
+            symbolicdataset=self.triplet_symDS
+        )
+        self.rtp_just_starting.inputs.create(
+            index=2,
+            symbolicdataset=self.singlet_symDS
+        )
+        self.rtp_just_starting.inputs.create(
+            index=3,
+            symbolicdataset=self.raw_symDS
+        )
+
+    def tearDown(self):
+        clean_up_all_files()
+
+    def test_remove_pipeline_fails(self):
+        """
+        Removing the Pipeline of a Run should fail.
+        """
+        self.assertRaisesRegexp(
+            RTPNotFinished,
+            "Cannot remove: an affected run is still in progress",
+            lambda: self.pE.remove()
+        )
+
+    def test_remove_dataset_fails(self):
+        """
+        Removing a Dataset of a Run should fail.
+        """
+        self.assertRaisesRegexp(
+            RTPNotFinished,
+            "Cannot remove: an affected run is still in progress",
+            lambda: self.triplet_symDS.remove()
+        )
+
+    def test_redact_dataset_fails(self):
+        """
+        Redacting a Dataset of a Run should fail.
+        """
+        self.assertRaisesRegexp(
+            RTPNotFinished,
+            "Cannot redact: an affected run is still in progress",
+            lambda: self.triplet_symDS.redact()
+        )
+
+
 class GarbageCollectionTest(TestCase):
     """
     Tests of sandbox garbage collection.
@@ -308,6 +503,32 @@ class GarbageCollectionTest(TestCase):
 
         self.assertFalse(os.path.exists(self.mock_sandbox_path))
         self.assertTrue(rtp.purged)
+
+    def test_reap_on_removal(self):
+        """
+        Removing a Run should reap the sandbox.
+        """
+        rtp = RunToProcess(
+            pipeline=self.noop_pl, run=self.noop_run,
+            sandbox_path=self.mock_sandbox_path,
+            user=self.noop_run.user)
+        rtp.save()
+
+        self.noop_run.remove()
+        self.assertFalse(os.path.exists(self.mock_sandbox_path))
+
+    def test_reap_on_redaction(self):
+        """
+        Redacting part of a Run should reap the sandbox.
+        """
+        rtp = RunToProcess(
+            pipeline=self.noop_pl, run=self.noop_run,
+            sandbox_path=self.mock_sandbox_path,
+            user=self.noop_run.user)
+        rtp.save()
+
+        self.noop_run.runsteps.first().execrecord.redact()
+        self.assertFalse(os.path.exists(self.mock_sandbox_path))
 
 
 class RunApiTests(TestCase):

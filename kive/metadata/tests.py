@@ -2690,6 +2690,9 @@ class CompoundDatatypeApiTests(TestCase):
         self.removal_path = reverse("compounddatatype-removal-plan",
                                    kwargs={'pk': self.detail_pk})
 
+        # We can't remove the CDT with PK = 3 as it's used by Kive's internals.
+        self.removal_pk = 4
+
         # This should equal metadata.ajax.CompoundDatatypeViewSet.as_view({"get": "list"}).
         self.list_view, _, _ = resolve(self.list_path)
         self.detail_view, _, _ = resolve(self.detail_path)
@@ -2731,7 +2734,7 @@ class CompoundDatatypeApiTests(TestCase):
     def test_removal_plan(self):
         request = self.factory.get(self.removal_path)
         force_authenticate(request, user=self.kive_user)
-        response = self.removal_view(request, pk=self.detail_pk)
+        response = self.removal_view(request, pk=self.removal_pk)
         self.assertEquals(response.data['CompoundDatatypes'], 1)
 
     def test_removal(self):
@@ -2739,8 +2742,20 @@ class CompoundDatatypeApiTests(TestCase):
         
         request = self.factory.delete(self.detail_path)
         force_authenticate(request, user=self.kive_user)
-        response = self.detail_view(request, pk=self.detail_pk)
+        response = self.detail_view(request, pk=self.removal_pk)
         self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
 
         end_count = CompoundDatatype.objects.all().count()
         self.assertEquals(end_count, start_count - 1)
+
+    def test_removal_plan_protected_CDT(self):
+        """
+        Removal plan will not attempt to remove a "protected" CDT (one that's used by Kive's internals).
+        """
+        request = self.factory.get(self.removal_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.removal_view(request, pk=self.detail_pk)
+        print(request)
+        print(response.data)
+        self.assertEquals(response.data['CompoundDatatypes'], 0)
+
