@@ -7,17 +7,19 @@ from django.test import TestCase
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 
-import archive.tests
 import metadata.tests
+from pipeline.models import PipelineFamily
 
 
 class StopwatchTests(TestCase):
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
+    fixtures = ["em_sandbox_test_environment"]
 
-    # create_archive_test_environment creates self.pE_run, which is a
+    # The fixture creates self.pE_run, which is a
     # Stopwatch.  We'll use this as our Stopwatch.
     def setUp(self):
-        archive.tests.create_archive_test_environment(self)
+        self.pf = PipelineFamily.objects.get(name="Pipeline_family")
+        self.pE = self.pf.members.get(revision_name="pE_name")
+        self.pE_run = self.pE.pipeline_instances.first()
 
     def tearDown(self):
         metadata.tests.clean_up_all_files()

@@ -237,7 +237,7 @@ class RunToProcessTest(TestCase):
 
 
 class RemoveRedactRunInProgress(TestCase):
-    fixtures = ["archive_test_environment"]
+    fixtures = ["em_sandbox_test_environment"]
 
     def setUp(self):
         # Clear out all the Runs and ExecRecords in the environment.
@@ -369,7 +369,7 @@ class RemoveRedactRunJustStarting(TestCase):
 
     FIXME this might be eliminated when we merge Run and RunToProcess.
     """
-    fixtures = ["archive_test_environment"]
+    fixtures = ["em_sandbox_test_environment"]
 
     def setUp(self):
         self.pf = PipelineFamily.objects.get(name="Pipeline_family")

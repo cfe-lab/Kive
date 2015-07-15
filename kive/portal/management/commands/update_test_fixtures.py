@@ -102,7 +102,7 @@ class EMSandboxTestEnvironmentBuilder(FixtureBuilder):
         return 'em_sandbox_test_environment.json'
 
     def build(self):
-        librarian.tests.create_librarian_test_environment(self)
+        librarian.tests.create_eric_martin_test_environment(self)
         tools.create_sandbox_testing_tools_environment(self)
         self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
         self.pE_run.grant_everyone_access()
