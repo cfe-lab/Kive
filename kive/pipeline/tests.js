@@ -162,6 +162,7 @@
             
             it('should highlight when marked as accepting connector', function() {
                 this.expectedCanvas.drawText({x:90, y: 10, text: 'example'});
+                this.expectedCanvas.ctx.fillStyle = '#ff8';
                 this.expectedCanvas.drawCircle({x: 100, y: 10, r: 5});
 
                 this.magnet.acceptingConnector = true;
@@ -170,6 +171,7 @@
             
             it('should offset the highlight', function() {
                 this.expectedCanvas.drawText({x: 88, y: 10, text: 'example'});
+                this.expectedCanvas.ctx.fillStyle = '#ff8';
                 this.expectedCanvas.drawCircle({x: 100, y: 10, r: 5});
                 
                 expect(this.magnet.offset).toBe(5);
@@ -183,13 +185,12 @@
                 this.expectedCanvas.ctx.fillStyle = '#ff8';
                 this.expectedCanvas.drawCircle({x: 100, y: 10, r:5});
                 
-                this.magnet.fill = '#ff8';
                 this.magnet.acceptingConnector = true;
                 this.magnet.draw(this.ctx);
             });
             
             it('should display output label on the right', function() {
-                this.expectedCanvas.drawCircle({x: 100, y: 10, r: 5});
+                this.expectedCanvas.ctx.save();
                 this.expectedCanvas.ctx.translate(100, 10);
                 this.expectedCanvas.ctx.rotate(Math.PI/6);
                 this.expectedCanvas.drawText({
@@ -197,6 +198,9 @@
                     y: 0,
                     text: 'example',
                     dir: 1});
+                this.expectedCanvas.ctx.restore();
+                this.expectedCanvas.ctx.fillStyle = '#ff8';
+                this.expectedCanvas.drawCircle({x: 100, y: 10, r: 5});
 
                 this.magnet.isOutput = true;
                 this.magnet.acceptingConnector = true;
@@ -1511,9 +1515,17 @@
                 
                 it('should create output', function() {
                     drawStartingPipeline(this);
+                    // crazy double-precisions that collision detection will produce
+                    this.expectedOutput.x = 223.56696744775581;
+                    this.expectedOutput.y = 29.94283749469356;
                     this.expectedOutput.draw(this.expectedCanvas.ctx);
-                    this.expectedCanvas.drawText(
-                            {x: 250, y: 45.5, text: "out", style: "node", dir: 0});
+                    this.expectedCanvas.drawText({
+                        x: this.expectedOutput.x,
+                        y: this.expectedOutput.y - 30.5,
+                        text: "out",
+                        style: "node",
+                        dir: 0
+                    });
                     // connector
                     this.expectedConnector.dest = this.expectedOutput.in_magnets[0];
                     this.expectedCanvas.ctx.globalAlpha = 0.75;
@@ -1546,12 +1558,12 @@
                     this.state.draw(this.ctx);
                     // select output and delete it
                     this.state.doDown({
-                        pageX: this.expectedOutput.x,
-                        pageY: this.expectedOutput.y
+                        pageX: 223.56696744775581,
+                        pageY: 29.94283749469356
                     });
                     this.state.doUp({
-                        pageX: this.expectedOutput.x,
-                        pageY: this.expectedOutput.y
+                        pageX: 223.56696744775581,
+                        pageY: 29.94283749469356
                     });
                     this.state.deleteObject();
                     // select method
@@ -1564,10 +1576,16 @@
                 
                 it('should create and move output', function() {
                     drawStartingPipeline(this);
-                    this.expectedOutput.y -= 20;
+                    this.expectedOutput.x = 221.56696744775581;
+                    this.expectedOutput.y = 97.44283749469356;
                     this.expectedOutput.draw(this.expectedCanvas.ctx);
-                    this.expectedCanvas.drawText(
-                            {x: 250, y: 25.5, text: "out", style: "node", dir: 0});
+                    this.expectedCanvas.drawText({
+                        x: 221.56696744775581,
+                        y: 66.94283749469356,
+                        text: "out",
+                        style: "node",
+                        dir: 0
+                    });
                     // connector
                     this.expectedConnector.dest = this.expectedOutput.in_magnets[0];
                     this.expectedCanvas.ctx.globalAlpha = 0.75;
@@ -1589,7 +1607,7 @@
                     var startX = this.actualMethod.out_magnets[0].connected[0].x,
                         startY = this.actualMethod.out_magnets[0].connected[0].y;
                     this.state.doDown({ pageX: startX, pageY: startY });
-                    this.state.doMove({ pageX: startX, pageY: startY-20 });
+                    this.state.doMove({ pageX: startX+10, pageY: startY+80 });
                     this.state.draw(this.ctx);
                 });
                 

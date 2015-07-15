@@ -358,10 +358,9 @@ $(function() {
     };
 
     var documentResizeHandler = function() {
-        var shape, i, scale_x, scale_y, out_z,
-            canvasWidth, canvasHeight;
-        canvasWidth  = canvasState.width = canvas.width  = window.innerWidth;
-        canvasHeight = canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
+        var shape, i, scale_x, scale_y,
+            canvasWidth  = canvasState.width  = canvas.width  = window.innerWidth,
+            canvasHeight = canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
         
         scale_x = canvas.width  / canvasState.old_width;
         scale_y = canvas.height / canvasState.old_height;
@@ -378,13 +377,7 @@ $(function() {
             canvasState.detectCollisions(shape);
         }
         
-        out_z = canvasState.outputZone;
-        out_z.x = canvasWidth * 0.8;
-        out_z.h = out_z.w = canvasWidth * 0.15;
-        while (out_z.h + out_z.y > canvasHeight) {
-            out_z.h /= 1.5;
-        }
-        
+        canvasState.outputZone.alignWithCanvas(canvasWidth, canvasHeight);
         canvasState.old_width = canvas.width;
         canvasState.old_height = canvas.height;
         canvasState.valid = false;

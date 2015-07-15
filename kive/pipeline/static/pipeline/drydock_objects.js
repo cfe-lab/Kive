@@ -187,7 +187,9 @@ var drydock_objects = (function() {
      * A base class for all nodes. (RawNode, CdtNode, MethodNode, OutputNode)
      * Doesn't do much yet.
      */
-    my.Node = function() {};
+    my.Node = function() {
+        this.affects_exec_order = false;
+    };
     my.Node.prototype.unlightMagnets = function() {
         var in_magnet;
         if (this.in_magnets instanceof Array) {
@@ -617,6 +619,8 @@ var drydock_objects = (function() {
         // Members for instances of methods in runs
         this.status = status;
 
+        this.affects_exec_order = true;
+
         // Sort the inputs by index
         var sorted_inputs = this.inputs.sort(function(a,b){ return a.dataset_idx - b.dataset_idx; }),
             sorted_outputs = this.outputs.sort(function(a,b){ return a.dataset_idx - b.dataset_idx; }),
@@ -931,6 +935,8 @@ var drydock_objects = (function() {
         // remove MethodNode from list and any attached Connectors
         var index = cs.shapes.indexOf(this);
         cs.shapes.splice(index, 1);
+        index = cs.methods.indexOf(this);
+        cs.methods.splice(index, 1);
     };
     
     my.Magnet = function(parent, r, attract, fill, cdt, label, offset, isOutput, pk) {
@@ -959,11 +965,15 @@ var drydock_objects = (function() {
     my.Magnet.prototype.draw = function(ctx) {
         // magnet coords are set by containing shape
         var canvas = new my.CanvasWrapper(undefined, ctx);
-        ctx.fillStyle = this.fill;
-        canvas.drawCircle({x: this.x, y: this.y, r: this.r});
         
-        if (this.acceptingConnector)
+        if (this.acceptingConnector) {
+            ctx.fillStyle = '#ff8';
+            canvas.drawCircle(this);
             this.highlight(ctx);
+        } else {
+            ctx.fillStyle = '#fff';
+            canvas.drawCircle(this);
+        }
     };
 
     my.Magnet.prototype.highlight = function(ctx) {
@@ -1035,6 +1045,19 @@ var drydock_objects = (function() {
             cs.selection = [ conn ];
             cs.dragoffx = pos.x - conn.fromX;
             cs.dragoffy = pos.y - conn.fromY;
+        }
+    };
+
+    my.Magnet.prototype.tryAcceptConnector = function(conn) {
+        if (conn instanceof my.Connector &&
+                this.connected.length === 0 &&
+                this.contains(conn.x, conn.y)) {
+            // jump to magnet
+            conn.x = this.x;
+            conn.y = this.y;
+            this.connected = [ conn ];
+            conn.dest = this;
+            this.acceptingConnector = false;
         }
     };
     
@@ -1144,7 +1167,7 @@ var drydock_objects = (function() {
     
     // make an object in the format of jsBezier lib
     my.Connector.prototype.calculateCurve = function() {
-        if (this.dest !== null) {
+        if (this.dest !== null && this.dest !== undefined) {
             // move with the attached shape
             this.x = this.dest.x;
             this.y = this.dest.y;
@@ -1343,8 +1366,14 @@ var drydock_objects = (function() {
     };
     
     my.Connector.prototype.doDown = function(cs, e) {
+        var pos = cs.getPos(e),
+            out_node;
         if (this.dest && this.dest.parent instanceof my.OutputNode) {
-            this.dest.parent.doDown(cs, e);
+            out_node = this.dest.parent;
+            out_node.x = pos.x;
+            out_node.y = pos.y;
+            out_node.dx = out_node.dy = 0;
+            out_node.doDown(cs, e);
         } else if (!e.shiftKey || cs.selection.length === 0) {
             cs.selection = [ this ];
             if (cs.can_edit) {
@@ -1361,22 +1390,24 @@ var drydock_objects = (function() {
         var index;
         
         // if a cable to an output node is severed, delete the node as well
-        if (this.dest.parent instanceof drydock_objects.OutputNode) {
-            index = cs.shapes.indexOf(this.dest.parent);
-            cs.shapes.splice(index, 1);
-        } else {
-            // remove connector from destination in-magnet
-            index = this.dest.connected.indexOf(this);
-            this.dest.connected.splice(index, 1);
+        if (this.dest) {
+            if (this.dest.parent instanceof drydock_objects.OutputNode) {
+                index = cs.shapes.indexOf(this.dest.parent);
+                if (index > -1) cs.shapes.splice(index, 1);
+            } else {
+                // remove connector from destination in-magnet
+                index = this.dest.connected.indexOf(this);
+                if (index > -1) this.dest.connected.splice(index, 1);
+            }
         }
 
         // remove connector from source out-magnet
         index = this.source.connected.indexOf(this);
-        this.source.connected.splice(index, 1);
+        if (index > -1) this.source.connected.splice(index, 1);
 
         // remove Connector from master list
         index = cs.connectors.indexOf(this);
-        cs.connectors.splice(index, 1);
+        if (index > -1) cs.connectors.splice(index, 1);
     };
     
     my.NodeLabel = function(label, x, y) {
@@ -1449,16 +1480,21 @@ var drydock_objects = (function() {
     };
     
     my.OutputZone = function(cw, ch, inset) {
-        this.x = cw * 0.82;
+        this.alignWithCanvas(cw, ch);
+        this.y = 1;
+        this.dy = 0;
+        this.dx = 0;
+        this.inset = inset || 15; // distance of label from center
+    };
+
+    my.OutputZone.prototype.alignWithCanvas = function(cw, ch) {
+        this.x = cw * 0.995;
         this.w = cw * 0.175;
         this.h = this.w;
-        this.y = 1;
         
         while (this.h + this.y > ch) {
             this.h /= 1.5;
         }
-        
-        this.inset = inset || 15; // distance of label from center
     };
     
     my.OutputZone.prototype.draw = function (ctx) {
@@ -1466,12 +1502,12 @@ var drydock_objects = (function() {
         ctx.strokeStyle = "#aaa";
         ctx.setLineDash([5]);
         ctx.lineWidth = 1;
-        ctx.strokeRect(this.x, this.y, this.w, this.h);
+        ctx.strokeRect(this.x - this.w, this.y, this.w, this.h);
         ctx.setLineDash([]);
     
         // draw label
         var canvas = new my.CanvasWrapper(undefined, ctx),
-            textParams = {x: this.x + this.w/2, y: this.y + this.inset, dir: 0};
+            textParams = {x: this.x - this.w/2, y: this.y + this.inset, dir: 0};
         textParams.style = "outputZone";
         textParams.text = "Drag here to";
         canvas.drawText(textParams);
@@ -1482,11 +1518,32 @@ var drydock_objects = (function() {
     
     my.OutputZone.prototype.contains = function (mx, my) {
         return (
-            mx >= this.x &&
-            mx <= this.x + this.w &&
+            mx <= this.x &&
+            mx >= this.x - this.w &&
             my >= this.y &&
             my <= this.y + this.h
         );
+    };
+
+    my.OutputZone.prototype.getVertices = function() {
+        var x, y,
+            spacing = 25,
+            vertices = [];
+        for (var i = 0; !i || y < this.y + this.h; i += spacing) {
+            x = this.x - (i % this.w);
+            y = (i / this.w >> 0) * spacing + this.y;
+            vertices.push({ x: x, y: y });
+        }
+
+        y = this.y + this.h;
+        for (x = this.x, i = this.x - this.w; x > i; x -= spacing) {
+            vertices.push({ x: x, y: y });
+        }
+        x = i;
+        for (y = this.y, i = this.y + this.h; y < i; y += spacing) {
+            vertices.push({ x: x, y: y });
+        }
+        return vertices;
     };
     
     my.OutputNode = function (x, y, label, pk, status, md5, dataset_id) {
