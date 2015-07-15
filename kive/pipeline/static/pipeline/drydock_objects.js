@@ -595,7 +595,6 @@ var drydock_objects = (function() {
         this.y = y || 0;
         this.dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
         this.dy = 0;
-        this.w = 10;
         this.inputs = inputs;
         this.outputs = outputs;
     
