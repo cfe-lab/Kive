@@ -49,7 +49,7 @@ $(function() {
         e.stopPropagation();
         var $this = $(this),
             menu = $($this.data('rel')),
-            inputs, input, preview_canvas, i, default_input_value;
+            inputs, input, preview_canvas, i;
         $('li', 'ul#id_ctrl_nav').not(this).removeClass('clicked');
         $this.addClass('clicked');
         $('.ctrl_menu', '#pipeline_ctrl').hide();
@@ -357,10 +357,12 @@ $(function() {
         }
     };
 
+    var resize_timeout = false;
     var documentResizeHandler = function() {
-        var shape, i, scale_x, scale_y,
-            canvasWidth  = canvasState.width  = canvas.width  = window.innerWidth,
-            canvasHeight = canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
+        var shape, i, scale_x, scale_y;
+
+        canvasState.width  = canvas.width  = window.innerWidth,
+        canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
         
         scale_x = canvas.width  / canvasState.old_width;
         scale_y = canvas.height / canvasState.old_height;
@@ -369,18 +371,27 @@ $(function() {
             return;
         }
         
-        for (i=0; i < canvasState.shapes.length; i++) {
-            shape = canvasState.shapes[i];
+        for (i = 0; (shape = canvasState.shapes[i]); i++) {
             shape.x *= scale_x;
             shape.y *= scale_y;
-            shape.dx = shape.dy = 0;
-            canvasState.detectCollisions(shape);
+            shape.dx *= scale_x;
+            shape.dy *= scale_y;
         }
         
-        canvasState.outputZone.alignWithCanvas(canvasWidth, canvasHeight);
         canvasState.old_width = canvas.width;
         canvasState.old_height = canvas.height;
         canvasState.valid = false;
+
+        clearTimeout(resize_timeout);
+        resize_timeout = setTimeout(endDocumentResize, 500);
+    };
+    var endDocumentResize = function() {
+        canvasState.valid = false;
+        for (var i = 0, shape; (shape = canvasState.shapes[i]); i++) {
+            shape.dx = shape.dy = 0;
+            canvasState.detectCollisions(shape);
+        }
+        canvasState.outputZone.alignWithCanvas(canvas.width, canvas.height);
     };
 
     var chooseContextMenuOption = function(e) {
@@ -501,6 +512,8 @@ $(function() {
                 this.value = '';
         });
         
+        /*
+        unused vars?
         var shapes = canvasState.shapes,
             this_shape,
             magnets,
@@ -511,6 +524,7 @@ $(function() {
             pipeline_outputs = [],
             method_nodes = [],
             num_connections;
+        */
 
         document.getElementById('id_submit_error').innerHTML = '';
 
@@ -647,14 +661,12 @@ $(function() {
                     submit_pipeline(result["id"]);
                 },
                 error: function(xhr, status, error) {
-                    var errors = [],
-                        json = xhr.responseJSON,
+                    var json = xhr.responseJSON,
                         serverErrors = json && json.non_field_errors || [];
                     
                     if (serverErrors.length === 0) {
                         submitError(xhr.status + " - " + error);
-                    }
-                    else {
+                    } else {
                         submitError(serverErrors);
                     }
                 }
