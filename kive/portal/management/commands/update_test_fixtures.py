@@ -12,6 +12,7 @@ from sandbox.execute import Sandbox
 import sandbox.testing_utils as tools
 from archive.tests import create_archive_test_environment
 from librarian.tests import create_removal_test_environment
+import librarian.tests
 import sandbox.tests
 import pipeline.models
 import kive.settings
@@ -94,6 +95,17 @@ class FixtureBuilder(object):
                 call_command("dumpdata", indent=4)
             finally:
                 sys.stdout = old_stdout
+
+
+class EMSandboxTestEnvironmentBuilder(FixtureBuilder):
+    def get_name(self):
+        return 'em_sandbox_test_environment.json'
+
+    def build(self):
+        librarian.tests.create_librarian_test_environment(self)
+        tools.create_sandbox_testing_tools_environment(self)
+        self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+        self.pE_run.grant_everyone_access()
 
 
 class ArchiveTestEnvironmentBuilder(FixtureBuilder):
@@ -367,6 +379,7 @@ class Command(BaseCommand):
     help = "Update test fixtures by running scripts and dumping test data."
 
     def handle(self, *args, **options):
+        EMSandboxTestEnvironmentBuilder().run()
         ArchiveTestEnvironmentBuilder().run()
         DeepNestedRunBuilder().run()
         SimpleRunBuilder().run()

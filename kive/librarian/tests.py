@@ -31,15 +31,14 @@ import sandbox.testing_utils as tools
 import sandbox.execute
 
 
-def create_librarian_test_environment(case):
+def create_eric_martin_test_environment(case):
     """
-    Set up default state for Librarian unit testing.
+    Set up the original test state Eric Martin designed.
 
     This sets up the environment as in the Metadata tests, and then augments with
     Methods, CR/CRR/CRDs, and DT/CDTs.  Note that these are *not* the same
     as those set up in the Method testing.
     """
-    # This sets up some DTs and CDTs.
     metadata.tests.create_metadata_test_environment(case)
 
     ####
@@ -286,6 +285,13 @@ def create_librarian_test_environment(case):
         groups_allowed=[everyone_group()])
     case.E21_41_DNA_doublet_symDS_structure = case.E21_41_DNA_doublet_symDS.structure
     case.E21_41_DNA_doublet_DS = case.E21_41_DNA_doublet_symDS.dataset
+
+
+def create_librarian_test_environment(case):
+    """
+    Set up default state for Librarian unit testing.
+    """
+    create_eric_martin_test_environment(case)
 
     # Some ExecRecords, some failed, others not.
     i = 0
