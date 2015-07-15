@@ -11,7 +11,7 @@ from django.contrib.auth.models import User
 import metadata.models
 from librarian.models import SymbolicDataset
 import method.models
-import sandbox.testing_utils as tools
+import kive.testing_utils as tools
 
 # This comes from the initial_data fixture.
 kive_user = User.objects.get(pk=1)

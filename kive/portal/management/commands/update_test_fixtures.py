@@ -9,7 +9,7 @@ import json
 
 from metadata.models import CompoundDatatype, everyone_group
 from sandbox.execute import Sandbox
-import sandbox.testing_utils as tools
+import kive.testing_utils as tools
 from archive.tests import create_archive_test_environment
 from librarian.tests import create_removal_test_environment
 import librarian.tests

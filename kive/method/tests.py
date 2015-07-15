@@ -35,7 +35,7 @@ from method.models import CodeResource, CodeResourceDependency, \
     CodeResourceRevision, Method, MethodFamily
 from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
 import portal.models
-import sandbox.testing_utils as tools
+import kive.testing_utils as tools
 import sandbox.execute
 from transformation.models import Transformation
 

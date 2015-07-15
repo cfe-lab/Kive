@@ -27,7 +27,7 @@ from method.tests import samplecode_path
 from pipeline.models import Pipeline, PipelineFamily, PipelineStep
 from transformation.models import Transformation
 import file_access_utils
-import sandbox.testing_utils as tools
+import kive.testing_utils as tools
 import sandbox.execute
 
 

@@ -9,7 +9,7 @@ import os.path
 
 from librarian.models import SymbolicDataset
 from sandbox.execute import Sandbox
-import sandbox.testing_utils as tools
+import kive.testing_utils as tools
 import kive.settings
 from pipeline.models import Pipeline, PipelineFamily
 from metadata.tests import clean_up_all_files

@@ -16,7 +16,7 @@ from datachecking.models import ContentCheckLog
 from sandbox.execute import Sandbox
 import kive.settings
 
-import sandbox.testing_utils as tools
+import kive.testing_utils as tools
 import file_access_utils
 
 from constants import datatypes, CDTs

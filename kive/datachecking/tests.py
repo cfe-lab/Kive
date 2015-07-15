@@ -15,7 +15,7 @@ from constants import datatypes
 import metadata.models
 from datachecking.models import *
 from librarian.models import *
-import sandbox.testing_utils as tools
+import kive.testing_utils as tools
 
 
 class BlankableTestCase(TestCase):

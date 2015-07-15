@@ -32,7 +32,7 @@ from pipeline.models import Pipeline, PipelineFamily, \
     PipelineOutputCable
 from pipeline.serializers import PipelineSerializer,\
     PipelineStepUpdateSerializer
-import sandbox.testing_utils as tools
+import kive.testing_utils as tools
 
 samplecode_path = "../samplecode"
 

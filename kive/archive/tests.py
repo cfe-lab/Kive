@@ -27,7 +27,7 @@ import metadata.tests
 from method.models import Method
 from pipeline.models import Pipeline, PipelineStep
 import sandbox.execute
-import sandbox.testing_utils as tools
+import kive.testing_utils as tools
 
 # Rather than define everyone_group here, we import this function to prevent compile-time
 # database access.
