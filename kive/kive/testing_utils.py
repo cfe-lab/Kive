@@ -4,6 +4,7 @@ import random
 import shutil
 import subprocess
 import tempfile
+import logging
 
 from django.contrib.auth.models import User
 from django.core.files import File
@@ -22,6 +23,35 @@ import sandbox.execute
 
 
 samplecode_path = "../samplecode"
+
+
+# This is copied from
+# http://stackoverflow.com/questions/2023608/check-what-files-are-open-in-python
+def get_open_fds():
+    """
+    Return the number of open file descriptors for the current process.
+
+    Warning: will only work on UNIX-like operating systems.
+    """
+    import subprocess
+    pid = os.getpid()
+    procs = subprocess.check_output(
+        [ "lsof", '-w', '-Ff', "-p", str( pid ) ] )
+
+    nprocs = len(
+        filter(
+            lambda s: s and s[ 0 ] == 'f' and s[1: ].isdigit(),
+            procs.split( '\n' ) )
+        )
+    return nprocs
+
+
+# For tracking whether we're leaking file descriptors.
+fd_count_logger = logging.getLogger("method.tests")
+
+
+def fd_count(msg):
+    fd_count_logger.debug("{}: {}".format(msg, get_open_fds()))
 
 
 def create_metadata_test_environment(case):

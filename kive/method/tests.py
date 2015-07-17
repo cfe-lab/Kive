@@ -43,40 +43,12 @@ from transformation.models import Transformation
 # This was previously defined here but has been moved to metadata.tests.
 samplecode_path = metadata.tests.samplecode_path
 
-# For tracking whether we're leaking file descriptors.
-fd_count_logger = logging.getLogger("method.tests")
-
-
-def fd_count(msg):
-    fd_count_logger.debug("{}: {}".format(msg, get_open_fds()))
-
-
-# This is copied from
-# http://stackoverflow.com/questions/2023608/check-what-files-are-open-in-python
-def get_open_fds():
-    """
-    Return the number of open file descriptors for the current process.
-
-    Warning: will only work on UNIX-like operating systems.
-    """
-    import subprocess
-    pid = os.getpid()
-    procs = subprocess.check_output(
-        [ "lsof", '-w', '-Ff', "-p", str( pid ) ] )
-
-    nprocs = len(
-        filter(
-            lambda s: s and s[ 0 ] == 'f' and s[1: ].isdigit(),
-            procs.split( '\n' ) )
-        )
-    return nprocs
-
 
 class FileAccessTests(TransactionTestCase):
     # fixtures = ["initial_groups", "initial_user", "initial_data"]
 
     def setUp(self):
-        fd_count("FDs (start)")
+        tools.fd_count("FDs (start)")
 
         # Since these fixtures touch ContentType and Permission, loading them in the
         # 'fixtures' attribute doesn't work.
@@ -107,12 +79,12 @@ class FileAccessTests(TransactionTestCase):
 
     def tearDown(self):
         tools.clean_up_all_files()
-        fd_count("FDs (end)")
+        tools.fd_count("FDs (end)")
         update_all_contenttypes(verbosity=0)
 
     def test_close_save(self):
         with open(os.path.join(samplecode_path, self.fn), "rb") as f:
-            fd_count("!close->save")
+            tools.fd_count("!close->save")
 
             test_crr = CodeResourceRevision(
                 coderesource=self.test_cr,
@@ -132,12 +104,12 @@ class FileAccessTests(TransactionTestCase):
                 content_file=File(f),
                 user=self.user_randy)
 
-            fd_count("!access->close->save")
+            tools.fd_count("!access->close->save")
             test_crr.content_file.read()
-            fd_count("access-!>close->save")
-        fd_count("access->close-!>save")
+            tools.fd_count("access-!>close->save")
+        tools.fd_count("access->close-!>save")
         self.assertRaises(ValueError, test_crr.save)
-        fd_count("access->close->save!")
+        tools.fd_count("access->close->save!")
 
     def test_close_access_save(self):
         with open(os.path.join(samplecode_path, self.fn), "rb") as f:
@@ -162,89 +134,89 @@ class FileAccessTests(TransactionTestCase):
             test_crr.save()
 
         test_crr.content_file.read()
-        fd_count("save->close->access")
+        tools.fd_count("save->close->access")
 
     def test_save_close_access_close(self):
         with open(os.path.join(samplecode_path, self.fn), "rb") as f:
-            fd_count("open-!>File->save->close->access->close")
+            tools.fd_count("open-!>File->save->close->access->close")
             test_crr = CodeResourceRevision(
                 coderesource=self.test_cr,
                 revision_name="v1",
                 revision_desc="First version",
                 content_file=File(f),
                 user=self.user_randy)
-            fd_count("open->File-!>save->close->access->close")
+            tools.fd_count("open->File-!>save->close->access->close")
             test_crr.save()
-            fd_count("open->File->save-!>close->access->close")
+            tools.fd_count("open->File->save-!>close->access->close")
 
-        fd_count("open->File->save->close-!>access->close")
+        tools.fd_count("open->File->save->close-!>access->close")
         test_crr.content_file.read()
-        fd_count("open->File->save->close->access-!>close")
+        tools.fd_count("open->File->save->close->access-!>close")
         test_crr.content_file.close()
-        fd_count("open->File->save->close->access->close!")
+        tools.fd_count("open->File->save->close->access->close!")
 
     def test_save_close_clean_close(self):
         with open(os.path.join(samplecode_path, self.fn), "rb") as f:
-            fd_count("open-!>File->save->close->clean->close")
+            tools.fd_count("open-!>File->save->close->clean->close")
             test_crr = CodeResourceRevision(
                 coderesource=self.test_cr,
                 revision_name="v1",
                 revision_desc="First version",
                 content_file=File(f),
                 user=self.user_randy)
-            fd_count("open->File-!>save->close->clean->close")
+            tools.fd_count("open->File-!>save->close->clean->close")
             test_crr.save()
-            fd_count("open->File->save-!>close->clean->close")
+            tools.fd_count("open->File->save-!>close->clean->close")
 
-        fd_count("open->File->save->close-!>clean->close")
+        tools.fd_count("open->File->save->close-!>clean->close")
         test_crr.clean()
-        fd_count("open->File->save->close->clean-!>close")
+        tools.fd_count("open->File->save->close->clean-!>close")
         test_crr.content_file.close()
-        fd_count("open->File->save->close->clean->close!")
+        tools.fd_count("open->File->save->close->clean->close!")
 
     def test_clean_save_close(self):
         with open(os.path.join(samplecode_path, self.fn), "rb") as f:
-            fd_count("open-!>File->clean->save->close")
+            tools.fd_count("open-!>File->clean->save->close")
             test_crr = CodeResourceRevision(
                 coderesource=self.test_cr,
                 revision_name="v1",
                 revision_desc="First version",
                 content_file=File(f),
                 user=self.user_randy)
-            fd_count("open->File-!>clean->save->close")
+            tools.fd_count("open->File-!>clean->save->close")
             test_crr.clean()
-            fd_count("open->File->clean-!>save->close")
+            tools.fd_count("open->File->clean-!>save->close")
             test_crr.save()
-            fd_count("open->File->clean->save-!>close")
-        fd_count("open->File->clean->save->close!")
+            tools.fd_count("open->File->clean->save-!>close")
+        tools.fd_count("open->File->clean->save->close!")
 
     def test_clean_save_close_clean_close(self):
         with open(os.path.join(samplecode_path, self.fn), "rb") as f:
 
-            fd_count("open-!>File->clean->save->close->clean->close")
+            tools.fd_count("open-!>File->clean->save->close->clean->close")
             test_crr = CodeResourceRevision(
                 coderesource=self.test_cr,
                 revision_name="v1",
                 revision_desc="First version",
                 content_file=File(f),
                 user=self.user_randy)
-            fd_count("open->File-!>clean->save->close->clean->close")
-            fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+            tools.fd_count("open->File-!>clean->save->close->clean->close")
+            tools.fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
             test_crr.clean()
-            fd_count("open->File->clean-!>save->close->clean->close")
-            fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+            tools.fd_count("open->File->clean-!>save->close->clean->close")
+            tools.fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
             test_crr.save()
-            fd_count("open->File->clean->save-!>close->clean->close")
-            fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+            tools.fd_count("open->File->clean->save-!>close->clean->close")
+            tools.fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
 
-        fd_count("open->File->clean->save->close-!>clean->close")
-        fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+        tools.fd_count("open->File->clean->save->close-!>clean->close")
+        tools.fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
         test_crr.clean()
-        fd_count("open->File->clean->save->close->clean-!>close")
-        fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+        tools.fd_count("open->File->clean->save->close->clean-!>close")
+        tools.fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
         test_crr.content_file.close()
-        fd_count("open->File->clean->save->close->clean->close!")
-        fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
+        tools.fd_count("open->File->clean->save->close->clean->close!")
+        tools.fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
 
 
 class MethodTestCase(TestCase):
