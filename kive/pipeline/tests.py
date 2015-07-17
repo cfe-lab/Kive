@@ -49,77 +49,6 @@ class DuckContext(dict):
     def __init__(self):
         self['request'] = DuckRequest()
 
-def create_pipeline_test_environment(case):
-    """
-    Sets up default database state for some Pipeline unit testing.
-
-    This also sets up Methods, CR/CRR/CRDs, and DTs/CDTs as in the Metadata and Methods tests.
-    """
-    method.tests.create_method_test_environment(case)
-    case.workdir = tempfile.mkdtemp()
-
-    case.user = User.objects.create_user('bob', 'bob@aol.com', '12345')
-    case.user.save()
-
-    # Define DNAcomp_pf
-    case.DNAcomp_pf = PipelineFamily(name="DNAcomplement", description="DNA complement pipeline.",
-                                     user=case.user)
-    case.DNAcomp_pf.save()
-
-    # Define DNAcompv1_p (pipeline revision)
-    case.DNAcompv1_p = case.DNAcomp_pf.members.create(revision_name="v1", revision_desc="First version",
-                                                      user=case.user)
-
-    # Add Pipeline input CDT DNAinput_cdt to pipeline revision DNAcompv1_p
-    case.DNAcompv1_p.create_input(
-        compounddatatype=case.DNAinput_cdt,
-        dataset_name="seqs_to_complement",
-        dataset_idx=1)
-
-    # Add a step to Pipeline revision DNAcompv1_p involving
-    # a transformation DNAcompv2_m at step 1
-    step1 = case.DNAcompv1_p.steps.create(
-        transformation=case.DNAcompv2_m,
-        step_num=1)
-
-    # Add cabling (PipelineStepInputCable's) to (step1, DNAcompv1_p)
-    # From step 0, output hole "seqs_to_complement" to
-    # input hole "input" (of this step)
-    step1.cables_in.create(dest=case.DNAcompv2_m.inputs.get(dataset_name="input"), source_step=0,
-                           source=case.DNAcompv1_p.inputs.get(dataset_name="seqs_to_complement"))
-
-    # Add output cabling (PipelineOutputCable) to DNAcompv1_p
-    # From step 1, output hole "output", send output to
-    # Pipeline output hole "complemented_seqs" at index 1
-    case.DNAcompv1_p.create_outcable(source_step=1,
-                                     source=step1.transformation.outputs.get(dataset_name="output"),
-                                     output_name="complemented_seqs", output_idx=1)
-
-
-    # Define PF in order to define pipeline
-    case.test_PF = PipelineFamily(
-        name="test pipeline family",
-        description="pipeline family placeholder",
-        user=case.user)
-    case.test_PF.full_clean()
-    case.test_PF.save()
-
-    # Set up an empty Pipeline.
-    family = PipelineFamily.filter_by_user(case.user).first()
-
-    # Nothing defined.
-    p = Pipeline(family=family, revision_name="foo", revision_desc="Foo version", user=case.user)
-    p.save()
-
-
-def destroy_pipeline_test_environment(case):
-    """
-    Clean up a TestCase where create_pipeline_test_environment has been called.
-    """
-    method.tests.destroy_method_test_environment(case)
-    Dataset.objects.all().delete()
-    shutil.rmtree(case.workdir)
-
 
 class PipelineTestCase(TestCase):
     """
@@ -129,10 +58,10 @@ class PipelineTestCase(TestCase):
 
     def setUp(self):
         """Set up default database state for Pipeline unit testing."""
-        create_pipeline_test_environment(self)
+        tools.create_pipeline_test_environment(self)
 
     def tearDown(self):
-        destroy_pipeline_test_environment(self)
+        tools.destroy_pipeline_test_environment(self)
 
 
 class PipelineFamilyTests(PipelineTestCase):

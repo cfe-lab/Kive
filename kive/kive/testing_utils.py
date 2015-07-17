@@ -737,6 +737,595 @@ def create_archive_test_environment(case):
     case.pE_run.grant_everyone_access()
 
 
+def create_method_test_environment(case):
+    """Set up default database state that includes some CRs, CRRs, Methods, etc."""
+    # This sets up the DTs and CDTs used in our metadata tests.
+    create_metadata_test_environment(case)
+
+    fd_count("FD count on environment creation")
+
+    # Define comp_cr
+    case.comp_cr = CodeResource(
+        name="complement",
+        description="Complement DNA/RNA nucleotide sequences",
+        filename="complement.py",
+        user=case.myUser)
+    case.comp_cr.save()
+    case.comp_cr.grant_everyone_access()
+
+    # Define compv1_crRev for comp_cr
+    fn = "complement.py"
+    with open(os.path.join(samplecode_path, fn), "rb") as f:
+        case.compv1_crRev = CodeResourceRevision(
+            coderesource=case.comp_cr,
+            revision_name="v1",
+            revision_desc="First version",
+            content_file=File(f),
+            user=case.myUser)
+        # case.compv1_crRev.content_file.save(fn, File(f))
+        case.compv1_crRev.full_clean()
+        case.compv1_crRev.save()
+    case.compv1_crRev.grant_everyone_access()
+
+    # Define compv2_crRev for comp_cr
+    fn = "complement_v2.py"
+    with open(os.path.join(samplecode_path, fn), "rb") as f:
+        case.compv2_crRev = CodeResourceRevision(
+            coderesource=case.comp_cr,
+            revision_name="v2",
+            revision_desc="Second version: better docstring",
+            revision_parent=case.compv1_crRev,
+            content_file=File(f),
+            user=case.myUser)
+        # case.compv2_crRev.content_file.save(fn, File(f))
+        case.compv2_crRev.full_clean()
+        case.compv2_crRev.save()
+    case.compv2_crRev.grant_everyone_access()
+
+    # Define DNA reference to use as a dependency
+    dna_resource = CodeResource(
+        name="dna_ref",
+        description="Reference DNA sequences",
+        filename="good_dna.csv",
+        user=case.myUser)
+    dna_resource.save()
+    dna_resource.grant_everyone_access()
+    fn = "GoodDNANucSeq.csv"
+    with open(os.path.join(samplecode_path, fn), "rb") as f:
+        dna_resource_revision = CodeResourceRevision(
+            coderesource=dna_resource,
+            revision_name="Prototype",
+            revision_desc="Reference DNA sequences",
+            content_file=File(f),
+            user=case.myUser)
+        # case.compv2_crRev.content_file.save(fn, File(f))
+        dna_resource_revision.full_clean()
+        dna_resource_revision.save()
+    dna_resource_revision.grant_everyone_access()
+
+    case.compv2_crRev.dependencies.create(
+        requirement=dna_resource_revision)
+
+    # The following is for testing code resource dependencies.
+    case.test_cr_1 = CodeResource(name="test_cr_1",
+                                  filename="test_cr_1.py",
+                                  description="CR1",
+                                  user=case.myUser)
+    case.test_cr_1.save()
+    case.test_cr_1.grant_everyone_access()
+    case.test_cr_1_rev1 = CodeResourceRevision(coderesource=case.test_cr_1,
+                                               revision_name="v1",
+                                               revision_desc="CR1-rev1",
+                                               user=case.myUser)
+
+
+    case.test_cr_2 = CodeResource(name="test_cr_2",
+                                  filename="test_cr_2.py",
+                                  description="CR2",
+                                  user=case.myUser)
+    case.test_cr_2.save()
+    case.test_cr_2.grant_everyone_access()
+    case.test_cr_2_rev1 = CodeResourceRevision(coderesource=case.test_cr_2,
+                                               revision_name="v1",
+                                               revision_desc="CR2-rev1",
+                                               user=case.myUser)
+
+    case.test_cr_3 = CodeResource(name="test_cr_3",
+                                  filename="test_cr_3.py",
+                                  description="CR3",
+                                  user=case.myUser)
+    case.test_cr_3.save()
+    case.test_cr_3.grant_everyone_access()
+    case.test_cr_3_rev1 = CodeResourceRevision(coderesource=case.test_cr_3,
+                                               revision_name="v1",
+                                               revision_desc="CR3-rev1",
+                                               user=case.myUser)
+    case.test_cr_3_rev1.save()
+
+    case.test_cr_4 = CodeResource(name="test_cr_4",
+                                  filename="test_cr_4.py",
+                                  description="CR4",
+                                  user=case.myUser)
+    case.test_cr_4.save()
+    case.test_cr_4.grant_everyone_access()
+    case.test_cr_4_rev1 = CodeResourceRevision(coderesource=case.test_cr_4,
+                                               revision_name="v1",
+                                               revision_desc="CR4-rev1",
+                                               user=case.myUser)
+    case.test_cr_4_rev1.save()
+
+    fn = "test_cr.py"
+    with open(os.path.join(samplecode_path, fn), "rb") as f:
+        for crr in [case.test_cr_1_rev1, case.test_cr_2_rev1, case.test_cr_3_rev1, case.test_cr_4_rev1]:
+            crr.content_file.save(fn, File(f))
+
+
+    for crr in [case.test_cr_1_rev1, case.test_cr_2_rev1, case.test_cr_3_rev1, case.test_cr_4_rev1]:
+        # crr.full_clean()
+        crr.save()
+        crr.grant_everyone_access()
+
+    # Define DNAcomp_mf
+    case.DNAcomp_mf = MethodFamily(
+        name="DNAcomplement",
+        description="Complement DNA nucleotide sequences.",
+        user=case.myUser)
+    case.DNAcomp_mf.full_clean()
+    case.DNAcomp_mf.save()
+    case.DNAcomp_mf.grant_everyone_access()
+
+    # Define DNAcompv1_m (method revision) for DNAcomp_mf with driver compv1_crRev
+    case.DNAcompv1_m = case.DNAcomp_mf.members.create(
+        revision_name="v1",
+        revision_desc="First version",
+        driver=case.compv1_crRev,
+        user=case.myUser)
+    case.DNAcompv1_m.grant_everyone_access()
+
+    # Add input DNAinput_cdt to DNAcompv1_m
+    case.DNAinput_ti = case.DNAcompv1_m.create_input(
+        compounddatatype = case.DNAinput_cdt,
+        dataset_name = "input",
+        dataset_idx = 1)
+    case.DNAinput_ti.full_clean()
+    case.DNAinput_ti.save()
+
+    # Add output DNAoutput_cdt to DNAcompv1_m
+    case.DNAoutput_to = case.DNAcompv1_m.create_output(
+        compounddatatype = case.DNAoutput_cdt,
+        dataset_name = "output",
+        dataset_idx = 1)
+    case.DNAoutput_to.full_clean()
+    case.DNAoutput_to.save()
+
+    # Define DNAcompv2_m for DNAcomp_mf with driver compv2_crRev
+    # May 20, 2014: where previously the inputs/outputs would be
+    # automatically copied over from the parent using save(), now
+    # we explicitly call copy_io_from_parent.
+    case.DNAcompv2_m = case.DNAcomp_mf.members.create(
+        revision_name="v2",
+        revision_desc="Second version",
+        revision_parent=case.DNAcompv1_m,
+        driver=case.compv2_crRev,
+        user=case.myUser)
+    case.DNAcompv2_m.full_clean()
+    case.DNAcompv2_m.save()
+    case.DNAcompv2_m.grant_everyone_access()
+    case.DNAcompv2_m.copy_io_from_parent()
+
+    # Define second family, RNAcomp_mf
+    case.RNAcomp_mf = MethodFamily(
+        name="RNAcomplement",
+        description="Complement RNA nucleotide sequences.",
+        user=case.myUser)
+    case.RNAcomp_mf.full_clean()
+    case.RNAcomp_mf.save()
+    case.RNAcomp_mf.grant_everyone_access()
+
+    # Define RNAcompv1_m for RNAcomp_mf with driver compv1_crRev
+    case.RNAcompv1_m = case.RNAcomp_mf.members.create(
+        revision_name="v1",
+        revision_desc="First version",
+        driver=case.compv1_crRev,
+        user=case.myUser)
+    case.RNAcompv1_m.grant_everyone_access()
+
+    # Add input RNAinput_cdt to RNAcompv1_m
+    case.RNAinput_ti = case.RNAcompv1_m.create_input(
+        compounddatatype = case.RNAinput_cdt,
+        dataset_name = "input",
+        dataset_idx = 1)
+    case.RNAinput_ti.full_clean()
+    case.RNAinput_ti.save()
+
+    # Add output RNAoutput_cdt to RNAcompv1_m
+    case.RNAoutput_to = case.RNAcompv1_m.create_output(
+        compounddatatype = case.RNAoutput_cdt,
+        dataset_name = "output",
+        dataset_idx = 1)
+    case.RNAoutput_to.full_clean()
+    case.RNAoutput_to.save()
+
+    # Define RNAcompv2_m for RNAcompv1_mf with driver compv2_crRev
+    # May 20, 2014: again, we now explicitly copy over the inputs/outputs.
+    case.RNAcompv2_m = case.RNAcomp_mf.members.create(
+        revision_name="v2",
+        revision_desc="Second version",
+        revision_parent=case.RNAcompv1_m,
+        driver=case.compv2_crRev,
+        user=case.myUser)
+    case.RNAcompv2_m.full_clean()
+    case.RNAcompv2_m.save()
+    case.RNAcompv2_m.copy_io_from_parent()
+    case.RNAcompv2_m.grant_everyone_access()
+
+    # Create method family for script_1_method / script_2_method / script_3_method
+    case.test_mf = MethodFamily(name="Test method family",
+                                description="Holds scripts 1/2/3",
+                                user=case.myUser)
+    case.test_mf.full_clean()
+    case.test_mf.save()
+    case.test_mf.grant_everyone_access()
+
+    # script_1_sum_and_outputs.py
+    # INPUT: 1 csv containing (x,y)
+    # OUTPUT: 1 csv containing (x+y,xy)
+    case.script_1_cr = CodeResource(name="Sum and product of x and y",
+                                    filename="script_1_sum_and_products.py",
+                                    description="Addition and multiplication",
+                                    user=case.myUser)
+    case.script_1_cr.save()
+    case.script_1_cr.grant_everyone_access()
+
+    # Add code resource revision for code resource (script_1_sum_and_products )
+    case.script_1_crRev = CodeResourceRevision(
+        coderesource=case.script_1_cr,
+        revision_name="v1",
+        revision_desc="First version",
+        user=case.myUser
+    )
+    fn = "script_1_sum_and_products.py"
+    with open(os.path.join(samplecode_path, fn), "rb") as f:
+        case.script_1_crRev.content_file.save(fn, File(f))
+    case.script_1_crRev.save()
+    case.script_1_crRev.grant_everyone_access()
+
+    # Establish code resource revision as a method
+    case.script_1_method = Method(
+        revision_name="script1",
+        revision_desc="script1",
+        family = case.test_mf,
+        driver = case.script_1_crRev,
+        user=case.myUser)
+    case.script_1_method.save()
+    case.script_1_method.grant_everyone_access()
+
+    # Assign tuple as both an input and an output to script_1_method
+    case.script_1_method.create_input(compounddatatype = case.tuple_cdt,
+                                      dataset_name = "input_tuple",
+                                      dataset_idx = 1)
+    case.script_1_method.create_output(compounddatatype = case.tuple_cdt,
+                                       dataset_name = "input_tuple",
+                                       dataset_idx = 1)
+    case.script_1_method.full_clean()
+    case.script_1_method.save()
+
+    # script_2_square_and_means
+    # INPUT: 1 csv containing (a,b,c)
+    # OUTPUT-1: 1 csv containing triplet (a^2,b^2,c^2)
+    # OUTPUT-2: 1 csv containing singlet mean(a,b,c)
+    case.script_2_cr = CodeResource(name="Square and mean of (a,b,c)",
+                                    filename="script_2_square_and_means.py",
+                                    description="Square and mean - 2 CSVs",
+                                    user=case.myUser)
+    case.script_2_cr.save()
+    case.script_2_cr.grant_everyone_access()
+
+    # Add code resource revision for code resource (script_2_square_and_means)
+    fn = "script_2_square_and_means.py"
+    case.script_2_crRev = CodeResourceRevision(
+        coderesource=case.script_2_cr,
+        revision_name="v1",
+        revision_desc="First version",
+        user=case.myUser)
+    with open(os.path.join(samplecode_path, fn), "rb") as f:
+        case.script_2_crRev.content_file.save(fn, File(f))
+    case.script_2_crRev.save()
+    case.script_2_crRev.grant_everyone_access()
+
+    # Establish code resource revision as a method
+    case.script_2_method = Method(
+        revision_name="script2",
+        revision_desc="script2",
+        family = case.test_mf,
+        driver = case.script_2_crRev,
+        user=case.myUser)
+    case.script_2_method.save()
+    case.script_2_method.grant_everyone_access()
+
+    # Assign triplet as input and output,
+    case.script_2_method.create_input(
+        compounddatatype = case.triplet_cdt,
+        dataset_name = "a_b_c",
+        dataset_idx = 1)
+    case.script_2_method.create_output(
+        compounddatatype = case.triplet_cdt,
+        dataset_name = "a_b_c_squared",
+        dataset_idx = 1)
+    case.script_2_method.create_output(
+        compounddatatype = case.singlet_cdt,
+        dataset_name = "a_b_c_mean",
+        dataset_idx = 2)
+    case.script_2_method.full_clean()
+    case.script_2_method.save()
+
+    # script_3_product
+    # INPUT-1: Single column (k)
+    # INPUT-2: Single-row, single column (r)
+    # OUTPUT-1: Single column r*(k)
+    case.script_3_cr = CodeResource(name="Scalar multiple of k",
+                                    filename="script_3_product.py",
+                                    description="Product of input",
+                                    user=case.myUser)
+    case.script_3_cr.save()
+    case.script_3_cr.grant_everyone_access()
+
+    # Add code resource revision for code resource (script_3_product)
+    with open(os.path.join(samplecode_path, "script_3_product.py"), "rb") as f:
+        case.script_3_crRev = CodeResourceRevision(
+            coderesource=case.script_3_cr,
+            revision_name="v1",
+            revision_desc="First version",
+            content_file=File(f),
+            user=case.myUser)
+        case.script_3_crRev.save()
+    case.script_3_crRev.grant_everyone_access()
+
+    # Establish code resource revision as a method
+    case.script_3_method = Method(
+        revision_name="script3",
+        revision_desc="script3",
+        family = case.test_mf,
+        driver = case.script_3_crRev,
+        user=case.myUser)
+    case.script_3_method.save()
+    case.script_3_method.grant_everyone_access()
+
+    # Assign singlet as input and output
+    case.script_3_method.create_input(compounddatatype = case.singlet_cdt,
+                                      dataset_name = "k",
+                                      dataset_idx = 1)
+
+    case.script_3_method.create_input(compounddatatype = case.singlet_cdt,
+                                      dataset_name = "r",
+                                      dataset_idx = 2,
+                                      max_row = 1,
+                                      min_row = 1)
+
+    case.script_3_method.create_output(compounddatatype = case.singlet_cdt,
+                                       dataset_name = "kr",
+                                       dataset_idx = 1)
+    case.script_3_method.full_clean()
+    case.script_3_method.save()
+
+    ####
+    # This next bit was originally in pipeline.tests.
+
+    # DNArecomp_mf is a MethodFamily called DNArecomplement
+    case.DNArecomp_mf = MethodFamily(
+        name="DNArecomplement",
+        description="Re-complement DNA nucleotide sequences.",
+        user=case.myUser)
+    case.DNArecomp_mf.full_clean()
+    case.DNArecomp_mf.save()
+    case.DNArecomp_mf.grant_everyone_access()
+
+    # Add to MethodFamily DNArecomp_mf a method revision DNArecomp_m
+    case.DNArecomp_m = case.DNArecomp_mf.members.create(
+        revision_name="v1",
+        revision_desc="First version",
+        driver=case.compv2_crRev,
+        user=case.myUser)
+    case.DNArecomp_m.grant_everyone_access()
+
+    # To this method revision, add inputs with CDT DNAoutput_cdt
+    case.DNArecomp_m.create_input(
+        compounddatatype = case.DNAoutput_cdt,
+        dataset_name = "complemented_seqs",
+        dataset_idx = 1)
+
+    # To this method revision, add outputs with CDT DNAinput_cdt
+    case.DNArecomp_m.create_output(
+        compounddatatype = case.DNAinput_cdt,
+        dataset_name = "recomplemented_seqs",
+        dataset_idx = 1)
+
+    # Setup used in the "2nd-wave" tests (this was originally in
+    # Copperfish_Raw_Setup).
+
+    # Define CR "script_4_raw_in_CSV_out.py"
+    # input: raw [but contains (a,b,c) triplet]
+    # output: CSV [3 CDT members of the form (a^2, b^2, c^2)]
+
+    # Define CR in order to define CRR
+    case.script_4_CR = CodeResource(name="Generate (a^2, b^2, c^2) using RAW input",
+        filename="script_4_raw_in_CSV_out.py",
+        description="Given (a,b,c), outputs (a^2,b^2,c^2)",
+        user=case.myUser)
+    case.script_4_CR.save()
+    case.script_4_CR.grant_everyone_access()
+
+    # Define CRR for this CR in order to define method
+    with open(os.path.join(samplecode_path, "script_4_raw_in_CSV_out.py"), "rb") as f:
+        case.script_4_1_CRR = CodeResourceRevision(
+            coderesource=case.script_4_CR,
+            revision_name="v1",
+            revision_desc="v1",
+            content_file=File(f),
+            user=case.myUser)
+        case.script_4_1_CRR.save()
+    case.script_4_1_CRR.grant_everyone_access()
+
+    # Define MF in order to define method
+    case.test_MF = MethodFamily(
+        name="test method family",
+        description="method family placeholder",
+        user=case.myUser)
+    case.test_MF.full_clean()
+    case.test_MF.save()
+    case.test_MF.grant_everyone_access()
+
+    # Establish CRR as a method within a given method family
+    case.script_4_1_M = Method(
+        revision_name="s4",
+        revision_desc="s4",
+        family = case.test_MF,
+        driver = case.script_4_1_CRR,
+        user=case.myUser)
+    case.script_4_1_M.save()
+    case.script_4_1_M.grant_everyone_access()
+
+    case.script_4_1_M.create_input(compounddatatype=case.triplet_cdt,
+        dataset_name="s4_input", dataset_idx = 1)
+    case.script_4_1_M.full_clean()
+
+    # A shorter alias
+    case.testmethod = case.script_4_1_M
+
+    # Some code for a no-op method.
+    resource = CodeResource(name="noop", filename="noop.sh", user=case.myUser); resource.save()
+    resource.grant_everyone_access()
+    with tempfile.NamedTemporaryFile() as f:
+        f.write("#!/bin/bash\ncat $1")
+        case.noop_data_file = f.name
+        revision = CodeResourceRevision(coderesource = resource, content_file = File(f),
+                                        user=case.myUser)
+        revision.clean()
+        revision.save()
+        revision.grant_everyone_access()
+
+    # Retrieve the string type.
+    string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
+    string_cdt = CompoundDatatype(user=case.myUser)
+    string_cdt.save()
+    string_cdt.members.create(datatype=string_dt, column_name="word", column_idx=1)
+    string_cdt.grant_everyone_access()
+    string_cdt.full_clean()
+
+    mfamily = MethodFamily(name="noop", user=case.myUser); mfamily.save()
+    mfamily.grant_everyone_access()
+    case.noop_method = Method(
+        family=mfamily, driver=revision,
+        revision_name = "1", revision_desc = "first version",
+        user=case.myUser)
+    case.noop_method.save()
+    case.noop_method.create_input(compounddatatype=string_cdt, dataset_name = "noop_data", dataset_idx=1)
+    case.noop_method.grant_everyone_access()
+    case.noop_method.full_clean()
+
+    # Some data.
+    case.scratch_dir = tempfile.mkdtemp(
+        dir=file_access_utils.sandbox_base_path()
+    )
+    file_access_utils.configure_sandbox_permissions(case.scratch_dir)
+    try:
+        fd, case.noop_infile = tempfile.mkstemp(dir=case.scratch_dir)
+    finally:
+        os.close(fd)
+    try:
+        fd, case.noop_outfile = tempfile.mkstemp(dir=case.scratch_dir)
+    finally:
+        os.close(fd)
+    case.noop_indata = "word\nhello\nworld"
+
+    with open(case.noop_infile, "w") as handle:
+        handle.write(case.noop_indata)
+
+    file_access_utils.configure_sandbox_permissions(case.noop_infile)
+    file_access_utils.configure_sandbox_permissions(case.noop_outfile)
+
+
+def destroy_method_test_environment(case):
+    """
+    Clean up a TestCase where create_method_test_environment has been called.
+    """
+    clean_up_all_files()
+    shutil.rmtree(case.scratch_dir)
+    CodeResource.objects.all().delete()
+
+
+def create_pipeline_test_environment(case):
+    """
+    Sets up default database state for some Pipeline unit testing.
+
+    This also sets up Methods, CR/CRR/CRDs, and DTs/CDTs as in the Metadata and Methods tests.
+    """
+    create_method_test_environment(case)
+    case.workdir = tempfile.mkdtemp()
+
+    case.user = User.objects.create_user('bob', 'bob@aol.com', '12345')
+    case.user.save()
+
+    # Define DNAcomp_pf
+    case.DNAcomp_pf = PipelineFamily(name="DNAcomplement", description="DNA complement pipeline.",
+                                     user=case.user)
+    case.DNAcomp_pf.save()
+
+    # Define DNAcompv1_p (pipeline revision)
+    case.DNAcompv1_p = case.DNAcomp_pf.members.create(revision_name="v1", revision_desc="First version",
+                                                      user=case.user)
+
+    # Add Pipeline input CDT DNAinput_cdt to pipeline revision DNAcompv1_p
+    case.DNAcompv1_p.create_input(
+        compounddatatype=case.DNAinput_cdt,
+        dataset_name="seqs_to_complement",
+        dataset_idx=1)
+
+    # Add a step to Pipeline revision DNAcompv1_p involving
+    # a transformation DNAcompv2_m at step 1
+    step1 = case.DNAcompv1_p.steps.create(
+        transformation=case.DNAcompv2_m,
+        step_num=1)
+
+    # Add cabling (PipelineStepInputCable's) to (step1, DNAcompv1_p)
+    # From step 0, output hole "seqs_to_complement" to
+    # input hole "input" (of this step)
+    step1.cables_in.create(dest=case.DNAcompv2_m.inputs.get(dataset_name="input"), source_step=0,
+                           source=case.DNAcompv1_p.inputs.get(dataset_name="seqs_to_complement"))
+
+    # Add output cabling (PipelineOutputCable) to DNAcompv1_p
+    # From step 1, output hole "output", send output to
+    # Pipeline output hole "complemented_seqs" at index 1
+    case.DNAcompv1_p.create_outcable(source_step=1,
+                                     source=step1.transformation.outputs.get(dataset_name="output"),
+                                     output_name="complemented_seqs", output_idx=1)
+
+
+    # Define PF in order to define pipeline
+    case.test_PF = PipelineFamily(
+        name="test pipeline family",
+        description="pipeline family placeholder",
+        user=case.user)
+    case.test_PF.full_clean()
+    case.test_PF.save()
+
+    # Set up an empty Pipeline.
+    family = PipelineFamily.filter_by_user(case.user).first()
+
+    # Nothing defined.
+    p = Pipeline(family=family, revision_name="foo", revision_desc="Foo version", user=case.user)
+    p.save()
+
+
+def destroy_pipeline_test_environment(case):
+    """
+    Clean up a TestCase where create_pipeline_test_environment has been called.
+    """
+    destroy_method_test_environment(case)
+    Dataset.objects.all().delete()
+    shutil.rmtree(case.workdir)
+
+
 def create_sequence_manipulation_environment(case):
     create_sandbox_testing_tools_environment(case)
 

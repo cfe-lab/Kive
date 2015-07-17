@@ -3773,7 +3773,7 @@ class MethodOutputApiTests(BaseTestCases.ApiTestCase):
         response = self.list_view(request, pk=None)
 
         # There are four CDTs loaded into the Database by default.
-        self.assertEquals(len(response.data), 5)
+        self.assertEquals(len(response.data), 2)
         self.assertEquals(response.data[0]['output_redacted'], False)
 
     def test_detail(self):

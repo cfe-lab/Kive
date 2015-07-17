@@ -2502,7 +2502,5 @@ class CompoundDatatypeApiTests(TestCase):
         request = self.factory.get(self.removal_path)
         force_authenticate(request, user=self.kive_user)
         response = self.removal_view(request, pk=self.detail_pk)
-        print(request)
-        print(response.data)
         self.assertEquals(response.data['CompoundDatatypes'], 0)
 
