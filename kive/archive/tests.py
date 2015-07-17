@@ -22,7 +22,6 @@ from file_access_utils import compute_md5
 from librarian.models import ExecRecord, SymbolicDataset
 
 from kive.tests import BaseTestCases, install_fixture_files, restore_production_files
-import librarian.tests
 import metadata.tests
 from method.models import Method
 from pipeline.models import Pipeline, PipelineStep
@@ -32,13 +31,6 @@ import kive.testing_utils as tools
 # Rather than define everyone_group here, we import this function to prevent compile-time
 # database access.
 from metadata.models import everyone_group, kive_user
-
-
-def create_archive_test_environment(case):
-    librarian.tests.create_librarian_test_environment(case)
-    tools.create_sandbox_testing_tools_environment(case)
-    case.pE_run = case.pE.pipeline_instances.create(user=case.myUser)
-    case.pE_run.grant_everyone_access()
 
 
 class ArchiveTestCaseHelpers:
@@ -504,7 +496,7 @@ class ArchiveTestCaseHelpers:
 class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
 
     def setUp(self):
-        create_archive_test_environment(self)
+        tools.create_archive_test_environment(self)
 
     def tearDown(self):
         metadata.tests.clean_up_all_files()
@@ -514,7 +506,7 @@ class ArchiveTransactionTestCase(TransactionTestCase, ArchiveTestCaseHelpers):
     # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
-        create_archive_test_environment(self)
+        tools.create_archive_test_environment(self)
 
     def tearDown(self):
         metadata.tests.clean_up_all_files()
@@ -2520,7 +2512,7 @@ class DatasetTests(TestCase):
     # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
-        librarian.tests.create_librarian_test_environment(self)
+        tools.create_librarian_test_environment(self)
 
     def tearDown(self):
         metadata.tests.clean_up_all_files()

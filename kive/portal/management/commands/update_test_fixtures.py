@@ -10,9 +10,6 @@ import json
 from metadata.models import CompoundDatatype, everyone_group
 from sandbox.execute import Sandbox
 import kive.testing_utils as tools
-from archive.tests import create_archive_test_environment
-from librarian.tests import create_removal_test_environment
-import librarian.tests
 import sandbox.tests
 import pipeline.models
 import kive.settings
@@ -102,7 +99,7 @@ class EMSandboxTestEnvironmentBuilder(FixtureBuilder):
         return 'em_sandbox_test_environment.json'
 
     def build(self):
-        librarian.tests.create_eric_martin_test_environment(self)
+        tools.create_eric_martin_test_environment(self)
         tools.create_sandbox_testing_tools_environment(self)
         self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
         self.pE_run.grant_everyone_access()
@@ -113,7 +110,7 @@ class ArchiveTestEnvironmentBuilder(FixtureBuilder):
         return 'archive_test_environment.json'
     
     def build(self):
-        create_archive_test_environment(self)
+        tools.create_archive_test_environment(self)
 
 
 class SimpleRunBuilder(FixtureBuilder):
@@ -121,7 +118,10 @@ class SimpleRunBuilder(FixtureBuilder):
         return 'simple_run.json'
     
     def build(self):
-        create_archive_test_environment(self)
+        tools.create_eric_martin_test_environment(self)
+        tools.create_sandbox_testing_tools_environment(self)
+        self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+        self.pE_run.grant_everyone_access()
         user = User.objects.get(username='john')
         # Everything in this pipeline will be a no-op, so all can be linked together
         # without remorse.
@@ -147,7 +147,7 @@ class DeepNestedRunBuilder(FixtureBuilder):
         return 'deep_nested_run.json'
     
     def build(self):
-        create_archive_test_environment(self)
+        tools.create_archive_test_environment(self)
         user = User.objects.get(username='john')
         # Everything in this pipeline will be a no-op, so all can be linked together
         # without remorse.
@@ -185,7 +185,7 @@ class RemovalTestEnvironmentBuilder(FixtureBuilder):
         return 'removal.json'
 
     def build(self):
-        create_removal_test_environment()
+        tools.create_removal_test_environment()
 
 
 class RunApiTestsEnvironmentBuilder(FixtureBuilder):
@@ -294,7 +294,10 @@ class RunPipelinesRecoveringReusedStepEnvironmentBuilder(FixtureBuilder):
         return "run_pipelines_recovering_reused_step.json"
 
     def build(self):
-        create_archive_test_environment(self)
+        tools.create_eric_martin_test_environment(self)
+        tools.create_sandbox_testing_tools_environment(self)
+        self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
+        self.pE_run.grant_everyone_access()
 
         p_one = tools.make_first_pipeline("p_one", "two no-ops", self.myUser)
         p_one.family.grant_everyone_access()

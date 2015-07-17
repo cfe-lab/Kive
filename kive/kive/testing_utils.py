@@ -11,12 +11,406 @@ from django.db import transaction
 
 from constants import datatypes
 import file_access_utils
-from librarian.models import SymbolicDataset
+from librarian.models import SymbolicDataset, ExecRecord
 from metadata.models import CompoundDatatype, Datatype, everyone_group
-from metadata.tests import clean_up_all_files
+from metadata.tests import clean_up_all_files, create_metadata_test_environment, samplecode_path
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
-from pipeline.models import Pipeline, PipelineFamily
+from pipeline.models import Pipeline, PipelineFamily, PipelineStep
+from archive.models import RunStep, ExecLog
 import sandbox.execute
+
+
+def create_eric_martin_test_environment(case):
+    """
+    Set up the original test state Eric Martin designed.
+
+    This sets up the environment as in the Metadata tests, and then augments with
+    Methods, CR/CRR/CRDs, and DT/CDTs.  Note that these are *not* the same
+    as those set up in the Method testing.
+    """
+    create_metadata_test_environment(case)
+
+    ####
+    # This is the big pipeline Eric developed that was originally
+    # used in copperfish/tests.py.
+    # CRs and CRRs:
+    case.generic_cr = CodeResource(
+        name="genericCR", description="Just a CR",
+        filename="generic_script.py", user=case.myUser)
+    case.generic_cr.save()
+    case.generic_cr.grant_everyone_access()
+    case.generic_crRev = CodeResourceRevision(
+        coderesource=case.generic_cr, revision_name="v1", revision_desc="desc",
+        user=case.myUser)
+    with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
+        case.generic_crRev.content_file.save("generic_script.py", File(f))
+    case.generic_crRev.save()
+    case.generic_crRev.grant_everyone_access()
+
+    # Method family, methods, and their input/outputs
+    case.mf = MethodFamily(name="method_family",description="Holds methods A/B/C", user=case.myUser)
+    case.mf.save()
+    case.mf.grant_everyone_access()
+    case.mA = Method(revision_name="mA_name", revision_desc="A_desc", family=case.mf, driver=case.generic_crRev,
+                     user=case.myUser)
+    case.mA.save()
+    case.mA.grant_everyone_access()
+    case.A1_rawin = case.mA.create_input(dataset_name="A1_rawin", dataset_idx=1)
+    case.A1_out = case.mA.create_output(compounddatatype=case.doublet_cdt,dataset_name="A1_out",dataset_idx=1)
+
+    case.mB = Method(revision_name="mB_name", revision_desc="B_desc", family=case.mf, driver=case.generic_crRev,
+                     user=case.myUser)
+    case.mB.save()
+    case.mB.grant_everyone_access()
+    case.B1_in = case.mB.create_input(compounddatatype=case.doublet_cdt,dataset_name="B1_in",dataset_idx=1)
+    case.B2_in = case.mB.create_input(compounddatatype=case.singlet_cdt,dataset_name="B2_in",dataset_idx=2)
+    case.B1_out = case.mB.create_output(compounddatatype=case.triplet_cdt,dataset_name="B1_out",dataset_idx=1,max_row=5)
+
+    case.mC = Method(revision_name="mC_name", revision_desc="C_desc", family=case.mf, driver=case.generic_crRev,
+                     user=case.myUser)
+    case.mC.save()
+    case.mC.grant_everyone_access()
+    case.C1_in = case.mC.create_input(compounddatatype=case.triplet_cdt,dataset_name="C1_in",dataset_idx=1)
+    case.C2_in = case.mC.create_input(compounddatatype=case.doublet_cdt,dataset_name="C2_in",dataset_idx=2)
+    case.C1_out = case.mC.create_output(compounddatatype=case.singlet_cdt,dataset_name="C1_out",dataset_idx=1)
+    case.C2_rawout = case.mC.create_output(dataset_name="C2_rawout",dataset_idx=2)
+    case.C3_rawout = case.mC.create_output(dataset_name="C3_rawout",dataset_idx=3)
+
+    # Pipeline family, pipelines, and their input/outputs
+    case.pf = PipelineFamily(name="Pipeline_family", description="PF desc", user=case.myUser); case.pf.save()
+    case.pf.grant_everyone_access()
+    case.pD = Pipeline(family=case.pf, revision_name="pD_name", revision_desc="D", user=case.myUser)
+    case.pD.save()
+    case.pD.grant_everyone_access()
+    case.D1_in = case.pD.create_input(compounddatatype=case.doublet_cdt,dataset_name="D1_in",dataset_idx=1)
+    case.D2_in = case.pD.create_input(compounddatatype=case.singlet_cdt,dataset_name="D2_in",dataset_idx=2)
+    case.pE = Pipeline(family=case.pf, revision_name="pE_name", revision_desc="E", user=case.myUser)
+    case.pE.save()
+    case.pE.grant_everyone_access()
+    case.E1_in = case.pE.create_input(compounddatatype=case.triplet_cdt,dataset_name="E1_in",dataset_idx=1)
+    case.E2_in = case.pE.create_input(compounddatatype=case.singlet_cdt,dataset_name="E2_in",dataset_idx=2,min_row=10)
+    case.E3_rawin = case.pE.create_input(dataset_name="E3_rawin",dataset_idx=3)
+
+    # Pipeline steps
+    case.step_D1 = case.pD.steps.create(transformation=case.mB,step_num=1)
+    case.step_E1 = case.pE.steps.create(transformation=case.mA,step_num=1)
+    case.step_E2 = case.pE.steps.create(transformation=case.pD,step_num=2)
+    case.step_E3 = case.pE.steps.create(transformation=case.mC,step_num=3)
+
+    # Pipeline cables and outcables
+    case.D01_11 = case.step_D1.cables_in.create(dest=case.B1_in,source_step=0,source=case.D1_in)
+    case.D02_12 = case.step_D1.cables_in.create(dest=case.B2_in,source_step=0,source=case.D2_in)
+    case.D11_21 = case.pD.outcables.create(output_name="D1_out",output_idx=1,output_cdt=case.triplet_cdt,source_step=1,source=case.B1_out)
+    case.pD.create_outputs()
+    case.D1_out = case.pD.outputs.get(dataset_name="D1_out")
+
+    case.E03_11 = case.step_E1.cables_in.create(dest=case.A1_rawin,source_step=0,source=case.E3_rawin)
+    case.E01_21 = case.step_E2.cables_in.create(dest=case.D1_in,source_step=0,source=case.E1_in)
+    case.E02_22 = case.step_E2.cables_in.create(dest=case.D2_in,source_step=0,source=case.E2_in)
+    case.E11_32 = case.step_E3.cables_in.create(dest=case.C2_in,source_step=1,source=case.A1_out)
+    case.E21_31 = case.step_E3.cables_in.create(dest=case.C1_in,source_step=2,source=case.step_E2.transformation.outputs.get(dataset_name="D1_out"))
+    case.E21_41 = case.pE.outcables.create(output_name="E1_out",output_idx=1,output_cdt=case.doublet_cdt,source_step=2,source=case.step_E2.transformation.outputs.get(dataset_name="D1_out"))
+    case.E31_42 = case.pE.outcables.create(output_name="E2_out",output_idx=2,output_cdt=case.singlet_cdt,source_step=3,source=case.C1_out)
+    case.E33_43 = case.pE.outcables.create(output_name="E3_rawout",output_idx=3,output_cdt=None,source_step=3,source=case.C3_rawout)
+    case.pE.create_outputs()
+    case.E1_out = case.pE.outputs.get(dataset_name="E1_out")
+    case.E2_out = case.pE.outputs.get(dataset_name="E2_out")
+    case.E3_rawout = case.pE.outputs.get(dataset_name="E3_rawout")
+
+    # Custom wiring/outwiring
+    case.E01_21_wire1 = case.E01_21.custom_wires.create(
+        source_pin=case.triplet_cdt.members.get(column_idx=1), dest_pin=case.doublet_cdt.members.get(column_idx=2))
+    case.E01_21_wire2 = case.E01_21.custom_wires.create(
+        source_pin=case.triplet_cdt.members.get(column_idx=3), dest_pin=case.doublet_cdt.members.get(column_idx=1))
+    case.E11_32_wire1 = case.E11_32.custom_wires.create(
+        source_pin=case.doublet_cdt.members.get(column_idx=1), dest_pin=case.doublet_cdt.members.get(column_idx=2))
+    case.E11_32_wire2 = case.E11_32.custom_wires.create(
+        source_pin=case.doublet_cdt.members.get(column_idx=2), dest_pin=case.doublet_cdt.members.get(column_idx=1))
+    case.E21_41_wire1 = case.E21_41.custom_wires.create(
+        source_pin=case.triplet_cdt.members.get(column_idx=2), dest_pin=case.doublet_cdt.members.get(column_idx=2))
+    case.E21_41_wire2 = case.E21_41.custom_wires.create(
+        source_pin=case.triplet_cdt.members.get(column_idx=3), dest_pin=case.doublet_cdt.members.get(column_idx=1))
+    case.pE.clean()
+
+    # Runs for the pipelines.
+    case.pD_run = case.pD.pipeline_instances.create(user=case.myUser)
+    case.pD_run.save()
+    case.pD_run.grant_everyone_access()
+    case.pE_run = case.pE.pipeline_instances.create(user=case.myUser,
+                                                    name='pE_run')
+    case.pE_run.save()
+    case.pE_run.grant_everyone_access()
+
+    # November 7, 2013: use a helper function (defined in
+    # librarian.models) to define our SymDSs and DSs.
+
+    # Define singlet, doublet, triplet, and raw uploaded datasets
+    case.triplet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_triplet.csv"),
+                                                   case.myUser,
+                                                   cdt=case.triplet_cdt, make_dataset=True,
+                                                   name="triplet", description="lol",
+                                                   groups_allowed=[everyone_group()])
+    case.triplet_symDS_structure = case.triplet_symDS.structure
+    case.triplet_DS = case.triplet_symDS.dataset
+
+    case.doublet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "doublet_cdt.csv"),
+                                                   case.myUser,
+                                                   cdt=case.doublet_cdt, name="doublet",
+                                                   description="lol",
+                                                   groups_allowed=[everyone_group()])
+    case.doublet_symDS_structure = case.doublet_symDS.structure
+    case.doublet_DS = case.doublet_symDS.dataset
+
+    case.singlet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "singlet_cdt_large.csv"),
+                                                   case.myUser,
+                                                   cdt=case.singlet_cdt, name="singlet",
+                                                   description="lol",
+                                                   groups_allowed=[everyone_group()])
+    case.singlet_symDS_structure = case.singlet_symDS.structure
+    case.singlet_DS = case.singlet_symDS.dataset
+
+    # October 1, 2013: this is the same as the old singlet_symDS.
+    case.singlet_3rows_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_singlet.csv"),
+                                                         case.myUser,
+                                                         cdt=case.singlet_cdt, name="singlet",
+                                                         description="lol",
+                                                         groups_allowed=[everyone_group()])
+    case.singlet_3rows_symDS_structure = case.singlet_3rows_symDS.structure
+    case.singlet_3rows_DS = case.singlet_3rows_symDS.dataset
+
+    case.raw_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
+                                               user=case.myUser, cdt=None, name="raw_DS", description="lol",
+                                               groups_allowed=[everyone_group()])
+    case.raw_DS = case.raw_symDS.dataset
+
+    # Added September 30, 2013: symbolic dataset that results from E01_21.
+    # November 7, 2013: created a file that this SD actually represented,
+    # even though it isn't in the database.
+    case.D1_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "doublet_remuxed_from_triplet.csv"),
+                                                 user=case.myUser,
+                                                 cdt=case.doublet_cdt,
+                                                 make_dataset=False,
+                                                 groups_allowed=[everyone_group()])
+    case.D1_in_symDS_structure = case.D1_in_symDS.structure
+
+    case.C1_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "C1_in_triplet.csv"),
+                                                 case.myUser,
+                                                 cdt=case.triplet_cdt, name="C1_in_triplet",
+                                                 description="triplet 3 rows",
+                                                 groups_allowed=[everyone_group()])
+    case.C1_in_symDS_structure = case.C1_in_symDS.structure
+    case.C1_in_DS = case.C1_in_symDS.dataset
+
+    # November 7, 2013: compute the MD5 checksum from the data file,
+    # which is the same as below.
+    case.C2_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "E11_32_output.csv"),
+                                                 case.myUser,
+                                                 cdt=case.doublet_cdt, make_dataset=False,
+                                                 groups_allowed=[everyone_group()])
+    case.C2_in_symDS_structure = case.C2_in_symDS.structure
+
+    # October 16: an alternative to C2_in_symDS, which has existent data.
+    case.E11_32_output_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "E11_32_output.csv"),
+                                                         case.myUser,
+                                                         cdt=case.doublet_cdt,
+                                                         name="E11_32 output doublet",
+                                                         description="result of E11_32 fed by doublet_cdt.csv",
+                                                         groups_allowed=[everyone_group()])
+    case.E11_32_output_symDS_structure = case.E11_32_output_symDS.structure
+    case.E11_32_output_DS = case.E11_32_output_symDS.dataset
+
+    case.C1_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_singlet.csv"),
+                                                  case.myUser,
+                                                  cdt=case.singlet_cdt, name="raw", description="lol",
+                                                  groups_allowed=[everyone_group()])
+    case.C1_out_symDS_structure = case.C1_out_symDS.structure
+    case.C1_out_DS = case.C1_out_symDS.dataset
+
+    case.C2_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
+                                                  case.myUser, cdt=None, name="C2_out", description="lol",
+                                                  groups_allowed=[everyone_group()])
+    case.C2_out_DS = case.C2_out_symDS.dataset
+
+    case.C3_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
+                                                  case.myUser, cdt=None, name="C3_out", description="lol",
+                                                  groups_allowed=[everyone_group()])
+    case.C3_out_DS = case.C3_out_symDS.dataset
+
+    case.triplet_3_rows_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"), case.myUser, cdt=case.triplet_cdt,
+        name="triplet", description="lol", groups_allowed=[everyone_group()])
+    case.triplet_3_rows_symDS_structure = case.triplet_3_rows_symDS.structure
+    case.triplet_3_rows_DS = case.triplet_3_rows_symDS.dataset
+
+    # October 9, 2013: added as the result of cable E21_41.
+    case.E1_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "doublet_remuxed_from_t3r.csv"),
+                                                  case.myUser, cdt=case.doublet_cdt, name="E1_out",
+                                                  description="doublet remuxed from triplet",
+                                                  groups_allowed=[everyone_group()])
+    case.E1_out_symDS_structure = case.E1_out_symDS.structure
+    case.E1_out_DS = case.E1_out_symDS.dataset
+
+    # October 15, 2013: SymbolicDatasets that go into and come out
+    # of cable E01_21 and E21_41.
+    case.DNA_triplet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "DNA_triplet.csv"),
+                                                       case.myUser, cdt=case.DNA_triplet_cdt, name="DNA_triplet",
+                                                       description="DNA triplet data",
+                                                       groups_allowed=[everyone_group()])
+    case.DNA_triplet_symDS_structure = case.DNA_triplet_symDS.structure
+    case.DNA_triplet_DS = case.DNA_triplet_symDS.dataset
+
+    case.E01_21_DNA_doublet_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "E01_21_DNA_doublet.csv"), case.myUser, cdt=case.DNA_doublet_cdt,
+        name="E01_21_DNA_doublet",
+        description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21",
+        groups_allowed=[everyone_group()])
+    case.E01_21_DNA_doublet_symDS_structure = case.E01_21_DNA_doublet_symDS.structure
+    case.E01_21_DNA_doublet_DS = case.E01_21_DNA_doublet_symDS.dataset
+
+    case.E21_41_DNA_doublet_symDS = SymbolicDataset.create_SD(
+        os.path.join(samplecode_path, "E21_41_DNA_doublet.csv"), case.myUser, cdt=case.DNA_doublet_cdt,
+        name="E21_41_DNA_doublet",
+        description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41",
+        groups_allowed=[everyone_group()])
+    case.E21_41_DNA_doublet_symDS_structure = case.E21_41_DNA_doublet_symDS.structure
+    case.E21_41_DNA_doublet_DS = case.E21_41_DNA_doublet_symDS.dataset
+
+
+def create_librarian_test_environment(case):
+    """
+    Set up default state for Librarian unit testing.
+    """
+    create_eric_martin_test_environment(case)
+
+    # Some ExecRecords, some failed, others not.
+    i = 0
+    for step in PipelineStep.objects.all():
+        if step.is_subpipeline: continue
+        run = step.pipeline.pipeline_instances.create(user=step.pipeline.user); run.save()
+        runstep = RunStep(pipelinestep=step, run=run, reused=False); runstep.save()
+        execlog = ExecLog.create(runstep, runstep)
+        execlog.methodoutput.return_code = i%2; execlog.methodoutput.save()
+        execrecord = ExecRecord(generator=execlog); execrecord.save()
+        for step_input in step.transformation.inputs.all():
+            sd = SymbolicDataset.filter_by_user(step.pipeline.user).filter(
+                structure__compounddatatype=step_input.compounddatatype).first()
+            execrecord.execrecordins.create(symbolicdataset=sd, generic_input=step_input)
+        runstep.execrecord = execrecord; runstep.save()
+        i += 1
+
+
+def create_removal_test_environment():
+    # We need:
+    # - a CodeResource with revisions
+    # - a CodeResourceRevision with dependencies
+    # - a Datatype
+    # - a CDT using that Datatype
+    # - a SymbolicDataset with that CDT
+    # - a Method using that CDT
+    # - a Pipeline containing that Method
+    # - two Runs from that pipeline, the second reusing the first
+    remover = User.objects.create_user("Rem Over", "rem@over.sucks", "baleeted")
+    remover.save()
+    remover.groups.add(everyone_group())
+    remover.save()
+
+    noop = make_first_revision(
+        "Noop",
+        "A noop script that simply writes its input to its output.",
+        "noop.bash",
+        """#!/bin/bash
+cat "$1" > "$2"
+""",
+        remover,
+        grant_everyone_access=False
+    )
+
+    pass_through = make_first_revision(
+        "Pass Through", "A script that does nothing to its input and passes it through untouched.",
+        "passthrough.bash",
+        """#!/bin/bash
+./noop.bash "$1" "$2"
+""",
+        remover,
+        grant_everyone_access=False
+    )
+    # Use the defaults for path and filename.
+    pass_through.dependencies.create(requirement=noop)
+
+    # A toy Datatype.
+    nucleotide_seq = new_datatype("Nucleotide sequence", "Sequences of A, C, G, and T",
+                                        Datatype.objects.get(pk=datatypes.STR_PK), remover,
+                                        grant_everyone_access=False)
+    one_col_nuc_seq = CompoundDatatype(user=remover)
+    one_col_nuc_seq.save()
+    one_col_nuc_seq.members.create(datatype=nucleotide_seq, column_name="sequence", column_idx=1)
+
+    seq_datafile = tempfile.NamedTemporaryFile(delete=False)
+    seq_datafile.write("""sequence
+ACGT
+ATCG
+GATTACA
+TTCCTCTA
+AAAAAAAG
+GGGAGTTC
+CCCTCCTC
+""")
+    seq_datafile.close()
+    seq_sd = SymbolicDataset.create_SD(seq_datafile.name,
+        name="Removal test data", cdt=one_col_nuc_seq, user=remover,
+        description="A dataset for use in the removal test case.", make_dataset=True)
+
+    nuc_seq_noop = make_first_method(
+        "Noop (nucleotide sequence)",
+        "A noop on nucleotide sequences",
+        noop,
+        remover,
+        grant_everyone_access=False
+    )
+    simple_method_io(nuc_seq_noop, one_col_nuc_seq, "nuc_seq_in", "nuc_seq_out")
+
+    noop_pl = make_first_pipeline(
+        "Nucleotide Sequence Noop",
+        "A noop pipeline for nucleotide sequences.",
+        remover,
+        grant_everyone_access=False
+        )
+    create_linear_pipeline(noop_pl, [nuc_seq_noop], "noop_pipeline_in", "noop_pipeline_out")
+
+    p_nested = make_first_pipeline("Nested pipeline", "Pipeline with one nested level", remover,
+                                         grant_everyone_access=False)
+    create_linear_pipeline(p_nested, [noop_pl, noop_pl], "nested_in", "nested_out")
+    p_nested.create_outputs()
+    p_nested.save()
+
+    first_run_sdbx = sandbox.execute.Sandbox(remover, noop_pl, [seq_sd], groups_allowed=[])
+    first_run_sdbx.execute_pipeline()
+    second_run_sdbx = sandbox.execute.Sandbox(remover, noop_pl, [seq_sd], groups_allowed=[])
+    second_run_sdbx.execute_pipeline()
+
+    two_step_noop_pl = make_first_pipeline(
+        "Nucleotide Sequence two-step Noop",
+        "A two-step noop pipeline for nucleotide sequences.",
+        remover,
+        grant_everyone_access=False
+        )
+    create_linear_pipeline(two_step_noop_pl, [nuc_seq_noop, nuc_seq_noop],
+                                 "noop_pipeline_in", "noop_pipeline_out")
+
+    two_step_seq_datafile = tempfile.NamedTemporaryFile(delete=False)
+    two_step_seq_datafile.write("""sequence
+AAAA
+CCCCC
+GGGGGG
+TTTTTTC
+""")
+    two_step_seq_datafile.close()
+    two_step_seq_sd = SymbolicDataset.create_SD(two_step_seq_datafile.name,
+        name="Removal test data for a two-step Pipeline", cdt=one_col_nuc_seq, user=remover,
+        description="A dataset for use in the removal test case with the two-step Pipeline.", make_dataset=True)
+
+    two_step_run_sdbx = sandbox.execute.Sandbox(remover, two_step_noop_pl, [two_step_seq_sd], groups_allowed=[])
+    two_step_run_sdbx.execute_pipeline()
 
 
 def create_sandbox_testing_tools_environment(case):
@@ -76,6 +470,13 @@ def destroy_sandbox_testing_tools_environment(case):
     Clean up a TestCase where create_sandbox_testing_tools_environment has been called.
     # """
     clean_up_all_files()
+
+
+def create_archive_test_environment(case):
+    create_librarian_test_environment(case)
+    create_sandbox_testing_tools_environment(case)
+    case.pE_run = case.pE.pipeline_instances.create(user=case.myUser)
+    case.pE_run.grant_everyone_access()
 
 
 def create_sequence_manipulation_environment(case):
