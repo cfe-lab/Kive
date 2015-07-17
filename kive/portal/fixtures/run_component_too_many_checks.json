@@ -57,10 +57,10 @@
     {
         "fields": {
             "execrecord": 2, 
-            "start_time": "2015-07-17T17:01:27.891Z", 
+            "start_time": "2015-07-17T17:37:39.512Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-07-17T17:01:28.867Z", 
+            "end_time": "2015-07-17T17:37:40.537Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -71,10 +71,10 @@
     {
         "fields": {
             "execrecord": 1, 
-            "start_time": "2015-07-17T17:01:27.961Z", 
+            "start_time": "2015-07-17T17:37:39.586Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-07-17T17:01:28.119Z", 
+            "end_time": "2015-07-17T17:37:39.749Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -85,10 +85,10 @@
     {
         "fields": {
             "execrecord": 4, 
-            "start_time": "2015-07-17T17:01:29.279Z", 
+            "start_time": "2015-07-17T17:37:40.934Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-07-17T17:01:30.347Z", 
+            "end_time": "2015-07-17T17:37:41.980Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -99,10 +99,10 @@
     {
         "fields": {
             "execrecord": 3, 
-            "start_time": "2015-07-17T17:01:29.373Z", 
+            "start_time": "2015-07-17T17:37:41.023Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-07-17T17:01:29.525Z", 
+            "end_time": "2015-07-17T17:37:41.175Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -113,10 +113,10 @@
     {
         "fields": {
             "execrecord": 5, 
-            "start_time": "2015-07-17T17:01:30.797Z", 
+            "start_time": "2015-07-17T17:37:42.417Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-07-17T17:01:30.985Z", 
+            "end_time": "2015-07-17T17:37:42.591Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -127,10 +127,10 @@
     {
         "fields": {
             "execrecord": 2, 
-            "start_time": "2015-07-17T17:01:32.334Z", 
+            "start_time": "2015-07-17T17:37:43.874Z", 
             "reused": true, 
             "_redacted": false, 
-            "end_time": "2015-07-17T17:01:32.695Z", 
+            "end_time": "2015-07-17T17:37:44.215Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -141,10 +141,10 @@
     {
         "fields": {
             "execrecord": 1, 
-            "start_time": "2015-07-17T17:01:32.407Z", 
+            "start_time": "2015-07-17T17:37:43.942Z", 
             "reused": true, 
             "_redacted": false, 
-            "end_time": "2015-07-17T17:01:32.498Z", 
+            "end_time": "2015-07-17T17:37:44.026Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -155,10 +155,10 @@
     {
         "fields": {
             "execrecord": 6, 
-            "start_time": "2015-07-17T17:01:32.991Z", 
+            "start_time": "2015-07-17T17:37:44.505Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-07-17T17:01:35.196Z", 
+            "end_time": "2015-07-17T17:37:45.867Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -169,10 +169,10 @@
     {
         "fields": {
             "execrecord": 3, 
-            "start_time": "2015-07-17T17:01:33.074Z", 
+            "start_time": "2015-07-17T17:37:44.575Z", 
             "reused": true, 
             "_redacted": false, 
-            "end_time": "2015-07-17T17:01:33.163Z", 
+            "end_time": "2015-07-17T17:37:44.658Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -183,10 +183,10 @@
     {
         "fields": {
             "execrecord": 7, 
-            "start_time": "2015-07-17T17:01:35.651Z", 
+            "start_time": "2015-07-17T17:37:46.307Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-07-17T17:01:35.829Z", 
+            "end_time": "2015-07-17T17:37:46.489Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -277,11 +277,11 @@
     {
         "fields": {
             "name": "blahblah", 
-            "date_modified": "2015-07-17T17:01:26.678Z", 
+            "date_modified": "2015-07-17T17:37:38.218Z", 
             "symbolicdataset": 1, 
             "created_by": null, 
-            "date_created": "2015-07-17T17:01:26.677Z", 
-            "dataset_file": "Datasets/2015_07/tmpV5XWuZ", 
+            "date_created": "2015-07-17T17:37:38.218Z", 
+            "dataset_file": "Datasets/2015_07/tmpGRrEPi", 
             "description": "blahblahblah"
         }, 
         "model": "archive.dataset", 
@@ -290,11 +290,11 @@
     {
         "fields": {
             "name": "wordbacks", 
-            "date_modified": "2015-07-17T17:01:27.319Z", 
+            "date_modified": "2015-07-17T17:37:38.956Z", 
             "symbolicdataset": 2, 
             "created_by": null, 
-            "date_created": "2015-07-17T17:01:27.319Z", 
-            "dataset_file": "Datasets/2015_07/tmpS9To1U", 
+            "date_created": "2015-07-17T17:37:38.956Z", 
+            "dataset_file": "Datasets/2015_07/tmp7z4vrW", 
             "description": "random reversed words"
         }, 
         "model": "archive.dataset", 
@@ -303,11 +303,11 @@
     {
         "fields": {
             "name": "backwords", 
-            "date_modified": "2015-07-17T17:01:27.460Z", 
+            "date_modified": "2015-07-17T17:37:39.088Z", 
             "symbolicdataset": 3, 
             "created_by": null, 
-            "date_created": "2015-07-17T17:01:27.460Z", 
-            "dataset_file": "Datasets/2015_07/tmps1NM8J", 
+            "date_created": "2015-07-17T17:37:39.088Z", 
+            "dataset_file": "Datasets/2015_07/tmpT1N0tS", 
             "description": "random reversed words"
         }, 
         "model": "archive.dataset", 
@@ -316,12 +316,12 @@
     {
         "fields": {
             "name": "run1_step2_outputmore_words", 
-            "date_modified": "2015-07-17T17:01:29.840Z", 
+            "date_modified": "2015-07-17T17:37:41.471Z", 
             "symbolicdataset": 5, 
             "created_by": 3, 
-            "date_created": "2015-07-17T17:01:29.840Z", 
+            "date_created": "2015-07-17T17:37:41.471Z", 
             "dataset_file": "Datasets/2015_07/step2_more_words.csv", 
-            "description": "Generated data from a run of pipeline \"Two-step pipeline:1 (v1)\" started at 2015-07-17 17:01:27.884653+00:00 by bob\nrun: 1\nuser: bob\nstep: 2\noutput: more_words"
+            "description": "Generated data from a run of pipeline \"Two-step pipeline:1 (v1)\" started at 2015-07-17 17:37:39.489902+00:00 by bob\nrun: 1\nuser: bob\nstep: 2\noutput: more_words"
         }, 
         "model": "archive.dataset", 
         "pk": 4
@@ -329,12 +329,12 @@
     {
         "fields": {
             "name": "run2_step2_outputreversed_words", 
-            "date_modified": "2015-07-17T17:01:34.685Z", 
+            "date_modified": "2015-07-17T17:37:45.371Z", 
             "symbolicdataset": 6, 
             "created_by": 8, 
-            "date_created": "2015-07-17T17:01:34.685Z", 
+            "date_created": "2015-07-17T17:37:45.371Z", 
             "dataset_file": "Datasets/2015_07/step2_reversed_words.csv", 
-            "description": "Generated data from a run of pipeline \"Pipeline that will follow the first:1 (v1)\" started at 2015-07-17 17:01:32.327322+00:00 by bob\nrun: 2\nuser: bob\nstep: 2\noutput: reversed_words"
+            "description": "Generated data from a run of pipeline \"Pipeline that will follow the first:1 (v1)\" started at 2015-07-17 17:37:43.867566+00:00 by bob\nrun: 2\nuser: bob\nstep: 2\noutput: reversed_words"
         }, 
         "model": "archive.dataset", 
         "pk": 5
@@ -342,9 +342,9 @@
     {
         "fields": {
             "record": 2, 
-            "start_time": "2015-07-17T17:01:27.983Z", 
+            "start_time": "2015-07-17T17:37:39.615Z", 
             "invoking_record": 2, 
-            "end_time": "2015-07-17T17:01:27.984Z"
+            "end_time": "2015-07-17T17:37:39.616Z"
         }, 
         "model": "archive.execlog", 
         "pk": 1
@@ -352,9 +352,9 @@
     {
         "fields": {
             "record": 1, 
-            "start_time": "2015-07-17T17:01:28.287Z", 
+            "start_time": "2015-07-17T17:37:39.924Z", 
             "invoking_record": 1, 
-            "end_time": "2015-07-17T17:01:28.370Z"
+            "end_time": "2015-07-17T17:37:40.005Z"
         }, 
         "model": "archive.execlog", 
         "pk": 2
@@ -362,9 +362,9 @@
     {
         "fields": {
             "record": 4, 
-            "start_time": "2015-07-17T17:01:29.393Z", 
+            "start_time": "2015-07-17T17:37:41.043Z", 
             "invoking_record": 4, 
-            "end_time": "2015-07-17T17:01:29.394Z"
+            "end_time": "2015-07-17T17:37:41.044Z"
         }, 
         "model": "archive.execlog", 
         "pk": 3
@@ -372,9 +372,9 @@
     {
         "fields": {
             "record": 3, 
-            "start_time": "2015-07-17T17:01:29.709Z", 
+            "start_time": "2015-07-17T17:37:41.353Z", 
             "invoking_record": 3, 
-            "end_time": "2015-07-17T17:01:29.794Z"
+            "end_time": "2015-07-17T17:37:41.433Z"
         }, 
         "model": "archive.execlog", 
         "pk": 4
@@ -382,9 +382,9 @@
     {
         "fields": {
             "record": 5, 
-            "start_time": "2015-07-17T17:01:30.811Z", 
+            "start_time": "2015-07-17T17:37:42.431Z", 
             "invoking_record": 5, 
-            "end_time": "2015-07-17T17:01:30.812Z"
+            "end_time": "2015-07-17T17:37:42.432Z"
         }, 
         "model": "archive.execlog", 
         "pk": 5
@@ -392,9 +392,9 @@
     {
         "fields": {
             "record": 6, 
-            "start_time": "2015-07-17T17:01:34.152Z", 
+            "start_time": "2015-07-17T17:37:44.831Z", 
             "invoking_record": 8, 
-            "end_time": "2015-07-17T17:01:34.234Z"
+            "end_time": "2015-07-17T17:37:44.914Z"
         }, 
         "model": "archive.execlog", 
         "pk": 6
@@ -402,9 +402,9 @@
     {
         "fields": {
             "record": 8, 
-            "start_time": "2015-07-17T17:01:34.543Z", 
+            "start_time": "2015-07-17T17:37:45.231Z", 
             "invoking_record": 8, 
-            "end_time": "2015-07-17T17:01:34.646Z"
+            "end_time": "2015-07-17T17:37:45.335Z"
         }, 
         "model": "archive.execlog", 
         "pk": 7
@@ -412,9 +412,9 @@
     {
         "fields": {
             "record": 10, 
-            "start_time": "2015-07-17T17:01:35.665Z", 
+            "start_time": "2015-07-17T17:37:46.323Z", 
             "invoking_record": 10, 
-            "end_time": "2015-07-17T17:01:35.666Z"
+            "end_time": "2015-07-17T17:37:46.325Z"
         }, 
         "model": "archive.execlog", 
         "pk": 8
@@ -450,10 +450,10 @@
             "execlog": 6, 
             "error_redacted": false, 
             "return_code": 0, 
-            "error_log": "Logs/step1_stderr_uFi9TGa.txt", 
+            "error_log": "Logs/step1_stderr_wbauXhP.txt", 
             "code_redacted": false, 
             "output_redacted": false, 
-            "output_log": "Logs/step1_stdout_fWyj3Bd.txt"
+            "output_log": "Logs/step1_stdout_fmyI8ku.txt"
         }, 
         "model": "archive.methodoutput", 
         "pk": 3
@@ -463,10 +463,10 @@
             "execlog": 7, 
             "error_redacted": false, 
             "return_code": 0, 
-            "error_log": "Logs/step2_stderr_haDthDf.txt", 
+            "error_log": "Logs/step2_stderr_mX6T0nD.txt", 
             "code_redacted": false, 
             "output_redacted": false, 
-            "output_log": "Logs/step2_stdout_oSaea1J.txt"
+            "output_log": "Logs/step2_stdout_je0kUbN.txt"
         }, 
         "model": "archive.methodoutput", 
         "pk": 4
@@ -1332,14 +1332,14 @@
             "is_active": true, 
             "is_superuser": false, 
             "is_staff": false, 
-            "last_login": "2015-07-17T17:01:25.624Z", 
+            "last_login": "2015-07-17T17:37:37.179Z", 
             "groups": [
                 1
             ], 
             "user_permissions": [], 
-            "password": "pbkdf2_sha256$15000$ujE22vQ9ArHw$BD9m9FhHXRPnu32bscyLLfX4LGBGcf7s8cCb4a/iGD0=", 
+            "password": "pbkdf2_sha256$15000$pctmZ5J6JkUt$kxSAn/VdWRTfJ884HgZZCK12uru8LuAHXYYINLEKB8I=", 
             "email": "bob@talabs.com", 
-            "date_joined": "2015-07-17T17:01:25.624Z"
+            "date_joined": "2015-07-17T17:37:37.179Z"
         }, 
         "model": "auth.user", 
         "pk": 2
@@ -1355,7 +1355,7 @@
             ], 
             "users_allowed": [], 
             "user": 2, 
-            "date_created": "2015-07-17T17:01:25.739Z", 
+            "date_created": "2015-07-17T17:37:37.295Z", 
             "prototype": null, 
             "name": "my_string"
         }, 
@@ -1402,10 +1402,10 @@
             "groups_allowed": [
                 1
             ], 
-            "start_time": "2015-07-17T17:01:27.884Z", 
+            "start_time": "2015-07-17T17:37:39.489Z", 
             "name": "", 
             "users_allowed": [], 
-            "end_time": "2015-07-17T17:01:31.101Z", 
+            "end_time": "2015-07-17T17:37:42.707Z", 
             "parent_runstep": null, 
             "user": 2
         }, 
@@ -1419,10 +1419,10 @@
             "groups_allowed": [
                 1
             ], 
-            "start_time": "2015-07-17T17:01:32.327Z", 
+            "start_time": "2015-07-17T17:37:43.867Z", 
             "name": "", 
             "users_allowed": [], 
-            "end_time": "2015-07-17T17:01:35.943Z", 
+            "end_time": "2015-07-17T17:37:46.602Z", 
             "parent_runstep": null, 
             "user": 2
         }, 
@@ -1548,7 +1548,7 @@
             "content_file": "CodeResources/fdopen", 
             "user": 2, 
             "revision_number": 1, 
-            "revision_DateTime": "2015-07-17T17:01:25.764Z", 
+            "revision_DateTime": "2015-07-17T17:37:37.321Z", 
             "users_allowed": []
         }, 
         "model": "method.coderesourcerevision", 
@@ -1564,10 +1564,10 @@
             "revision_desc": "first version", 
             "coderesource": 2, 
             "MD5_checksum": "", 
-            "content_file": "CodeResources/fdopen_Pm0puA9", 
+            "content_file": "CodeResources/fdopen_c4WZgWz", 
             "user": 2, 
             "revision_number": 1, 
-            "revision_DateTime": "2015-07-17T17:01:26.129Z", 
+            "revision_DateTime": "2015-07-17T17:37:37.674Z", 
             "users_allowed": []
         }, 
         "model": "method.coderesourcerevision", 
@@ -1846,7 +1846,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-07-17T17:01:25.809Z"
+            "revision_DateTime": "2015-07-17T17:37:37.358Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 1
@@ -1860,7 +1860,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-07-17T17:01:25.943Z"
+            "revision_DateTime": "2015-07-17T17:37:37.492Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 2
@@ -1874,7 +1874,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-07-17T17:01:26.058Z"
+            "revision_DateTime": "2015-07-17T17:37:37.607Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 3
@@ -1888,7 +1888,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-07-17T17:01:26.163Z"
+            "revision_DateTime": "2015-07-17T17:37:37.715Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 4
@@ -1902,7 +1902,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-07-17T17:01:26.276Z"
+            "revision_DateTime": "2015-07-17T17:37:37.828Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 5
@@ -1916,7 +1916,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-07-17T17:01:26.383Z"
+            "revision_DateTime": "2015-07-17T17:37:37.935Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 6
@@ -1930,7 +1930,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-07-17T17:01:26.493Z"
+            "revision_DateTime": "2015-07-17T17:37:38.042Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 7
@@ -1944,7 +1944,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-07-17T17:01:27.482Z"
+            "revision_DateTime": "2015-07-17T17:37:39.121Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 8
@@ -1958,7 +1958,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-07-17T17:01:31.925Z"
+            "revision_DateTime": "2015-07-17T17:37:43.502Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 9
@@ -1966,9 +1966,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-07-17T17:01:26.617Z", 
+            "start_time": "2015-07-17T17:37:38.158Z", 
             "symbolicdataset": 1, 
-            "end_time": "2015-07-17T17:01:26.672Z", 
+            "end_time": "2015-07-17T17:37:38.213Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1977,9 +1977,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-07-17T17:01:27.202Z", 
+            "start_time": "2015-07-17T17:37:38.741Z", 
             "symbolicdataset": 2, 
-            "end_time": "2015-07-17T17:01:27.313Z", 
+            "end_time": "2015-07-17T17:37:38.859Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1988,9 +1988,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-07-17T17:01:27.339Z", 
+            "start_time": "2015-07-17T17:37:38.977Z", 
             "symbolicdataset": 3, 
-            "end_time": "2015-07-17T17:01:27.455Z", 
+            "end_time": "2015-07-17T17:37:39.084Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1999,9 +1999,9 @@
     {
         "fields": {
             "execlog": 2, 
-            "start_time": "2015-07-17T17:01:28.704Z", 
+            "start_time": "2015-07-17T17:37:40.357Z", 
             "symbolicdataset": 4, 
-            "end_time": "2015-07-17T17:01:28.818Z", 
+            "end_time": "2015-07-17T17:37:40.481Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2010,9 +2010,9 @@
     {
         "fields": {
             "execlog": 4, 
-            "start_time": "2015-07-17T17:01:30.174Z", 
+            "start_time": "2015-07-17T17:37:41.809Z", 
             "symbolicdataset": 5, 
-            "end_time": "2015-07-17T17:01:30.294Z", 
+            "end_time": "2015-07-17T17:37:41.927Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2021,9 +2021,9 @@
     {
         "fields": {
             "execlog": 7, 
-            "start_time": "2015-07-17T17:01:35.024Z", 
+            "start_time": "2015-07-17T17:37:45.702Z", 
             "symbolicdataset": 6, 
-            "end_time": "2015-07-17T17:01:35.142Z", 
+            "end_time": "2015-07-17T17:37:45.814Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2032,9 +2032,9 @@
     {
         "fields": {
             "execlog": 1, 
-            "start_time": "2015-07-17T17:01:28.110Z", 
+            "start_time": "2015-07-17T17:37:39.741Z", 
             "symbolicdataset": 2, 
-            "end_time": "2015-07-17T17:01:28.110Z", 
+            "end_time": "2015-07-17T17:37:39.741Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
@@ -2043,9 +2043,9 @@
     {
         "fields": {
             "execlog": 3, 
-            "start_time": "2015-07-17T17:01:29.517Z", 
+            "start_time": "2015-07-17T17:37:41.167Z", 
             "symbolicdataset": 4, 
-            "end_time": "2015-07-17T17:01:29.517Z", 
+            "end_time": "2015-07-17T17:37:41.167Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
@@ -2054,9 +2054,9 @@
     {
         "fields": {
             "execlog": 5, 
-            "start_time": "2015-07-17T17:01:30.975Z", 
+            "start_time": "2015-07-17T17:37:42.581Z", 
             "symbolicdataset": 5, 
-            "end_time": "2015-07-17T17:01:30.975Z", 
+            "end_time": "2015-07-17T17:37:42.582Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
@@ -2065,9 +2065,9 @@
     {
         "fields": {
             "execlog": 6, 
-            "start_time": "2015-07-17T17:01:34.255Z", 
+            "start_time": "2015-07-17T17:37:44.948Z", 
             "symbolicdataset": 4, 
-            "end_time": "2015-07-17T17:01:34.255Z", 
+            "end_time": "2015-07-17T17:37:44.949Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
@@ -2076,9 +2076,9 @@
     {
         "fields": {
             "execlog": 8, 
-            "start_time": "2015-07-17T17:01:35.819Z", 
+            "start_time": "2015-07-17T17:37:46.477Z", 
             "symbolicdataset": 6, 
-            "end_time": "2015-07-17T17:01:35.819Z", 
+            "end_time": "2015-07-17T17:37:46.478Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
