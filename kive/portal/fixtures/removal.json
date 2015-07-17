@@ -13,10 +13,10 @@
     {
         "fields": {
             "execrecord": 2, 
-            "start_time": "2015-06-30T22:46:53.149Z", 
+            "start_time": "2015-07-17T17:00:53.358Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:46:54.275Z", 
+            "end_time": "2015-07-17T17:00:54.504Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -27,10 +27,10 @@
     {
         "fields": {
             "execrecord": 1, 
-            "start_time": "2015-06-30T22:46:53.223Z", 
+            "start_time": "2015-07-17T17:00:53.443Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:46:53.406Z", 
+            "end_time": "2015-07-17T17:00:53.650Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -41,10 +41,10 @@
     {
         "fields": {
             "execrecord": 3, 
-            "start_time": "2015-06-30T22:46:54.723Z", 
+            "start_time": "2015-07-17T17:00:54.961Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:46:55.187Z", 
+            "end_time": "2015-07-17T17:00:55.165Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -55,10 +55,10 @@
     {
         "fields": {
             "execrecord": 2, 
-            "start_time": "2015-06-30T22:46:55.832Z", 
+            "start_time": "2015-07-17T17:00:55.855Z", 
             "reused": true, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:46:56.164Z", 
+            "end_time": "2015-07-17T17:00:56.222Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -69,10 +69,10 @@
     {
         "fields": {
             "execrecord": 1, 
-            "start_time": "2015-06-30T22:46:55.898Z", 
+            "start_time": "2015-07-17T17:00:55.931Z", 
             "reused": true, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:46:55.983Z", 
+            "end_time": "2015-07-17T17:00:56.027Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -83,10 +83,10 @@
     {
         "fields": {
             "execrecord": 3, 
-            "start_time": "2015-06-30T22:46:56.528Z", 
+            "start_time": "2015-07-17T17:00:56.599Z", 
             "reused": true, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:46:56.599Z", 
+            "end_time": "2015-07-17T17:00:56.670Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -97,10 +97,10 @@
     {
         "fields": {
             "execrecord": 5, 
-            "start_time": "2015-06-30T22:46:57.599Z", 
+            "start_time": "2015-07-17T17:00:57.794Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:46:58.630Z", 
+            "end_time": "2015-07-17T17:00:58.902Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -111,10 +111,10 @@
     {
         "fields": {
             "execrecord": 4, 
-            "start_time": "2015-06-30T22:46:57.670Z", 
+            "start_time": "2015-07-17T17:00:57.886Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:46:57.835Z", 
+            "end_time": "2015-07-17T17:00:58.092Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -125,10 +125,10 @@
     {
         "fields": {
             "execrecord": 7, 
-            "start_time": "2015-06-30T22:46:59.032Z", 
+            "start_time": "2015-07-17T17:00:59.311Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:47:00.191Z", 
+            "end_time": "2015-07-17T17:01:00.499Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -139,10 +139,10 @@
     {
         "fields": {
             "execrecord": 6, 
-            "start_time": "2015-06-30T22:46:59.119Z", 
+            "start_time": "2015-07-17T17:00:59.414Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:46:59.301Z", 
+            "end_time": "2015-07-17T17:00:59.606Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -153,10 +153,10 @@
     {
         "fields": {
             "execrecord": 8, 
-            "start_time": "2015-06-30T22:47:00.651Z", 
+            "start_time": "2015-07-17T17:01:00.992Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:47:00.844Z", 
+            "end_time": "2015-07-17T17:01:01.194Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -255,11 +255,11 @@
     {
         "fields": {
             "name": "Removal test data", 
-            "date_modified": "2015-06-30T22:46:52.274Z", 
+            "date_modified": "2015-07-17T17:00:52.189Z", 
             "symbolicdataset": 1, 
             "created_by": null, 
-            "date_created": "2015-06-30T22:46:52.273Z", 
-            "dataset_file": "Datasets/2015_06/tmpsizYjp", 
+            "date_created": "2015-07-17T17:00:52.189Z", 
+            "dataset_file": "Datasets/2015_07/tmpl1xQqQ", 
             "description": "A dataset for use in the removal test case."
         }, 
         "model": "archive.dataset", 
@@ -268,12 +268,12 @@
     {
         "fields": {
             "name": "run1_step1_outputnuc_seq_out", 
-            "date_modified": "2015-06-30T22:46:53.693Z", 
+            "date_modified": "2015-07-17T17:00:54.017Z", 
             "symbolicdataset": 2, 
             "created_by": 1, 
-            "date_created": "2015-06-30T22:46:53.693Z", 
-            "dataset_file": "Datasets/2015_06/step1_nuc_seq_out.csv", 
-            "description": "Generated data from a run of pipeline \"Nucleotide Sequence Noop:1 (v1)\" started at 2015-06-30 22:46:53.129414+00:00 by Rem Over\nrun: 1\nuser: Rem Over\nstep: 1\noutput: nuc_seq_out"
+            "date_created": "2015-07-17T17:00:54.017Z", 
+            "dataset_file": "Datasets/2015_07/step1_nuc_seq_out.csv", 
+            "description": "Generated data from a run of pipeline \"Nucleotide Sequence Noop:1 (v1)\" started at 2015-07-17 17:00:53.349584+00:00 by Rem Over\nrun: 1\nuser: Rem Over\nstep: 1\noutput: nuc_seq_out"
         }, 
         "model": "archive.dataset", 
         "pk": 2
@@ -281,11 +281,11 @@
     {
         "fields": {
             "name": "Removal test data for a two-step Pipeline", 
-            "date_modified": "2015-06-30T22:46:57.556Z", 
+            "date_modified": "2015-07-17T17:00:57.736Z", 
             "symbolicdataset": 3, 
             "created_by": null, 
-            "date_created": "2015-06-30T22:46:57.556Z", 
-            "dataset_file": "Datasets/2015_06/tmpxL5_YH", 
+            "date_created": "2015-07-17T17:00:57.735Z", 
+            "dataset_file": "Datasets/2015_07/tmpa10w6B", 
             "description": "A dataset for use in the removal test case with the two-step Pipeline."
         }, 
         "model": "archive.dataset", 
@@ -294,12 +294,12 @@
     {
         "fields": {
             "name": "run3_step1_outputnuc_seq_out", 
-            "date_modified": "2015-06-30T22:46:58.142Z", 
+            "date_modified": "2015-07-17T17:00:58.412Z", 
             "symbolicdataset": 4, 
             "created_by": 7, 
-            "date_created": "2015-06-30T22:46:58.142Z", 
-            "dataset_file": "Datasets/2015_06/step1_nuc_seq_out_rVXa4jP.csv", 
-            "description": "Generated data from a run of pipeline \"Nucleotide Sequence two-step Noop:1 (v1)\" started at 2015-06-30 22:46:57.589791+00:00 by Rem Over\nrun: 3\nuser: Rem Over\nstep: 1\noutput: nuc_seq_out"
+            "date_created": "2015-07-17T17:00:58.412Z", 
+            "dataset_file": "Datasets/2015_07/step1_nuc_seq_out_QMdGMXD.csv", 
+            "description": "Generated data from a run of pipeline \"Nucleotide Sequence two-step Noop:1 (v1)\" started at 2015-07-17 17:00:57.784858+00:00 by Rem Over\nrun: 3\nuser: Rem Over\nstep: 1\noutput: nuc_seq_out"
         }, 
         "model": "archive.dataset", 
         "pk": 4
@@ -307,12 +307,12 @@
     {
         "fields": {
             "name": "run3_step2_outputnuc_seq_out", 
-            "date_modified": "2015-06-30T22:46:59.696Z", 
+            "date_modified": "2015-07-17T17:00:59.991Z", 
             "symbolicdataset": 5, 
             "created_by": 9, 
-            "date_created": "2015-06-30T22:46:59.696Z", 
-            "dataset_file": "Datasets/2015_06/step2_nuc_seq_out.csv", 
-            "description": "Generated data from a run of pipeline \"Nucleotide Sequence two-step Noop:1 (v1)\" started at 2015-06-30 22:46:57.589791+00:00 by Rem Over\nrun: 3\nuser: Rem Over\nstep: 2\noutput: nuc_seq_out"
+            "date_created": "2015-07-17T17:00:59.991Z", 
+            "dataset_file": "Datasets/2015_07/step2_nuc_seq_out.csv", 
+            "description": "Generated data from a run of pipeline \"Nucleotide Sequence two-step Noop:1 (v1)\" started at 2015-07-17 17:00:57.784858+00:00 by Rem Over\nrun: 3\nuser: Rem Over\nstep: 2\noutput: nuc_seq_out"
         }, 
         "model": "archive.dataset", 
         "pk": 5
@@ -320,9 +320,9 @@
     {
         "fields": {
             "record": 2, 
-            "start_time": "2015-06-30T22:46:53.252Z", 
+            "start_time": "2015-07-17T17:00:53.472Z", 
             "invoking_record": 2, 
-            "end_time": "2015-06-30T22:46:53.253Z"
+            "end_time": "2015-07-17T17:00:53.474Z"
         }, 
         "model": "archive.execlog", 
         "pk": 1
@@ -330,9 +330,9 @@
     {
         "fields": {
             "record": 1, 
-            "start_time": "2015-06-30T22:46:53.569Z", 
+            "start_time": "2015-07-17T17:00:53.872Z", 
             "invoking_record": 1, 
-            "end_time": "2015-06-30T22:46:53.652Z"
+            "end_time": "2015-07-17T17:00:53.968Z"
         }, 
         "model": "archive.execlog", 
         "pk": 2
@@ -340,9 +340,9 @@
     {
         "fields": {
             "record": 3, 
-            "start_time": "2015-06-30T22:46:54.740Z", 
+            "start_time": "2015-07-17T17:00:54.989Z", 
             "invoking_record": 3, 
-            "end_time": "2015-06-30T22:46:54.741Z"
+            "end_time": "2015-07-17T17:00:54.990Z"
         }, 
         "model": "archive.execlog", 
         "pk": 3
@@ -350,9 +350,9 @@
     {
         "fields": {
             "record": 8, 
-            "start_time": "2015-06-30T22:46:57.692Z", 
+            "start_time": "2015-07-17T17:00:57.922Z", 
             "invoking_record": 8, 
-            "end_time": "2015-06-30T22:46:57.693Z"
+            "end_time": "2015-07-17T17:00:57.924Z"
         }, 
         "model": "archive.execlog", 
         "pk": 4
@@ -360,9 +360,9 @@
     {
         "fields": {
             "record": 7, 
-            "start_time": "2015-06-30T22:46:58.022Z", 
+            "start_time": "2015-07-17T17:00:58.289Z", 
             "invoking_record": 7, 
-            "end_time": "2015-06-30T22:46:58.103Z"
+            "end_time": "2015-07-17T17:00:58.371Z"
         }, 
         "model": "archive.execlog", 
         "pk": 5
@@ -370,9 +370,9 @@
     {
         "fields": {
             "record": 10, 
-            "start_time": "2015-06-30T22:46:59.138Z", 
+            "start_time": "2015-07-17T17:00:59.440Z", 
             "invoking_record": 10, 
-            "end_time": "2015-06-30T22:46:59.139Z"
+            "end_time": "2015-07-17T17:00:59.441Z"
         }, 
         "model": "archive.execlog", 
         "pk": 6
@@ -380,9 +380,9 @@
     {
         "fields": {
             "record": 9, 
-            "start_time": "2015-06-30T22:46:59.536Z", 
+            "start_time": "2015-07-17T17:00:59.868Z", 
             "invoking_record": 9, 
-            "end_time": "2015-06-30T22:46:59.617Z"
+            "end_time": "2015-07-17T17:00:59.949Z"
         }, 
         "model": "archive.execlog", 
         "pk": 7
@@ -390,9 +390,9 @@
     {
         "fields": {
             "record": 11, 
-            "start_time": "2015-06-30T22:47:00.666Z", 
+            "start_time": "2015-07-17T17:01:01.014Z", 
             "invoking_record": 11, 
-            "end_time": "2015-06-30T22:47:00.667Z"
+            "end_time": "2015-07-17T17:01:01.016Z"
         }, 
         "model": "archive.execlog", 
         "pk": 8
@@ -415,10 +415,10 @@
             "execlog": 5, 
             "error_redacted": false, 
             "return_code": 0, 
-            "error_log": "Logs/step1_stderr_qJ5tBSu.txt", 
+            "error_log": "Logs/step1_stderr_uUHfnCi.txt", 
             "code_redacted": false, 
             "output_redacted": false, 
-            "output_log": "Logs/step1_stdout_FyGTSWJ.txt"
+            "output_log": "Logs/step1_stdout_NRyfCqg.txt"
         }, 
         "model": "archive.methodoutput", 
         "pk": 2
@@ -1116,14 +1116,14 @@
             "is_active": true, 
             "is_superuser": false, 
             "is_staff": false, 
-            "last_login": "2015-06-30T22:46:52.013Z", 
+            "last_login": "2015-07-17T17:00:51.882Z", 
             "groups": [
                 1
             ], 
             "user_permissions": [], 
-            "password": "pbkdf2_sha256$15000$xHJXEem2G3ER$9JxwIcIPp0H4klzUdsDkxGWagIs5XgCeGxTh+2FAzWc=", 
+            "password": "pbkdf2_sha256$15000$yN5YGCUau4rt$ri1zwd82B02XDLaHc0JrLdGfA1eh+y4mba/Lh5kTCwU=", 
             "email": "rem@over.sucks", 
-            "date_joined": "2015-06-30T22:46:52.013Z"
+            "date_joined": "2015-07-17T17:00:51.882Z"
         }, 
         "model": "auth.user", 
         "pk": 2
@@ -1137,7 +1137,7 @@
             ], 
             "users_allowed": [], 
             "user": 2, 
-            "date_created": "2015-06-30T22:46:52.191Z", 
+            "date_created": "2015-07-17T17:00:52.051Z", 
             "prototype": null, 
             "name": "Nucleotide sequence"
         }, 
@@ -1158,10 +1158,10 @@
             "pipeline": 2, 
             "description": "", 
             "groups_allowed": [], 
-            "start_time": "2015-06-30T22:46:53.129Z", 
+            "start_time": "2015-07-17T17:00:53.349Z", 
             "name": "", 
             "users_allowed": [], 
-            "end_time": "2015-06-30T22:46:55.308Z", 
+            "end_time": "2015-07-17T17:00:55.290Z", 
             "parent_runstep": null, 
             "user": 2
         }, 
@@ -1173,10 +1173,10 @@
             "pipeline": 2, 
             "description": "", 
             "groups_allowed": [], 
-            "start_time": "2015-06-30T22:46:55.826Z", 
+            "start_time": "2015-07-17T17:00:55.848Z", 
             "name": "", 
             "users_allowed": [], 
-            "end_time": "2015-06-30T22:46:56.703Z", 
+            "end_time": "2015-07-17T17:00:56.778Z", 
             "parent_runstep": null, 
             "user": 2
         }, 
@@ -1188,10 +1188,10 @@
             "pipeline": 4, 
             "description": "", 
             "groups_allowed": [], 
-            "start_time": "2015-06-30T22:46:57.589Z", 
+            "start_time": "2015-07-17T17:00:57.784Z", 
             "name": "", 
             "users_allowed": [], 
-            "end_time": "2015-06-30T22:47:00.969Z", 
+            "end_time": "2015-07-17T17:01:01.321Z", 
             "parent_runstep": null, 
             "user": 2
         }, 
@@ -1288,7 +1288,7 @@
             "content_file": "CodeResources/fdopen", 
             "user": 2, 
             "revision_number": 1, 
-            "revision_DateTime": "2015-06-30T22:46:52.146Z", 
+            "revision_DateTime": "2015-07-17T17:00:52.007Z", 
             "users_allowed": []
         }, 
         "model": "method.coderesourcerevision", 
@@ -1302,10 +1302,10 @@
             "revision_desc": "first version", 
             "coderesource": 2, 
             "MD5_checksum": "", 
-            "content_file": "CodeResources/fdopen_Ba1uP1b", 
+            "content_file": "CodeResources/fdopen_Hzex9Mc", 
             "user": 2, 
             "revision_number": 1, 
-            "revision_DateTime": "2015-06-30T22:46:52.165Z", 
+            "revision_DateTime": "2015-07-17T17:00:52.034Z", 
             "users_allowed": []
         }, 
         "model": "method.coderesourcerevision", 
@@ -1413,7 +1413,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-06-30T22:46:52.290Z"
+            "revision_DateTime": "2015-07-17T17:00:52.223Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 1
@@ -1425,7 +1425,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-06-30T22:46:52.432Z"
+            "revision_DateTime": "2015-07-17T17:00:52.416Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 2
@@ -1437,7 +1437,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-06-30T22:46:52.675Z"
+            "revision_DateTime": "2015-07-17T17:00:52.781Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 3
@@ -1449,7 +1449,7 @@
             "revision_desc": "first version", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-06-30T22:46:57.112Z"
+            "revision_DateTime": "2015-07-17T17:00:57.199Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 4
@@ -1457,9 +1457,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-06-30T22:46:52.212Z", 
+            "start_time": "2015-07-17T17:00:52.076Z", 
             "symbolicdataset": 1, 
-            "end_time": "2015-06-30T22:46:52.269Z", 
+            "end_time": "2015-07-17T17:00:52.184Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1468,9 +1468,9 @@
     {
         "fields": {
             "execlog": 2, 
-            "start_time": "2015-06-30T22:46:54.156Z", 
+            "start_time": "2015-07-17T17:00:54.384Z", 
             "symbolicdataset": 2, 
-            "end_time": "2015-06-30T22:46:54.215Z", 
+            "end_time": "2015-07-17T17:00:54.444Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1479,9 +1479,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-06-30T22:46:57.497Z", 
+            "start_time": "2015-07-17T17:00:57.647Z", 
             "symbolicdataset": 3, 
-            "end_time": "2015-06-30T22:46:57.552Z", 
+            "end_time": "2015-07-17T17:00:57.728Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1490,9 +1490,9 @@
     {
         "fields": {
             "execlog": 5, 
-            "start_time": "2015-06-30T22:46:58.500Z", 
+            "start_time": "2015-07-17T17:00:58.781Z", 
             "symbolicdataset": 4, 
-            "end_time": "2015-06-30T22:46:58.569Z", 
+            "end_time": "2015-07-17T17:00:58.842Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1501,9 +1501,9 @@
     {
         "fields": {
             "execlog": 7, 
-            "start_time": "2015-06-30T22:47:00.073Z", 
+            "start_time": "2015-07-17T17:01:00.364Z", 
             "symbolicdataset": 5, 
-            "end_time": "2015-06-30T22:47:00.132Z", 
+            "end_time": "2015-07-17T17:01:00.430Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1512,9 +1512,9 @@
     {
         "fields": {
             "execlog": 1, 
-            "start_time": "2015-06-30T22:46:53.397Z", 
+            "start_time": "2015-07-17T17:00:53.640Z", 
             "symbolicdataset": 1, 
-            "end_time": "2015-06-30T22:46:53.397Z", 
+            "end_time": "2015-07-17T17:00:53.640Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
@@ -1523,9 +1523,9 @@
     {
         "fields": {
             "execlog": 3, 
-            "start_time": "2015-06-30T22:46:55.177Z", 
+            "start_time": "2015-07-17T17:00:55.155Z", 
             "symbolicdataset": 2, 
-            "end_time": "2015-06-30T22:46:55.177Z", 
+            "end_time": "2015-07-17T17:00:55.155Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
@@ -1534,9 +1534,9 @@
     {
         "fields": {
             "execlog": 4, 
-            "start_time": "2015-06-30T22:46:57.826Z", 
+            "start_time": "2015-07-17T17:00:58.083Z", 
             "symbolicdataset": 3, 
-            "end_time": "2015-06-30T22:46:57.826Z", 
+            "end_time": "2015-07-17T17:00:58.083Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
@@ -1545,9 +1545,9 @@
     {
         "fields": {
             "execlog": 6, 
-            "start_time": "2015-06-30T22:46:59.293Z", 
+            "start_time": "2015-07-17T17:00:59.597Z", 
             "symbolicdataset": 4, 
-            "end_time": "2015-06-30T22:46:59.293Z", 
+            "end_time": "2015-07-17T17:00:59.597Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
@@ -1556,9 +1556,9 @@
     {
         "fields": {
             "execlog": 8, 
-            "start_time": "2015-06-30T22:47:00.834Z", 
+            "start_time": "2015-07-17T17:01:01.183Z", 
             "symbolicdataset": 5, 
-            "end_time": "2015-06-30T22:47:00.834Z", 
+            "end_time": "2015-07-17T17:01:01.183Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 

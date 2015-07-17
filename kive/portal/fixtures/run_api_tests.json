@@ -112,10 +112,10 @@
     {
         "fields": {
             "execrecord": 2, 
-            "start_time": "2015-06-30T22:47:08.145Z", 
+            "start_time": "2015-07-17T17:01:09.374Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:47:15.107Z", 
+            "end_time": "2015-07-17T17:01:16.368Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -126,10 +126,10 @@
     {
         "fields": {
             "execrecord": 1, 
-            "start_time": "2015-06-30T22:47:08.230Z", 
+            "start_time": "2015-07-17T17:01:09.446Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:47:08.625Z", 
+            "end_time": "2015-07-17T17:01:09.857Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -140,10 +140,10 @@
     {
         "fields": {
             "execrecord": 2, 
-            "start_time": "2015-06-30T22:47:15.574Z", 
+            "start_time": "2015-07-17T17:01:16.850Z", 
             "reused": true, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:47:15.983Z", 
+            "end_time": "2015-07-17T17:01:17.271Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -154,10 +154,10 @@
     {
         "fields": {
             "execrecord": 1, 
-            "start_time": "2015-06-30T22:47:15.647Z", 
+            "start_time": "2015-07-17T17:01:16.920Z", 
             "reused": true, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:47:15.750Z", 
+            "end_time": "2015-07-17T17:01:17.026Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -168,10 +168,10 @@
     {
         "fields": {
             "execrecord": 3, 
-            "start_time": "2015-06-30T22:47:16.415Z", 
+            "start_time": "2015-07-17T17:01:17.694Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:47:16.952Z", 
+            "end_time": "2015-07-17T17:01:17.889Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -182,10 +182,10 @@
     {
         "fields": {
             "execrecord": 4, 
-            "start_time": "2015-06-30T22:47:17.241Z", 
+            "start_time": "2015-07-17T17:01:18.084Z", 
             "reused": false, 
             "_redacted": false, 
-            "end_time": "2015-06-30T22:47:17.464Z", 
+            "end_time": "2015-07-17T17:01:18.651Z", 
             "_complete": true, 
             "is_cancelled": false, 
             "_successful": true
@@ -228,7 +228,7 @@
     {
         "fields": {
             "run": 1, 
-            "pipelineoutputcable": 8
+            "pipelineoutputcable": 7
         }, 
         "model": "archive.runoutputcable", 
         "pk": 5
@@ -236,7 +236,7 @@
     {
         "fields": {
             "run": 1, 
-            "pipelineoutputcable": 7
+            "pipelineoutputcable": 8
         }, 
         "model": "archive.runoutputcable", 
         "pk": 6
@@ -244,11 +244,11 @@
     {
         "fields": {
             "name": "pX_in_symDS", 
-            "date_modified": "2015-06-30T22:47:07.730Z", 
+            "date_modified": "2015-07-17T17:01:08.967Z", 
             "symbolicdataset": 1, 
             "created_by": null, 
-            "date_created": "2015-06-30T22:47:07.730Z", 
-            "dataset_file": "Datasets/2015_06/input_for_test_C_twostep_with_subpipeline.csv", 
+            "date_created": "2015-07-17T17:01:08.967Z", 
+            "dataset_file": "Datasets/2015_07/input_for_test_C_twostep_with_subpipeline.csv", 
             "description": "input to pipeline pX"
         }, 
         "model": "archive.dataset", 
@@ -257,11 +257,11 @@
     {
         "fields": {
             "name": "pX_in_symDS", 
-            "date_modified": "2015-06-30T22:47:07.746Z", 
+            "date_modified": "2015-07-17T17:01:08.983Z", 
             "symbolicdataset": 2, 
             "created_by": null, 
-            "date_created": "2015-06-30T22:47:07.746Z", 
-            "dataset_file": "Datasets/2015_06/input_for_test_C_twostep_with_subpipeline_G50uO43.csv", 
+            "date_created": "2015-07-17T17:01:08.983Z", 
+            "dataset_file": "Datasets/2015_07/input_for_test_C_twostep_with_subpipeline_XTkPERG.csv", 
             "description": "input to pipeline pX"
         }, 
         "model": "archive.dataset", 
@@ -270,12 +270,12 @@
     {
         "fields": {
             "name": "run1_step1_outputmA_out", 
-            "date_modified": "2015-06-30T22:47:14.540Z", 
+            "date_modified": "2015-07-17T17:01:15.784Z", 
             "symbolicdataset": 4, 
             "created_by": 1, 
-            "date_created": "2015-06-30T22:47:14.540Z", 
-            "dataset_file": "Datasets/2015_06/step1_mA_out.csv", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-06-30 22:47:08.125389+00:00 by john\nrun: 1\nuser: john\nstep: 1\noutput: mA_out"
+            "date_created": "2015-07-17T17:01:15.784Z", 
+            "dataset_file": "Datasets/2015_07/step1_mA_out.csv", 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-07-17 17:01:09.354145+00:00 by john\nrun: 1\nuser: john\nstep: 1\noutput: mA_out"
         }, 
         "model": "archive.dataset", 
         "pk": 3
@@ -283,12 +283,12 @@
     {
         "fields": {
             "name": "run1_output2", 
-            "date_modified": "2015-06-30T22:47:16.501Z", 
+            "date_modified": "2015-07-17T17:01:18.203Z", 
             "symbolicdataset": 5, 
-            "created_by": 5, 
-            "date_created": "2015-06-30T22:47:16.501Z", 
-            "dataset_file": "Datasets/2015_06/run1_pX_out_2.csv", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-06-30 22:47:08.125389+00:00 by john\nrun: 1\nuser: john\noutput: pX_out_2"
+            "created_by": 6, 
+            "date_created": "2015-07-17T17:01:18.203Z", 
+            "dataset_file": "Datasets/2015_07/run1_pX_out_2.csv", 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-07-17 17:01:09.354145+00:00 by john\nrun: 1\nuser: john\noutput: pX_out_2"
         }, 
         "model": "archive.dataset", 
         "pk": 4
@@ -296,9 +296,9 @@
     {
         "fields": {
             "record": 2, 
-            "start_time": "2015-06-30T22:47:08.274Z", 
+            "start_time": "2015-07-17T17:01:09.492Z", 
             "invoking_record": 2, 
-            "end_time": "2015-06-30T22:47:08.288Z"
+            "end_time": "2015-07-17T17:01:09.505Z"
         }, 
         "model": "archive.execlog", 
         "pk": 1
@@ -306,9 +306,9 @@
     {
         "fields": {
             "record": 1, 
-            "start_time": "2015-06-30T22:47:08.866Z", 
+            "start_time": "2015-07-17T17:01:10.118Z", 
             "invoking_record": 1, 
-            "end_time": "2015-06-30T22:47:14.496Z"
+            "end_time": "2015-07-17T17:01:15.739Z"
         }, 
         "model": "archive.execlog", 
         "pk": 2
@@ -316,9 +316,9 @@
     {
         "fields": {
             "record": 5, 
-            "start_time": "2015-06-30T22:47:16.462Z", 
+            "start_time": "2015-07-17T17:01:17.709Z", 
             "invoking_record": 5, 
-            "end_time": "2015-06-30T22:47:16.479Z"
+            "end_time": "2015-07-17T17:01:17.710Z"
         }, 
         "model": "archive.execlog", 
         "pk": 3
@@ -326,9 +326,9 @@
     {
         "fields": {
             "record": 6, 
-            "start_time": "2015-06-30T22:47:17.287Z", 
+            "start_time": "2015-07-17T17:01:18.161Z", 
             "invoking_record": 6, 
-            "end_time": "2015-06-30T22:47:17.288Z"
+            "end_time": "2015-07-17T17:01:18.178Z"
         }, 
         "model": "archive.execlog", 
         "pk": 4
@@ -467,7 +467,7 @@
     {
         "fields": {
             "execrecord": 3, 
-            "symbolicdataset": 5, 
+            "symbolicdataset": 4, 
             "generic_output": 10
         }, 
         "model": "librarian.execrecordout", 
@@ -476,7 +476,7 @@
     {
         "fields": {
             "execrecord": 4, 
-            "symbolicdataset": 4, 
+            "symbolicdataset": 5, 
             "generic_output": 11
         }, 
         "model": "librarian.execrecordout", 
@@ -914,7 +914,7 @@
             "min_row": null, 
             "transf_xput": 10, 
             "max_row": null, 
-            "compounddatatype": 8
+            "compounddatatype": 7
         }, 
         "model": "transformation.xputstructure", 
         "pk": 8
@@ -924,7 +924,7 @@
             "min_row": null, 
             "transf_xput": 11, 
             "max_row": null, 
-            "compounddatatype": 7
+            "compounddatatype": 8
         }, 
         "model": "transformation.xputstructure", 
         "pk": 9
@@ -1012,18 +1012,18 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 2, 
+            "dataset_idx": 1, 
             "transformation": 5, 
-            "dataset_name": "pX_out_2"
+            "dataset_name": "pX_out_1"
         }, 
         "model": "transformation.transformationoutput", 
         "pk": 10
     }, 
     {
         "fields": {
-            "dataset_idx": 1, 
+            "dataset_idx": 2, 
             "transformation": 5, 
-            "dataset_name": "pX_out_1"
+            "dataset_name": "pX_out_2"
         }, 
         "model": "transformation.transformationoutput", 
         "pk": 11
@@ -1036,14 +1036,14 @@
             "is_active": true, 
             "is_superuser": false, 
             "is_staff": false, 
-            "last_login": "2015-06-30T22:47:07.431Z", 
+            "last_login": "2015-07-17T17:01:08.665Z", 
             "groups": [
                 1
             ], 
             "user_permissions": [], 
-            "password": "pbkdf2_sha256$15000$sh0CdKT6AEuK$cCk7BD0KLM5/jFwic7NEwhGIPEQajBrozcaZsNsxGS4=", 
+            "password": "pbkdf2_sha256$15000$983Rp2T7lDmj$w3IeRnSASBgcDRDELdrrcSYtoniZao2qsRv8oIqi6dY=", 
             "email": "lennon@thebeatles.com", 
-            "date_joined": "2015-06-30T22:47:07.431Z"
+            "date_joined": "2015-07-17T17:01:08.665Z"
         }, 
         "model": "auth.user", 
         "pk": 2
@@ -1089,10 +1089,10 @@
             "pipeline": 5, 
             "description": "", 
             "groups_allowed": [], 
-            "start_time": "2015-06-30T22:47:08.125Z", 
+            "start_time": "2015-07-17T17:01:09.354Z", 
             "name": "", 
             "users_allowed": [], 
-            "end_time": "2015-06-30T22:47:17.585Z", 
+            "end_time": "2015-07-17T17:01:18.891Z", 
             "parent_runstep": null, 
             "user": 2
         }, 
@@ -1177,7 +1177,7 @@
             "content_file": "CodeResources/generic_script.py", 
             "user": 2, 
             "revision_number": 1, 
-            "revision_DateTime": "2015-06-30T22:47:07.554Z", 
+            "revision_DateTime": "2015-07-17T17:01:08.790Z", 
             "users_allowed": []
         }, 
         "model": "method.coderesourcerevision", 
@@ -1276,7 +1276,7 @@
             "revision_desc": "mA_desc", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-06-30T22:47:07.765Z"
+            "revision_DateTime": "2015-07-17T17:01:09.002Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 1
@@ -1288,7 +1288,7 @@
             "revision_desc": "X", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-06-30T22:47:07.838Z"
+            "revision_DateTime": "2015-07-17T17:01:09.069Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 2
@@ -1300,7 +1300,7 @@
             "revision_desc": "X", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-06-30T22:47:07.899Z"
+            "revision_DateTime": "2015-07-17T17:01:09.140Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 3
@@ -1312,7 +1312,7 @@
             "revision_desc": "mA_desc", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-06-30T22:47:07.903Z"
+            "revision_DateTime": "2015-07-17T17:01:09.145Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 4
@@ -1324,7 +1324,7 @@
             "revision_desc": "X2", 
             "users_allowed": [], 
             "user": 2, 
-            "revision_DateTime": "2015-06-30T22:47:08.004Z"
+            "revision_DateTime": "2015-07-17T17:01:09.230Z"
         }, 
         "model": "transformation.transformation", 
         "pk": 5
@@ -1332,9 +1332,9 @@
     {
         "fields": {
             "execlog": null, 
-            "start_time": "2015-06-30T22:47:07.589Z", 
+            "start_time": "2015-07-17T17:01:08.823Z", 
             "symbolicdataset": 1, 
-            "end_time": "2015-06-30T22:47:07.725Z", 
+            "end_time": "2015-07-17T17:01:08.961Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1343,9 +1343,9 @@
     {
         "fields": {
             "execlog": 1, 
-            "start_time": "2015-06-30T22:47:08.540Z", 
+            "start_time": "2015-07-17T17:01:09.768Z", 
             "symbolicdataset": 3, 
-            "end_time": "2015-06-30T22:47:08.618Z", 
+            "end_time": "2015-07-17T17:01:09.850Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1354,9 +1354,9 @@
     {
         "fields": {
             "execlog": 2, 
-            "start_time": "2015-06-30T22:47:14.967Z", 
+            "start_time": "2015-07-17T17:01:16.227Z", 
             "symbolicdataset": 4, 
-            "end_time": "2015-06-30T22:47:15.048Z", 
+            "end_time": "2015-07-17T17:01:16.309Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1364,10 +1364,10 @@
     }, 
     {
         "fields": {
-            "execlog": 3, 
-            "start_time": "2015-06-30T22:47:16.847Z", 
+            "execlog": 4, 
+            "start_time": "2015-07-17T17:01:18.543Z", 
             "symbolicdataset": 5, 
-            "end_time": "2015-06-30T22:47:16.943Z", 
+            "end_time": "2015-07-17T17:01:18.642Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1375,10 +1375,10 @@
     }, 
     {
         "fields": {
-            "execlog": 4, 
-            "start_time": "2015-06-30T22:47:17.454Z", 
+            "execlog": 3, 
+            "start_time": "2015-07-17T17:01:17.879Z", 
             "symbolicdataset": 4, 
-            "end_time": "2015-06-30T22:47:17.454Z", 
+            "end_time": "2015-07-17T17:01:17.879Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
