@@ -1508,6 +1508,7 @@ class CompoundDatatype(AccessControl):
     the resultant data structure serving as inputs or outputs
     for a Transformation.
 
+    TODO: Fix the docs here
     Related to :model:`copperfish.CompoundDatatypeMember`
     Related to :model:`copperfish.Dataset`
     """
@@ -1557,7 +1558,7 @@ class CompoundDatatype(AccessControl):
 
     def __str__(self):
         return self._format()
-    
+
     @property
     def short_name(self):
         return self._format(limit=4)
@@ -1757,7 +1758,7 @@ class CompoundDatatype(AccessControl):
         return [_check_constr(chk, val) for chk, val in map(None, self.members.all(), row)]
 
     @property
-    def num_conforming_datasets (self):
+    def num_conforming_datasets(self):
         """
         Returns the number of Datasets that conform to this CompoundDatatype.
         Is this even possible?

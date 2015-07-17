@@ -78,7 +78,15 @@ def dataset_view(request, dataset_id):
 
     try:
         accessible_SDs = librarian.models.SymbolicDataset.filter_by_user(request.user)
-        dataset = Dataset.objects.get(symbolicdataset__in=accessible_SDs, pk=dataset_id)
+        dataset = Dataset.objects.prefetch_related(
+            'symbolicdataset',
+            'symbolicdataset__structure',
+            'symbolicdataset__structure__compounddatatype',
+            'symbolicdataset__structure__compounddatatype__members',
+            'symbolicdataset__structure__compounddatatype__members__datatype',
+            'symbolicdataset__structure__compounddatatype__members__datatype__basic_constraints'
+        ).get(symbolicdataset__in=accessible_SDs, pk=dataset_id)
+
     except Dataset.DoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
@@ -87,8 +95,9 @@ def dataset_view(request, dataset_id):
 
     # If we have a mismatched output, we do an alignment
     # over the columns
-    col_matching, processed_rows = None, dataset.rows(True)
-    if not dataset.content_matches_header:
+    if dataset.content_matches_header:
+        col_matching, processed_rows = None, dataset.rows(True)
+    else:
         col_matching, insert = dataset.column_alignment()
         processed_rows = dataset.rows(data_check=True, insert_at=insert)
 

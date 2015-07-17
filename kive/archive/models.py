@@ -2091,7 +2091,7 @@ class Dataset(models.Model):
 
     class Meta:
         ordering = ["-date_created", "name"]
-        
+
     @property
     def user(self):
         if self.created_by is None:
@@ -2131,7 +2131,13 @@ class Dataset(models.Model):
     @property
     def content_matches_header(self):
         observed = self.header()
-        expected = self.expected_header()
+
+        # Cache this so we only hit the db once here
+        if hasattr(self, "_expected_header_cache"):
+            expected = self._expected_header_cache
+        else:
+            expected = self._expected_header_cache = self.expected_header()
+
         if len(observed) != len(expected):
             return False
         return not any([o != x for (o, x) in zip(observed, expected)])

@@ -101,6 +101,7 @@ $(document).ready(function(){
     <tr>
 
     {% if dataset.content_matches_header %}
+
        {% for column in dataset.header %}
             <th>{{ column }}</th>
         {% endfor %}
