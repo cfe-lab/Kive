@@ -15,7 +15,7 @@ from method.models import CodeResource, CodeResourceRevision, Method, MethodFami
 from method.tests import samplecode_path
 from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
-from metadata.tests import clean_up_all_files
+from kive.testing_utils import clean_up_all_files
 
 
 def execute_tests_environment_setup(case):

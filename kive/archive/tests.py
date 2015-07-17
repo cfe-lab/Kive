@@ -499,7 +499,7 @@ class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
         tools.create_archive_test_environment(self)
 
     def tearDown(self):
-        metadata.tests.clean_up_all_files()
+        tools.clean_up_all_files()
 
 
 class ArchiveTransactionTestCase(TransactionTestCase, ArchiveTestCaseHelpers):
@@ -509,7 +509,7 @@ class ArchiveTransactionTestCase(TransactionTestCase, ArchiveTestCaseHelpers):
         tools.create_archive_test_environment(self)
 
     def tearDown(self):
-        metadata.tests.clean_up_all_files()
+        tools.clean_up_all_files()
 
 
 class RunComponentTests(ArchiveTestCase):
@@ -2515,7 +2515,7 @@ class DatasetTests(TestCase):
         tools.create_librarian_test_environment(self)
 
     def tearDown(self):
-        metadata.tests.clean_up_all_files()
+        tools.clean_up_all_files()
 
     def test_Dataset_check_MD5(self):
         old_md5 = "7dc85e11b5c02e434af5bd3b3da9938e"

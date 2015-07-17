@@ -12,7 +12,6 @@ from sandbox.execute import Sandbox
 import kive.testing_utils as tools
 import kive.settings
 from pipeline.models import Pipeline, PipelineFamily
-from metadata.tests import clean_up_all_files
 from kive.tests import install_fixture_files, restore_production_files
 from method.models import Method
 import file_access_utils
@@ -87,7 +86,7 @@ class ExecuteResultTestsRM(TestCase):
         self.cdt_record = self.method_complement.inputs.first().structure.compounddatatype
 
     def tearDown(self):
-        clean_up_all_files()
+        tools.clean_up_all_files()
         restore_production_files()
 
     def test_execute_pipeline_run(self):
@@ -319,7 +318,7 @@ class ExecuteDiscardedIntermediateTests(TestCase):
         )
 
     def tearDown(self):
-        clean_up_all_files()
+        tools.clean_up_all_files()
         restore_production_files()
 
     def test_discard_intermediate_file(self):

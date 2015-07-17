@@ -15,7 +15,7 @@ from fleet.exceptions import SandboxActiveException
 from librarian.models import ExecRecord, SymbolicDataset
 from pipeline.models import Pipeline, PipelineFamily
 from metadata.models import kive_user, RTPNotFinished
-from metadata.tests import clean_up_all_files
+from kive.testing_utils import clean_up_all_files
 from kive import settings
 from kive.tests import install_fixture_files, restore_production_files
 

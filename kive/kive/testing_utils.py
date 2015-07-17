@@ -12,12 +12,270 @@ from django.db import transaction
 from constants import datatypes
 import file_access_utils
 from librarian.models import SymbolicDataset, ExecRecord
-from metadata.models import CompoundDatatype, Datatype, everyone_group
-from metadata.tests import clean_up_all_files, create_metadata_test_environment, samplecode_path
+from metadata.models import BasicConstraint, CompoundDatatype, Datatype, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from pipeline.models import Pipeline, PipelineFamily, PipelineStep
-from archive.models import RunStep, ExecLog
+from archive.models import RunStep, ExecLog, Dataset, MethodOutput
+from datachecking.models import VerificationLog
+from portal.models import StagedFile
 import sandbox.execute
+
+
+samplecode_path = "../samplecode"
+
+
+def create_metadata_test_environment(case):
+    """Setup default database state from which to perform unit testing."""
+    # Define a user.  This was previously in librarian/tests.py,
+    # but we put it here now so all tests can use it.
+    case.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+    case.myUser.save()
+    case.myUser.groups.add(everyone_group())
+    case.myUser.save()
+
+    # Load up the builtin Datatypes.
+    case.STR = Datatype.objects.get(pk=datatypes.STR_PK)
+    case.FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
+    case.INT = Datatype.objects.get(pk=datatypes.INT_PK)
+    case.BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
+
+    # Many tests use case.string_dt as a name for case.STR.
+    case.string_dt = case.STR
+
+    # Create Datatype "DNANucSeq" with a regexp basic constraint.
+    case.DNA_dt = Datatype(
+        name="DNANucSeq",
+        description="String consisting of ACGTacgt",
+        user=case.myUser)
+    case.DNA_dt.save()
+    # DNA_dt is a restricted type of string
+    case.DNA_dt.restricts.add(case.string_dt)
+    case.DNA_dt.grant_everyone_access()
+    case.DNA_dt.basic_constraints.create(
+        ruletype=BasicConstraint.REGEXP,
+        rule="^[ACGTacgt]*$")
+    case.DNA_dt.save()
+
+    # Similarly, create Datatype "RNANucSeq".
+    case.RNA_dt = Datatype(
+        name="RNANucSeq",
+        description="String consisting of ACGUacgu",
+        user=case.myUser)
+    case.RNA_dt.save()
+    # RNA_dt is a restricted type of string
+    case.RNA_dt.restricts.add(case.string_dt)
+    case.RNA_dt.grant_everyone_access()
+    case.RNA_dt.basic_constraints.create(
+        ruletype=BasicConstraint.REGEXP,
+        rule="^[ACGUacgu]*$")
+    case.RNA_dt.save()
+
+    # Define a new CDT with a bunch of different member
+    case.basic_cdt = CompoundDatatype(user=case.myUser)
+    case.basic_cdt.save()
+    case.basic_cdt.grant_everyone_access()
+    case.basic_cdt.save()
+
+    case.basic_cdt.members.create(
+        datatype=case.string_dt,
+        column_name='label',
+        column_idx=1)
+    case.basic_cdt.members.create(
+        datatype=case.INT,
+        column_name='integer',
+        column_idx=2)
+    case.basic_cdt.members.create(
+        datatype=case.FLOAT,
+        column_name='float',
+        column_idx=3)
+    case.basic_cdt.members.create(
+        datatype=case.BOOL,
+        column_name='bool',
+        column_idx=4)
+    case.basic_cdt.members.create(
+        datatype=case.RNA_dt,
+        column_name="rna",
+        column_idx=5)
+    case.basic_cdt.full_clean()
+    case.basic_cdt.save()
+
+    # Define test_cdt as containing 3 members:
+    # (label, PBMCseq, PLAseq) as (string,DNA,RNA)
+    case.test_cdt = CompoundDatatype(user=case.myUser)
+    case.test_cdt.save()
+    case.test_cdt.grant_everyone_access()
+    case.test_cdt.save()
+    case.test_cdt.members.create(
+        datatype=case.string_dt,
+        column_name="label",
+        column_idx=1)
+    case.test_cdt.members.create(
+        datatype=case.DNA_dt,
+        column_name="PBMCseq",
+        column_idx=2)
+    case.test_cdt.members.create(
+        datatype=case.RNA_dt,
+        column_name="PLAseq",
+        column_idx=3)
+    case.test_cdt.full_clean()
+    case.test_cdt.save()
+
+    # Define DNAinput_cdt (1 member)
+    case.DNAinput_cdt = CompoundDatatype(user=case.myUser)
+    case.DNAinput_cdt.save()
+    case.DNAinput_cdt.members.create(
+        datatype=case.DNA_dt,
+        column_name="SeqToComplement",
+        column_idx=1)
+    case.DNAinput_cdt.grant_everyone_access()
+    case.DNAinput_cdt.full_clean()
+    case.DNAinput_cdt.save()
+
+    # Define DNAoutput_cdt (1 member)
+    case.DNAoutput_cdt = CompoundDatatype(user=case.myUser)
+    case.DNAoutput_cdt.save()
+    case.DNAoutput_cdt.members.create(
+        datatype=case.DNA_dt,
+        column_name="ComplementedSeq",
+        column_idx=1)
+    case.DNAoutput_cdt.grant_everyone_access()
+    case.DNAoutput_cdt.full_clean()
+    case.DNAoutput_cdt.save()
+
+    # Define RNAinput_cdt (1 column)
+    case.RNAinput_cdt = CompoundDatatype(user=case.myUser)
+    case.RNAinput_cdt.save()
+    case.RNAinput_cdt.members.create(
+        datatype=case.RNA_dt,
+        column_name="SeqToComplement",
+        column_idx=1)
+    case.RNAinput_cdt.grant_everyone_access()
+    case.RNAinput_cdt.full_clean()
+    case.RNAinput_cdt.save()
+
+    # Define RNAoutput_cdt (1 column)
+    case.RNAoutput_cdt = CompoundDatatype(user=case.myUser)
+    case.RNAoutput_cdt.save()
+    case.RNAoutput_cdt.members.create(
+        datatype=case.RNA_dt,
+        column_name="ComplementedSeq",
+        column_idx=1)
+    case.RNAoutput_cdt.grant_everyone_access()
+    case.RNAoutput_cdt.full_clean()
+    case.RNAoutput_cdt.save()
+
+    ####
+    # Everything above this point is used in metadata.tests.
+    # This next bit is used in method.tests.
+
+    # Define "tuple" CDT containing (x,y): members x and y exist at index 1 and 2
+    case.tuple_cdt = CompoundDatatype(user=case.myUser)
+    case.tuple_cdt.save()
+    case.tuple_cdt.members.create(datatype=case.string_dt, column_name="x", column_idx=1)
+    case.tuple_cdt.members.create(datatype=case.string_dt, column_name="y", column_idx=2)
+    case.tuple_cdt.grant_everyone_access()
+
+    # Define "singlet" CDT containing CDT member (a) and "triplet" CDT with members (a,b,c)
+    case.singlet_cdt = CompoundDatatype(user=case.myUser)
+    case.singlet_cdt.save()
+    case.singlet_cdt.members.create(
+        datatype=case.string_dt, column_name="k", column_idx=1)
+    case.singlet_cdt.grant_everyone_access()
+
+    case.triplet_cdt = CompoundDatatype(user=case.myUser)
+    case.triplet_cdt.save()
+    case.triplet_cdt.members.create(datatype=case.string_dt, column_name="a", column_idx=1)
+    case.triplet_cdt.members.create(datatype=case.string_dt, column_name="b", column_idx=2)
+    case.triplet_cdt.members.create(datatype=case.string_dt, column_name="c", column_idx=3)
+    case.triplet_cdt.grant_everyone_access()
+
+    ####
+    # This next bit is used for pipeline.tests.
+
+    # Define CDT "triplet_squares_cdt" with 3 members for use as an input/output
+    case.triplet_squares_cdt = CompoundDatatype(user=case.myUser)
+    case.triplet_squares_cdt.save()
+    case.triplet_squares_cdt.members.create(datatype=case.string_dt, column_name="a^2", column_idx=1)
+    case.triplet_squares_cdt.members.create(datatype=case.string_dt, column_name="b^2", column_idx=2)
+    case.triplet_squares_cdt.members.create(datatype=case.string_dt, column_name="c^2", column_idx=3)
+    case.triplet_squares_cdt.grant_everyone_access()
+
+    # A CDT with mixed Datatypes
+    case.mix_triplet_cdt = CompoundDatatype(user=case.myUser)
+    case.mix_triplet_cdt.save()
+    case.mix_triplet_cdt.members.create(datatype=case.string_dt, column_name="StrCol1", column_idx=1)
+    case.mix_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="DNACol2", column_idx=2)
+    case.mix_triplet_cdt.members.create(datatype=case.string_dt, column_name="StrCol3", column_idx=3)
+    case.mix_triplet_cdt.grant_everyone_access()
+
+    # Define CDT "doublet_cdt" with 2 members for use as an input/output
+    case.doublet_cdt = CompoundDatatype(user=case.myUser)
+    case.doublet_cdt.save()
+    case.doublet_cdt.members.create(datatype=case.string_dt, column_name="x", column_idx=1)
+    case.doublet_cdt.members.create(datatype=case.string_dt, column_name="y", column_idx=2)
+    case.doublet_cdt.grant_everyone_access()
+
+    ####
+    # Stuff from this point on is used in librarian and archive
+    # testing.
+
+    # October 15: more CDTs.
+    case.DNA_triplet_cdt = CompoundDatatype(user=case.myUser)
+    case.DNA_triplet_cdt.save()
+    case.DNA_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="a", column_idx=1)
+    case.DNA_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="b", column_idx=2)
+    case.DNA_triplet_cdt.members.create(datatype=case.DNA_dt, column_name="c", column_idx=3)
+    case.DNA_triplet_cdt.grant_everyone_access()
+
+    case.DNA_doublet_cdt = CompoundDatatype(user=case.myUser)
+    case.DNA_doublet_cdt.save()
+    case.DNA_doublet_cdt.members.create(datatype=case.DNA_dt, column_name="x", column_idx=1)
+    case.DNA_doublet_cdt.members.create(datatype=case.DNA_dt, column_name="y", column_idx=2)
+    case.DNA_doublet_cdt.grant_everyone_access()
+
+
+def clean_up_all_files():
+    """
+    Delete all files that have been put into the database as FileFields.
+    """
+    for crr in CodeResourceRevision.objects.all():
+        # Remember that this can be empty.
+        # if crr.content_file != None:
+        #     crr.content_file.delete()
+        # Weirdly, if crr.content_file == None,
+        # it still entered the above.  This seems to be a bug
+        # in Django!
+        if crr.coderesource.filename != "":
+            crr.content_file.close()
+            crr.content_file.delete()
+
+        crr.delete()
+
+    # Also clear all datasets.  This was previously in librarian.tests
+    # but we move it here.
+    for dataset in Dataset.objects.all():
+        dataset.dataset_file.close()
+        dataset.dataset_file.delete()
+        dataset.delete()
+
+    for mo in MethodOutput.objects.all():
+        mo.output_log.close()
+        mo.output_log.delete()
+        mo.error_log.close()
+        mo.error_log.delete()
+        mo.delete()
+
+    for vl in VerificationLog.objects.all():
+        vl.output_log.close()
+        vl.output_log.delete()
+        vl.error_log.close()
+        vl.error_log.delete()
+        vl.delete()
+
+    for sf in StagedFile.objects.all():
+        sf.uploaded_file.close()
+        sf.uploaded_file.delete()
+        sf.delete()
 
 
 def create_eric_martin_test_environment(case):

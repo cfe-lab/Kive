@@ -8,7 +8,6 @@ import re
 import tempfile
 import time
 import logging
-import itertools
 
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -71,7 +70,7 @@ class LibrarianTestCase(TestCase):
         tools.create_librarian_test_environment(self)
 
     def tearDown(self):
-        metadata.tests.clean_up_all_files()
+        tools.clean_up_all_files()
 
 
 class SymbolicDatasetTests(LibrarianTestCase):
@@ -1115,7 +1114,7 @@ class RemovalTests(TestCase):
             self.two_step_execrecords.add(roc.execrecord)
 
     def tearDown(self):
-        metadata.tests.clean_up_all_files()
+        tools.clean_up_all_files()
 
     def removal_plan_tester(self, obj_to_remove, SDs=None, ERs=None, runs=None, pipelines=None,
                             pfs=None, methods=None, mfs=None, CDTs=None, DTs=None, CRRs=None, CRs=None):

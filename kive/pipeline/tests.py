@@ -4526,7 +4526,7 @@ class PipelineSerializerTests(TestCase):
         create_pipeline_deserialization_environment(self)
 
     def tearDown(self):
-        metadata.tests.clean_up_all_files()
+        tools.clean_up_all_files()
 
     def test_validate(self):
         ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)

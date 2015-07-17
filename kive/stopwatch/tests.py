@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 
-import metadata.tests
+import kive.testing_utils as tools
 from pipeline.models import PipelineFamily
 
 
@@ -22,7 +22,7 @@ class StopwatchTests(TestCase):
         self.pE_run = self.pE.pipeline_instances.first()
 
     def tearDown(self):
-        metadata.tests.clean_up_all_files()
+        tools.clean_up_all_files()
 
     def test_neither_set(self):
         """

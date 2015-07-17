@@ -75,7 +75,7 @@ def get_open_fds():
 def create_method_test_environment(case):
     """Set up default database state that includes some CRs, CRRs, Methods, etc."""
     # This sets up the DTs and CDTs used in our metadata tests.
-    metadata.tests.create_metadata_test_environment(case)
+    tools.create_metadata_test_environment(case)
 
     fd_count("FD count on environment creation")
 
@@ -584,7 +584,7 @@ def destroy_method_test_environment(case):
     """
     Clean up a TestCase where create_method_test_environment has been called.
     """
-    metadata.tests.clean_up_all_files()
+    tools.clean_up_all_files()
     shutil.rmtree(case.scratch_dir)
     CodeResource.objects.all().delete()
 
@@ -623,7 +623,7 @@ class FileAccessTests(TransactionTestCase):
         self.fn = "complement.py"
 
     def tearDown(self):
-        metadata.tests.clean_up_all_files()
+        tools.clean_up_all_files()
         fd_count("FDs (end)")
         update_all_contenttypes(verbosity=0)
 
@@ -3194,7 +3194,7 @@ class CodeResourceRevisionSerializerTests(TestCase):
         crr_test_setup(self)
 
     def tearDown(self):
-        metadata.tests.clean_up_all_files()
+        tools.clean_up_all_files()
 
     # Note: all validation tests are redundant.  There is no customized validation code anymore.
     def test_validate_nodep(self):
@@ -3298,7 +3298,7 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         crr_test_setup(self)
 
     def tearDown(self):
-        metadata.tests.clean_up_all_files()
+        tools.clean_up_all_files()
 
     def test_list(self):
         request = self.factory.get(self.list_path)
@@ -3441,7 +3441,7 @@ class MethodSerializerTests(TestCase):
         method_test_setup(self)
 
     def tearDown(self):
-        metadata.tests.clean_up_all_files()
+        tools.clean_up_all_files()
 
     def test_create(self):
         method_s = MethodSerializer(data=self.method_data, context=self.duck_context)
@@ -3574,7 +3574,7 @@ class InvokeCodeTests(TestCase):
         file_access_utils.configure_sandbox_permissions(self.empty_dir)
 
     def tearDown(self):
-        metadata.tests.clean_up_all_files()
+        tools.clean_up_all_files()
         # if os.path.exists(self.passthrough_input_name):
         #     os.remove(self.passthrough_input_name)
         # shutil.rmtree(self.empty_dir)
