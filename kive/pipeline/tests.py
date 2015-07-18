@@ -18,15 +18,13 @@ from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.test import force_authenticate
 
-from archive.models import Dataset, ExecLog
+from archive.models import ExecLog
 from constants import datatypes
 from kive.tests import BaseTestCases
 from metadata.models import CompoundDatatype, CompoundDatatypeMember, \
     Datatype, kive_user, everyone_group
-import metadata.tests
 from method.models import Method, MethodFamily, CodeResource,\
     CodeResourceRevision, CodeResourceDependency
-import method.tests
 from pipeline.models import Pipeline, PipelineFamily, \
     PipelineStep, PipelineStepInputCable, \
     PipelineOutputCable
