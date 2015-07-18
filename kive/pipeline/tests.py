@@ -34,7 +34,8 @@ from pipeline.serializers import PipelineSerializer,\
     PipelineStepUpdateSerializer
 import kive.testing_utils as tools
 
-samplecode_path = "../samplecode"
+samplecode_path = tools.samplecode_path
+
 
 class DuckRequest(object):
     """ A fake request used to test serializers. """
@@ -43,7 +44,8 @@ class DuckRequest(object):
         
     def build_absolute_uri(self, url):
         return url
-    
+
+
 class DuckContext(dict):
     """ A fake context used to test serializers. """
     def __init__(self):
@@ -2813,6 +2815,7 @@ class RawOutputCableTests(PipelineTestCase):
         self.assertRaisesRegexp(ValidationError, error_msg,
                                 self.pipeline_1.complete_clean)
 
+
 class PipelineUpdateTests(PipelineTestCase):
     def create_dependency_revision(self):
         """ Find a dependency that is used in a pipeline.
@@ -2931,6 +2934,7 @@ class PipelineUpdateTests(PipelineTestCase):
         update = data[0]
         self.assertEqual(len(update['dependencies']), 1)
         self.assertEqual(update['dependencies'][0]['id'], new_revision.id)
+
 
 class RawInputCableTests(PipelineTestCase):
     def test_PSIC_raw_cable_comes_from_pipeline_input_good(self):
