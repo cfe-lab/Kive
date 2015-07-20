@@ -594,7 +594,8 @@ def create_method_from_forms(family_form, method_form, input_forms, output_forms
                 revision_parent=parent_method,
                 driver=coderesource_revision,
                 reusable=method_form.cleaned_data['reusable'],
-                user=creating_user
+                user=creating_user,
+                threads=method_form.cleaned_data["threads"]
             )
             new_method.save()
 
