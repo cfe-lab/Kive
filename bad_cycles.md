@@ -18,7 +18,7 @@ overestimates in the frequencies of E138A (which decreases
 susceptibility to some NNRTIs) in the samples being processed
 in this run for resistance genotyping.
 
-![chart of bad cycles][http://cfe-lab.github.io/Kive/images/bad_cycles.png]
+![chart of bad cycles](http://cfe-lab.github.io/Kive/images/bad_cycles.png)
 
 ## Revision to the MiSeq pipeline in Kive ##
 In response to the observation of "bad cycles" in MiSeq control
@@ -36,9 +36,9 @@ cylinders represent raw data inputs. Blue cubes indicate
 with specific variable types). Red cylinders represent the
 pipeline data outputs.
 
-![original pipeline][http://cfe-lab.github.io/Kive/images/pipeline_original.png]
+![original pipeline](http://cfe-lab.github.io/Kive/images/pipeline_original.png)
 
-![fixed pipeline][http://cfe-lab.github.io/Kive/images/pipeline_fixed.png]
+![fixed pipeline](http://cfe-lab.github.io/Kive/images/pipeline_fixed.png)
 
 ## Retrieving a pipeline history in Kive ##
 When the user "drags" a pipeline output file into the web
@@ -48,7 +48,7 @@ this output (highlighted in blue) based on that file's md5
 checksum. This history is permanently recorded in the Kive
 database.
 
-![pipeline lookup][http://cfe-lab.github.io/Kive/images/pipeline_lookup.png]
+![pipeline lookup](http://cfe-lab.github.io/Kive/images/pipeline_lookup.png)
 
 ## Outcome of pipeline revision ##
 This barplot depicts the observed frequencies of amino acids that
@@ -64,4 +64,4 @@ We observed >3% prevalence of E138A in this particular sample for
 pipeline version 6.6. However, applying the empirical error rate
 filtering in version 6.7.3 substantially reduced this frequency.
 
-![pipeline outcome][http://cfe-lab.github.io/Kive/images/pipeline_outcome.png]
+![pipeline outcome](http://cfe-lab.github.io/Kive/images/pipeline_outcome.png)
