@@ -83,10 +83,7 @@ var drydock_objects = (function() {
      *  or 0 for the centre
      */
     my.CanvasWrapper.prototype.drawText = function(args) {
-        var width,
-            height,
-            yoff,
-            dir = args.dir === 1 ? 1 : args.dir === 0 ? 0 : -1,
+        var dir = args.dir === 1 ? 1 : args.dir === 0 ? 0 : -1,
             rectArgs = {x: args.x, y: args.y},
             textFill = "black",
             margin = 2;
@@ -615,6 +612,8 @@ var drydock_objects = (function() {
         this.in_magnets = [];
         this.out_magnets = [];
 
+        this.outputs_to_delete = [];
+
         // Members for instances of methods in runs
         this.status = status;
 
@@ -627,37 +626,24 @@ var drydock_objects = (function() {
             attract = 5, // Default attraction radius?
             magnet_fill = '#fff'; // Default fill
 
-        $.each(sorted_inputs, function(_, input) {
-            var cdt_pk = null,
-                magnet = null;
-
-            if (input.structure !== null)
+        function addXput(input, magnet_array, is_output) {
+            var cdt_pk = null;
+            if (input.structure !== null) {
                 cdt_pk = input.structure.compounddatatype;
+            }
 
-            magnet = new my.Magnet(self, r, attract, magnet_fill, cdt_pk, input.dataset_name, null, false);
+            magnet_array.push(new my.Magnet(
+                self, r, attract, magnet_fill,
+                cdt_pk, input.dataset_name, null, is_output
+            ));
+        }
 
-            // Fudge the magnet position around, I guess?
-            if (self.n_inputs === 1)
-                magnet.x -= self.h/3;
-
-            self.in_magnets.push(magnet);
-        });
-
-        $.each(sorted_outputs, function(_, output) {
-            var cdt_pk = null,
-                magnet = null;
-
-            if (output.structure !== null)
-                cdt_pk = output.structure.compounddatatype;
-
-            magnet = new my.Magnet(self, r, attract, magnet_fill, cdt_pk, output.dataset_name, null, true);
-
-            // Fudge the magnet position around, I guess?
-            if (self.n_inputs === 1)
-                magnet.x += self.h/3;
-
-            self.out_magnets.push(magnet);
-        });
+        for (var i = 0; i < sorted_inputs.length; i++) {
+            addXput(sorted_inputs[i], this.in_magnets, false);
+        }
+        for (i = 0; i < sorted_outputs.length; i++) {
+            addXput(sorted_outputs[i], this.out_magnets, true);
+        }
     };
     my.MethodNode.prototype = Object.create(my.Node.prototype);
     my.MethodNode.prototype.constructor = my.MethodNode;
@@ -766,9 +752,8 @@ var drydock_objects = (function() {
         }
     };
     
-    my.MethodNode.prototype.highlight = function(ctx, dragging) {
+    my.MethodNode.prototype.highlight = function(ctx) {
         // highlight this node shape
-        var vertices = this.getVertices();
         ctx.globalCompositeOperation = 'destination-over';
     
         // body
@@ -910,6 +895,19 @@ var drydock_objects = (function() {
         }
         
         return is_fully_connected;
+    };
+
+    my.MethodNode.prototype.flagOutputsToDelete = function(ar) {
+        for (
+                var i = 0, j = 0, output_name;
+                (output_name = ar[i]);
+                i++
+            ) {
+            for (j; (magnet = this.out_magnets[j]); j++) {
+                if (magnet.label == output_name)
+                    magnet.to_delete = true;
+            }
+        }
     };
     
     my.MethodNode.prototype.deleteFrom = function(cs) {

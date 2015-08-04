@@ -203,6 +203,13 @@ $(function() {
                 <!-- populated by ajax transaction -->
             </select>
             </div>
+
+            <div id="id_method_delete_outputs_field">
+                <input id="id_method_delete_outputs" name="method_delete_outputs" type="checkbox" checked>
+                <label for="id_method_delete_outputs">Save intermediate outputs of this step</label>
+                <div class="expand_outputs_ctrl">▸ List outputs</div> 
+                <fieldset id="id_method_delete_outputs_details"></fieldset>
+            </div>
             
             <input type="submit" id="id_method_button" value="Add Method">
             <div class="errortext" id="id_method_error"></div>
