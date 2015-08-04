@@ -27,12 +27,13 @@ class DatasetSerializer(serializers.ModelSerializer):
     download_url = serializers.HyperlinkedIdentityField(view_name='dataset-download')
     removal_plan = serializers.HyperlinkedIdentityField(view_name='dataset-removal-plan')
     redaction_plan = serializers.HyperlinkedIdentityField(view_name='dataset-redaction-plan')
+    symbolic_id = serializers.IntegerField(source='symbolicdataset.id')
 
     class Meta:
         model = Dataset
-        fields = ('id', 'url', 'name', 'description', 'filename', 'user', 'date_created', 'date_modified',
+        fields = ('id', 'symbolic_id', 'url', 'name', 'description', 'filename', 'user', 'date_created', 'date_modified',
                   'download_url', 'compounddatatype', 'filesize', 'users_allowed', 'groups_allowed', 'removal_plan',
-                  'redaction_plan')
+                  'redaction_plan' )
 
     def get_filename(self, obj):
         if obj:
