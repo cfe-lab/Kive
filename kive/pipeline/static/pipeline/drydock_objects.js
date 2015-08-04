@@ -896,19 +896,6 @@ var drydock_objects = (function() {
         
         return is_fully_connected;
     };
-
-    my.MethodNode.prototype.flagOutputsToDelete = function(ar) {
-        for (
-                var i = 0, j = 0, output_name;
-                (output_name = ar[i]);
-                i++
-            ) {
-            for (j; (magnet = this.out_magnets[j]); j++) {
-                if (magnet.label == output_name)
-                    magnet.to_delete = true;
-            }
-        }
-    };
     
     my.MethodNode.prototype.deleteFrom = function(cs) {
         var magnet, i, j;

@@ -702,12 +702,10 @@ $(function() {
                 data: {'_content': JSON.stringify(form_data), "_content_type": "application/json"},
                 dataType: 'json',
                 success: function(result) {
-                    console.log(form_data);
                     $('#id_submit_error').html('').hide();
-//                    window.location.href = '/pipelines/' + family_pk;
+                    window.location.href = '/pipelines/' + family_pk;
                 },
                 error: function(xhr, status, error) {
-                    console.log(form_data);
                     var json = xhr.responseJSON;
                     
                     if (json) {
