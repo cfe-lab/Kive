@@ -152,27 +152,40 @@
                 this.magnet.draw(this.ctx);
             });
             
-            it('should draw a magnet with highlight', function() {
-                this.expectedCanvas.drawText({x:90, y: 10, text: 'example'});
+            it('should draw an in-magnet with highlight', function() {
                 this.expectedCanvas.drawCircle({x: 100, y: 10, r: 5});
+                this.expectedCanvas.drawText({x:90, y: 10, text: 'example', style: 'in-magnet'});
                 
                 this.magnet.draw(this.ctx);
                 this.magnet.highlight(this.ctx);
             });
             
-            it('should highlight when marked as accepting connector', function() {
-                this.expectedCanvas.drawText({x:90, y: 10, text: 'example'});
-                this.expectedCanvas.ctx.fillStyle = '#ff8';
+            it('should draw an out-magnet with highlight', function() {
                 this.expectedCanvas.drawCircle({x: 100, y: 10, r: 5});
+                this.expectedCanvas.drawText({x:110, y: 10, text: 'example', style: 'out-magnet'});
+                
+                this.magnet.isOutput = true;
+                this.magnet.draw(this.ctx);
+                this.magnet.highlight(this.ctx);
+            });
+            
+            it('should highlight when marked as accepting connector', function() {
+                this.expectedCanvas.ctx.fillStyle = '#fff';
+                this.expectedCanvas.drawCircle({x: 100, y: 10, r: 5});
+                this.expectedCanvas.ctx.fillStyle = '#ff0';
+                this.expectedCanvas.drawCircle({x: 100, y: 10, r: 3.5});
+                this.expectedCanvas.drawText({x:90, y: 10, text: 'example', style: 'in-magnet'});
 
                 this.magnet.acceptingConnector = true;
                 this.magnet.draw(this.ctx);
             });
             
             it('should offset the highlight', function() {
-                this.expectedCanvas.drawText({x: 88, y: 10, text: 'example'});
-                this.expectedCanvas.ctx.fillStyle = '#ff8';
+                this.expectedCanvas.ctx.fillStyle = '#fff';
                 this.expectedCanvas.drawCircle({x: 100, y: 10, r: 5});
+                this.expectedCanvas.ctx.fillStyle = '#ff0';
+                this.expectedCanvas.drawCircle({x: 100, y: 10, r: 3.5});
+                this.expectedCanvas.drawText({x: 88, y: 10, text: 'example', style: 'in-magnet'});
                 
                 expect(this.magnet.offset).toBe(5);
                 this.magnet.offset += 2;
@@ -181,26 +194,32 @@
             });
             
             it('should have custom fill colour', function() {
-                this.expectedCanvas.drawText({x: 90, y: 10, text: 'example'});
-                this.expectedCanvas.ctx.fillStyle = '#ff8';
+                this.expectedCanvas.ctx.fillStyle = '#fff';
                 this.expectedCanvas.drawCircle({x: 100, y: 10, r:5});
+                this.expectedCanvas.ctx.fillStyle = '#ff0';
+                this.expectedCanvas.drawCircle({x: 100, y: 10, r:3.5});
+                this.expectedCanvas.drawText({x: 90, y: 10, text: 'example', style: 'in-magnet'});
                 
                 this.magnet.acceptingConnector = true;
                 this.magnet.draw(this.ctx);
             });
             
+            it('should mark outputs to delete with a black dot', function() {
+                this.expectedCanvas.ctx.fillStyle = '#fff';
+                this.expectedCanvas.drawCircle({x: 100, y: 10, r:5});
+                this.expectedCanvas.ctx.fillStyle = '#000';
+                this.expectedCanvas.drawCircle({x: 100, y: 10, r:3.5});
+                
+                this.magnet.toDelete = true;
+                this.magnet.draw(this.ctx);
+            });
+            
             it('should display output label on the right', function() {
-                this.expectedCanvas.ctx.save();
-                this.expectedCanvas.ctx.translate(100, 10);
-                this.expectedCanvas.ctx.rotate(Math.PI/6);
-                this.expectedCanvas.drawText({
-                    x: 10,
-                    y: 0,
-                    text: 'example',
-                    dir: 1});
-                this.expectedCanvas.ctx.restore();
-                this.expectedCanvas.ctx.fillStyle = '#ff8';
+                this.expectedCanvas.ctx.fillStyle = '#fff';
                 this.expectedCanvas.drawCircle({x: 100, y: 10, r: 5});
+                this.expectedCanvas.ctx.fillStyle = '#ff0';
+                this.expectedCanvas.drawCircle({x: 100, y: 10, r: 3.5});
+                this.expectedCanvas.drawText({ x: 110, y: 10, text: 'example', style: 'out-magnet'});
 
                 this.magnet.isOutput = true;
                 this.magnet.acceptingConnector = true;
@@ -664,20 +683,20 @@
                 buildMethodBodyPath(this.expectedCanvas.ctx);
                 this.expectedCanvas.ctx.stroke();
                 this.node.draw(this.expectedCanvas.ctx);
-                // in magnet
-                var magnet = new drydock_objects.Magnet();
-                magnet.x = 150;
-                magnet.y = 15;
-                magnet.r = 5;
-                magnet.label = "in";
-                magnet.highlight(this.expectedCanvas.ctx);
+                // // in magnet
+                // var magnet = new drydock_objects.Magnet();
+                // magnet.x = 150;
+                // magnet.y = 15;
+                // magnet.r = 5;
+                // magnet.label = "in";
+                // magnet.highlight(this.expectedCanvas.ctx);
                 
-                // out magnet
-                magnet.x = 188.97114317029974;
-                magnet.y = 57.5;
-                magnet.label = "out";
-                magnet.isOutput = true;
-                magnet.highlight(this.expectedCanvas.ctx);
+                // // out magnet
+                // magnet.x = 188.97114317029974;
+                // magnet.y = 57.5;
+                // magnet.label = "out";
+                // magnet.isOutput = true;
+                // magnet.highlight(this.expectedCanvas.ctx);
                 
                 this.ctx.strokeStyle = "#7bf";
                 this.ctx.lineWidth = 4;
@@ -710,14 +729,14 @@
                 expectedCable.draw(this.expectedCanvas.ctx);
                 expectedCable.drawLabel(this.expectedCanvas.ctx);
                 
-                // out magnet
-                var out_magnet = new drydock_objects.Magnet();
-                out_magnet.x = 188.97114317029974;
-                out_magnet.y = 57.5;
-                out_magnet.r = 5;
-                out_magnet.label = "out";
-                out_magnet.isOutput = true;
-                out_magnet.highlight(this.expectedCanvas.ctx);
+                // // out magnet
+                // var out_magnet = new drydock_objects.Magnet();
+                // out_magnet.x = 188.97114317029974;
+                // out_magnet.y = 57.5;
+                // out_magnet.r = 5;
+                // out_magnet.label = "out";
+                // out_magnet.isOutput = true;
+                // out_magnet.highlight(this.expectedCanvas.ctx);
                 
                 var actualCable = new drydock_objects.Connector(source);
                 actualCable.dest = this.node.in_magnets[0];
@@ -742,13 +761,13 @@
                 dest.y = 75;
                 dest.label = "out";
                 
-                // in magnet
-                var in_magnet = new drydock_objects.Magnet();
-                in_magnet.x = 150;
-                in_magnet.y = 15;
-                in_magnet.r = 5;
-                in_magnet.label = "in";
-                in_magnet.highlight(this.expectedCanvas.ctx);
+                // // in magnet
+                // var in_magnet = new drydock_objects.Magnet();
+                // in_magnet.x = 150;
+                // in_magnet.y = 15;
+                // in_magnet.r = 5;
+                // in_magnet.label = "in";
+                // in_magnet.highlight(this.expectedCanvas.ctx);
                 
                 // out magnet
                 var out_magnet = new drydock_objects.Magnet(this.node),
@@ -783,13 +802,13 @@
                 // dest magnet
                 var expectedOutput = new drydock_objects.OutputNode(250, 75, "out");
                 
-                // in magnet
-                var in_magnet = new drydock_objects.Magnet();
-                in_magnet.x = 150;
-                in_magnet.y = 15;
-                in_magnet.r = 5;
-                in_magnet.label = "in";
-                in_magnet.highlight(this.expectedCanvas.ctx);
+                // // in magnet
+                // var in_magnet = new drydock_objects.Magnet();
+                // in_magnet.x = 150;
+                // in_magnet.y = 15;
+                // in_magnet.r = 5;
+                // in_magnet.label = "in";
+                // in_magnet.highlight(this.expectedCanvas.ctx);
                 
                 // out magnet
                 var out_magnet = new drydock_objects.Magnet(this.node),

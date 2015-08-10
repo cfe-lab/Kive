@@ -50,7 +50,7 @@ $(function() {
         var $this = $(this),
             menu = $($this.data('rel')),
             inputs, input, preview_canvas, i;
-        $('li', 'ul#id_ctrl_nav').not(this).removeClass('clicked');
+        $('#id_ctrl_nav li').not(this).removeClass('clicked');
         $this.addClass('clicked');
         $('.ctrl_menu', '#pipeline_ctrl').hide();
         menu.show().css('left', $this.offset().left);
@@ -321,9 +321,14 @@ $(function() {
                         outputs)
             ;
 
-            $.each(method_dont_delete_outputs, function(_, method_dont_delete_output) {
-                if (!$(method_dont_delete_output).prop('checked')) {
-                    method.outputs_to_delete.push(method_dont_delete_output.value);
+            method_dont_delete_outputs.each(function() {
+                if (!$(this).prop('checked')) {
+                    method.outputs_to_delete.push(this.value);
+
+                    for (var i = 0, magnet; (magnet = method.out_magnets[i]); i++) {
+                        if (this.value === magnet.label)
+                            magnet.toDelete = true;
+                    }
                 }
             });
 
@@ -338,7 +343,6 @@ $(function() {
                 // draw new node over old node
                 var old_node = canvasState.selection[0];
                 canvasState.replaceMethod(old_node, method);
-
                 canvasState.selection = [ method ];
             }
             
@@ -397,14 +401,14 @@ $(function() {
                 canvasState.deleteObject();
                 var menus = $('.ctrl_menu, .context_menu, .modal_dialog').filter(':visible');
                 menus.trigger('cancel');
-                $('li', 'ul#id_ctrl_nav').add(menus).removeClass('clicked');
+                $('#id_ctrl_nav li').add(menus).removeClass('clicked');
             }
             pipelineCheckReadiness();
         }
         
         // escape key closes menus
         else if (e.which == 27) {
-            $('li', 'ul#id_ctrl_nav').removeClass('clicked');
+            $('#id_ctrl_nav li').removeClass('clicked');
             $('.ctrl_menu:visible').trigger('cancel');
             canvasState.selection = [];
             canvasState.valid = false;
@@ -415,7 +419,7 @@ $(function() {
         var menus = $('.ctrl_menu, .context_menu, .modal_dialog').filter(':visible');
         if ($(e.target).closest(menus).length === 0) {
             menus.trigger('cancel');
-            $('li', 'ul#id_ctrl_nav').add(menus).removeClass('clicked');
+            $('#id_ctrl_nav li').add(menus).removeClass('clicked');
         }
     };
 
