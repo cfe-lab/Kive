@@ -101,7 +101,6 @@ $(document).ready(function(){
     <tr>
 
     {% if dataset.content_matches_header %}
-
        {% for column in dataset.header %}
             <th>{{ column }}</th>
         {% endfor %}
@@ -148,6 +147,10 @@ $(document).ready(function(){
         {% endfor %}
         </tr>
     {% endfor %}
+
+    {% if processed_rows|length == DATASET_DISPLAY_MAX %}
+      <tr><td colspan="9999" style="text-align:center">&#8942;</td></tr>
+    {% endif %}
 </tbody>
 </table>
 {% endblock %}

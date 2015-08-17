@@ -14,12 +14,13 @@ from django.db import transaction
 from django.forms.formsets import formset_factory
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
-
 from archive.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm, ArchiveAddDatasetForm
 from archive.models import Dataset, MethodOutput
 from archive.serializers import DatasetSerializer
-import librarian.models
 from portal.views import admin_check
+from kive.settings import DATASET_DISPLAY_MAX
+
+import librarian.models
 import json
 
 LOGGER = logging.getLogger(__name__)
@@ -101,9 +102,11 @@ def dataset_view(request, dataset_id):
         col_matching, insert = dataset.column_alignment()
         processed_rows = dataset.rows(data_check=True, insert_at=insert)
 
+    processed_rows = zip(*zip(processed_rows, xrange(DATASET_DISPLAY_MAX)))[0]
+
     t = loader.get_template("archive/dataset_view.html")
     c = RequestContext(request, {'dataset': dataset, 'column_matching': col_matching, 'processed_rows': processed_rows,
-                                 'return': return_url})
+                                 'return': return_url, "DATASET_DISPLAY_MAX": DATASET_DISPLAY_MAX})
     return HttpResponse(t.render(c))
 
 

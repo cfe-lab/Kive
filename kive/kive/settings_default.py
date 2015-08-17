@@ -249,3 +249,5 @@ KIVE_SANDBOX_WORKER_ACCOUNT = ""
 # The system group that contains both the user that launches the fleet and
 # the sandbox worker account.  This is ignored if KIVE_SANDBOX_WORKER_ACCOUNT is blank.
 KIVE_GROUP = "kive"
+
+DATASET_DISPLAY_MAX = 100
