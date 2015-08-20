@@ -162,6 +162,7 @@ def view_results(request, rtp_id):
     """View outputs from a pipeline run."""
     template = loader.get_template("sandbox/view_results.html")
     context = RequestContext(request)
+
     context['is_user_admin'] = admin_check(request.user)
     context['back_to_view'] = request.GET.get('back_to_view', None) == 'true'
     context['rtp_id'] = rtp_id
@@ -169,6 +170,8 @@ def view_results(request, rtp_id):
     four_oh_four = False
     try:
         rtp = fleet.models.RunToProcess.objects.get(id=rtp_id)
+        context['pipeline_name'] = rtp.pipeline.family.name
+        context['pipeline_revision'] = rtp.pipeline.revision_number
         if not rtp.can_be_accessed(request.user):
             four_oh_four = True
     except RunToProcess.DoesNotExist:
