@@ -401,7 +401,7 @@ var drydock_objects = (function() {
                 this.y + this.dy - this.h/2 - this.offset);
     };
 
-    my.RawNode = function(x, y, label) {
+    my.RawNode = function(x, y, label, input_index) {
         /*
         Node representing an unstructured (raw) datatype.
          */
@@ -411,6 +411,7 @@ var drydock_objects = (function() {
         this.inset = 10; // distance of magnet from center
         // Input node always has one magnet
         this.out_magnets.push(new my.Magnet(this, 5, 2, "white", null, this.label, null, true));
+        this.input_index = input_index;
     };
     my.RawNode.prototype = Object.create(my.CylinderNode.prototype);
     my.RawNode.prototype.constructor = my.RawNode;
@@ -436,7 +437,7 @@ var drydock_objects = (function() {
         cs.shapes.splice(index, 1);
     };
 
-    my.CdtNode = function(pk, x, y, label) {
+    my.CdtNode = function(pk, x, y, label, input_index) {
         my.Node.call(this);
         /*
         Node represents a Compound Datatype (CSV structured data).
@@ -455,6 +456,7 @@ var drydock_objects = (function() {
         this.label = label || '';
         this.in_magnets = [];
         this.out_magnets = [ new my.Magnet(this, 5, 2, "white", this.pk, this.label, null, true, pk) ];
+        this.input_index = input_index;
     };
     my.CdtNode.prototype = Object.create(my.Node.prototype);
     my.CdtNode.prototype.constructor = my.CdtNode;

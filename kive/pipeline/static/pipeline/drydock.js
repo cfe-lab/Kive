@@ -1197,6 +1197,18 @@ var drydock = (function() {
         }
         return null;
     };
-    
+
+    my.CanvasState.prototype.findInputNode = function(input_index) {
+        var shapes = this.shapes;
+        for(var i = 0; i < shapes.length; i++) {
+            if ((shapes[i] instanceof drydock_objects.CdtNode ||
+                 shapes[i] instanceof drydock_objects.RawNode )
+               && shapes[i].input_index == input_index) {
+                return shapes[i];
+            }
+        }
+        return null;
+    };
+
     return my;
 }());

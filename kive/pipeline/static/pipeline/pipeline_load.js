@@ -258,6 +258,20 @@ var pipeline = (function(exports){
             }
         });
 
+        // Update the inputs
+        $.each(runstat.inputs, function(input_pk, output) {
+            var shape = self.canvasState.findInputNode(parseInt(input_pk));
+
+            if (shape instanceof drydock_objects.RawNode ||
+                shape instanceof drydock_objects.CdtNode) {
+                shape.dataset_id = output.dataset_id;
+                shape.md5 = output.md5;
+
+                shape.rtp_id = rtp_id;
+                shape.found_md5 = (shape.md5 === look_for_md5);
+            }
+        });
+
         // Invalidate and force redraw
         self.canvasState.valid = false;
         self.canvasState.draw();
@@ -295,7 +309,8 @@ var pipeline = (function(exports){
                 self.canvasState.addShape(new drydock_objects.RawNode(
                     node.x * canvas_x_ratio,
                     node.y * canvas_y_ratio,
-                    node.dataset_name
+                    node.dataset_name,
+                    node.dataset_idx
                 ));
             }
             else {
@@ -303,7 +318,8 @@ var pipeline = (function(exports){
                     node.structure.compounddatatype,
                     node.x * canvas_x_ratio,
                     node.y * canvas_y_ratio,
-                    node.dataset_name
+                    node.dataset_name,
+                    node.dataset_idx
                 ));
             }
 

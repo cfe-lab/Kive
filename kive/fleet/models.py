@@ -133,7 +133,8 @@ class RunToProcess(metadata.models.AccessControl):
         for _input in self.inputs.all():
             if _input.symbolicdataset.has_data():
                 input_list[_input.index] = {"dataset_id": _input.symbolicdataset.dataset.id,
-                                            "dataset_name": _input.symbolicdataset.dataset.name}
+                                            "dataset_name": _input.symbolicdataset.dataset.name,
+                                            "md5": _input.symbolicdataset.MD5_checksum}
 
 
         # One of the steps is in progress?

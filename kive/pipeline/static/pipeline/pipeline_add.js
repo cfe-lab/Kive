@@ -477,23 +477,29 @@ $(function() {
             }
             if (action == 'display') {
                 sel = sel[0];
-                if(sel instanceof drydock_objects.OutputNode)
+                if(sel instanceof drydock_objects.OutputNode || sel instanceof drydock_objects.CdtNode ||
+                   sel instanceof drydock_objects.RawNode) {
                     window.location = '/dataset_view/' + sel.dataset_id + '?rtp_id=' + sel.rtp_id;
+                }
             }
             if (action == 'download') {
                 sel = sel[0];
-                if(sel instanceof drydock_objects.OutputNode)
+                if(sel instanceof drydock_objects.OutputNode || sel instanceof drydock_objects.CdtNode ||
+                   sel instanceof drydock_objects.RawNode) {
                     window.location = '/dataset_download/' + sel.dataset_id;
+                }
             }
             if (action == 'viewlog') {
                 sel = sel[0];
-                if(sel instanceof drydock_objects.MethodNode)
+                if(sel instanceof drydock_objects.MethodNode) {
                     window.location = '/stdout_view/' + sel.log_id + '?rtp_id=' + sel.rtp_id;
+                }
             }
             if (action == 'viewerrorlog') {
                 sel = sel[0];
-                if(sel instanceof drydock_objects.MethodNode)
+                if(sel instanceof drydock_objects.MethodNode) {
                     window.location = '/stderr_view/' + sel.log_id + '?rtp_id=' + sel.rtp_id;
+                }
             }
         }
         $('.context_menu').hide();
