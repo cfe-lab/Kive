@@ -789,20 +789,21 @@ var drydock = (function() {
             }
         } else if (sel.length == 1) {
             // Otherwise, we're read only, so only popup the context menu for outputs with datasets
-            if (sel[0] instanceof drydock_objects.OutputNode &&
+            if ((sel[0] instanceof drydock_objects.OutputNode ||
+                 sel[0] instanceof drydock_objects.CdtNode ||
+                 sel[0] instanceof drydock_objects.RawNode) &&
                 sel[0].dataset_id) {
 
                // Context menu for pipeline outputs
                showMenu();
                $('.step_node', mcm).hide();
-
             }
             else if (sel[0] instanceof drydock_objects.MethodNode &&
                      sel[0].log_id) {
 
                // Context menu for pipeline steps
                showMenu();
-               $('.output_node', mcm).hide();
+               $('.dataset_node', mcm).hide();
             }
         }
         this.doUp(e);
