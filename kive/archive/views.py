@@ -21,6 +21,7 @@ from portal.views import admin_check
 from kive.settings import DATASET_DISPLAY_MAX
 
 import librarian.models
+import fleet.models
 import json
 
 LOGGER = logging.getLogger(__name__)
@@ -445,9 +446,31 @@ def dataset_lookup(request, md5_checksum=None):
                 checksum.update(chunk)
             md5_checksum = checksum.hexdigest()
 
-    datasets = librarian.models.SymbolicDataset.filter_by_user(request.user).filter(MD5_checksum=md5_checksum)
+    datasets = librarian.models.SymbolicDataset.filter_by_user(request.user).filter(MD5_checksum=md5_checksum).\
+                exclude(dataset__created_by=None)
+
+    datasets_as_inputs = []
+    rtps = fleet.models.RunToProcess.objects.filter(inputs__symbolicdataset__MD5_checksum=md5_checksum)
+
+    for rtp in rtps:
+        for input in [x for x in rtp.inputs.all() if x.symbolicdataset.MD5_checksum == md5_checksum]:
+            breakout = False
+            for d in datasets_as_inputs:
+                if d["rtp_id"] == rtp.id and d["dataset"].id == input.symbolicdataset.dataset.id:
+                    breakout = True
+                    continue
+            if breakout:
+                continue
+
+            datasets_as_inputs += [{
+                "rtp_id": rtp.id,
+                "run": rtp.run,
+                "pipeline": rtp.pipeline,
+                "dataset": input.symbolicdataset.dataset
+            }]
+
     t = loader.get_template('archive/dataset_lookup.html')
-    c = RequestContext(request, {'datasets': datasets, 'md5': md5_checksum})
+    c = RequestContext(request, {'datasets': datasets, 'datasets_as_inputs': datasets_as_inputs, 'md5': md5_checksum})
 
     return HttpResponse(t.render(c))
 
