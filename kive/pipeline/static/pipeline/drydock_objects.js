@@ -295,7 +295,8 @@ var drydock_objects = (function() {
         }
         
         // draw bottom ellipse
-        ctx.fillStyle = this.fill;
+
+        ctx.fillStyle = this.found_md5 ? this.found_fill : this.fill;
         canvas.drawEllipse({x: cx, y: cy + this.h/2, rx: this.r, ry: this.r2});
         
         // draw stack 
@@ -407,6 +408,7 @@ var drydock_objects = (function() {
          */
         my.CylinderNode.call(this, x, y, label);
         this.fill = "#8D8";
+        this.found_fill = "blue";
         this.magnetOffset = {x: 10, y: this.r2/2};
         this.inset = 10; // distance of magnet from center
         // Input node always has one magnet
@@ -451,6 +453,7 @@ var drydock_objects = (function() {
         this.w = 45;
         this.h = 28;
         this.fill = "#88D";
+        this.found_fill = "blue";
         this.inset = 13;
         this.offset = 15;
         this.label = label || '';
@@ -466,8 +469,8 @@ var drydock_objects = (function() {
             cy = this.y + this.dy,
             out_magnet;
         
-        ctx.fillStyle = this.fill;
-        
+        ctx.fillStyle = this.found_md5 ? this.found_fill : this.fill;
+
         // draw base
         var prism_base = cy + this.h/2;
         ctx.beginPath();
@@ -1553,7 +1556,7 @@ var drydock_objects = (function() {
          */
         my.CylinderNode.call(this, x, y, label);
         this.fill = this.defaultFill = "#d40";
-        this.diffFill = "blue";
+        this.found_fill = "blue";
         this.inset = 12; // distance of magnet from center
         this.in_magnets.push(new my.Magnet(this, 5, 2, "white", null, this.label, pk));
         this.pk = pk;
@@ -1578,7 +1581,7 @@ var drydock_objects = (function() {
             this.highlightStroke = undefined;
         }
         
-        this.fill = this.found_md5 ? this.diffFill : this.defaultFill;
+        this.fill = this.defaultFill;
         my.CylinderNode.prototype.draw.call(this, ctx);
     };
     
