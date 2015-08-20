@@ -61,68 +61,102 @@ class MethodOutputSerializer(serializers.ModelSerializer):
                   'code_redaction_plan')
 
 
+class _RunDataset(object):
+    def __init__(self,
+                 step_name,
+                 output_name,
+                 type,
+                 id=None,
+                 size="redacted",
+                 date="redacted",
+                 url=None,
+                 redaction_plan=None,
+                 is_ok=True,
+                 filename=None):
+        self.step_name = step_name
+        self.output_name = output_name
+        self.type = type
+        self.id = id
+        self.size = size
+        self.date = date
+        self.url = url
+        self.redaction_plan = redaction_plan
+        self.is_ok = is_ok
+        self.filename = filename
+
+    def set_dataset(self, dataset, request):
+        self.id = dataset.id
+        self.size = dataset.dataset_file.size
+        self.date = dataset.date_created
+        self.url = reverse('dataset-detail',
+                           kwargs={'pk': dataset.id},
+                           request=request)
+        self.redaction_plan = reverse('dataset-redaction-plan',
+                                      kwargs={'pk': dataset.id},
+                                      request=request)
+        self.filename = os.path.basename(dataset.dataset_file.name)
+
+
 class RunOutputsSerializer(serializers.ModelSerializer):
     """ Serialize a run with a focus on the outputs. """
     
     output_summary = serializers.SerializerMethodField()
+    input_summary = serializers.SerializerMethodField()
 
     class Meta:
         model = Run
-        fields = ('id', 'output_summary')
-        
+        fields = ('id', 'output_summary', 'input_summary')
+
+    def get_input_summary(self, run):
+        """ Get a  list of objects that summarize all the inputs for a run.
+
+        """
+
+        request = self.context.get('request', None)
+        inputs = []
+
+        for i, _input in enumerate(run.runtoprocess.inputs.all()):
+
+
+
+            input_data = _RunDataset(step_name=(i == 0 and 'Run inputs' or ''),
+                            output_name=_input.symbolicdataset.dataset.name,
+                            type='dataset')
+            input_data.set_dataset(_input.symbolicdataset.dataset, request)
+            inputs += [input_data]
+
+        for output in inputs:
+            output.is_invalid = not output.is_ok and output.id is not None
+            output.step_name = str(output.step_name)
+            output.output_name = str(output.output_name)
+
+            if output.size != 'redacted':
+                output.size = filesizeformat(output.size)
+                output.date = timezone.localtime(output.date).strftime(
+                    '%d %b %Y %H:%M:%S')
+
+
+        return [inp.__dict__ for inp in inputs]
+
+
     def get_output_summary(self, run):
         """ Get a list of objects that summarize all the outputs from a run.
         
         Outputs include pipeline outputs, as well as output log, error log, and
         output cables for each step.
         """
-        class Output(object):
-            def __init__(self,
-                         step_name,
-                         output_name,
-                         type,
-                         id=None,
-                         size="redacted",
-                         date="redacted",
-                         url=None,
-                         redaction_plan=None,
-                         is_ok=True,
-                         filename=None):
-                self.step_name = step_name
-                self.output_name = output_name
-                self.type = type
-                self.id = id
-                self.size = size
-                self.date = date
-                self.url = url
-                self.redaction_plan = redaction_plan
-                self.is_ok = is_ok
-                self.filename = filename
-                
-            def set_dataset(self, dataset):
-                self.id = dataset.id
-                self.size = dataset.dataset_file.size
-                self.date = dataset.date_created
-                self.url = reverse('dataset-detail',
-                                   kwargs={'pk': dataset.id},
-                                   request=request)
-                self.redaction_plan = reverse('dataset-redaction-plan',
-                                              kwargs={'pk': dataset.id},
-                                              request=request)
-                self.filename = os.path.basename(dataset.dataset_file.name)
-                
-        
+
         request = self.context.get('request', None)
         outputs = []
         for i, outcable in enumerate(run.outcables_in_order):
             if outcable.execrecord is not None:
                 execrecordout = outcable.execrecord.execrecordouts.first()
-                output = Output(step_name=(i == 0 and 'Run outputs' or ''),
+                output = _RunDataset(step_name=(i == 0 and 'Run outputs' or ''),
                                 output_name=outcable.pipelineoutputcable.dest,
                                 type='dataset')
                 if execrecordout.symbolicdataset.has_data():
                     dataset = execrecordout.symbolicdataset.dataset
-                    output.set_dataset(dataset)
+                    output.set_dataset(dataset, request)
     
                 outputs.append(output)
             
@@ -132,7 +166,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 continue
             methodoutput = execlog.methodoutput
     
-            output = Output(step_name=runstep.pipelinestep,
+            output = _RunDataset(step_name=runstep.pipelinestep,
                             output_name='Standard out',
                             type='stdout')
             if methodoutput.is_output_redacted():
@@ -152,7 +186,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     outputs.append(output)
                 except ValueError:
                     pass
-            output = Output(step_name="",
+            output = _RunDataset(step_name="",
                             output_name='Standard error',
                             type='stderr')
             if methodoutput.is_error_redacted():
@@ -174,13 +208,13 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     pass
             if runstep.execrecord is not None:
                 for execrecordout in runstep.execrecord.execrecordouts_in_order:
-                    output = Output(step_name='',
+                    output = _RunDataset(step_name='',
                                     output_name=execrecordout.generic_output,
                                     is_ok=execrecordout.is_OK(),
                                     type='dataset')
                     if execrecordout.symbolicdataset.has_data():
                         dataset = execrecordout.symbolicdataset.dataset
-                        output.set_dataset(dataset)
+                        output.set_dataset(dataset, request)
         
                     outputs.append(output)
         for output in outputs:
