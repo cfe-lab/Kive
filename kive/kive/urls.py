@@ -66,7 +66,7 @@ urlpatterns = patterns(
 
     url(r'^method_families$', 'method.views.method_families', name='method_families'),
     #url(r'^method_family_add$', 'method.views.method_add', name='method_family_add'),
-    url(r'^method_add$', 'method.views.method_add', name='method_add'),
+    url(r'^method_new$', 'method.views.method_new', name='method_new'),
     url(r'^methods/(?P<id>\d+)/$', 'method.views.methods', name='methods'),
     url(r'^method_add/(?P<id>\d+)/$', 'method.views.method_add', name='method_add'),
     url(r'^method_revise/(?P<id>\d+)/$', 'method.views.method_revise', name='method_revise'),

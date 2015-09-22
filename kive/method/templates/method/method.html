@@ -3,7 +3,15 @@
 
 {% extends "portal/base.html" %}
 
-{% block title %}Add a new method{% endblock %}
+{% block title %}
+    {% if parent != None %}
+        Revise a method
+    {% elif family != None %}
+        Add a method
+    {% else %}
+        Create a new method family
+    {% endif %}
+{% endblock %}
 
 {% block javascript %}
 <script src="/static/portal/jquery-2.0.3.min.js"></script>
@@ -23,7 +31,13 @@
 <a href="/methods/{{ family.pk }}" rel="prev">return to Methods summary</a>
 {% endif %}
 
-<h2>{{ header }}</h2>
+<h2>
+{% if parent == None %}
+{{ header }}
+{% else %}
+Revise method '{{ parent.revision_name }}' in family '{{ family.name }}'
+{% endif %}
+</h2>
 
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
 
@@ -41,12 +55,16 @@
 
 <table>
     <tr>
-        <th>{{ method_form.coderesource.label }}</th>
+        <th>Code resource</th>
         <td>
+            {% if parent == None %}
             {{ method_form.coderesource }}
             <div class="helptext">{{ method_form.coderesource.help_text }}</div>
             <br/>
             <div class="errortext">{{ method_form.coderesource.errors }}</div>
+            {% else %}
+            {{ coderesource }}
+            {% endif %}
         </td>
         <th>{{ method_form.revisions.label }}</th>
         <td>
@@ -72,24 +90,56 @@
 
     <tr>
         <th>{{ method_form.threads.label }}</th>
+
+        {% if parent == None %}
         <td colspan="3">
+        {% else %}
+        <td>{{ parent.threads }}</td>
+        <td colspan="2">
+        {% endif %}
             {{ method_form.threads }}
             <div class="helptext">{{ method_form.threads.help_text }}</div>
             <br/>
             <div class="errortext">{{ method_form.threads.errors }}</div>
         </td>
-        <th></th>
-        <td></td>
     </tr>
 
     <tr>
-        <th>{{ method_form.permissions.label_tag }} 
-        <br>
-        <div class="helptext">{{ method_form.permissions.help_text }}</div>
-        <br/>
-        <div class="errortext">{{ method_form.permissions.errors }}</div>
+        <th>{{ method_form.permissions.label }}
+            <div class="helptext">{{ method_form.permissions.help_text }}</div>
         </th>
-        <td colspan="3">{{ method_form.permissions }} </td>
+
+        {% if parent == None %}
+        <td colspan="3">
+        {% else %}
+        <td style="font-style:italic">
+            <h4>Users</h4>
+            {% if parent.users_allowed.exists %}
+            <ul>
+            {% for user in parent.users_allowed.all %}
+                <li>{{ user }}</li>
+            {% endfor %}
+            </ul>
+            {% else %}
+                None
+            {% endif %}
+
+            <h4>Groups</h4>
+            {% if parent.groups_allowed.exists %}
+            <ul>
+            {% for group in parent.groups_allowed.all %}
+                <li>{{ group }}</li>
+            {% endfor %}
+            </ul>
+            {% else %}
+                None
+            {% endif %}
+        </td>
+        <td colspan="2">
+        {% endif %}
+        {{ method_form.permissions }} <br/>
+            <div class="errortext">{{ method_form.permissions.errors }}</div>
+        </td>
     </tr>
 
     <tr>
@@ -119,14 +169,14 @@
         </td>
     </tr>
     <tr>
-        <th>Method name</th>
+        <th>Method revision name<br/><span class="smalltxt">Optional</span></th>
         <td>
             {{ method_form.revision_name }}
             <div class="helptext">{{ method_form.revision_name.help_text }}</div>
             <br/>
             <div class="errortext">{{ method_form.revision_name.errors }}</div>
         </td>
-        <th>Method<br/> description</th>
+        <th>{{ method_form.revision_desc.label }}</th>
         <td>
             {{ method_form.revision_desc }}
             <div class="helptext">{{ method_form.revision_desc.help_text }}</div>
