@@ -750,17 +750,14 @@ def _method_creation_helper(request, method_family=None):
 
         # Next, attempt to build the Method and its associated MethodFamily (if necessary),
         # inputs, and outputs.
-        create_method_from_forms(
+        just_created = create_method_from_forms(
             family_form, method_form, input_form_tuples, output_form_tuples, creating_user,
             family=method_family
         )
 
         if _method_forms_check_valid(family_form, method_form, input_form_tuples, output_form_tuples):
             # Success!
-            if id:
-                return HttpResponseRedirect('/methods/{}'.format(id))
-            else:
-                return HttpResponseRedirect('/method_families')
+            return HttpResponseRedirect('/methods/{}'.format(just_created.family.pk))
 
     else:
         # Prepare a blank set of forms for rendering.
