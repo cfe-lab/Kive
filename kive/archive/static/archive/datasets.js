@@ -26,7 +26,7 @@ var datasets = (function() {
         });
         this.registerColumn("Description", buildDescription);
         this.registerColumn("Date Created", buildDateCreated);
-        this.registerColumn("File Size (B)", "filesize");
+        this.registerColumn("File Size", "filesize_display");
         this.registerColumn("", buildDownload);
     };
     DatasetsTable.prototype = Object.create(

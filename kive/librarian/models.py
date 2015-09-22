@@ -31,7 +31,6 @@ import datachecking.models
 import metadata.models
 import fleet.exceptions
 import file_access_utils
-import kive.settings
 
 LOGGER = logging.getLogger(__name__)
 

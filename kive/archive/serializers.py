@@ -22,6 +22,7 @@ class DatasetSerializer(serializers.ModelSerializer):
     compounddatatype = CompoundDatatypeSerializer(source='symbolicdataset.compounddatatype')
     filename = serializers.SerializerMethodField()
     filesize = serializers.IntegerField(source='get_filesize')
+    filesize_display = serializers.SerializerMethodField()
     users_allowed = serializers.StringRelatedField(many=True, source="symbolicdataset.users_allowed")
     groups_allowed = serializers.StringRelatedField(many=True, source="symbolicdataset.groups_allowed")
     download_url = serializers.HyperlinkedIdentityField(view_name='dataset-download')
@@ -31,13 +32,31 @@ class DatasetSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Dataset
-        fields = ('id', 'symbolic_id', 'url', 'name', 'description', 'filename', 'user', 'date_created', 'date_modified',
-                  'download_url', 'compounddatatype', 'filesize', 'users_allowed', 'groups_allowed', 'removal_plan',
-                  'redaction_plan' )
+        fields = ('id',
+                  'symbolic_id',
+                  'url',
+                  'name',
+                  'description',
+                  'filename',
+                  'user',
+                  'date_created',
+                  'date_modified',
+                  'download_url',
+                  'compounddatatype',
+                  'filesize',
+                  'filesize_display',
+                  'users_allowed',
+                  'groups_allowed',
+                  'removal_plan',
+                  'redaction_plan')
 
     def get_filename(self, obj):
         if obj:
             return os.path.basename(obj.dataset_file.name)
+    
+    def get_filesize_display(self, obj):
+        if obj:
+            return filesizeformat(obj.get_filesize())
 
 
 class MethodOutputSerializer(serializers.ModelSerializer):
