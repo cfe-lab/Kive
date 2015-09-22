@@ -169,8 +169,7 @@ class PipelineViewSet(CleanCreateModelMixin,
         if request.data.get("published") == "" or request.data.get("published") is None:
             return Response({"message": "published is unspecified."})
 
-        publish_update = json.loads(request.data["published"])
-
+        publish_update = request.data.get("published", "false") == "true"
         pipeline_to_change.published = publish_update
         pipeline_to_change.save()
         response_msg = 'Pipeline "{}" has been {}published.'.format(

@@ -141,7 +141,8 @@ class RedactModelMixin(object):
         pass
 
     def partial_update(self, request, pk=None):
-        if request.data.get('is_redacted', False):
+        is_redacted = request.data.get("is_redacted", "false") == "true"
+        if is_redacted:
             try:
                 self.get_object().redact()
             except RTPNotFinished as e:
