@@ -50,7 +50,7 @@ def pipeline_families(request):
 @user_passes_test(developer_check)
 def pipelines(request, id):
     """
-    Display a list of all Pipelines within a given MethodFamily.
+    Display a list of all Pipelines within a given PipelineFamily.
     """
     four_oh_four = False
     try:

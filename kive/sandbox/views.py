@@ -12,7 +12,7 @@ import fleet.models
 from fleet.models import RunToProcess
 from fleet.serializers import RunToProcessOutputsSerializer
 from pipeline.models import PipelineFamily, Pipeline
-from pipeline.serializers import PipelineFamilySerializer
+from pipeline.serializers import AnalysisSerializer
 from portal.views import admin_check
 from sandbox.forms import InputSubmissionForm, RunSubmissionForm
 
@@ -23,9 +23,9 @@ def choose_pipeline(request, error_message=''):
     template = loader.get_template("sandbox/choose_pipeline.html")
     
     families = PipelineFamily.filter_by_user(request.user)
-    families_json = json.dumps(PipelineFamilySerializer(families,
-                                                        context={'request': request},
-                                                        many=True).data)
+    families_json = json.dumps(AnalysisSerializer(families,
+                                                  context={'request': request},
+                                                  many=True).data)
 
     context = RequestContext(request, {"rows_json": families_json,
                                        "error_msg": error_message })

@@ -60,19 +60,43 @@ var choose_pipeline = (function() {
     function buildMembers($td, row) {
         var $form = $('<form method="GET" action="choose_inputs">'),
             $select = $('<select name="pipeline">');
-        for (var i = 0; i < row.members.length; i++) {
-            var member = row.members[i],
-                $option = $('<option>').attr(
-                        'value',
-                        member.id).text(member.display_name);
-            if (member.id === row.published_version) {
-                $option.attr('selected', true);
-            }
-            $select.append($option);
+
+        var already_have_one_selected = false;
+
+        if (row.members.length === 0) {
+            var $none_published = $("<option>").attr(
+                "value", ""
+            ).attr(
+                "disabled", true
+            ).text(
+                "No published versions"
+            );
+            $select.append($none_published);
+            $form.append($select);
         }
-        $select.change(function() { drawThumbnail(this); });
-        $form.append($select);
-        $form.append('&nbsp;<input type="submit" value="Choose">');
+        else {
+            for (var i = 0; i < row.members.length; i++) {
+                var member = row.members[i],
+                    $option = $('<option>').attr(
+                            'value',
+                            member.id);
+
+                if (member.published) {
+                    $option.text(member.display_name);
+                    if (!already_have_one_selected) {
+                        $option.attr('selected', true);
+                    }
+                }
+                else {
+                    // De-emphasize this.
+                    $option.text("(" + member.display_name + ")")
+                }
+                $select.append($option);
+            }
+            $select.change(function() { drawThumbnail(this); });
+            $form.append($select);
+            $form.append('&nbsp;<input type="submit" value="Choose">');
+        }
         $td.append($form);
     }
     

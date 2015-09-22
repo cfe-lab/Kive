@@ -3295,8 +3295,7 @@
             "description": "PF desc", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 2, 
             "name": "Pipeline_family"
@@ -3309,8 +3308,7 @@
             "description": "two no-ops", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 2, 
             "name": "p_one"
@@ -3323,8 +3321,7 @@
             "description": "one no-op then one trivial", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 2, 
             "name": "p_two"

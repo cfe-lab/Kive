@@ -35,7 +35,7 @@ var pipelines = (function() {
         
         $form.append($pipeline_pk_input, $action_input, $input);
 
-        if (pipeline.is_published_version) {
+        if (pipeline.published) {
             $form.prepend('<input type="button" class="left-button" disabled value="Published">');
             $action_input.val("unpublish");
             $input.val("×").addClass('right-button close-button');
@@ -48,16 +48,17 @@ var pipelines = (function() {
                 e.preventDefault();
 
                 var action = $action_input.val(),
-                    new_published_version = $pipeline_pk_input.val();
+                    revision = $pipeline_pk_input.val(),
+                    published = true;
 
                 if (action === "unpublish") {
-                    new_published_version = null;
+                    published = false;
                 }
 
                 $.ajax({
                     type: "PATCH",
-                    url: "/api/pipelinefamilies/"  + family_pk,
-                    data: { published_version: new_published_version },
+                    url: "/api/pipelines/"  + pipeline.id,
+                    data: { published: published },
                     datatype: "json",
                     success: function(){
                         data.table.reloadTable();

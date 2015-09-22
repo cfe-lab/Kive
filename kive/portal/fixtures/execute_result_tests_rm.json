@@ -2282,8 +2282,7 @@
             "description": "a pipeline to complement DNA", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 3, 
             "name": "DNA complement"
@@ -2296,8 +2295,7 @@
             "description": "a pipeline to reverse DNA", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 3, 
             "name": "DNA reverse"
@@ -2310,8 +2308,7 @@
             "description": "a pipeline to reverse and complement DNA", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 3, 
             "name": "DNA revcomp"
@@ -2324,8 +2321,7 @@
             "description": "a pipeline to reverse DNA and translate it to RNA", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 3, 
             "name": "DNA to reversed RNA"

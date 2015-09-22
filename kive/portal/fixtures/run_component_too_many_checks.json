@@ -1788,8 +1788,7 @@
             "description": "Toy pipeline for testing data check cleaning of RunSteps.", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 2, 
             "name": "Two-step pipeline"
@@ -1802,8 +1801,7 @@
             "description": "Toy pipeline that will need to recover its first step when following the above.", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 2, 
             "name": "Pipeline that will follow the first"

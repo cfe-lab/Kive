@@ -76,19 +76,19 @@ class PipelineFamilyTests(PipelineTestCase):
         """Can I delete a PipelineFamily?"""
         self.assertIsNone(PipelineFamily.objects.first().delete())
 
-    def test_published_version_display_name_is_none(self):
-        family = PipelineFamily.objects.get(name='DNAcomplement')
-        self.assertIsNone(family.published_version_display_name)
+    # def test_published_version_display_name_is_none(self):
+    #     family = PipelineFamily.objects.get(name='DNAcomplement')
+    #     self.assertIsNone(family.published_version_display_name)
 
-    def test_published_version_display_name(self):
-        family = PipelineFamily.objects.get(name='DNAcomplement')
-        family.published_version = family.members.last() #oldest version
-        family.clean()
-        family.save()
-        
-        reloaded = PipelineFamily.objects.get(pk=family.pk)
-        
-        self.assertEqual("1: v1", reloaded.published_version_display_name)
+    # def test_published_version_display_name(self):
+    #     family = PipelineFamily.objects.get(name='DNAcomplement')
+    #     family.published_version = family.members.last() #oldest version
+    #     family.clean()
+    #     family.save()
+    #
+    #     reloaded = PipelineFamily.objects.get(pk=family.pk)
+    #
+    #     self.assertEqual("1: v1", reloaded.published_version_display_name)
 
 
 class PipelineTests(PipelineTestCase):

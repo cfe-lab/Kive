@@ -5810,8 +5810,7 @@
             "description": "PF desc", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 2, 
             "name": "Pipeline_family"
@@ -5824,8 +5823,7 @@
             "description": "innermost pipeline", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 2, 
             "name": "p_basic"
@@ -5838,8 +5836,7 @@
             "description": "second-level pipeline", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 2, 
             "name": "p_sub"
@@ -5852,8 +5849,7 @@
             "description": "top-level pipeline", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 2, 
             "name": "p_top"
