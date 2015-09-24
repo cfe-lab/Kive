@@ -33,7 +33,6 @@ def get_open_fds():
 
     Warning: will only work on UNIX-like operating systems.
     """
-    import subprocess
     pid = os.getpid()
     procs = subprocess.check_output(
         [ "lsof", '-w', '-Ff', "-p", str( pid ) ] )

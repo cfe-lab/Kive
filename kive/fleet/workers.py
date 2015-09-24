@@ -13,12 +13,13 @@ import os
 import glob
 import shutil
 
+from django.conf import settings
 from django.utils import timezone
 
 import archive.models
+from fleet.exceptions import SandboxActiveException
 import fleet.models
 import sandbox.execute
-import kive.settings  # @UnresolvedImport
 
 mgr_logger = logging.getLogger("fleet.Manager")
 worker_logger = logging.getLogger("fleet.Worker")
@@ -320,10 +321,10 @@ class Manager:
         """
         Poll the database for new jobs, and handle running of sandboxes.
         """
-        purge_interval = datetime.timedelta(days=kive.settings.SANDBOX_PURGE_DAYS,
-                                            hours=kive.settings.SANDBOX_PURGE_HOURS,
-                                            minutes=kive.settings.SANDBOX_PURGE_MINUTES)
-        keep_recent = kive.settings.SANDBOX_KEEP_RECENT
+        purge_interval = datetime.timedelta(days=settings.SANDBOX_PURGE_DAYS,
+                                            hours=settings.SANDBOX_PURGE_HOURS,
+                                            minutes=settings.SANDBOX_PURGE_MINUTES)
+        keep_recent = settings.SANDBOX_KEEP_RECENT
 
         while True:
             # We can't use a for loop over the task queue because assign_task may add to the queue.
@@ -342,7 +343,7 @@ class Manager:
                 self.task_queue = self.task_queue[1:]
 
             # Everything in the queue has been started, so we check and see if anything has finished.
-            time_to_poll = time.time() + kive.settings.FLEET_POLLING_INTERVAL
+            time_to_poll = time.time() + settings.FLEET_POLLING_INTERVAL
             while time.time() < time_to_poll:
                 if self.comm.Iprobe(source=MPI.ANY_SOURCE, tag=Worker.FINISHED):
                     lord_rank, result_pk = self.comm.recv(source=MPI.ANY_SOURCE,
@@ -423,14 +424,14 @@ class Manager:
                 try:
                     mgr_logger.debug("Removing sandbox at {}".format(rtp.sandbox_path))
                     rtp.collect_garbage()
-                except fleet.models.SandboxActiveException as e:
+                except SandboxActiveException as e:
                     mgr_logger.debug(e)
 
             # Next, look through the sandbox directory and see if there are any orphaned sandboxes
             # to remove.
             mgr_logger.debug("Checking for orphaned sandbox directories to clean up....")
 
-            sdbx_path = os.path.join(kive.settings.MEDIA_ROOT, kive.settings.SANDBOX_PATH)
+            sdbx_path = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
             for putative_sdbx in glob.glob(os.path.join(sdbx_path, sandbox.execute.sandbox_glob)):
 
                 # Remove this sandbox if there is no RunToProcess that is on record as having used it.

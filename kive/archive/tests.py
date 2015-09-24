@@ -22,7 +22,6 @@ from file_access_utils import compute_md5
 from librarian.models import ExecRecord, SymbolicDataset
 
 from kive.tests import BaseTestCases, install_fixture_files, restore_production_files
-import metadata.tests
 from method.models import Method
 from pipeline.models import Pipeline, PipelineStep
 import sandbox.execute
