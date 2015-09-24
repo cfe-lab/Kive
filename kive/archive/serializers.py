@@ -86,8 +86,8 @@ class _RunDataset(object):
                  output_name,
                  type,
                  id=None,
-                 size="redacted",
-                 date="redacted",
+                 size="removed",
+                 date="removed",
                  url=None,
                  redaction_plan=None,
                  is_ok=True,
@@ -114,6 +114,9 @@ class _RunDataset(object):
                                       kwargs={'pk': dataset.id},
                                       request=request)
         self.filename = os.path.basename(dataset.dataset_file.name)
+    
+    def set_redacted(self):
+        self.size = self.date = 'redacted'
 
 
 class RunOutputsSerializer(serializers.ModelSerializer):
@@ -176,6 +179,8 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 if execrecordout.symbolicdataset.has_data():
                     dataset = execrecordout.symbolicdataset.dataset
                     output.set_dataset(dataset, request)
+                elif execrecordout.symbolicdataset.is_redacted():
+                    output.set_redacted()
     
                 outputs.append(output)
             
@@ -189,6 +194,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                             output_name='Standard out',
                             type='stdout')
             if methodoutput.is_output_redacted():
+                output.set_redacted()
                 outputs.append(output)
             else:
                 try:
@@ -209,6 +215,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                             output_name='Standard error',
                             type='stderr')
             if methodoutput.is_error_redacted():
+                output.set_redacted()
                 outputs.append(output)
             else:
                 try:
@@ -234,6 +241,8 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     if execrecordout.symbolicdataset.has_data():
                         dataset = execrecordout.symbolicdataset.dataset
                         output.set_dataset(dataset, request)
+                    elif execrecordout.symbolicdataset.is_redacted():
+                        output.set_redacted()
         
                     outputs.append(output)
         for output in outputs:
@@ -241,9 +250,13 @@ class RunOutputsSerializer(serializers.ModelSerializer):
             output.step_name = str(output.step_name)
             output.output_name = str(output.output_name)
 
-            if output.size != 'redacted':
+            try:
+                output.size += 0
+                # It's a number, so format it nicely, along with date.
                 output.size = filesizeformat(output.size)
                 output.date = timezone.localtime(output.date).strftime(
                     '%d %b %Y %H:%M:%S')
+            except TypeError:
+                pass # Size was not a number, so leave it alone.
         
         return [output.__dict__ for output in outputs]

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from django.db import models, migrations
+from django.db import migrations
 
 
 def mark_published_versions(apps, schema_editor):
@@ -13,8 +13,10 @@ def mark_published_versions(apps, schema_editor):
     """
     PipelineFamily = apps.get_model("pipeline", "PipelineFamily")
     for pf in PipelineFamily.objects.all():
-        pf.published_version.published = True
-        pf.published_version.save()
+        published_version = pf.published_version
+        if published_version is not None:
+            published_version.published = True
+            published_version.save()
 
 
 class Migration(migrations.Migration):

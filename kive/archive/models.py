@@ -832,7 +832,7 @@ class RunComponent(stopwatch.models.Stopwatch):
             if ds.symbolicdataset not in removal_plan["SymbolicDatasets"]:
                 metadata.models.update_removal_plan(removal_plan, ds.symbolicdataset.build_removal_plan(removal_plan))
 
-        if self.has_log and self.execrecord.generator == self.log:
+        if self.has_log and self.execrecord and self.execrecord.generator == self.log:
             if self.execrecord not in removal_plan["ExecRecords"]:
                 metadata.models.update_removal_plan(removal_plan, self.execrecord.build_removal_plan(removal_plan))
 

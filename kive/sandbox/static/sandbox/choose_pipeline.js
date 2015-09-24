@@ -89,7 +89,7 @@ var choose_pipeline = (function() {
                 }
                 else {
                     // De-emphasize this.
-                    $option.text("(" + member.display_name + ")")
+                    $option.text("(" + member.display_name + ")");
                 }
                 $select.append($option);
             }
