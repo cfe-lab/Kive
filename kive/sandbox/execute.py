@@ -1702,7 +1702,8 @@ def finish_step(step_execute_dict, worker_rank):
                             return curr_RS
 
                         else:
-                            logger.debug("[%d] Filling in ExecRecord %s", worker_rank, curr_ER)
+                            logger.debug("[%d] ExecRecord not reusable %s", worker_rank, curr_ER)
+                            curr_ER = None
 
                     else:
                         logger.debug("[%d] No compatible ExecRecord found yet", worker_rank)
