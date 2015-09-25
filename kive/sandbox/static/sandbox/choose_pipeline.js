@@ -85,6 +85,7 @@ var choose_pipeline = (function() {
                     $option.text(member.display_name);
                     if (!already_have_one_selected) {
                         $option.attr('selected', true);
+                        already_have_one_selected = true;
                     }
                 }
                 else {
