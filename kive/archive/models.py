@@ -7,6 +7,7 @@ Dataset, etc.
 from __future__ import unicode_literals
 
 import csv
+from datetime import datetime, timedelta
 import file_access_utils
 import heapq
 import itertools
@@ -2355,11 +2356,16 @@ class Dataset(models.Model):
                 filedate, relpath, filesize = heapq.heappop(files)
                 dataset = Dataset.objects.filter(dataset_file=relpath).first()
                 if dataset is None:
-                    cls.logger.warn('No dataset matches file %r, deleting it.',
-                                    relpath)
                     filepath = os.path.join(settings.MEDIA_ROOT, relpath)
-                    os.remove(filepath)
-                    total_size -= filesize
+                    filedate = os.path.getmtime(filepath)
+                    file_age = datetime.now() - datetime.fromtimestamp(filedate)
+                    if file_age < timedelta(hours=1):
+                        skipped_count += 1
+                    else:
+                        cls.logger.warn('No dataset matches file %r, deleting it.',
+                                        relpath)
+                        os.remove(filepath)
+                        total_size -= filesize
                 else:
                     creator = dataset.created_by # run component that created it
                     consumers = dataset.symbolicdataset.runtoprocessinputs.all()
