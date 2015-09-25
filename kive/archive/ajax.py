@@ -14,7 +14,7 @@ from kive.ajax import RemovableModelViewSet, RedactModelMixin, IsGrantedReadOnly
     StandardPagination
 
 from librarian.models import SymbolicDataset
-
+import hashlib
 
 JSON_CONTENT_TYPE = 'application/json'
 
@@ -90,6 +90,18 @@ class DatasetViewSet(RemovableModelViewSet, RedactModelMixin):
         the front end.
         """
         single_dataset_form = DatasetForm(request.POST, request.FILES, user=request.user, prefix="")
+
+        # compute MD5 checksum
+        checksum = hashlib.md5()
+        for chunk in request.FILES['dataset_file'].chunks():
+            checksum.update(chunk)
+        md5 = checksum.hexdigest()
+
+        symdatasets = SymbolicDataset.filter_by_user(request.user).filter(MD5_checksum=md5)
+        if len(symdatasets) > 0:
+            # one or more Datasets with identical MD5 already exist
+            return Response(DatasetSerializer(symdatasets[0].dataset, context={'request': request}).data, status=200)
+
         symdataset = single_dataset_form.create_dataset(request.user) if single_dataset_form.is_valid() else None
 
         if symdataset is None:

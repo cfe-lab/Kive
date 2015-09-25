@@ -182,6 +182,7 @@ def datasets_add(request):
     """
     Add datasets to db.
     """
+    t = loader.get_template('archive/datasets_add.html')
     c = RequestContext(request)
     if request.method == 'POST':
         single_dataset_form = DatasetForm(request.POST, request.FILES, user=request.user, prefix="single")
@@ -192,6 +193,19 @@ def datasets_add(request):
                 single_dataset_form.add_error(None, "Invalid form submission")
                 success = False
             elif single_dataset_form.is_valid():
+                # calculate md5 checksum for uploaded file
+                checksum = hashlib.md5()
+                for chunk in request.FILES['single-dataset_file'].chunks():
+                    checksum.update(chunk)
+                md5 = checksum.hexdigest()
+
+                # check to see if this md5 already exists in database
+                datasets = librarian.models.SymbolicDataset.filter_by_user(request.user).filter(MD5_checksum=md5)
+                if len(datasets) > 0:
+                    single_dataset_form.add_error('dataset_file', 'Dataset with identical md5 already exists.')
+                    c.update({'singleDataset': single_dataset_form})
+                    return HttpResponse(t.render(c))
+
                 single_dataset_form.create_dataset(request.user)
             else:
                 success = False
@@ -204,13 +218,11 @@ def datasets_add(request):
         if success:
             return HttpResponseRedirect("datasets")
         else:
-            t = loader.get_template('archive/datasets_add.html')
             c.update({'singleDataset': single_dataset_form})
 
 
     else:  # return an empty formset for the user to fill in
         single_dataset_form = DatasetForm(user=request.user, prefix="single")
-        t = loader.get_template('archive/datasets_add.html')
         c.update({'singleDataset': single_dataset_form})
 
     return HttpResponse(t.render(c))
