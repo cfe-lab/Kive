@@ -1202,8 +1202,9 @@ var drydock = (function() {
         var shapes = this.shapes;
         for(var i = 0; i < shapes.length; i++) {
             if ((shapes[i] instanceof drydock_objects.CdtNode ||
-                 shapes[i] instanceof drydock_objects.RawNode )
-               && shapes[i].input_index == input_index) {
+                 shapes[i] instanceof drydock_objects.RawNode ) &&
+                shapes[i].input_index == input_index) {
+                
                 return shapes[i];
             }
         }

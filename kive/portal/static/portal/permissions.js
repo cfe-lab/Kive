@@ -297,6 +297,9 @@ var permissions = (function() {
                             }
                         );
                     }
+                }).fail(function (request) {
+                    window.alert('Failed to build removal plan: ' +
+                            request.statusText);
                 });
     }
 

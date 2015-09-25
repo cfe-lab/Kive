@@ -8,6 +8,8 @@ from pipeline.models import PipelineFamily, Pipeline, CustomCableWire,\
 from transformation.models import XputStructure
 from transformation.serializers import TransformationInputSerializer,\
     TransformationOutputSerializer
+from metadata.models import KiveUser
+from portal.views import developer_check
 
 
 class CustomCableWireSerializer(serializers.ModelSerializer):
@@ -198,10 +200,10 @@ def _source_transf_finder(step_num, dataset_name, step_data_dicts):
     return curr_transf.outputs.get(dataset_name=dataset_name)
 
 
-class PipelineSummarySerializer(serializers.ModelSerializer):
+class PipelineSummarySerializer(AccessControlSerializer, serializers.ModelSerializer):
     class Meta:
         model = Pipeline
-        fields = ('id', 'display_name', 'url')
+        fields = ("id", "display_name", "url", "published")
 
 
 class PipelineSerializer(AccessControlSerializer,
@@ -224,8 +226,6 @@ class PipelineSerializer(AccessControlSerializer,
 
     absolute_url = serializers.SerializerMethodField()
 
-    publish_on_submit = serializers.BooleanField(default=False, write_only=True)
-
     # This is as per CodeResourceRevisionSerializer.
     revision_number = serializers.IntegerField(
         read_only=True,
@@ -244,7 +244,7 @@ class PipelineSerializer(AccessControlSerializer,
             'revision_number',
             "revision_parent",
             "revision_DateTime",
-            "is_published_version",
+            "published",
             'user',
             "users_allowed",
             "groups_allowed",
@@ -255,7 +255,6 @@ class PipelineSerializer(AccessControlSerializer,
             'removal_plan',
             'step_updates',
             "absolute_url",
-            "publish_on_submit"
         )
 
     def __init__(self, *args, **kwargs):
@@ -316,7 +315,6 @@ class PipelineSerializer(AccessControlSerializer,
         inputs = validated_data.pop("inputs")
         steps = validated_data.pop("steps")
         outcables = validated_data.pop("outcables")
-        publish_on_submit = validated_data.pop("publish_on_submit")
 
         users_allowed = validated_data.pop("users_allowed")
         groups_allowed = validated_data.pop("groups_allowed")
@@ -438,11 +436,6 @@ class PipelineSerializer(AccessControlSerializer,
                 curr_outcable.custom_wires.create(**wire_data)
             curr_outcable.create_output(x=x, y=y)
 
-        # Mark this as the published version if appropriate.
-        if publish_on_submit:
-            pipeline.family.published_version = pipeline
-            pipeline.family.save()
-
         return pipeline
 
     def get_absolute_url(self, obj):
@@ -453,11 +446,12 @@ class PipelineSerializer(AccessControlSerializer,
 
 class PipelineFamilySerializer(AccessControlSerializer,
                                serializers.ModelSerializer):
-    # published_version = PipelineSerializer(allow_null=True)
     removal_plan = serializers.HyperlinkedIdentityField(view_name='pipelinefamily-removal-plan')
     absolute_url = serializers.SerializerMethodField()
 
-    members = PipelineSummarySerializer(many=True, read_only=True)
+    # We use a SerializerMethodField here so we can pass in the necessary context to filter
+    # by the requesting user.
+    members = serializers.SerializerMethodField()
     members_url = serializers.HyperlinkedIdentityField(view_name='pipelinefamily-pipelines')
 
     absolute_url = serializers.SerializerMethodField()
@@ -471,15 +465,13 @@ class PipelineFamilySerializer(AccessControlSerializer,
                   "user",
                   "users_allowed",
                   "groups_allowed",
-                  'published_version',
-                  'published_version_display_name',
                   "absolute_url",
                   'removal_plan',
                   "num_revisions",
                   'members',
-                  'members_url')
+                  'members_url'
+        )
         read_only_fields = (
-            "published_version",
             "members"
         )
 
@@ -487,3 +479,56 @@ class PipelineFamilySerializer(AccessControlSerializer,
         if not obj:
             return None
         return '/pipelines/{}'.format(obj.pk)
+
+    def get_members(self, obj):
+        """
+        Wrapper for a PipelineSummarySerializer that allows us to pass in some context.
+        """
+        if not obj:
+            return None
+
+        serializer = PipelineSummarySerializer(obj.members, many=True, context=self.context)
+        return serializer.data
+
+
+class AnalysisSerializer(PipelineFamilySerializer):
+    """
+    A modified version of PipelineFamilySerializer used for choosing a Pipeline for an analysis.
+
+    Everything looks the same except that members have non-published versions filtered out
+    if you aren't a developer.
+    """
+    class Meta:
+        model = PipelineFamily
+        fields = ('id',
+                  'url',
+                  'name',
+                  "description",
+                  "user",
+                  "users_allowed",
+                  "groups_allowed",
+                  "absolute_url",
+                  'removal_plan',
+                  "num_revisions",
+                  'members',
+                  'members_url'
+        )
+        read_only_fields = (
+            "members"
+        )
+
+    def get_members(self, obj):
+        """
+        Akin to the superclass' method but with extra filtering.
+        """
+        if not obj:
+            return None
+
+        curr_user = self.context["request"].user
+        user_plus = KiveUser.kiveify(curr_user)
+        accessible_members = obj.members.filter(user_plus.access_query())
+        if not developer_check(curr_user):
+            accessible_members = accessible_members.filter(published=True)
+
+        serializer = PipelineSummarySerializer(accessible_members, many=True, context=self.context)
+        return serializer.data

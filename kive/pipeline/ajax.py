@@ -98,6 +98,7 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
                                    Q(description__icontains=value))
         raise APIException('Unknown filter key: {}'.format(key))
 
+
 class PipelineViewSet(CleanCreateModelMixin,
                       RemovableModelViewSet):
     queryset = Pipeline.objects.all()
@@ -152,6 +153,30 @@ class PipelineViewSet(CleanCreateModelMixin,
             new_pipeline.complete_clean()
         except DjangoValidationError as ex:
             raise convert_validation(ex)
+
+    def partial_update(self, request, pk=None):
+        """
+        Defines PATCH functionality on a Pipeline.
+        """
+        if "published" in request.data:
+            # This is a PATCH to publish/unpublish this Pipeline.
+            return self.change_published_version(request)
+
+        return Response({"message": "No action taken."})
+
+    def change_published_version(self, request):
+        pipeline_to_change = self.get_object()
+        if request.data.get("published") == "" or request.data.get("published") is None:
+            return Response({"message": "published is unspecified."})
+
+        publish_update = request.data.get("published", "false") == "true"
+        pipeline_to_change.published = publish_update
+        pipeline_to_change.save()
+        response_msg = 'Pipeline "{}" has been {}published.'.format(
+            pipeline_to_change,
+            "" if publish_update else "un"
+        )
+        return Response({'message': response_msg})
 
 
 @login_required

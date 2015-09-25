@@ -537,13 +537,13 @@ $(function() {
         var is_new = e.data.action == "new";
         var is_revision = e.data.action == "revise";
 
-        // arguments to initialize new Pipeline Family
+        // arguments to initialize new Pipeline Familyﬁ
         var family_name = $('#id_family_name').val(),  // hidden input if revision
             family_desc = $('#id_family_desc').val(),
             family_pk = $('#id_family_pk').val(),
             revision_name = $('#id_revision_name').val(),
             revision_desc = $('#id_revision_desc').val(),
-            publish_on_submit = $('#publish_on_submit').prop('checked'),
+            published = $('#published').prop('checked'),
             users_allowed = [],
             groups_allowed = [];
 
@@ -582,7 +582,7 @@ $(function() {
             revision_name: revision_name,
             revision_desc: revision_desc,
             revision_parent: is_revision ? JSON.parse($("#initial_data").text()).id : null,
-            publish_on_submit: publish_on_submit,
+            published: published,
 
             // Canvas information to store in the Pipeline object.
             canvas_width: canvas.width,

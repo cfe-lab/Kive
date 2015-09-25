@@ -680,37 +680,61 @@ def _method_forms_check_valid(family_form, method_form, input_form_tuples, outpu
 
 @login_required
 @user_passes_test(developer_check)
-def method_add(request, id=None):
+def method_new(request):
     """
-    Generate forms for adding Methods, and validate and process POST data returned
-    by the user.  Allows for an arbitrary number of input and output forms.
+    Generate/validate/process forms creating a new MethodFamily and initial Method.
 
-    [id] : User is adding a new Method to an existing family
-           without a specified parent Method (different CodeResource)
-           If id is None, then user is creating a new MethodFamily.
+    Allows for an arbitrary number of input and output forms.
     """
     creating_user = request.user
-    if id:
-        four_oh_four = False
-        try:
-            this_family = MethodFamily.objects.get(pk=id)
-            if not this_family.can_be_accessed(creating_user):
-                four_oh_four = True
-        except MethodFamily.DoesNotExist:
+    header = 'Start a new MethodFamily with an initial Method'
+
+    return _method_creation_helper(request, method_family=None)
+
+
+@login_required
+@user_passes_test(developer_check)
+def method_add(request, id):
+    """
+    Generate/validate/process forms for adding a Method to an existing MethodFamily.
+
+    Allows for an arbitrary number of input and output forms.
+
+    [id] : primary key of the MethodFamily that this Method is being added to.
+    """
+    creating_user = request.user
+
+    four_oh_four = False
+    try:
+        this_family = MethodFamily.objects.get(pk=id)
+        if not this_family.can_be_accessed(creating_user):
             four_oh_four = True
-        if four_oh_four:
-            raise Http404("ID {} is inaccessible".format(id))
+    except MethodFamily.DoesNotExist:
+        four_oh_four = True
+    if four_oh_four:
+        raise Http404("ID {} is inaccessible".format(id))
 
-        header = "Add a new Method to MethodFamily '%s'" % this_family.name
-    else:
-        this_family = None
-        header = 'Start a new MethodFamily with an initial Method'
+    return _method_creation_helper(request, method_family=this_family)
 
-    t = loader.get_template('method/method_add.html')
+
+def _method_creation_helper(request, method_family=None):
+    """
+    Helper for method_new and method_add.
+
+    [request]: the request that actually came in.
+    [method_family]: the MethodFamily to add to if applicable, None otherwise.
+    """
+    creating_user = request.user
+
+    header = 'Start a new MethodFamily with an initial Method'
+    if method_family:
+        header = "Add a new Method to MethodFamily '%s'" % method_family.name
+
+    t = loader.get_template('method/method.html')
     c = RequestContext(request)
     if request.method == 'POST':
         family_form, method_form, input_form_tuples, output_form_tuples = create_method_forms(
-            request.POST, creating_user, family=this_family)
+            request.POST, creating_user, family=method_family)
         if not _method_forms_check_valid(family_form, method_form, input_form_tuples, output_form_tuples):
             # Bail out now if there are any problems.
             c.update(
@@ -719,24 +743,21 @@ def method_add(request, id=None):
                     'method_form': method_form,
                     'input_forms': input_form_tuples,
                     'output_forms': output_form_tuples,
-                    'family': this_family,
+                    'family': method_family,
                     'header': header
                 })
             return HttpResponse(t.render(c))
 
         # Next, attempt to build the Method and its associated MethodFamily (if necessary),
         # inputs, and outputs.
-        create_method_from_forms(
+        just_created = create_method_from_forms(
             family_form, method_form, input_form_tuples, output_form_tuples, creating_user,
-            family=this_family
+            family=method_family
         )
 
         if _method_forms_check_valid(family_form, method_form, input_form_tuples, output_form_tuples):
             # Success!
-            if id:
-                return HttpResponseRedirect('/methods/{}'.format(id))
-            else:
-                return HttpResponseRedirect('/method_families')
+            return HttpResponseRedirect('/methods/{}'.format(just_created.family.pk))
 
     else:
         # Prepare a blank set of forms for rendering.
@@ -757,7 +778,7 @@ def method_add(request, id=None):
             'method_form': method_form,
             'input_forms': input_form_tuples,
             'output_forms': output_form_tuples,
-            'family': this_family,
+            'family': method_family,
             'header': header
         })
     return HttpResponse(t.render(c))
@@ -770,7 +791,7 @@ def method_revise(request, id):
     Add a revision of an existing Method.  revision_parent is defined by the
     previous version.
     """
-    t = loader.get_template('method/method_revise.html')
+    t = loader.get_template('method/method.html')
     c = RequestContext(request)
     creating_user = request.user
 
@@ -824,7 +845,7 @@ def method_revise(request, id):
 
     else:
         # initialize forms with values of parent Method
-        family_form = MethodFamilyForm(request.POST)
+        family_form = MethodFamilyForm({"name": family.name, "description": family.description})
         parent_users_allowed = [x.pk for x in parent_revision.users_allowed.all()]
         parent_groups_allowed = [x.pk for x in parent_revision.groups_allowed.all()]
         method_revise_form = MethodReviseForm(
@@ -869,7 +890,7 @@ def method_revise(request, id):
         (str(x.id), '{}: {}'.format(x.revision_number, x.revision_name)) for x in all_revisions
     ]
     c.update({'coderesource': this_code_resource,
-              'method_revise_form': method_revise_form,
+              'method_form': method_revise_form,
               'input_forms': input_form_tuples,
               'output_forms': output_form_tuples,
               'family': family,

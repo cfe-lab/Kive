@@ -22,7 +22,6 @@ from file_access_utils import compute_md5
 from librarian.models import ExecRecord, SymbolicDataset
 
 from kive.tests import BaseTestCases, install_fixture_files, restore_production_files
-import metadata.tests
 from method.models import Method
 from pipeline.models import Pipeline, PipelineStep
 import sandbox.execute
@@ -3731,7 +3730,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
             pk=self.detail_pk).symbolicdataset_id
         
         request = self.factory.patch(self.detail_path,
-                                     {'is_redacted': True})
+                                     {'is_redacted': "true"})
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
         self.assertEquals(response.status_code, status.HTTP_200_OK)
@@ -3802,7 +3801,7 @@ class MethodOutputApiTests(BaseTestCases.ApiTestCase):
 
     def test_redaction(self):
         request = self.factory.patch(self.detail_path,
-                                     {'output_redacted': True})
+                                     {'output_redacted': "true"})
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
         self.assertEquals(response.status_code, status.HTTP_200_OK)

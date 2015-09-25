@@ -1227,8 +1227,7 @@
     {
         "fields": {
             "description": "self.pf desc", 
-            "groups_allowed": [], 
-            "published_version": null, 
+            "groups_allowed": [],
             "users_allowed": [], 
             "user": 2, 
             "name": "self.pf"

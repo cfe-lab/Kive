@@ -68,7 +68,6 @@
     "pk": 2, 
     "model": "pipeline.pipelinefamily", 
     "fields": {
-        "published_version": 13,
         "name": "MiSeq",
         "description": "",
         "user": 1,
@@ -81,7 +80,8 @@
     "fields": {
         "revision_number": 1, 
         "revision_parent": null, 
-        "family": 2
+        "family": 2,
+        "published": true
     }
 },
 {

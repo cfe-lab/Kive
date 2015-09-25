@@ -98,12 +98,13 @@ def dataset_view(request, dataset_id):
     # If we have a mismatched output, we do an alignment
     # over the columns
     if dataset.content_matches_header:
-        col_matching, processed_rows = None, dataset.rows(True)
+        col_matching, processed_rows = None, dataset.rows(True,
+                                                          limit=DATASET_DISPLAY_MAX)
     else:
         col_matching, insert = dataset.column_alignment()
-        processed_rows = dataset.rows(data_check=True, insert_at=insert)
-
-    processed_rows = zip(*zip(processed_rows, xrange(DATASET_DISPLAY_MAX)))[0]
+        processed_rows = dataset.rows(data_check=True,
+                                      insert_at=insert,
+                                      limit=DATASET_DISPLAY_MAX)
 
     t = loader.get_template("archive/dataset_view.html")
     c = RequestContext(request, {'dataset': dataset, 'column_matching': col_matching, 'processed_rows': processed_rows,
