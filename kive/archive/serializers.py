@@ -136,27 +136,35 @@ class RunOutputsSerializer(serializers.ModelSerializer):
 
         request = self.context.get('request', None)
         inputs = []
+        pipeline_inputs = run.runtoprocess.pipeline.inputs
 
-        for i, _input in enumerate(run.runtoprocess.inputs.all()):
-
-
-
+        for i, input in enumerate(run.runtoprocess.inputs.all()):
+            has_data = input.symbolicdataset.has_data()
+            if has_data:
+                input_name = input.symbolicdataset.dataset.name
+            else:
+                pipeline_input = pipeline_inputs.get(dataset_idx=input.index)
+                input_name = pipeline_input.dataset_name
             input_data = _RunDataset(step_name=(i == 0 and 'Run inputs' or ''),
-                            output_name=_input.symbolicdataset.dataset.name,
-                            type='dataset')
-            input_data.set_dataset(_input.symbolicdataset.dataset, request)
+                                     output_name=input_name,
+                                     type='dataset')
+            if has_data:
+                input_data.set_dataset(input.symbolicdataset.dataset, request)
             inputs += [input_data]
 
-        for output in inputs:
-            output.is_invalid = not output.is_ok and output.id is not None
-            output.step_name = str(output.step_name)
-            output.output_name = str(output.output_name)
+        for input in inputs:
+            input.is_invalid = not input.is_ok and input.id is not None
+            input.step_name = str(input.step_name)
+            input.output_name = str(input.output_name)
 
-            if output.size != 'redacted':
-                output.size = filesizeformat(output.size)
-                output.date = timezone.localtime(output.date).strftime(
+            try:
+                input.size += 0
+                # It's a number, so format it nicely, along with date.
+                input.size = filesizeformat(input.size)
+                input.date = timezone.localtime(input.date).strftime(
                     '%d %b %Y %H:%M:%S')
-
+            except TypeError:
+                pass # Size was not a number, so leave it alone.
 
         return [inp.__dict__ for inp in inputs]
 

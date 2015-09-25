@@ -2141,11 +2141,15 @@ class Dataset(models.Model):
         rows = self.all_rows()
         return next(rows)
 
-    def rows(self, data_check=False, insert_at=None):
+    def rows(self, data_check=False, insert_at=None, limit=None):
         rows = self.all_rows(data_check, insert_at)
-        next(rows)  # skip header
-        for row in rows:
-            yield row
+        for i, row in enumerate(rows):
+            if i == 0:
+                pass # skip header
+            else:
+                yield row
+            if limit is not None and i >= limit:
+                break
 
     def expected_header(self):
         header = []
