@@ -160,8 +160,8 @@ $(function() {
 
             <select id="id_select_cdt" name="select_cdt" class="select-label">
                 <option value="">Raw</option>
-                {% for cdt in compound_datatypes %}
-                    <option value="{{ cdt.pk }}">{{ cdt }}</option>
+                {% for name, pk in compound_datatypes %}
+                    <option value="{{ pk }}">{{ name }}</option>
                 {% endfor %}
             </select>
 

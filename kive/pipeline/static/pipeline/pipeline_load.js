@@ -92,8 +92,7 @@ var pipeline = (function(exports){
 
         // at least one Connector must terminate as pipeline output
         if (pipeline_outputs.length === 0) {
-            submitError('Pipeline has no output');
-            return;
+            throw 'Pipeline has no output.';
         }
 
         // Now we're ready to start

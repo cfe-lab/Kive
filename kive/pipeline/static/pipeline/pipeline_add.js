@@ -226,9 +226,13 @@ $(function() {
                 shape;
             
             if (this_pk === ""){
-                shape = new drydock_objects.RawNode(         pos.left, pos.top, node_label);
+                shape = new drydock_objects.RawNode(pos.left, pos.top, node_label);
             } else {
-                shape = new drydock_objects.CdtNode(this_pk, pos.left, pos.top, node_label);
+                shape = new drydock_objects.CdtNode(
+                        parseInt(this_pk),
+                        pos.left,
+                        pos.top,
+                        node_label);
             }
             canvasState.addShape(shape);
             canvasState.detectCollisions(shape, 0);// Second arg: Upon collision, move new shape 0% and move existing objects 100%
