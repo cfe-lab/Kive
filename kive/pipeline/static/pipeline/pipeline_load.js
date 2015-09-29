@@ -146,7 +146,7 @@ var pipeline = (function(exports){
                         step.new_code_resource_revision ?
                                 step.new_code_resource_revision.id :
                                     null),
-                outputs_to_delete: step.outputs_to_delete
+                new_outputs_to_delete_names: step.outputs_to_delete
             };
 
             if (step.new_dependencies && step.new_dependencies.length) {
