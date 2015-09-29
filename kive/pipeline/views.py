@@ -50,7 +50,7 @@ def pipeline_families(request):
 @user_passes_test(developer_check)
 def pipelines(request, id):
     """
-    Display a list of all Pipelines within a given MethodFamily.
+    Display a list of all Pipelines within a given PipelineFamily.
     """
     four_oh_four = False
     try:
@@ -94,6 +94,12 @@ def prepare_pipeline_dict(request_body, user):
     form_data["user"] = user.pk
     return form_data
 
+def _get_compound_datatypes(request):
+    """ Get a sorted list of (name, id) pairs for compound datatypes. """
+    compound_datatypes = [(cdt.short_name, cdt.pk)
+                          for cdt in CompoundDatatype.filter_by_user(request.user)]
+    compound_datatypes.sort()
+    return compound_datatypes
 
 @login_required
 @user_passes_test(developer_check)
@@ -104,9 +110,9 @@ def pipeline_new(request):
     """
     t = loader.get_template('pipeline/pipeline.html')
     method_families = MethodFamily.filter_by_user(request.user).order_by('name')
-    compound_datatypes = CompoundDatatype.filter_by_user(request.user)
     acf = metadata.forms.AccessControlForm()
-    c = RequestContext(request, {'method_families': method_families, 'compound_datatypes': compound_datatypes,
+    c = RequestContext(request, {'method_families': method_families,
+                                 'compound_datatypes': _get_compound_datatypes(request),
                                  "access_control_form": acf})
 
     return HttpResponse(t.render(c))
@@ -120,7 +126,6 @@ def pipeline_add(request, id=None):
     """
     t = loader.get_template('pipeline/pipeline.html')
     method_families = MethodFamily.filter_by_user(request.user).order_by('name')
-    compound_datatypes = CompoundDatatype.filter_by_user(request.user)
 
     # Retrieve this pipeline from database.
     four_oh_four = False
@@ -147,7 +152,7 @@ def pipeline_add(request, id=None):
         {
             "family": family,
             'method_families': method_families,
-            'compound_datatypes': compound_datatypes,
+            'compound_datatypes': _get_compound_datatypes(request),
             "access_control_form": acf
         }
     )
@@ -167,7 +172,6 @@ def pipeline_revise(request, id):
     """
     t = loader.get_template('pipeline/pipeline.html')
     method_families = MethodFamily.filter_by_user(request.user).order_by('name')
-    compound_datatypes = CompoundDatatype.filter_by_user(request.user)
 
     # Retrieve this pipeline from database.
     four_oh_four = False
@@ -202,7 +206,7 @@ def pipeline_revise(request, id):
             "parent_revision": parent_revision,
             "parent_revision_json": parent_revision_json,
             'method_families': method_families,
-            'compound_datatypes': compound_datatypes,
+            'compound_datatypes': _get_compound_datatypes(request),
             "access_control_form": acf
         }
     )

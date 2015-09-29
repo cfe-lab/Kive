@@ -14,6 +14,7 @@ from archive.models import summarize_redaction_plan
 from metadata.models import AccessControl, RTPNotFinished
 from portal.views import developer_check, admin_check
 
+
 def convert_validation(ex):
     """ Convert Django validation error to REST framework validation error """
     
@@ -32,8 +33,10 @@ def convert_validation(ex):
     
     return serializers.ValidationError(errors)
 
+
 class StandardPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
+
 
 class IsGrantedReadOnly(permissions.BasePermission):
     """ Custom permission for historical resources like runs.
@@ -83,7 +86,7 @@ class IsDeveloperOrGrantedReadOnly(IsGrantedReadOnly):
             return True
         if request.method in permissions.SAFE_METHODS:
             return True
-        return developer_check(request.user) and request.method == 'POST'
+        return developer_check(request.user) and request.method in ("POST", "PATCH")
 
 
 class GrantedModelMixin(object):
@@ -138,7 +141,8 @@ class RedactModelMixin(object):
         pass
 
     def partial_update(self, request, pk=None):
-        if request.data.get('is_redacted', False):
+        is_redacted = request.data.get("is_redacted", "false") == "true"
+        if is_redacted:
             try:
                 self.get_object().redact()
             except RTPNotFinished as e:
@@ -150,6 +154,7 @@ class RedactModelMixin(object):
     def redaction_plan(self, request, pk=None):
         redaction_plan = self.get_object().build_redaction_plan()
         return Response(summarize_redaction_plan(redaction_plan))
+
 
 class RemoveModelMixin(mixins.DestroyModelMixin):
     """ Remove a model instance and build a removal plan.

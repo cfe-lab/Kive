@@ -13,12 +13,14 @@ import os
 import glob
 import shutil
 
+from django.conf import settings
 from django.utils import timezone
 
 import archive.models
+from archive.models import Dataset
+from fleet.exceptions import SandboxActiveException
 import fleet.models
 import sandbox.execute
-import kive.settings  # @UnresolvedImport
 
 mgr_logger = logging.getLogger("fleet.Manager")
 worker_logger = logging.getLogger("fleet.Worker")
@@ -320,129 +322,146 @@ class Manager:
         """
         Poll the database for new jobs, and handle running of sandboxes.
         """
-        purge_interval = datetime.timedelta(days=kive.settings.SANDBOX_PURGE_DAYS,
-                                            hours=kive.settings.SANDBOX_PURGE_HOURS,
-                                            minutes=kive.settings.SANDBOX_PURGE_MINUTES)
-        keep_recent = kive.settings.SANDBOX_KEEP_RECENT
-
         while True:
-            # We can't use a for loop over the task queue because assign_task may add to the queue.
-            while len(self.task_queue) > 0:
-                # task_queue entries are (sandbox, run_step)
-                self.task_queue.sort(key=lambda entry: entry[0].run.start_time)
-                curr_task = self.task_queue[0] # looks like (sandbox, task)
-                task_sdbx = self.active_sandboxes[curr_task[1].top_level_run]
-                # We assign this task to a worker, and do not proceed until the task
-                # is assigned.
+            if not self.assign_tasks():
+                return
+
+            # Everything in the queue has been started, so we check and see if
+            # anything has finished.
+            if not self.wait_for_polling():
+                return
+
+            self.find_new_runs()
+            self.purge_sandboxes()
+            Dataset.purge()
+            
+    def assign_tasks(self):
+        # We can't use a for loop over the task queue because assign_task may add to the queue.
+        while len(self.task_queue) > 0:
+            # task_queue entries are (sandbox, run_step)
+            self.task_queue.sort(key=lambda entry: entry[0].run.start_time)
+            curr_task = self.task_queue[0] # looks like (sandbox, task)
+            task_sdbx = self.active_sandboxes[curr_task[1].top_level_run]
+            # We assign this task to a worker, and do not proceed until the task
+            # is assigned.
+            try:
+                self.assign_task(task_sdbx, curr_task[1])
+            except WorkerFailedException as e:
+                mgr_logger.error(e.error_msg)
+                return False
+            self.task_queue = self.task_queue[1:]
+        return True
+    
+    def wait_for_polling(self):
+        time_to_poll = time.time() + settings.FLEET_POLLING_INTERVAL
+        while time.time() < time_to_poll:
+            if self.comm.Iprobe(source=MPI.ANY_SOURCE, tag=Worker.FINISHED):
+                lord_rank, result_pk = self.comm.recv(source=MPI.ANY_SOURCE,
+                                                      tag=Worker.FINISHED)
                 try:
-                    self.assign_task(task_sdbx, curr_task[1])
+                    self.worker_finished(lord_rank, result_pk)
+                    break
                 except WorkerFailedException as e:
                     mgr_logger.error(e.error_msg)
-                    return
-                self.task_queue = self.task_queue[1:]
+                    return False
 
-            # Everything in the queue has been started, so we check and see if anything has finished.
-            time_to_poll = time.time() + kive.settings.FLEET_POLLING_INTERVAL
-            while time.time() < time_to_poll:
-                if self.comm.Iprobe(source=MPI.ANY_SOURCE, tag=Worker.FINISHED):
-                    lord_rank, result_pk = self.comm.recv(source=MPI.ANY_SOURCE,
-                                                          tag=Worker.FINISHED)
-                    try:
-                        self.worker_finished(lord_rank, result_pk)
-                        break
-                    except WorkerFailedException as e:
-                        mgr_logger.error(e.error_msg)
-                        return
+            try:
+                time.sleep(SLEEP_SECONDS)
+            except KeyboardInterrupt:
+                return False
+        return True
+        
+    def find_new_runs(self):
+        # Look for new jobs to run.  We will also
+        # build in a delay here so we don't clog up the database.
+        mgr_logger.debug("Looking for new runs....")
+        # with transaction.atomic():
+        pending_runs = [x for x in fleet.models.RunToProcess.objects.order_by("time_queued") if not x.started]
 
-                try:
-                    time.sleep(SLEEP_SECONDS)
-                except KeyboardInterrupt:
-                    return
+        mgr_logger.debug("Pending runs: {}".format(pending_runs))
 
-            # Look for new jobs to run.  We will also
-            # build in a delay here so we don't clog up the database.
-            mgr_logger.debug("Looking for new runs....")
-            # with transaction.atomic():
-            pending_runs = [x for x in fleet.models.RunToProcess.objects.order_by("time_queued") if not x.started]
-
-            mgr_logger.debug("Pending runs: {}".format(pending_runs))
-
-            for run_to_process in pending_runs:
-                threads_needed = run_to_process.pipeline.threads_needed()
-                if threads_needed > self.max_host_cpus:
-                    mgr_logger.info(
-                        "Cannot run Pipeline %s for user %s: %d threads required, %d available",
-                        run_to_process.pipeline, run_to_process.user, threads_needed,
-                        self.max_host_cpus)
-                    esc = fleet.models.ExceedsSystemCapabilities(
-                        runtoprocess = run_to_process,
-                        threads_requested=threads_needed,
-                        max_available=self.max_host_cpus
-                    )
-                    esc.save()
-                    run_to_process.clean()
-                    continue
-
-                mgr_logger.info("Starting run:\nPipeline: {}\nUser: {}".format(
-                    run_to_process.pipeline, run_to_process.user))
-                new_sdbx = self.start_run(run_to_process.user, run_to_process.pipeline,
-                                          [x.symbolicdataset for x in run_to_process.inputs.order_by("index")],
-                                          users_allowed=run_to_process.users_allowed.all(),
-                                          groups_allowed=run_to_process.groups_allowed.all(),
-                                          sandbox_path=run_to_process.sandbox_path)
-                run_to_process.run = new_sdbx.run
-                run_to_process.sandbox_path = new_sdbx.sandbox_path
-                run_to_process.save()
-
-                mgr_logger.debug("Task queue: {}".format(self.task_queue))
-                mgr_logger.debug("Active sandboxes: {}".format(self.active_sandboxes))
-
-            # Next, look for finished jobs to clean up.
-            mgr_logger.debug("Checking for old sandboxes to clean up....")
-
-            purge_candidates = fleet.models.RunToProcess.objects.filter(
-                run__isnull=False, run__end_time__isnull=False,
-                run__end_time__lte=timezone.now()-purge_interval,
-                purged=False)
-
-            # Retain the most recent ones for each PipelineFamily.
-            pfs_represented = purge_candidates.values_list("pipeline__family")
-
-            ready_to_purge = []
-            for pf in set(pfs_represented):
-                # Look for the oldest ones.
-                curr_candidates = purge_candidates.filter(pipeline__family=pf).order_by("run__end_time")
-                num_remaining = curr_candidates.count()
-
-                ready_to_purge = itertools.chain(
-                    ready_to_purge,
-                    curr_candidates[:max(num_remaining - keep_recent, 0)]
+        for run_to_process in pending_runs:
+            threads_needed = run_to_process.pipeline.threads_needed()
+            if threads_needed > self.max_host_cpus:
+                mgr_logger.info(
+                    "Cannot run Pipeline %s for user %s: %d threads required, %d available",
+                    run_to_process.pipeline, run_to_process.user, threads_needed,
+                    self.max_host_cpus)
+                esc = fleet.models.ExceedsSystemCapabilities(
+                    runtoprocess = run_to_process,
+                    threads_requested=threads_needed,
+                    max_available=self.max_host_cpus
                 )
+                esc.save()
+                run_to_process.clean()
+                continue
 
-            for rtp in ready_to_purge:
+            mgr_logger.info("Starting run:\nPipeline: {}\nUser: {}".format(
+                run_to_process.pipeline, run_to_process.user))
+            new_sdbx = self.start_run(run_to_process.user, run_to_process.pipeline,
+                                      [x.symbolicdataset for x in run_to_process.inputs.order_by("index")],
+                                      users_allowed=run_to_process.users_allowed.all(),
+                                      groups_allowed=run_to_process.groups_allowed.all(),
+                                      sandbox_path=run_to_process.sandbox_path)
+            run_to_process.run = new_sdbx.run
+            run_to_process.sandbox_path = new_sdbx.sandbox_path
+            run_to_process.save()
+
+            mgr_logger.debug("Task queue: {}".format(self.task_queue))
+            mgr_logger.debug("Active sandboxes: {}".format(self.active_sandboxes))
+
+    def purge_sandboxes(self):
+        # Next, look for finished jobs to clean up.
+        mgr_logger.debug("Checking for old sandboxes to clean up....")
+
+        purge_interval = datetime.timedelta(days=settings.SANDBOX_PURGE_DAYS,
+                                            hours=settings.SANDBOX_PURGE_HOURS,
+                                            minutes=settings.SANDBOX_PURGE_MINUTES)
+        keep_recent = settings.SANDBOX_KEEP_RECENT
+
+        purge_candidates = fleet.models.RunToProcess.objects.filter(
+            run__isnull=False, run__end_time__isnull=False,
+            run__end_time__lte=timezone.now()-purge_interval,
+            purged=False)
+
+        # Retain the most recent ones for each PipelineFamily.
+        pfs_represented = purge_candidates.values_list("pipeline__family")
+
+        ready_to_purge = []
+        for pf in set(pfs_represented):
+            # Look for the oldest ones.
+            curr_candidates = purge_candidates.filter(pipeline__family=pf).order_by("run__end_time")
+            num_remaining = curr_candidates.count()
+
+            ready_to_purge = itertools.chain(
+                ready_to_purge,
+                curr_candidates[:max(num_remaining - keep_recent, 0)]
+            )
+
+        for rtp in ready_to_purge:
+            try:
+                mgr_logger.debug("Removing sandbox at {}".format(rtp.sandbox_path))
+                rtp.collect_garbage()
+            except SandboxActiveException as e:
+                mgr_logger.debug(e)
+
+        # Next, look through the sandbox directory and see if there are any orphaned sandboxes
+        # to remove.
+        mgr_logger.debug("Checking for orphaned sandbox directories to clean up....")
+
+        sdbx_path = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
+        for putative_sdbx in glob.glob(os.path.join(sdbx_path, sandbox.execute.sandbox_glob)):
+
+            # Remove this sandbox if there is no RunToProcess that is on record as having used it.
+            matching_rtps = fleet.models.RunToProcess.objects.filter(
+                sandbox_path__startswith=putative_sdbx,
+            )
+            if not matching_rtps.exists():
                 try:
-                    mgr_logger.debug("Removing sandbox at {}".format(rtp.sandbox_path))
-                    rtp.collect_garbage()
-                except fleet.models.SandboxActiveException as e:
-                    mgr_logger.debug(e)
-
-            # Next, look through the sandbox directory and see if there are any orphaned sandboxes
-            # to remove.
-            mgr_logger.debug("Checking for orphaned sandbox directories to clean up....")
-
-            sdbx_path = os.path.join(kive.settings.MEDIA_ROOT, kive.settings.SANDBOX_PATH)
-            for putative_sdbx in glob.glob(os.path.join(sdbx_path, sandbox.execute.sandbox_glob)):
-
-                # Remove this sandbox if there is no RunToProcess that is on record as having used it.
-                matching_rtps = fleet.models.RunToProcess.objects.filter(
-                    sandbox_path__startswith=putative_sdbx,
-                )
-                if not matching_rtps.exists():
-                    try:
-                        path_to_rm = os.path.join(sdbx_path, putative_sdbx)
-                        shutil.rmtree(path_to_rm)
-                    except OSError as e:
-                        mgr_logger.warning(e)
+                    path_to_rm = os.path.join(sdbx_path, putative_sdbx)
+                    shutil.rmtree(path_to_rm)
+                except OSError as e:
+                    mgr_logger.warning(e)
 
 class Worker:
     """

@@ -6,26 +6,30 @@ Dataset, etc.
 """
 from __future__ import unicode_literals
 
-from django.db import models, transaction
-from django.db.models.signals import post_delete
-from django.core.exceptions import ValidationError, ObjectDoesNotExist
-from django.core.urlresolvers import reverse
-from django.utils.encoding import python_2_unicode_compatible
-
-import logging
+import csv
+from datetime import datetime, timedelta
+import file_access_utils
+import heapq
 import itertools
+import logging
+from operator import attrgetter, itemgetter
 import os
 import time
-import file_access_utils
-import csv
-from operator import attrgetter, itemgetter
 
-from datachecking.models import ContentCheckLog, IntegrityCheckLog
-import stopwatch.models
-import metadata.models
-from constants import maxlengths
+from django.db import models, transaction
+from django.db.models.signals import post_delete
+from django.conf import settings
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
+from django.core.urlresolvers import reverse
+from django.template.defaultfilters import filesizeformat
+from django.utils.encoding import python_2_unicode_compatible
+
 import archive.signals
+from constants import maxlengths
+from datachecking.models import ContentCheckLog, IntegrityCheckLog
 import fleet.exceptions
+import metadata.models
+import stopwatch.models
 
 
 def empty_redaction_plan():
@@ -832,7 +836,7 @@ class RunComponent(stopwatch.models.Stopwatch):
             if ds.symbolicdataset not in removal_plan["SymbolicDatasets"]:
                 metadata.models.update_removal_plan(removal_plan, ds.symbolicdataset.build_removal_plan(removal_plan))
 
-        if self.has_log and self.execrecord.generator == self.log:
+        if self.has_log and self.execrecord and self.execrecord.generator == self.log:
             if self.execrecord not in removal_plan["ExecRecords"]:
                 metadata.models.update_removal_plan(removal_plan, self.execrecord.build_removal_plan(removal_plan))
 
@@ -2109,6 +2113,8 @@ class Dataset(models.Model):
     # Datasets always have a referring SymbolicDataset
     symbolicdataset = models.OneToOneField("librarian.SymbolicDataset", related_name="dataset")
 
+    logger = logging.getLogger('archive.Dataset')
+
     class Meta:
         ordering = ["-date_created", "name"]
 
@@ -2136,11 +2142,15 @@ class Dataset(models.Model):
         rows = self.all_rows()
         return next(rows)
 
-    def rows(self, data_check=False, insert_at=None):
+    def rows(self, data_check=False, insert_at=None, limit=None):
         rows = self.all_rows(data_check, insert_at)
-        next(rows)  # skip header
-        for row in rows:
-            yield row
+        for i, row in enumerate(rows):
+            if i == 0:
+                pass # skip header
+            else:
+                yield row
+            if limit is not None and i >= limit:
+                break
 
     def expected_header(self):
         header = []
@@ -2321,6 +2331,56 @@ class Dataset(models.Model):
             return self.symbolicdataset.build_redaction_plan()
         return []
 
+    @classmethod
+    def purge(cls,
+              max_storage=settings.DATASET_MAX_STORAGE,
+              target=settings.DATASET_TARGET_STORAGE):
+        
+        files = [] # [(date, path)]
+        start_path = os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR)
+        total_size = 0
+        skipped_count = 0
+        for dirpath, _dirnames, filenames in os.walk(start_path):
+            for filename in filenames:
+                filepath = os.path.join(dirpath, filename)
+                filedate = os.path.getmtime(filepath)
+                filesize = os.path.getsize(filepath)
+                relpath = os.path.relpath(filepath, settings.MEDIA_ROOT)
+                total_size += filesize
+                heapq.heappush(files, (filedate, relpath, filesize))
+        if total_size >= settings.DATASET_MAX_STORAGE:
+            cls.logger.info('Dataset purge triggered at %s over %d files.',
+                            filesizeformat(total_size),
+                            len(files))
+            while total_size > settings.DATASET_TARGET_STORAGE and files:
+                filedate, relpath, filesize = heapq.heappop(files)
+                dataset = Dataset.objects.filter(dataset_file=relpath).first()
+                if dataset is None:
+                    filepath = os.path.join(settings.MEDIA_ROOT, relpath)
+                    filedate = os.path.getmtime(filepath)
+                    file_age = datetime.now() - datetime.fromtimestamp(filedate)
+                    if file_age < timedelta(hours=1):
+                        skipped_count += 1
+                    else:
+                        cls.logger.warn('No dataset matches file %r, deleting it.',
+                                        relpath)
+                        os.remove(filepath)
+                        total_size -= filesize
+                else:
+                    creator = dataset.created_by # run component that created it
+                    consumers = dataset.symbolicdataset.runtoprocessinputs.all()
+                    is_skipped = (creator is None or
+                                  not creator.top_level_run.is_complete() or
+                                  any(not consumer.runtoprocess.finished
+                                      for consumer in consumers))
+                    if is_skipped:
+                        skipped_count += 1
+                    else:
+                        dataset.delete()
+                        total_size -= filesize
+            cls.logger.info('Dataset purge finished, leaving %s over %d files.',
+                            filesizeformat(total_size),
+                            len(files) + skipped_count)
 
 class ExecLog(stopwatch.models.Stopwatch):
     """

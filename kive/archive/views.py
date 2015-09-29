@@ -14,12 +14,14 @@ from django.db import transaction
 from django.forms.formsets import formset_factory
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
-
 from archive.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm, ArchiveAddDatasetForm
 from archive.models import Dataset, MethodOutput
 from archive.serializers import DatasetSerializer
-import librarian.models
 from portal.views import admin_check
+from kive.settings import DATASET_DISPLAY_MAX
+
+import librarian.models
+import fleet.models
 import json
 
 LOGGER = logging.getLogger(__name__)
@@ -96,14 +98,17 @@ def dataset_view(request, dataset_id):
     # If we have a mismatched output, we do an alignment
     # over the columns
     if dataset.content_matches_header:
-        col_matching, processed_rows = None, dataset.rows(True)
+        col_matching, processed_rows = None, dataset.rows(True,
+                                                          limit=DATASET_DISPLAY_MAX)
     else:
         col_matching, insert = dataset.column_alignment()
-        processed_rows = dataset.rows(data_check=True, insert_at=insert)
+        processed_rows = dataset.rows(data_check=True,
+                                      insert_at=insert,
+                                      limit=DATASET_DISPLAY_MAX)
 
     t = loader.get_template("archive/dataset_view.html")
     c = RequestContext(request, {'dataset': dataset, 'column_matching': col_matching, 'processed_rows': processed_rows,
-                                 'return': return_url})
+                                 'return': return_url, "DATASET_DISPLAY_MAX": DATASET_DISPLAY_MAX})
     return HttpResponse(t.render(c))
 
 
@@ -178,6 +183,7 @@ def datasets_add(request):
     """
     Add datasets to db.
     """
+    t = loader.get_template('archive/datasets_add.html')
     c = RequestContext(request)
     if request.method == 'POST':
         single_dataset_form = DatasetForm(request.POST, request.FILES, user=request.user, prefix="single")
@@ -188,6 +194,19 @@ def datasets_add(request):
                 single_dataset_form.add_error(None, "Invalid form submission")
                 success = False
             elif single_dataset_form.is_valid():
+                # calculate md5 checksum for uploaded file
+                checksum = hashlib.md5()
+                for chunk in request.FILES['single-dataset_file'].chunks():
+                    checksum.update(chunk)
+                md5 = checksum.hexdigest()
+
+                # check to see if this md5 already exists in database
+                datasets = librarian.models.SymbolicDataset.filter_by_user(request.user).filter(MD5_checksum=md5)
+                if len(datasets) > 0:
+                    single_dataset_form.add_error('dataset_file', 'Dataset with identical md5 already exists.')
+                    c.update({'singleDataset': single_dataset_form})
+                    return HttpResponse(t.render(c))
+
                 single_dataset_form.create_dataset(request.user)
             else:
                 success = False
@@ -200,13 +219,11 @@ def datasets_add(request):
         if success:
             return HttpResponseRedirect("datasets")
         else:
-            t = loader.get_template('archive/datasets_add.html')
             c.update({'singleDataset': single_dataset_form})
 
 
     else:  # return an empty formset for the user to fill in
         single_dataset_form = DatasetForm(user=request.user, prefix="single")
-        t = loader.get_template('archive/datasets_add.html')
         c.update({'singleDataset': single_dataset_form})
 
     return HttpResponse(t.render(c))
@@ -442,9 +459,31 @@ def dataset_lookup(request, md5_checksum=None):
                 checksum.update(chunk)
             md5_checksum = checksum.hexdigest()
 
-    datasets = librarian.models.SymbolicDataset.filter_by_user(request.user).filter(MD5_checksum=md5_checksum)
+    datasets = librarian.models.SymbolicDataset.filter_by_user(request.user).filter(MD5_checksum=md5_checksum).\
+                exclude(dataset__created_by=None)
+
+    datasets_as_inputs = []
+    rtps = fleet.models.RunToProcess.objects.filter(inputs__symbolicdataset__MD5_checksum=md5_checksum)
+
+    for rtp in rtps:
+        for input in [x for x in rtp.inputs.all() if x.symbolicdataset.MD5_checksum == md5_checksum]:
+            breakout = False
+            for d in datasets_as_inputs:
+                if d["rtp_id"] == rtp.id and d["dataset"].id == input.symbolicdataset.dataset.id:
+                    breakout = True
+                    continue
+            if breakout:
+                continue
+
+            datasets_as_inputs += [{
+                "rtp_id": rtp.id,
+                "run": rtp.run,
+                "pipeline": rtp.pipeline,
+                "dataset": input.symbolicdataset.dataset
+            }]
+
     t = loader.get_template('archive/dataset_lookup.html')
-    c = RequestContext(request, {'datasets': datasets, 'md5': md5_checksum})
+    c = RequestContext(request, {'datasets': datasets, 'datasets_as_inputs': datasets_as_inputs, 'md5': md5_checksum})
 
     return HttpResponse(t.render(c))
 

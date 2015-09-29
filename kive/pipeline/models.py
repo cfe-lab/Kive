@@ -38,10 +38,6 @@ class PipelineFamily(transformation.models.TransformationFamily):
     # Implicitly defined:
     #   members (Pipeline/ForeignKey)
 
-    # marks which member of the PipelineFamily in production
-    published_version = models.ForeignKey('Pipeline', null=True, blank=True,
-                                          on_delete=models.SET_NULL)
-
     @property
     def size(self):
         """Returns size of this Pipeline's family"""
@@ -67,11 +63,11 @@ class PipelineFamily(transformation.models.TransformationFamily):
         max_rev = self.max_revision()
         return (max_rev if max_rev is not None else 0) + 1
      
-    @property
-    def published_version_display_name(self):
-        if self.published_version is None:
-            return None
-        return self.published_version.display_name
+    # @property
+    # def published_version_display_name(self):
+    #     if self.published_version is None:
+    #         return None
+    #     return self.published_version.display_name
 
     @property
     def complete_members(self):
@@ -152,6 +148,11 @@ class Pipeline(transformation.models.Transformation):
         blank=True
     )
 
+    # Is this Pipeline a published version?
+    published = models.BooleanField(
+        "Is this Pipeline public?",
+        default=False)
+
     # revision_number must be unique within PipelineFamily.
     class Meta:
         unique_together = (("family", "revision_number"))
@@ -189,7 +190,7 @@ class Pipeline(transformation.models.Transformation):
     @property
     def is_published_version(self):
         """Evaluate if this pipeline revision is marked as the published version"""
-        return self.family.published_version == self
+        return self.published
 
     def clean(self):
         """

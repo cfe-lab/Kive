@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.test import TestCase
 
 from rest_framework.test import APIRequestFactory, force_authenticate
@@ -6,7 +7,6 @@ import os
 import shutil
 
 from metadata.models import kive_user
-import kive.settings
 
 stash_dir = "StashedWhileTesting"
 targets = ["CodeResources",
@@ -68,7 +68,7 @@ def install_fixture_files(fixture_name):
     os.makedirs(stash_dir)
 
     for target in targets:
-        target_path = os.path.join(kive.settings.MEDIA_ROOT, target)
+        target_path = os.path.join(settings.MEDIA_ROOT, target)
         if os.path.isdir(target_path):
             shutil.move(target_path, os.path.join(stash_dir, target))
 
@@ -85,7 +85,7 @@ def restore_production_files():
         return
 
     for target in targets:
-        target_path = os.path.join(kive.settings.MEDIA_ROOT, target)
+        target_path = os.path.join(settings.MEDIA_ROOT, target)
         if os.path.isdir(target_path):
             shutil.rmtree(target_path)
 

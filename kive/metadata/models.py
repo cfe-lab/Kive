@@ -464,7 +464,7 @@ class AccessControl(models.Model):
         """
         if self.user != ac.user:
             raise ValidationError(
-                "Instances have different users", code="different_user"
+                "Instances have different users: %s, %s" % (self.user, ac.user), code="different_user"
             )
 
         non_overlapping_users_allowed = set(self.users_allowed.all()).symmetric_difference(ac.users_allowed.all())

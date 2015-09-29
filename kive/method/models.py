@@ -14,6 +14,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator
 from django.core.files import File
 from django.utils.encoding import python_2_unicode_compatible
+from django.conf import settings
 
 import metadata.models
 import transformation.models
@@ -21,7 +22,6 @@ import file_access_utils
 from constants import maxlengths
 import method.signals
 from metadata.models import empty_removal_plan, remove_helper, update_removal_plan
-import kive.settings
 
 import os
 import stat
@@ -804,7 +804,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 details_to_fill.save()
 
     def invoke_code(self, run_path, input_paths, output_paths,
-                    ssh_sandbox_worker_account=kive.settings.KIVE_SANDBOX_WORKER_ACCOUNT):
+                    ssh_sandbox_worker_account=settings.KIVE_SANDBOX_WORKER_ACCOUNT):
         """
         SYNOPSIS
         Runs a method using the run path and input/outputs.

@@ -233,6 +233,11 @@ SANDBOX_PURGE_MINUTES = 0
 # Keep this many of the most recent Sandboxes for any PipelineFamily.
 SANDBOX_KEEP_RECENT = 10
 
+# When to start purging old output datasets
+DATASET_MAX_STORAGE    = 5 << 40 #TB
+# When to stop purging
+DATASET_TARGET_STORAGE = 2 << 40 #TB
+
 # Worker account configuration
 
 # The system user that actually runs the code.  This user:
@@ -249,3 +254,5 @@ KIVE_SANDBOX_WORKER_ACCOUNT = ""
 # The system group that contains both the user that launches the fleet and
 # the sandbox worker account.  This is ignored if KIVE_SANDBOX_WORKER_ACCOUNT is blank.
 KIVE_GROUP = "kive"
+
+DATASET_DISPLAY_MAX = 100

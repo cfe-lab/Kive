@@ -128,6 +128,14 @@ class RunToProcess(metadata.models.AccessControl):
         status = ""
         step_progress = {}
         cable_progress = {}
+        input_list = {}
+
+        for _input in self.inputs.all():
+            if _input.symbolicdataset.has_data():
+                input_list[_input.index] = {"dataset_id": _input.symbolicdataset.dataset.id,
+                                            "dataset_name": _input.symbolicdataset.dataset.name,
+                                            "md5": _input.symbolicdataset.MD5_checksum}
+
 
         # One of the steps is in progress?
         total_steps = run.pipeline.steps.count()
@@ -202,6 +210,7 @@ class RunToProcess(metadata.models.AccessControl):
         if detailed:
             result['step_progress'] = step_progress
             result['output_progress'] = cable_progress
+            result['inputs'] = input_list
 
         result['status'] = status
         result['id'] = run.id

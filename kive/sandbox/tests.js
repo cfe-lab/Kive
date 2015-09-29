@@ -39,9 +39,8 @@
         });
         
         it('should select published version by default', function() {
-            this.rows[0].members = [{ id: 23, display_name: 'second' },
-                                    { id: 17, display_name: 'first' }];
-            this.rows[0].published_version = 17;
+            this.rows[0].members = [{ id: 23, display_name: 'second', published: false },
+                                    { id: 17, display_name: 'first', published: true}];
             var table = new choose_pipeline.PipelineFamiliesTable(
                     this.$table,
                     this.is_user_admin);
@@ -53,6 +52,22 @@
                 $select = $cells.eq(2).find('select');
             
             expect($select.find('option:selected').text()).toBe('first');
+        });
+
+        it('should select most recent published version by default', function() {
+            this.rows[0].members = [{ id: 23, display_name: 'second', published: true },
+                                    { id: 17, display_name: 'first', published: true}];
+            var table = new choose_pipeline.PipelineFamiliesTable(
+                    this.$table,
+                    this.is_user_admin);
+            table.drawThumbnails = function() {};
+            table.buildTable(this.rows);
+
+            var $rows = this.$table.find('tr'),
+                $cells = $rows.eq(1).find('td'),
+                $select = $cells.eq(2).find('select');
+
+            expect($select.find('option:selected').text()).toBe('second');
         });
     });
     

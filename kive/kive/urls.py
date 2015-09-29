@@ -1,8 +1,8 @@
 from django.conf.urls import patterns, url, include
-from rest_framework.routers import DefaultRouter
 
 from archive.ajax import DatasetViewSet, MethodOutputViewSet
 from fleet.ajax import RunToProcessViewSet
+from kive.kive_router import KiveRouter
 from metadata.ajax import DatatypeViewSet, CompoundDatatypeViewSet
 from method.ajax import MethodViewSet, MethodFamilyViewSet, CodeResourceViewSet, CodeResourceRevisionViewSet
 from pipeline.ajax import PipelineFamilyViewSet, PipelineViewSet
@@ -13,7 +13,7 @@ from portal.forms import LoginForm
 from django.contrib import admin
 admin.autodiscover()
 
-router = DefaultRouter()
+router = KiveRouter()
 router.register(r'coderesourcerevisions', CodeResourceRevisionViewSet)
 router.register(r'coderesources', CodeResourceViewSet)
 router.register(r'compounddatatypes', CompoundDatatypeViewSet)
@@ -66,7 +66,7 @@ urlpatterns = patterns(
 
     url(r'^method_families$', 'method.views.method_families', name='method_families'),
     #url(r'^method_family_add$', 'method.views.method_add', name='method_family_add'),
-    url(r'^method_add$', 'method.views.method_add', name='method_add'),
+    url(r'^method_new$', 'method.views.method_new', name='method_new'),
     url(r'^methods/(?P<id>\d+)/$', 'method.views.methods', name='methods'),
     url(r'^method_add/(?P<id>\d+)/$', 'method.views.method_add', name='method_add'),
     url(r'^method_revise/(?P<id>\d+)/$', 'method.views.method_revise', name='method_revise'),

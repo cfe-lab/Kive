@@ -122,7 +122,7 @@ $(function() {
                 <label for="id_revision_desc" class="text-field-label">Description</label>
                 <textarea id="id_revision_desc" name="revision_desc"></textarea>
                 
-                <div class="form-inline-opts"><input type="checkbox" id="publish_on_submit" name="publish_on_submit"> <label for="publish_on_submit" class="checkbox-label">Publish this revision immediately on submission</label></div>
+                <div class="form-inline-opts"><input type="checkbox" id="published" name="published"> <label for="published" class="checkbox-label">Publish this revision immediately on submission</label></div>
 
                 <h5>Users and groups allowed:</h5>
                 {{ access_control_form.permissions }}
@@ -160,8 +160,8 @@ $(function() {
 
             <select id="id_select_cdt" name="select_cdt" class="select-label">
                 <option value="">Raw</option>
-                {% for cdt in compound_datatypes %}
-                    <option value="{{ cdt.pk }}">{{ cdt }}</option>
+                {% for name, pk in compound_datatypes %}
+                    <option value="{{ pk }}">{{ name }}</option>
                 {% endfor %}
             </select>
 

@@ -2905,8 +2905,7 @@
             "description": "PF desc", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 2, 
             "name": "Pipeline_family"
@@ -2919,8 +2918,7 @@
             "description": "Innermost pipeline", 
             "groups_allowed": [
                 1
-            ], 
-            "published_version": null, 
+            ],
             "users_allowed": [], 
             "user": 2, 
             "name": "P_basic"

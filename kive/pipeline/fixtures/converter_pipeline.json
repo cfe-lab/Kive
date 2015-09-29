@@ -3,7 +3,6 @@
     "pk": 1,
     "model": "pipeline.pipelinefamily",
     "fields": {
-        "published_version": null,
         "name": "Fasta2CSV",
         "description": "One-step pipeline wrapper for Fasta2CSV Method",
         "user": 1,

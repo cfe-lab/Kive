@@ -460,11 +460,18 @@ code on a developer workstation.
     
 Creating a UML diagram of the backend
 -------------------------------------
-The optional `django-extensions` module adds a command to `./manage.py` that creates a UML representation of the database design using either `pydot` or `pygraphviz`.  For example, to build a UML diagram of the `method` app, you may use
+The optional `django-extensions` module adds a command to `./manage.py` that
+creates a UML representation of the database design using either `pydot` or
+`pygraphviz`.  For example, to build a UML diagram of the `method` app, you may
+use:
 
     ./manage.py graph_models --pygraphviz --settings=kive.UML_settings method -g > method.dot
     
-This creates a `.dot` file that can be opened using GraphViz.  Note that this command specifies an alternate settings file that is provided in the code base: this was done to ensure that you don't need to install `django-extensions` to run the system normally.  If you prefer to directly create a PDF file, you can use the `-o` option:
+This creates a `.dot` file that can be opened using GraphViz.  Note that this
+command specifies an alternate settings file that is provided in the code base:
+this was done to ensure that you don't need to install `django-extensions` to
+run the system normally.  If you prefer to directly create a PDF file, you can
+use the `-o` option:
 
     ./manage.py graph_models --pygraphviz --settings=kive.UML_settings method -g -o method.pdf
     

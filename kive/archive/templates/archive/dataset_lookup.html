@@ -16,7 +16,7 @@
     <h2>Matching runs</h2>
 
 
-    {% if datasets.count == 0 %}
+    {% if datasets.count == 0 and datasets_as_inputs.count == 0 %}
         <h3>No matching runs!</h3>
     {% else %}
         <table>
@@ -30,7 +30,6 @@
             </thead>
         {% for d in datasets %}
             <tr>
-
                 <td>{{ d.dataset.created_by.parent_run.id }}</td>
                 <td> <a href="/dataset_view/{{d.dataset.id}}"> {{ d.dataset.name }} </a> </td>
                 <td>{{ d.dataset.created_by.parent_run.pipeline.family }} </td>
@@ -50,6 +49,27 @@
                     {% else %}
                         <a href="/view_run/{{ d.dataset.created_by.parent_run.runtoprocess.id }}/{{md5}}">View run</a>
                     {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+
+        {% for d in datasets_as_inputs %}
+            <tr>
+                <td>{{ d.run.id }}</td>
+                <td> <a href="/dataset_view/{{d.dataset.id}}"> {{ d.dataset.name }} </a> </td>
+                <td>{{ d.pipeline.family }} </td>
+                <td>
+                    {% if  d.run.pipeline.revision_name|length <= 0 %}
+                        {{ d.run.pipeline.family }}
+                    {% else %}
+                        {{ d.run.pipeline.revision_name }}
+                    {% endif %}
+                </td>
+                <td>
+                    {{ d.pipeline.revision_number }}
+                </td>
+                <td>
+                    <a href="/view_run/{{ d.run.runtoprocess.id }}/{{md5}}">View run</a>
                 </td>
             </tr>
         {% endfor %}

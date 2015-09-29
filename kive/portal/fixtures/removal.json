@@ -1340,8 +1340,7 @@
     {
         "fields": {
             "description": "A noop pipeline for nucleotide sequences.", 
-            "groups_allowed": [], 
-            "published_version": null, 
+            "groups_allowed": [],
             "users_allowed": [], 
             "user": 2, 
             "name": "Nucleotide Sequence Noop"
@@ -1352,8 +1351,7 @@
     {
         "fields": {
             "description": "Pipeline with one nested level", 
-            "groups_allowed": [], 
-            "published_version": null, 
+            "groups_allowed": [],
             "users_allowed": [], 
             "user": 2, 
             "name": "Nested pipeline"
@@ -1364,8 +1362,7 @@
     {
         "fields": {
             "description": "A two-step noop pipeline for nucleotide sequences.", 
-            "groups_allowed": [], 
-            "published_version": null, 
+            "groups_allowed": [],
             "users_allowed": [], 
             "user": 2, 
             "name": "Nucleotide Sequence two-step Noop"

@@ -281,9 +281,13 @@ $(function() {
                 shape;
             
             if (this_pk === ""){
-                shape = new drydock_objects.RawNode(         pos.left, pos.top, node_label);
+                shape = new drydock_objects.RawNode(pos.left, pos.top, node_label);
             } else {
-                shape = new drydock_objects.CdtNode(this_pk, pos.left, pos.top, node_label);
+                shape = new drydock_objects.CdtNode(
+                        parseInt(this_pk),
+                        pos.left,
+                        pos.top,
+                        node_label);
             }
             canvasState.addShape(shape);
             canvasState.detectCollisions(shape, 0);// Second arg: Upon collision, move new shape 0% and move existing objects 100%
@@ -564,23 +568,29 @@ $(function() {
             }
             if (action == 'display') {
                 sel = sel[0];
-                if(sel instanceof drydock_objects.OutputNode)
+                if(sel instanceof drydock_objects.OutputNode || sel instanceof drydock_objects.CdtNode ||
+                   sel instanceof drydock_objects.RawNode) {
                     window.location = '/dataset_view/' + sel.dataset_id + '?rtp_id=' + sel.rtp_id;
+                }
             }
             if (action == 'download') {
                 sel = sel[0];
-                if(sel instanceof drydock_objects.OutputNode)
+                if(sel instanceof drydock_objects.OutputNode || sel instanceof drydock_objects.CdtNode ||
+                   sel instanceof drydock_objects.RawNode) {
                     window.location = '/dataset_download/' + sel.dataset_id;
+                }
             }
             if (action == 'viewlog') {
                 sel = sel[0];
-                if(sel instanceof drydock_objects.MethodNode)
+                if(sel instanceof drydock_objects.MethodNode) {
                     window.location = '/stdout_view/' + sel.log_id + '?rtp_id=' + sel.rtp_id;
+                }
             }
             if (action == 'viewerrorlog') {
                 sel = sel[0];
-                if(sel instanceof drydock_objects.MethodNode)
+                if(sel instanceof drydock_objects.MethodNode) {
                     window.location = '/stderr_view/' + sel.log_id + '?rtp_id=' + sel.rtp_id;
+                }
             }
         }
         $('.context_menu').hide();
@@ -618,13 +628,13 @@ $(function() {
         var is_new = e.data.action == "new";
         var is_revision = e.data.action == "revise";
 
-        // arguments to initialize new Pipeline Family
+        // arguments to initialize new Pipeline Familyﬁ
         var family_name = $('#id_family_name').val(),  // hidden input if revision
             family_desc = $('#id_family_desc').val(),
             family_pk = $('#id_family_pk').val(),
             revision_name = $('#id_revision_name').val(),
             revision_desc = $('#id_revision_desc').val(),
-            publish_on_submit = $('#publish_on_submit').prop('checked'),
+            published = $('#published').prop('checked'),
             users_allowed = [],
             groups_allowed = [];
 
@@ -663,7 +673,7 @@ $(function() {
             revision_name: revision_name,
             revision_desc: revision_desc,
             revision_parent: is_revision ? JSON.parse($("#initial_data").text()).id : null,
-            publish_on_submit: publish_on_submit,
+            published: published,
 
             // Canvas information to store in the Pipeline object.
             canvas_width: canvas.width,
