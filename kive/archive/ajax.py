@@ -100,13 +100,18 @@ class DatasetViewSet(RemovableModelViewSet, RedactModelMixin):
         symdatasets = SymbolicDataset.filter_by_user(request.user).filter(MD5_checksum=md5)
         if len(symdatasets) > 0:
             # one or more Datasets with identical MD5 already exist
-            return Response(DatasetSerializer(symdatasets[0].dataset, context={'request': request}).data, status=200)
+            return Response({'errors': 'Content matches existing dataset.',
+                             'duplicate_symbolic_dataset_id': symdatasets[0].id},
+                            status=status.HTTP_409_CONFLICT)
 
         symdataset = single_dataset_form.create_dataset(request.user) if single_dataset_form.is_valid() else None
 
         if symdataset is None:
-            return Response({'errors': single_dataset_form.errors}, status=400)
-        return Response(DatasetSerializer(symdataset.dataset, context={'request': request}).data,  status=201)
+            return Response({'errors': single_dataset_form.errors},
+                            status=status.HTTP_403_FORBIDDEN)
+        return Response(DatasetSerializer(symdataset.dataset,
+                                          context={'request': request}).data,
+                        status=status.HTTP_201_CREATED)
 
     def patch_object(self, request, pk=None):
         return Response(DatasetSerializer(self.get_object(), context={'request': request}).data)
