@@ -277,7 +277,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/tmp2kstA1", 
+            "dataset_file": "Datasets/fixtures/tmp2kstA1", 
             "date_created": "2015-07-17T23:13:19.266Z", 
             "date_modified": "2015-07-17T23:13:19.266Z", 
             "description": "blahblahblah", 
@@ -290,7 +290,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/tmpKxaaBW", 
+            "dataset_file": "Datasets/fixtures/tmpKxaaBW", 
             "date_created": "2015-07-17T23:13:20.626Z", 
             "date_modified": "2015-07-17T23:13:20.626Z", 
             "description": "random reversed words", 
@@ -303,7 +303,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/tmpygR3un", 
+            "dataset_file": "Datasets/fixtures/tmpygR3un", 
             "date_created": "2015-07-17T23:13:20.793Z", 
             "date_modified": "2015-07-17T23:13:20.793Z", 
             "description": "random reversed words", 
@@ -316,7 +316,7 @@
     {
         "fields": {
             "created_by": 3, 
-            "dataset_file": "Datasets/2015_07/step2_more_words.csv", 
+            "dataset_file": "Datasets/fixtures/step2_more_words.csv", 
             "date_created": "2015-07-17T23:13:23.406Z", 
             "date_modified": "2015-07-17T23:13:23.406Z", 
             "description": "Generated data from a run of pipeline \"Two-step pipeline:1 (v1)\" started at 2015-07-17 23:13:21.220040+00:00 by bob\nrun: 1\nuser: bob\nstep: 2\noutput: more_words", 
@@ -329,7 +329,7 @@
     {
         "fields": {
             "created_by": 8, 
-            "dataset_file": "Datasets/2015_07/step2_reversed_words.csv", 
+            "dataset_file": "Datasets/fixtures/step2_reversed_words.csv", 
             "date_created": "2015-07-17T23:13:27.549Z", 
             "date_modified": "2015-07-17T23:13:27.549Z", 
             "description": "Generated data from a run of pipeline \"Pipeline that will follow the first:1 (v1)\" started at 2015-07-17 23:13:26.011754+00:00 by bob\nrun: 2\nuser: bob\nstep: 2\noutput: reversed_words", 

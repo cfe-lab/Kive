@@ -1582,7 +1582,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/step_0_triplet.csv", 
+            "dataset_file": "Datasets/fixtures/step_0_triplet.csv", 
             "date_created": "2015-07-17T23:11:11.845Z", 
             "date_modified": "2015-07-17T23:11:11.845Z", 
             "description": "lol", 
@@ -1595,7 +1595,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/doublet_cdt.csv", 
+            "dataset_file": "Datasets/fixtures/doublet_cdt.csv", 
             "date_created": "2015-07-17T23:11:11.911Z", 
             "date_modified": "2015-07-17T23:11:11.911Z", 
             "description": "lol", 
@@ -1608,7 +1608,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/singlet_cdt_large.csv", 
+            "dataset_file": "Datasets/fixtures/singlet_cdt_large.csv", 
             "date_created": "2015-07-17T23:11:11.956Z", 
             "date_modified": "2015-07-17T23:11:11.956Z", 
             "description": "lol", 
@@ -1621,7 +1621,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/step_0_singlet.csv", 
+            "dataset_file": "Datasets/fixtures/step_0_singlet.csv", 
             "date_created": "2015-07-17T23:11:12.001Z", 
             "date_modified": "2015-07-17T23:11:12.001Z", 
             "description": "lol", 
@@ -1634,7 +1634,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/step_0_raw.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw.fasta", 
             "date_created": "2015-07-17T23:11:12.014Z", 
             "date_modified": "2015-07-17T23:11:12.014Z", 
             "description": "lol", 
@@ -1647,7 +1647,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/C1_in_triplet.csv", 
+            "dataset_file": "Datasets/fixtures/C1_in_triplet.csv", 
             "date_created": "2015-07-17T23:11:12.151Z", 
             "date_modified": "2015-07-17T23:11:12.151Z", 
             "description": "triplet 3 rows", 
@@ -1660,7 +1660,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/E11_32_output.csv", 
+            "dataset_file": "Datasets/fixtures/E11_32_output.csv", 
             "date_created": "2015-07-17T23:11:12.271Z", 
             "date_modified": "2015-07-17T23:11:12.271Z", 
             "description": "result of E11_32 fed by doublet_cdt.csv", 
@@ -1673,7 +1673,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/step_0_singlet_cqV6SSV.csv", 
+            "dataset_file": "Datasets/fixtures/step_0_singlet_cqV6SSV.csv", 
             "date_created": "2015-07-17T23:11:12.315Z", 
             "date_modified": "2015-07-17T23:11:12.315Z", 
             "description": "lol", 
@@ -1686,7 +1686,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/step_0_raw_KQOLnjo.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw_KQOLnjo.fasta", 
             "date_created": "2015-07-17T23:11:12.329Z", 
             "date_modified": "2015-07-17T23:11:12.329Z", 
             "description": "lol", 
@@ -1699,7 +1699,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/step_0_raw_9uogjdO.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw_9uogjdO.fasta", 
             "date_created": "2015-07-17T23:11:12.337Z", 
             "date_modified": "2015-07-17T23:11:12.337Z", 
             "description": "lol", 
@@ -1712,7 +1712,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/step_0_triplet_3_rows.csv", 
+            "dataset_file": "Datasets/fixtures/step_0_triplet_3_rows.csv", 
             "date_created": "2015-07-17T23:11:12.418Z", 
             "date_modified": "2015-07-17T23:11:12.418Z", 
             "description": "lol", 
@@ -1725,7 +1725,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/doublet_remuxed_from_t3r.csv", 
+            "dataset_file": "Datasets/fixtures/doublet_remuxed_from_t3r.csv", 
             "date_created": "2015-07-17T23:11:12.479Z", 
             "date_modified": "2015-07-17T23:11:12.479Z", 
             "description": "doublet remuxed from triplet", 
@@ -1738,7 +1738,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/DNA_triplet.csv", 
+            "dataset_file": "Datasets/fixtures/DNA_triplet.csv", 
             "date_created": "2015-07-17T23:11:12.665Z", 
             "date_modified": "2015-07-17T23:11:12.665Z", 
             "description": "DNA triplet data", 
@@ -1751,7 +1751,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/E01_21_DNA_doublet.csv", 
+            "dataset_file": "Datasets/fixtures/E01_21_DNA_doublet.csv", 
             "date_created": "2015-07-17T23:11:12.807Z", 
             "date_modified": "2015-07-17T23:11:12.807Z", 
             "description": "DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21", 
@@ -1764,7 +1764,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/E21_41_DNA_doublet.csv", 
+            "dataset_file": "Datasets/fixtures/E21_41_DNA_doublet.csv", 
             "date_created": "2015-07-17T23:11:12.940Z", 
             "date_modified": "2015-07-17T23:11:12.940Z", 
             "description": "DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41", 
@@ -1777,7 +1777,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/tmpSF16PV", 
+            "dataset_file": "Datasets/fixtures/tmpSF16PV", 
             "date_created": "2015-07-17T23:11:15.278Z", 
             "date_modified": "2015-07-17T23:11:15.278Z", 
             "description": "blahblahblah", 
@@ -1790,7 +1790,7 @@
     {
         "fields": {
             "created_by": 8, 
-            "dataset_file": "Datasets/2015_07/step1_same_strings.csv", 
+            "dataset_file": "Datasets/fixtures/step1_same_strings.csv", 
             "date_created": "2015-07-17T23:11:16.530Z", 
             "date_modified": "2015-07-17T23:11:16.530Z", 
             "description": "Generated data from a run of pipeline \"p_basic:1 (v1)\" started at 2015-07-17 23:11:15.991798+00:00 by bob\nrun: 9\nuser: bob\nstep: 1\noutput: same_strings", 
@@ -1803,7 +1803,7 @@
     {
         "fields": {
             "created_by": 10, 
-            "dataset_file": "Datasets/2015_07/step2_same_strings.csv", 
+            "dataset_file": "Datasets/fixtures/step2_same_strings.csv", 
             "date_created": "2015-07-17T23:11:18.529Z", 
             "date_modified": "2015-07-17T23:11:18.529Z", 
             "description": "Generated data from a run of pipeline \"p_basic:1 (v1)\" started at 2015-07-17 23:11:15.991798+00:00 by bob\nrun: 9\nuser: bob\nstep: 2\noutput: same_strings", 
@@ -1816,7 +1816,7 @@
     {
         "fields": {
             "created_by": 15, 
-            "dataset_file": "Datasets/2015_07/step1_same_strings_MaT28kG.csv", 
+            "dataset_file": "Datasets/fixtures/step1_same_strings_MaT28kG.csv", 
             "date_created": "2015-07-17T23:11:22.941Z", 
             "date_modified": "2015-07-17T23:11:22.941Z", 
             "description": "Generated data from a run of pipeline \"p_basic:1 (v1)\" started at 2015-07-17 23:11:22.424119+00:00 by bob\nrun: 10\nuser: bob\nstep: 1\noutput: same_strings", 
@@ -1829,7 +1829,7 @@
     {
         "fields": {
             "created_by": 17, 
-            "dataset_file": "Datasets/2015_07/step2_same_strings_Y8Oclrs.csv", 
+            "dataset_file": "Datasets/fixtures/step2_same_strings_Y8Oclrs.csv", 
             "date_created": "2015-07-17T23:11:24.379Z", 
             "date_modified": "2015-07-17T23:11:24.379Z", 
             "description": "Generated data from a run of pipeline \"p_basic:1 (v1)\" started at 2015-07-17 23:11:22.424119+00:00 by bob\nrun: 10\nuser: bob\nstep: 2\noutput: same_strings", 
@@ -1842,7 +1842,7 @@
     {
         "fields": {
             "created_by": 25, 
-            "dataset_file": "Datasets/2015_07/step1_same_strings_81Otr7T.csv", 
+            "dataset_file": "Datasets/fixtures/step1_same_strings_81Otr7T.csv", 
             "date_created": "2015-07-17T23:11:35.911Z", 
             "date_modified": "2015-07-17T23:11:35.911Z", 
             "description": "Generated data from a run of pipeline \"p_basic:1 (v1)\" started at 2015-07-17 23:11:35.328404+00:00 by bob\nrun: 12\nuser: bob\nstep: 1\noutput: same_strings", 
@@ -1855,7 +1855,7 @@
     {
         "fields": {
             "created_by": 27, 
-            "dataset_file": "Datasets/2015_07/step2_same_strings_e5KFQJ0.csv", 
+            "dataset_file": "Datasets/fixtures/step2_same_strings_e5KFQJ0.csv", 
             "date_created": "2015-07-17T23:11:37.441Z", 
             "date_modified": "2015-07-17T23:11:37.441Z", 
             "description": "Generated data from a run of pipeline \"p_basic:1 (v1)\" started at 2015-07-17 23:11:35.328404+00:00 by bob\nrun: 12\nuser: bob\nstep: 2\noutput: same_strings", 
@@ -1868,7 +1868,7 @@
     {
         "fields": {
             "created_by": 32, 
-            "dataset_file": "Datasets/2015_07/step1_same_strings_jKsF686.csv", 
+            "dataset_file": "Datasets/fixtures/step1_same_strings_jKsF686.csv", 
             "date_created": "2015-07-17T23:11:42.643Z", 
             "date_modified": "2015-07-17T23:11:42.643Z", 
             "description": "Generated data from a run of pipeline \"p_basic:1 (v1)\" started at 2015-07-17 23:11:42.037849+00:00 by bob\nrun: 13\nuser: bob\nstep: 1\noutput: same_strings", 
@@ -1881,7 +1881,7 @@
     {
         "fields": {
             "created_by": 34, 
-            "dataset_file": "Datasets/2015_07/step2_same_strings_4ZpD4KL.csv", 
+            "dataset_file": "Datasets/fixtures/step2_same_strings_4ZpD4KL.csv", 
             "date_created": "2015-07-17T23:11:44.191Z", 
             "date_modified": "2015-07-17T23:11:44.191Z", 
             "description": "Generated data from a run of pipeline \"p_basic:1 (v1)\" started at 2015-07-17 23:11:42.037849+00:00 by bob\nrun: 13\nuser: bob\nstep: 2\noutput: same_strings", 
@@ -1894,7 +1894,7 @@
     {
         "fields": {
             "created_by": 42, 
-            "dataset_file": "Datasets/2015_07/step1_same_strings_K3JEFmR.csv", 
+            "dataset_file": "Datasets/fixtures/step1_same_strings_K3JEFmR.csv", 
             "date_created": "2015-07-17T23:11:57.421Z", 
             "date_modified": "2015-07-17T23:11:57.421Z", 
             "description": "Generated data from a run of pipeline \"p_basic:1 (v1)\" started at 2015-07-17 23:11:56.747115+00:00 by bob\nrun: 15\nuser: bob\nstep: 1\noutput: same_strings", 
@@ -1907,7 +1907,7 @@
     {
         "fields": {
             "created_by": 44, 
-            "dataset_file": "Datasets/2015_07/step2_same_strings_rCQWJ8M.csv", 
+            "dataset_file": "Datasets/fixtures/step2_same_strings_rCQWJ8M.csv", 
             "date_created": "2015-07-17T23:11:59.061Z", 
             "date_modified": "2015-07-17T23:11:59.061Z", 
             "description": "Generated data from a run of pipeline \"p_basic:1 (v1)\" started at 2015-07-17 23:11:56.747115+00:00 by bob\nrun: 15\nuser: bob\nstep: 2\noutput: same_strings", 
@@ -1920,7 +1920,7 @@
     {
         "fields": {
             "created_by": 49, 
-            "dataset_file": "Datasets/2015_07/step1_same_strings_0uj9iEK.csv", 
+            "dataset_file": "Datasets/fixtures/step1_same_strings_0uj9iEK.csv", 
             "date_created": "2015-07-17T23:12:04.918Z", 
             "date_modified": "2015-07-17T23:12:04.918Z", 
             "description": "Generated data from a run of pipeline \"p_basic:1 (v1)\" started at 2015-07-17 23:12:04.212234+00:00 by bob\nrun: 16\nuser: bob\nstep: 1\noutput: same_strings", 
@@ -1933,7 +1933,7 @@
     {
         "fields": {
             "created_by": 51, 
-            "dataset_file": "Datasets/2015_07/step2_same_strings_tjwIM5k.csv", 
+            "dataset_file": "Datasets/fixtures/step2_same_strings_tjwIM5k.csv", 
             "date_created": "2015-07-17T23:12:06.539Z", 
             "date_modified": "2015-07-17T23:12:06.539Z", 
             "description": "Generated data from a run of pipeline \"p_basic:1 (v1)\" started at 2015-07-17 23:12:04.212234+00:00 by bob\nrun: 16\nuser: bob\nstep: 2\noutput: same_strings", 

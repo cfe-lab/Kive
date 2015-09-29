@@ -343,7 +343,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/tmpmE4TwN", 
+            "dataset_file": "Datasets/fixtures/tmpmE4TwN", 
             "date_created": "2015-07-17T23:13:54.415Z", 
             "date_modified": "2015-07-17T23:13:54.415Z", 
             "description": "data from the lab", 
@@ -356,7 +356,7 @@
     {
         "fields": {
             "created_by": 1, 
-            "dataset_file": "Datasets/2015_07/step1_complemented_DNA.csv", 
+            "dataset_file": "Datasets/fixtures/step1_complemented_DNA.csv", 
             "date_created": "2015-07-17T23:13:56.679Z", 
             "date_modified": "2015-07-17T23:13:56.679Z", 
             "description": "Generated data from a run of pipeline \"DNA complement:1 (v1)\" started at 2015-07-17 23:13:56.083650+00:00 by alice\nrun: 1\nuser: alice\nstep: 1\noutput: complemented_DNA", 
@@ -369,7 +369,7 @@
     {
         "fields": {
             "created_by": 7, 
-            "dataset_file": "Datasets/2015_07/step1_reversed_DNA.csv", 
+            "dataset_file": "Datasets/fixtures/step1_reversed_DNA.csv", 
             "date_created": "2015-07-17T23:14:00.517Z", 
             "date_modified": "2015-07-17T23:14:00.517Z", 
             "description": "Generated data from a run of pipeline \"DNA reverse:1 (v1)\" started at 2015-07-17 23:14:00.046971+00:00 by alice\nrun: 4\nuser: alice\nstep: 1\noutput: reversed_DNA", 
@@ -382,7 +382,7 @@
     {
         "fields": {
             "created_by": 12, 
-            "dataset_file": "Datasets/2015_07/step2_complemented_DNA.csv", 
+            "dataset_file": "Datasets/fixtures/step2_complemented_DNA.csv", 
             "date_created": "2015-07-17T23:14:03.607Z", 
             "date_modified": "2015-07-17T23:14:03.607Z", 
             "description": "Generated data from a run of pipeline \"DNA revcomp:1 (v1)\" started at 2015-07-17 23:14:02.324197+00:00 by alice\nrun: 2\nuser: alice\nstep: 2\noutput: complemented_DNA", 

@@ -255,7 +255,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/tmpktfYh_", 
+            "dataset_file": "Datasets/fixtures/tmpktfYh_", 
             "date_created": "2015-07-17T23:12:44.098Z", 
             "date_modified": "2015-07-17T23:12:44.098Z", 
             "description": "A dataset for use in the removal test case.", 
@@ -268,7 +268,7 @@
     {
         "fields": {
             "created_by": 1, 
-            "dataset_file": "Datasets/2015_07/step1_nuc_seq_out.csv", 
+            "dataset_file": "Datasets/fixtures/step1_nuc_seq_out.csv", 
             "date_created": "2015-07-17T23:12:45.956Z", 
             "date_modified": "2015-07-17T23:12:45.956Z", 
             "description": "Generated data from a run of pipeline \"Nucleotide Sequence Noop:1 (v1)\" started at 2015-07-17 23:12:45.078138+00:00 by Rem Over\nrun: 1\nuser: Rem Over\nstep: 1\noutput: nuc_seq_out", 
@@ -281,7 +281,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/tmpQnBirn", 
+            "dataset_file": "Datasets/fixtures/tmpQnBirn", 
             "date_created": "2015-07-17T23:12:50.339Z", 
             "date_modified": "2015-07-17T23:12:50.339Z", 
             "description": "A dataset for use in the removal test case with the two-step Pipeline.", 
@@ -294,7 +294,7 @@
     {
         "fields": {
             "created_by": 7, 
-            "dataset_file": "Datasets/2015_07/step1_nuc_seq_out_VOO6LIW.csv", 
+            "dataset_file": "Datasets/fixtures/step1_nuc_seq_out_VOO6LIW.csv", 
             "date_created": "2015-07-17T23:12:51.014Z", 
             "date_modified": "2015-07-17T23:12:51.014Z", 
             "description": "Generated data from a run of pipeline \"Nucleotide Sequence two-step Noop:1 (v1)\" started at 2015-07-17 23:12:50.375797+00:00 by Rem Over\nrun: 3\nuser: Rem Over\nstep: 1\noutput: nuc_seq_out", 
@@ -307,7 +307,7 @@
     {
         "fields": {
             "created_by": 9, 
-            "dataset_file": "Datasets/2015_07/step2_nuc_seq_out.csv", 
+            "dataset_file": "Datasets/fixtures/step2_nuc_seq_out.csv", 
             "date_created": "2015-07-17T23:12:52.601Z", 
             "date_modified": "2015-07-17T23:12:52.601Z", 
             "description": "Generated data from a run of pipeline \"Nucleotide Sequence two-step Noop:1 (v1)\" started at 2015-07-17 23:12:50.375797+00:00 by Rem Over\nrun: 3\nuser: Rem Over\nstep: 2\noutput: nuc_seq_out", 

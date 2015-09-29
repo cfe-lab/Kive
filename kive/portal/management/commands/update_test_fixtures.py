@@ -92,7 +92,21 @@ class FixtureBuilder(object):
                 call_command("dumpdata", indent=4)
             finally:
                 sys.stdout = old_stdout
-
+    
+    def rename_dataset_files(self, dataset_path, dump_objects):
+        source_root, source_folder = os.path.split(dataset_path)
+        fixtures_path = os.path.join(dataset_path, 'fixtures')
+        if not os.path.isdir(fixtures_path):
+            os.mkdir(fixtures_path)
+        for dump_object in dump_objects:
+            if dump_object['model'] == 'archive.dataset':
+                file_path = dump_object['fields']['dataset_file']
+                source_path = os.path.join(source_root, file_path)
+                file_name = os.path.basename(file_path)
+                target_path = os.path.join(fixtures_path, file_name)
+                os.rename(source_path, target_path)
+                new_file_path = os.path.join(source_folder, 'fixtures', file_name)
+                dump_object['fields']['dataset_file'] = new_file_path
 
 class EMSandboxTestEnvironmentBuilder(FixtureBuilder):
     def get_name(self):
@@ -382,15 +396,39 @@ class Command(BaseCommand):
     help = "Update test fixtures by running scripts and dumping test data."
 
     def handle(self, *args, **options):
-        EMSandboxTestEnvironmentBuilder().run()
-        ArchiveTestEnvironmentBuilder().run()
-        DeepNestedRunBuilder().run()
-        SimpleRunBuilder().run()
-        RemovalTestEnvironmentBuilder().run()
-        RunApiTestsEnvironmentBuilder().run()
-        RunComponentTooManyChecksEnvironmentBuilder().run()
-        RunPipelinesRecoveringReusedStepEnvironmentBuilder().run()
-        ExecuteResultTestsRMEnvironmentBuilder().run()
-        ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
+#         EMSandboxTestEnvironmentBuilder().run()
+#         ArchiveTestEnvironmentBuilder().run()
+#         DeepNestedRunBuilder().run()
+#         SimpleRunBuilder().run()
+#         RemovalTestEnvironmentBuilder().run()
+#         RunApiTestsEnvironmentBuilder().run()
+#         RunComponentTooManyChecksEnvironmentBuilder().run()
+#         RunPipelinesRecoveringReusedStepEnvironmentBuilder().run()
+#         ExecuteResultTestsRMEnvironmentBuilder().run()
+#         ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
+        builders = [
+            EMSandboxTestEnvironmentBuilder(),
+            ArchiveTestEnvironmentBuilder(),
+            DeepNestedRunBuilder(),
+            SimpleRunBuilder(),
+            RemovalTestEnvironmentBuilder(),
+            RunApiTestsEnvironmentBuilder(),
+            RunComponentTooManyChecksEnvironmentBuilder(),
+            RunPipelinesRecoveringReusedStepEnvironmentBuilder(),
+            ExecuteResultTestsRMEnvironmentBuilder(),
+            ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder()]
+
+        for builder in builders:
+#         builder = RunComponentTooManyChecksEnvironmentBuilder()
+            dump_filename = os.path.join('portal', 'fixtures', builder.get_name())
+            with open(dump_filename, 'rU') as dump_file:
+                dump_objects = json.load(dump_file)
+            dataset_path = os.path.join("FixtureFiles",
+                                        builder.get_name(),
+                                        archive.models.Dataset.UPLOAD_DIR)
+             
+            builder.rename_dataset_files(dataset_path, dump_objects)
+            with open(dump_filename, 'w') as dump_file:
+                json.dump(dump_objects, dump_file, indent=4, sort_keys=True)
         
         self.stdout.write('Done.')

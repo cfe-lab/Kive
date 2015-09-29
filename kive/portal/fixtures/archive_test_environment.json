@@ -438,7 +438,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/step_0_triplet.csv", 
+            "dataset_file": "Datasets/fixtures/step_0_triplet.csv", 
             "date_created": "2015-07-17T23:11:03.383Z", 
             "date_modified": "2015-07-17T23:11:03.383Z", 
             "description": "lol", 
@@ -451,7 +451,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/doublet_cdt.csv", 
+            "dataset_file": "Datasets/fixtures/doublet_cdt.csv", 
             "date_created": "2015-07-17T23:11:03.446Z", 
             "date_modified": "2015-07-17T23:11:03.446Z", 
             "description": "lol", 
@@ -464,7 +464,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/singlet_cdt_large.csv", 
+            "dataset_file": "Datasets/fixtures/singlet_cdt_large.csv", 
             "date_created": "2015-07-17T23:11:03.490Z", 
             "date_modified": "2015-07-17T23:11:03.490Z", 
             "description": "lol", 
@@ -477,7 +477,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/step_0_singlet.csv", 
+            "dataset_file": "Datasets/fixtures/step_0_singlet.csv", 
             "date_created": "2015-07-17T23:11:03.534Z", 
             "date_modified": "2015-07-17T23:11:03.534Z", 
             "description": "lol", 
@@ -490,7 +490,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/step_0_raw.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw.fasta", 
             "date_created": "2015-07-17T23:11:03.547Z", 
             "date_modified": "2015-07-17T23:11:03.547Z", 
             "description": "lol", 
@@ -503,7 +503,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/C1_in_triplet.csv", 
+            "dataset_file": "Datasets/fixtures/C1_in_triplet.csv", 
             "date_created": "2015-07-17T23:11:03.687Z", 
             "date_modified": "2015-07-17T23:11:03.687Z", 
             "description": "triplet 3 rows", 
@@ -516,7 +516,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/E11_32_output.csv", 
+            "dataset_file": "Datasets/fixtures/E11_32_output.csv", 
             "date_created": "2015-07-17T23:11:03.805Z", 
             "date_modified": "2015-07-17T23:11:03.805Z", 
             "description": "result of E11_32 fed by doublet_cdt.csv", 
@@ -529,7 +529,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/step_0_singlet_D0gyOuy.csv", 
+            "dataset_file": "Datasets/fixtures/step_0_singlet_D0gyOuy.csv", 
             "date_created": "2015-07-17T23:11:03.848Z", 
             "date_modified": "2015-07-17T23:11:03.848Z", 
             "description": "lol", 
@@ -542,7 +542,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/step_0_raw_1oSNQpd.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw_1oSNQpd.fasta", 
             "date_created": "2015-07-17T23:11:03.862Z", 
             "date_modified": "2015-07-17T23:11:03.862Z", 
             "description": "lol", 
@@ -555,7 +555,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/step_0_raw_PhrfHjq.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw_PhrfHjq.fasta", 
             "date_created": "2015-07-17T23:11:03.870Z", 
             "date_modified": "2015-07-17T23:11:03.870Z", 
             "description": "lol", 
@@ -568,7 +568,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/step_0_triplet_3_rows.csv", 
+            "dataset_file": "Datasets/fixtures/step_0_triplet_3_rows.csv", 
             "date_created": "2015-07-17T23:11:03.956Z", 
             "date_modified": "2015-07-17T23:11:03.956Z", 
             "description": "lol", 
@@ -581,7 +581,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/doublet_remuxed_from_t3r.csv", 
+            "dataset_file": "Datasets/fixtures/doublet_remuxed_from_t3r.csv", 
             "date_created": "2015-07-17T23:11:04.016Z", 
             "date_modified": "2015-07-17T23:11:04.016Z", 
             "description": "doublet remuxed from triplet", 
@@ -594,7 +594,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/DNA_triplet.csv", 
+            "dataset_file": "Datasets/fixtures/DNA_triplet.csv", 
             "date_created": "2015-07-17T23:11:04.203Z", 
             "date_modified": "2015-07-17T23:11:04.203Z", 
             "description": "DNA triplet data", 
@@ -607,7 +607,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/E01_21_DNA_doublet.csv", 
+            "dataset_file": "Datasets/fixtures/E01_21_DNA_doublet.csv", 
             "date_created": "2015-07-17T23:11:04.334Z", 
             "date_modified": "2015-07-17T23:11:04.334Z", 
             "description": "DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21", 
@@ -620,7 +620,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/E21_41_DNA_doublet.csv", 
+            "dataset_file": "Datasets/fixtures/E21_41_DNA_doublet.csv", 
             "date_created": "2015-07-17T23:11:04.466Z", 
             "date_modified": "2015-07-17T23:11:04.466Z", 
             "description": "DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41", 

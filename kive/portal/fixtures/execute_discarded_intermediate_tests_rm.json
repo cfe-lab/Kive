@@ -123,7 +123,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/tmpm6XkhJ", 
+            "dataset_file": "Datasets/fixtures/tmpm6XkhJ", 
             "date_created": "2015-07-17T23:14:13.445Z", 
             "date_modified": "2015-07-17T23:14:13.445Z", 
             "description": "data from the lab", 

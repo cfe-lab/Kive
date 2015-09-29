@@ -244,7 +244,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/input_for_test_C_twostep_with_subpipeline.csv", 
+            "dataset_file": "Datasets/fixtures/input_for_test_C_twostep_with_subpipeline.csv", 
             "date_created": "2015-07-17T23:13:01.153Z", 
             "date_modified": "2015-07-17T23:13:01.153Z", 
             "description": "input to pipeline pX", 
@@ -257,7 +257,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/2015_07/input_for_test_C_twostep_with_subpipeline_Tj0AaRi.csv", 
+            "dataset_file": "Datasets/fixtures/input_for_test_C_twostep_with_subpipeline_Tj0AaRi.csv", 
             "date_created": "2015-07-17T23:13:01.173Z", 
             "date_modified": "2015-07-17T23:13:01.173Z", 
             "description": "input to pipeline pX", 
@@ -270,7 +270,7 @@
     {
         "fields": {
             "created_by": 1, 
-            "dataset_file": "Datasets/2015_07/step1_mA_out.csv", 
+            "dataset_file": "Datasets/fixtures/step1_mA_out.csv", 
             "date_created": "2015-07-17T23:13:07.931Z", 
             "date_modified": "2015-07-17T23:13:07.931Z", 
             "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-07-17 23:13:01.521376+00:00 by john\nrun: 1\nuser: john\nstep: 1\noutput: mA_out", 
@@ -283,7 +283,7 @@
     {
         "fields": {
             "created_by": 5, 
-            "dataset_file": "Datasets/2015_07/run1_pX_out_2.csv", 
+            "dataset_file": "Datasets/fixtures/run1_pX_out_2.csv", 
             "date_created": "2015-07-17T23:13:09.993Z", 
             "date_modified": "2015-07-17T23:13:09.993Z", 
             "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-07-17 23:13:01.521376+00:00 by john\nrun: 1\nuser: john\noutput: pX_out_2", 
