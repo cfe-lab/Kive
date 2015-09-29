@@ -22,26 +22,32 @@ class TinyRunSerializer(serializers.ModelSerializer):
 
 class DatasetSerializer(serializers.ModelSerializer):
 
-    #user = serializers.StringRelatedField()
-    user = serializers.SlugRelatedField(slug_field='username', read_only=True,
-                                        default=serializers.CurrentUserDefault())
+    user = serializers.SlugRelatedField(
+        source="symbolicdataset.user",
+        slug_field='username',
+        read_only=True,
+        default=serializers.CurrentUserDefault())
 
     compounddatatype = CompoundDatatypeSerializer(source='symbolicdataset.compounddatatype')
     filename = serializers.SerializerMethodField()
     filesize = serializers.IntegerField(source='get_filesize')
     filesize_display = serializers.SerializerMethodField()
 
-    users_allowed = serializers.StringRelatedField(many=True, source="symbolicdataset.users_allowed")
-    #users_allowed = serializers.SlugRelatedField(slug_field='username', queryset=User.objects.all(),
-    #                                             many=True, allow_null=True, required=False)
-    groups_allowed = serializers.StringRelatedField(many=True, source="symbolicdataset.groups_allowed")
-    #groups_allowed = serializers.SlugRelatedField(slug_field='name', queryset=Group.objects.all(),
-    #                                              many=True, allow_null=True, required=False)
+    users_allowed = serializers.SlugRelatedField(
+        slug_field='username',
+        queryset=User.objects.all(),
+        many=True, allow_null=True, required=False
+    )
+    groups_allowed = serializers.SlugRelatedField(
+        slug_field='name',
+        queryset=Group.objects.all(),
+        many=True, allow_null=True, required=False
+    )
 
     download_url = serializers.HyperlinkedIdentityField(view_name='dataset-download')
     removal_plan = serializers.HyperlinkedIdentityField(view_name='dataset-removal-plan')
     redaction_plan = serializers.HyperlinkedIdentityField(view_name='dataset-redaction-plan')
-    symbolic_id = serializers.IntegerField(source='symbolicdataset.id')
+    symbolic_id = serializers.IntegerField(source='symbolicdataset.id', read_only=False)
 
     class Meta():
         model = Dataset
