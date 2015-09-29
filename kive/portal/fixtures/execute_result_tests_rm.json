@@ -1,229 +1,229 @@
 [
     {
         "fields": {
-            "datatype": 8, 
-            "column_idx": 1, 
-            "compounddatatype": 5, 
             "blankable": false, 
-            "column_name": "word"
+            "column_idx": 1, 
+            "column_name": "word", 
+            "compounddatatype": 5, 
+            "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 7
     }, 
     {
         "fields": {
-            "datatype": 8, 
-            "column_idx": 1, 
-            "compounddatatype": 6, 
             "blankable": false, 
-            "column_name": "header"
+            "column_idx": 1, 
+            "column_name": "header", 
+            "compounddatatype": 6, 
+            "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 8
     }, 
     {
         "fields": {
-            "datatype": 9, 
-            "column_idx": 2, 
-            "compounddatatype": 6, 
             "blankable": false, 
-            "column_name": "sequence"
+            "column_idx": 2, 
+            "column_name": "sequence", 
+            "compounddatatype": 6, 
+            "datatype": 9
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 9
     }, 
     {
         "fields": {
-            "execrecord": 2, 
-            "start_time": "2015-07-17T23:13:56.095Z", 
-            "reused": false, 
-            "_redacted": false, 
-            "end_time": "2015-07-17T23:13:57.256Z", 
             "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2015-07-17T23:13:57.256Z", 
+            "execrecord": 2, 
             "is_cancelled": false, 
-            "_successful": true
+            "reused": false, 
+            "start_time": "2015-07-17T23:13:56.095Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 1
     }, 
     {
         "fields": {
-            "execrecord": 1, 
-            "start_time": "2015-07-17T23:13:56.178Z", 
-            "reused": false, 
-            "_redacted": false, 
-            "end_time": "2015-07-17T23:13:56.371Z", 
             "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2015-07-17T23:13:56.371Z", 
+            "execrecord": 1, 
             "is_cancelled": false, 
-            "_successful": true
+            "reused": false, 
+            "start_time": "2015-07-17T23:13:56.178Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 2
     }, 
     {
         "fields": {
-            "execrecord": 3, 
-            "start_time": "2015-07-17T23:13:57.747Z", 
-            "reused": false, 
-            "_redacted": false, 
-            "end_time": "2015-07-17T23:13:57.949Z", 
             "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2015-07-17T23:13:57.949Z", 
+            "execrecord": 3, 
             "is_cancelled": false, 
-            "_successful": true
+            "reused": false, 
+            "start_time": "2015-07-17T23:13:57.747Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 3
     }, 
     {
         "fields": {
-            "execrecord": 2, 
-            "start_time": "2015-07-17T23:13:58.655Z", 
-            "reused": true, 
-            "_redacted": false, 
-            "end_time": "2015-07-17T23:13:59.017Z", 
             "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2015-07-17T23:13:59.017Z", 
+            "execrecord": 2, 
             "is_cancelled": false, 
-            "_successful": true
+            "reused": true, 
+            "start_time": "2015-07-17T23:13:58.655Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 4
     }, 
     {
         "fields": {
-            "execrecord": 1, 
-            "start_time": "2015-07-17T23:13:58.723Z", 
-            "reused": true, 
-            "_redacted": false, 
-            "end_time": "2015-07-17T23:13:58.812Z", 
             "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2015-07-17T23:13:58.812Z", 
+            "execrecord": 1, 
             "is_cancelled": false, 
-            "_successful": true
+            "reused": true, 
+            "start_time": "2015-07-17T23:13:58.723Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 5
     }, 
     {
         "fields": {
-            "execrecord": 3, 
-            "start_time": "2015-07-17T23:13:59.406Z", 
-            "reused": true, 
-            "_redacted": false, 
-            "end_time": "2015-07-17T23:13:59.481Z", 
             "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2015-07-17T23:13:59.481Z", 
+            "execrecord": 3, 
             "is_cancelled": false, 
-            "_successful": true
+            "reused": true, 
+            "start_time": "2015-07-17T23:13:59.406Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 6
     }, 
     {
         "fields": {
-            "execrecord": 4, 
-            "start_time": "2015-07-17T23:14:00.054Z", 
-            "reused": false, 
-            "_redacted": false, 
-            "end_time": "2015-07-17T23:14:01.045Z", 
             "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2015-07-17T23:14:01.045Z", 
+            "execrecord": 4, 
             "is_cancelled": false, 
-            "_successful": true
+            "reused": false, 
+            "start_time": "2015-07-17T23:14:00.054Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 7
     }, 
     {
         "fields": {
-            "execrecord": 1, 
-            "start_time": "2015-07-17T23:14:00.122Z", 
-            "reused": true, 
-            "_redacted": false, 
-            "end_time": "2015-07-17T23:14:00.213Z", 
             "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2015-07-17T23:14:00.213Z", 
+            "execrecord": 1, 
             "is_cancelled": false, 
-            "_successful": true
+            "reused": true, 
+            "start_time": "2015-07-17T23:14:00.122Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 8
     }, 
     {
         "fields": {
-            "execrecord": 5, 
-            "start_time": "2015-07-17T23:14:01.489Z", 
-            "reused": false, 
-            "_redacted": false, 
-            "end_time": "2015-07-17T23:14:01.684Z", 
             "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2015-07-17T23:14:01.684Z", 
+            "execrecord": 5, 
             "is_cancelled": false, 
-            "_successful": true
+            "reused": false, 
+            "start_time": "2015-07-17T23:14:01.489Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 9
     }, 
     {
         "fields": {
-            "execrecord": 4, 
-            "start_time": "2015-07-17T23:14:02.331Z", 
-            "reused": true, 
-            "_redacted": false, 
-            "end_time": "2015-07-17T23:14:02.729Z", 
             "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2015-07-17T23:14:02.729Z", 
+            "execrecord": 4, 
             "is_cancelled": false, 
-            "_successful": true
+            "reused": true, 
+            "start_time": "2015-07-17T23:14:02.331Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 10
     }, 
     {
         "fields": {
-            "execrecord": 1, 
-            "start_time": "2015-07-17T23:14:02.408Z", 
-            "reused": true, 
-            "_redacted": false, 
-            "end_time": "2015-07-17T23:14:02.516Z", 
             "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2015-07-17T23:14:02.516Z", 
+            "execrecord": 1, 
             "is_cancelled": false, 
-            "_successful": true
+            "reused": true, 
+            "start_time": "2015-07-17T23:14:02.408Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 11
     }, 
     {
         "fields": {
-            "execrecord": 6, 
-            "start_time": "2015-07-17T23:14:03.104Z", 
-            "reused": false, 
-            "_redacted": false, 
-            "end_time": "2015-07-17T23:14:04.154Z", 
             "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2015-07-17T23:14:04.154Z", 
+            "execrecord": 6, 
             "is_cancelled": false, 
-            "_successful": true
+            "reused": false, 
+            "start_time": "2015-07-17T23:14:03.104Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 12
     }, 
     {
         "fields": {
-            "execrecord": 5, 
-            "start_time": "2015-07-17T23:14:03.197Z", 
-            "reused": true, 
-            "_redacted": false, 
-            "end_time": "2015-07-17T23:14:03.272Z", 
             "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2015-07-17T23:14:03.272Z", 
+            "execrecord": 5, 
             "is_cancelled": false, 
-            "_successful": true
+            "reused": true, 
+            "start_time": "2015-07-17T23:14:03.197Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 13
     }, 
     {
         "fields": {
-            "execrecord": 7, 
-            "start_time": "2015-07-17T23:14:04.605Z", 
-            "reused": false, 
-            "_redacted": false, 
-            "end_time": "2015-07-17T23:14:04.810Z", 
             "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2015-07-17T23:14:04.810Z", 
+            "execrecord": 7, 
             "is_cancelled": false, 
-            "_successful": true
+            "reused": false, 
+            "start_time": "2015-07-17T23:14:04.605Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 14
@@ -270,269 +270,269 @@
     }, 
     {
         "fields": {
-            "runstep": 1, 
-            "PSIC": 1
+            "PSIC": 1, 
+            "runstep": 1
         }, 
         "model": "archive.runsic", 
         "pk": 2
     }, 
     {
         "fields": {
-            "runstep": 4, 
-            "PSIC": 1
+            "PSIC": 1, 
+            "runstep": 4
         }, 
         "model": "archive.runsic", 
         "pk": 5
     }, 
     {
         "fields": {
-            "runstep": 7, 
-            "PSIC": 3
+            "PSIC": 3, 
+            "runstep": 7
         }, 
         "model": "archive.runsic", 
         "pk": 8
     }, 
     {
         "fields": {
-            "runstep": 10, 
-            "PSIC": 5
+            "PSIC": 5, 
+            "runstep": 10
         }, 
         "model": "archive.runsic", 
         "pk": 11
     }, 
     {
         "fields": {
-            "runstep": 12, 
-            "PSIC": 6
+            "PSIC": 6, 
+            "runstep": 12
         }, 
         "model": "archive.runsic", 
         "pk": 13
     }, 
     {
         "fields": {
-            "run": 1, 
-            "pipelineoutputcable": 2
+            "pipelineoutputcable": 2, 
+            "run": 1
         }, 
         "model": "archive.runoutputcable", 
         "pk": 3
     }, 
     {
         "fields": {
-            "run": 3, 
-            "pipelineoutputcable": 2
+            "pipelineoutputcable": 2, 
+            "run": 3
         }, 
         "model": "archive.runoutputcable", 
         "pk": 6
     }, 
     {
         "fields": {
-            "run": 4, 
-            "pipelineoutputcable": 4
+            "pipelineoutputcable": 4, 
+            "run": 4
         }, 
         "model": "archive.runoutputcable", 
         "pk": 9
     }, 
     {
         "fields": {
-            "run": 2, 
-            "pipelineoutputcable": 7
+            "pipelineoutputcable": 7, 
+            "run": 2
         }, 
         "model": "archive.runoutputcable", 
         "pk": 14
     }, 
     {
         "fields": {
-            "name": "lab data", 
-            "date_modified": "2015-07-17T23:13:54.415Z", 
-            "symbolicdataset": 1, 
             "created_by": null, 
-            "date_created": "2015-07-17T23:13:54.415Z", 
             "dataset_file": "Datasets/2015_07/tmpmE4TwN", 
-            "description": "data from the lab"
+            "date_created": "2015-07-17T23:13:54.415Z", 
+            "date_modified": "2015-07-17T23:13:54.415Z", 
+            "description": "data from the lab", 
+            "name": "lab data", 
+            "symbolicdataset": 1
         }, 
         "model": "archive.dataset", 
         "pk": 1
     }, 
     {
         "fields": {
-            "name": "run1_step1_outputcomplemented_DNA", 
-            "date_modified": "2015-07-17T23:13:56.679Z", 
-            "symbolicdataset": 2, 
             "created_by": 1, 
-            "date_created": "2015-07-17T23:13:56.679Z", 
             "dataset_file": "Datasets/2015_07/step1_complemented_DNA.csv", 
-            "description": "Generated data from a run of pipeline \"DNA complement:1 (v1)\" started at 2015-07-17 23:13:56.083650+00:00 by alice\nrun: 1\nuser: alice\nstep: 1\noutput: complemented_DNA"
+            "date_created": "2015-07-17T23:13:56.679Z", 
+            "date_modified": "2015-07-17T23:13:56.679Z", 
+            "description": "Generated data from a run of pipeline \"DNA complement:1 (v1)\" started at 2015-07-17 23:13:56.083650+00:00 by alice\nrun: 1\nuser: alice\nstep: 1\noutput: complemented_DNA", 
+            "name": "run1_step1_outputcomplemented_DNA", 
+            "symbolicdataset": 2
         }, 
         "model": "archive.dataset", 
         "pk": 2
     }, 
     {
         "fields": {
-            "name": "run4_step1_outputreversed_DNA", 
-            "date_modified": "2015-07-17T23:14:00.517Z", 
-            "symbolicdataset": 3, 
             "created_by": 7, 
-            "date_created": "2015-07-17T23:14:00.517Z", 
             "dataset_file": "Datasets/2015_07/step1_reversed_DNA.csv", 
-            "description": "Generated data from a run of pipeline \"DNA reverse:1 (v1)\" started at 2015-07-17 23:14:00.046971+00:00 by alice\nrun: 4\nuser: alice\nstep: 1\noutput: reversed_DNA"
+            "date_created": "2015-07-17T23:14:00.517Z", 
+            "date_modified": "2015-07-17T23:14:00.517Z", 
+            "description": "Generated data from a run of pipeline \"DNA reverse:1 (v1)\" started at 2015-07-17 23:14:00.046971+00:00 by alice\nrun: 4\nuser: alice\nstep: 1\noutput: reversed_DNA", 
+            "name": "run4_step1_outputreversed_DNA", 
+            "symbolicdataset": 3
         }, 
         "model": "archive.dataset", 
         "pk": 3
     }, 
     {
         "fields": {
-            "name": "run2_step2_outputcomplemented_DNA", 
-            "date_modified": "2015-07-17T23:14:03.607Z", 
-            "symbolicdataset": 4, 
             "created_by": 12, 
-            "date_created": "2015-07-17T23:14:03.607Z", 
             "dataset_file": "Datasets/2015_07/step2_complemented_DNA.csv", 
-            "description": "Generated data from a run of pipeline \"DNA revcomp:1 (v1)\" started at 2015-07-17 23:14:02.324197+00:00 by alice\nrun: 2\nuser: alice\nstep: 2\noutput: complemented_DNA"
+            "date_created": "2015-07-17T23:14:03.607Z", 
+            "date_modified": "2015-07-17T23:14:03.607Z", 
+            "description": "Generated data from a run of pipeline \"DNA revcomp:1 (v1)\" started at 2015-07-17 23:14:02.324197+00:00 by alice\nrun: 2\nuser: alice\nstep: 2\noutput: complemented_DNA", 
+            "name": "run2_step2_outputcomplemented_DNA", 
+            "symbolicdataset": 4
         }, 
         "model": "archive.dataset", 
         "pk": 4
     }, 
     {
         "fields": {
-            "record": 2, 
-            "start_time": "2015-07-17T23:13:56.205Z", 
+            "end_time": "2015-07-17T23:13:56.207Z", 
             "invoking_record": 2, 
-            "end_time": "2015-07-17T23:13:56.207Z"
+            "record": 2, 
+            "start_time": "2015-07-17T23:13:56.205Z"
         }, 
         "model": "archive.execlog", 
         "pk": 1
     }, 
     {
         "fields": {
-            "record": 1, 
-            "start_time": "2015-07-17T23:13:56.556Z", 
+            "end_time": "2015-07-17T23:13:56.638Z", 
             "invoking_record": 1, 
-            "end_time": "2015-07-17T23:13:56.638Z"
+            "record": 1, 
+            "start_time": "2015-07-17T23:13:56.556Z"
         }, 
         "model": "archive.execlog", 
         "pk": 2
     }, 
     {
         "fields": {
-            "record": 3, 
-            "start_time": "2015-07-17T23:13:57.762Z", 
+            "end_time": "2015-07-17T23:13:57.763Z", 
             "invoking_record": 3, 
-            "end_time": "2015-07-17T23:13:57.763Z"
+            "record": 3, 
+            "start_time": "2015-07-17T23:13:57.762Z"
         }, 
         "model": "archive.execlog", 
         "pk": 3
     }, 
     {
         "fields": {
-            "record": 7, 
-            "start_time": "2015-07-17T23:14:00.396Z", 
+            "end_time": "2015-07-17T23:14:00.478Z", 
             "invoking_record": 7, 
-            "end_time": "2015-07-17T23:14:00.478Z"
+            "record": 7, 
+            "start_time": "2015-07-17T23:14:00.396Z"
         }, 
         "model": "archive.execlog", 
         "pk": 4
     }, 
     {
         "fields": {
-            "record": 9, 
-            "start_time": "2015-07-17T23:14:01.504Z", 
+            "end_time": "2015-07-17T23:14:01.505Z", 
             "invoking_record": 9, 
-            "end_time": "2015-07-17T23:14:01.505Z"
+            "record": 9, 
+            "start_time": "2015-07-17T23:14:01.504Z"
         }, 
         "model": "archive.execlog", 
         "pk": 5
     }, 
     {
         "fields": {
-            "record": 12, 
-            "start_time": "2015-07-17T23:14:03.489Z", 
+            "end_time": "2015-07-17T23:14:03.572Z", 
             "invoking_record": 12, 
-            "end_time": "2015-07-17T23:14:03.572Z"
+            "record": 12, 
+            "start_time": "2015-07-17T23:14:03.489Z"
         }, 
         "model": "archive.execlog", 
         "pk": 6
     }, 
     {
         "fields": {
-            "record": 14, 
-            "start_time": "2015-07-17T23:14:04.625Z", 
+            "end_time": "2015-07-17T23:14:04.626Z", 
             "invoking_record": 14, 
-            "end_time": "2015-07-17T23:14:04.626Z"
+            "record": 14, 
+            "start_time": "2015-07-17T23:14:04.625Z"
         }, 
         "model": "archive.execlog", 
         "pk": 7
     }, 
     {
         "fields": {
-            "execlog": 2, 
-            "error_redacted": false, 
-            "return_code": 0, 
+            "code_redacted": false, 
             "error_log": "Logs/step1_stderr.txt", 
-            "code_redacted": false, 
+            "error_redacted": false, 
+            "execlog": 2, 
+            "output_log": "Logs/step1_stdout.txt", 
             "output_redacted": false, 
-            "output_log": "Logs/step1_stdout.txt"
+            "return_code": 0
         }, 
         "model": "archive.methodoutput", 
         "pk": 1
     }, 
     {
         "fields": {
-            "execlog": 4, 
-            "error_redacted": false, 
-            "return_code": 0, 
+            "code_redacted": false, 
             "error_log": "Logs/step1_stderr_fYmKdRZ.txt", 
-            "code_redacted": false, 
+            "error_redacted": false, 
+            "execlog": 4, 
+            "output_log": "Logs/step1_stdout_IYedxZJ.txt", 
             "output_redacted": false, 
-            "output_log": "Logs/step1_stdout_IYedxZJ.txt"
+            "return_code": 0
         }, 
         "model": "archive.methodoutput", 
         "pk": 2
     }, 
     {
         "fields": {
-            "execlog": 6, 
-            "error_redacted": false, 
-            "return_code": 0, 
-            "error_log": "Logs/step2_stderr.txt", 
             "code_redacted": false, 
+            "error_log": "Logs/step2_stderr.txt", 
+            "error_redacted": false, 
+            "execlog": 6, 
+            "output_log": "Logs/step2_stdout.txt", 
             "output_redacted": false, 
-            "output_log": "Logs/step2_stdout.txt"
+            "return_code": 0
         }, 
         "model": "archive.methodoutput", 
         "pk": 3
     }, 
     {
         "fields": {
+            "compounddatatype": 6, 
             "num_rows": 10, 
-            "symbolicdataset": 1, 
-            "compounddatatype": 6
+            "symbolicdataset": 1
         }, 
         "model": "librarian.datasetstructure", 
         "pk": 1
     }, 
     {
         "fields": {
+            "compounddatatype": 6, 
             "num_rows": 10, 
-            "symbolicdataset": 2, 
-            "compounddatatype": 6
+            "symbolicdataset": 2
         }, 
         "model": "librarian.datasetstructure", 
         "pk": 2
     }, 
     {
         "fields": {
+            "compounddatatype": 6, 
             "num_rows": 10, 
-            "symbolicdataset": 3, 
-            "compounddatatype": 6
+            "symbolicdataset": 3
         }, 
         "model": "librarian.datasetstructure", 
         "pk": 3
     }, 
     {
         "fields": {
+            "compounddatatype": 6, 
             "num_rows": 10, 
-            "symbolicdataset": 4, 
-            "compounddatatype": 6
+            "symbolicdataset": 4
         }, 
         "model": "librarian.datasetstructure", 
         "pk": 4
@@ -652,8 +652,8 @@
     {
         "fields": {
             "execrecord": 1, 
-            "symbolicdataset": 1, 
-            "generic_output": 7
+            "generic_output": 7, 
+            "symbolicdataset": 1
         }, 
         "model": "librarian.execrecordout", 
         "pk": 1
@@ -661,8 +661,8 @@
     {
         "fields": {
             "execrecord": 2, 
-            "symbolicdataset": 2, 
-            "generic_output": 8
+            "generic_output": 8, 
+            "symbolicdataset": 2
         }, 
         "model": "librarian.execrecordout", 
         "pk": 2
@@ -670,8 +670,8 @@
     {
         "fields": {
             "execrecord": 3, 
-            "symbolicdataset": 2, 
-            "generic_output": 13
+            "generic_output": 13, 
+            "symbolicdataset": 2
         }, 
         "model": "librarian.execrecordout", 
         "pk": 3
@@ -679,8 +679,8 @@
     {
         "fields": {
             "execrecord": 4, 
-            "symbolicdataset": 3, 
-            "generic_output": 10
+            "generic_output": 10, 
+            "symbolicdataset": 3
         }, 
         "model": "librarian.execrecordout", 
         "pk": 4
@@ -688,8 +688,8 @@
     {
         "fields": {
             "execrecord": 5, 
-            "symbolicdataset": 3, 
-            "generic_output": 16
+            "generic_output": 16, 
+            "symbolicdataset": 3
         }, 
         "model": "librarian.execrecordout", 
         "pk": 5
@@ -697,8 +697,8 @@
     {
         "fields": {
             "execrecord": 6, 
-            "symbolicdataset": 4, 
-            "generic_output": 8
+            "generic_output": 8, 
+            "symbolicdataset": 4
         }, 
         "model": "librarian.execrecordout", 
         "pk": 6
@@ -706,8 +706,8 @@
     {
         "fields": {
             "execrecord": 7, 
-            "symbolicdataset": 4, 
-            "generic_output": 19
+            "generic_output": 19, 
+            "symbolicdataset": 4
         }, 
         "model": "librarian.execrecordout", 
         "pk": 7
@@ -715,13 +715,13 @@
     {
         "fields": {
             "fill_colour": "", 
-            "pipeline": 4, 
             "name": "", 
             "outputs_to_delete": [], 
-            "y": 0.0, 
-            "x": 0.0, 
+            "pipeline": 4, 
+            "step_num": 1, 
             "transformation": 7, 
-            "step_num": 1
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "pipeline.pipelinestep", 
         "pk": 1
@@ -729,13 +729,13 @@
     {
         "fields": {
             "fill_colour": "", 
-            "pipeline": 5, 
             "name": "", 
             "outputs_to_delete": [], 
-            "y": 0.0, 
-            "x": 0.0, 
+            "pipeline": 5, 
+            "step_num": 1, 
             "transformation": 8, 
-            "step_num": 1
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "pipeline.pipelinestep", 
         "pk": 2
@@ -743,13 +743,13 @@
     {
         "fields": {
             "fill_colour": "", 
-            "pipeline": 6, 
             "name": "", 
             "outputs_to_delete": [], 
-            "y": 0.0, 
-            "x": 0.0, 
+            "pipeline": 6, 
+            "step_num": 1, 
             "transformation": 8, 
-            "step_num": 1
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "pipeline.pipelinestep", 
         "pk": 3
@@ -757,13 +757,13 @@
     {
         "fields": {
             "fill_colour": "", 
-            "pipeline": 6, 
             "name": "", 
             "outputs_to_delete": [], 
-            "y": 0.0, 
-            "x": 0.0, 
+            "pipeline": 6, 
+            "step_num": 2, 
             "transformation": 7, 
-            "step_num": 2
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "pipeline.pipelinestep", 
         "pk": 4
@@ -771,15 +771,15 @@
     {
         "fields": {
             "fill_colour": "", 
-            "pipeline": 9, 
             "name": "", 
             "outputs_to_delete": [
                 8
             ], 
-            "y": 0.0, 
-            "x": 0.0, 
+            "pipeline": 9, 
+            "step_num": 1, 
             "transformation": 7, 
-            "step_num": 1
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "pipeline.pipelinestep", 
         "pk": 5
@@ -787,15 +787,15 @@
     {
         "fields": {
             "fill_colour": "", 
-            "pipeline": 10, 
             "name": "", 
             "outputs_to_delete": [
                 10
             ], 
-            "y": 0.0, 
-            "x": 0.0, 
+            "pipeline": 10, 
+            "step_num": 1, 
             "transformation": 8, 
-            "step_num": 1
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "pipeline.pipelinestep", 
         "pk": 6
@@ -803,15 +803,15 @@
     {
         "fields": {
             "fill_colour": "", 
-            "pipeline": 10, 
             "name": "", 
             "outputs_to_delete": [
                 8
             ], 
-            "y": 0.0, 
-            "x": 0.0, 
+            "pipeline": 10, 
+            "step_num": 2, 
             "transformation": 7, 
-            "step_num": 2
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "pipeline.pipelinestep", 
         "pk": 7
@@ -819,15 +819,15 @@
     {
         "fields": {
             "fill_colour": "", 
-            "pipeline": 11, 
             "name": "", 
             "outputs_to_delete": [
                 10
             ], 
-            "y": 0.0, 
-            "x": 0.0, 
+            "pipeline": 11, 
+            "step_num": 1, 
             "transformation": 8, 
-            "step_num": 1
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "pipeline.pipelinestep", 
         "pk": 8
@@ -835,13 +835,13 @@
     {
         "fields": {
             "fill_colour": "", 
-            "pipeline": 11, 
             "name": "", 
             "outputs_to_delete": [], 
-            "y": 0.0, 
-            "x": 0.0, 
+            "pipeline": 11, 
+            "step_num": 2, 
             "transformation": 7, 
-            "step_num": 2
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "pipeline.pipelinestep", 
         "pk": 9
@@ -849,13 +849,13 @@
     {
         "fields": {
             "fill_colour": "", 
-            "pipeline": 13, 
             "name": "", 
             "outputs_to_delete": [], 
-            "y": 0.0, 
-            "x": 0.0, 
+            "pipeline": 13, 
+            "step_num": 1, 
             "transformation": 8, 
-            "step_num": 1
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "pipeline.pipelinestep", 
         "pk": 10
@@ -863,13 +863,13 @@
     {
         "fields": {
             "fill_colour": "", 
-            "pipeline": 13, 
             "name": "", 
             "outputs_to_delete": [], 
-            "y": 0.0, 
-            "x": 0.0, 
+            "pipeline": 13, 
+            "step_num": 2, 
             "transformation": 12, 
-            "step_num": 2
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "pipeline.pipelinestep", 
         "pk": 11
@@ -956,593 +956,593 @@
     }, 
     {
         "fields": {
-            "pipelinestep": 1, 
             "dest": 7, 
             "keep_output": false, 
-            "source_step": 0, 
-            "source": 11
+            "pipelinestep": 1, 
+            "source": 11, 
+            "source_step": 0
         }, 
         "model": "pipeline.pipelinestepinputcable", 
         "pk": 1
     }, 
     {
         "fields": {
-            "pipelinestep": 2, 
             "dest": 9, 
             "keep_output": false, 
-            "source_step": 0, 
-            "source": 14
+            "pipelinestep": 2, 
+            "source": 14, 
+            "source_step": 0
         }, 
         "model": "pipeline.pipelinestepinputcable", 
         "pk": 3
     }, 
     {
         "fields": {
-            "pipelinestep": 3, 
             "dest": 9, 
             "keep_output": false, 
-            "source_step": 0, 
-            "source": 17
+            "pipelinestep": 3, 
+            "source": 17, 
+            "source_step": 0
         }, 
         "model": "pipeline.pipelinestepinputcable", 
         "pk": 5
     }, 
     {
         "fields": {
-            "pipelinestep": 4, 
             "dest": 7, 
             "keep_output": false, 
-            "source_step": 1, 
-            "source": 10
+            "pipelinestep": 4, 
+            "source": 10, 
+            "source_step": 1
         }, 
         "model": "pipeline.pipelinestepinputcable", 
         "pk": 6
     }, 
     {
         "fields": {
-            "pipelinestep": 5, 
             "dest": 7, 
             "keep_output": false, 
-            "source_step": 0, 
-            "source": 20
+            "pipelinestep": 5, 
+            "source": 20, 
+            "source_step": 0
         }, 
         "model": "pipeline.pipelinestepinputcable", 
         "pk": 8
     }, 
     {
         "fields": {
-            "pipelinestep": 6, 
             "dest": 9, 
             "keep_output": false, 
-            "source_step": 0, 
-            "source": 22
+            "pipelinestep": 6, 
+            "source": 22, 
+            "source_step": 0
         }, 
         "model": "pipeline.pipelinestepinputcable", 
         "pk": 10
     }, 
     {
         "fields": {
-            "pipelinestep": 7, 
             "dest": 7, 
             "keep_output": false, 
-            "source_step": 1, 
-            "source": 10
+            "pipelinestep": 7, 
+            "source": 10, 
+            "source_step": 1
         }, 
         "model": "pipeline.pipelinestepinputcable", 
         "pk": 11
     }, 
     {
         "fields": {
-            "pipelinestep": 8, 
             "dest": 9, 
             "keep_output": false, 
-            "source_step": 0, 
-            "source": 24
+            "pipelinestep": 8, 
+            "source": 24, 
+            "source_step": 0
         }, 
         "model": "pipeline.pipelinestepinputcable", 
         "pk": 13
     }, 
     {
         "fields": {
-            "pipelinestep": 9, 
             "dest": 7, 
             "keep_output": false, 
-            "source_step": 1, 
-            "source": 10
+            "pipelinestep": 9, 
+            "source": 10, 
+            "source_step": 1
         }, 
         "model": "pipeline.pipelinestepinputcable", 
         "pk": 14
     }, 
     {
         "fields": {
-            "pipelinestep": 10, 
             "dest": 9, 
             "keep_output": false, 
-            "source_step": 0, 
-            "source": 29
+            "pipelinestep": 10, 
+            "source": 29, 
+            "source_step": 0
         }, 
         "model": "pipeline.pipelinestepinputcable", 
         "pk": 16
     }, 
     {
         "fields": {
-            "pipelinestep": 11, 
             "dest": 27, 
             "keep_output": false, 
-            "source_step": 1, 
-            "source": 10
+            "pipelinestep": 11, 
+            "source": 10, 
+            "source_step": 1
         }, 
         "model": "pipeline.pipelinestepinputcable", 
         "pk": 17
     }, 
     {
         "fields": {
-            "pipeline": 4, 
+            "output_cdt": 6, 
             "output_idx": 1, 
-            "source": 8, 
-            "source_step": 1, 
             "output_name": "complemented_lab_data", 
-            "output_cdt": 6
+            "pipeline": 4, 
+            "source": 8, 
+            "source_step": 1
         }, 
         "model": "pipeline.pipelineoutputcable", 
         "pk": 2
     }, 
     {
         "fields": {
-            "pipeline": 5, 
+            "output_cdt": 6, 
             "output_idx": 1, 
-            "source": 10, 
-            "source_step": 1, 
             "output_name": "reversed_lab_data", 
-            "output_cdt": 6
+            "pipeline": 5, 
+            "source": 10, 
+            "source_step": 1
         }, 
         "model": "pipeline.pipelineoutputcable", 
         "pk": 4
     }, 
     {
         "fields": {
-            "pipeline": 6, 
+            "output_cdt": 6, 
             "output_idx": 1, 
-            "source": 8, 
-            "source_step": 2, 
             "output_name": "reverse_and_complemented_lab_data", 
-            "output_cdt": 6
+            "pipeline": 6, 
+            "source": 8, 
+            "source_step": 2
         }, 
         "model": "pipeline.pipelineoutputcable", 
         "pk": 7
     }, 
     {
         "fields": {
-            "pipeline": 11, 
+            "output_cdt": 6, 
             "output_idx": 1, 
-            "source": 8, 
-            "source_step": 2, 
             "output_name": "revcomped_lab_data", 
-            "output_cdt": 6
+            "pipeline": 11, 
+            "source": 8, 
+            "source_step": 2
         }, 
         "model": "pipeline.pipelineoutputcable", 
         "pk": 15
     }, 
     {
         "fields": {
-            "pipeline": 13, 
+            "output_cdt": 6, 
             "output_idx": 1, 
-            "source": 28, 
-            "source_step": 2, 
             "output_name": "RNAd_lab_data", 
-            "output_cdt": 6
+            "pipeline": 13, 
+            "source": 28, 
+            "source_step": 2
         }, 
         "model": "pipeline.pipelineoutputcable", 
         "pk": 18
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 1
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 2
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 3
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 4
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 5
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 6
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 7
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 8
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 9
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 10
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 11
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 13
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 14
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 16
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 17
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 19
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 20
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 22
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 24
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 26
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 27
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 28
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 29
     }, 
     {
         "fields": {
-            "y": 0.0, 
-            "x": 0.0
+            "x": 0.0, 
+            "y": 0.0
         }, 
         "model": "transformation.transformationxput", 
         "pk": 31
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 1, 
+            "compounddatatype": 5, 
             "max_row": null, 
-            "compounddatatype": 5
+            "min_row": null, 
+            "transf_xput": 1
         }, 
         "model": "transformation.xputstructure", 
         "pk": 1
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 2, 
+            "compounddatatype": 5, 
             "max_row": null, 
-            "compounddatatype": 5
+            "min_row": null, 
+            "transf_xput": 2
         }, 
         "model": "transformation.xputstructure", 
         "pk": 2
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 3, 
+            "compounddatatype": 5, 
             "max_row": null, 
-            "compounddatatype": 5
+            "min_row": null, 
+            "transf_xput": 3
         }, 
         "model": "transformation.xputstructure", 
         "pk": 3
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 4, 
+            "compounddatatype": 5, 
             "max_row": null, 
-            "compounddatatype": 5
+            "min_row": null, 
+            "transf_xput": 4
         }, 
         "model": "transformation.xputstructure", 
         "pk": 4
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 7, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 7
         }, 
         "model": "transformation.xputstructure", 
         "pk": 5
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 8, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 8
         }, 
         "model": "transformation.xputstructure", 
         "pk": 6
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 9, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 9
         }, 
         "model": "transformation.xputstructure", 
         "pk": 7
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 10, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 10
         }, 
         "model": "transformation.xputstructure", 
         "pk": 8
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 11, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 11
         }, 
         "model": "transformation.xputstructure", 
         "pk": 9
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 13, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 13
         }, 
         "model": "transformation.xputstructure", 
         "pk": 11
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 14, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 14
         }, 
         "model": "transformation.xputstructure", 
         "pk": 12
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 16, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 16
         }, 
         "model": "transformation.xputstructure", 
         "pk": 14
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 17, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 17
         }, 
         "model": "transformation.xputstructure", 
         "pk": 15
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 19, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 19
         }, 
         "model": "transformation.xputstructure", 
         "pk": 17
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 20, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 20
         }, 
         "model": "transformation.xputstructure", 
         "pk": 18
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 22, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 22
         }, 
         "model": "transformation.xputstructure", 
         "pk": 20
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 24, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 24
         }, 
         "model": "transformation.xputstructure", 
         "pk": 22
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 26, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 26
         }, 
         "model": "transformation.xputstructure", 
         "pk": 24
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 27, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 27
         }, 
         "model": "transformation.xputstructure", 
         "pk": 25
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 28, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 28
         }, 
         "model": "transformation.xputstructure", 
         "pk": 26
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 29, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 29
         }, 
         "model": "transformation.xputstructure", 
         "pk": 27
     }, 
     {
         "fields": {
-            "min_row": null, 
-            "transf_xput": 31, 
+            "compounddatatype": 6, 
             "max_row": null, 
-            "compounddatatype": 6
+            "min_row": null, 
+            "transf_xput": 31
         }, 
         "model": "transformation.xputstructure", 
         "pk": 29
@@ -1550,8 +1550,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 1, 
-            "dataset_name": "strings"
+            "dataset_name": "strings", 
+            "transformation": 1
         }, 
         "model": "transformation.transformationinput", 
         "pk": 1
@@ -1559,8 +1559,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 2, 
-            "dataset_name": "strings"
+            "dataset_name": "strings", 
+            "transformation": 2
         }, 
         "model": "transformation.transformationinput", 
         "pk": 3
@@ -1568,8 +1568,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 3, 
-            "dataset_name": "raw"
+            "dataset_name": "raw", 
+            "transformation": 3
         }, 
         "model": "transformation.transformationinput", 
         "pk": 5
@@ -1577,8 +1577,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 7, 
-            "dataset_name": "DNA_to_complement"
+            "dataset_name": "DNA_to_complement", 
+            "transformation": 7
         }, 
         "model": "transformation.transformationinput", 
         "pk": 7
@@ -1586,8 +1586,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 8, 
-            "dataset_name": "DNA_to_reverse"
+            "dataset_name": "DNA_to_reverse", 
+            "transformation": 8
         }, 
         "model": "transformation.transformationinput", 
         "pk": 9
@@ -1595,8 +1595,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 4, 
-            "dataset_name": "lab_data"
+            "dataset_name": "lab_data", 
+            "transformation": 4
         }, 
         "model": "transformation.transformationinput", 
         "pk": 11
@@ -1604,8 +1604,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 5, 
-            "dataset_name": "lab_data"
+            "dataset_name": "lab_data", 
+            "transformation": 5
         }, 
         "model": "transformation.transformationinput", 
         "pk": 14
@@ -1613,8 +1613,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 6, 
-            "dataset_name": "lab_data"
+            "dataset_name": "lab_data", 
+            "transformation": 6
         }, 
         "model": "transformation.transformationinput", 
         "pk": 17
@@ -1622,8 +1622,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 9, 
-            "dataset_name": "lab_data"
+            "dataset_name": "lab_data", 
+            "transformation": 9
         }, 
         "model": "transformation.transformationinput", 
         "pk": 20
@@ -1631,8 +1631,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 10, 
-            "dataset_name": "lab_data"
+            "dataset_name": "lab_data", 
+            "transformation": 10
         }, 
         "model": "transformation.transformationinput", 
         "pk": 22
@@ -1640,8 +1640,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 11, 
-            "dataset_name": "lab_data"
+            "dataset_name": "lab_data", 
+            "transformation": 11
         }, 
         "model": "transformation.transformationinput", 
         "pk": 24
@@ -1649,8 +1649,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 12, 
-            "dataset_name": "DNA_to_convert"
+            "dataset_name": "DNA_to_convert", 
+            "transformation": 12
         }, 
         "model": "transformation.transformationinput", 
         "pk": 27
@@ -1658,8 +1658,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 13, 
-            "dataset_name": "lab_data"
+            "dataset_name": "lab_data", 
+            "transformation": 13
         }, 
         "model": "transformation.transformationinput", 
         "pk": 29
@@ -1667,8 +1667,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 1, 
-            "dataset_name": "same_strings"
+            "dataset_name": "same_strings", 
+            "transformation": 1
         }, 
         "model": "transformation.transformationoutput", 
         "pk": 2
@@ -1676,8 +1676,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 2, 
-            "dataset_name": "untouched_strings"
+            "dataset_name": "untouched_strings", 
+            "transformation": 2
         }, 
         "model": "transformation.transformationoutput", 
         "pk": 4
@@ -1685,8 +1685,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 3, 
-            "dataset_name": "same_raw"
+            "dataset_name": "same_raw", 
+            "transformation": 3
         }, 
         "model": "transformation.transformationoutput", 
         "pk": 6
@@ -1694,8 +1694,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 7, 
-            "dataset_name": "complemented_DNA"
+            "dataset_name": "complemented_DNA", 
+            "transformation": 7
         }, 
         "model": "transformation.transformationoutput", 
         "pk": 8
@@ -1703,8 +1703,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 8, 
-            "dataset_name": "reversed_DNA"
+            "dataset_name": "reversed_DNA", 
+            "transformation": 8
         }, 
         "model": "transformation.transformationoutput", 
         "pk": 10
@@ -1712,8 +1712,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 4, 
-            "dataset_name": "complemented_lab_data"
+            "dataset_name": "complemented_lab_data", 
+            "transformation": 4
         }, 
         "model": "transformation.transformationoutput", 
         "pk": 13
@@ -1721,8 +1721,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 5, 
-            "dataset_name": "reversed_lab_data"
+            "dataset_name": "reversed_lab_data", 
+            "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
         "pk": 16
@@ -1730,8 +1730,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 6, 
-            "dataset_name": "reverse_and_complemented_lab_data"
+            "dataset_name": "reverse_and_complemented_lab_data", 
+            "transformation": 6
         }, 
         "model": "transformation.transformationoutput", 
         "pk": 19
@@ -1739,8 +1739,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 11, 
-            "dataset_name": "revcomped_lab_data"
+            "dataset_name": "revcomped_lab_data", 
+            "transformation": 11
         }, 
         "model": "transformation.transformationoutput", 
         "pk": 26
@@ -1748,8 +1748,8 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 12, 
-            "dataset_name": "RNA"
+            "dataset_name": "RNA", 
+            "transformation": 12
         }, 
         "model": "transformation.transformationoutput", 
         "pk": 28
@@ -1757,210 +1757,210 @@
     {
         "fields": {
             "dataset_idx": 1, 
-            "transformation": 13, 
-            "dataset_name": "RNAd_lab_data"
+            "dataset_name": "RNAd_lab_data", 
+            "transformation": 13
         }, 
         "model": "transformation.transformationoutput", 
         "pk": 31
     }, 
     {
         "fields": {
-            "username": "bob", 
+            "date_joined": "2015-07-17T23:13:52.470Z", 
+            "email": "bob@talabs.com", 
             "first_name": "", 
-            "last_name": "", 
-            "is_active": true, 
-            "is_superuser": false, 
-            "is_staff": false, 
-            "last_login": "2015-07-17T23:13:52.470Z", 
             "groups": [
                 1
             ], 
-            "user_permissions": [], 
+            "is_active": true, 
+            "is_staff": false, 
+            "is_superuser": false, 
+            "last_login": "2015-07-17T23:13:52.470Z", 
+            "last_name": "", 
             "password": "pbkdf2_sha256$15000$4jFWn6DgNnZT$vslCfhQroI3CdEK6GTSNXyti39SexTKtaHorYWJUCjw=", 
-            "email": "bob@talabs.com", 
-            "date_joined": "2015-07-17T23:13:52.470Z"
+            "user_permissions": [], 
+            "username": "bob"
         }, 
         "model": "auth.user", 
         "pk": 2
     }, 
     {
         "fields": {
-            "username": "alice", 
+            "date_joined": "2015-07-17T23:13:52.966Z", 
+            "email": "alice@talabs.com", 
             "first_name": "", 
-            "last_name": "", 
-            "is_active": true, 
-            "is_superuser": false, 
-            "is_staff": false, 
-            "last_login": "2015-07-17T23:13:52.966Z", 
             "groups": [
                 1
             ], 
-            "user_permissions": [], 
+            "is_active": true, 
+            "is_staff": false, 
+            "is_superuser": false, 
+            "last_login": "2015-07-17T23:13:52.966Z", 
+            "last_name": "", 
             "password": "pbkdf2_sha256$15000$ccNe0y9UPi2d$SagCyj+TlYf05hDk5vR6xQkLfP0Z1rGgxAijj0vO7zM=", 
-            "email": "alice@talabs.com", 
-            "date_joined": "2015-07-17T23:13:52.966Z"
+            "user_permissions": [], 
+            "username": "alice"
         }, 
         "model": "auth.user", 
         "pk": 3
     }, 
     {
         "fields": {
+            "date_created": "2015-07-17T23:13:52.587Z", 
             "description": "sequences of ASCII characters", 
             "groups_allowed": [
                 1
             ], 
+            "name": "my_string", 
+            "prototype": null, 
             "restricts": [
                 1
             ], 
-            "users_allowed": [], 
             "user": 2, 
-            "date_created": "2015-07-17T23:13:52.587Z", 
-            "prototype": null, 
-            "name": "my_string"
+            "users_allowed": []
         }, 
         "model": "metadata.datatype", 
         "pk": 8
     }, 
     {
         "fields": {
+            "date_created": "2015-07-17T23:13:53.140Z", 
             "description": "sequences of ATCG", 
             "groups_allowed": [
                 1
             ], 
+            "name": "DNA", 
+            "prototype": null, 
             "restricts": [
                 1
             ], 
-            "users_allowed": [], 
             "user": 3, 
-            "date_created": "2015-07-17T23:13:53.140Z", 
-            "prototype": null, 
-            "name": "DNA"
+            "users_allowed": []
         }, 
         "model": "metadata.datatype", 
         "pk": 9
     }, 
     {
         "fields": {
-            "users_allowed": [], 
-            "user": 2, 
             "groups_allowed": [
                 1
-            ]
+            ], 
+            "user": 2, 
+            "users_allowed": []
         }, 
         "model": "metadata.compounddatatype", 
         "pk": 5
     }, 
     {
         "fields": {
-            "users_allowed": [], 
-            "user": 3, 
             "groups_allowed": [
                 1
-            ]
+            ], 
+            "user": 3, 
+            "users_allowed": []
         }, 
         "model": "metadata.compounddatatype", 
         "pk": 6
     }, 
     {
         "fields": {
-            "pipeline": 4, 
             "description": "", 
-            "groups_allowed": [], 
-            "start_time": "2015-07-17T23:13:56.083Z", 
-            "name": "", 
-            "users_allowed": [], 
             "end_time": "2015-07-17T23:13:58.079Z", 
+            "groups_allowed": [], 
+            "name": "", 
             "parent_runstep": null, 
-            "user": 3
+            "pipeline": 4, 
+            "start_time": "2015-07-17T23:13:56.083Z", 
+            "user": 3, 
+            "users_allowed": []
         }, 
         "model": "archive.run", 
         "pk": 1
     }, 
     {
         "fields": {
-            "pipeline": 6, 
             "description": "", 
-            "groups_allowed": [], 
-            "start_time": "2015-07-17T23:14:02.324Z", 
-            "name": "", 
-            "users_allowed": [], 
             "end_time": "2015-07-17T23:14:04.939Z", 
+            "groups_allowed": [], 
+            "name": "", 
             "parent_runstep": null, 
-            "user": 3
+            "pipeline": 6, 
+            "start_time": "2015-07-17T23:14:02.324Z", 
+            "user": 3, 
+            "users_allowed": []
         }, 
         "model": "archive.run", 
         "pk": 2
     }, 
     {
         "fields": {
-            "pipeline": 4, 
             "description": "", 
-            "groups_allowed": [], 
-            "start_time": "2015-07-17T23:13:58.648Z", 
-            "name": "", 
-            "users_allowed": [], 
             "end_time": "2015-07-17T23:13:59.594Z", 
+            "groups_allowed": [], 
+            "name": "", 
             "parent_runstep": null, 
-            "user": 3
+            "pipeline": 4, 
+            "start_time": "2015-07-17T23:13:58.648Z", 
+            "user": 3, 
+            "users_allowed": []
         }, 
         "model": "archive.run", 
         "pk": 3
     }, 
     {
         "fields": {
-            "pipeline": 5, 
             "description": "", 
-            "groups_allowed": [], 
-            "start_time": "2015-07-17T23:14:00.046Z", 
-            "name": "", 
-            "users_allowed": [], 
             "end_time": "2015-07-17T23:14:01.810Z", 
+            "groups_allowed": [], 
+            "name": "", 
             "parent_runstep": null, 
-            "user": 3
+            "pipeline": 5, 
+            "start_time": "2015-07-17T23:14:00.046Z", 
+            "user": 3, 
+            "users_allowed": []
         }, 
         "model": "archive.run", 
         "pk": 4
     }, 
     {
         "fields": {
-            "_redacted": false, 
-            "users_allowed": [], 
-            "user": 3, 
             "MD5_checksum": "0082bc75b97d81a1b92adaa894fef1bd", 
-            "groups_allowed": []
+            "_redacted": false, 
+            "groups_allowed": [], 
+            "user": 3, 
+            "users_allowed": []
         }, 
         "model": "librarian.symbolicdataset", 
         "pk": 1
     }, 
     {
         "fields": {
-            "_redacted": false, 
-            "users_allowed": [], 
-            "user": 3, 
             "MD5_checksum": "c0d4cb49470a30a88ea5d4cf0c3324c9", 
-            "groups_allowed": []
+            "_redacted": false, 
+            "groups_allowed": [], 
+            "user": 3, 
+            "users_allowed": []
         }, 
         "model": "librarian.symbolicdataset", 
         "pk": 2
     }, 
     {
         "fields": {
-            "_redacted": false, 
-            "users_allowed": [], 
-            "user": 3, 
             "MD5_checksum": "c0d4cb49470a30a88ea5d4cf0c3324c9", 
-            "groups_allowed": []
+            "_redacted": false, 
+            "groups_allowed": [], 
+            "user": 3, 
+            "users_allowed": []
         }, 
         "model": "librarian.symbolicdataset", 
         "pk": 3
     }, 
     {
         "fields": {
-            "_redacted": false, 
-            "users_allowed": [], 
-            "user": 3, 
             "MD5_checksum": "0082bc75b97d81a1b92adaa894fef1bd", 
-            "groups_allowed": []
+            "_redacted": false, 
+            "groups_allowed": [], 
+            "user": 3, 
+            "users_allowed": []
         }, 
         "model": "librarian.symbolicdataset", 
         "pk": 4
@@ -1968,13 +1968,13 @@
     {
         "fields": {
             "description": "a script to do nothing", 
+            "filename": "noop.sh", 
             "groups_allowed": [
                 1
             ], 
-            "filename": "noop.sh", 
-            "users_allowed": [], 
+            "name": "noop", 
             "user": 2, 
-            "name": "noop"
+            "users_allowed": []
         }, 
         "model": "method.coderesource", 
         "pk": 1
@@ -1982,13 +1982,13 @@
     {
         "fields": {
             "description": "a script to complement DNA", 
+            "filename": "complement.sh", 
             "groups_allowed": [
                 1
             ], 
-            "filename": "complement.sh", 
-            "users_allowed": [], 
+            "name": "DNA complement", 
             "user": 3, 
-            "name": "DNA complement"
+            "users_allowed": []
         }, 
         "model": "method.coderesource", 
         "pk": 2
@@ -1996,13 +1996,13 @@
     {
         "fields": {
             "description": "a script to reverse DNA", 
+            "filename": "reverse.sh", 
             "groups_allowed": [
                 1
             ], 
-            "filename": "reverse.sh", 
-            "users_allowed": [], 
+            "name": "DNA reverse", 
             "user": 3, 
-            "name": "DNA reverse"
+            "users_allowed": []
         }, 
         "model": "method.coderesource", 
         "pk": 3
@@ -2010,31 +2010,31 @@
     {
         "fields": {
             "description": "a script to reverse DNA", 
+            "filename": "DNA2RNA.sh", 
             "groups_allowed": [
                 1
             ], 
-            "filename": "DNA2RNA.sh", 
-            "users_allowed": [], 
+            "name": "DNA to RNA", 
             "user": 3, 
-            "name": "DNA to RNA"
+            "users_allowed": []
         }, 
         "model": "method.coderesource", 
         "pk": 4
     }, 
     {
         "fields": {
-            "revision_name": "1", 
-            "revision_parent": null, 
+            "MD5_checksum": "", 
+            "coderesource": 1, 
+            "content_file": "CodeResources/fdopen", 
             "groups_allowed": [
                 1
             ], 
-            "revision_desc": "first version", 
-            "coderesource": 1, 
-            "MD5_checksum": "", 
-            "content_file": "CodeResources/fdopen", 
-            "user": 2, 
-            "revision_number": 1, 
             "revision_DateTime": "2015-07-17T23:13:52.624Z", 
+            "revision_desc": "first version", 
+            "revision_name": "1", 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "user": 2, 
             "users_allowed": []
         }, 
         "model": "method.coderesourcerevision", 
@@ -2042,18 +2042,18 @@
     }, 
     {
         "fields": {
-            "revision_name": "1", 
-            "revision_parent": null, 
+            "MD5_checksum": "", 
+            "coderesource": 2, 
+            "content_file": "CodeResources/fdopen_I8TwanZ", 
             "groups_allowed": [
                 1
             ], 
-            "revision_desc": "first version", 
-            "coderesource": 2, 
-            "MD5_checksum": "", 
-            "content_file": "CodeResources/fdopen_I8TwanZ", 
-            "user": 3, 
-            "revision_number": 1, 
             "revision_DateTime": "2015-07-17T23:13:53.160Z", 
+            "revision_desc": "first version", 
+            "revision_name": "1", 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "user": 3, 
             "users_allowed": []
         }, 
         "model": "method.coderesourcerevision", 
@@ -2061,18 +2061,18 @@
     }, 
     {
         "fields": {
-            "revision_name": "1", 
-            "revision_parent": null, 
+            "MD5_checksum": "", 
+            "coderesource": 3, 
+            "content_file": "CodeResources/fdopen_6BkKWO9", 
             "groups_allowed": [
                 1
             ], 
-            "revision_desc": "first version", 
-            "coderesource": 3, 
-            "MD5_checksum": "", 
-            "content_file": "CodeResources/fdopen_6BkKWO9", 
-            "user": 3, 
-            "revision_number": 1, 
             "revision_DateTime": "2015-07-17T23:13:53.181Z", 
+            "revision_desc": "first version", 
+            "revision_name": "1", 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "user": 3, 
             "users_allowed": []
         }, 
         "model": "method.coderesourcerevision", 
@@ -2080,18 +2080,18 @@
     }, 
     {
         "fields": {
-            "revision_name": "1", 
-            "revision_parent": null, 
+            "MD5_checksum": "", 
+            "coderesource": 4, 
+            "content_file": "CodeResources/fdopen_Jz48nXx", 
             "groups_allowed": [
                 1
             ], 
-            "revision_desc": "first version", 
-            "coderesource": 4, 
-            "MD5_checksum": "", 
-            "content_file": "CodeResources/fdopen_Jz48nXx", 
-            "user": 3, 
-            "revision_number": 1, 
             "revision_DateTime": "2015-07-17T23:13:55.455Z", 
+            "revision_desc": "first version", 
+            "revision_name": "1", 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "user": 3, 
             "users_allowed": []
         }, 
         "model": "method.coderesourcerevision", 
@@ -2099,180 +2099,180 @@
     }, 
     {
         "fields": {
-            "threads": 1, 
-            "revision_parent": null, 
+            "driver": 1, 
             "family": 1, 
             "groups_allowed": [
                 1
             ], 
-            "driver": 1, 
-            "tainted": false, 
+            "reusable": 1, 
             "revision_number": 1, 
-            "users_allowed": [], 
-            "reusable": 1
+            "revision_parent": null, 
+            "tainted": false, 
+            "threads": 1, 
+            "users_allowed": []
         }, 
         "model": "method.method", 
         "pk": 1
     }, 
     {
         "fields": {
-            "threads": 1, 
-            "revision_parent": null, 
+            "driver": 1, 
             "family": 2, 
             "groups_allowed": [
                 1
             ], 
-            "driver": 1, 
-            "tainted": false, 
+            "reusable": 1, 
             "revision_number": 1, 
-            "users_allowed": [], 
-            "reusable": 1
+            "revision_parent": null, 
+            "tainted": false, 
+            "threads": 1, 
+            "users_allowed": []
         }, 
         "model": "method.method", 
         "pk": 2
     }, 
     {
         "fields": {
-            "threads": 1, 
-            "revision_parent": null, 
+            "driver": 1, 
             "family": 3, 
             "groups_allowed": [
                 1
             ], 
-            "driver": 1, 
-            "tainted": false, 
+            "reusable": 1, 
             "revision_number": 1, 
-            "users_allowed": [], 
-            "reusable": 1
+            "revision_parent": null, 
+            "tainted": false, 
+            "threads": 1, 
+            "users_allowed": []
         }, 
         "model": "method.method", 
         "pk": 3
     }, 
     {
         "fields": {
-            "threads": 1, 
-            "revision_parent": null, 
+            "driver": 2, 
             "family": 4, 
             "groups_allowed": [
                 1
             ], 
-            "driver": 2, 
-            "tainted": false, 
+            "reusable": 1, 
             "revision_number": 1, 
-            "users_allowed": [], 
-            "reusable": 1
+            "revision_parent": null, 
+            "tainted": false, 
+            "threads": 1, 
+            "users_allowed": []
         }, 
         "model": "method.method", 
         "pk": 7
     }, 
     {
         "fields": {
-            "threads": 1, 
-            "revision_parent": null, 
+            "driver": 2, 
             "family": 5, 
             "groups_allowed": [
                 1
             ], 
-            "driver": 2, 
-            "tainted": false, 
+            "reusable": 1, 
             "revision_number": 1, 
-            "users_allowed": [], 
-            "reusable": 1
+            "revision_parent": null, 
+            "tainted": false, 
+            "threads": 1, 
+            "users_allowed": []
         }, 
         "model": "method.method", 
         "pk": 8
     }, 
     {
         "fields": {
-            "threads": 1, 
-            "revision_parent": null, 
+            "driver": 4, 
             "family": 6, 
             "groups_allowed": [
                 1
             ], 
-            "driver": 4, 
-            "tainted": false, 
+            "reusable": 1, 
             "revision_number": 1, 
-            "users_allowed": [], 
-            "reusable": 1
+            "revision_parent": null, 
+            "tainted": false, 
+            "threads": 1, 
+            "users_allowed": []
         }, 
         "model": "method.method", 
         "pk": 12
     }, 
     {
         "fields": {
-            "user": 2, 
-            "users_allowed": [], 
             "description": "a method to do nothing to strings", 
-            "name": "string noop", 
             "groups_allowed": [
                 1
-            ]
+            ], 
+            "name": "string noop", 
+            "user": 2, 
+            "users_allowed": []
         }, 
         "model": "method.methodfamily", 
         "pk": 1
     }, 
     {
         "fields": {
-            "user": 2, 
-            "users_allowed": [], 
             "description": "a TOTALLY DIFFERENT method that TOTALLY does SOMETHING to strings by leaving them alone", 
-            "name": "string trivial", 
             "groups_allowed": [
                 1
-            ]
+            ], 
+            "name": "string trivial", 
+            "user": 2, 
+            "users_allowed": []
         }, 
         "model": "method.methodfamily", 
         "pk": 2
     }, 
     {
         "fields": {
-            "user": 2, 
-            "users_allowed": [], 
             "description": "do nothing to raw data", 
-            "name": "raw noop", 
             "groups_allowed": [
                 1
-            ]
+            ], 
+            "name": "raw noop", 
+            "user": 2, 
+            "users_allowed": []
         }, 
         "model": "method.methodfamily", 
         "pk": 3
     }, 
     {
         "fields": {
-            "user": 3, 
-            "users_allowed": [], 
             "description": "a method to complement strings of DNA", 
-            "name": "DNA complement", 
             "groups_allowed": [
                 1
-            ]
+            ], 
+            "name": "DNA complement", 
+            "user": 3, 
+            "users_allowed": []
         }, 
         "model": "method.methodfamily", 
         "pk": 4
     }, 
     {
         "fields": {
-            "user": 3, 
-            "users_allowed": [], 
             "description": "a method to reverse strings of DNA", 
-            "name": "DNA reverse", 
             "groups_allowed": [
                 1
-            ]
+            ], 
+            "name": "DNA reverse", 
+            "user": 3, 
+            "users_allowed": []
         }, 
         "model": "method.methodfamily", 
         "pk": 5
     }, 
     {
         "fields": {
-            "user": 3, 
-            "users_allowed": [], 
             "description": "a method to turn strings of DNA into RNA", 
-            "name": "DNA to RNA", 
             "groups_allowed": [
                 1
-            ]
+            ], 
+            "name": "DNA to RNA", 
+            "user": 3, 
+            "users_allowed": []
         }, 
         "model": "method.methodfamily", 
         "pk": 6
@@ -2282,10 +2282,10 @@
             "description": "a pipeline to complement DNA", 
             "groups_allowed": [
                 1
-            ],
-            "users_allowed": [], 
+            ], 
+            "name": "DNA complement", 
             "user": 3, 
-            "name": "DNA complement"
+            "users_allowed": []
         }, 
         "model": "pipeline.pipelinefamily", 
         "pk": 1
@@ -2295,10 +2295,10 @@
             "description": "a pipeline to reverse DNA", 
             "groups_allowed": [
                 1
-            ],
-            "users_allowed": [], 
+            ], 
+            "name": "DNA reverse", 
             "user": 3, 
-            "name": "DNA reverse"
+            "users_allowed": []
         }, 
         "model": "pipeline.pipelinefamily", 
         "pk": 2
@@ -2308,10 +2308,10 @@
             "description": "a pipeline to reverse and complement DNA", 
             "groups_allowed": [
                 1
-            ],
-            "users_allowed": [], 
+            ], 
+            "name": "DNA revcomp", 
             "user": 3, 
-            "name": "DNA revcomp"
+            "users_allowed": []
         }, 
         "model": "pipeline.pipelinefamily", 
         "pk": 3
@@ -2321,10 +2321,10 @@
             "description": "a pipeline to reverse DNA and translate it to RNA", 
             "groups_allowed": [
                 1
-            ],
-            "users_allowed": [], 
+            ], 
+            "name": "DNA to reversed RNA", 
             "user": 3, 
-            "name": "DNA to reversed RNA"
+            "users_allowed": []
         }, 
         "model": "pipeline.pipelinefamily", 
         "pk": 4
@@ -2332,12 +2332,12 @@
     {
         "fields": {
             "family": 1, 
-            "users_allowed": [], 
-            "revision_parent": null, 
-            "revision_number": 1, 
             "groups_allowed": [
                 1
-            ]
+            ], 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "users_allowed": []
         }, 
         "model": "pipeline.pipeline", 
         "pk": 4
@@ -2345,12 +2345,12 @@
     {
         "fields": {
             "family": 2, 
-            "users_allowed": [], 
-            "revision_parent": null, 
-            "revision_number": 1, 
             "groups_allowed": [
                 1
-            ]
+            ], 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "users_allowed": []
         }, 
         "model": "pipeline.pipeline", 
         "pk": 5
@@ -2358,12 +2358,12 @@
     {
         "fields": {
             "family": 3, 
-            "users_allowed": [], 
-            "revision_parent": null, 
-            "revision_number": 1, 
             "groups_allowed": [
                 1
-            ]
+            ], 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "users_allowed": []
         }, 
         "model": "pipeline.pipeline", 
         "pk": 6
@@ -2371,10 +2371,10 @@
     {
         "fields": {
             "family": 1, 
-            "users_allowed": [], 
-            "revision_parent": null, 
+            "groups_allowed": [], 
             "revision_number": 2, 
-            "groups_allowed": []
+            "revision_parent": null, 
+            "users_allowed": []
         }, 
         "model": "pipeline.pipeline", 
         "pk": 9
@@ -2382,10 +2382,10 @@
     {
         "fields": {
             "family": 3, 
-            "users_allowed": [], 
-            "revision_parent": null, 
+            "groups_allowed": [], 
             "revision_number": 2, 
-            "groups_allowed": []
+            "revision_parent": null, 
+            "users_allowed": []
         }, 
         "model": "pipeline.pipeline", 
         "pk": 10
@@ -2393,10 +2393,10 @@
     {
         "fields": {
             "family": 3, 
-            "users_allowed": [], 
-            "revision_parent": null, 
+            "groups_allowed": [], 
             "revision_number": 3, 
-            "groups_allowed": []
+            "revision_parent": null, 
+            "users_allowed": []
         }, 
         "model": "pipeline.pipeline", 
         "pk": 11
@@ -2404,198 +2404,198 @@
     {
         "fields": {
             "family": 4, 
-            "users_allowed": [], 
-            "revision_parent": null, 
-            "revision_number": 1, 
             "groups_allowed": [
                 1
-            ]
+            ], 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "users_allowed": []
         }, 
         "model": "pipeline.pipeline", 
         "pk": 13
     }, 
     {
         "fields": {
-            "revision_name": "v1", 
             "groups_allowed": [
                 1
             ], 
+            "revision_DateTime": "2015-07-17T23:13:52.653Z", 
             "revision_desc": "first version", 
-            "users_allowed": [], 
+            "revision_name": "v1", 
             "user": 2, 
-            "revision_DateTime": "2015-07-17T23:13:52.653Z"
+            "users_allowed": []
         }, 
         "model": "transformation.transformation", 
         "pk": 1
     }, 
     {
         "fields": {
-            "revision_name": "v1", 
             "groups_allowed": [
                 1
             ], 
+            "revision_DateTime": "2015-07-17T23:13:52.786Z", 
             "revision_desc": "first version", 
-            "users_allowed": [], 
+            "revision_name": "v1", 
             "user": 2, 
-            "revision_DateTime": "2015-07-17T23:13:52.786Z"
+            "users_allowed": []
         }, 
         "model": "transformation.transformation", 
         "pk": 2
     }, 
     {
         "fields": {
-            "revision_name": "v1", 
             "groups_allowed": [
                 1
             ], 
+            "revision_DateTime": "2015-07-17T23:13:52.903Z", 
             "revision_desc": "first version", 
-            "users_allowed": [], 
+            "revision_name": "v1", 
             "user": 2, 
-            "revision_DateTime": "2015-07-17T23:13:52.903Z"
+            "users_allowed": []
         }, 
         "model": "transformation.transformation", 
         "pk": 3
     }, 
     {
         "fields": {
-            "revision_name": "v1", 
             "groups_allowed": [
                 1
             ], 
+            "revision_DateTime": "2015-07-17T23:13:53.090Z", 
             "revision_desc": "first version", 
-            "users_allowed": [], 
+            "revision_name": "v1", 
             "user": 3, 
-            "revision_DateTime": "2015-07-17T23:13:53.090Z"
+            "users_allowed": []
         }, 
         "model": "transformation.transformation", 
         "pk": 4
     }, 
     {
         "fields": {
-            "revision_name": "v1", 
             "groups_allowed": [
                 1
             ], 
+            "revision_DateTime": "2015-07-17T23:13:53.107Z", 
             "revision_desc": "first version", 
-            "users_allowed": [], 
+            "revision_name": "v1", 
             "user": 3, 
-            "revision_DateTime": "2015-07-17T23:13:53.107Z"
+            "users_allowed": []
         }, 
         "model": "transformation.transformation", 
         "pk": 5
     }, 
     {
         "fields": {
-            "revision_name": "v1", 
             "groups_allowed": [
                 1
             ], 
+            "revision_DateTime": "2015-07-17T23:13:53.134Z", 
             "revision_desc": "first version", 
-            "users_allowed": [], 
+            "revision_name": "v1", 
             "user": 3, 
-            "revision_DateTime": "2015-07-17T23:13:53.134Z"
+            "users_allowed": []
         }, 
         "model": "transformation.transformation", 
         "pk": 6
     }, 
     {
         "fields": {
-            "revision_name": "v1", 
             "groups_allowed": [
                 1
             ], 
+            "revision_DateTime": "2015-07-17T23:13:53.214Z", 
             "revision_desc": "first version", 
-            "users_allowed": [], 
+            "revision_name": "v1", 
             "user": 3, 
-            "revision_DateTime": "2015-07-17T23:13:53.214Z"
+            "users_allowed": []
         }, 
         "model": "transformation.transformation", 
         "pk": 7
     }, 
     {
         "fields": {
-            "revision_name": "v1", 
             "groups_allowed": [
                 1
             ], 
+            "revision_DateTime": "2015-07-17T23:13:53.328Z", 
             "revision_desc": "first version", 
-            "users_allowed": [], 
+            "revision_name": "v1", 
             "user": 3, 
-            "revision_DateTime": "2015-07-17T23:13:53.328Z"
+            "users_allowed": []
         }, 
         "model": "transformation.transformation", 
         "pk": 8
     }, 
     {
         "fields": {
-            "revision_name": "2", 
             "groups_allowed": [], 
+            "revision_DateTime": "2015-07-17T23:13:54.458Z", 
             "revision_desc": "second version", 
-            "users_allowed": [], 
+            "revision_name": "2", 
             "user": 3, 
-            "revision_DateTime": "2015-07-17T23:13:54.458Z"
+            "users_allowed": []
         }, 
         "model": "transformation.transformation", 
         "pk": 9
     }, 
     {
         "fields": {
-            "revision_name": "2", 
             "groups_allowed": [], 
+            "revision_DateTime": "2015-07-17T23:13:54.700Z", 
             "revision_desc": "second version", 
-            "users_allowed": [], 
+            "revision_name": "2", 
             "user": 3, 
-            "revision_DateTime": "2015-07-17T23:13:54.700Z"
+            "users_allowed": []
         }, 
         "model": "transformation.transformation", 
         "pk": 10
     }, 
     {
         "fields": {
-            "revision_name": "3", 
             "groups_allowed": [], 
+            "revision_DateTime": "2015-07-17T23:13:55.082Z", 
             "revision_desc": "third version", 
-            "users_allowed": [], 
+            "revision_name": "3", 
             "user": 3, 
-            "revision_DateTime": "2015-07-17T23:13:55.082Z"
+            "users_allowed": []
         }, 
         "model": "transformation.transformation", 
         "pk": 11
     }, 
     {
         "fields": {
-            "revision_name": "v1", 
             "groups_allowed": [
                 1
             ], 
+            "revision_DateTime": "2015-07-17T23:13:55.476Z", 
             "revision_desc": "first version", 
-            "users_allowed": [], 
+            "revision_name": "v1", 
             "user": 3, 
-            "revision_DateTime": "2015-07-17T23:13:55.476Z"
+            "users_allowed": []
         }, 
         "model": "transformation.transformation", 
         "pk": 12
     }, 
     {
         "fields": {
-            "revision_name": "v1", 
             "groups_allowed": [
                 1
             ], 
+            "revision_DateTime": "2015-07-17T23:13:55.604Z", 
             "revision_desc": "first version", 
-            "users_allowed": [], 
+            "revision_name": "v1", 
             "user": 3, 
-            "revision_DateTime": "2015-07-17T23:13:55.604Z"
+            "users_allowed": []
         }, 
         "model": "transformation.transformation", 
         "pk": 13
     }, 
     {
         "fields": {
+            "end_time": "2015-07-17T23:13:54.410Z", 
             "execlog": null, 
             "start_time": "2015-07-17T23:13:54.298Z", 
             "symbolicdataset": 1, 
-            "end_time": "2015-07-17T23:13:54.410Z", 
             "user": 3
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2603,10 +2603,10 @@
     }, 
     {
         "fields": {
+            "end_time": "2015-07-17T23:13:57.189Z", 
             "execlog": 2, 
             "start_time": "2015-07-17T23:13:57.071Z", 
             "symbolicdataset": 2, 
-            "end_time": "2015-07-17T23:13:57.189Z", 
             "user": 3
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2614,10 +2614,10 @@
     }, 
     {
         "fields": {
+            "end_time": "2015-07-17T23:14:00.983Z", 
             "execlog": 4, 
             "start_time": "2015-07-17T23:14:00.862Z", 
             "symbolicdataset": 3, 
-            "end_time": "2015-07-17T23:14:00.983Z", 
             "user": 3
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2625,10 +2625,10 @@
     }, 
     {
         "fields": {
+            "end_time": "2015-07-17T23:14:04.094Z", 
             "execlog": 6, 
             "start_time": "2015-07-17T23:14:03.972Z", 
             "symbolicdataset": 4, 
-            "end_time": "2015-07-17T23:14:04.094Z", 
             "user": 3
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2636,10 +2636,10 @@
     }, 
     {
         "fields": {
+            "end_time": "2015-07-17T23:13:56.360Z", 
             "execlog": 1, 
             "start_time": "2015-07-17T23:13:56.360Z", 
             "symbolicdataset": 1, 
-            "end_time": "2015-07-17T23:13:56.360Z", 
             "user": 3
         }, 
         "model": "datachecking.integritychecklog", 
@@ -2647,10 +2647,10 @@
     }, 
     {
         "fields": {
+            "end_time": "2015-07-17T23:13:57.939Z", 
             "execlog": 3, 
             "start_time": "2015-07-17T23:13:57.939Z", 
             "symbolicdataset": 2, 
-            "end_time": "2015-07-17T23:13:57.939Z", 
             "user": 3
         }, 
         "model": "datachecking.integritychecklog", 
@@ -2658,10 +2658,10 @@
     }, 
     {
         "fields": {
+            "end_time": "2015-07-17T23:14:01.674Z", 
             "execlog": 5, 
             "start_time": "2015-07-17T23:14:01.674Z", 
             "symbolicdataset": 3, 
-            "end_time": "2015-07-17T23:14:01.674Z", 
             "user": 3
         }, 
         "model": "datachecking.integritychecklog", 
@@ -2669,10 +2669,10 @@
     }, 
     {
         "fields": {
+            "end_time": "2015-07-17T23:14:04.800Z", 
             "execlog": 7, 
             "start_time": "2015-07-17T23:14:04.800Z", 
             "symbolicdataset": 4, 
-            "end_time": "2015-07-17T23:14:04.800Z", 
             "user": 3
         }, 
         "model": "datachecking.integritychecklog", 
