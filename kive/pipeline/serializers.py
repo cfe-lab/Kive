@@ -70,6 +70,17 @@ class PipelineStepSerializer(serializers.ModelSerializer):
     new_dependency_ids = serializers.ListField(child=serializers.IntegerField(),
                                                write_only=True,
                                                required=False)
+    outputs_to_delete = serializers.SlugRelatedField(
+        many=True,
+        read_only=True,
+        slug_field="dataset_name"
+    )
+    new_outputs_to_delete_names = serializers.ListField(
+        child=serializers.CharField(),
+        write_only=True,
+        required=False
+    )
+
 
     class Meta:
         model = PipelineStep
@@ -86,21 +97,28 @@ class PipelineStepSerializer(serializers.ModelSerializer):
             "outputs",
             "inputs",
             "new_code_resource_revision_id",
-            "new_dependency_ids"
+            "new_dependency_ids",
+            "new_outputs_to_delete_names"
         )
 
     def validate(self, data):
         """
         Check that the cables point to actual inputs of this PipelineStep.
         """
+        curr_transf = data["transformation"].definite
         for cable_data in data["cables_in"]:
             # FIXME this is a workaround for weird deserialization behaviour.
             curr_dest_name = cable_data["dest"]["definite"]["dataset_name"]
-            curr_transf = data["transformation"].definite
             if not curr_transf.inputs.filter(dataset_name=curr_dest_name).exists():
                 raise serializers.ValidationError(
                     'Step {} has no input named "{}"'.format(data["step_num"],
                                                              curr_dest_name)
+                )
+
+        for otd_name in data.get("new_outputs_to_delete_names", []):
+            if not curr_transf.outputs.filter(dataset_name=otd_name).exists():
+                raise serializers.ValidationError(
+                    'Step {} has no output named "{}"'.format(data["step_num"], otd_name)
                 )
 
         return data
@@ -342,7 +360,7 @@ class PipelineSerializer(AccessControlSerializer,
             cables = step_data.pop("cables_in")
             # This is a ManyToManyField so it must be populated after the step
             # itself is created.
-            outputs_to_delete = step_data.pop("outputs_to_delete")
+            new_outputs_to_delete_names = step_data.pop("new_outputs_to_delete_names", [])
             code_resource_revision_id = step_data.pop(
                 "new_code_resource_revision_id",
                 None)
@@ -394,7 +412,8 @@ class PipelineSerializer(AccessControlSerializer,
                 step_data['transformation'] = method
 
             curr_step = pipeline.steps.create(**step_data)
-            curr_step.outputs_to_delete.add(*outputs_to_delete)
+            curr_step.outputs_to_delete.add(
+                *[step_data["transformation"].outputs.get(dataset_name=x) for x in new_outputs_to_delete_names])
 
             for cable_data in cables:
                 custom_wires = cable_data.pop("custom_wires") if "custom_wires" in cable_data else []

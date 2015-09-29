@@ -92,8 +92,7 @@ var pipeline = (function(exports){
 
         // at least one Connector must terminate as pipeline output
         if (pipeline_outputs.length === 0) {
-            submitError('Pipeline has no output');
-            return;
+            throw 'Pipeline has no output.';
         }
 
         // Now we're ready to start
@@ -147,8 +146,9 @@ var pipeline = (function(exports){
                         step.new_code_resource_revision ?
                                 step.new_code_resource_revision.id :
                                     null),
-                outputs_to_delete: [] // not yet implemented
+                new_outputs_to_delete_names: step.outputs_to_delete
             };
+
             if (step.new_dependencies && step.new_dependencies.length) {
                 var new_dependency_ids = [];
                 for (var i = 0; i < step.new_dependencies.length; i++) {

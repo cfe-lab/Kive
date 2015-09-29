@@ -50,7 +50,7 @@ $(function() {
         var $this = $(this),
             menu = $($this.data('rel')),
             inputs, input, preview_canvas, i;
-        $('li', 'ul#id_ctrl_nav').not(this).removeClass('clicked');
+        $('#id_ctrl_nav li').not(this).removeClass('clicked');
         $this.addClass('clicked');
         $('.ctrl_menu', '#pipeline_ctrl').hide();
         menu.show().css('left', $this.offset().left);
@@ -139,24 +139,79 @@ $(function() {
             $.getJSON("/api/methods/" + val + "/").done(function(result) {
                 ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
                 var n_outputs = Object.keys(result.outputs).length * 8,
-                    n_inputs  = Object.keys(result.inputs).length * 8;
+                    n_inputs  = Object.keys(result.inputs).length * 8 + 14;
                 
-                preview_canvas.height = (n_outputs + n_inputs) / 2 + 62;
+                preview_canvas.height = (n_outputs + n_inputs) / 2 + 55;
                 (new drydock_objects.MethodNode(
                     val,
-                    null,//family
+                    null,// family
                     // Ensures node is centred perfectly on the preview canvas
-                    // Makes assumptions that parameters like magnet radius and scoop length are default.
-                    preview_canvas.width/2 - ( Math.min(-n_inputs - 14, 42 - n_outputs) + Math.max(n_inputs + 14, n_outputs + 48) ) * 0.4330127,// x
-                    n_inputs / 2 + 27,// y
-                    colour, 
-                    null,//label
+                    // For this calculation to be accurate, method node draw params cannot change.
+                    preview_canvas.width / 2 - 
+                        (
+                            Math.max(0, n_outputs - n_inputs + 48) - 
+                            Math.max(0, n_outputs - n_inputs - 42)
+                        ) * 0.4330127,// x
+                    n_inputs / 2 + 20,// y
+                    colour,
+                    null,// label
                     result.inputs,
                     result.outputs
                 )).draw(ctx);
+
+                /*
+                 * Update outputs fieldset list
+                 * (not a part of this function's original mandate)
+                 */
+                var fieldset = $('#id_method_delete_outputs_details').empty();
+                for (var i = 0, output; (output = result.outputs[i]); i++) {
+                    fieldset.append(
+                        $('<input>', {
+                            type: 'checkbox',
+                            name: 'dont_delete_outputs',
+                            class: 'method_delete_outputs',
+                            id: 'dont_delete_outputs_'+ output.dataset_idx,
+                            value: output.dataset_name,
+                            checked: 'checked'
+                        }),
+                        $('<label>', {
+                            'for': 'dont_delete_outputs_'+ output.dataset_idx
+                        }).text(output.dataset_name),
+                        $('<br>')
+                    );
+                }
+                $('#id_method_delete_outputs').prop('checked', true);
             });
         }
         e.stopPropagation();
+    };
+
+    var linkParentCheckbox = function() {
+        var siblings = $(this).siblings('input').add(this),
+            checked_inputs = siblings.filter(':checked').length,
+            prop_obj = { indeterminate: false };
+
+        if (checked_inputs < siblings.length && checked_inputs > 0) {
+            prop_obj.indeterminate = true;
+        } else {
+            prop_obj.checked = (checked_inputs !== 0);
+        }
+        $('#id_method_delete_outputs').prop(prop_obj);
+    };
+
+    var linkChildCheckboxes = function() {
+        $('#id_method_delete_outputs_details input')
+            .prop('checked', $(this).is(':checked'));
+    };
+
+    var childCheckboxVisibilityCtrl = function() {
+        var is_shown = $('#id_method_delete_outputs_details').is(':visible');
+
+        $('#id_method_delete_outputs_details')
+            [is_shown ? 'hide':'show']();
+        $(this).text(
+            is_shown ? '▸ List outputs':'▾ Hide list'
+        );
     };
 
     var updateMethodRevisionsMenu = function() {
@@ -226,9 +281,13 @@ $(function() {
                 shape;
             
             if (this_pk === ""){
-                shape = new drydock_objects.RawNode(         pos.left, pos.top, node_label);
+                shape = new drydock_objects.RawNode(pos.left, pos.top, node_label);
             } else {
-                shape = new drydock_objects.CdtNode(this_pk, pos.left, pos.top, node_label);
+                shape = new drydock_objects.CdtNode(
+                        parseInt(this_pk),
+                        pos.left,
+                        pos.top,
+                        node_label);
             }
             canvasState.addShape(shape);
             canvasState.detectCollisions(shape, 0);// Second arg: Upon collision, move new shape 0% and move existing objects 100%
@@ -245,6 +304,7 @@ $(function() {
             method_family = $('#id_select_method_family', this),
             method_colour = $('#id_select_colour', this),
             method = $('#id_select_method', this),
+            method_dont_delete_outputs = $('#id_method_delete_outputs_details input', this),
             mid = method.val(), // pk of method
             pos,
             dlg = $(this).closest('.modal_dialog'),
@@ -262,9 +322,21 @@ $(function() {
                         method_colour.val(), 
                         node_label,
                         inputs,
-                        outputs);
+                        outputs)
+            ;
 
-            if (document.getElementById('id_method_button').value == 'Add Method') {
+            method_dont_delete_outputs.each(function() {
+                if (!$(this).prop('checked')) {
+                    method.outputs_to_delete.push(this.value);
+
+                    for (var i = 0, magnet; (magnet = method.out_magnets[i]); i++) {
+                        if (this.value === magnet.label)
+                            magnet.toDelete = true;
+                    }
+                }
+            });
+
+            if ($('#id_method_button').val() == 'Add Method') {
                 // create new MethodNode
                 canvasState.addShape(method);
             } else {
@@ -275,7 +347,6 @@ $(function() {
                 // draw new node over old node
                 var old_node = canvasState.selection[0];
                 canvasState.replaceMethod(old_node, method);
-
                 canvasState.selection = [ method ];
             }
             
@@ -307,8 +378,7 @@ $(function() {
                 // required field
                 method_error[0].innerHTML = "Label is required";
                 method_name.focus();
-            }
-            else {
+            } else {
                 method_error[0].innerHTML = '';
                 
                 // use AJAX to retrieve Revision inputs and outputs
@@ -335,14 +405,14 @@ $(function() {
                 canvasState.deleteObject();
                 var menus = $('.ctrl_menu, .context_menu, .modal_dialog').filter(':visible');
                 menus.trigger('cancel');
-                $('li', 'ul#id_ctrl_nav').add(menus).removeClass('clicked');
+                $('#id_ctrl_nav li').add(menus).removeClass('clicked');
             }
             pipelineCheckReadiness();
         }
         
         // escape key closes menus
         else if (e.which == 27) {
-            $('li', 'ul#id_ctrl_nav').removeClass('clicked');
+            $('#id_ctrl_nav li').removeClass('clicked');
             $('.ctrl_menu:visible').trigger('cancel');
             canvasState.selection = [];
             canvasState.valid = false;
@@ -353,7 +423,7 @@ $(function() {
         var menus = $('.ctrl_menu, .context_menu, .modal_dialog').filter(':visible');
         if ($(e.target).closest(menus).length === 0) {
             menus.trigger('cancel');
-            $('li', 'ul#id_ctrl_nav').add(menus).removeClass('clicked');
+            $('#id_ctrl_nav li').add(menus).removeClass('clicked');
         }
     };
 
@@ -421,41 +491,62 @@ $(function() {
                         top:  sel.y + sel.dy - inputs_width + canvas.offsetTop - 29,
                         left: sel.x + sel.dx - preview_canvas.width/2 + 0.8660254 * Math.min(Math.max(outputs_width - inputs_width, 0), 45) + canvas.offsetLeft - 9
                     });
-                    $('#id_select_colour').val(sel.fill);
-                    $('#colour_picker_pick').css('background-color', sel.fill);
-                    var $method_family = $('#id_select_method_family');
+                    $('#id_select_colour', menu).val(sel.fill);
+                    $('#colour_picker_pick', menu).css('background-color', sel.fill);
+
+                    if ($('#id_method_delete_outputs_details', menu).is(':visible')) {
+                        $('#id_method_delete_outputs_field .expand_outputs_ctrl', menu).trigger('click');
+                    }
+
+                    var $method_family = $('#id_select_method_family', menu);
                     $method_family.val(sel.family);
                     var request = updateMethodRevisionsMenu.call($method_family[0]); // trigger ajax
                     if (sel.new_code_resource_revision) {
                         request.done(function() {
                             var name = sel.new_code_resource_revision.revision_name;
-                            $("#id_select_method").prepend(
-                                    $('<option>', { value: sel.pk }).text(
-                                            'new: ' + name));
+                            $('<option>', { value: sel.pk })
+                                .text('new: ' + name)
+                                .prependTo($("#id_select_method", menu));
                         });
                     }
                     if (sel.new_dependencies) {
                         request.done(function() {
                             var name = "new: ";
                             for (var i = 0; i < sel.new_dependencies.length; i++) {
-                                if (i > 0) {
-                                    name += ", ";
-                                }
+                                if (i > 0) name += ", ";
                                 name += sel.new_dependencies[i].revision_name;
                             }
-                            $("#id_select_method").prepend(
-                                    $('<option>', { value: sel.pk }).text(name));
+                            $('<option>', { value: sel.pk })
+                                .text(name)
+                                .prependTo($("#id_select_method", menu));
                         });
                     }
                     
+                    // disable forms while ajax is loading
+                    $('input', menu).prop('disabled', true);
+
                     // #id_method_revision_field is always populated via ajax.
-                    // $.one() will run this event exactly once before killing it.
+                    // it will run this event exactly twice before killing it.
                     // first we execute, then we kill.
-                    $(document).one('ajaxComplete', function() {
-                        // wait for AJAX to populate drop-down before selecting option
-                        $('#id_method_revision_field select').val(sel.pk);
-                        $('#id_method_name').val_(sel.label).select();
-                    });
+                    $(document).on('ajaxComplete', (function(method) {
+                        var counter = 0;
+                        return function() {
+                            // only act on the second time this is called.
+                            if (2 !== ++counter) return;
+                            // don't run it a third time.
+                            $(document).off('ajaxComplete');
+                            $('input', menu).prop('disabled', false);
+
+                            var checkboxes = $('#id_method_delete_outputs_details input', menu);
+                            // wait for AJAX to populate drop-down before selecting option
+                            $('#id_method_revision_field select', menu).val(method.pk);
+                            $('#id_method_name', menu).val_(method.label).select();
+                            checkboxes.each(function() {
+                                $(this).prop('checked', -1 === method.outputs_to_delete.indexOf(this.value) );
+                            });
+                            linkParentCheckbox.call(checkboxes[0]);
+                        };
+                    })(sel) );
                 }
                 else if (sel instanceof drydock_objects.OutputNode) {
                     /*
@@ -651,7 +742,7 @@ $(function() {
         if(!is_new)
             submit_pipeline(family_pk);
 
-        else // Pushing a new family
+        else {// Pushing a new family
             $.ajax({
                 type: 'POST',
                 url: '/api/pipelinefamilies/',
@@ -677,6 +768,7 @@ $(function() {
                     }
                 }
             });
+        }
     };
 
     var changeExecOrderDisplayOption = function() {
@@ -756,8 +848,6 @@ $(function() {
                                  .on('cancel',               cancelOutputNode);           // Cancel is not a native event and can only be triggered via javascript
     $('#id_select_cdt')          .on('change',               updateCDtPreviewCanvas);
     $('#id_select_method')       .on('change',               updateMethodPreviewCanvas);
-    $("#id_select_method_family").on('change',               updateMethodRevisionsMenu)   // Update method drop-down
-                                 .trigger('change'); // Trigger on load
     $('form','#id_input_ctrl')   .on('submit',               createNewInputNode);         // Handle 'Inputs' menu
     $('form', '#id_method_ctrl') .on('submit',               submitMethodDialog)          // Handle 'Methods' menu
                                  .on('reset',                resetMethodDialog);
@@ -771,6 +861,10 @@ $(function() {
     $('.form-inline-opts')       .on('click', 'input',       changeExecOrderDisplayOption);
     $('#colour_picker_pick')     .on('click',                showColourPicker);
     $('#colour_picker_menu')     .on('click', 'div',         pickColour);
+    $("#id_select_method_family")           .on('change',    updateMethodRevisionsMenu)                             .trigger('change'); // Trigger on load
+    $('#id_method_delete_outputs')          .on('change',    linkChildCheckboxes)                                   .trigger('change');
+    $('#id_method_delete_outputs_field')    .on('click',   '.expand_outputs_ctrl',   childCheckboxVisibilityCtrl)   .trigger('click');
+    $('#id_method_delete_outputs_details')  .on('change',  '.method_delete_outputs', linkParentCheckbox);
     /*
     ------------------------------------------------------------------------------------
     */

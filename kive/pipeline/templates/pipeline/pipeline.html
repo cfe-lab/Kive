@@ -160,8 +160,8 @@ $(function() {
 
             <select id="id_select_cdt" name="select_cdt" class="select-label">
                 <option value="">Raw</option>
-                {% for cdt in compound_datatypes %}
-                    <option value="{{ cdt.pk }}">{{ cdt }}</option>
+                {% for name, pk in compound_datatypes %}
+                    <option value="{{ pk }}">{{ name }}</option>
                 {% endfor %}
             </select>
 
@@ -202,6 +202,13 @@ $(function() {
             <select id="id_select_method" name="select_method">
                 <!-- populated by ajax transaction -->
             </select>
+            </div>
+
+            <div id="id_method_delete_outputs_field">
+                <input id="id_method_delete_outputs" name="method_delete_outputs" type="checkbox" checked>
+                <label for="id_method_delete_outputs">Save intermediate outputs of this step</label>
+                <div class="expand_outputs_ctrl">▸ List outputs</div> 
+                <fieldset id="id_method_delete_outputs_details"></fieldset>
             </div>
             
             <input type="submit" id="id_method_button" value="Add Method">

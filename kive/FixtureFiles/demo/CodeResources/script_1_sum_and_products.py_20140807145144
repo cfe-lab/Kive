@@ -5,43 +5,35 @@ Takes as input a 2-column (x,y) CSV file and outputs
 a single 2-column (x+y,x*y) output CSV file.
 """
 
-import csv;
-import argparse;
-import sys;
+from argparse import FileType, ArgumentParser
+import csv
+import os
 
-# In order to work with kive, scripts which having a inputs
+# In order to work with kive, scripts that have a inputs
 # and b outputs must have a+b command line arguments, the first a
 # arguments specifying paths of input files, the subsequent b
-# arguments specifying the paths of where outputs are written]
+# arguments specifying the paths where outputs are written.
 
 
 # ArgumentParser facilitates parsing inputs from sys.argv, and
 # generates help messages based on the expected input specification
-
-# Only allow .stringUT.py -h or ./stringUT.py --help by default
-scriptDescription = "Takes CSV containing (x,y), \
-outputs CSV containing (x+y),(x*y)";
-
-parser = argparse.ArgumentParser(scriptDescription);
-parser.add_argument("input_csv",help="CSV containing (x,y) pairs");
-parser.add_argument("output_csv",help="CSV containing (x+y,xy) pairs");
+parser = ArgumentParser(
+    description="Takes CSV with (x,y), outputs CSV with (x+y),(x*y)");
+parser.add_argument("input_csv",
+                    type=FileType('rU'),
+                    help="CSV containing (x,y) pairs");
+parser.add_argument("output_csv",
+                    type=FileType('wb'),
+                    help="CSV containing (x+y,xy) pairs");
 args = parser.parse_args();
 
-with open(args.input_csv, "rU") as f, open(args.output_csv, "w") as output:
+reader = csv.DictReader(args.input_csv);
+writer = csv.DictWriter(args.output_csv,
+                        ['sum', 'product'],
+                        lineterminator=os.linesep)
+writer.writeheader()
 
-    # csv.reader() returns list inside an iterable
-    # Iterables can be used in for/in blocks
-    reader = csv.DictReader(f);
-
-    output.write('sum,product\n')
-    try:
-        for row in reader:
-            x = int(row['x'])
-            y = int(row['y'])
-            output.write('{},{}\n'.format(x+y, x*y))
-
-    # If csv iterable method __next__() throws error, exit
-    except csv.Error as e:
-        sys.exit("Error at line {}: {}".format(reader.line_num, e));
-
-
+for row in reader:
+    x = int(row['x'])
+    y = int(row['y'])
+    writer.writerow(dict(sum=x+y, product=x*y))

@@ -27,7 +27,7 @@ html body {
 #pipeline_ctrl input[type="radio"] {
     display: inline;
 }
-#pipeline_ctrl #id_method_button, 
+#pipeline_ctrl #id_method_button,
 #pipeline_ctrl #id_cdt_button {
     margin: .5em;
 }
@@ -89,7 +89,17 @@ ul#id_ctrl_nav li:hover {
     box-sizing: border-box;
     width: 250px;
 }
-
+#id_method_delete_outputs_field {
+    margin: .5em 0;
+    font-size: .8em;
+}
+#id_method_delete_outputs_field .expand_outputs_ctrl {
+    cursor: pointer;
+    font-size: .9em;
+}
+#id_method_delete_outputs_field fieldset {
+    display: none;
+}
 #pipeline_ctrl #form_ctrl {
     float: right;
     margin-top: -1.25em;

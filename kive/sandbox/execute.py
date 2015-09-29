@@ -1230,10 +1230,12 @@ class Sandbox:
                                 curr_RS.stop(save=True, clean=False)
                                 curr_RS.complete_clean()
                                 self.update_step_maps(curr_RS, step_run_dir, output_paths)
+                                execute_info.execrecord = curr_ER
                                 return curr_RS
 
                             else:
                                 self.logger.debug("Filling in ExecRecord {}".format(curr_ER))
+                                execute_info.execrecord = curr_ER
 
                         else:
                             self.logger.debug("No compatible ExecRecord found yet")
@@ -1252,7 +1254,7 @@ class Sandbox:
         # this step as waiting for them.
         if len(symbolically_okay_SDs) > 0:
             for missing_data in symbolically_okay_SDs:
-                self.queue_recovery(missing_data, recovering_record=curr_RS)
+                self.queue_recovery(missing_data, invoking_record=curr_RS)
                 self.tasks_waiting[missing_data].append(curr_RS)
             self.waiting_for[curr_RS] = symbolically_okay_SDs
         else:
@@ -1284,7 +1286,7 @@ class Sandbox:
         SDs_to_recover_first = []
         for cable in cable_info_list:
             # We use the sandbox's version of the execute information for this cable.
-            cable_info = self.cable_execute_info[(cable.cable_record.parent_run, cable.cable_record)]
+            cable_info = self.cable_execute_info[(cable.cable_record.parent_run, cable.cable_record.PSIC)]
 
             # If the cable needs its feeding steps to recover, we throw them onto the queue if they're not there
             # already.
@@ -1307,6 +1309,10 @@ class Sandbox:
 
         This is an MPI-friendly version of recover.  It only ever handles non-trivial recoveries,
         as trivial recoveries are now performed by cables themselves.
+        
+        @param SD_to_recover: symbolic dataset that needs to be recovered
+        @param invoking_record: the run component that needs the symbolic
+            dataset as an input
 
         PRE
         SD_to_recover is in the maps but no corresponding file is on the file system.

@@ -4209,7 +4209,7 @@ def create_pipeline_deserialization_environment(case):
                         "keep_output": False
                     }
                 ],
-                "outputs_to_delete": []
+                "new_outputs_to_delete_names": []
             },
             {
                 "transformation": case.method_noop.pk,
@@ -4227,7 +4227,6 @@ def create_pipeline_deserialization_environment(case):
                         "keep_output": False
                     }
                 ],
-                "outputs_to_delete": []
             },
             {
                 "transformation": case.method_noop.pk,
@@ -4244,7 +4243,7 @@ def create_pipeline_deserialization_environment(case):
                         "keep_output": False
                     }
                 ],
-                "outputs_to_delete": []
+                "new_outputs_to_delete_names": []
             }
         ],
         "outcables": [
@@ -4327,7 +4326,6 @@ def create_pipeline_deserialization_environment(case):
                         "keep_output": False
                     }
                 ],
-                "outputs_to_delete": []
             },
             {
                 "transformation": case.method_noop.pk,
@@ -4350,7 +4348,6 @@ def create_pipeline_deserialization_environment(case):
                         "keep_output": False
                     }
                 ],
-                "outputs_to_delete": []
             }
         ],
         "outcables": [
@@ -4414,7 +4411,6 @@ def create_pipeline_deserialization_environment(case):
                         "keep_output": False
                     }
                 ],
-                "outputs_to_delete": []
             },
             {
                 "transformation": case.method_noop_raw.pk,
@@ -4431,7 +4427,6 @@ def create_pipeline_deserialization_environment(case):
                         "keep_output": False
                     }
                 ],
-                "outputs_to_delete": []
             }
         ],
         "outcables": [
@@ -4464,6 +4459,27 @@ class PipelineSerializerTests(TestCase):
         ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)
         ps.is_valid()
         self.assertTrue(ps.is_valid())
+
+    def test_validate_otd_good_name(self):
+        """
+        Validating a properly-named output_to_delete.
+        """
+        self.pipeline_dict["steps"][0]["new_outputs_to_delete_names"] = [self.noop_output_name]
+        ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)
+        self.assertTrue(ps.is_valid())
+
+    def test_validate_otd_bad_name(self):
+        """
+        A step with a badly-named output to delete should fail.
+        """
+        incorrect_name = "foo"
+        self.pipeline_dict["steps"][0]["new_outputs_to_delete_names"] = [incorrect_name]
+        ps = PipelineSerializer(data=self.pipeline_dict, context=self.duck_context)
+        self.assertFalse(ps.is_valid())
+        self.assertEquals(
+            ps.errors["steps"][0]["non_field_errors"][0],
+            'Step {} has no output named "{}"'.format(1, incorrect_name)
+        )
 
     def test_validate_dest_bad_name(self):
         """
@@ -4569,6 +4585,18 @@ class PipelineSerializerTests(TestCase):
         self.assertEquals(output.dataset_idx, 1)
         self.assertEquals(output.x, 0.85)
         self.assertEquals(output.y, 0.5)
+
+    def test_create_with_otd(self):
+        self.pipeline_dict["steps"][0]["new_outputs_to_delete_names"] = [self.noop_output_name]
+        ps = PipelineSerializer(data=self.pipeline_dict,
+                                context=self.duck_context)
+        ps.is_valid()
+        pl = ps.save()
+
+        # Probe the Pipeline to see if the output was properly registered for deletion.
+        step_1 = pl.steps.get(step_num=1)
+        self.assertEquals(step_1.outputs_to_delete.count(), 1)
+        self.assertEquals(step_1.outputs_to_delete.first(), step_1.transformation.outputs.first())
 
     def test_create_with_custom_wires(self):
         """

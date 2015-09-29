@@ -1,5 +1,5 @@
 """
-Shipyard archive application unit tests.
+Kive archive application unit tests.
 """
 
 import os
@@ -3674,14 +3674,19 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
     def test_dataset_add(self):
         """
         Test adding a Dataset via the API.
+        
+        Each dataset must have unique content.
         """
         num_cols = 12
         num_files = 2
+        FROM_FILE_END = 2
 
         with tempfile.TemporaryFile() as f:
             data = ','.join(map(str, range(num_cols)))
             f.write(data)
             for i in xrange(num_files):
+                f.seek(0, FROM_FILE_END)
+                f.write('data file {}\n'.format(i))
                 f.seek(0)
                 request = self.factory.post(
                     self.list_path,
@@ -3695,6 +3700,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
 
                 force_authenticate(request, user=self.kive_user)
                 resp = self.list_view(request).render().data
+                self.assertIsNone(resp.get('errors'))
                 self.assertEquals(resp['name'], "My cool file %d" % i)
 
         self.test_dataset_list(expected_entries=num_files)

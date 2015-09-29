@@ -167,7 +167,8 @@ var drydock = (function() {
             method, 
             sel, 
             source_shape, 
-            in_magnet;
+            in_magnet,
+            magnet;
         
         if (this.dragging) {
             this.valid = false; // redraw
@@ -230,6 +231,22 @@ var drydock = (function() {
             this.dragstart = mouse;
         }
         
+        var was_highlighted = this.mouse_highlight instanceof drydock_objects.Magnet;
+        this.mouse_highlight = null;
+        for (i = 0; (method = methods[i]); i++) {
+            magnet = method.getMouseTarget(mouse.x, mouse.y);
+            if (magnet instanceof drydock_objects.Magnet && 
+                    magnet.connected.length === 0) {
+                if (magnet !== this.mouse_highlight) {
+                    this.mouse_highlight = magnet;
+                    this.valid = false;
+                }
+                break;
+            }
+        }
+        if (was_highlighted && !this.mouse_highlight) {
+            this.valid = false;
+        }
     };
     
     my.CanvasState.prototype.scaleToCanvas = function(maintain_aspect_ratio) {
@@ -1119,7 +1136,7 @@ var drydock = (function() {
             // to minimize canvas state changes, loop twice.
             // canvas state changes are computationally expensive.
             ctx.fillStyle = '#fff';
-            ctx.globalAlpha = 0.5;
+            ctx.globalAlpha = 0.7;
             for (i = 0; (l = labels[i]); i++) {
                 textWidth = ctx.measureText(l.label).width;
                 ctx.fillRect(l.x - textWidth/2 - 2, l.y - 11, textWidth + 4, 14);
@@ -1129,6 +1146,11 @@ var drydock = (function() {
             for (i = 0; (l = labels[i]); i++) {
                 ctx.fillText(l.label, l.x, l.y);
             }
+        }
+
+        if (this.mouse_highlight) {
+            // Highlight (label) the object (usually a magnet);
+            this.mouse_highlight.highlight(ctx);
         }
         
         ctx.restore();

@@ -83,15 +83,12 @@ var drydock_objects = (function() {
      *  or 0 for the centre
      */
     my.CanvasWrapper.prototype.drawText = function(args) {
-        var width,
-            height,
-            yoff,
-            dir = args.dir === 1 ? 1 : args.dir === 0 ? 0 : -1,
+        var dir = args.dir === 1 ? 1 : args.dir === 0 ? 0 : -1,
             rectArgs = {x: args.x, y: args.y},
             textFill = "black",
             margin = 2;
         this.ctx.save();
-        this.ctx.globalAlpha = 0.5;
+        this.ctx.globalAlpha = 0.7;
         switch (args.style) {
         case 'node':
             this.ctx.font = '10pt Lato, sans-serif';
@@ -115,6 +112,36 @@ var drydock_objects = (function() {
             textFill = '#aaa';
             rectArgs = undefined;
             break;
+        case 'in-magnet':
+            this.ctx.font = '9pt Lato, sans-serif';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.strokeStyle = '#fff';
+            this.ctx.fillStyle = '#666';
+            this.ctx.lineWidth = 1;
+            this.ctx.globalAlpha = 1;
+            rectArgs.height = 17;
+            rectArgs.y -= 8.5;
+            rectArgs.r = 3;
+            margin = 3;
+            dir = -1;
+            textFill = "white";
+            rectArgs.stroke = true;
+            break;
+        case 'out-magnet':
+            this.ctx.font = '9pt Lato, sans-serif';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.strokeStyle = '#fff';
+            this.ctx.fillStyle = '#666';
+            this.ctx.lineWidth = 1;
+            this.ctx.globalAlpha = 1;
+            rectArgs.height = 17;
+            rectArgs.y -= 8.5;
+            rectArgs.r = 3;
+            margin = 3;
+            dir = 1;
+            textFill = "white";
+            rectArgs.stroke = true;
+            break;
         default:
             this.ctx.font = '9pt Lato, sans-serif';
             this.ctx.textBaseline = 'middle';
@@ -124,7 +151,7 @@ var drydock_objects = (function() {
         this.ctx.textAlign = dir === 1 ? 'left' : dir === 0 ? 'center' : 'right';
         if (rectArgs !== undefined) {
             // make a backing box so the label is on the fill colour
-            rectArgs.width = 2*margin + this.ctx.measureText(args.text).width;
+            rectArgs.width = 2 * margin + this.ctx.measureText(args.text).width;
             if (dir === 0) {
                 rectArgs.x -= rectArgs.width/2;
             }
@@ -133,6 +160,24 @@ var drydock_objects = (function() {
                 rectArgs.width *= dir;
             }
             this.fillRect(rectArgs);
+            if (rectArgs.stroke) {
+                this.strokeRect(rectArgs);
+            }
+            if (args.style == 'in-magnet' || args.style == 'out-magnet') {
+                // draw triangle pointer
+                this.ctx.beginPath();
+                if (args.style == 'in-magnet') {
+                    this.ctx.moveTo(rectArgs.x - 1,     args.y - 3);
+                    this.ctx.lineTo(rectArgs.x + 3, args.y);
+                    this.ctx.lineTo(rectArgs.x - 1,     args.y + 3);
+                } else {
+                    this.ctx.moveTo(rectArgs.x + 1,     args.y - 3);
+                    this.ctx.lineTo(rectArgs.x - 3, args.y);
+                    this.ctx.lineTo(rectArgs.x + 1,     args.y + 3);
+                }
+                this.ctx.closePath();
+                this.ctx.fill();
+            }
         }
         this.ctx.globalAlpha = 1;
         this.ctx.fillStyle = textFill;
@@ -155,32 +200,44 @@ var drydock_objects = (function() {
             this.ctx.fillRect(args.x, args.y, args.width, args.height);
         }
         else {
-            this.ctx.beginPath();
-            // middle of top edge
-            this.ctx.moveTo(args.x + args.width/2, args.y);
-            // to middle of right edge
-            this.ctx.arcTo(
-                    args.x + args.width, args.y,
-                    args.x + args.width, args.y + args.height/2,
-                    args.r);
-            // to middle of bottom edge
-            this.ctx.arcTo(
-                    args.x + args.width, args.y + args.height,
-                    args.x + args.width/2, args.y + args.height,
-                    args.r);
-            // to middle of left edge
-            this.ctx.arcTo(
-                    args.x, args.y + args.height,
-                    args.x, args.y + args.height/2,
-                    args.r);
-            // to middle of top edge
-            this.ctx.arcTo(
-                    args.x, args.y,
-                    args.x + args.width/2, args.y,
-                    args.r);
-            this.ctx.closePath();
+            this.buildRect(args);
             this.ctx.fill();
         }
+    };
+    my.CanvasWrapper.prototype.strokeRect = function(args) {
+        if (args.r === undefined) {
+            this.ctx.strokeRect(args.x, args.y, args.width, args.height);
+        }
+        else {
+            this.buildRect(args);
+            this.ctx.stroke();
+        }
+    };
+    my.CanvasWrapper.prototype.buildRect = function(args) {
+        this.ctx.beginPath();
+        // middle of top edge
+        this.ctx.moveTo(args.x + args.width/2, args.y);
+        // to middle of right edge
+        this.ctx.arcTo(
+                args.x + args.width, args.y,
+                args.x + args.width, args.y + args.height/2,
+                args.r);
+        // to middle of bottom edge
+        this.ctx.arcTo(
+                args.x + args.width, args.y + args.height,
+                args.x + args.width/2, args.y + args.height,
+                args.r);
+        // to middle of left edge
+        this.ctx.arcTo(
+                args.x, args.y + args.height,
+                args.x, args.y + args.height/2,
+                args.r);
+        // to middle of top edge
+        this.ctx.arcTo(
+                args.x, args.y,
+                args.x + args.width/2, args.y,
+                args.r);
+        this.ctx.closePath();
     };
     
     /**
@@ -620,6 +677,8 @@ var drydock_objects = (function() {
         this.in_magnets = [];
         this.out_magnets = [];
 
+        this.outputs_to_delete = [];
+
         // Members for instances of methods in runs
         this.status = status;
 
@@ -632,37 +691,24 @@ var drydock_objects = (function() {
             attract = 5, // Default attraction radius?
             magnet_fill = '#fff'; // Default fill
 
-        $.each(sorted_inputs, function(_, input) {
-            var cdt_pk = null,
-                magnet = null;
-
-            if (input.structure !== null)
+        function addXput(input, magnet_array, is_output) {
+            var cdt_pk = null;
+            if (input.structure !== null) {
                 cdt_pk = input.structure.compounddatatype;
+            }
 
-            magnet = new my.Magnet(self, r, attract, magnet_fill, cdt_pk, input.dataset_name, null, false);
+            magnet_array.push(new my.Magnet(
+                self, r, attract, magnet_fill,
+                cdt_pk, input.dataset_name, null, is_output
+            ));
+        }
 
-            // Fudge the magnet position around, I guess?
-            if (self.n_inputs === 1)
-                magnet.x -= self.h/3;
-
-            self.in_magnets.push(magnet);
-        });
-
-        $.each(sorted_outputs, function(_, output) {
-            var cdt_pk = null,
-                magnet = null;
-
-            if (output.structure !== null)
-                cdt_pk = output.structure.compounddatatype;
-
-            magnet = new my.Magnet(self, r, attract, magnet_fill, cdt_pk, output.dataset_name, null, true);
-
-            // Fudge the magnet position around, I guess?
-            if (self.n_inputs === 1)
-                magnet.x += self.h/3;
-
-            self.out_magnets.push(magnet);
-        });
+        for (var i = 0; i < sorted_inputs.length; i++) {
+            addXput(sorted_inputs[i], this.in_magnets, false);
+        }
+        for (i = 0; i < sorted_outputs.length; i++) {
+            addXput(sorted_outputs[i], this.out_magnets, true);
+        }
     };
     my.MethodNode.prototype = Object.create(my.Node.prototype);
     my.MethodNode.prototype.constructor = my.MethodNode;
@@ -771,9 +817,8 @@ var drydock_objects = (function() {
         }
     };
     
-    my.MethodNode.prototype.highlight = function(ctx, dragging) {
+    my.MethodNode.prototype.highlight = function(ctx) {
         // highlight this node shape
-        var vertices = this.getVertices();
         ctx.globalCompositeOperation = 'destination-over';
     
         // body
@@ -795,16 +840,13 @@ var drydock_objects = (function() {
                 magnet.connected[j].drawLabel(ctx);
             }
             
-            if (magnet.connected.length === 0) {
-                // Highlight (label) the magnet
-                magnet.highlight(ctx);
-            }
+            // if (magnet.connected.length === 0) {
+            //     // Highlight (label) the magnet
+            //     magnet.highlight(ctx);
+            // }
         }
-        for (i = 0; i < this.in_magnets.length; i++) {
-            magnet = this.in_magnets[i];
-            if (magnet.connected.length === 0) {
-                magnet.highlight(ctx);
-            } else {
+        for (i = 0; (magnet = this.in_magnets[i]); i++) {
+            if (magnet.connected.length !== 0) {
                 magnet.connected[0].drawLabel(ctx);
             }
         }
@@ -964,23 +1006,35 @@ var drydock_objects = (function() {
         this.pk = pk || null;
         this.connected = [];  // hold references to Connectors
         this.acceptingConnector = false; // true if a connector is being dragged
+        this.toDelete = false;
     };
 
     my.Magnet.prototype.draw = function(ctx) {
         // magnet coords are set by containing shape
         var canvas = new my.CanvasWrapper(undefined, ctx);
         
+        ctx.fillStyle = '#fff';
+        canvas.drawCircle(this);
         if (this.acceptingConnector) {
-            ctx.fillStyle = '#ff8';
-            canvas.drawCircle(this);
+            ctx.fillStyle = '#ff0';
+            canvas.drawCircle({ x: this.x, y: this.y, r: this.r - 1.5 });
             this.highlight(ctx);
-        } else {
-            ctx.fillStyle = '#fff';
-            canvas.drawCircle(this);
+        } else if (this.toDelete) {
+            ctx.fillStyle = '#000';
+            canvas.drawCircle({ x: this.x, y: this.y, r: this.r - 1.5 });
         }
     };
 
     my.Magnet.prototype.highlight = function(ctx) {
+        ctx.fillStyle = '#fff';
+        new my.CanvasWrapper(undefined, ctx).drawText({
+            x: this.x + (this.r + this.offset) * (this.isOutput || -1),
+            y: this.y,
+            text: this.label,
+            dir: 0,
+            style: this.isOutput? "out-magnet":"in-magnet"
+        });
+        /*
         // draw label
         var dir = -1;
     
@@ -988,29 +1042,7 @@ var drydock_objects = (function() {
         ctx.translate(this.x, this.y);
         if (this.isOutput) {
             dir = 1;
-            var angle = Math.PI/6;
-            
-            /* 
-             *   I'm not sold on this display method. Commented out for now. —jn
-             *
-            sin_ = Math.sin(angle), 
-            cos_ = Math.cos(angle);
-             *   isometric perspective transform
-             *   rotate(ϑ), shear(ϑ, 1), scale(1, cosϑ)
-             *
-             *   Affine transformation:
-             *   cosϑ -sinϑ  0     1  ϑ  0     1   0   0
-             *   sinϑ  cosϑ  0  ×  0  1  0  ×  0  cosϑ 0
-             *    0     0    1     0  0  1     0   0   1
-             *   
-             *   Final product:
-             *   cosϑ  cosϑ(ϑcosϑ - sinϑ)   0
-             *   sinϑ  cosϑ(ϑsinϑ + cosϑ)   0
-             *   0            0             1
-             */
-            
-    //        ctx.transform(cos_, sin_, cos_*(angle*cos_ - sin_), cos_*(angle*sin_ + cos_), 0, 0);
-            ctx.rotate(angle);
+            ctx.rotate(Math.PI / 6);
         }
         
         ctx.fillStyle = '#fff';
@@ -1021,6 +1053,7 @@ var drydock_objects = (function() {
             dir: dir});
     
         ctx.restore();
+        */
     };
 
     my.Magnet.prototype.contains = function(mx, my) {
