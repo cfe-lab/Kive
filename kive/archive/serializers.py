@@ -101,7 +101,7 @@ class DatasetSerializer(serializers.ModelSerializer):
         cdt = None
         if "structure" in validated_data["symbolicdataset"]:
             cdt = validated_data["symbolicdataset"]["structure"].get("compounddatatype", None)
-            
+
         symbolicdataset = SymbolicDataset.create_SD(
             file_path=None,
             user=self.context["request"].user,

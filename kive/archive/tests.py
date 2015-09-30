@@ -3696,7 +3696,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
                     {
                         'name': "My cool file %d" % i,
                         'description': 'A really cool file',
-                        'compound_datatype': '__raw__',
+                        'compound_datatype': None,
                         'dataset_file': f
                     }
                 )
@@ -3902,7 +3902,7 @@ baz
             f.seek(0)
 
             self.data_to_serialize["dataset_file"] = File(f)
-            self.data_to_serialize["groups_allowed"].append(everyone_group())
+            self.data_to_serialize["groups_allowed"].append(everyone_group().name)
 
             ds = DatasetSerializer(
                 data=self.data_to_serialize,

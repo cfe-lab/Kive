@@ -92,34 +92,9 @@ class DatasetViewSet(RemovableModelViewSet,
     def perform_create(self, serializer):
         try:
             new_dataset = serializer.save()
-            new_dataset.complete_clean()
+            new_dataset.clean()
         except DjangoValidationError as ex:
             raise convert_validation(ex)
-
-    # def create(self, request):
-    #     """
-    #     Override the create function, this allows us to POST to
-    #     this viewset, but also provides us with an incorrect form on
-    #     the front end.
-    #     """
-    #     single_dataset_form = DatasetForm(request.POST, request.FILES, user=request.user, prefix="")
-    #
-    #     # compute MD5 checksum
-    #     checksum = hashlib.md5()
-    #     for chunk in request.FILES['dataset_file'].chunks():
-    #         checksum.update(chunk)
-    #     md5 = checksum.hexdigest()
-    #
-    #     symdatasets = SymbolicDataset.filter_by_user(request.user).filter(MD5_checksum=md5)
-    #     if len(symdatasets) > 0:
-    #         # one or more Datasets with identical MD5 already exist
-    #         return Response(DatasetSerializer(symdatasets[0].dataset, context={'request': request}).data, status=200)
-    #
-    #     symdataset = single_dataset_form.create_dataset(request.user) if single_dataset_form.is_valid() else None
-    #
-    #     if symdataset is None:
-    #         return Response({'errors': single_dataset_form.errors}, status=400)
-    #     return Response(DatasetSerializer(symdataset.dataset, context={'request': request}).data,  status=201)
 
     def patch_object(self, request, pk=None):
         return Response(DatasetSerializer(self.get_object(), context={'request': request}).data)
