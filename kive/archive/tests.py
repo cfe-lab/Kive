@@ -3696,17 +3696,61 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
                     {
                         'name': "My cool file %d" % i,
                         'description': 'A really cool file',
-                        'compound_datatype': None,
+                        # No CompoundDatatype -- this is raw.
                         'dataset_file': f
                     }
                 )
 
                 force_authenticate(request, user=self.kive_user)
                 resp = self.list_view(request).render().data
+
                 self.assertIsNone(resp.get('errors'))
                 self.assertEquals(resp['name'], "My cool file %d" % i)
 
         self.test_dataset_list(expected_entries=num_files)
+
+    def test_dataset_add_duplicate(self):
+        """
+        Test adding a duplicate Dataset via the API.
+
+        Each dataset must have unique content.
+        """
+        num_cols = 12
+        FROM_FILE_END = 2
+
+        with tempfile.TemporaryFile() as f:
+            data = ','.join(map(str, range(num_cols)))
+            f.write(data)
+            f.seek(0)
+
+            # First, we add this file and it works.
+            request = self.factory.post(
+                self.list_path,
+                {
+                    'name': "Original",
+                    'description': 'Totes unique',
+                    # No CompoundDatatype -- this is raw.
+                    'dataset_file': f
+                }
+            )
+            force_authenticate(request, user=self.kive_user)
+            resp = self.list_view(request).render().data
+
+            # Now we add the same file again.
+            request = self.factory.post(
+                self.list_path,
+                {
+                    'name': "CarbonCopy",
+                    'description': "Maybe not so unique",
+                    'dataset_file': f
+                }
+            )
+            force_authenticate(request, user=self.kive_user)
+            resp = self.list_view(request).render().data
+
+        self.assertEquals(len(resp), 1)
+        self.assertEquals(len(resp["dataset_file"]), 1)
+        self.assertEquals(resp["dataset_file"][0], "The submitted file is empty.")
 
     def test_dataset_removal_plan(self):
         request = self.factory.get(self.removal_path)

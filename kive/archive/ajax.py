@@ -93,6 +93,22 @@ class DatasetViewSet(RemovableModelViewSet,
         try:
             new_dataset = serializer.save()
             new_dataset.clean()
+
+            # Check that this is not a duplicate of any other uploaded Dataset made by
+            # this user.
+            new_SD = new_dataset.symbolicdataset
+            conflicting_SDs = SymbolicDataset.objects.filter(
+                user=self.request.user, MD5_checksum=new_SD.MD5_checksum
+            ).exclude(pk=new_SD.pk)
+            if conflicting_SDs.exists():
+                first_conflicting_SD = conflicting_SDs.first()
+                raise DjangoValidationError(
+                    "Content matches existing dataset (PK=%(dataset_pk)s; symbolic PK=%(sd_pk)s)",
+                    params={
+                        "dataset_pk": first_conflicting_SD.dataset.pk if first_conflicting_SD.has_data() else None,
+                        "sd_pk": first_conflicting_SD.pk
+                    }
+                )
         except DjangoValidationError as ex:
             raise convert_validation(ex)
 
