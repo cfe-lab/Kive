@@ -439,8 +439,8 @@
         "fields": {
             "created_by": null, 
             "dataset_file": "Datasets/fixtures/step_0_triplet.csv", 
-            "date_created": "2000-01-01T00:00:01Z", 
-            "date_modified": "2000-01-01T00:00:01Z", 
+            "date_created": "2000-01-01T00:00:00Z", 
+            "date_modified": "2000-01-01T00:00:00Z", 
             "description": "lol", 
             "name": "triplet", 
             "symbolicdataset": 1
@@ -529,7 +529,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_singlet_D0gyOuy.csv", 
+            "dataset_file": "Datasets/fixtures/step_0_singlet_IWbAvlF.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -542,7 +542,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_raw_1oSNQpd.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw_5X7BAkT.fasta", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -555,7 +555,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_raw_PhrfHjq.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw_L6PowJj.fasta", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -595,8 +595,8 @@
         "fields": {
             "created_by": null, 
             "dataset_file": "Datasets/fixtures/DNA_triplet.csv", 
-            "date_created": "2000-01-01T00:00:02Z", 
-            "date_modified": "2000-01-01T00:00:02Z", 
+            "date_created": "2000-01-01T00:00:01Z", 
+            "date_modified": "2000-01-01T00:00:01Z", 
             "description": "DNA triplet data", 
             "name": "DNA_triplet", 
             "symbolicdataset": 15
@@ -608,8 +608,8 @@
         "fields": {
             "created_by": null, 
             "dataset_file": "Datasets/fixtures/E01_21_DNA_doublet.csv", 
-            "date_created": "2000-01-01T00:00:02Z", 
-            "date_modified": "2000-01-01T00:00:02Z", 
+            "date_created": "2000-01-01T00:00:01Z", 
+            "date_modified": "2000-01-01T00:00:01Z", 
             "description": "DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21", 
             "name": "E01_21_DNA_doublet", 
             "symbolicdataset": 16
@@ -621,8 +621,8 @@
         "fields": {
             "created_by": null, 
             "dataset_file": "Datasets/fixtures/E21_41_DNA_doublet.csv", 
-            "date_created": "2000-01-01T00:00:02Z", 
-            "date_modified": "2000-01-01T00:00:02Z", 
+            "date_created": "2000-01-01T00:00:01Z", 
+            "date_modified": "2000-01-01T00:00:01Z", 
             "description": "DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41", 
             "name": "E21_41_DNA_doublet", 
             "symbolicdataset": 17
@@ -1503,20 +1503,20 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
-            "max_row": 5, 
+            "compounddatatype": 12, 
+            "max_row": null, 
             "min_row": null, 
-            "transf_xput": 17
+            "transf_xput": 18
         }, 
         "model": "transformation.xputstructure", 
         "pk": 13
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
-            "max_row": null, 
+            "compounddatatype": 16, 
+            "max_row": 5, 
             "min_row": null, 
-            "transf_xput": 18
+            "transf_xput": 19
         }, 
         "model": "transformation.xputstructure", 
         "pk": 14
@@ -1734,8 +1734,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 1, 
-            "dataset_name": "E1_out", 
+            "dataset_idx": 3, 
+            "dataset_name": "E3_rawout", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -1752,8 +1752,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 3, 
-            "dataset_name": "E3_rawout", 
+            "dataset_idx": 1, 
+            "dataset_name": "E1_out", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -1799,7 +1799,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$pBKCTiiEuegO$M9Qmm5SmRE8OMy017yqI+woiVJpON9kNnJyQlT4H5Hw=", 
+            "password": "pbkdf2_sha256$15000$hWeeHL1XCREd$Eap1aqUFU3pWWFYakcIRJbN3GkDxdhdjemWeH5PZH+4=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -1819,7 +1819,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:02Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$ngWKwCMeXKb1$Xo/TaqseOM4uN2k5iNoiZK/G6y4Zrl8jxdp4cg8jDxM=", 
+            "password": "pbkdf2_sha256$15000$VNNKpFYx2feA$SpsRObUvmN6LK3RQHqfJ+faN4WjSkk37Tdyry1t6VzA=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -2601,6 +2601,7 @@
             "groups_allowed": [
                 1
             ], 
+            "published": false, 
             "revision_number": 1, 
             "revision_parent": null, 
             "users_allowed": []
@@ -2614,6 +2615,7 @@
             "groups_allowed": [
                 1
             ], 
+            "published": false, 
             "revision_number": 2, 
             "revision_parent": null, 
             "users_allowed": []
@@ -2735,9 +2737,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:01Z", 
+            "end_time": "2000-01-01T00:00:00Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:01Z", 
+            "start_time": "2000-01-01T00:00:00Z", 
             "symbolicdataset": 1, 
             "user": 2
         }, 
@@ -2856,7 +2858,7 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
             "start_time": "2000-01-01T00:00:01Z", 
             "symbolicdataset": 15, 
@@ -2867,9 +2869,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:02Z", 
+            "start_time": "2000-01-01T00:00:01Z", 
             "symbolicdataset": 16, 
             "user": 2
         }, 
@@ -2878,9 +2880,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:02Z", 
+            "start_time": "2000-01-01T00:00:01Z", 
             "symbolicdataset": 17, 
             "user": 2
         }, 

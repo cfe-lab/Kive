@@ -1,22 +1,25 @@
+from datetime import datetime
+import json
+import os
+import shutil
+import sys
+
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
+from django.utils.dateparse import parse_datetime
+from django.utils.timezone import utc
 
-import sys
-import shutil
-import os
-import json
-
-from metadata.models import CompoundDatatype, everyone_group
-from sandbox.execute import Sandbox
-import kive.testing_utils as tools
-import sandbox.tests
-import pipeline.models
-import kive.settings
-import method.models
 import archive.models
 import datachecking.models
+import kive.settings
+import kive.testing_utils as tools
+from metadata.models import CompoundDatatype, everyone_group
+import method.models
+import pipeline.models
 import portal.models
+from sandbox.execute import Sandbox
+import sandbox.tests
 
 
 class FixtureBuilder(object):
@@ -55,9 +58,14 @@ class FixtureBuilder(object):
             else:
                 dump_objects.append(after_object)
         
+        self.replace_timestamps(dump_objects)
+        self.rename_dataset_files(os.path.join(kive.settings.MEDIA_ROOT,
+                                               archive.models.Dataset.UPLOAD_DIR),
+                                  dump_objects)
+        
         dump_filename = os.path.join('portal', 'fixtures', self.get_name())
         with open(dump_filename, 'w') as dump_file:
-            json.dump(dump_objects, dump_file, indent=4)
+            json.dump(dump_objects, dump_file, indent=4, sort_keys=True)
             
         os.remove(before_filename)
         os.remove(after_filename)
@@ -107,7 +115,34 @@ class FixtureBuilder(object):
                 os.rename(source_path, target_path)
                 new_file_path = os.path.join(source_folder, 'fixtures', file_name)
                 dump_object['fields']['dataset_file'] = new_file_path
-
+    
+    def replace_timestamps(self, dump_objects):
+        date_map = {} # {old_date: new_date}
+        field_names = set()
+        for dump_object in dump_objects:
+            for field, value in dump_object['fields'].iteritems():
+                if value is not None and (field.endswith('time') or
+                                          field.startswith('date') or
+                                          field.endswith('DateTime') or
+                                          field == 'last_login'):
+                    
+                    field_names.add(field)
+                    date_map[value] = None
+        old_dates = date_map.keys()
+        old_dates.sort()
+        offset = None
+        for old_date in old_dates:
+            old_datetime = parse_datetime(old_date)
+            if offset is None:
+                offset = datetime(2000, 1, 1, tzinfo=utc) - old_datetime
+            rounded = (old_datetime + offset).replace(microsecond=0, tzinfo=None)
+            date_map[old_date] = rounded.isoformat() + 'Z'
+            
+        for dump_object in dump_objects:
+            for field, value in dump_object['fields'].iteritems():
+                if value is not None and field in field_names:
+                    dump_object['fields'][field] = date_map[value]
+            
 class EMSandboxTestEnvironmentBuilder(FixtureBuilder):
     def get_name(self):
         return 'em_sandbox_test_environment.json'
@@ -396,39 +431,15 @@ class Command(BaseCommand):
     help = "Update test fixtures by running scripts and dumping test data."
 
     def handle(self, *args, **options):
-#         EMSandboxTestEnvironmentBuilder().run()
-#         ArchiveTestEnvironmentBuilder().run()
-#         DeepNestedRunBuilder().run()
-#         SimpleRunBuilder().run()
-#         RemovalTestEnvironmentBuilder().run()
-#         RunApiTestsEnvironmentBuilder().run()
-#         RunComponentTooManyChecksEnvironmentBuilder().run()
-#         RunPipelinesRecoveringReusedStepEnvironmentBuilder().run()
-#         ExecuteResultTestsRMEnvironmentBuilder().run()
-#         ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
-        builders = [
-            EMSandboxTestEnvironmentBuilder(),
-            ArchiveTestEnvironmentBuilder(),
-            DeepNestedRunBuilder(),
-            SimpleRunBuilder(),
-            RemovalTestEnvironmentBuilder(),
-            RunApiTestsEnvironmentBuilder(),
-            RunComponentTooManyChecksEnvironmentBuilder(),
-            RunPipelinesRecoveringReusedStepEnvironmentBuilder(),
-            ExecuteResultTestsRMEnvironmentBuilder(),
-            ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder()]
-
-        for builder in builders:
-#         builder = RunComponentTooManyChecksEnvironmentBuilder()
-            dump_filename = os.path.join('portal', 'fixtures', builder.get_name())
-            with open(dump_filename, 'rU') as dump_file:
-                dump_objects = json.load(dump_file)
-            dataset_path = os.path.join("FixtureFiles",
-                                        builder.get_name(),
-                                        archive.models.Dataset.UPLOAD_DIR)
-             
-            builder.rename_dataset_files(dataset_path, dump_objects)
-            with open(dump_filename, 'w') as dump_file:
-                json.dump(dump_objects, dump_file, indent=4, sort_keys=True)
+        EMSandboxTestEnvironmentBuilder().run()
+        ArchiveTestEnvironmentBuilder().run()
+        DeepNestedRunBuilder().run()
+        SimpleRunBuilder().run()
+        RemovalTestEnvironmentBuilder().run()
+        RunApiTestsEnvironmentBuilder().run()
+        RunComponentTooManyChecksEnvironmentBuilder().run()
+        RunPipelinesRecoveringReusedStepEnvironmentBuilder().run()
+        ExecuteResultTestsRMEnvironmentBuilder().run()
+        ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
         
         self.stdout.write('Done.')

@@ -463,7 +463,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_singlet_p5BcOcc.csv", 
+            "dataset_file": "Datasets/fixtures/step_0_singlet_EQeVALt.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -476,7 +476,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_raw_ruHB02B.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw_Urn634f.fasta", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -489,7 +489,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_raw_LN1oyb8.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw_H6TSUIk.fasta", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -1302,20 +1302,20 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
-            "max_row": 5, 
+            "compounddatatype": 12, 
+            "max_row": null, 
             "min_row": null, 
-            "transf_xput": 17
+            "transf_xput": 18
         }, 
         "model": "transformation.xputstructure", 
         "pk": 13
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
-            "max_row": null, 
+            "compounddatatype": 16, 
+            "max_row": 5, 
             "min_row": null, 
-            "transf_xput": 18
+            "transf_xput": 19
         }, 
         "model": "transformation.xputstructure", 
         "pk": 14
@@ -1533,8 +1533,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 1, 
-            "dataset_name": "E1_out", 
+            "dataset_idx": 3, 
+            "dataset_name": "E3_rawout", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -1551,8 +1551,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 3, 
-            "dataset_name": "E3_rawout", 
+            "dataset_idx": 1, 
+            "dataset_name": "E1_out", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -1598,7 +1598,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$gQ5lQ7qz10FZ$lWRigdhQ+qgaWQOs0Kb4b3+JlNpKZg8l2IrGSR0lytA=", 
+            "password": "pbkdf2_sha256$15000$IgoHXR8IjOWW$FYNx7QA5Btv9jgiVXiIpwB4f10+3tAz8or2Y2qx8OTo=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -1618,7 +1618,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:02Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$bVS8Xa1SLbrU$7Y4kqDhxXMZZsApkD3guz/AeJb2wZlKo3CkDX/EI3fA=", 
+            "password": "pbkdf2_sha256$15000$JUmODl63Oh2C$yUK6DW/THXl60Hc7WFGY2QI2XfkzT0HB+qjP3XyFp64=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -2355,6 +2355,7 @@
             "groups_allowed": [
                 1
             ], 
+            "published": false, 
             "revision_number": 1, 
             "revision_parent": null, 
             "users_allowed": []
@@ -2368,6 +2369,7 @@
             "groups_allowed": [
                 1
             ], 
+            "published": false, 
             "revision_number": 2, 
             "revision_parent": null, 
             "users_allowed": []
@@ -2491,7 +2493,7 @@
         "fields": {
             "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:01Z", 
+            "start_time": "2000-01-01T00:00:00Z", 
             "symbolicdataset": 1, 
             "user": 2
         }, 
@@ -2610,7 +2612,7 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
             "start_time": "2000-01-01T00:00:01Z", 
             "symbolicdataset": 15, 

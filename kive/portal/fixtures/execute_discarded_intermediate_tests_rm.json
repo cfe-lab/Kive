@@ -37,11 +37,11 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:04Z", 
+            "end_time": "2000-01-01T00:00:03Z", 
             "execrecord": 2, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:03Z"
+            "start_time": "2000-01-01T00:00:02Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 1
@@ -51,11 +51,11 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "execrecord": 1, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:03Z"
+            "start_time": "2000-01-01T00:00:02Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 2
@@ -65,11 +65,11 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:04Z", 
             "execrecord": 4, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:05Z"
+            "start_time": "2000-01-01T00:00:03Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 3
@@ -79,11 +79,11 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:05Z", 
+            "end_time": "2000-01-01T00:00:03Z", 
             "execrecord": 3, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:05Z"
+            "start_time": "2000-01-01T00:00:03Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 4
@@ -123,7 +123,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/tmpm6XkhJ", 
+            "dataset_file": "Datasets/fixtures/tmpOZoHX5", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "data from the lab", 
@@ -135,40 +135,40 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "invoking_record": 2, 
             "record": 2, 
-            "start_time": "2000-01-01T00:00:03Z"
+            "start_time": "2000-01-01T00:00:02Z"
         }, 
         "model": "archive.execlog", 
         "pk": 1
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:04Z", 
+            "end_time": "2000-01-01T00:00:03Z", 
             "invoking_record": 1, 
             "record": 1, 
-            "start_time": "2000-01-01T00:00:04Z"
+            "start_time": "2000-01-01T00:00:03Z"
         }, 
         "model": "archive.execlog", 
         "pk": 2
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:05Z", 
+            "end_time": "2000-01-01T00:00:03Z", 
             "invoking_record": 4, 
             "record": 4, 
-            "start_time": "2000-01-01T00:00:05Z"
+            "start_time": "2000-01-01T00:00:03Z"
         }, 
         "model": "archive.execlog", 
         "pk": 3
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:05Z", 
+            "end_time": "2000-01-01T00:00:03Z", 
             "invoking_record": 3, 
             "record": 3, 
-            "start_time": "2000-01-01T00:00:05Z"
+            "start_time": "2000-01-01T00:00:03Z"
         }, 
         "model": "archive.execlog", 
         "pk": 4
@@ -1390,7 +1390,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$FS61PCmOqBld$GMHkN8SUSCZ6SFjgbFt0+g2H58nyV5kyUziPFf+UisU=", 
+            "password": "pbkdf2_sha256$15000$gg9LDCryzq60$XsCrb9UgsExzqV5clnVrjmy5TVH5p7AjpHo6Ywkl3sQ=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -1410,7 +1410,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$h4FMjWLK2DHA$etcUkxiXmNlWkuQM74wXpaeFP+U4zUxu+ILNJA3Wv6I=", 
+            "password": "pbkdf2_sha256$15000$i3JLAVF5UhBC$2FXdGaIS0rW1Jwxa2uAvs/b/qJ97RNXmWlZ0Z4z8Q0M=", 
             "user_permissions": [], 
             "username": "alice"
         }, 
@@ -1508,12 +1508,12 @@
     {
         "fields": {
             "description": "", 
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:04Z", 
             "groups_allowed": [], 
             "name": "", 
             "parent_runstep": null, 
             "pipeline": 10, 
-            "start_time": "2000-01-01T00:00:03Z", 
+            "start_time": "2000-01-01T00:00:02Z", 
             "user": 3, 
             "users_allowed": []
         }, 
@@ -1632,7 +1632,7 @@
         "fields": {
             "MD5_checksum": "", 
             "coderesource": 2, 
-            "content_file": "CodeResources/fdopen_Fpq1e9g", 
+            "content_file": "CodeResources/fdopen_PvTItuI", 
             "groups_allowed": [
                 1
             ], 
@@ -1651,7 +1651,7 @@
         "fields": {
             "MD5_checksum": "", 
             "coderesource": 3, 
-            "content_file": "CodeResources/fdopen_LCtvhbW", 
+            "content_file": "CodeResources/fdopen_51RstV8", 
             "groups_allowed": [
                 1
             ], 
@@ -1670,11 +1670,11 @@
         "fields": {
             "MD5_checksum": "", 
             "coderesource": 4, 
-            "content_file": "CodeResources/fdopen_7uV5Xzg", 
+            "content_file": "CodeResources/fdopen_4V6co4G", 
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:03Z", 
+            "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "1", 
             "revision_number": 1, 
@@ -1923,6 +1923,7 @@
             "groups_allowed": [
                 1
             ], 
+            "published": false, 
             "revision_number": 1, 
             "revision_parent": null, 
             "users_allowed": []
@@ -1936,6 +1937,7 @@
             "groups_allowed": [
                 1
             ], 
+            "published": false, 
             "revision_number": 1, 
             "revision_parent": null, 
             "users_allowed": []
@@ -1949,6 +1951,7 @@
             "groups_allowed": [
                 1
             ], 
+            "published": false, 
             "revision_number": 1, 
             "revision_parent": null, 
             "users_allowed": []
@@ -1960,6 +1963,7 @@
         "fields": {
             "family": 1, 
             "groups_allowed": [], 
+            "published": false, 
             "revision_number": 2, 
             "revision_parent": null, 
             "users_allowed": []
@@ -1971,6 +1975,7 @@
         "fields": {
             "family": 3, 
             "groups_allowed": [], 
+            "published": false, 
             "revision_number": 2, 
             "revision_parent": null, 
             "users_allowed": []
@@ -1982,6 +1987,7 @@
         "fields": {
             "family": 3, 
             "groups_allowed": [], 
+            "published": false, 
             "revision_number": 3, 
             "revision_parent": null, 
             "users_allowed": []
@@ -1995,6 +2001,7 @@
             "groups_allowed": [
                 1
             ], 
+            "published": false, 
             "revision_number": 1, 
             "revision_parent": null, 
             "users_allowed": []
@@ -2129,7 +2136,7 @@
     {
         "fields": {
             "groups_allowed": [], 
-            "revision_DateTime": "2000-01-01T00:00:02Z", 
+            "revision_DateTime": "2000-01-01T00:00:01Z", 
             "revision_desc": "second version", 
             "revision_name": "2", 
             "user": 3, 
@@ -2155,7 +2162,7 @@
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:03Z", 
+            "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
             "user": 3, 
@@ -2169,7 +2176,7 @@
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:03Z", 
+            "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
             "user": 3, 
@@ -2191,9 +2198,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:04Z", 
+            "end_time": "2000-01-01T00:00:03Z", 
             "execlog": 2, 
-            "start_time": "2000-01-01T00:00:04Z", 
+            "start_time": "2000-01-01T00:00:03Z", 
             "symbolicdataset": 2, 
             "user": 3
         }, 
@@ -2202,9 +2209,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:04Z", 
             "execlog": 4, 
-            "start_time": "2000-01-01T00:00:06Z", 
+            "start_time": "2000-01-01T00:00:04Z", 
             "symbolicdataset": 3, 
             "user": 3
         }, 
@@ -2213,9 +2220,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "execlog": 1, 
-            "start_time": "2000-01-01T00:00:03Z", 
+            "start_time": "2000-01-01T00:00:02Z", 
             "symbolicdataset": 1, 
             "user": 3
         }, 
@@ -2224,9 +2231,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:05Z", 
+            "end_time": "2000-01-01T00:00:03Z", 
             "execlog": 3, 
-            "start_time": "2000-01-01T00:00:05Z", 
+            "start_time": "2000-01-01T00:00:03Z", 
             "symbolicdataset": 2, 
             "user": 3
         }, 
