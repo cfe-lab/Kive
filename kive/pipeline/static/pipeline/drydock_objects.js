@@ -646,7 +646,7 @@ var drydock_objects = (function() {
      * @param status: describes progress during a run, possible values are the
      *  keys in statusColorMap
      */
-    my.MethodNode = function(pk, family, x, y, fill, label, inputs, outputs, status) {
+    my.MethodNode = function(pk, family, x, y, fill, label, inputs, outputs, status, outputs_to_delete) {
         my.Node.call(this);
         var self = this;
 
@@ -677,7 +677,7 @@ var drydock_objects = (function() {
         this.in_magnets = [];
         this.out_magnets = [];
 
-        this.outputs_to_delete = [];
+        this.outputs_to_delete = outputs_to_delete || [];
 
         // Members for instances of methods in runs
         this.status = status;
@@ -699,7 +699,8 @@ var drydock_objects = (function() {
 
             magnet_array.push(new my.Magnet(
                 self, r, attract, magnet_fill,
-                cdt_pk, input.dataset_name, null, is_output
+                cdt_pk, input.dataset_name, null, is_output, null,
+                self.outputs_to_delete.indexOf(input.dataset_name) > -1
             ));
         }
 
@@ -985,7 +986,7 @@ var drydock_objects = (function() {
         cs.methods.splice(index, 1);
     };
     
-    my.Magnet = function(parent, r, attract, fill, cdt, label, offset, isOutput, pk) {
+    my.Magnet = function(parent, r, attract, fill, cdt, label, offset, isOutput, pk, toDelete) {
         /*
         CONSTRUCTOR
         A Magnet is the attachment point for a Node (shape) given a
@@ -1006,7 +1007,7 @@ var drydock_objects = (function() {
         this.pk = pk || null;
         this.connected = [];  // hold references to Connectors
         this.acceptingConnector = false; // true if a connector is being dragged
-        this.toDelete = false;
+        this.toDelete = toDelete || false;
     };
 
     my.Magnet.prototype.draw = function(ctx) {

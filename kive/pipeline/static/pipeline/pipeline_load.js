@@ -351,7 +351,9 @@ var pipeline = (function(exports){
                     node.fill_colour, // fill
                     node.name,
                     node.inputs,
-                    node.outputs
+                    node.outputs,
+                    undefined, // status
+                    node.outputs_to_delete
             );
 
             // Add `n draw
