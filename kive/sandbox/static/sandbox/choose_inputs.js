@@ -40,7 +40,7 @@ var choose_inputs = (function() {
                 $tr = $target.closest('tr');
             if ( ! $target.is('input')) {
                 e.preventDefault();
-                $tr.find('input').click();
+                $tr.find('input').prop('checked', true);
             }
         });
     };
