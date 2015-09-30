@@ -18,6 +18,21 @@ targets = ["CodeResources",
            "StagedFiles"]
 
 
+class DuckRequest(object):
+    """ A fake request used to test serializers. """
+    def __init__(self, user=None):
+        self.user = user or kive_user()
+
+    def build_absolute_uri(self, url):
+        return url
+
+
+class DuckContext(dict):
+    """ A fake context used to test serializers. """
+    def __init__(self, user=None):
+        self['request'] = DuckRequest(user=user)
+
+
 class BaseTestCases:
     """ A class to hide our base classes so they won't be executed as tests.
     """

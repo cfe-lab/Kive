@@ -13,7 +13,8 @@ from django.utils import timezone
 from django.test import TestCase, TransactionTestCase
 from django.core.urlresolvers import reverse, resolve
 from rest_framework import status
-from rest_framework.test import force_authenticate
+from rest_framework.test import force_authenticate, APIRequestFactory
+from rest_framework.parsers import MultiPartParser
 
 from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
     RunOutputCable, RunStep, RunSIC
@@ -21,15 +22,17 @@ from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, SymbolicDataset
 
-from kive.tests import BaseTestCases, install_fixture_files, restore_production_files
+from kive.tests import BaseTestCases, install_fixture_files, restore_production_files, DuckContext
 from method.models import Method
 from pipeline.models import Pipeline, PipelineStep
+
+from archive.serializers import DatasetSerializer
 import sandbox.execute
 import kive.testing_utils as tools
 
 # Rather than define everyone_group here, we import this function to prevent compile-time
 # database access.
-from metadata.models import everyone_group, kive_user
+from metadata.models import everyone_group, kive_user, CompoundDatatype
 
 
 class ArchiveTestCaseHelpers:
@@ -3814,3 +3817,174 @@ class MethodOutputApiTests(BaseTestCases.ApiTestCase):
 
         method_output = MethodOutput.objects.get(pk=self.detail_pk)
         self.assertTrue(method_output.is_output_redacted())
+
+
+class DatasetSerializerTests(TestCase):
+    """
+    Tests of DatasetSerializer.
+    """
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.list_path = reverse("dataset-list")
+
+        # This defines a user named "john" which is now accessible as self.myUser.
+        tools.create_metadata_test_environment(self)
+        self.kive_user = kive_user()
+        self.duck_context = DuckContext()
+
+        num_cols = 12
+        self.raw_file_contents = ','.join(map(str, range(num_cols)))
+
+        # A CompoundDatatype that belongs to the Kive user.
+        self.kive_CDT = CompoundDatatype(user=self.kive_user)
+        self.kive_CDT.save()
+        self.kive_CDT.members.create(
+            datatype=self.string_dt,
+            column_name="col1",
+            column_idx=1
+        )
+        self.kive_CDT.full_clean()
+
+        self.kive_file_contents = """col1
+foo
+bar
+baz
+"""
+
+        self.data_to_serialize = {
+            "name": "SerializedData",
+            "description": "Dataset for testing deserialization",
+            "users_allowed": [],
+            "groups_allowed": []
+        }
+
+    def test_validate(self):
+        """
+        Test validating a new Dataset.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            self.assertTrue(ds.is_valid())
+
+    def test_validate_with_users_allowed(self):
+        """
+        Test validating a new Dataset with users allowed.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["users_allowed"].append(self.myUser.username)
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            self.assertTrue(ds.is_valid())
+
+    def test_validate_with_groups_allowed(self):
+        """
+        Test validating a new Dataset with groups allowed.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["groups_allowed"].append(everyone_group())
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            self.assertTrue(ds.is_valid())
+
+    def test_validate_with_CDT(self):
+        """
+        Test validating a Dataset with a CDT.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.kive_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["compounddatatype"] = self.kive_CDT.pk
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            self.assertTrue(ds.is_valid())
+
+    def test_validate_ineligible_CDT(self):
+        """
+        Test validating a Dataset with a CDT that the user doesn't have access to.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.kive_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["compounddatatype"] = self.kive_CDT.pk
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=DuckContext(self.myUser)
+            )
+            self.assertFalse(ds.is_valid())
+            self.assertEquals(len(ds.errors["compounddatatype"]), 1)
+
+    def test_create(self):
+        """
+        Test creating a Dataset.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            ds.is_valid()
+            dataset = ds.save()
+
+            # Probe the Dataset to make sure everything looks fine.
+            self.assertEquals(dataset.name, self.data_to_serialize["name"])
+            self.assertEquals(dataset.description, self.data_to_serialize["description"])
+            self.assertIsNone(dataset.symbolicdataset.compounddatatype)
+            self.assertEquals(dataset.symbolicdataset.user, self.kive_user)
+
+    def test_create_with_CDT(self):
+        """
+        Test creating a Dataset with a CDT.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.kive_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["compounddatatype"] = self.kive_CDT.pk
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            ds.is_valid()
+            dataset = ds.save()
+
+            # Probe to make sure the CDT got set correctly.
+            self.assertEquals(dataset.symbolicdataset.compounddatatype, self.kive_CDT)
