@@ -21,7 +21,7 @@ from rest_framework.test import force_authenticate
 
 from archive.models import ExecLog
 from constants import datatypes
-from kive.tests import BaseTestCases
+from kive.tests import BaseTestCases, DuckContext
 from metadata.models import CompoundDatatype, CompoundDatatypeMember, \
     Datatype, kive_user, everyone_group
 from method.models import Method, MethodFamily, CodeResource,\
@@ -34,21 +34,6 @@ from pipeline.serializers import PipelineSerializer,\
 import kive.testing_utils as tools
 
 samplecode_path = tools.samplecode_path
-
-
-class DuckRequest(object):
-    """ A fake request used to test serializers. """
-    def __init__(self):
-        self.user = kive_user()
-        
-    def build_absolute_uri(self, url):
-        return url
-
-
-class DuckContext(dict):
-    """ A fake context used to test serializers. """
-    def __init__(self):
-        self['request'] = DuckRequest()
 
 
 class PipelineTestCase(TestCase):

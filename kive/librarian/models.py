@@ -1081,7 +1081,7 @@ class ExecRecordIn(models.Model):
     generic_input = models.ForeignKey(transformation.models.TransformationXput)
 
     class Meta:
-        unique_together = ("execrecord", "generic_input");
+        unique_together = ("execrecord", "generic_input")
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -1234,7 +1234,7 @@ class ExecRecordOut(models.Model):
                                        related_name="execrecordouts_referencing")
 
     class Meta:
-        unique_together = ("execrecord", "generic_output");
+        unique_together = ("execrecord", "generic_output")
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)

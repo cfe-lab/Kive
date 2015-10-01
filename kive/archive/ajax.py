@@ -1,4 +1,7 @@
+from django.db import transaction
 from django.db.models import Q
+from django.core.exceptions import ValidationError as DjangoValidationError
+
 from rest_framework import permissions, status
 from rest_framework.decorators import detail_route
 from rest_framework.exceptions import APIException
@@ -11,14 +14,16 @@ from archive.models import Dataset, MethodOutput, summarize_redaction_plan
 from archive.views import _build_download_response
 
 from kive.ajax import RemovableModelViewSet, RedactModelMixin, IsGrantedReadOnly, IsGrantedReadCreate,\
-    StandardPagination
+    StandardPagination, RemovableModelViewSet, CleanCreateModelMixin, convert_validation
 
 from librarian.models import SymbolicDataset
 import hashlib
 
 JSON_CONTENT_TYPE = 'application/json'
 
-class DatasetViewSet(RemovableModelViewSet, RedactModelMixin):
+class DatasetViewSet(RemovableModelViewSet,
+                     CleanCreateModelMixin,
+                     RedactModelMixin):
     """ List and modify datasets.
     
     POST to the list to upload a new dataset, DELETE an instance to remove it
@@ -83,35 +88,29 @@ class DatasetViewSet(RemovableModelViewSet, RedactModelMixin):
                     symbolicdataset__structure__compounddatatype=value)
         raise APIException('Unknown filter key: {}'.format(key))
 
-    def create(self, request):
-        """
-        Override the create function, this allows us to POST to
-        this viewset, but also provides us with an incorrect form on
-        the front end.
-        """
-        single_dataset_form = DatasetForm(request.POST, request.FILES, user=request.user, prefix="")
+    @transaction.atomic
+    def perform_create(self, serializer):
+        try:
+            new_dataset = serializer.save()
+            new_dataset.clean()
 
-        # compute MD5 checksum
-        checksum = hashlib.md5()
-        for chunk in request.FILES['dataset_file'].chunks():
-            checksum.update(chunk)
-        md5 = checksum.hexdigest()
-
-        symdatasets = SymbolicDataset.filter_by_user(request.user).filter(MD5_checksum=md5)
-        if len(symdatasets) > 0:
-            # one or more Datasets with identical MD5 already exist
-            return Response({'errors': 'Content matches existing dataset.',
-                             'duplicate_symbolic_dataset_id': symdatasets[0].id},
-                            status=status.HTTP_409_CONFLICT)
-
-        symdataset = single_dataset_form.create_dataset(request.user) if single_dataset_form.is_valid() else None
-
-        if symdataset is None:
-            return Response({'errors': single_dataset_form.errors},
-                            status=status.HTTP_403_FORBIDDEN)
-        return Response(DatasetSerializer(symdataset.dataset,
-                                          context={'request': request}).data,
-                        status=status.HTTP_201_CREATED)
+            # Check that this is not a duplicate of any other uploaded Dataset made by
+            # this user.
+            new_SD = new_dataset.symbolicdataset
+            conflicting_SDs = SymbolicDataset.objects.filter(
+                user=self.request.user, MD5_checksum=new_SD.MD5_checksum
+            ).exclude(pk=new_SD.pk)
+            if conflicting_SDs.exists():
+                first_conflicting_SD = conflicting_SDs.first()
+                raise DjangoValidationError(
+                    "Content matches existing dataset (PK=%(dataset_pk)s; symbolic PK=%(sd_pk)s)",
+                    params={
+                        "dataset_pk": first_conflicting_SD.dataset.pk if first_conflicting_SD.has_data() else None,
+                        "sd_pk": first_conflicting_SD.pk
+                    }
+                )
+        except DjangoValidationError as ex:
+            raise convert_validation(ex)
 
     def patch_object(self, request, pk=None):
         return Response(DatasetSerializer(self.get_object(), context={'request': request}).data)

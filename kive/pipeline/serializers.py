@@ -219,9 +219,10 @@ def _source_transf_finder(step_num, dataset_name, step_data_dicts):
 
 
 class PipelineSummarySerializer(AccessControlSerializer, serializers.ModelSerializer):
+    inputs = TransformationInputSerializer(many=True)
     class Meta:
         model = Pipeline
-        fields = ("id", "display_name", "url", "published")
+        fields = ("id", "display_name", "url", "published", 'revision_number', 'inputs')
 
 
 class PipelineSerializer(AccessControlSerializer,

@@ -2,10 +2,15 @@ import os
 
 from django.template.defaultfilters import filesizeformat
 from django.utils import timezone
+from django.contrib.auth.models import User, Group
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
+from kive.serializers import AccessControlSerializer
+
 from archive.models import Dataset, Run, MethodOutput
+from librarian.models import SymbolicDataset
+from metadata.models import CompoundDatatype
 from metadata.serializers import CompoundDatatypeSerializer
 
 
@@ -18,37 +23,68 @@ class TinyRunSerializer(serializers.ModelSerializer):
 
 class DatasetSerializer(serializers.ModelSerializer):
 
-    user = serializers.StringRelatedField()
-    compounddatatype = CompoundDatatypeSerializer(source='symbolicdataset.compounddatatype')
+    user = serializers.SlugRelatedField(
+        source="symbolicdataset.user",
+        slug_field='username',
+        read_only=True,
+        default=serializers.CurrentUserDefault())
+
+    compounddatatype = serializers.PrimaryKeyRelatedField(
+        source="symbolicdataset.structure.compounddatatype",
+        queryset=CompoundDatatype.objects.all(),
+        required=False
+    )
+
     filename = serializers.SerializerMethodField()
-    filesize = serializers.IntegerField(source='get_filesize')
+    filesize = serializers.IntegerField(source='get_filesize', read_only=True)
     filesize_display = serializers.SerializerMethodField()
-    users_allowed = serializers.StringRelatedField(many=True, source="symbolicdataset.users_allowed")
-    groups_allowed = serializers.StringRelatedField(many=True, source="symbolicdataset.groups_allowed")
+
+    users_allowed = serializers.SlugRelatedField(
+        source="symbolicdataset.users_allowed",
+        slug_field='username',
+        queryset=User.objects.all(),
+        many=True, allow_null=True, required=False
+    )
+    groups_allowed = serializers.SlugRelatedField(
+        source="symbolicdataset.groups_allowed",
+        slug_field='name',
+        queryset=Group.objects.all(),
+        many=True, allow_null=True, required=False
+    )
+
     download_url = serializers.HyperlinkedIdentityField(view_name='dataset-download')
     removal_plan = serializers.HyperlinkedIdentityField(view_name='dataset-removal-plan')
     redaction_plan = serializers.HyperlinkedIdentityField(view_name='dataset-redaction-plan')
-    symbolic_id = serializers.IntegerField(source='symbolicdataset.id')
+    symbolic_id = serializers.IntegerField(source='symbolicdataset.id', read_only=True)
 
-    class Meta:
+    class Meta():
         model = Dataset
-        fields = ('id',
-                  'symbolic_id',
-                  'url',
-                  'name',
-                  'description',
-                  'filename',
-                  'user',
-                  'date_created',
-                  'date_modified',
-                  'download_url',
-                  'compounddatatype',
-                  'filesize',
-                  'filesize_display',
-                  'users_allowed',
-                  'groups_allowed',
-                  'removal_plan',
-                  'redaction_plan')
+        fields = (
+            'id',
+            'symbolic_id',
+            'url',
+            'name',
+            'description',
+            "dataset_file",
+            'filename',
+            'date_created',
+            'date_modified',
+            'download_url',
+            'compounddatatype',
+            'filesize',
+            'filesize_display',
+
+            'user',  # inherited
+            'users_allowed',
+            'groups_allowed',
+
+            'removal_plan',
+            'redaction_plan'
+        )
+
+    def __init__(self, *args, **kwargs):
+        super(DatasetSerializer, self).__init__(*args, **kwargs)
+        self.fields["compounddatatype"].queryset = CompoundDatatype.filter_by_user(self.context["request"].user)
 
     def get_filename(self, obj):
         if obj:
@@ -57,6 +93,37 @@ class DatasetSerializer(serializers.ModelSerializer):
     def get_filesize_display(self, obj):
         if obj:
             return filesizeformat(obj.get_filesize())
+
+    def create(self, validated_data):
+        """
+        Create a Dataset object from deserialized and validated data.
+        """
+        cdt = None
+        if "structure" in validated_data["symbolicdataset"]:
+            cdt = validated_data["symbolicdataset"]["structure"].get("compounddatatype", None)
+
+        users_allowed = None
+        groups_allowed = None
+        if "users_allowed" in validated_data["symbolicdataset"]:
+            users_allowed = validated_data["symbolicdataset"]["users_allowed"]
+
+        if "groups_allowed" in validated_data["symbolicdataset"]:
+            groups_allowed = validated_data["symbolicdataset"]["groups_allowed"]
+
+        symbolicdataset = SymbolicDataset.create_SD(
+            file_path=None,
+            user=self.context["request"].user,
+            users_allowed=users_allowed,
+            groups_allowed=groups_allowed,
+            cdt=cdt,
+            make_dataset=True,
+            name=validated_data["name"],
+            description=validated_data["description"],
+            created_by=None,
+            check=True,
+            file_handle=validated_data["dataset_file"]
+        )
+        return symbolicdataset.dataset
 
 
 class MethodOutputSerializer(serializers.ModelSerializer):
