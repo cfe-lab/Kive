@@ -37,7 +37,7 @@ If you are already running Django 1.6, installing should be as painless as runni
 system-wide.  Also, many systems have multiple Python installations, so make sure that
 `pip` is using the correct one. Django REST Framework can also be installed via
 
-    pip install djangorestframework
+    pip install djangorestframework==3.1.0
 
 Instructions for downloading and installing `django-extensions` may be found
 [here](http://django-extensions.readthedocs.org/en/latest/installation_instructions.html).
