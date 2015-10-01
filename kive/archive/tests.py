@@ -14,7 +14,6 @@ from django.test import TestCase, TransactionTestCase
 from django.core.urlresolvers import reverse, resolve
 from rest_framework import status
 from rest_framework.test import force_authenticate, APIRequestFactory
-from rest_framework.parsers import MultiPartParser
 
 from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
     RunOutputCable, RunStep, RunSIC
@@ -3716,7 +3715,6 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         Each dataset must have unique content.
         """
         num_cols = 12
-        FROM_FILE_END = 2
 
         with tempfile.TemporaryFile() as f:
             data = ','.join(map(str, range(num_cols)))
@@ -3734,7 +3732,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
                 }
             )
             force_authenticate(request, user=self.kive_user)
-            resp = self.list_view(request).render().data
+            self.list_view(request).render()
 
             # Now we add the same file again.
             request = self.factory.post(
@@ -3748,9 +3746,8 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
             force_authenticate(request, user=self.kive_user)
             resp = self.list_view(request).render().data
 
-        self.assertEquals(len(resp), 1)
-        self.assertEquals(len(resp["dataset_file"]), 1)
-        self.assertEquals(resp["dataset_file"][0], "The submitted file is empty.")
+        self.assertEqual({'dataset_file': [u'The submitted file is empty.']},
+                         resp)
 
     def test_dataset_removal_plan(self):
         request = self.factory.get(self.removal_path)
