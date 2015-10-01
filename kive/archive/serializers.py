@@ -102,11 +102,19 @@ class DatasetSerializer(serializers.ModelSerializer):
         if "structure" in validated_data["symbolicdataset"]:
             cdt = validated_data["symbolicdataset"]["structure"].get("compounddatatype", None)
 
+        users_allowed = None
+        groups_allowed = None
+        if "users_allowed" in validated_data["symbolicdataset"]:
+            users_allowed = validated_data["symbolicdataset"]["users_allowed"]
+
+        if "groups_allowed" in validated_data["symbolicdataset"]:
+            groups_allowed = validated_data["symbolicdataset"]["groups_allowed"]
+
         symbolicdataset = SymbolicDataset.create_SD(
             file_path=None,
             user=self.context["request"].user,
-            users_allowed=validated_data.get("users_allowed", None),
-            groups_allowed=validated_data.get("groups_allowed", None),
+            users_allowed=users_allowed,
+            groups_allowed=groups_allowed,
             cdt=cdt,
             make_dataset=True,
             name=validated_data["name"],
