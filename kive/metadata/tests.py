@@ -4,7 +4,6 @@ Unit tests for Shipyard metadata models.
 import os
 import re
 
-from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase, TransactionTestCase
 from django.core.urlresolvers import reverse, resolve
@@ -12,13 +11,9 @@ from django.core.urlresolvers import reverse, resolve
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from metadata.models import BasicConstraint, CompoundDatatype, Datatype, everyone_group, kive_user
-from method.models import CodeResourceRevision
-from archive.models import Dataset, MethodOutput
+from metadata.models import BasicConstraint, CompoundDatatype, Datatype, kive_user
 from librarian.models import SymbolicDataset
-from datachecking.models import VerificationLog
-from portal.models import StagedFile
-from constants import datatypes, CDTs
+from constants import CDTs
 import kive.testing_utils as tools
 
 
@@ -2297,6 +2292,40 @@ class CompoundDatatypeTests(MetadataTestCase):
         self.assertRaisesRegexp(ValidationError,
                                 "{'column_name': \[u'This field cannot be blank.'\]}",
                                 cdt.clean)
+
+    def test_copy_users_allowed(self):
+        cdt_without_permissions = CompoundDatatype.objects.filter(
+            users_allowed__isnull=True).first()
+        cdt_with_permissions = CompoundDatatype.objects.filter(
+            users_allowed__isnull=False).first()
+        self.assertIsNotNone(cdt_without_permissions)
+        self.assertIsNotNone(cdt_with_permissions)
+        expected_permissions = set(
+            cdt_with_permissions.users_allowed.values_list('username'))
+        
+        cdt_without_permissions.copy_permissions(cdt_with_permissions)
+        
+        permissions = set(
+            cdt_without_permissions.users_allowed.values_list('username'))
+        
+        self.assertEqual(expected_permissions, permissions)
+
+    def test_copy_groups_allowed(self):
+        cdt_without_permissions = CompoundDatatype.objects.filter(
+            groups_allowed__isnull=True).first()
+        cdt_with_permissions = CompoundDatatype.objects.filter(
+            groups_allowed__isnull=False).first()
+        self.assertIsNotNone(cdt_without_permissions)
+        self.assertIsNotNone(cdt_with_permissions)
+        expected_permissions = set(
+            cdt_with_permissions.groups_allowed.values_list('name'))
+        
+        cdt_without_permissions.copy_permissions(cdt_with_permissions)
+        
+        permissions = set(
+            cdt_without_permissions.groups_allowed.values_list('name'))
+        
+        self.assertEqual(expected_permissions, permissions)
 
     def test_create_SD_raw(self):
         """

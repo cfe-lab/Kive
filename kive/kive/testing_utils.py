@@ -57,8 +57,14 @@ def create_metadata_test_environment(case):
     """Setup default database state from which to perform unit testing."""
     # Define a user.  This was previously in librarian/tests.py,
     # but we put it here now so all tests can use it.
-    case.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
+    case.myUser = User.objects.create_user('john',
+                                           'lennon@thebeatles.com',
+                                           'johnpassword')
     case.myUser.save()
+    case.ringoUser = User.objects.create_user('ringo',
+                                              'starr@thebeatles.com',
+                                              'ringopassword')
+    case.ringoUser.save()
     case.myUser.groups.add(everyone_group())
     case.myUser.save()
 
@@ -127,6 +133,17 @@ def create_metadata_test_environment(case):
         column_idx=5)
     case.basic_cdt.full_clean()
     case.basic_cdt.save()
+
+    # Define a new CDT that is only accessible to two users
+    shared_cdt = CompoundDatatype(user=case.myUser)
+    shared_cdt.save()
+    shared_cdt.users_allowed.add(case.ringoUser)
+    shared_cdt.save()
+
+    shared_cdt.members.create(
+        datatype=case.string_dt,
+        column_name='label',
+        column_idx=1)
 
     # Define test_cdt as containing 3 members:
     # (label, PBMCseq, PLAseq) as (string,DNA,RNA)

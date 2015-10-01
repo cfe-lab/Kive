@@ -55,6 +55,14 @@ class Command(BaseCommand):
                 for child in os.listdir(fixture_folder):
                     source = os.path.join(fixture_folder, child)
                     if os.path.isdir(source):
-                        destination = os.path.join(kive.settings.MEDIA_ROOT,
-                                                   child)
-                        shutil.copytree(source, destination)
+                        destination = os.path.join(kive.settings.MEDIA_ROOT, child)
+                        if not os.path.exists(destination):
+                            os.mkdir(destination)
+                        for grandchild in os.listdir(source):
+                            source_child = os.path.join(source, grandchild)
+                            destination_child = os.path.join(destination,
+                                                             grandchild)
+                            if os.path.isdir(source_child):
+                                shutil.copytree(source_child, destination_child)
+                            else:
+                                shutil.copy(source_child, destination_child)

@@ -5,21 +5,28 @@ import shutil
 import sys
 
 from django.contrib.auth.models import User
+from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.utils.dateparse import parse_datetime
 from django.utils.timezone import utc
 
 import archive.models
 import datachecking.models
+from file_access_utils import compute_md5
 import kive.settings
 import kive.testing_utils as tools
+from librarian.models import SymbolicDataset
 from metadata.models import CompoundDatatype, everyone_group
 import method.models
+from method.models import CodeResource, MethodFamily
 import pipeline.models
+from pipeline.models import PipelineFamily
 import portal.models
 from sandbox.execute import Sandbox
 import sandbox.tests
+from archive.models import Dataset
 
 
 class FixtureBuilder(object):
@@ -82,7 +89,8 @@ class FixtureBuilder(object):
 
         for target in targets:
             target_path = os.path.join(kive.settings.MEDIA_ROOT, target)
-            fixture_files_path = os.path.join("FixtureFiles", self.get_name(), target)
+            fixture_name, _extension = os.path.splitext(self.get_name())
+            fixture_files_path = os.path.join("FixtureFiles", fixture_name, target)
 
             # Out with the old...
             if os.path.isdir(fixture_files_path):
@@ -105,7 +113,7 @@ class FixtureBuilder(object):
         source_root, source_folder = os.path.split(dataset_path)
         fixtures_path = os.path.join(dataset_path, 'fixtures')
         if not os.path.isdir(fixtures_path):
-            os.mkdir(fixtures_path)
+            os.makedirs(fixtures_path)
         for dump_object in dump_objects:
             if dump_object['model'] == 'archive.dataset':
                 file_path = dump_object['fields']['dataset_file']
@@ -228,6 +236,262 @@ class DeepNestedRunBuilder(FixtureBuilder):
                               groups_allowed=[everyone_group()])
         run_sandbox.execute_pipeline()
 
+class RestoreReusableDatasetBuilder(FixtureBuilder):
+    def get_name(self):
+        return 'restore_reusable_dataset.json'
+    
+    def build(self):
+        SHUFFLED_SUMS_AND_PRODUCTS_SOURCE = """\
+#! /usr/bin/env python
+
+from argparse import FileType, ArgumentParser
+import csv
+import os
+from random import shuffle
+
+parser = ArgumentParser(
+    description="Takes CSV with (x,y), outputs CSV with (x+y),(x*y)");
+parser.add_argument("input_csv",
+                    type=FileType('rU'),
+                    help="CSV containing (x,y) pairs");
+parser.add_argument("output_csv",
+                    type=FileType('wb'),
+                    help="CSV containing (x+y,xy) pairs");
+args = parser.parse_args();
+
+reader = csv.DictReader(args.input_csv);
+writer = csv.DictWriter(args.output_csv,
+                        ['sum', 'product'],
+                        lineterminator=os.linesep)
+writer.writeheader()
+
+rows = list(reader)
+shuffle(rows) # Makes this version reusable, but not deterministic
+for row in rows:
+    x = int(row['x'])
+    y = int(row['y'])
+    writer.writerow(dict(sum=x+y, product=x*y))
+"""
+        TOTAL_SOURCE_TEMPLATE = """\
+#!/usr/bin/env python
+
+from argparse import FileType, ArgumentParser
+import csv
+from operator import itemgetter
+import os
+
+parser = ArgumentParser(description='Calculate the total of a column.');
+parser.add_argument("input_csv",
+                    type=FileType('rU'),
+                    help="CSV containing (sum,product) pairs");
+parser.add_argument("output_csv",
+                    type=FileType('wb'),
+                    help="CSV containing one (sum,product) pair");
+args = parser.parse_args();
+
+reader = csv.DictReader(args.input_csv);
+writer = csv.DictWriter(args.output_csv,
+                        ['sum', 'product'],
+                        lineterminator=os.linesep)
+writer.writeheader()
+
+# Copy first row unchanged
+for row in reader:
+    writer.writerow(row)
+    break
+    
+sum_total = 0
+product_total = 0
+writer.writerow(dict(sum=sum_total, product=product_total))
+"""
+        DATASET_CONTENT = """\
+x,y
+0,1
+2,3
+4,5
+6,7
+8,9
+"""
+        total_sums_source = TOTAL_SOURCE_TEMPLATE.replace(
+            "sum_total = 0",
+            "sum_total = sum(map(int, map(itemgetter('sum'), reader)))")
+        total_products_source = TOTAL_SOURCE_TEMPLATE.replace(
+            "product_total = 0",
+            "product_total = sum(map(int, map(itemgetter('product'), reader)))")
+        user = User.objects.first()
+        
+        dataset_file = ContentFile(DATASET_CONTENT)
+        symbolic = SymbolicDataset(user=user,
+                                   MD5_checksum=compute_md5(dataset_file))
+        symbolic.save()
+        symbolic.clean()
+        symbolic.grant_everyone_access()
+        dataset = Dataset(symbolicdataset=symbolic, name='pairs', user=user)
+        dataset.dataset_file.save(name='pairs.csv', content=dataset_file)
+        
+        sums_and_products = self.create_method(
+            'sums_and_products',
+            SHUFFLED_SUMS_AND_PRODUCTS_SOURCE,
+            user,
+            ['pairs'],
+            ['sums_and_products'])
+        total_sums = self.create_method('total_sums',
+                                        total_sums_source,
+                                        user,
+                                        ['sums_and_products'],
+                                        ['total_sums'])
+        total_products = self.create_method('total_products',
+                                            total_products_source,
+                                            user,
+                                            ['sums_and_products'],
+                                            ['total_products'])
+        with transaction.atomic():
+            family = PipelineFamily(name='sums and products', user=user)
+            family.save()
+            family.clean()
+            family.grant_everyone_access()
+            
+            pipeline1 = family.members.create(revision_name='sums only',
+                                              user=user)
+            pipeline1.clean()
+            pipeline1.grant_everyone_access()
+            
+            self.next_step_num = 1
+            self.next_output_num = 1
+            input1 = pipeline1.inputs.create(dataset_name='pairs',
+                                             dataset_idx=1)
+            step1_1 = self.create_step(pipeline1, sums_and_products, input1)
+            step1_1.outputs_to_delete.add(sums_and_products.outputs.first())
+            step1_2 = self.create_step(pipeline1, total_sums, step1_1)
+            self.create_cable(step1_2, pipeline1)
+            pipeline1.create_outputs()
+            self.set_position([input1,
+                               step1_1,
+                               step1_2,
+                               pipeline1.outputs.first()])
+            pipeline1.complete_clean()
+            
+            pipeline2 = family.members.create(revision_name='sums and products',
+                                              revision_parent=pipeline1,
+                                              user=user)
+            pipeline2.clean()
+            pipeline2.grant_everyone_access()
+            self.next_step_num = 1
+            self.next_output_num = 1
+            input2 = pipeline2.inputs.create(dataset_name='pairs',
+                                             dataset_idx=1)
+            step2_1 = self.create_step(pipeline2, sums_and_products, input2)
+            step2_1.outputs_to_delete.add(sums_and_products.outputs.first())
+            step2_2 = self.create_step(pipeline2, total_sums, step2_1)
+            step2_3 = self.create_step(pipeline2, total_products, step2_1)
+            self.create_cable(step2_2, pipeline2)
+            self.create_cable(step2_3, pipeline2)
+            pipeline2.create_outputs()
+            self.set_position([input2,
+                               step2_1,
+                               step2_2,
+                               pipeline2.outputs.first(),
+                               step2_3,
+                               pipeline2.outputs.last()])
+            pipeline2.complete_clean()
+    
+    def set_position(self, objects):
+        n = len(objects)
+        for i, object in enumerate(objects, 1):
+            object.x = object.y = float(i)/(n+1)
+            object.save()
+    
+    def create_cable(self, source, dest):
+        """ Create a cable between to pipeline objects.
+        
+        @param source: either a PipelineStep or one of the pipeline's
+        TransformationInput objects for the cable to use as a source.
+        @param dest: either a PipelineStep or the Pipeline for the cable to use
+        as a destination.
+        """
+        try:
+            source_output = source.transformation.outputs.first()
+            source_step_num = source.step_num
+        except AttributeError:
+            # must be a pipeline input
+            source_output = source
+            source_step_num = 0
+            
+        try:
+            cable = dest.cables_in.create(dest=dest.transformation.inputs.first(),
+                                          source=source_output,
+                                          source_step=source_step_num)
+        except AttributeError:
+            # must be a pipeline output
+            cable = dest.create_raw_outcable(source.name,
+                                             self.next_output_num,
+                                             source.step_num,
+                                             source_output)
+            self.next_output_num += 1
+        return cable
+            
+    def create_step(self, pipeline, method, input_source):
+        """ Create a pipeline step.
+        
+        @param method: the method for the step to run
+        @param input_source: either a pipeline input or another step that this
+        step will use for its input.
+        """
+        step = pipeline.steps.create(transformation=method,
+                                     name=method.family.name,
+                                     step_num=self.next_step_num)
+        self.create_cable(input_source, step)
+        step.clean()
+        self.next_step_num += 1
+        return step
+        
+    def create_method(self, name, source, user, input_names, output_names):
+        """ Create a method.
+        
+        @param source: source code
+        @param input_names: list of strings to name raw inputs
+        @param output_names: list of strings to name raw outputs
+        @return: a new Method object that has been saved
+        """
+        with transaction.atomic():
+            code_resource_revision = self.create_code_resource(name, source, user)
+            family = MethodFamily(name=name, user=user)
+            family.save()
+            family.clean()
+            family.grant_everyone_access()
+            
+            method = family.members.create(revision_name='first',
+                                           driver=code_resource_revision,
+                                           user=user)
+            method.save()
+            for i, input_name in enumerate(input_names, 1):
+                method.inputs.create(dataset_name=input_name, dataset_idx=i)
+            for i, output_name in enumerate(output_names, 1):
+                method.outputs.create(dataset_name=output_name, dataset_idx=i)
+            method.clean()
+            method.grant_everyone_access()
+            return method
+        
+    def create_code_resource(self, name, source, user):
+        """ Create a new code resource.
+        
+        @param source: source code
+        @return: a new CodeResourceRevision object that has been saved
+        """
+        with transaction.atomic():
+            filename = name+'.py'
+            resource = CodeResource(name=name, filename=filename, user=user)
+            resource.save()
+            resource.clean()
+            resource.grant_everyone_access()
+            
+            revision = resource.revisions.create(user=user)
+            revision.content_file.save(filename, ContentFile(source))
+            revision.clean()
+            revision.grant_everyone_access()
+        resource.clean()
+        return revision
+    
 
 class RemovalTestEnvironmentBuilder(FixtureBuilder):
     def get_name(self):
@@ -441,5 +705,6 @@ class Command(BaseCommand):
         RunPipelinesRecoveringReusedStepEnvironmentBuilder().run()
         ExecuteResultTestsRMEnvironmentBuilder().run()
         ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
+        RestoreReusableDatasetBuilder().run()
         
         self.stdout.write('Done.')

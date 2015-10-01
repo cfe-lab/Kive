@@ -521,6 +521,13 @@ class AccessControl(models.Model):
         for group in permissions_list[1]:
             self.groups_allowed.add(group)
 
+    def copy_permissions(self, source):
+        """ Copy users_allowed and groups_allowed from the source object.
+        
+        @param source: another AccessControl object
+        """
+        self.grant_from_permissions_list((source.users_allowed.all(),
+                                          source.groups_allowed.all()))
 
 @python_2_unicode_compatible
 class Datatype(AccessControl):

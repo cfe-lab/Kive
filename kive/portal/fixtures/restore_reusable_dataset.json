@@ -1,0 +1,720 @@
+[
+    {
+        "fields": {
+            "created_by": null, 
+            "dataset_file": "Datasets/fixtures/pairs.csv", 
+            "date_created": "2000-01-01T00:00:00Z", 
+            "date_modified": "2000-01-01T00:00:00Z", 
+            "description": "", 
+            "name": "pairs", 
+            "symbolicdataset": 1
+        }, 
+        "model": "archive.dataset", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "name": "sums_and_products", 
+            "outputs_to_delete": [
+                2
+            ], 
+            "pipeline": 4, 
+            "step_num": 1, 
+            "transformation": 1, 
+            "x": 0.4, 
+            "y": 0.4
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "name": "total_sums", 
+            "outputs_to_delete": [], 
+            "pipeline": 4, 
+            "step_num": 2, 
+            "transformation": 2, 
+            "x": 0.6, 
+            "y": 0.6
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "name": "sums_and_products", 
+            "outputs_to_delete": [
+                2
+            ], 
+            "pipeline": 5, 
+            "step_num": 1, 
+            "transformation": 1, 
+            "x": 0.285714285714286, 
+            "y": 0.285714285714286
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "name": "total_sums", 
+            "outputs_to_delete": [], 
+            "pipeline": 5, 
+            "step_num": 2, 
+            "transformation": 2, 
+            "x": 0.428571428571429, 
+            "y": 0.428571428571429
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "fill_colour": "", 
+            "name": "total_products", 
+            "outputs_to_delete": [], 
+            "pipeline": 5, 
+            "step_num": 3, 
+            "transformation": 3, 
+            "x": 0.714285714285714, 
+            "y": 0.714285714285714
+        }, 
+        "model": "pipeline.pipelinestep", 
+        "pk": 5
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 1
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 2
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 3
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 4
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 5
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 6
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 7
+    }, 
+    {
+        "fields": {}, 
+        "model": "pipeline.pipelinecable", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "dest": 1, 
+            "keep_output": false, 
+            "pipelinestep": 1, 
+            "source": 7, 
+            "source_step": 0
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "dest": 3, 
+            "keep_output": false, 
+            "pipelinestep": 2, 
+            "source": 2, 
+            "source_step": 1
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "dest": 1, 
+            "keep_output": false, 
+            "pipelinestep": 3, 
+            "source": 9, 
+            "source_step": 0
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "dest": 3, 
+            "keep_output": false, 
+            "pipelinestep": 4, 
+            "source": 2, 
+            "source_step": 1
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "dest": 5, 
+            "keep_output": false, 
+            "pipelinestep": 5, 
+            "source": 2, 
+            "source_step": 1
+        }, 
+        "model": "pipeline.pipelinestepinputcable", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "output_cdt": null, 
+            "output_idx": 1, 
+            "output_name": "total_sums", 
+            "pipeline": 4, 
+            "source": 4, 
+            "source_step": 2
+        }, 
+        "model": "pipeline.pipelineoutputcable", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "output_cdt": null, 
+            "output_idx": 1, 
+            "output_name": "total_sums", 
+            "pipeline": 5, 
+            "source": 4, 
+            "source_step": 2
+        }, 
+        "model": "pipeline.pipelineoutputcable", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "output_cdt": null, 
+            "output_idx": 2, 
+            "output_name": "total_products", 
+            "pipeline": 5, 
+            "source": 6, 
+            "source_step": 3
+        }, 
+        "model": "pipeline.pipelineoutputcable", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "x": 0.0, 
+            "y": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "x": 0.0, 
+            "y": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "x": 0.0, 
+            "y": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "x": 0.0, 
+            "y": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "x": 0.0, 
+            "y": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "x": 0.0, 
+            "y": 0.0
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "x": 0.2, 
+            "y": 0.2
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "x": 0.8, 
+            "y": 0.8
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "x": 0.142857142857143, 
+            "y": 0.142857142857143
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "x": 0.571428571428571, 
+            "y": 0.571428571428571
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "x": 0.857142857142857, 
+            "y": 0.857142857142857
+        }, 
+        "model": "transformation.transformationxput", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "dataset_name": "pairs", 
+            "transformation": 1
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "dataset_name": "sums_and_products", 
+            "transformation": 2
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "dataset_name": "sums_and_products", 
+            "transformation": 3
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "dataset_name": "pairs", 
+            "transformation": 4
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 7
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "dataset_name": "pairs", 
+            "transformation": 5
+        }, 
+        "model": "transformation.transformationinput", 
+        "pk": 9
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "dataset_name": "sums_and_products", 
+            "transformation": 1
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "dataset_name": "total_sums", 
+            "transformation": 2
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "dataset_name": "total_products", 
+            "transformation": 3
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 6
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "dataset_name": "total_sums", 
+            "transformation": 4
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 8
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 1, 
+            "dataset_name": "total_sums", 
+            "transformation": 5
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 10
+    }, 
+    {
+        "fields": {
+            "dataset_idx": 2, 
+            "dataset_name": "total_products", 
+            "transformation": 5
+        }, 
+        "model": "transformation.transformationoutput", 
+        "pk": 11
+    }, 
+    {
+        "fields": {
+            "MD5_checksum": "e093c9eac5d0cae832d4e2071ccfdc5f", 
+            "_redacted": false, 
+            "groups_allowed": [
+                1
+            ], 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "description": "", 
+            "filename": "sums_and_products.py", 
+            "groups_allowed": [
+                1
+            ], 
+            "name": "sums_and_products", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "method.coderesource", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "description": "", 
+            "filename": "total_sums.py", 
+            "groups_allowed": [
+                1
+            ], 
+            "name": "total_sums", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "method.coderesource", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "description": "", 
+            "filename": "total_products.py", 
+            "groups_allowed": [
+                1
+            ], 
+            "name": "total_products", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "method.coderesource", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "MD5_checksum": "", 
+            "coderesource": 1, 
+            "content_file": "CodeResources/sums_and_products.py", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_DateTime": "2000-01-01T00:00:00Z", 
+            "revision_desc": "", 
+            "revision_name": "", 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "method.coderesourcerevision", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "MD5_checksum": "", 
+            "coderesource": 2, 
+            "content_file": "CodeResources/total_sums.py", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_DateTime": "2000-01-01T00:00:00Z", 
+            "revision_desc": "", 
+            "revision_name": "", 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "method.coderesourcerevision", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "MD5_checksum": "", 
+            "coderesource": 3, 
+            "content_file": "CodeResources/total_products.py", 
+            "groups_allowed": [
+                1
+            ], 
+            "revision_DateTime": "2000-01-01T00:00:00Z", 
+            "revision_desc": "", 
+            "revision_name": "", 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "method.coderesourcerevision", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "driver": 1, 
+            "family": 1, 
+            "groups_allowed": [
+                1
+            ], 
+            "reusable": 1, 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "tainted": false, 
+            "threads": 1, 
+            "users_allowed": []
+        }, 
+        "model": "method.method", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "driver": 2, 
+            "family": 2, 
+            "groups_allowed": [
+                1
+            ], 
+            "reusable": 1, 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "tainted": false, 
+            "threads": 1, 
+            "users_allowed": []
+        }, 
+        "model": "method.method", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "driver": 3, 
+            "family": 3, 
+            "groups_allowed": [
+                1
+            ], 
+            "reusable": 1, 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "tainted": false, 
+            "threads": 1, 
+            "users_allowed": []
+        }, 
+        "model": "method.method", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "description": "", 
+            "groups_allowed": [
+                1
+            ], 
+            "name": "sums_and_products", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "method.methodfamily", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "description": "", 
+            "groups_allowed": [
+                1
+            ], 
+            "name": "total_sums", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "method.methodfamily", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "description": "", 
+            "groups_allowed": [
+                1
+            ], 
+            "name": "total_products", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "method.methodfamily", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "description": "", 
+            "groups_allowed": [
+                1
+            ], 
+            "name": "sums and products", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "pipeline.pipelinefamily", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "family": 1, 
+            "groups_allowed": [
+                1
+            ], 
+            "published": false, 
+            "revision_number": 1, 
+            "revision_parent": null, 
+            "users_allowed": []
+        }, 
+        "model": "pipeline.pipeline", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "family": 1, 
+            "groups_allowed": [
+                1
+            ], 
+            "published": false, 
+            "revision_number": 2, 
+            "revision_parent": 4, 
+            "users_allowed": []
+        }, 
+        "model": "pipeline.pipeline", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "groups_allowed": [
+                1
+            ], 
+            "revision_DateTime": "2000-01-01T00:00:00Z", 
+            "revision_desc": "", 
+            "revision_name": "first", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "groups_allowed": [
+                1
+            ], 
+            "revision_DateTime": "2000-01-01T00:00:00Z", 
+            "revision_desc": "", 
+            "revision_name": "first", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "groups_allowed": [
+                1
+            ], 
+            "revision_DateTime": "2000-01-01T00:00:00Z", 
+            "revision_desc": "", 
+            "revision_name": "first", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "groups_allowed": [
+                1
+            ], 
+            "revision_DateTime": "2000-01-01T00:00:00Z", 
+            "revision_desc": "", 
+            "revision_name": "sums only", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "groups_allowed": [
+                1
+            ], 
+            "revision_DateTime": "2000-01-01T00:00:00Z", 
+            "revision_desc": "", 
+            "revision_name": "sums and products", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "transformation.transformation", 
+        "pk": 5
+    }
+]
