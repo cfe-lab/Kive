@@ -717,6 +717,7 @@ $(function() {
                 dataType: 'json',
                 success: function(result) {
                     $('#id_submit_error').html('').hide();
+                    $(window).off('beforeunload');
                     window.location.href = '/pipelines/' + family_pk;
                 },
                 error: function(xhr, status, error) {
@@ -840,7 +841,8 @@ $(function() {
      ELEMENT                         EVENT                   FUNCTION CALLBACK
     ------------------------------------------------------------------------------------
     */
-    $(window)                    .on('resize',               documentResizeHandler);
+    $(window)                    .on('resize',               documentResizeHandler)
+                                 .on('beforeunload',         function() { if (canvasState.can_edit) return 'Are you sure you want to leave?'; });
     $(document)                  .on('keydown',              documentKeyHandler)
                                  .on('mousedown',            documentClickHandler)
                                  .on('cancel', '.context_menu, .modal_dialog, .ctrl_menu', function() { $(this).hide(); });
