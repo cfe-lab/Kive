@@ -4032,3 +4032,45 @@ baz
 
             # Probe to make sure the CDT got set correctly.
             self.assertEquals(dataset.symbolicdataset.compounddatatype, self.kive_CDT)
+
+    def test_create_with_users_allowed(self):
+        """
+        Test validating a new Dataset with users allowed.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["users_allowed"].append(self.myUser.username)
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            ds.is_valid()
+            dataset = ds.save()
+
+            self.assertListEqual(list(dataset.symbolicdataset.users_allowed.all()),
+                                 [self.myUser])
+
+    def test_create_with_groups_allowed(self):
+        """
+        Test validating a new Dataset with groups allowed.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["groups_allowed"].append(everyone_group().name)
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            ds.is_valid()
+            dataset = ds.save()
+
+            self.assertListEqual(list(dataset.symbolicdataset.groups_allowed.all()),
+                                 [everyone_group()])
