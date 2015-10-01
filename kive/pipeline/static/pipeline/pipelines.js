@@ -24,6 +24,7 @@ var pipelines = (function() {
 
     function published_version($td, pipeline, data) {
         var $form = $('<form class="publish">'),
+            $button_group = $('<div class="button-group">'),
             $input = $('<input type="submit">'),
             $pipeline_pk_input = $('<input>', {
                 type: 'hidden',
@@ -33,10 +34,11 @@ var pipelines = (function() {
             $action_input = $('<input type="hidden" name="action">'),
             family_pk = data.family_pk;
         
-        $form.append($pipeline_pk_input, $action_input, $input);
+        $button_group.append($pipeline_pk_input, $action_input, $input);
+        $form.append($button_group);
 
         if (pipeline.published) {
-            $form.prepend('<input type="button" class="left-button" disabled value="Published">');
+            $button_group.prepend('<input type="button" class="left-button" disabled value="Published">');
             $action_input.val("unpublish");
             $input.val("×").addClass('right-button close-button');
         } else {

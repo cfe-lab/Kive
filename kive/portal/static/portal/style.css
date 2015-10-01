@@ -368,6 +368,9 @@ input.right-button {
     font-weight: bold;
     margin-left: 0;
 }
+div.button-group {
+    white-space: nowrap
+}
 input.close-button {
     padding: 0 .5em;
 }
