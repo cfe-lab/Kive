@@ -1110,6 +1110,7 @@ class CodeResourceRevisionTests(MethodTestCase):
         
         self.assertEqual(update, self.compv2_crRev)
 
+
 class CodeResourceDependencyTests(MethodTestCase):
 
     def test_unicode(self):
@@ -2203,6 +2204,7 @@ class MethodTests(MethodTestCase):
         
         self.assertEqual(update, None)
 
+
 class MethodFamilyTests(MethodTestCase):
 
     def test_unicode(self):
@@ -2748,7 +2750,11 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
 
         self.detail_path = reverse("coderesourcerevision-detail", kwargs={"pk": self.noop_crr.pk})
         self.detail_view, _, _ = resolve(self.detail_path)
+
         self.removal_plan = self.noop_crr.build_removal_plan()
+
+        self.download_path = reverse("coderesourcerevision-download", kwargs={"pk": self.noop_crr.pk})
+        self.download_view, _, _ = resolve(self.download_path)
 
         crr_test_setup(self)
 
@@ -2836,6 +2842,15 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         self.assertDictEqual(
             response.data,
             { 'non_field_errors': "depPath cannot reference ../" })
+
+    def test_download(self):
+        request = self.factory.get(self.download_path)
+        force_authenticate(request, user=self.remover)
+        response = self.download_view(request, pk=self.noop_crr.pk)
+
+        self.assertIn("Content-Disposition", response)
+        self.assertTrue(response["Content-Disposition"].startswith("attachment; filename="))
+
 
 def method_test_setup(case):
     """

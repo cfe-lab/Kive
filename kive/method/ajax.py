@@ -50,10 +50,6 @@ class CodeResourceRevisionViewSet(CleanCreateModelMixin, RemovableModelViewSet):
         accessible_CRRs = CodeResourceRevision.filter_by_user(request.user)
         CRR = self.get_object()
 
-        print("FOOOOOO")
-        print(type(CRR.content_file))
-        print("BAAAAAR")
-
         if not accessible_CRRs.filter(pk=CRR.pk).exists():
             return Response(None, status=status.HTTP_404_NOT_FOUND)
         elif not CRR.content_file:
