@@ -2,7 +2,7 @@ from django.http import HttpResponse, Http404
 from django.core import serializers
 from django.contrib.auth.decorators import login_required, user_passes_test
 
-from rest_framework import permissions
+from rest_framework import permissions, status
 from rest_framework.decorators import detail_route
 from rest_framework.response import Response
 
@@ -11,6 +11,7 @@ from method.models import CodeResourceRevision, Method, MethodFamily, CodeResour
 from method.serializers import MethodSerializer, MethodFamilySerializer, \
     CodeResourceSerializer, CodeResourceRevisionSerializer
 from metadata.models import AccessControl
+from archive.views import _build_download_response
 from portal.views import developer_check, admin_check
 
 
@@ -40,6 +41,26 @@ class CodeResourceRevisionViewSet(CleanCreateModelMixin, RemovableModelViewSet):
     queryset = CodeResourceRevision.objects.all()
     serializer_class = CodeResourceRevisionSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+
+    @detail_route(methods=['get'])
+    def download(self, request, pk=None):
+        """
+        Download the file pointed to by this CodeResourceRevision.
+        """
+        accessible_CRRs = CodeResourceRevision.filter_by_user(request.user)
+        CRR = self.get_object()
+
+        print("FOOOOOO")
+        print(type(CRR.content_file))
+        print("BAAAAAR")
+
+        if not accessible_CRRs.filter(pk=CRR.pk).exists():
+            return Response(None, status=status.HTTP_404_NOT_FOUND)
+        elif not CRR.content_file:
+            return Response({"errors": "This CodeResourceRevision has no content file."},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        return _build_download_response(CRR.content_file)
 
 
 @login_required

@@ -88,7 +88,7 @@ def resource_revisions(request, id):
 
 
         try:
-            _make_crv(request.FILES['content_file'],
+            _make_crv(request.FILES('content_file', None),
                       request.user,
                       revision_form,
                       dep_forms,
@@ -180,6 +180,8 @@ def _make_crv(file_in_memory,
     for dep_form in dep_forms:
         assert isinstance(dep_form, CodeResourceDependencyForm) or dep_form is None
 
+    cr_filename = "" if file_in_memory is None else file_in_memory.name
+
     if code_resource is None and parent_revision is not None:
         code_resource = parent_revision.coderesource
     if code_resource is None:
@@ -187,7 +189,7 @@ def _make_crv(file_in_memory,
         code_resource = CodeResource(
             name=crv_form.cleaned_data['resource_name'],
             description=crv_form.cleaned_data['resource_desc'],
-            filename=file_in_memory.name,
+            filename=cr_filename,
             user=creating_user
         )
         try:
@@ -209,7 +211,8 @@ def _make_crv(file_in_memory,
         rev_desc = crv_form.cleaned_data["revision_desc"]
 
     # Modify actual filename prior to saving revision object.
-    file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
+    if file_in_memory is not None:
+        file_in_memory.name += '_' + datetime.now().strftime('%Y%m%d%H%M%S')
 
     revision = CodeResourceRevision(
         revision_parent=parent_revision,
@@ -291,7 +294,7 @@ def resource_add(request):
         if all_good:
             # Now we can try to create objects in the database, catching backend-raised exceptions as we go.
             try:
-                _make_crv(request.FILES["content_file"],
+                _make_crv(request.FILES.get("content_file", None),
                           creating_user,
                           resource_form,
                           dep_forms)
@@ -361,7 +364,7 @@ def resource_revision_add(request, id):
 
 
         try:
-            _make_crv(request.FILES['content_file'], creating_user, revision_form, dep_forms,
+            _make_crv(request.FILES.get('content_file', None), creating_user, revision_form, dep_forms,
                       parent_revision=parent_revision)
         except ValidationError:
             # The forms have all been updated with the appropriate errors.

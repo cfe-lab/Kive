@@ -50,7 +50,8 @@ class CodeResourcePrototypeForm(AccessControlForm):
     # Stuff that goes directly into the CodeResourceRevision.
     content_file = forms.FileField(
         label="File",
-        help_text="File containing this new code resource"
+        help_text="File containing this new code resource",
+        required=False
     )
 
 
@@ -59,7 +60,8 @@ class CodeResourceRevisionForm(AccessControlForm):
     # Stuff that goes directly into the CodeResourceRevision.
     content_file = forms.FileField(
         label="File",
-        help_text="File contents of this code resource revision"
+        help_text="File contents of this code resource revision",
+        required=False
     )
 
     revision_name = forms.CharField(

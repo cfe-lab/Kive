@@ -79,6 +79,7 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
         required=False
     )
 
+    download_url = serializers.HyperlinkedIdentityField(view_name='coderesourcerevision-download')
     removal_plan = serializers.HyperlinkedIdentityField(view_name='coderesourcerevision-removal-plan')
     absolute_url = serializers.SerializerMethodField()
     view_url = serializers.SerializerMethodField()
@@ -116,7 +117,8 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
             'revision_DateTime',
             "content_file",
             "staged_file",
-            "dependencies"
+            "dependencies",
+            "download_url"
         )
         # revision_DateTime, removal_plan, absolute_url, and display_name are already read_only.
         read_only_fields = ("content_file",)

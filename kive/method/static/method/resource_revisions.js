@@ -4,6 +4,9 @@
 (function(window){
 
     function coderevision_link($td, revision) {
+        if (revision["content_file"].length !== 0) {
+
+        }
         var $a = $("<a/>").attr("href", revision["absolute_url"]).text("Revise");
         $td.append($a);
     }
@@ -11,6 +14,12 @@
     function coderevision_view_link($td, revision) {
         var $a = $("<a/>").attr("href", revision["view_url"]).text(revision["display_name"]);
         $td.append($a);
+    }
+
+    function buildDownload($td, revision) {
+        if (revision["content_file"].length !== 0) {
+            $td.append($('<a/>').text('Download').attr('href', revision["download_url"]));
+        }
     }
 
     var CodeResourceRevisionTable = function($table, is_user_admin, ccr_pk) {
@@ -21,6 +30,7 @@
         this.registerColumn("", coderevision_link);
         this.registerColumn("Description", "revision_desc");
         this.registerColumn("Date", "revision_DateTime");
+        this.registerColumn("", buildDownload);
     };
 
     CodeResourceRevisionTable.prototype = Object.create(permissions.PermissionsTable.prototype);
