@@ -48,7 +48,7 @@ def datasets(request):
 
 
 def _build_download_response(source_file):
-    file_chunker = FileWrapper(source_file) # stream file in chunks to avoid overloading memory
+    file_chunker = FileWrapper(source_file)  # Stream file in chunks to avoid overloading memory.
     mimetype = mimetypes.guess_type(source_file.url)[0]
     response = HttpResponse(file_chunker, content_type=mimetype)
     response['Content-Length'] = source_file.size
