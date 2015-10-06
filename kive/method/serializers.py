@@ -118,10 +118,11 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
             "content_file",
             "staged_file",
             "dependencies",
-            "download_url"
+            "download_url",
+            "MD5_checksum"
         )
         # revision_DateTime, removal_plan, absolute_url, and display_name are already read_only.
-        read_only_fields = ("content_file",)
+        read_only_fields = ("content_file", "MD5_checksum")
         extra_kwargs = {
             "content_file": {"use_url": False},
         }

@@ -28,6 +28,7 @@ worker_logger = logging.getLogger("fleet.Worker")
 # Shorter sleep makes worker more responsive, generates more load when idle
 SLEEP_SECONDS = 0.1
 
+
 def adjust_log_files(target_logger, rank):
     """ Configure a different log file for each worker process.
     
@@ -43,6 +44,7 @@ def adjust_log_files(target_logger, rank):
             handler.baseFilename = '{}.{:03}{}'.format(fileRoot, rank, fileExt) 
     if target_logger.parent is not None:
         adjust_log_files(target_logger.parent, rank)
+
 
 class Manager:
     """
@@ -465,6 +467,7 @@ class Manager:
                     shutil.rmtree(path_to_rm)
                 except OSError as e:
                     mgr_logger.warning(e)
+
 
 class Worker:
     """

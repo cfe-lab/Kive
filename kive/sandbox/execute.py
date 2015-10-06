@@ -1740,6 +1740,26 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
     curr_log = archive.models.ExecLog.create(runstep, invoking_record)
     stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
     stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
+
+    # Check the integrity of the code before we run.
+    if not pipelinestep.transformation.definite.driver.check_md5():
+        logger.debug("[%d] Method code has gone corrupt; stopping step", worker_rank)
+        # Stop everything!
+        curr_log.start()
+        curr_log.methodoutput.are_checksums_OK = False
+        curr_log.methodoutput.save()
+        curr_log.stop(save=True, clean=False)
+
+        if not recover:
+            if sandbox_to_update is not None:
+                # Since reused=False, step_run_dir represents where the step *actually is*.
+                sandbox_to_update.update_step_maps(runstep, step_run_dir, output_paths)
+
+            runstep.stop(save=True, clean=False)
+        runstep.complete_clean()
+        return runstep
+
+    # From here on the code is assumed to not be corrupted.
     with open(stdout_path, "w+") as out_write, open(stderr_path, "w+") as err_write:
         pipelinestep.transformation.definite.run_code(
             step_run_dir, input_paths,

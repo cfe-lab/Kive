@@ -266,6 +266,30 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
         return check_dep
 
+    def compute_md5(self):
+        """Computes the MD5 checksum of the CodeResourceRevision."""
+        try:
+            self.content_file.open()
+            md5 = file_access_utils.compute_md5(self.content_file.file)
+        finally:
+            self.content_file.close()
+
+        return md5
+
+    def check_md5(self):
+        """
+        Checks the MD5s of the CodeResourceRevision and its dependencies against their stored values.
+        """
+        # Recompute the MD5, see if it equals what is already stored.
+        if self.MD5_checksum != self.compute_md5():
+            return False
+
+        for dep in self.dependencies.all():
+            if not dep.check_md5():
+                return False
+
+        return True
+
     def clean(self):
         """Check coherence of this CodeResourceRevision.
 
@@ -273,29 +297,45 @@ class CodeResourceRevision(metadata.models.AccessControl):
         itself at all?  Also, checks for conflicts in the
         dependencies.  Finally, if there is a file specified, fill in
         the MD5 checksum.
+
+        NOTE: originally we were going to disallow duplicates (by checking the MD5),
+        but this will be too restrictive because:
+        a) we now have multiple users
+        b) multiple CodeResourceRevisions may have the same file but different
+           dependencies
         """
-        # Get the initial state of content_file, so we can preserve it afterwards.
-        initially_closed = self.content_file.closed
+        if self.pk is None or not CodeResourceRevision.objects.filter(pk=self.pk).exists():
+            # Set the MD5 if it has never been set before, or leave it blank if there is no file
+            # (i.e. if this is a metapackage).
+            try:
+                md5gen = hashlib.md5()
+                # print("Before reading, self.content_file is open? {}".format(not self.content_file.closed))
+                # print("Before reading, self.content_file.file is open? {}".format(not self.content_file.file.closed))
+                # print("self.content_file.file is {}".format(self.content_file.file))
+                # print("How about now, is self.content_file open? {}".format(not self.content_file.closed))
+                # print("")
 
-        # CodeResource can be a collection of dependencies and not contain
-        # a file - in this case, MD5 has no meaning and shouldn't exist
-        try:
-            md5gen = hashlib.md5()
-            # print("Before reading, self.content_file is open? {}".format(not self.content_file.closed))
-            # print("Before reading, self.content_file.file is open? {}".format(not self.content_file.file.closed))
-            # print("self.content_file.file is {}".format(self.content_file.file))
-            # print("How about now, is self.content_file open? {}".format(not self.content_file.closed))
-            # print("")
-            md5gen.update(self.content_file.read())
-            if initially_closed:
-                self.content_file.close()
+                # Get the initial state of content_file, so we can preserve it afterwards.
+                initially_closed = self.content_file.closed
+                md5gen.update(self.content_file.read())
+                if initially_closed:
+                    self.content_file.close()
 
-            self.MD5_checksum = md5gen.hexdigest()
+                self.MD5_checksum = md5gen.hexdigest()
 
-        except ValueError:
-            self.MD5_checksum = ""
-
-        # TODO: duplicate coderesourcerevision based on MD5 should not be permitted - Art.
+            except ValueError:
+                self.MD5_checksum = ""
+        else:
+            # The CodeResourceRevision already existed, so we should check the MD5.
+            curr_md5 = self.compute_md5()
+            if curr_md5 != self.MD5_checksum:
+                raise ValidationError(
+                    "File has been corrupted: original MD5=%(orig_md5)s, current MD5=%(curr_md5)s",
+                    params={
+                        "orig_md5": self.MD5_checksum,
+                        "curr_md5": curr_md5
+                    }
+                )
 
         # Check for a circular dependency.
         if self.has_circular_dependence():
@@ -384,7 +424,6 @@ class CodeResourceRevision(metadata.models.AccessControl):
         """
         return '/resource_revision_view/%i' % self.id
 
-
     @transaction.atomic
     def remove(self):
         removal_plan = self.build_removal_plan()
@@ -439,6 +478,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
     def find_update(self):
         update = self.coderesource.revisions.latest('revision_number')
         return update if update != self else None
+
 
 @python_2_unicode_compatible
 class CodeResourceDependency(models.Model):

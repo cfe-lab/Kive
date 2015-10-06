@@ -2508,9 +2508,12 @@ class ExecLog(stopwatch.models.Stopwatch):
         Note that the execution may still be in progress when we call this;
         this function tells us if anything has gone wrong so far.
         """
-        # If this ExecLog has a MethodOutput, check its return code.
+        # If this ExecLog has a MethodOutput, check whether its
+        # integrity was compromised, and its return code.
         try:
-            if self.methodoutput.return_code is not None and self.methodoutput.return_code != 0:
+            if not self.methodoutput.are_checksums_OK:
+                return False
+            elif self.methodoutput.return_code is not None and self.methodoutput.return_code != 0:
                 return False
         except ObjectDoesNotExist:
             pass
@@ -2674,6 +2677,9 @@ class MethodOutput(models.Model):
     error_log = models.FileField("error log", upload_to=UPLOAD_DIR,
                                  help_text="Terminal error output of the RunStep Method, i.e. stderr.",
                                  null=True, blank=True)
+
+    are_checksums_OK = models.BooleanField(help_text="Do code checksums match originals?",
+                                           default=True)
 
     output_redacted = models.BooleanField(default=False)
     error_redacted = models.BooleanField(default=False)
