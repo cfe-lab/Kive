@@ -5,6 +5,7 @@ import tempfile
 
 from django.contrib.auth.models import User
 from django.core.files import File
+from django.core.files.base import ContentFile
 from django.test import TestCase
 
 from constants import datatypes
@@ -393,6 +394,23 @@ class ExecuteTests(ExecuteTestsBase):
             re.escape('SymbolicDataset {} passed as input {} to Pipeline "{}" is not OK'
                       .format(bad_input, bad_index, pipeline)),
             lambda: sandbox.execute_pipeline(pipeline, inputs, sandbox.sandbox_path, runstep))
+
+    def test_crr_corrupted(self):
+        """
+        Test that a Run fails if a CodeResource has been corrupted.
+        """
+        self.mA_crr.content_file.save("NowCorrupted.dat", ContentFile("CORRUPTED"))
+        self.mA_crr.save()
+
+        sandbox = Sandbox(self.myUser, self.pX, [self.symDS])
+        sandbox.execute_pipeline()
+
+        # This Run should have failed right away.
+        self.assertEquals(sandbox.run.runsteps.count(), 1)
+        rs = sandbox.run.runsteps.first()
+
+        self.assertFalse(rs.log.methodoutput.are_checksums_OK)
+        self.assertFalse(sandbox.run.successful_execution())
 
 
 class SandboxTests(ExecuteTestsBase):
