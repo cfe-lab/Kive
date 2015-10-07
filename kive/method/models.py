@@ -718,7 +718,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         @param dest_streams: a sequence of streams to redirect output to
         """
         for line in source_stream:
-            self.logger.debug('%s: %s', source_name, line.rstrip()) #drops \n
+            self.logger.debug('%s: %s', source_name, line.rstrip().decode('utf-8')) #drops \n
 
             for stream in dest_streams:
                 stream.write(line)
