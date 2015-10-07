@@ -48,10 +48,10 @@ class ExecuteResultTestsRM(TestCase):
     """
     Tests on the results of executing Pipelines.
     """
-    fixtures = ["execute_result_tests_rm.json"]
+    fixtures = ["execute_result_tests_rm"]
 
     def setUp(self):
-        install_fixture_files("execute_result_tests_rm.json")
+        install_fixture_files("execute_result_tests_rm")
         self.method_complement = Method.objects.get(
             family__name="DNA complement",
             revision_name="v1"
@@ -300,10 +300,10 @@ class ExecuteResultTestsRM(TestCase):
 
 
 class ExecuteDiscardedIntermediateTests(TestCase):
-    fixtures = ["execute_discarded_intermediate_tests_rm.json"]
+    fixtures = ["execute_discarded_intermediate_tests_rm"]
 
     def setUp(self):
-        install_fixture_files("execute_discarded_intermediate_tests_rm.json")
+        install_fixture_files("execute_discarded_intermediate_tests_rm")
         self.revcomp_pf = PipelineFamily.objects.get(name="DNA revcomp")
         self.pipeline_revcomp_v2 = self.revcomp_pf.members.get(revision_name="2")
         self.pipeline_revcomp_v3 = self.revcomp_pf.members.get(revision_name="3")

@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import tempfile
 import logging
+import hashlib
 
 from django.contrib.auth.models import User
 from django.core.files import File
@@ -343,12 +344,16 @@ def create_eric_martin_test_environment(case):
         filename="generic_script.py", user=case.myUser)
     case.generic_cr.save()
     case.generic_cr.grant_everyone_access()
-    case.generic_crRev = CodeResourceRevision(
-        coderesource=case.generic_cr, revision_name="v1", revision_desc="desc",
-        user=case.myUser)
     with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
-        case.generic_crRev.content_file.save("generic_script.py", File(f))
-    case.generic_crRev.save()
+        case.generic_crRev = CodeResourceRevision(
+            coderesource=case.generic_cr,
+            revision_name="v1",
+            revision_desc="desc",
+            user=case.myUser,
+            content_file=File(f)
+        )
+        case.generic_crRev.clean()
+        case.generic_crRev.save()
     case.generic_crRev.grant_everyone_access()
 
     # Method family, methods, and their input/outputs
@@ -902,12 +907,14 @@ def create_method_test_environment(case):
 
     fn = "test_cr.py"
     with open(os.path.join(samplecode_path, fn), "rb") as f:
+        md5gen = hashlib.md5()
+        md5gen.update(f.read())
+        f.seek(0)
         for crr in [case.test_cr_1_rev1, case.test_cr_2_rev1, case.test_cr_3_rev1, case.test_cr_4_rev1]:
+            crr.MD5_checksum = md5gen.hexdigest()
             crr.content_file.save(fn, File(f))
 
-
     for crr in [case.test_cr_1_rev1, case.test_cr_2_rev1, case.test_cr_3_rev1, case.test_cr_4_rev1]:
-        # crr.full_clean()
         crr.save()
         crr.grant_everyone_access()
 
@@ -1024,16 +1031,17 @@ def create_method_test_environment(case):
     case.script_1_cr.grant_everyone_access()
 
     # Add code resource revision for code resource (script_1_sum_and_products )
-    case.script_1_crRev = CodeResourceRevision(
-        coderesource=case.script_1_cr,
-        revision_name="v1",
-        revision_desc="First version",
-        user=case.myUser
-    )
     fn = "script_1_sum_and_products.py"
     with open(os.path.join(samplecode_path, fn), "rb") as f:
-        case.script_1_crRev.content_file.save(fn, File(f))
-    case.script_1_crRev.save()
+        case.script_1_crRev = CodeResourceRevision(
+            coderesource=case.script_1_cr,
+            revision_name="v1",
+            revision_desc="First version",
+            user=case.myUser,
+            content_file=File(f)
+        )
+        case.script_1_crRev.full_clean()
+        case.script_1_crRev.save()
     case.script_1_crRev.grant_everyone_access()
 
     # Establish code resource revision as a method
@@ -1069,14 +1077,15 @@ def create_method_test_environment(case):
 
     # Add code resource revision for code resource (script_2_square_and_means)
     fn = "script_2_square_and_means.py"
-    case.script_2_crRev = CodeResourceRevision(
-        coderesource=case.script_2_cr,
-        revision_name="v1",
-        revision_desc="First version",
-        user=case.myUser)
     with open(os.path.join(samplecode_path, fn), "rb") as f:
-        case.script_2_crRev.content_file.save(fn, File(f))
-    case.script_2_crRev.save()
+        case.script_2_crRev = CodeResourceRevision(
+            coderesource=case.script_2_cr,
+            revision_name="v1",
+            revision_desc="First version",
+            user=case.myUser,
+            content_file=File(f))
+        case.script_2_crRev.full_clean()
+        case.script_2_crRev.save()
     case.script_2_crRev.grant_everyone_access()
 
     # Establish code resource revision as a method
@@ -1124,6 +1133,7 @@ def create_method_test_environment(case):
             revision_desc="First version",
             content_file=File(f),
             user=case.myUser)
+        case.script_3_crRev.full_clean()
         case.script_3_crRev.save()
     case.script_3_crRev.grant_everyone_access()
 
@@ -1209,6 +1219,7 @@ def create_method_test_environment(case):
             revision_desc="v1",
             content_file=File(f),
             user=case.myUser)
+        case.script_4_1_CRR.full_clean()
         case.script_4_1_CRR.save()
     case.script_4_1_CRR.grant_everyone_access()
 
@@ -1695,6 +1706,12 @@ def make_first_revision(resname, resdesc, resfn, contents, user, grant_everyone_
                 revision_desc="first version",
                 content_file=File(f),
                 user=user)
+
+            # We need to set the MD5.
+            md5gen = hashlib.md5()
+            md5gen.update(contents)
+            revision.MD5_checksum = md5gen.hexdigest()
+
             revision.save()
             revision.clean()
     if grant_everyone_access:

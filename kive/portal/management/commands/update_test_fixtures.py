@@ -150,7 +150,8 @@ class FixtureBuilder(object):
             for field, value in dump_object['fields'].iteritems():
                 if value is not None and field in field_names:
                     dump_object['fields'][field] = date_map[value]
-            
+
+
 class EMSandboxTestEnvironmentBuilder(FixtureBuilder):
     def get_name(self):
         return 'em_sandbox_test_environment.json'
@@ -235,6 +236,7 @@ class DeepNestedRunBuilder(FixtureBuilder):
         run_sandbox = Sandbox(self.user_bob, p_top, [self.symds_words],
                               groups_allowed=[everyone_group()])
         run_sandbox.execute_pipeline()
+
 
 class RestoreReusableDatasetBuilder(FixtureBuilder):
     def get_name(self):

@@ -535,10 +535,10 @@ class RunApiTests(TestCase):
     # This fixture has the result of sandbox.tests.execute_tests_environment_setup,
     # as well of setting up another Pipeline; this other Pipeline and the resulting
     # run is used in this test case.
-    fixtures = ["run_api_tests.json"]
+    fixtures = ["run_api_tests"]
 
     def setUp(self):
-        install_fixture_files("run_api_tests.json")
+        install_fixture_files("run_api_tests")
         self.kive_user = kive_user()
         self.myUser = User.objects.get(username="john")
 

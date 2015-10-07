@@ -123,6 +123,7 @@ def set_up_directory(directory_to_use, tolerate=False):
                     continue
             raise ValueError("Directory \"{}\" nonempty; contains file {}".format(directory_to_use, path))
 
+
 def compute_md5(file_to_checksum):
     """Computes MD5 checksum of specified file.
 
@@ -134,6 +135,7 @@ def compute_md5(file_to_checksum):
     for line in file_to_checksum:
         md5gen.update(line)
     return md5gen.hexdigest()
+
 
 def file_exists(path):
     """Does the given file exist?"""

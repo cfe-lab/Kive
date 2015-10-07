@@ -4742,8 +4742,8 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
                 revision_desc="just print a message",
                 content_file=File(f),
                 user=self.user_bob)
-            revision.save()
             revision.clean()
+            revision.save()
         return revision
 
     def test_create_with_new_method(self):

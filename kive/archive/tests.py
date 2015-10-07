@@ -723,10 +723,10 @@ class RunComponentTests(ArchiveTestCase):
 
 
 class RunComponentInvokedBySubsequentTests(TestCase):
-    fixtures = ["run_pipelines_recovering_reused_step.json"]
+    fixtures = ["run_pipelines_recovering_reused_step"]
 
     def setUp(self):
-        install_fixture_files("run_pipelines_recovering_reused_step.json")
+        install_fixture_files("run_pipelines_recovering_reused_step")
 
     def tearDown(self):
         restore_production_files()
@@ -1264,7 +1264,7 @@ class RunComponentTooManyChecks(TestCase):
     """
     Tests that check clean() on the case where a RunComponent has too much datachecking.
     """
-    fixtures = ["run_component_too_many_checks.json"]
+    fixtures = ["run_component_too_many_checks"]
 
     def setUp(self):
         # tools.create_word_reversal_environment(self)
@@ -1301,7 +1301,7 @@ class RunComponentTooManyChecks(TestCase):
         # self.following_sdbx.execute_pipeline()
         # second_step = self.following_sdbx.run.runsteps.get(pipelinestep__step_num=2)
         # assert(second_step.invoked_logs.count() == 2)
-        install_fixture_files("run_component_too_many_checks.json")
+        install_fixture_files("run_component_too_many_checks")
         self.user_bob = User.objects.get(username="bob")
 
     def tearDown(self):
@@ -3197,49 +3197,138 @@ for i in range(%d):
         self.assertEqual(len(stdout_content), len(expected_output))
         self.assertEqual(stdout_content, expected_output)
 
+    def setup_incorrectly_random_method(self):
+        """
+        Helper that sets up a CodeResource and Method that spits out the current time.
+        """
+        python_code = """\
+#! /usr/bin/env python
+import sys
+import datetime
+import csv
+
+with open(sys.argv[2], "wb") as f:
+    dt_writer = csv.writer(f)
+    dt_writer.writerow(("year", "month", "day", "hour", "minute", "second", "microsecond"))
+
+    curr_time = datetime.datetime.now()
+    dt_writer.writerow((curr_time.year, curr_time.month, curr_time.day,
+                        curr_time.hour, curr_time.minute, curr_time.second,
+                        curr_time.microsecond))
+
+"""
+        self.curr_time_crr = tools.make_first_revision(
+            "CurrentTime",
+            "Gives the current time",
+            "CurrentTime.py",
+            python_code,
+            self.user_bob)
+
+        self.curr_time_CDT = CompoundDatatype(user=self.user_bob)
+        self.curr_time_CDT.save()
+        self.curr_time_CDT.grant_everyone_access()
+        self.curr_time_CDT.members.create(
+            datatype=self.INT,
+            column_name="year",
+            column_idx=1
+        )
+        self.curr_time_CDT.members.create(
+            datatype=self.INT,
+            column_name="month",
+            column_idx=2
+        )
+        self.curr_time_CDT.members.create(
+            datatype=self.INT,
+            column_name="day",
+            column_idx=3
+        )
+        self.curr_time_CDT.members.create(
+            datatype=self.INT,
+            column_name="hour",
+            column_idx=4
+        )
+        self.curr_time_CDT.members.create(
+            datatype=self.INT,
+            column_name="minute",
+            column_idx=5
+        )
+        self.curr_time_CDT.members.create(
+            datatype=self.INT,
+            column_name="second",
+            column_idx=6
+        )
+        self.curr_time_CDT.members.create(
+            datatype=self.INT,
+            column_name="microsecond",
+            column_idx=7
+        )
+
+        # Note that this is incorrectly marked as deterministic!  (This is on purpose for the
+        # test.)
+        self.curr_time_method = tools.make_first_method(
+            "CurrentTime",
+            "Gives the current time -- incorrectly marked as deterministic",
+            self.curr_time_crr,
+            self.user_bob
+        )
+        tools.simple_method_io(self.curr_time_method, self.curr_time_CDT, "ignored_input", "curr_time")
+
+        self.time_noop = tools.make_first_method(
+            "TimeNoop",
+            "Noop on curr_time_CDT",
+            self.coderev_noop,
+            self.user_bob
+        )
+        tools.simple_method_io(self.time_noop, self.curr_time_CDT, "input", "unchanged_output")
+
+        self.time_trivial = tools.make_first_method(
+            "TimeTrivial",
+            "Also a noop on curr_time_CDT",
+            self.coderev_noop,
+            self.user_bob
+        )
+        tools.simple_method_io(self.time_trivial, self.curr_time_CDT, "input", "unchanged_output")
+
+        self.time_SD = tools.make_SD(
+            """\
+year,month,day,hour,minute,second,microsecond
+1969,1,1,0,0,0,0
+""",
+            self.curr_time_CDT,
+            True,
+            self.user_bob,
+            "EpochTime",
+            "12AM, January 1, 1969",
+            None,
+            True
+        )
+
     def test_runcomponent_unsuccessful_failed_integrity_check_during_recovery(self):
         """Testing of a RunComponent which has a failed integrity check during recovery."""
-        # Run two pipelines, the second of which reuses parts of the first, but the method has been
-        # changed and the output is different now.
-        p_one = tools.make_first_pipeline("p_one", "two no-ops", self.user_bob)
-        tools.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
+        # Run two pipelines, the second of which reuses parts of the first, but the first step's output
+        # is different now.
+        self.setup_incorrectly_random_method()
+
+        p_one = tools.make_first_pipeline("p_one", "time then noop", self.user_bob)
+        tools.create_linear_pipeline(p_one, [self.curr_time_method, self.time_noop], "p_one_in", "p_one_out")
         p_one.create_outputs()
         p_one.save()
         # Mark the output of step 1 as not retained.
-        p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
+        p_one.steps.get(step_num=1).add_deletion(self.curr_time_method.outputs.first())
 
-        # Set up a words dataset.
-        tools.make_words_symDS(self)
-
-        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
-                                                   groups_allowed=[everyone_group()])
+        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.time_SD])
         self.sandbox_one.execute_pipeline()
 
-        tampered_script = """#!/bin/bash
-echo
-echo
-echo 'This CRR has been tampered with and outputs bad data while returning code 0'
-echo
-echo
-echo "This is not what's supposed to be output here" > $2
-        """
-        # Oops!  Between runs, self.method_noop gets screwed with.
-        with tempfile.TemporaryFile() as f:
-            f.write(tampered_script)
-            os.remove(self.coderev_noop.content_file.path)
-            self.coderev_noop.content_file=File(f)
-            self.coderev_noop.save()
-
-        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial", self.user_bob)
-        tools.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
+        # Oops!  The first step should not have been marked as deterministic.
+        p_two = tools.make_first_pipeline("p_two", "time then trivial", self.user_bob)
+        tools.create_linear_pipeline(p_two, [self.curr_time_method, self.time_trivial], "p_two_in", "p_two_out")
         p_two.create_outputs()
         p_two.save()
         # We also delete the output of step 1 so that it reuses the existing ER we'll have
         # create for p_one.
-        p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
+        p_two.steps.get(step_num=1).add_deletion(self.curr_time_method.outputs.first())
 
-        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words],
-                                                   groups_allowed=[everyone_group()])
+        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.time_SD])
         self.sandbox_two.execute_pipeline()
 
         # In the second run: the transformation of the second step should have tried to invoke the log of step 1 and
@@ -3254,65 +3343,6 @@ echo "This is not what's supposed to be output here" > $2
         self.assertTrue(run2_step1.log.is_successful())
         self.assertFalse(run2_step1.log.all_checks_passed())
         self.assertTrue(run2_step2.is_complete())
-        self.assertFalse(run2_step2.successful_execution())
-
-    def test_runcomponent_unsuccessful_failed_content_check_during_recovery(self):
-        """Testing of a RunComponent which has a failed content check (missing data) during recovery."""
-        # Run two pipelines, the second of which reuses parts of the first, but the method has been
-        # changed and the output is different now.
-        p_one = tools.make_first_pipeline("p_one", "two no-ops", self.user_bob)
-        tools.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
-        p_one.create_outputs()
-        p_one.save()
-        # Mark the output of step 1 as not retained.
-        p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
-
-        # Set up a words dataset.
-        tools.make_words_symDS(self)
-
-        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
-                                                   groups_allowed=[everyone_group()])
-        self.sandbox_one.execute_pipeline()
-
-        # Between runs, self.method_noop gets screwed with so that no data comes out, but still returns code 0.
-        tampered_script = """#!/bin/bash
-echo
-echo
-echo 'This CRR has been tampered with and produces no data but returns code 0'
-echo
-echo
-        """
-        with tempfile.TemporaryFile() as f:
-            f.write(tampered_script)
-            os.remove(self.coderev_noop.content_file.path)
-            self.coderev_noop.content_file=File(f)
-            self.coderev_noop.save()
-
-        p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial", self.user_bob)
-        tools.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
-        p_two.create_outputs()
-        p_two.save()
-        # We also delete the output of step 1 so that it reuses the existing ER we'll have
-        # from p_one.
-        p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
-
-        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words])
-        self.sandbox_two.execute_pipeline()
-
-        # In the second run: the cable feeding the second step should have tried to invoke the log of step 1 and
-        # failed.
-        run2_step1 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=1)
-        run2_step2 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
-        run2_step2_cable = run2_step2.RSICs.first()
-
-        self.assertFalse(run2_step2.has_log)
-        self.assertEquals(run2_step2.invoked_logs.count(), 1)
-        self.assertEquals(run2_step2.invoked_logs.first(), run2_step1.log)
-
-        self.assertTrue(run2_step1.log.is_successful())
-        self.assertFalse(run2_step1.log.all_checks_passed())
-        self.assertTrue(run2_step2_cable.is_complete())
-        self.assertFalse(run2_step2_cable.successful_reuse())
         self.assertFalse(run2_step2.successful_execution())
 
     def test_runstep_subpipeline_not_complete(self):

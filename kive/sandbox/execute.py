@@ -1751,10 +1751,6 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
         curr_log.stop(save=True, clean=False)
 
         if not recover:
-            if sandbox_to_update is not None:
-                # Since reused=False, step_run_dir represents where the step *actually is*.
-                sandbox_to_update.update_step_maps(runstep, step_run_dir, output_paths)
-
             runstep.stop(save=True, clean=False)
         runstep.complete_clean()
         return runstep

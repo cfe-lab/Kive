@@ -163,9 +163,10 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
         staged_file = crr_data.pop("staged_file") if "staged_file" in crr_data else None
 
         with transaction.atomic():
-            crr = CodeResourceRevision.objects.create(**crr_data)
+            crr = CodeResourceRevision(**crr_data)
             if staged_file is not None:
                 crr.content_file = File(staged_file.uploaded_file.file)
+                crr.clean()  # This sets the MD5.
                 crr.save()
 
             crr.users_allowed.add(*users_allowed)

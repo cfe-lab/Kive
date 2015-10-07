@@ -157,13 +157,22 @@ class FileAccessTests(TransactionTestCase):
 
     def test_save_close_clean_close(self):
         with open(os.path.join(samplecode_path, self.fn), "rb") as f:
+            # Compute the reference MD5
+            md5gen = hashlib.md5()
+            md5gen.update(f.read())
+            f_checksum = md5gen.hexdigest()
+            f.seek(0)
+
             tools.fd_count("open-!>File->save->close->clean->close")
             test_crr = CodeResourceRevision(
                 coderesource=self.test_cr,
                 revision_name="v1",
                 revision_desc="First version",
                 content_file=File(f),
+                MD5_checksum = f_checksum,
                 user=self.user_randy)
+
+
             tools.fd_count("open->File-!>save->close->clean->close")
             test_crr.save()
             tools.fd_count("open->File->save-!>close->clean->close")
@@ -2578,18 +2587,6 @@ def crr_test_setup(case):
     case.duck_request.user = kive_user()
     case.duck_context = {"request": case.duck_request}
 
-    # Some stuff we need for testing creation.
-    with tempfile.TemporaryFile() as f:
-        f.write("""#!/bin/bash
-
-echo "Hello World"
-""")
-        case.staged_file = portal.models.StagedFile(
-            uploaded_file=File(f),
-            user=kive_user()
-        )
-        case.staged_file.save()
-
     case.cr_name = "Deserialization Test Family"
     case.cr = CodeResource(name=case.cr_name,
                            filename="HelloWorld.py",
@@ -2603,6 +2600,7 @@ echo "Hello World"
 
 echo "Hello World"
 """)
+        f.seek(0)
         case.staged_file = portal.models.StagedFile(
             uploaded_file=File(f),
             user=kive_user()
@@ -2619,12 +2617,14 @@ echo "Hello World"
 
     with tempfile.TemporaryFile() as f:
         f.write("""language = ENG""")
+        f.seek(0)
         case.crd = CodeResourceRevision(
             coderesource=case.cr,
             revision_name="dependency",
             revision_desc="Dependency",
             user=kive_user(),
             content_file=File(f))
+        case.crd.clean()
         case.crd.save()
         case.crd.grant_everyone_access()
 

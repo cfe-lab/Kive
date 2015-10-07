@@ -16,6 +16,7 @@ from method.tests import samplecode_path
 from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox
 from kive.testing_utils import clean_up_all_files
+import file_access_utils
 
 
 def execute_tests_environment_setup(case):
@@ -36,7 +37,11 @@ def execute_tests_environment_setup(case):
     case.mA_crr = CodeResourceRevision(coderesource=case.mA_cr, revision_name="v1", revision_desc="desc",
                                        user=case.myUser)
     with open(os.path.join(samplecode_path, "generic_script.py"), "rb") as f:
+        new_file_MD5 = file_access_utils.compute_md5(f)
+        f.seek(0)
         case.mA_crr.content_file.save("generic_script.py", File(f))
+        case.mA_crr.MD5_checksum = new_file_MD5
+
     case.mA_crr.save()
 
     # Basic DTs
@@ -316,6 +321,7 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertFalse(all(i.is_raw() for i in inputs))
         run = Sandbox(self.myUser, pipeline, inputs).execute_pipeline()
         self.assertTrue(run.is_complete())
+
         self.assertTrue(run.successful_execution())
         self.assertIsNone(run.clean())
         self.assertIsNone(run.complete_clean())
