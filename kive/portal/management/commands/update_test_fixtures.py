@@ -35,47 +35,47 @@ class FixtureBuilder(object):
     def get_name(self):
         """ Return the fixture file's name. """
         raise NotImplementedError()
-    
+
     def build(self):
         """ Build all the records that should be in the fixture. """
         raise NotImplementedError()
-    
+
     def run(self):
         call_command('reset')
-        
+
         before_filename = 'test_fixture_before.json'
         self.dump_all_data(before_filename)
-        
+
         self.build()
 
         after_filename = 'test_fixture_after.json'
         self.dump_all_data(after_filename)
-        
+
         with open(before_filename, 'rU') as jsonfile:
             before_objects = json.load(jsonfile)
-        
+
         with open(after_filename, 'rU') as jsonfile:
             after_objects = json.load(jsonfile)
 
         dump_objects = []
         before_index = 0
         for after_object in after_objects:
-            before_object = (before_index < len(before_objects)
-                             and before_objects[before_index])
+            before_object = (before_index < len(before_objects) and
+                             before_objects[before_index])
             if after_object == before_object:
                 before_index += 1
             else:
                 dump_objects.append(after_object)
-        
+
         self.replace_timestamps(dump_objects)
         self.rename_dataset_files(os.path.join(kive.settings.MEDIA_ROOT,
                                                archive.models.Dataset.UPLOAD_DIR),
                                   dump_objects)
-        
+
         dump_filename = os.path.join('portal', 'fixtures', self.get_name())
         with open(dump_filename, 'w') as dump_file:
             json.dump(dump_objects, dump_file, indent=4, sort_keys=True)
-            
+
         os.remove(before_filename)
         os.remove(after_filename)
 
@@ -101,7 +101,7 @@ class FixtureBuilder(object):
             # ... in with the new.
             if os.path.isdir(target_path):
                 shutil.copytree(target_path, fixture_files_path)
-    
+
     def dump_all_data(self, filename):
         with open(filename, "w") as fixture_file:
             old_stdout = sys.stdout
@@ -110,7 +110,7 @@ class FixtureBuilder(object):
                 call_command("dumpdata", indent=4)
             finally:
                 sys.stdout = old_stdout
-    
+
     def rename_dataset_files(self, dataset_path, dump_objects):
         source_root, source_folder = os.path.split(dataset_path)
         fixtures_path = os.path.join(dataset_path, 'fixtures')
@@ -125,9 +125,9 @@ class FixtureBuilder(object):
                 os.rename(source_path, target_path)
                 new_file_path = os.path.join(source_folder, 'fixtures', file_name)
                 dump_object['fields']['dataset_file'] = new_file_path
-    
+
     def replace_timestamps(self, dump_objects):
-        date_map = {} # {old_date: new_date}
+        date_map = {}  # {old_date: new_date}
         field_names = set()
         for dump_object in dump_objects:
             for field, value in dump_object['fields'].iteritems():
@@ -135,7 +135,7 @@ class FixtureBuilder(object):
                                           field.startswith('date') or
                                           field.endswith('DateTime') or
                                           field == 'last_login'):
-                    
+
                     field_names.add(field)
                     date_map[value] = None
         old_dates = date_map.keys()
@@ -147,7 +147,7 @@ class FixtureBuilder(object):
                 offset = datetime(2000, 1, 1, tzinfo=utc) - old_datetime
             rounded = (old_datetime + offset).replace(microsecond=0, tzinfo=None)
             date_map[old_date] = rounded.isoformat() + 'Z'
-            
+
         for dump_object in dump_objects:
             for field, value in dump_object['fields'].iteritems():
                 if value is not None and field in field_names:
@@ -168,7 +168,7 @@ class EMSandboxTestEnvironmentBuilder(FixtureBuilder):
 class ArchiveTestEnvironmentBuilder(FixtureBuilder):
     def get_name(self):
         return 'archive_test_environment.json'
-    
+
     def build(self):
         tools.create_archive_test_environment(self)
 
@@ -176,7 +176,7 @@ class ArchiveTestEnvironmentBuilder(FixtureBuilder):
 class SimpleRunBuilder(FixtureBuilder):
     def get_name(self):
         return 'simple_run.json'
-    
+
     def build(self):
         tools.create_eric_martin_test_environment(self)
         tools.create_sandbox_testing_tools_environment(self)
@@ -205,7 +205,7 @@ class SimpleRunBuilder(FixtureBuilder):
 class DeepNestedRunBuilder(FixtureBuilder):
     def get_name(self):
         return 'deep_nested_run.json'
-    
+
     def build(self):
         tools.create_archive_test_environment(self)
         user = User.objects.get(username='john')
@@ -243,7 +243,7 @@ class DeepNestedRunBuilder(FixtureBuilder):
 class RestoreReusableDatasetBuilder(FixtureBuilder):
     def get_name(self):
         return 'restore_reusable_dataset.json'
-    
+
     def build(self):
         user = User.objects.first()
         pipeline1, _pipeline2 = self.create_pipelines(user)
@@ -264,12 +264,12 @@ x,y
         symbolic.grant_everyone_access()
         dataset = Dataset(symbolicdataset=symbolic, name='pairs', user=user)
         dataset.dataset_file.save(name='pairs.csv', content=dataset_file)
-        
+
         run_to_process = RunToProcess(pipeline=pipeline1, user=user)
         run_to_process.save()
         run_to_process.clean()
         run_to_process.inputs.create(symbolicdataset=symbolic, index=1)
-        
+
         manager = Manager(0, None)
         manager.max_host_cpus = 1
         manager.worker_status = {}
@@ -289,11 +289,11 @@ x,y
                     sandbox_result = finish_cable(task_info_dict, worker_rank)
                 manager.note_progress(worker_rank, sandbox_result)
         run_to_process = RunToProcess.objects.get(id=run_to_process.id)
-        run_to_process.collect_garbage() # Delete sandbox directories
-        
+        run_to_process.collect_garbage()  # Delete sandbox directories
+
     def create_pipelines(self, user):
         """ Create two pipelines: sums_only and sums_and_products.
-        
+
         @return: (pipeline1, pipeline2)
         """
         SHUFFLED_SUMS_AND_PRODUCTS_SOURCE = """\
@@ -354,7 +354,7 @@ writer.writeheader()
 for row in reader:
     writer.writerow(row)
     break
-    
+
 sum_total = 0
 product_total = 0
 writer.writerow(dict(sum=sum_total, product=product_total))
@@ -365,7 +365,7 @@ writer.writerow(dict(sum=sum_total, product=product_total))
         total_products_source = TOTAL_SOURCE_TEMPLATE.replace(
             "product_total = 0",
             "product_total = sum(map(int, map(itemgetter('product'), reader)))")
-        
+
         sums_and_products = self.create_method(
             'sums_and_products',
             SHUFFLED_SUMS_AND_PRODUCTS_SOURCE,
@@ -374,7 +374,7 @@ writer.writerow(dict(sum=sum_total, product=product_total))
             ['sums_and_products'])
         sums_and_products.reusable = Method.REUSABLE
         sums_and_products.save()
-        sums_and_products.clean() 
+        sums_and_products.clean()
         total_sums = self.create_method('total_sums',
                                         total_sums_source,
                                         user,
@@ -390,12 +390,12 @@ writer.writerow(dict(sum=sum_total, product=product_total))
             family.save()
             family.clean()
             family.grant_everyone_access()
-            
+
             pipeline1 = family.members.create(revision_name='sums only',
                                               user=user)
             pipeline1.clean()
             pipeline1.grant_everyone_access()
-            
+
             self.next_step_num = 1
             self.next_output_num = 1
             input1 = pipeline1.inputs.create(dataset_name='pairs',
@@ -410,7 +410,7 @@ writer.writerow(dict(sum=sum_total, product=product_total))
                                step1_2,
                                pipeline1.outputs.first()])
             pipeline1.complete_clean()
-            
+
             pipeline2 = family.members.create(revision_name='sums and products',
                                               revision_parent=pipeline1,
                                               user=user)
@@ -435,16 +435,16 @@ writer.writerow(dict(sum=sum_total, product=product_total))
                                pipeline2.outputs.last()])
             pipeline2.complete_clean()
         return pipeline1, pipeline2
-    
+
     def set_position(self, objects):
         n = len(objects)
         for i, object in enumerate(objects, 1):
             object.x = object.y = float(i)/(n+1)
             object.save()
-    
+
     def create_cable(self, source, dest):
         """ Create a cable between to pipeline objects.
-        
+
         @param source: either a PipelineStep or one of the pipeline's
         TransformationInput objects for the cable to use as a source.
         @param dest: either a PipelineStep or the Pipeline for the cable to use
@@ -457,7 +457,7 @@ writer.writerow(dict(sum=sum_total, product=product_total))
             # must be a pipeline input
             source_output = source
             source_step_num = 0
-            
+
         try:
             cable = dest.cables_in.create(dest=dest.transformation.inputs.first(),
                                           source=source_output,
@@ -470,10 +470,10 @@ writer.writerow(dict(sum=sum_total, product=product_total))
                                              source_output)
             self.next_output_num += 1
         return cable
-            
+
     def create_step(self, pipeline, method, input_source):
         """ Create a pipeline step.
-        
+
         @param method: the method for the step to run
         @param input_source: either a pipeline input or another step that this
         step will use for its input.
@@ -485,10 +485,10 @@ writer.writerow(dict(sum=sum_total, product=product_total))
         step.clean()
         self.next_step_num += 1
         return step
-        
+
     def create_method(self, name, source, user, input_names, output_names):
         """ Create a method.
-        
+
         @param source: source code
         @param input_names: list of strings to name raw inputs
         @param output_names: list of strings to name raw outputs
@@ -500,7 +500,7 @@ writer.writerow(dict(sum=sum_total, product=product_total))
             family.save()
             family.clean()
             family.grant_everyone_access()
-            
+
             method = family.members.create(revision_name='first',
                                            driver=code_resource_revision,
                                            user=user)
@@ -512,10 +512,10 @@ writer.writerow(dict(sum=sum_total, product=product_total))
             method.clean()
             method.grant_everyone_access()
             return method
-        
+
     def create_code_resource(self, name, source, user):
         """ Create a new code resource.
-        
+
         @param source: source code
         @return: a new CodeResourceRevision object that has been saved
         """
@@ -525,14 +525,14 @@ writer.writerow(dict(sum=sum_total, product=product_total))
             resource.save()
             resource.clean()
             resource.grant_everyone_access()
-            
+
             revision = resource.revisions.create(user=user)
             revision.content_file.save(filename, ContentFile(source))
             revision.clean()
             revision.grant_everyone_access()
         resource.clean()
         return revision
-    
+
 
 class RemovalTestEnvironmentBuilder(FixtureBuilder):
     def get_name(self):
@@ -567,15 +567,30 @@ class RunApiTestsEnvironmentBuilder(FixtureBuilder):
 
         # POCs: one is trivial, the second uses custom outwires
         # Note: by default, create_outcables assumes the POC has the CDT of the source (IE, this is a TRIVIAL cable)
-        self.outcable_1 = self.pX_2.create_outcable(output_name="pX_out_1",output_idx=1,source_step=1,source=self.mA_out)
-        self.outcable_2 = self.pX_2.create_outcable(output_name="pX_out_2",output_idx=2,source_step=2,source=self.mA_out)
+        self.outcable_1 = self.pX_2.create_outcable(output_name="pX_out_1",
+                                                    output_idx=1,
+                                                    source_step=1,
+                                                    source=self.mA_out)
+        self.outcable_2 = self.pX_2.create_outcable(output_name="pX_out_2",
+                                                    output_idx=2,
+                                                    source_step=2,
+                                                    source=self.mA_out)
 
         # Define CDT for the second output (first output is defined by a trivial cable)
         self.pipeline_out2_cdt = CompoundDatatype(user=self.myUser)
         self.pipeline_out2_cdt.save()
-        self.out2_cdtm_1 = self.pipeline_out2_cdt.members.create(column_name="c",column_idx=1,datatype=self.int_dt)
-        self.out2_cdtm_2 = self.pipeline_out2_cdt.members.create(column_name="d",column_idx=2,datatype=self.string_dt)
-        self.out2_cdtm_3 = self.pipeline_out2_cdt.members.create(column_name="e",column_idx=3,datatype=self.string_dt)
+        self.out2_cdtm_1 = self.pipeline_out2_cdt.members.create(
+            column_name="c",
+            column_idx=1,
+            datatype=self.int_dt)
+        self.out2_cdtm_2 = self.pipeline_out2_cdt.members.create(
+            column_name="d",
+            column_idx=2,
+            datatype=self.string_dt)
+        self.out2_cdtm_3 = self.pipeline_out2_cdt.members.create(
+            column_name="e",
+            column_idx=3,
+            datatype=self.string_dt)
 
         # Second cable is not a trivial - we assign the new CDT to it
         self.outcable_2.output_cdt = self.pipeline_out2_cdt
@@ -747,5 +762,5 @@ class Command(BaseCommand):
         ExecuteResultTestsRMEnvironmentBuilder().run()
         ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
         RestoreReusableDatasetBuilder().run()
-        
+
         self.stdout.write('Done.')
