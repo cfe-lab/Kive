@@ -20,7 +20,8 @@ import kive.testing_utils as tools
 from librarian.models import SymbolicDataset
 from metadata.models import CompoundDatatype, everyone_group
 import method.models
-from method.models import CodeResource, MethodFamily, Method
+from method.models import CodeResource, MethodFamily, Method,\
+    CodeResourceRevision
 import pipeline.models
 from pipeline.models import PipelineFamily
 import portal.models
@@ -526,9 +527,10 @@ writer.writerow(dict(sum=sum_total, product=product_total))
             resource.clean()
             resource.grant_everyone_access()
 
-            revision = resource.revisions.create(user=user)
-            revision.content_file.save(filename, ContentFile(source))
-            revision.clean()
+            revision = CodeResourceRevision(coderesource=resource, user=user)
+            revision.content_file.save(filename, ContentFile(source), save=False)
+            revision.clean()  # calculates md5
+            revision.save()
             revision.grant_everyone_access()
         resource.clean()
         return revision

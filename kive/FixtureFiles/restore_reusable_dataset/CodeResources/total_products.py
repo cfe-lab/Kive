@@ -24,7 +24,7 @@ writer.writeheader()
 for row in reader:
     writer.writerow(row)
     break
-    
+
 sum_total = 0
 product_total = sum(map(int, map(itemgetter('product'), reader)))
 writer.writerow(dict(sum=sum_total, product=product_total))

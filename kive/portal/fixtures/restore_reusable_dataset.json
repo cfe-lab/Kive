@@ -18,8 +18,8 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:01Z", 
-            "execrecord": 1, 
+            "end_time": "2000-01-01T00:00:02Z", 
+            "execrecord": 4, 
             "is_cancelled": false, 
             "reused": false, 
             "start_time": "2000-01-01T00:00:00Z"
@@ -32,11 +32,11 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:02Z", 
-            "execrecord": 4, 
+            "end_time": "2000-01-01T00:00:01Z", 
+            "execrecord": 1, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:01Z"
+            "start_time": "2000-01-01T00:00:00Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 3
@@ -83,7 +83,7 @@
             "run": 1
         }, 
         "model": "archive.runstep", 
-        "pk": 3
+        "pk": 2
     }, 
     {
         "fields": {
@@ -91,12 +91,12 @@
             "runstep": 1
         }, 
         "model": "archive.runsic", 
-        "pk": 2
+        "pk": 3
     }, 
     {
         "fields": {
             "PSIC": 2, 
-            "runstep": 3
+            "runstep": 2
         }, 
         "model": "archive.runsic", 
         "pk": 4
@@ -124,11 +124,11 @@
     }, 
     {
         "fields": {
-            "created_by": 3, 
+            "created_by": 2, 
             "dataset_file": "Datasets/fixtures/step2_total_sums.raw", 
             "date_created": "2000-01-01T00:00:02Z", 
             "date_modified": "2000-01-01T00:00:02Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2015-10-02 20:20:50.154463+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2015-10-08 21:07:46.688153+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
             "name": "run1_step2_outputtotal_sums", 
             "symbolicdataset": 3
         }, 
@@ -137,10 +137,10 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:00Z", 
-            "invoking_record": 2, 
-            "record": 2, 
-            "start_time": "2000-01-01T00:00:00Z"
+            "end_time": "2000-01-01T00:00:01Z", 
+            "invoking_record": 3, 
+            "record": 3, 
+            "start_time": "2000-01-01T00:00:01Z"
         }, 
         "model": "archive.execlog", 
         "pk": 1
@@ -157,10 +157,10 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "invoking_record": 4, 
             "record": 4, 
-            "start_time": "2000-01-01T00:00:02Z"
+            "start_time": "2000-01-01T00:00:01Z"
         }, 
         "model": "archive.execlog", 
         "pk": 3
@@ -168,8 +168,8 @@
     {
         "fields": {
             "end_time": "2000-01-01T00:00:02Z", 
-            "invoking_record": 3, 
-            "record": 3, 
+            "invoking_record": 2, 
+            "record": 2, 
             "start_time": "2000-01-01T00:00:02Z"
         }, 
         "model": "archive.execlog", 
@@ -187,6 +187,7 @@
     }, 
     {
         "fields": {
+            "are_checksums_OK": true, 
             "code_redacted": false, 
             "error_log": "Logs/step1_stderr.txt", 
             "error_redacted": false, 
@@ -200,6 +201,7 @@
     }, 
     {
         "fields": {
+            "are_checksums_OK": true, 
             "code_redacted": false, 
             "error_log": "Logs/step2_stderr.txt", 
             "error_redacted": false, 
@@ -740,7 +742,7 @@
     {
         "fields": {
             "description": "", 
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:04Z", 
             "groups_allowed": [], 
             "name": "", 
             "parent_runstep": null, 
@@ -767,7 +769,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "2f0819b494d9487f3672f3adad8b9d70", 
+            "MD5_checksum": "1a2db0fde673d661c4b3af2336b7d09e", 
             "_redacted": false, 
             "groups_allowed": [], 
             "user": 1, 
@@ -778,7 +780,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "6dc476f01f77ab2aa13e3e5a6291edf1", 
+            "MD5_checksum": "7ff6ac15c4dd1c669671b0095937c4f5", 
             "_redacted": false, 
             "groups_allowed": [], 
             "user": 1, 
@@ -831,7 +833,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "", 
+            "MD5_checksum": "70b0b8bd967b4981a4a395e47fb47b15", 
             "coderesource": 1, 
             "content_file": "CodeResources/sums_and_products.py", 
             "groups_allowed": [
@@ -850,7 +852,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "", 
+            "MD5_checksum": "2069c24f06ad2c48833648c475101298", 
             "coderesource": 2, 
             "content_file": "CodeResources/total_sums.py", 
             "groups_allowed": [
@@ -869,7 +871,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "", 
+            "MD5_checksum": "d7b66610f9b11a5ad16cddd4bc5fe6f6", 
             "coderesource": 3, 
             "content_file": "CodeResources/total_products.py", 
             "groups_allowed": [
@@ -1148,8 +1150,8 @@
             "pipeline": 4, 
             "purged": true, 
             "run": 1, 
-            "sandbox_path": "/home/don/data/kive/Sandboxes/userkive_run1_GL86nU", 
-            "time_queued": "2015-10-02T20:20:50.108Z", 
+            "sandbox_path": "/home/don/data/kive/Sandboxes/userkive_run1_4SqyMY", 
+            "time_queued": "2015-10-08T21:07:46.647Z", 
             "user": 1, 
             "users_allowed": []
         }, 
