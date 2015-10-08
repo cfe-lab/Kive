@@ -401,13 +401,15 @@ class Manager:
                 run_to_process.clean()
                 continue
 
-            mgr_logger.info("Starting run:\nPipeline: {}\nUser: {}".format(
-                run_to_process.pipeline, run_to_process.user))
             new_sdbx = self.start_run(run_to_process.user, run_to_process.pipeline,
                                       [x.symbolicdataset for x in run_to_process.inputs.order_by("index")],
                                       users_allowed=run_to_process.users_allowed.all(),
                                       groups_allowed=run_to_process.groups_allowed.all(),
                                       sandbox_path=run_to_process.sandbox_path)
+            mgr_logger.info("Started run id %d, pipeline %s, user %s",
+                            new_sdbx.run.id,
+                            run_to_process.pipeline,
+                            run_to_process.user)
             run_to_process.run = new_sdbx.run
             run_to_process.sandbox_path = new_sdbx.sandbox_path
             run_to_process.save()

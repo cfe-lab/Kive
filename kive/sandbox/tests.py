@@ -8,15 +8,17 @@ from django.core.files import File
 from django.core.files.base import ContentFile
 from django.test import TestCase
 
+from archive.models import Dataset
 from constants import datatypes
 from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
+from kive.testing_utils import clean_up_all_files
+from kive.tests import install_fixture_files, restore_production_files
 from librarian.models import SymbolicDataset, DatasetStructure
 from metadata.models import Datatype, CompoundDatatype, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from method.tests import samplecode_path
 from pipeline.models import Pipeline, PipelineFamily
-from sandbox.execute import Sandbox
-from kive.testing_utils import clean_up_all_files
+from sandbox.execute import Sandbox, RunPlan, StepPlan, DatasetPlan
 import file_access_utils
 
 
@@ -27,7 +29,7 @@ def execute_tests_environment_setup(case):
     case.myUser.groups.add(everyone_group())
     case.myUser.save()
 
-    case.mf = MethodFamily(name="self.mf",description="self.mf desc", user=case.myUser)
+    case.mf = MethodFamily(name="self.mf", description="self.mf desc", user=case.myUser)
     case.mf.save()
     case.pf = PipelineFamily(name="self.pf", description="self.pf desc", user=case.myUser)
     case.pf.save()
@@ -181,40 +183,46 @@ class ExecuteTests(ExecuteTestsBase):
         """Two step pipeline with second step identical to the first"""
 
         # Define pipeline containing two steps with the same method + pipeline input
-        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X", user=self.myUser)
+        self.pX = Pipeline(family=self.pf, revision_name="pX_revision", revision_desc="X", user=self.myUser)
         self.pX.save()
-        self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
-        self.step_X1 = self.pX.steps.create(transformation=self.mA,step_num=1)
-        self.step_X2 = self.pX.steps.create(transformation=self.mA,step_num=2)
+        self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt, dataset_name="pX_in", dataset_idx=1)
+        self.step_X1 = self.pX.steps.create(transformation=self.mA, step_num=1)
+        self.step_X2 = self.pX.steps.create(transformation=self.mA, step_num=2)
 
         # Use the SAME custom cable from pipeline input to steps 1 and 2
-        self.cable_X1_A1 = self.step_X1.cables_in.create(dest=self.mA_in,source_step=0,source=self.X1_in)
-        self.wire1 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_2,dest_pin=self.mA_in_cdtm_2)
-        self.wire2 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_3,dest_pin=self.mA_in_cdtm_1)
-        self.cable_X1_A2 = self.step_X2.cables_in.create(dest=self.mA_in,source_step=0,source=self.X1_in)
-        self.wire3 = self.cable_X1_A2.custom_wires.create(source_pin=self.pX_in_cdtm_2,dest_pin=self.mA_in_cdtm_2)
-        self.wire4 = self.cable_X1_A2.custom_wires.create(source_pin=self.pX_in_cdtm_3,dest_pin=self.mA_in_cdtm_1)
+        self.cable_X1_A1 = self.step_X1.cables_in.create(dest=self.mA_in, source_step=0, source=self.X1_in)
+        self.wire1 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_2, dest_pin=self.mA_in_cdtm_2)
+        self.wire2 = self.cable_X1_A1.custom_wires.create(source_pin=self.pX_in_cdtm_3, dest_pin=self.mA_in_cdtm_1)
+        self.cable_X1_A2 = self.step_X2.cables_in.create(dest=self.mA_in, source_step=0, source=self.X1_in)
+        self.wire3 = self.cable_X1_A2.custom_wires.create(source_pin=self.pX_in_cdtm_2, dest_pin=self.mA_in_cdtm_2)
+        self.wire4 = self.cable_X1_A2.custom_wires.create(source_pin=self.pX_in_cdtm_3, dest_pin=self.mA_in_cdtm_1)
 
         # POCs: one is trivial, the second uses custom outwires
         # Note: by default, create_outcables assumes the POC has the CDT of the source (IE, this is a TRIVIAL cable)
-        self.outcable_1 = self.pX.create_outcable(output_name="pX_out_1",output_idx=1,source_step=1,source=self.mA_out)
-        self.outcable_2 = self.pX.create_outcable(output_name="pX_out_2",output_idx=2,source_step=2,source=self.mA_out)
+        self.outcable_1 = self.pX.create_outcable(output_name="pX_out_1",
+                                                  output_idx=1,
+                                                  source_step=1,
+                                                  source=self.mA_out)
+        self.outcable_2 = self.pX.create_outcable(output_name="pX_out_2",
+                                                  output_idx=2,
+                                                  source_step=2,
+                                                  source=self.mA_out)
 
         # Define CDT for the second output (first output is defined by a trivial cable)
         self.pipeline_out2_cdt = CompoundDatatype(user=self.myUser)
         self.pipeline_out2_cdt.save()
-        self.out2_cdtm_1 = self.pipeline_out2_cdt.members.create(column_name="c",column_idx=1,datatype=self.int_dt)
-        self.out2_cdtm_2 = self.pipeline_out2_cdt.members.create(column_name="d",column_idx=2,datatype=self.string_dt)
-        self.out2_cdtm_3 = self.pipeline_out2_cdt.members.create(column_name="e",column_idx=3,datatype=self.string_dt)
+        self.out2_cdtm_1 = self.pipeline_out2_cdt.members.create(column_name="c", column_idx=1, datatype=self.int_dt)
+        self.out2_cdtm_2 = self.pipeline_out2_cdt.members.create(column_name="d", column_idx=2, datatype=self.string_dt)
+        self.out2_cdtm_3 = self.pipeline_out2_cdt.members.create(column_name="e", column_idx=3, datatype=self.string_dt)
 
         # Second cable is not a trivial - we assign the new CDT to it
         self.outcable_2.output_cdt = self.pipeline_out2_cdt
         self.outcable_2.save()
 
         # Define custom outwires to the second output (Wire twice from cdtm 2)
-        self.outwire1 = self.outcable_2.custom_wires.create(source_pin=self.mA_out_cdtm_1,dest_pin=self.out2_cdtm_1)
-        self.outwire2 = self.outcable_2.custom_wires.create(source_pin=self.mA_out_cdtm_2,dest_pin=self.out2_cdtm_2)
-        self.outwire3 = self.outcable_2.custom_wires.create(source_pin=self.mA_out_cdtm_2,dest_pin=self.out2_cdtm_3)
+        self.outwire1 = self.outcable_2.custom_wires.create(source_pin=self.mA_out_cdtm_1, dest_pin=self.out2_cdtm_1)
+        self.outwire2 = self.outcable_2.custom_wires.create(source_pin=self.mA_out_cdtm_2, dest_pin=self.out2_cdtm_2)
+        self.outwire3 = self.outcable_2.custom_wires.create(source_pin=self.mA_out_cdtm_2, dest_pin=self.out2_cdtm_3)
 
         # Have the cables define the TOs of the pipeline
         self.pX.create_outputs()
@@ -231,22 +239,22 @@ class ExecuteTests(ExecuteTestsBase):
         # Define 2 member input and 1 member output CDTs for inner pipeline pY
         self.pY_in_cdt = CompoundDatatype(user=self.myUser)
         self.pY_in_cdt.save()
-        self.pY_in_cdtm_1 = self.pY_in_cdt.members.create(column_name="pYA",column_idx=1,datatype=self.int_dt)
-        self.pY_in_cdtm_2 = self.pY_in_cdt.members.create(column_name="pYB",column_idx=2,datatype=self.string_dt)
+        self.pY_in_cdtm_1 = self.pY_in_cdt.members.create(column_name="pYA", column_idx=1, datatype=self.int_dt)
+        self.pY_in_cdtm_2 = self.pY_in_cdt.members.create(column_name="pYB", column_idx=2, datatype=self.string_dt)
 
         self.pY_out_cdt = CompoundDatatype(user=self.myUser)
         self.pY_out_cdt.save()
-        self.pY_out_cdt_cdtm_1 = self.pY_out_cdt.members.create(column_name="pYC",column_idx=1,datatype=self.int_dt)
+        self.pY_out_cdt_cdtm_1 = self.pY_out_cdt.members.create(column_name="pYC", column_idx=1, datatype=self.int_dt)
 
         # Define 1-step inner pipeline pY
         self.pY = Pipeline(family=self.pf, revision_name="pY_revision", revision_desc="Y", user=self.myUser)
         self.pY.save()
-        self.pY_in = self.pY.create_input(compounddatatype=self.pY_in_cdt,dataset_name="pY_in",dataset_idx=1)
+        self.pY_in = self.pY.create_input(compounddatatype=self.pY_in_cdt, dataset_name="pY_in", dataset_idx=1)
 
-        self.pY_step_1 = self.pY.steps.create(transformation=self.mA,step_num=1)
-        self.pY_cable_in = self.pY_step_1.cables_in.create(dest=self.mA_in,source_step=0,source=self.pY_in)
-        self.pY_cable_in.custom_wires.create(source_pin=self.pY_in_cdtm_1,dest_pin=self.mA_in_cdtm_2)
-        self.pY_cable_in.custom_wires.create(source_pin=self.pY_in_cdtm_2,dest_pin=self.mA_in_cdtm_1)
+        self.pY_step_1 = self.pY.steps.create(transformation=self.mA, step_num=1)
+        self.pY_cable_in = self.pY_step_1.cables_in.create(dest=self.mA_in, source_step=0, source=self.pY_in)
+        self.pY_cable_in.custom_wires.create(source_pin=self.pY_in_cdtm_1, dest_pin=self.mA_in_cdtm_2)
+        self.pY_cable_in.custom_wires.create(source_pin=self.pY_in_cdtm_2, dest_pin=self.mA_in_cdtm_1)
 
         self.pY_cable_out = self.pY.outcables.create(
             output_name="pY_out", output_idx=1, source_step=1,
@@ -269,9 +277,9 @@ class ExecuteTests(ExecuteTestsBase):
         )
 
         # Define outer 2-step pipeline with mA at step 1 and pY at step 2
-        self.pX = Pipeline(family=self.pf, revision_name="pX_revision",revision_desc="X", user=self.myUser)
+        self.pX = Pipeline(family=self.pf, revision_name="pX_revision", revision_desc="X", user=self.myUser)
         self.pX.save()
-        self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt,dataset_name="pX_in",dataset_idx=1)
+        self.X1_in = self.pX.create_input(compounddatatype=self.pX_in_cdt, dataset_name="pX_in", dataset_idx=1)
         self.pX_step_1 = self.pX.steps.create(transformation=self.mA, step_num=1)
         self.pX_step_2 = self.pX.steps.create(transformation=self.pY, step_num=2)
 
@@ -357,8 +365,10 @@ class ExecuteTests(ExecuteTestsBase):
                 bad_ccl.add_missing_output()
                 break
 
-        run = pipeline.pipeline_instances.create(user=self.myUser); run.save()
-        runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run); runstep.save()
+        run = pipeline.pipeline_instances.create(user=self.myUser)
+        run.save()
+        runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
+        runstep.save()
 
         self.assertFalse(all(i.is_OK() for i in inputs))
         self.assertRaisesRegexp(
@@ -385,8 +395,10 @@ class ExecuteTests(ExecuteTestsBase):
                 MD5Conflict(integritychecklog=bad_icl, conflicting_SD=sd).save()
                 break
 
-        run = pipeline.pipeline_instances.create(user=user); run.save()
-        runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run); runstep.save()
+        run = pipeline.pipeline_instances.create(user=user)
+        run.save()
+        runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
+        runstep.save()
 
         self.assertFalse(all(i.is_OK() for i in inputs))
         self.assertRaisesRegexp(
@@ -442,8 +454,11 @@ class SandboxTests(ExecuteTestsBase):
         """
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
-        p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
-            min_row = 8, max_row = 12)
+        p.create_input(compounddatatype=self.pX_in_cdt,
+                       dataset_name="in",
+                       dataset_idx=1,
+                       min_row=8,
+                       max_row=12)
         # Assert no ValueError raised.
         Sandbox(self.myUser, p, [self.symDS])
 
@@ -453,7 +468,7 @@ class SandboxTests(ExecuteTestsBase):
         """
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
-        p.create_input(dataset_name="in", dataset_idx = 1)
+        p.create_input(dataset_name="in", dataset_idx=1)
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expected input {} to be raw, but got one with '
                                           'CompoundDatatype "{}"'.format(p, 1, self.symDS.structure.compounddatatype)),
@@ -484,12 +499,12 @@ class SandboxTests(ExecuteTestsBase):
         """
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
-        p.create_input(compounddatatype=self.mA_in_cdt, dataset_name="in", dataset_idx = 1)
+        p.create_input(compounddatatype=self.mA_in_cdt, dataset_name="in", dataset_idx=1)
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got one '
                                           'with CompoundDatatype "{}"'
                                           .format(p, 1, self.mA_in_cdt, self.symDS.structure.compounddatatype)),
-            lambda: Sandbox(self.myUser, p, [self.symDS]))
+                                lambda: Sandbox(self.myUser, p, [self.symDS]))
 
     def test_sandbox_too_many_rows(self):
         """
@@ -498,12 +513,17 @@ class SandboxTests(ExecuteTestsBase):
         """
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
-        p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
-            min_row = 2, max_row = 4)
+        p.create_input(compounddatatype=self.pX_in_cdt,
+                       dataset_name="in",
+                       dataset_idx=1,
+                       min_row=2,
+                       max_row=4)
+        expected_message = (
+            'Pipeline "{}" expected input {} to have between {} and {} rows, '
+            'but got one with {}'.format(p, 1, 2, 4, self.symDS.num_rows()))
         self.assertRaisesRegexp(ValueError,
-                                re.escape('Pipeline "{}" expected input {} to have between {} and {} rows, but got one '
-                                'with {}'.format(p, 1, 2, 4, self.symDS.num_rows())),
-            lambda: Sandbox(self.myUser, p, [self.symDS]))
+                                re.escape(expected_message),
+                                lambda: Sandbox(self.myUser, p, [self.symDS]))
 
     def test_sandbox_too_few_rows(self):
         """
@@ -512,9 +532,125 @@ class SandboxTests(ExecuteTestsBase):
         """
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
-        p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx = 1,
-            min_row = 20)
+        p.create_input(compounddatatype=self.pX_in_cdt,
+                       dataset_name="in",
+                       dataset_idx=1,
+                       min_row=20)
+        expected_message = (
+            'Pipeline "{}" expected input {} to have between {} and {} rows, '
+            'but got one with {}'.format(p, 1, 20, sys.maxint, self.symDS.num_rows()))
         self.assertRaisesRegexp(ValueError,
-                                re.escape('Pipeline "{}" expected input {} to have between {} and {} rows, but got one '
-                                'with {}'.format(p, 1, 20, sys.maxint, self.symDS.num_rows())),
-            lambda: Sandbox(self.myUser, p, [self.symDS]))
+                                re.escape(expected_message),
+                                lambda: Sandbox(self.myUser, p, [self.symDS]))
+
+
+class RestoreReusableDatasetTest(TestCase):
+    """
+    Scenario where an output is marked as reusable, and it needs to be restored.
+
+    There are three methods:
+    * sums_and_products - take each row of two integers, calculate sum and
+    product, then shuffle all the result rows. This makes it reusable, but not
+    deterministic.
+    * total_sums - copy the first row, then one more row with the sum of all
+    the sums from the remaining rows.
+    * total_products - copy the first row, then one more row with the sum of all
+    the products from the remaining rows.
+
+    """
+    fixtures = ["restore_reusable_dataset"]
+
+    def setUp(self):
+        install_fixture_files("restore_reusable_dataset")
+
+    def tearDown(self):
+        restore_production_files()
+
+    def test_load_run_plan(self):
+        pipeline = Pipeline.objects.get(revision_name='sums only')
+        dataset = Dataset.objects.get(name='pairs').symbolicdataset
+
+        sandbox = Sandbox(pipeline.user, pipeline, [dataset])
+        run_plan = RunPlan()
+        run_plan.load(sandbox.run, sandbox.inputs)
+        step_plans = run_plan.step_plans
+
+        self.assertEqual(sandbox.run, run_plan.run)
+        self.assertEqual([StepPlan(1), StepPlan(2)], step_plans)
+        self.assertEqual([DatasetPlan(dataset)],
+                         step_plans[0].inputs)
+        self.assertEqual([DatasetPlan(step_num=1, output_num=1)],
+                         step_plans[0].outputs)
+        self.assertEqual(step_plans[0].outputs, step_plans[1].inputs)
+        self.assertIs(step_plans[0].outputs[0], step_plans[1].inputs[0])
+
+        self.assertEqual([DatasetPlan(dataset)], run_plan.inputs)
+        self.assertEqual([DatasetPlan(step_num=2, output_num=1)],
+                         run_plan.outputs)
+
+    def test_create_run_steps_for_rerun(self):
+        pipeline = Pipeline.objects.get(revision_name='sums only')
+        input_dataset = Dataset.objects.get(name='pairs').symbolicdataset
+        step1_output_dataset = SymbolicDataset.objects.get(id=2)
+        step2_output_dataset = SymbolicDataset.objects.get(id=3)
+        sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
+        run_plan = RunPlan()
+        run_plan.load(sandbox.run, sandbox.inputs)
+
+        run_plan.create_run_steps()
+        step_plans = run_plan.step_plans
+
+        self.assertEqual([DatasetPlan(step1_output_dataset)],
+                         step_plans[0].outputs)
+        self.assertEqual([DatasetPlan(step2_output_dataset)],
+                         step_plans[1].outputs)
+
+    def test_create_run_steps_for_new_run(self):
+        pipeline = Pipeline.objects.get(revision_name='sums and products')
+        input_dataset = Dataset.objects.get(name='pairs').symbolicdataset
+        sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
+        run_plan = RunPlan()
+        run_plan.load(sandbox.run, sandbox.inputs)
+
+        run_plan.create_run_steps()
+        step_plans = run_plan.step_plans
+
+        self.assertEqual([DatasetPlan(step_num=1, output_num=1)],
+                         step_plans[0].outputs)
+        self.assertEqual([DatasetPlan(step_num=2, output_num=1)],
+                         step_plans[1].outputs)
+        self.assertEqual([DatasetPlan(step_num=3, output_num=1)],
+                         step_plans[2].outputs)
+
+    def test_create_run_steps_with_missing_output(self):
+        pipeline = Pipeline.objects.get(revision_name='sums only')
+        pipeline.steps.get(step_num=1).outputs_to_delete.clear()
+
+        input_dataset = Dataset.objects.get(name='pairs').symbolicdataset
+        sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
+        run_plan = RunPlan()
+        run_plan.load(sandbox.run, sandbox.inputs)
+
+        run_plan.create_run_steps()
+        step_plans = run_plan.step_plans
+
+        self.assertIsNone(step_plans[0].execrecord)
+
+    def test_create_run_steps_with_missing_output_of_deterministic_method(self):
+        pipeline = Pipeline.objects.get(revision_name='sums only')
+        pipeline_step = pipeline.steps.get(step_num=1)
+        pipeline_step.outputs_to_delete.clear()
+        method = pipeline_step.transformation.definite
+        method.reusable = Method.DETERMINISTIC
+        method.save()
+        method.clean()
+
+        input_dataset = Dataset.objects.get(name='pairs').symbolicdataset
+        sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
+        run_plan = RunPlan()
+        run_plan.load(sandbox.run, sandbox.inputs)
+
+        run_plan.create_run_steps()
+        step_plans = run_plan.step_plans
+
+        self.assertIsNotNone(step_plans[0].execrecord)

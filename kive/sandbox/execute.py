@@ -1,23 +1,25 @@
 """Code that is responsible for the execution of Pipelines."""
 
+from collections import defaultdict
+import logging
+import os.path
+import random
+import shutil
+import tempfile
+import time
+
 from django.utils import timezone
 from django.db import transaction, OperationalError, InternalError
 from django.contrib.auth.models import User
 
 import archive.models
+from archive.models import RunStep
+from constants import dirnames, extensions
+import file_access_utils
 import librarian.models
 import pipeline.models
+from method.models import Method
 
-import file_access_utils
-from constants import dirnames, extensions
-
-import os.path
-import shutil
-import logging
-import tempfile
-import time
-import random
-from collections import defaultdict
 
 logger = logging.getLogger("Sandbox")
 
@@ -31,8 +33,8 @@ class Sandbox:
     A Sandbox is the environment in which a Pipeline is run. It contains
     all the information necessary to run the Pipeline, including the code
     for all steps of the Pipeline, and the data to feed in. The Sandbox keeps
-    track of a single Run of the Pipeline it was created with. 
-    
+    track of a single Run of the Pipeline it was created with.
+
     Note that Sandboxes are single-use; that is, a Pipeline may only be run
     once in a Sandbox. To run the same Pipeline again, you must create a new
     Sandbox.
@@ -46,7 +48,7 @@ class Sandbox:
     # A generator is a cable, or a pipeline step. A socket is a TI/TO.
     # If the generator is none, the socket is a pipeline input.
     # This will be used to look up inputs when running a pipeline.
-    
+
     # ps_map: maps PS to (path, RunStep of PS): the path tells you
     # the directory that the PS would have been run in
     # (whether or not it was): the RunStep tells you what inputs are
@@ -58,7 +60,7 @@ class Sandbox:
 
     # step_execute_info: table of RunStep "bundles" giving all the information
     # necessary to process a RunStep.
-        
+
     # cable_map maps cables to ROC/RSIC.
 
     def __init__(self, user, my_pipeline, inputs, users_allowed=None, groups_allowed=None, sandbox_path=None):
@@ -96,7 +98,7 @@ class Sandbox:
         self.ps_map = {}
         self.pipeline.check_inputs(self.inputs)
 
-        # Determine a sandbox path, and input/output directories for 
+        # Determine a sandbox path, and input/output directories for
         # top-level Pipeline.
         self.sandbox_path = sandbox_path or tempfile.mkdtemp(
             prefix=sandbox_prefix.format(self.user, self.run.pk),
@@ -119,7 +121,6 @@ class Sandbox:
         file_access_utils.set_up_directory(in_dir)
         file_access_utils.set_up_directory(self.out_dir)
         file_access_utils.configure_sandbox_permissions(self.out_dir)
-
 
         # Queue of RunSteps/RunCables to process.
         self.queue_for_processing = []
@@ -186,7 +187,7 @@ class Sandbox:
 
     def update_cable_maps(self, runcable, output_SD, output_path):
         """Update maps after cable execution.
-        
+
         INPUTS
         runcable        RunCable created for cable execution
         output_SD       SymbolicDataset output by cable
@@ -199,7 +200,7 @@ class Sandbox:
 
     def update_step_maps(self, runstep, step_run_dir, output_paths):
         """Update maps after pipeline step execution.
-        
+
         INPUTS
         runstep         RunStep responsible for execution
         step_run_dir    directory where execution was done
@@ -221,7 +222,7 @@ class Sandbox:
 
     def _register_missing_output(self, output_SD, execlog, start_time, end_time):
         """Create a failed ContentCheckLog for missing cable output
-        
+
         INPUTS
         output_SD       SymbolicDataset cable was supposed to output
         execlog         ExecLog for cable execution which didn't produce
@@ -242,7 +243,7 @@ class Sandbox:
         input_SD        SD fed into the PSIC/POC
         output_path     Where the output file should be written
         parent_record   If not a recovery, the Run or RunStep
-                        executing the cable; if a recovery, the 
+                        executing the cable; if a recovery, the
                         RunAtomic invoking the recovery
         recover         whether or not to execute the step in recovery
                         mode
@@ -314,7 +315,6 @@ class Sandbox:
                     wait_time = random.random()
                     self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time)
                     time.sleep(wait_time)
-
 
             # At this point, we know we did not reuse an ExecRecord -- we're either filling one in
             # or creating a new one.
@@ -485,7 +485,6 @@ class Sandbox:
                 self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time)
                 time.sleep(wait_time)
 
-
         invoking_record = recovering_record if recover else curr_RS
 
         # Gather inputs.
@@ -548,12 +547,12 @@ class Sandbox:
 
         curr_run.start(save=True, clean=False)
         sandbox_path = sandbox_path or self.sandbox_path
-    
+
         for step in pipeline.steps.order_by("step_num"):
             self.logger.debug("Executing step {} - looking for cables feeding into this step".format(step))
 
             step_inputs = []
-            run_dir = os.path.join(sandbox_path,"step{}".format(step.step_num))
+            run_dir = os.path.join(sandbox_path, "step{}".format(step.step_num))
 
             # Before executing a step, we need to know what input SDs to feed into the step for execution.
             # Because pipeline steps includes the cable execution prior to the transformation,
@@ -627,14 +626,14 @@ class Sandbox:
             else:
                 # The generator is the subpipeline's output cable.  Retrieve the subrun so we can
                 # look up the right SymbolicDataset.
-                generator = source_step.transformation.pipeline.outcables.get(output_idx = socket.dataset_idx)
+                generator = source_step.transformation.pipeline.outcables.get(output_idx=socket.dataset_idx)
                 runstep_containing_subrun = curr_run.runsteps.get(pipelinestep__step_num=outcable.source_step)
                 run_to_query = archive.models.Run.objects.get(parent_runstep=runstep_containing_subrun)
 
             source_SD = self.socket_map[(run_to_query, generator, socket)]
             file_suffix = "raw" if outcable.is_raw() else "csv"
-            out_file_name = "run{}_{}.{}".format(curr_run.pk, outcable.output_name,file_suffix)
-            output_path = os.path.join(self.out_dir,out_file_name)
+            out_file_name = "run{}_{}.{}".format(curr_run.pk, outcable.output_name, file_suffix)
+            output_path = os.path.join(self.out_dir, out_file_name)
             curr_ROC = self.execute_cable(outcable, curr_run, recovering_record=None,
                                           input_SD=source_SD, output_path=output_path)
 
@@ -677,7 +676,7 @@ class Sandbox:
 
         # If it's not a pipeline input, check all the steps.
         steps = curr_run.runsteps.all()
-        steps = sorted(steps, key = lambda step: step.pipelinestep.step_num)
+        steps = sorted(steps, key=lambda step: step.pipelinestep.step_num)
 
         for step in steps:
             # First check if the SD is an input to this step. In that case, it
@@ -695,7 +694,7 @@ class Sandbox:
             # it might be somewhere within the sub-pipeline. Search recursively.
             if hasattr(step, "child_run") and step.child_run is not None:
                 run, generator = self.first_generator_of_SD(SD_to_find, step.child_run)
-                if run is not None: 
+                if run is not None:
 
                     # Did we find it somewhere inside the sub-Pipeline?
                     if generator is not None:
@@ -820,8 +819,10 @@ class Sandbox:
          - if run_to_start is not None then we're starting a sub-pipeline
          - if task_completed is not None then we're resuming either the top-level run or a sub-run.
         """
-        assert (type(task_completed) in (archive.models.RunStep, archive.models.RunSIC, archive.models.RunOutputCable)
-                or task_completed is None)
+        assert (type(task_completed) in (archive.models.RunStep,
+                                         archive.models.RunSIC,
+                                         archive.models.RunOutputCable) or
+                task_completed is None)
         assert not (run_to_start is not None and task_completed is not None)
 
         run_to_resume = self.run
@@ -833,6 +834,11 @@ class Sandbox:
 
         if task_completed is None:
             run_to_resume.start(save=True)
+
+        self.run_plan = RunPlan()
+        self.run_plan.load(self.run, self.inputs)
+
+        self.run_plan.create_run_steps()
 
         pipeline_to_resume = run_to_resume.pipeline
 
@@ -859,7 +865,8 @@ class Sandbox:
         # If task_completed is None, then we are starting the pipeline and we look at the pipeline inputs.
         for step in pipeline_to_resume.steps.order_by("step_num"):
             # If this is already running, we skip it.
-            corresp_runstep = run_to_resume.runsteps.filter(pipelinestep=step)
+            corresp_runstep = run_to_resume.runsteps.filter(pipelinestep=step,
+                                                            RSICs__isnull=False)
             if corresp_runstep.exists():
                 # We don't advance sub-pipelines -- if those are waiting on tasks in their parent run,
                 # then that would be a case for enqueue_runnable_tasks.
@@ -1131,7 +1138,8 @@ class Sandbox:
         Outputs written to: [step run dir]/output_data/step[step num]_[output name]
         Logs written to:    [step run dir]/logs/step[step num]_std(out|err).txt
         """
-        curr_RS = archive.models.RunStep.create(pipelinestep, parent_run)
+        step_plan = self.run_plan.step_plans[pipelinestep.step_num-1]
+        curr_RS = step_plan.run_step
 
         # Note: bad inputs will be caught by the cables.
         input_names = ", ".join(str(i) for i in inputs)
@@ -1216,7 +1224,8 @@ class Sandbox:
             while not succeeded_yet:
                 try:
                     with transaction.atomic():
-                        curr_ER, can_reuse = curr_RS.get_suitable_ER(inputs_after_cable)
+                        curr_ER = step_plan.execrecord
+                        can_reuse = curr_ER and curr_RS.check_ER_usable(curr_ER)
                         if curr_ER is not None:
                             # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now,
                             # we can return.
@@ -1247,7 +1256,6 @@ class Sandbox:
                     wait_time = random.random()
                     self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time)
                     time.sleep(wait_time)
-
 
         # We found no reusable ER, so we add this step to the queue.
         # If there were any inputs that were only symbolically OK, we call queue_recover on them and register
@@ -1309,7 +1317,7 @@ class Sandbox:
 
         This is an MPI-friendly version of recover.  It only ever handles non-trivial recoveries,
         as trivial recoveries are now performed by cables themselves.
-        
+
         @param SD_to_recover: symbolic dataset that needs to be recovered
         @param invoking_record: the run component that needs the symbolic
             dataset as an input
@@ -1694,9 +1702,8 @@ def finish_step(step_execute_dict, worker_rank):
         while not succeeded_yet:
             try:
                 with transaction.atomic():
-                    if curr_ER is None:
-                        curr_ER, can_reuse = curr_RS.get_suitable_ER(inputs_after_cable)
                     if curr_ER is not None:
+                        can_reuse = curr_RS.check_ER_usable(curr_ER)
                         # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
                         if not can_reuse["successful"] or can_reuse["fully reusable"]:
                             logger.debug("[%d] ExecRecord %s is reusable (successful = %s)",
@@ -1915,6 +1922,181 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
         runstep.stop(save=True, clean=False)
     runstep.complete_clean()
     return runstep
+
+
+class RunPlan(object):
+    """ Hold the plan for which steps will be executed in a sandbox.
+
+    Also holds the dependencies between steps and cables, as well as the
+    ExecRecord that will be reused for each step and cable that doesn't have
+    to be run this time.
+    """
+    def load(self, run, inputs):
+        """ Load the steps from the pipeline and dataset dependencies.
+
+        Links pipeline inputs and step outputs to the inputs of other steps.
+        """
+        self.run = run
+        self.step_plans = []
+        self.inputs = [DatasetPlan(input_item) for input_item in inputs]
+        for step in run.pipeline.steps.all():
+            step_plan = StepPlan(step.step_num)
+            step_plan.pipeline_step = step
+            self.step_plans.append(step_plan)
+            for output in step.transformation.outputs.all():
+                step_plan.outputs.append(DatasetPlan(step_num=step.step_num,
+                                                     output_num=output.dataset_idx))
+            for cable in step.cables_in.all():
+                if cable.source_step == 0:
+                    input_index = cable.source.definite.dataset_idx-1
+                    input_plan = self.inputs[input_index]
+                else:
+                    step_index = cable.source_step-1
+                    output_index = cable.source.definite.dataset_idx-1
+                    input_plan = self.step_plans[step_index].outputs[output_index]
+                step_plan.inputs.append(input_plan)
+        self.outputs = []
+        for cable in run.pipeline.outcables.all():
+            step_index = cable.source_step-1
+            output_index = cable.source.definite.dataset_idx-1
+            output_plan = self.step_plans[step_index].outputs[output_index]
+            self.outputs.append(output_plan)
+
+    def create_run_steps(self):
+        """ Create run steps and find suitable execrecords. """
+        for step_plan in self.step_plans:
+            run_step = self.run.runsteps.filter(
+                pipelinestep__step_num=step_plan.step_num).first()
+            if run_step is None:
+                run_step = RunStep.create(step_plan.pipeline_step, self.run)
+            step_plan.run_step = run_step
+            input_datasets = [plan.symbolicdataset for plan in step_plan.inputs]
+            if all(input_datasets):
+                method = step_plan.pipeline_step.transformation.definite
+                if method.reusable == Method.NON_REUSABLE:
+                    continue
+                execrecord, summary = run_step.get_suitable_ER(input_datasets)
+                if not summary:
+                    # no exec record, have to run
+                    continue
+                if (not summary['fully reusable'] and
+                        method.reusable != Method.DETERMINISTIC):
+
+                    continue
+                step_plan.execrecord = execrecord
+                execrecordouts = execrecord.execrecordouts.all()
+                for i, execrecordout in enumerate(execrecordouts):
+                    output = step_plan.outputs[i]
+                    output.symbolicdataset = execrecordout.symbolicdataset
+
+        is_changed = True
+        while is_changed:
+            is_changed = self._walk_backward() or self._walk_forward()
+
+    def _walk_backward(self):
+        """ Walk backward through the steps, flagging needed runs.
+
+        @return: True if any new steps were flagged for running.
+        """
+        is_changed = False
+        for step_plan in reversed(self.step_plans):
+            if not step_plan.execrecord:
+                for input_plan in step_plan.inputs:
+                    if not input_plan.has_data():
+                        source_plan = self.step_plans[input_plan.step_num-1]
+                        is_changed = source_plan.check_rerun() or is_changed
+        return is_changed
+
+    def _walk_forward(self):
+        """ Walk forward through the steps, flagging needed runs.
+
+        @return: True if any new steps were flagged for running.
+        """
+        is_changed = False
+        for step_plan in self.step_plans:
+            for input_plan in step_plan.inputs:
+                if not input_plan.symbolicdataset and step_plan.execrecord:
+                    step_plan.execrecord = None
+                    for output_plan in step_plan.outputs:
+                        output_plan.symbolicdataset = None
+                    is_changed = True
+        return is_changed
+
+
+class StepPlan(object):
+    """ Plan whether a step will actually be executed.
+    """
+    def __init__(self, step_num):
+        self.step_num = step_num
+        self.execrecord = None
+        self.pipeline_step = None
+        self.run_step = None
+        self.inputs = []
+        self.outputs = []
+
+    def check_rerun(self):
+        """ Check that this step can recreate one of its missing outputs.
+
+        If the execrecord cannot be restored, don't use it, and mark all
+        the outputs as having no data.
+        @return: True if the execrecord had to be abandoned.
+        """
+        if not self.execrecord:
+            return False
+        method = self.run_step.transformation.definite
+        if method.reusable == Method.DETERMINISTIC:
+            return False
+
+        self.execrecord = None
+        for output_plan in self.outputs:
+            output_plan.symbolicdataset = None
+        return True
+
+    def __repr__(self):
+        return 'StepPlan({})'.format(self.step_num)
+
+    def __eq__(self, other):
+        return isinstance(other, StepPlan) and other.step_num == self.step_num
+
+    def __hash__(self):
+        return hash(self.step_num)
+
+
+class DatasetPlan(object):
+    def __init__(self, symbolicdataset=None, step_num=None, output_num=None):
+        self.symbolicdataset = symbolicdataset
+        self.step_num = step_num
+        self.output_num = output_num
+
+    def has_data(self):
+        return self.symbolicdataset and self.symbolicdataset.has_data()
+
+    def __repr__(self):
+        if self.symbolicdataset is not None:
+            args = repr(self.symbolicdataset)
+        elif self.step_num is not None:
+            args = 'step_num={}, output_num={}'.format(self.step_num,
+                                                       self.output_num)
+        else:
+            args = ''
+        return 'DatasetPlan({})'.format(args)
+
+    def __eq__(self, other):
+        if not isinstance(other, DatasetPlan):
+            return False
+        if self.symbolicdataset is not None or other.symbolicdataset is not None:
+            return self.symbolicdataset == other.symbolicdataset
+        if self.step_num is not None:
+            return (self.step_num == other.step_num and
+                    self.output_num == other.output_num)
+        return other is self
+
+    def __hash__(self):
+        if self.symbolicdataset is not None:
+            return hash(self.symbolicdataset)
+        if self.step_num is not None:
+            return hash((self.step_num, self.output_num))
+        return hash(self)
 
 
 # A simple struct that holds the information required to perform a RunStep.

@@ -1,6 +1,116 @@
 [
     {
         "fields": {
+            "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2000-01-01T00:00:01Z", 
+            "execrecord": 2, 
+            "is_cancelled": false, 
+            "reused": false, 
+            "start_time": "2000-01-01T00:00:00Z"
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2000-01-01T00:00:01Z", 
+            "execrecord": 1, 
+            "is_cancelled": false, 
+            "reused": false, 
+            "start_time": "2000-01-01T00:00:00Z"
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2000-01-01T00:00:02Z", 
+            "execrecord": 4, 
+            "is_cancelled": false, 
+            "reused": false, 
+            "start_time": "2000-01-01T00:00:01Z"
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2000-01-01T00:00:02Z", 
+            "execrecord": 3, 
+            "is_cancelled": false, 
+            "reused": false, 
+            "start_time": "2000-01-01T00:00:01Z"
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "_complete": true, 
+            "_redacted": false, 
+            "_successful": true, 
+            "end_time": "2000-01-01T00:00:03Z", 
+            "execrecord": 5, 
+            "is_cancelled": false, 
+            "reused": false, 
+            "start_time": "2000-01-01T00:00:03Z"
+        }, 
+        "model": "archive.runcomponent", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 1, 
+            "run": 1
+        }, 
+        "model": "archive.runstep", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "pipelinestep": 2, 
+            "run": 1
+        }, 
+        "model": "archive.runstep", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "PSIC": 1, 
+            "runstep": 1
+        }, 
+        "model": "archive.runsic", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "PSIC": 2, 
+            "runstep": 3
+        }, 
+        "model": "archive.runsic", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "pipelineoutputcable": 3, 
+            "run": 1
+        }, 
+        "model": "archive.runoutputcable", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
             "created_by": null, 
             "dataset_file": "Datasets/fixtures/pairs.csv", 
             "date_created": "2000-01-01T00:00:00Z", 
@@ -11,6 +121,220 @@
         }, 
         "model": "archive.dataset", 
         "pk": 1
+    }, 
+    {
+        "fields": {
+            "created_by": 3, 
+            "dataset_file": "Datasets/fixtures/step2_total_sums.raw", 
+            "date_created": "2000-01-01T00:00:02Z", 
+            "date_modified": "2000-01-01T00:00:02Z", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2015-10-02 20:20:50.154463+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
+            "name": "run1_step2_outputtotal_sums", 
+            "symbolicdataset": 3
+        }, 
+        "model": "archive.dataset", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "end_time": "2000-01-01T00:00:00Z", 
+            "invoking_record": 2, 
+            "record": 2, 
+            "start_time": "2000-01-01T00:00:00Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "end_time": "2000-01-01T00:00:01Z", 
+            "invoking_record": 1, 
+            "record": 1, 
+            "start_time": "2000-01-01T00:00:01Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "end_time": "2000-01-01T00:00:02Z", 
+            "invoking_record": 4, 
+            "record": 4, 
+            "start_time": "2000-01-01T00:00:02Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "end_time": "2000-01-01T00:00:02Z", 
+            "invoking_record": 3, 
+            "record": 3, 
+            "start_time": "2000-01-01T00:00:02Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "end_time": "2000-01-01T00:00:03Z", 
+            "invoking_record": 5, 
+            "record": 5, 
+            "start_time": "2000-01-01T00:00:03Z"
+        }, 
+        "model": "archive.execlog", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "code_redacted": false, 
+            "error_log": "Logs/step1_stderr.txt", 
+            "error_redacted": false, 
+            "execlog": 2, 
+            "output_log": "Logs/step1_stdout.txt", 
+            "output_redacted": false, 
+            "return_code": 0
+        }, 
+        "model": "archive.methodoutput", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "code_redacted": false, 
+            "error_log": "Logs/step2_stderr.txt", 
+            "error_redacted": false, 
+            "execlog": 4, 
+            "output_log": "Logs/step2_stdout.txt", 
+            "output_redacted": false, 
+            "return_code": 0
+        }, 
+        "model": "archive.methodoutput", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "generator": 1
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "generator": 2
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "generator": 3
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "generator": 4
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "generator": 5
+        }, 
+        "model": "librarian.execrecord", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "execrecord": 1, 
+            "generic_input": 7, 
+            "symbolicdataset": 1
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "execrecord": 2, 
+            "generic_input": 1, 
+            "symbolicdataset": 1
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "execrecord": 3, 
+            "generic_input": 2, 
+            "symbolicdataset": 2
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "execrecord": 4, 
+            "generic_input": 3, 
+            "symbolicdataset": 2
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "execrecord": 5, 
+            "generic_input": 4, 
+            "symbolicdataset": 3
+        }, 
+        "model": "librarian.execrecordin", 
+        "pk": 5
+    }, 
+    {
+        "fields": {
+            "execrecord": 1, 
+            "generic_output": 1, 
+            "symbolicdataset": 1
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "execrecord": 2, 
+            "generic_output": 2, 
+            "symbolicdataset": 2
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "execrecord": 3, 
+            "generic_output": 3, 
+            "symbolicdataset": 2
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "execrecord": 4, 
+            "generic_output": 4, 
+            "symbolicdataset": 3
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 4
+    }, 
+    {
+        "fields": {
+            "execrecord": 5, 
+            "generic_output": 8, 
+            "symbolicdataset": 3
+        }, 
+        "model": "librarian.execrecordout", 
+        "pk": 5
     }, 
     {
         "fields": {
@@ -406,6 +730,30 @@
     }, 
     {
         "fields": {
+            "index": 1, 
+            "runtoprocess": 1, 
+            "symbolicdataset": 1
+        }, 
+        "model": "fleet.runtoprocessinput", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "description": "", 
+            "end_time": "2000-01-01T00:00:03Z", 
+            "groups_allowed": [], 
+            "name": "", 
+            "parent_runstep": null, 
+            "pipeline": 4, 
+            "start_time": "2000-01-01T00:00:00Z", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "archive.run", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
             "MD5_checksum": "e093c9eac5d0cae832d4e2071ccfdc5f", 
             "_redacted": false, 
             "groups_allowed": [
@@ -416,6 +764,28 @@
         }, 
         "model": "librarian.symbolicdataset", 
         "pk": 1
+    }, 
+    {
+        "fields": {
+            "MD5_checksum": "2f0819b494d9487f3672f3adad8b9d70", 
+            "_redacted": false, 
+            "groups_allowed": [], 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "MD5_checksum": "6dc476f01f77ab2aa13e3e5a6291edf1", 
+            "_redacted": false, 
+            "groups_allowed": [], 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "librarian.symbolicdataset", 
+        "pk": 3
     }, 
     {
         "fields": {
@@ -523,7 +893,7 @@
             "groups_allowed": [
                 1
             ], 
-            "reusable": 1, 
+            "reusable": 2, 
             "revision_number": 1, 
             "revision_parent": null, 
             "tainted": false, 
@@ -716,5 +1086,74 @@
         }, 
         "model": "transformation.transformation", 
         "pk": 5
+    }, 
+    {
+        "fields": {
+            "end_time": "2000-01-01T00:00:01Z", 
+            "execlog": 2, 
+            "start_time": "2000-01-01T00:00:01Z", 
+            "symbolicdataset": 2, 
+            "user": 1
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "end_time": "2000-01-01T00:00:02Z", 
+            "execlog": 4, 
+            "start_time": "2000-01-01T00:00:02Z", 
+            "symbolicdataset": 3, 
+            "user": 1
+        }, 
+        "model": "datachecking.contentchecklog", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "end_time": "2000-01-01T00:00:01Z", 
+            "execlog": 1, 
+            "start_time": "2000-01-01T00:00:01Z", 
+            "symbolicdataset": 1, 
+            "user": 1
+        }, 
+        "model": "datachecking.integritychecklog", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "end_time": "2000-01-01T00:00:02Z", 
+            "execlog": 3, 
+            "start_time": "2000-01-01T00:00:02Z", 
+            "symbolicdataset": 2, 
+            "user": 1
+        }, 
+        "model": "datachecking.integritychecklog", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "end_time": "2000-01-01T00:00:03Z", 
+            "execlog": 5, 
+            "start_time": "2000-01-01T00:00:03Z", 
+            "symbolicdataset": 3, 
+            "user": 1
+        }, 
+        "model": "datachecking.integritychecklog", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "groups_allowed": [], 
+            "pipeline": 4, 
+            "purged": true, 
+            "run": 1, 
+            "sandbox_path": "/home/don/data/kive/Sandboxes/userkive_run1_GL86nU", 
+            "time_queued": "2015-10-02T20:20:50.108Z", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "fleet.runtoprocess", 
+        "pk": 1
     }
 ]

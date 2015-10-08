@@ -20,13 +20,15 @@ import kive.testing_utils as tools
 from librarian.models import SymbolicDataset
 from metadata.models import CompoundDatatype, everyone_group
 import method.models
-from method.models import CodeResource, MethodFamily
+from method.models import CodeResource, MethodFamily, Method
 import pipeline.models
 from pipeline.models import PipelineFamily
 import portal.models
-from sandbox.execute import Sandbox
+from sandbox.execute import Sandbox, finish_step, finish_cable
 import sandbox.tests
-from archive.models import Dataset
+from archive.models import Dataset, RunStep
+from fleet.models import RunToProcess
+from fleet.workers import Manager
 
 
 class FixtureBuilder(object):
@@ -243,6 +245,57 @@ class RestoreReusableDatasetBuilder(FixtureBuilder):
         return 'restore_reusable_dataset.json'
     
     def build(self):
+        user = User.objects.first()
+        pipeline1, _pipeline2 = self.create_pipelines(user)
+
+        DATASET_CONTENT = """\
+x,y
+0,1
+2,3
+4,5
+6,7
+8,9
+"""
+        dataset_file = ContentFile(DATASET_CONTENT)
+        symbolic = SymbolicDataset(user=user,
+                                   MD5_checksum=compute_md5(dataset_file))
+        symbolic.save()
+        symbolic.clean()
+        symbolic.grant_everyone_access()
+        dataset = Dataset(symbolicdataset=symbolic, name='pairs', user=user)
+        dataset.dataset_file.save(name='pairs.csv', content=dataset_file)
+        
+        run_to_process = RunToProcess(pipeline=pipeline1, user=user)
+        run_to_process.save()
+        run_to_process.clean()
+        run_to_process.inputs.create(symbolicdataset=symbolic, index=1)
+        
+        manager = Manager(0, None)
+        manager.max_host_cpus = 1
+        manager.worker_status = {}
+        manager.find_new_runs()
+        while manager.task_queue:
+            tasks = manager.task_queue
+            manager.task_queue = []
+            for sandbox, task in tasks:
+                task_info = sandbox.get_task_info(task)
+                task_info_dict = task_info.dict_repr()
+                worker_rank = 1
+                manager.tasks_in_progress[worker_rank] = {"task": task,
+                                                          "vassals": []}
+                if type(task) == RunStep:
+                    sandbox_result = finish_step(task_info_dict, worker_rank)
+                else:
+                    sandbox_result = finish_cable(task_info_dict, worker_rank)
+                manager.note_progress(worker_rank, sandbox_result)
+        run_to_process = RunToProcess.objects.get(id=run_to_process.id)
+        run_to_process.collect_garbage() # Delete sandbox directories
+        
+    def create_pipelines(self, user):
+        """ Create two pipelines: sums_only and sums_and_products.
+        
+        @return: (pipeline1, pipeline2)
+        """
         SHUFFLED_SUMS_AND_PRODUCTS_SOURCE = """\
 #! /usr/bin/env python
 
@@ -306,30 +359,12 @@ sum_total = 0
 product_total = 0
 writer.writerow(dict(sum=sum_total, product=product_total))
 """
-        DATASET_CONTENT = """\
-x,y
-0,1
-2,3
-4,5
-6,7
-8,9
-"""
         total_sums_source = TOTAL_SOURCE_TEMPLATE.replace(
             "sum_total = 0",
             "sum_total = sum(map(int, map(itemgetter('sum'), reader)))")
         total_products_source = TOTAL_SOURCE_TEMPLATE.replace(
             "product_total = 0",
             "product_total = sum(map(int, map(itemgetter('product'), reader)))")
-        user = User.objects.first()
-        
-        dataset_file = ContentFile(DATASET_CONTENT)
-        symbolic = SymbolicDataset(user=user,
-                                   MD5_checksum=compute_md5(dataset_file))
-        symbolic.save()
-        symbolic.clean()
-        symbolic.grant_everyone_access()
-        dataset = Dataset(symbolicdataset=symbolic, name='pairs', user=user)
-        dataset.dataset_file.save(name='pairs.csv', content=dataset_file)
         
         sums_and_products = self.create_method(
             'sums_and_products',
@@ -337,6 +372,9 @@ x,y
             user,
             ['pairs'],
             ['sums_and_products'])
+        sums_and_products.reusable = Method.REUSABLE
+        sums_and_products.save()
+        sums_and_products.clean() 
         total_sums = self.create_method('total_sums',
                                         total_sums_source,
                                         user,
@@ -396,6 +434,7 @@ x,y
                                step2_3,
                                pipeline2.outputs.last()])
             pipeline2.complete_clean()
+        return pipeline1, pipeline2
     
     def set_position(self, objects):
         n = len(objects)

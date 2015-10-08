@@ -9,7 +9,8 @@ from django.core.urlresolvers import reverse, resolve
 
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable
+from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable,\
+    Dataset
 from fleet.models import RunToProcess, RunToProcessInput
 from fleet.exceptions import SandboxActiveException
 from librarian.models import ExecRecord, SymbolicDataset
@@ -18,6 +19,8 @@ from metadata.models import kive_user, RTPNotFinished
 from kive.testing_utils import clean_up_all_files
 from kive import settings
 from kive.tests import install_fixture_files, restore_production_files
+from fleet.workers import Manager
+from sandbox.execute import finish_step, finish_cable
 
 
 class RunToProcessTest(TestCase):
@@ -33,18 +36,18 @@ class RunToProcessTest(TestCase):
 
     def test_run_progress_no_run(self):
         run_tracker = RunToProcess()
-        
+
         progress = run_tracker.get_run_progress()
-        
+
         self.assertSequenceEqual('?', progress['status'])
         self.assertSequenceEqual('Run', progress['name'])
-        
+
     def test_owner(self):
         expected_username = 'dave'
         run_tracker = RunToProcess(user=User(username=expected_username))
-        
+
         progress = run_tracker.get_run_progress()
-        
+
         self.assertSequenceEqual(expected_username, progress['user'])
 
     def create_with_empty_pipeline(self):
@@ -54,9 +57,9 @@ class RunToProcessTest(TestCase):
 
     def test_run_progress_empty_pipeline(self):
         run_tracker = self.create_with_empty_pipeline()
-        
+
         progress = run_tracker.get_run_progress()
-        
+
         self.assertSequenceEqual('-', progress['status'])
 
     def create_with_pipeline_step(self):
@@ -69,9 +72,9 @@ class RunToProcessTest(TestCase):
 
     def test_run_progress_starting(self):
         run_tracker = self.create_with_pipeline_step()
-        
+
         progress = run_tracker.get_run_progress()
-        
+
         self.assertSequenceEqual('.-.', progress['status'])
         self.assertSequenceEqual('Fasta2CSV', progress['name'])
 
@@ -95,14 +98,14 @@ class RunToProcessTest(TestCase):
         run_step.save()
         run_step_input_cable = RunSIC(PSIC=pipeline_step.cables_in.first())
         run_step.RSICs.add(run_step_input_cable)
-        
+
         return run_tracker
 
     def test_run_progress_ready(self):
         run_tracker = self.create_with_run_step()
-        
+
         progress = run_tracker.get_run_progress()
-        
+
         self.assertSequenceEqual(':-.', progress['status'])
 
     def create_with_started_run_step(self):
@@ -124,16 +127,16 @@ class RunToProcessTest(TestCase):
 
     def test_run_progress_started_steps(self):
         run_tracker = self.create_with_started_run_step()
-        
+
         progress = run_tracker.get_run_progress()
-        
+
         self.assertSequenceEqual('+-.', progress['status'])
 
     def test_run_progress_completed_steps(self):
         run_tracker = self.create_with_completed_run_step()
-        
+
         progress = run_tracker.get_run_progress()
-        
+
         self.assertSequenceEqual('*-.', progress['status'])
 
     def test_run_progress_failed_steps(self):
@@ -143,9 +146,9 @@ class RunToProcessTest(TestCase):
         exec_log.methodoutput.return_code = 5
         exec_log.methodoutput.save()
         run_step.save()
-        
+
         progress = run_tracker.get_run_progress()
-        
+
         self.assertSequenceEqual('!-.', progress['status'])
 
     def test_run_progress_output_ready(self):
@@ -154,9 +157,9 @@ class RunToProcessTest(TestCase):
         pipeline_output_cable = run.pipeline.outcables.first()
         run.runoutputcables.add(RunOutputCable(
             pipelineoutputcable=pipeline_output_cable))
-        
+
         progress = run_tracker.get_run_progress()
-        
+
         self.assertSequenceEqual('*-:', progress['status'])
 
     def test_run_progress_output_running(self):
@@ -167,9 +170,9 @@ class RunToProcessTest(TestCase):
             pipelineoutputcable=pipeline_output_cable)
         run.runoutputcables.add(run_output_cable)
         self.add_exec_log(run_output_cable)
-        
+
         progress = run_tracker.get_run_progress()
-        
+
         self.assertSequenceEqual('*-+', progress['status'])
 
     def test_run_progress_complete(self):
@@ -181,9 +184,9 @@ class RunToProcessTest(TestCase):
         run.runoutputcables.add(run_output_cable)
         self.add_exec_log(run_output_cable)
         self.add_exec_record(run_output_cable)
-        
+
         progress = run_tracker.get_run_progress()
-        
+
         self.assertSequenceEqual('*-*', progress['status'])
 
     def add_input(self, run_tracker):
@@ -193,43 +196,43 @@ class RunToProcessTest(TestCase):
                                       symbolicdataset=symbolicdataset,
                                       index=1)
         run_input.save()
-        
+
     def test_run_progress_display_name(self):
         run_tracker = self.create_with_pipeline_step()
         self.add_input(run_tracker)
-        
+
         progress = run_tracker.get_run_progress()
-        
+
         self.assertSequenceEqual('Fasta2CSV on TestFASTA', progress['name'])
 
     def test_run_progress_display_name_but_no_run(self):
-        pipeline=Pipeline.objects.get(pk=2)
+        pipeline = Pipeline.objects.get(pk=2)
         user = User.objects.first()
         run_tracker = RunToProcess(user=user, pipeline=pipeline)
         self.add_input(run_tracker)
-        
+
         progress = run_tracker.get_run_progress()
-        
+
         self.assertSequenceEqual('Fasta2CSV on TestFASTA', progress['name'])
 
     def test_display_name(self):
-        pipeline=Pipeline.objects.get(pk=2)
+        pipeline = Pipeline.objects.get(pk=2)
         user = User.objects.first()
         run_tracker = RunToProcess(user=user, pipeline=pipeline)
         self.add_input(run_tracker)
-        
+
         display_name = run_tracker.display_name
 
         self.assertSequenceEqual(u'Fasta2CSV on TestFASTA', display_name)
 
     def test_display_name_no_input(self):
-        pipeline=Pipeline.objects.get(pk=2)
+        pipeline = Pipeline.objects.get(pk=2)
         user = User.objects.first()
         run_tracker = RunToProcess(user=user, pipeline=pipeline)
         run_tracker.save()
         run_tracker.time_queued = parse_datetime('2015-01-13 00:00:00Z')
         run_tracker.save()
-        
+
         display_name = run_tracker.display_name
 
         self.assertSequenceEqual('Fasta2CSV at 2015-01-13 00:00:00+00:00',
@@ -428,6 +431,76 @@ class RemoveRedactRunJustStarting(TestCase):
             "Cannot redact: an affected run is still in progress",
             lambda: self.triplet_symDS.redact()
         )
+
+
+class RestoreReusableDatasetTest(TestCase):
+    """
+    Scenario where an output is marked as reusable, and it needs to be restored.
+
+    There are three methods:
+    * sums_and_products - take each row of two integers, calculate sum and
+    product, then shuffle all the result rows. This makes it reusable, but not
+    deterministic.
+    * total_sums - copy the first row, then one more row with the sum of all
+    the sums from the remaining rows.
+    * total_products - copy the first row, then one more row with the sum of all
+    the products from the remaining rows.
+    """
+    fixtures = ["restore_reusable_dataset"]
+
+    def setUp(self):
+        install_fixture_files("restore_reusable_dataset")
+
+    def tearDown(self):
+        restore_production_files()
+
+    def create_run_to_process(self, pipeline):
+        dataset = Dataset.objects.get(name='pairs')
+        run_to_process = RunToProcess(pipeline=pipeline, user=pipeline.user)
+        run_to_process.save()
+        run_to_process.clean()
+        run_to_process.inputs.create(symbolicdataset=dataset.symbolicdataset, index=1)
+        return run_to_process
+
+    def execute_pipeline(self, pipeline):
+        run_to_process = self.create_run_to_process(pipeline)
+
+        manager = Manager(0, None)
+        manager.max_host_cpus = 1
+        manager.worker_status = {}
+        manager.find_new_runs()
+        while manager.task_queue:
+            tasks = manager.task_queue
+            manager.task_queue = []
+            for sandbox, task in tasks:
+                task_info = sandbox.get_task_info(task)
+                task_info_dict = task_info.dict_repr()
+                worker_rank = 1
+                manager.tasks_in_progress[worker_rank] = {"task": task,
+                                                          "vassals": []}
+                if type(task) == RunStep:
+                    sandbox_result = finish_step(task_info_dict, worker_rank)
+                else:
+                    sandbox_result = finish_cable(task_info_dict, worker_rank)
+                manager.note_progress(worker_rank, sandbox_result)
+
+        return RunToProcess.objects.get(id=run_to_process.id)
+
+    def test_run_new_pipeline(self):
+        pipeline = Pipeline.objects.get(revision_name='sums and products')
+
+        run_to_process = self.execute_pipeline(pipeline)
+
+        self.assertTrue(run_to_process.run.successful_execution())
+
+    def test_rerun_old_pipeline(self):
+        pipeline = Pipeline.objects.get(revision_name='sums only')
+        expected_execrecord_count = ExecRecord.objects.count()
+
+        run_to_process = self.execute_pipeline(pipeline)
+
+        self.assertTrue(run_to_process.run.successful_execution())
+        self.assertEqual(expected_execrecord_count, ExecRecord.objects.count())
 
 
 class GarbageCollectionTest(TestCase):
@@ -653,4 +726,3 @@ class RunApiTests(TestCase):
         response = view(request, *args, **kwargs)
         self.assertEquals(response.render().data, None)
         self.test_run_index(0)
-
