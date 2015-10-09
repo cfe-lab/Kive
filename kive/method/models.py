@@ -285,7 +285,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
             return False
 
         for dep in self.dependencies.all():
-            if not dep.check_md5():
+            if not dep.requirement.check_md5():
                 return False
 
         return True

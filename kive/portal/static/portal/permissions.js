@@ -34,7 +34,7 @@ var permissions = (function() {
      *  Derived classes can also set this.reload_interval in milliseconds for
      *  the table to continuously poll the server.
      */
-    my.PermissionsTable = function($table, is_user_admin) {
+    my.PermissionsTable = function($table, is_user_admin, $navigation_links) {
         this.$table = $table;
         this.is_user_admin = is_user_admin;
         this.is_locked = true;
@@ -42,6 +42,10 @@ var permissions = (function() {
         this.registered_columns = [];
         this.$lockImage = $('<img/>');
         this.$lockSpan = $('<span/>');
+
+        this.$navigation_links = $navigation_links;
+        this.page_size = 100;
+        this.page = 1;
     };
     
     /**
@@ -94,6 +98,7 @@ var permissions = (function() {
                     'Groups with access',
                     buildListCell,
                     'groups_allowed');
+
             this.buildHeaders($tr);
             this.$table.append($('<thead/>').append($tr));
             this.$tbody = $('<tbody/>');
@@ -126,6 +131,11 @@ var permissions = (function() {
     my.PermissionsTable.prototype.buildCells = function($tr, row) {
         this.buildPermissionCells($tr, row);
     };
+
+    my.PermissionsTable.prototype.buildPageLinks = function() {
+        var $prev, $next;
+
+    }
     
     my.PermissionsTable.prototype.buildPermissionHeaders = function($tr) {
         var $a;
@@ -177,8 +187,14 @@ var permissions = (function() {
         this.is_locked = ! this.is_locked;
         this.reloadTable();
     };
+
+    function navLink(event) {
+        event.preventDefault();
+        var permissions_table = event.data;
+        permissions_table.reloadTable(event.target.href);
+    }
     
-    my.PermissionsTable.prototype.reloadTable = function() {
+    my.PermissionsTable.prototype.reloadTable = function(ajax_request_url) {
         var permissions_table = this;
         if (permissions_table.timeout_id !== undefined) {
             window.clearTimeout(permissions_table.timeout_id);
@@ -188,24 +204,54 @@ var permissions = (function() {
             permissions_table.ajax_request.abort();
             permissions_table.ajax_request = undefined;
         }
+
+        var query_params = undefined;
+        if (ajax_request_url === undefined) {
+            ajax_request_url = permissions_table.list_url + "?page_size=" + permissions_table.page_size;
+            // FIXME may need to explicitly set is_granted here.
+            query_params = permissions_table.getQueryParams();
+        }
         permissions_table.ajax_request = $.getJSON(
-                permissions_table.list_url,
-                permissions_table.getQueryParams()).done(function(response) {
-                    var rows;
-                    rows = permissions_table.extractRows(response);
-                    permissions_table.buildTable(rows);
-                    permissions_table.setCaption("");
-                }).fail(function(request) {
-                    var response = request.responseJSON,
-                        detail = (
-                                response ?
-                                response.detail :
-                                "Failed to reload table");
+            ajax_request_url,
+            query_params).done(function(response) {
+                var rows;
+                rows = permissions_table.extractRows(response);
+
+                if (permissions_table.$navigation_links !== undefined) {
+                    permissions_table.$navigation_links.empty();
+
+                    if ("previous" in response && response["previous"] !== null) {
+                        permissions_table.$navigation_links.append(
+                            $('<a/>').attr("href", response["previous"])
+                                .text("prev")
+                                .click(permissions_table, navLink)
+                        );
+                    }
+
+                    if ("next" in response && response["next"] !== null) {
+                        permissions_table.$navigation_links.append(
+                            $('<a/>').attr("href", response["next"])
+                            .text("next")
+                            .click(permissions_table, navLink)
+                        );
+                    }
+                }
+
+                permissions_table.buildTable(rows);
+                permissions_table.setCaption("");
+            }).fail(function(request) {
+                var response = request.responseJSON,
+                    detail = (
+                            response ?
+                            response.detail :
+                            "Failed to reload table");
+                if (permissions_table.$tbody !== undefined) {
                     permissions_table.$tbody.empty();
-                    permissions_table.setCaption(detail);
-                }).always(function() {
-                    permissions_table.ajax_request = undefined;
-                });
+                }
+                permissions_table.setCaption(detail);
+            }).always(function() {
+                permissions_table.ajax_request = undefined;
+            });
     };
     
     my.PermissionsTable.prototype.setCaption = function(text) {
@@ -228,6 +274,9 @@ var permissions = (function() {
      * @param response: the JSON object returned from the server
      */
     my.PermissionsTable.prototype.extractRows = function(response) {
+        if ("count" in response) {
+            return response["results"];
+        }
         return response;
     };
     
@@ -311,36 +360,36 @@ var permissions = (function() {
             plan_url = $a.attr('plan');
         event.preventDefault();
         $.getJSON(
-                plan_url,
-                {},
-                function (plan) {
-                    var message = permissions_table.buildConfirmationMessage(
-                            plan,
-                            "redact"),
-                        redaction_field = permissions_table.getRedactionField(
-                                plan_url),
-                        redaction_data = {};
-                    if (window.confirm(message)) {
-                        redaction_data[redaction_field] = true;
-                        $.ajax({
-                            url: $a.attr('href'),
-                            method: 'PATCH',
-                            data: redaction_data,
-                            success: function() {
-                                permissions_table.reloadTable();
-                            }
-                        }).fail(
-                            function (request) {
-                                var response = request.responseJSON,
-                                    detail = (
-                                            response ?
-                                            response.detail :
-                                            "Failed to redact");
-                                window.alert(detail);
-                            }
-                        );
-                    }
-                });
+            plan_url,
+            {},
+            function (plan) {
+                var message = permissions_table.buildConfirmationMessage(
+                        plan,
+                        "redact"),
+                    redaction_field = permissions_table.getRedactionField(
+                            plan_url),
+                    redaction_data = {};
+                if (window.confirm(message)) {
+                    redaction_data[redaction_field] = true;
+                    $.ajax({
+                        url: $a.attr('href'),
+                        method: 'PATCH',
+                        data: redaction_data,
+                        success: function() {
+                            permissions_table.reloadTable();
+                        }
+                    }).fail(
+                        function (request) {
+                            var response = request.responseJSON,
+                                detail = (
+                                        response ?
+                                        response.detail :
+                                        "Failed to redact");
+                            window.alert(detail);
+                        }
+                    );
+                }
+            });
     }
     
     my.formatDate = function(text) {

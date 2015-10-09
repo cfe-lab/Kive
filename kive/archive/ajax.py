@@ -8,7 +8,6 @@ from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from archive.forms import DatasetForm
 from archive.serializers import DatasetSerializer, MethodOutputSerializer
 from archive.models import Dataset, MethodOutput, summarize_redaction_plan
 from archive.views import _build_download_response
@@ -17,9 +16,9 @@ from kive.ajax import RemovableModelViewSet, RedactModelMixin, IsGrantedReadOnly
     StandardPagination, RemovableModelViewSet, CleanCreateModelMixin, convert_validation
 
 from librarian.models import SymbolicDataset
-import hashlib
 
 JSON_CONTENT_TYPE = 'application/json'
+
 
 class DatasetViewSet(RemovableModelViewSet,
                      CleanCreateModelMixin,
