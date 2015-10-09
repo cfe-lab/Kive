@@ -1750,7 +1750,10 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
 
     # Check the integrity of the code before we run.
     if not pipelinestep.transformation.definite.driver.check_md5():
-        logger.debug("[%d] Method code has gone corrupt; stopping step", worker_rank)
+        logger.error("[%d] Method code has gone corrupt for %s or its " +
+                     "dependencies; stopping step",
+                     worker_rank,
+                     pipelinestep.transformation.definite.driver)
         # Stop everything!
         curr_log.start()
         curr_log.methodoutput.are_checksums_OK = False

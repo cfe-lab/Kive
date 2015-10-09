@@ -281,11 +281,16 @@ class CodeResourceRevision(metadata.models.AccessControl):
         Checks the MD5s of the CodeResourceRevision and its dependencies against their stored values.
         """
         # Recompute the MD5, see if it equals what is already stored.
-        if self.MD5_checksum != self.compute_md5():
+        new_md5 = self.compute_md5()
+        if self.MD5_checksum != new_md5:
+            self.logger.warn('MD5 mismatch for %s: expected %s, but was %s.',
+                             self.content_file,
+                             self.MD5_checksum,
+                             new_md5)
             return False
 
         for dep in self.dependencies.all():
-            if not dep.check_md5():
+            if not dep.requirement.check_md5():
                 return False
 
         return True
