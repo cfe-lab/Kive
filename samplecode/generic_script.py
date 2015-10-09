@@ -3,7 +3,6 @@
 import argparse
 import csv
 import sys
-import time
 
 # In order to work with kive, scripts which having a inputs
 # and b inputs must have a+b command line arguments, the first a
@@ -27,7 +26,6 @@ try:
 
         try:
             for i, row in enumerate(string_csv):
-                time.sleep(0.5)
                 if i == 0:
                     # Output column names must be registered in kive
                     output.write("c,d\n")
