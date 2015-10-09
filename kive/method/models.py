@@ -821,15 +821,11 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
             self.logger.debug("Polling Popen + displaying stdout/stderr to console")
 
-            out_thread = threading.Thread(
-                target=self._poll_stream,
-                args=(method_popen.stdout, 'stdout', output_streams))
             err_thread = threading.Thread(
                 target=self._poll_stream,
                 args=(method_popen.stderr, 'stderr', error_streams))
-            out_thread.start()
             err_thread.start()
-            out_thread.join()
+            self._poll_stream(method_popen.stdout, 'stdout', output_streams)
             err_thread.join()
 
             returncode = method_popen.wait()
