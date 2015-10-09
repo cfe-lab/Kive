@@ -5,13 +5,14 @@ from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
 
+
 class Command(BaseCommand):
-    help = 'Resets the database and loads sample data.'
-    
+    help = 'Generates class diagrams.'
+
     def handle(self, *args, **options):
         if 'django_extensions' not in settings.INSTALLED_APPS:
             exit('django_extensions not found, try using --setting kive.UML_settings')
-        
+
         docs_path = os.path.join(os.path.pardir, 'doc', 'models')
         apps = [app for app in settings.INSTALLED_APPS
                 if not (app.startswith('django') or app == 'rest_framework')]

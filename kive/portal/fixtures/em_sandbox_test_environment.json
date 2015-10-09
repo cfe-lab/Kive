@@ -86,10 +86,10 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "PBMCseq", 
-            "compounddatatype": 6, 
-            "datatype": 8
+            "column_idx": 1, 
+            "column_name": "label", 
+            "compounddatatype": 7, 
+            "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 13
@@ -97,10 +97,10 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 3, 
-            "column_name": "PLAseq", 
-            "compounddatatype": 6, 
-            "datatype": 9
+            "column_idx": 2, 
+            "column_name": "PBMCseq", 
+            "compounddatatype": 7, 
+            "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 14
@@ -108,10 +108,10 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "SeqToComplement", 
+            "column_idx": 3, 
+            "column_name": "PLAseq", 
             "compounddatatype": 7, 
-            "datatype": 8
+            "datatype": 9
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 15
@@ -120,7 +120,7 @@
         "fields": {
             "blankable": false, 
             "column_idx": 1, 
-            "column_name": "ComplementedSeq", 
+            "column_name": "SeqToComplement", 
             "compounddatatype": 8, 
             "datatype": 8
         }, 
@@ -131,9 +131,9 @@
         "fields": {
             "blankable": false, 
             "column_idx": 1, 
-            "column_name": "SeqToComplement", 
+            "column_name": "ComplementedSeq", 
             "compounddatatype": 9, 
-            "datatype": 9
+            "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 17
@@ -142,7 +142,7 @@
         "fields": {
             "blankable": false, 
             "column_idx": 1, 
-            "column_name": "ComplementedSeq", 
+            "column_name": "SeqToComplement", 
             "compounddatatype": 10, 
             "datatype": 9
         }, 
@@ -153,9 +153,9 @@
         "fields": {
             "blankable": false, 
             "column_idx": 1, 
-            "column_name": "x", 
+            "column_name": "ComplementedSeq", 
             "compounddatatype": 11, 
-            "datatype": 1
+            "datatype": 9
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 19
@@ -163,9 +163,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "y", 
-            "compounddatatype": 11, 
+            "column_idx": 1, 
+            "column_name": "x", 
+            "compounddatatype": 12, 
             "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -174,8 +174,8 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "k", 
+            "column_idx": 2, 
+            "column_name": "y", 
             "compounddatatype": 12, 
             "datatype": 1
         }, 
@@ -186,7 +186,7 @@
         "fields": {
             "blankable": false, 
             "column_idx": 1, 
-            "column_name": "a", 
+            "column_name": "k", 
             "compounddatatype": 13, 
             "datatype": 1
         }, 
@@ -196,9 +196,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "b", 
-            "compounddatatype": 13, 
+            "column_idx": 1, 
+            "column_name": "a", 
+            "compounddatatype": 14, 
             "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -207,9 +207,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 3, 
-            "column_name": "c", 
-            "compounddatatype": 13, 
+            "column_idx": 2, 
+            "column_name": "b", 
+            "compounddatatype": 14, 
             "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -218,8 +218,8 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "a^2", 
+            "column_idx": 3, 
+            "column_name": "c", 
             "compounddatatype": 14, 
             "datatype": 1
         }, 
@@ -229,9 +229,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "b^2", 
-            "compounddatatype": 14, 
+            "column_idx": 1, 
+            "column_name": "a^2", 
+            "compounddatatype": 15, 
             "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -240,9 +240,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 3, 
-            "column_name": "c^2", 
-            "compounddatatype": 14, 
+            "column_idx": 2, 
+            "column_name": "b^2", 
+            "compounddatatype": 15, 
             "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -251,8 +251,8 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "StrCol1", 
+            "column_idx": 3, 
+            "column_name": "c^2", 
             "compounddatatype": 15, 
             "datatype": 1
         }, 
@@ -262,10 +262,10 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "DNACol2", 
-            "compounddatatype": 15, 
-            "datatype": 8
+            "column_idx": 1, 
+            "column_name": "StrCol1", 
+            "compounddatatype": 16, 
+            "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 29
@@ -273,10 +273,10 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 3, 
-            "column_name": "StrCol3", 
-            "compounddatatype": 15, 
-            "datatype": 1
+            "column_idx": 2, 
+            "column_name": "DNACol2", 
+            "compounddatatype": 16, 
+            "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 30
@@ -284,8 +284,8 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "x", 
+            "column_idx": 3, 
+            "column_name": "StrCol3", 
             "compounddatatype": 16, 
             "datatype": 1
         }, 
@@ -295,9 +295,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "y", 
-            "compounddatatype": 16, 
+            "column_idx": 1, 
+            "column_name": "x", 
+            "compounddatatype": 17, 
             "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -306,10 +306,10 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "a", 
+            "column_idx": 2, 
+            "column_name": "y", 
             "compounddatatype": 17, 
-            "datatype": 8
+            "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 33
@@ -317,9 +317,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "b", 
-            "compounddatatype": 17, 
+            "column_idx": 1, 
+            "column_name": "a", 
+            "compounddatatype": 18, 
             "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -328,9 +328,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 3, 
-            "column_name": "c", 
-            "compounddatatype": 17, 
+            "column_idx": 2, 
+            "column_name": "b", 
+            "compounddatatype": 18, 
             "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -339,8 +339,8 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "x", 
+            "column_idx": 3, 
+            "column_name": "c", 
             "compounddatatype": 18, 
             "datatype": 8
         }, 
@@ -350,9 +350,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "y", 
-            "compounddatatype": 18, 
+            "column_idx": 1, 
+            "column_name": "x", 
+            "compounddatatype": 19, 
             "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -361,13 +361,24 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "word", 
+            "column_idx": 2, 
+            "column_name": "y", 
             "compounddatatype": 19, 
-            "datatype": 10
+            "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 38
+    }, 
+    {
+        "fields": {
+            "blankable": false, 
+            "column_idx": 1, 
+            "column_name": "word", 
+            "compounddatatype": 20, 
+            "datatype": 10
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 39
     }, 
     {
         "fields": {
@@ -463,7 +474,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_singlet_EQeVALt.csv", 
+            "dataset_file": "Datasets/fixtures/step_0_singlet_ggNs7IY.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -476,7 +487,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_raw_Urn634f.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw_GbYP9Xf.fasta", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -489,7 +500,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_raw_H6TSUIk.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw_B8T7EsQ.fasta", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -529,8 +540,8 @@
         "fields": {
             "created_by": null, 
             "dataset_file": "Datasets/fixtures/DNA_triplet.csv", 
-            "date_created": "2000-01-01T00:00:02Z", 
-            "date_modified": "2000-01-01T00:00:02Z", 
+            "date_created": "2000-01-01T00:00:01Z", 
+            "date_modified": "2000-01-01T00:00:01Z", 
             "description": "DNA triplet data", 
             "name": "DNA_triplet", 
             "symbolicdataset": 15
@@ -542,8 +553,8 @@
         "fields": {
             "created_by": null, 
             "dataset_file": "Datasets/fixtures/E01_21_DNA_doublet.csv", 
-            "date_created": "2000-01-01T00:00:02Z", 
-            "date_modified": "2000-01-01T00:00:02Z", 
+            "date_created": "2000-01-01T00:00:01Z", 
+            "date_modified": "2000-01-01T00:00:01Z", 
             "description": "DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21", 
             "name": "E01_21_DNA_doublet", 
             "symbolicdataset": 16
@@ -555,8 +566,8 @@
         "fields": {
             "created_by": null, 
             "dataset_file": "Datasets/fixtures/E21_41_DNA_doublet.csv", 
-            "date_created": "2000-01-01T00:00:02Z", 
-            "date_modified": "2000-01-01T00:00:02Z", 
+            "date_created": "2000-01-01T00:00:01Z", 
+            "date_modified": "2000-01-01T00:00:01Z", 
             "description": "DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41", 
             "name": "E21_41_DNA_doublet", 
             "symbolicdataset": 17
@@ -566,7 +577,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
+            "compounddatatype": 14, 
             "num_rows": 10, 
             "symbolicdataset": 1
         }, 
@@ -575,7 +586,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "num_rows": 3, 
             "symbolicdataset": 2
         }, 
@@ -584,7 +595,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "num_rows": 13, 
             "symbolicdataset": 3
         }, 
@@ -593,7 +604,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "num_rows": 3, 
             "symbolicdataset": 4
         }, 
@@ -602,7 +613,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "num_rows": 10, 
             "symbolicdataset": 6
         }, 
@@ -611,7 +622,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
+            "compounddatatype": 14, 
             "num_rows": 3, 
             "symbolicdataset": 7
         }, 
@@ -620,7 +631,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "num_rows": 3, 
             "symbolicdataset": 8
         }, 
@@ -629,7 +640,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "num_rows": 3, 
             "symbolicdataset": 9
         }, 
@@ -638,7 +649,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "num_rows": 3, 
             "symbolicdataset": 10
         }, 
@@ -647,7 +658,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
+            "compounddatatype": 14, 
             "num_rows": 3, 
             "symbolicdataset": 13
         }, 
@@ -656,7 +667,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "num_rows": 3, 
             "symbolicdataset": 14
         }, 
@@ -665,7 +676,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 17, 
+            "compounddatatype": 18, 
             "num_rows": 3, 
             "symbolicdataset": 15
         }, 
@@ -674,7 +685,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 18, 
+            "compounddatatype": 19, 
             "num_rows": 3, 
             "symbolicdataset": 16
         }, 
@@ -683,7 +694,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 18, 
+            "compounddatatype": 19, 
             "num_rows": 3, 
             "symbolicdataset": 17
         }, 
@@ -881,8 +892,8 @@
     {
         "fields": {
             "cable": 5, 
-            "dest_pin": 32, 
-            "source_pin": 22
+            "dest_pin": 33, 
+            "source_pin": 23
         }, 
         "model": "pipeline.customcablewire", 
         "pk": 1
@@ -890,8 +901,8 @@
     {
         "fields": {
             "cable": 5, 
-            "dest_pin": 31, 
-            "source_pin": 24
+            "dest_pin": 32, 
+            "source_pin": 25
         }, 
         "model": "pipeline.customcablewire", 
         "pk": 2
@@ -899,8 +910,8 @@
     {
         "fields": {
             "cable": 7, 
-            "dest_pin": 32, 
-            "source_pin": 31
+            "dest_pin": 33, 
+            "source_pin": 32
         }, 
         "model": "pipeline.customcablewire", 
         "pk": 3
@@ -908,8 +919,8 @@
     {
         "fields": {
             "cable": 7, 
-            "dest_pin": 31, 
-            "source_pin": 32
+            "dest_pin": 32, 
+            "source_pin": 33
         }, 
         "model": "pipeline.customcablewire", 
         "pk": 4
@@ -917,8 +928,8 @@
     {
         "fields": {
             "cable": 9, 
-            "dest_pin": 32, 
-            "source_pin": 23
+            "dest_pin": 33, 
+            "source_pin": 24
         }, 
         "model": "pipeline.customcablewire", 
         "pk": 5
@@ -926,15 +937,15 @@
     {
         "fields": {
             "cable": 9, 
-            "dest_pin": 31, 
-            "source_pin": 24
+            "dest_pin": 32, 
+            "source_pin": 25
         }, 
         "model": "pipeline.customcablewire", 
         "pk": 6
     }, 
     {
         "fields": {
-            "output_cdt": 13, 
+            "output_cdt": 14, 
             "output_idx": 1, 
             "output_name": "D1_out", 
             "pipeline": 4, 
@@ -946,7 +957,7 @@
     }, 
     {
         "fields": {
-            "output_cdt": 16, 
+            "output_cdt": 17, 
             "output_idx": 1, 
             "output_name": "E1_out", 
             "pipeline": 5, 
@@ -958,7 +969,7 @@
     }, 
     {
         "fields": {
-            "output_cdt": 12, 
+            "output_cdt": 13, 
             "output_idx": 2, 
             "output_name": "E2_out", 
             "pipeline": 5, 
@@ -1182,7 +1193,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 2
@@ -1192,7 +1203,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 3
@@ -1202,7 +1213,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 4
@@ -1212,7 +1223,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
+            "compounddatatype": 14, 
             "max_row": 5, 
             "min_row": null, 
             "transf_xput": 5
@@ -1222,7 +1233,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
+            "compounddatatype": 14, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 6
@@ -1232,7 +1243,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 7
@@ -1242,7 +1253,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 8
@@ -1252,7 +1263,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 11
@@ -1262,7 +1273,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 12
@@ -1272,7 +1283,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
+            "compounddatatype": 14, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 13
@@ -1282,7 +1293,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "max_row": null, 
             "min_row": 10, 
             "transf_xput": 14
@@ -1292,7 +1303,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
+            "compounddatatype": 14, 
             "max_row": 5, 
             "min_row": null, 
             "transf_xput": 16
@@ -1302,7 +1313,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 18
@@ -1312,7 +1323,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "max_row": 5, 
             "min_row": null, 
             "transf_xput": 19
@@ -1322,7 +1333,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 20
@@ -1332,7 +1343,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 21
@@ -1342,7 +1353,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 22
@@ -1352,7 +1363,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 23
@@ -1598,7 +1609,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$IgoHXR8IjOWW$FYNx7QA5Btv9jgiVXiIpwB4f10+3tAz8or2Y2qx8OTo=", 
+            "password": "pbkdf2_sha256$15000$KsRFrLB67liq$G3HeDo3d7C9T7dqMzQ00bWWq5WuQ14Wi09j60yOmKRk=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -1607,7 +1618,25 @@
     }, 
     {
         "fields": {
-            "date_joined": "2000-01-01T00:00:02Z", 
+            "date_joined": "2000-01-01T00:00:00Z", 
+            "email": "starr@thebeatles.com", 
+            "first_name": "", 
+            "groups": [], 
+            "is_active": true, 
+            "is_staff": false, 
+            "is_superuser": false, 
+            "last_login": "2000-01-01T00:00:00Z", 
+            "last_name": "", 
+            "password": "pbkdf2_sha256$15000$fhxNXUHUfyUz$b3+LC8rNcssGRRns02Hq2LOeWOhn2+1LVupx1TmZWTs=", 
+            "user_permissions": [], 
+            "username": "ringo"
+        }, 
+        "model": "auth.user", 
+        "pk": 3
+    }, 
+    {
+        "fields": {
+            "date_joined": "2000-01-01T00:00:01Z", 
             "email": "bob@talabs.com", 
             "first_name": "", 
             "groups": [
@@ -1616,14 +1645,14 @@
             "is_active": true, 
             "is_staff": false, 
             "is_superuser": false, 
-            "last_login": "2000-01-01T00:00:02Z", 
+            "last_login": "2000-01-01T00:00:01Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$JUmODl63Oh2C$yUK6DW/THXl60Hc7WFGY2QI2XfkzT0HB+qjP3XyFp64=", 
+            "password": "pbkdf2_sha256$15000$xEPgZY5L16E4$pmPhxUQ/SZvjDAa5dA/GcfsiSs8Pfy24I/fysO0UIU8=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
         "model": "auth.user", 
-        "pk": 3
+        "pk": 4
     }, 
     {
         "fields": {
@@ -1673,7 +1702,7 @@
             "restricts": [
                 1
             ], 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "metadata.datatype", 
@@ -1692,11 +1721,11 @@
     }, 
     {
         "fields": {
-            "groups_allowed": [
-                1
-            ], 
+            "groups_allowed": [], 
             "user": 2, 
-            "users_allowed": []
+            "users_allowed": [
+                3
+            ]
         }, 
         "model": "metadata.compounddatatype", 
         "pk": 6
@@ -1838,11 +1867,22 @@
             "groups_allowed": [
                 1
             ], 
-            "user": 3, 
+            "user": 2, 
             "users_allowed": []
         }, 
         "model": "metadata.compounddatatype", 
         "pk": 19
+    }, 
+    {
+        "fields": {
+            "groups_allowed": [
+                1
+            ], 
+            "user": 4, 
+            "users_allowed": []
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 20
     }, 
     {
         "fields": {
@@ -2138,7 +2178,7 @@
                 1
             ], 
             "name": "noop", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "method.coderesource", 
@@ -2146,7 +2186,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "", 
+            "MD5_checksum": "ddcae61b8b247ecf5aa7f089f99b55c3", 
             "coderesource": 1, 
             "content_file": "CodeResources/generic_script.py", 
             "groups_allowed": [
@@ -2165,7 +2205,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "", 
+            "MD5_checksum": "d218c00725d473639f347d456de381d8", 
             "coderesource": 2, 
             "content_file": "CodeResources/fdopen", 
             "groups_allowed": [
@@ -2176,7 +2216,7 @@
             "revision_name": "1", 
             "revision_number": 1, 
             "revision_parent": null, 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "method.coderesourcerevision", 
@@ -2304,7 +2344,7 @@
                 1
             ], 
             "name": "string noop", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "method.methodfamily", 
@@ -2317,7 +2357,7 @@
                 1
             ], 
             "name": "string trivial", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "method.methodfamily", 
@@ -2330,7 +2370,7 @@
                 1
             ], 
             "name": "raw noop", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "method.methodfamily", 
@@ -2455,7 +2495,7 @@
             "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "transformation.transformation", 
@@ -2469,7 +2509,7 @@
             "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "transformation.transformation", 
@@ -2483,7 +2523,7 @@
             "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "transformation.transformation", 
@@ -2623,9 +2663,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:02Z", 
+            "start_time": "2000-01-01T00:00:01Z", 
             "symbolicdataset": 16, 
             "user": 2
         }, 
@@ -2634,9 +2674,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:02Z", 
+            "start_time": "2000-01-01T00:00:01Z", 
             "symbolicdataset": 17, 
             "user": 2
         }, 

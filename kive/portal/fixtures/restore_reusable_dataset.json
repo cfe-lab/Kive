@@ -50,7 +50,7 @@
             "execrecord": 3, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:01Z"
+            "start_time": "2000-01-01T00:00:02Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 4
@@ -128,7 +128,7 @@
             "dataset_file": "Datasets/fixtures/step2_total_sums.raw", 
             "date_created": "2000-01-01T00:00:02Z", 
             "date_modified": "2000-01-01T00:00:02Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2015-10-08 21:07:46.688153+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2015-10-09 18:49:53.481785+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
             "name": "run1_step2_outputtotal_sums", 
             "symbolicdataset": 3
         }, 
@@ -157,10 +157,10 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:01Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "invoking_record": 4, 
             "record": 4, 
-            "start_time": "2000-01-01T00:00:01Z"
+            "start_time": "2000-01-01T00:00:02Z"
         }, 
         "model": "archive.execlog", 
         "pk": 3
@@ -714,8 +714,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 1, 
-            "dataset_name": "total_sums", 
+            "dataset_idx": 2, 
+            "dataset_name": "total_products", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -723,8 +723,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 2, 
-            "dataset_name": "total_products", 
+            "dataset_idx": 1, 
+            "dataset_name": "total_sums", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -769,7 +769,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "1a2db0fde673d661c4b3af2336b7d09e", 
+            "MD5_checksum": "54d87e23e1de26dbc69c78a9a2dde2ef", 
             "_redacted": false, 
             "groups_allowed": [], 
             "user": 1, 
@@ -780,7 +780,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "7ff6ac15c4dd1c669671b0095937c4f5", 
+            "MD5_checksum": "6dc476f01f77ab2aa13e3e5a6291edf1", 
             "_redacted": false, 
             "groups_allowed": [], 
             "user": 1, 
@@ -1150,8 +1150,8 @@
             "pipeline": 4, 
             "purged": true, 
             "run": 1, 
-            "sandbox_path": "/home/don/data/kive/Sandboxes/userkive_run1_4SqyMY", 
-            "time_queued": "2015-10-08T21:07:46.647Z", 
+            "sandbox_path": "/home/don/data/kive/Sandboxes/userkive_run1_8w3bTz", 
+            "time_queued": "2015-10-09T18:49:53.439Z", 
             "user": 1, 
             "users_allowed": []
         }, 

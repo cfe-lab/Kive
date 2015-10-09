@@ -142,7 +142,7 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:08Z", 
+            "end_time": "2000-01-01T00:00:07Z", 
             "execrecord": 2, 
             "is_cancelled": false, 
             "reused": true, 
@@ -184,11 +184,11 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:09Z", 
+            "end_time": "2000-01-01T00:00:08Z", 
             "execrecord": 4, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:09Z"
+            "start_time": "2000-01-01T00:00:08Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 6
@@ -257,7 +257,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/input_for_test_C_twostep_with_subpipeline_zdms54g.csv", 
+            "dataset_file": "Datasets/fixtures/input_for_test_C_twostep_with_subpipeline_XoOO0O1.csv", 
             "date_created": "2000-01-01T00:00:00Z", 
             "date_modified": "2000-01-01T00:00:00Z", 
             "description": "input to pipeline pX", 
@@ -273,7 +273,7 @@
             "dataset_file": "Datasets/fixtures/step1_mA_out.csv", 
             "date_created": "2000-01-01T00:00:06Z", 
             "date_modified": "2000-01-01T00:00:06Z", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-09-30 21:55:13.043616+00:00 by john\nrun: 1\nuser: john\nstep: 1\noutput: mA_out", 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-10-09 18:48:50.142945+00:00 by john\nrun: 1\nuser: john\nstep: 1\noutput: mA_out", 
             "name": "run1_step1_outputmA_out", 
             "symbolicdataset": 4
         }, 
@@ -286,7 +286,7 @@
             "dataset_file": "Datasets/fixtures/run1_pX_out_2.csv", 
             "date_created": "2000-01-01T00:00:08Z", 
             "date_modified": "2000-01-01T00:00:08Z", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-09-30 21:55:13.043616+00:00 by john\nrun: 1\nuser: john\noutput: pX_out_2", 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-10-09 18:48:50.142945+00:00 by john\nrun: 1\nuser: john\noutput: pX_out_2", 
             "name": "run1_output2", 
             "symbolicdataset": 5
         }, 
@@ -325,16 +325,17 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:09Z", 
+            "end_time": "2000-01-01T00:00:08Z", 
             "invoking_record": 6, 
             "record": 6, 
-            "start_time": "2000-01-01T00:00:09Z"
+            "start_time": "2000-01-01T00:00:08Z"
         }, 
         "model": "archive.execlog", 
         "pk": 4
     }, 
     {
         "fields": {
+            "are_checksums_OK": true, 
             "code_redacted": false, 
             "error_log": "Logs/step1_stderr.txt", 
             "error_redacted": false, 
@@ -1041,7 +1042,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$RFQ34tgjpJ0C$d0nJ+AHTVQ3lWjwp08RtdUpoFRwRgsGmE5Jeb4obKco=", 
+            "password": "pbkdf2_sha256$15000$0qNjASBYepXW$LyX8M6pEjsi4hyHFpr5W1Wfgml+KDErl0myKrq3InLU=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -1168,7 +1169,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "", 
+            "MD5_checksum": "ddcae61b8b247ecf5aa7f089f99b55c3", 
             "coderesource": 1, 
             "content_file": "CodeResources/generic_script.py", 
             "groups_allowed": [], 
@@ -1377,9 +1378,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:09Z", 
+            "end_time": "2000-01-01T00:00:08Z", 
             "execlog": 4, 
-            "start_time": "2000-01-01T00:00:09Z", 
+            "start_time": "2000-01-01T00:00:08Z", 
             "symbolicdataset": 4, 
             "user": 2
         }, 

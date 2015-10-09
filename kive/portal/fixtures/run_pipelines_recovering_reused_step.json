@@ -86,10 +86,10 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "PBMCseq", 
-            "compounddatatype": 6, 
-            "datatype": 8
+            "column_idx": 1, 
+            "column_name": "label", 
+            "compounddatatype": 7, 
+            "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 13
@@ -97,10 +97,10 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 3, 
-            "column_name": "PLAseq", 
-            "compounddatatype": 6, 
-            "datatype": 9
+            "column_idx": 2, 
+            "column_name": "PBMCseq", 
+            "compounddatatype": 7, 
+            "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 14
@@ -108,10 +108,10 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "SeqToComplement", 
+            "column_idx": 3, 
+            "column_name": "PLAseq", 
             "compounddatatype": 7, 
-            "datatype": 8
+            "datatype": 9
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 15
@@ -120,7 +120,7 @@
         "fields": {
             "blankable": false, 
             "column_idx": 1, 
-            "column_name": "ComplementedSeq", 
+            "column_name": "SeqToComplement", 
             "compounddatatype": 8, 
             "datatype": 8
         }, 
@@ -131,9 +131,9 @@
         "fields": {
             "blankable": false, 
             "column_idx": 1, 
-            "column_name": "SeqToComplement", 
+            "column_name": "ComplementedSeq", 
             "compounddatatype": 9, 
-            "datatype": 9
+            "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 17
@@ -142,7 +142,7 @@
         "fields": {
             "blankable": false, 
             "column_idx": 1, 
-            "column_name": "ComplementedSeq", 
+            "column_name": "SeqToComplement", 
             "compounddatatype": 10, 
             "datatype": 9
         }, 
@@ -153,9 +153,9 @@
         "fields": {
             "blankable": false, 
             "column_idx": 1, 
-            "column_name": "x", 
+            "column_name": "ComplementedSeq", 
             "compounddatatype": 11, 
-            "datatype": 1
+            "datatype": 9
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 19
@@ -163,9 +163,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "y", 
-            "compounddatatype": 11, 
+            "column_idx": 1, 
+            "column_name": "x", 
+            "compounddatatype": 12, 
             "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -174,8 +174,8 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "k", 
+            "column_idx": 2, 
+            "column_name": "y", 
             "compounddatatype": 12, 
             "datatype": 1
         }, 
@@ -186,7 +186,7 @@
         "fields": {
             "blankable": false, 
             "column_idx": 1, 
-            "column_name": "a", 
+            "column_name": "k", 
             "compounddatatype": 13, 
             "datatype": 1
         }, 
@@ -196,9 +196,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "b", 
-            "compounddatatype": 13, 
+            "column_idx": 1, 
+            "column_name": "a", 
+            "compounddatatype": 14, 
             "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -207,9 +207,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 3, 
-            "column_name": "c", 
-            "compounddatatype": 13, 
+            "column_idx": 2, 
+            "column_name": "b", 
+            "compounddatatype": 14, 
             "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -218,8 +218,8 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "a^2", 
+            "column_idx": 3, 
+            "column_name": "c", 
             "compounddatatype": 14, 
             "datatype": 1
         }, 
@@ -229,9 +229,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "b^2", 
-            "compounddatatype": 14, 
+            "column_idx": 1, 
+            "column_name": "a^2", 
+            "compounddatatype": 15, 
             "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -240,9 +240,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 3, 
-            "column_name": "c^2", 
-            "compounddatatype": 14, 
+            "column_idx": 2, 
+            "column_name": "b^2", 
+            "compounddatatype": 15, 
             "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -251,8 +251,8 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "StrCol1", 
+            "column_idx": 3, 
+            "column_name": "c^2", 
             "compounddatatype": 15, 
             "datatype": 1
         }, 
@@ -262,10 +262,10 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "DNACol2", 
-            "compounddatatype": 15, 
-            "datatype": 8
+            "column_idx": 1, 
+            "column_name": "StrCol1", 
+            "compounddatatype": 16, 
+            "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 29
@@ -273,10 +273,10 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 3, 
-            "column_name": "StrCol3", 
-            "compounddatatype": 15, 
-            "datatype": 1
+            "column_idx": 2, 
+            "column_name": "DNACol2", 
+            "compounddatatype": 16, 
+            "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 30
@@ -284,8 +284,8 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "x", 
+            "column_idx": 3, 
+            "column_name": "StrCol3", 
             "compounddatatype": 16, 
             "datatype": 1
         }, 
@@ -295,9 +295,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "y", 
-            "compounddatatype": 16, 
+            "column_idx": 1, 
+            "column_name": "x", 
+            "compounddatatype": 17, 
             "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -306,10 +306,10 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "a", 
+            "column_idx": 2, 
+            "column_name": "y", 
             "compounddatatype": 17, 
-            "datatype": 8
+            "datatype": 1
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 33
@@ -317,9 +317,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "b", 
-            "compounddatatype": 17, 
+            "column_idx": 1, 
+            "column_name": "a", 
+            "compounddatatype": 18, 
             "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -328,9 +328,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 3, 
-            "column_name": "c", 
-            "compounddatatype": 17, 
+            "column_idx": 2, 
+            "column_name": "b", 
+            "compounddatatype": 18, 
             "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -339,8 +339,8 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "x", 
+            "column_idx": 3, 
+            "column_name": "c", 
             "compounddatatype": 18, 
             "datatype": 8
         }, 
@@ -350,9 +350,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "y", 
-            "compounddatatype": 18, 
+            "column_idx": 1, 
+            "column_name": "x", 
+            "compounddatatype": 19, 
             "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -361,13 +361,24 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "word", 
+            "column_idx": 2, 
+            "column_name": "y", 
             "compounddatatype": 19, 
-            "datatype": 10
+            "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 38
+    }, 
+    {
+        "fields": {
+            "blankable": false, 
+            "column_idx": 1, 
+            "column_name": "word", 
+            "compounddatatype": 20, 
+            "datatype": 10
+        }, 
+        "model": "metadata.compounddatatypemember", 
+        "pk": 39
     }, 
     {
         "fields": {
@@ -378,7 +389,7 @@
             "execrecord": 2, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:02Z"
+            "start_time": "2000-01-01T00:00:03Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 1
@@ -486,7 +497,7 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:07Z", 
             "execrecord": 3, 
             "is_cancelled": false, 
             "reused": true, 
@@ -504,7 +515,7 @@
             "execrecord": 7, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:07Z"
+            "start_time": "2000-01-01T00:00:08Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 10
@@ -593,8 +604,8 @@
         "fields": {
             "created_by": null, 
             "dataset_file": "Datasets/fixtures/step_0_triplet.csv", 
-            "date_created": "2000-01-01T00:00:00Z", 
-            "date_modified": "2000-01-01T00:00:00Z", 
+            "date_created": "2000-01-01T00:00:01Z", 
+            "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
             "name": "triplet", 
             "symbolicdataset": 1
@@ -683,7 +694,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_singlet_8n2QBjF.csv", 
+            "dataset_file": "Datasets/fixtures/step_0_singlet_UXDlZ7E.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -696,7 +707,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_raw_ehtNJmd.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw_3bHML2k.fasta", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -709,7 +720,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_raw_MvNY5OO.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw_A2mmmmI.fasta", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -787,9 +798,9 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/tmpIEO_Iy", 
-            "date_created": "2000-01-01T00:00:02Z", 
-            "date_modified": "2000-01-01T00:00:02Z", 
+            "dataset_file": "Datasets/fixtures/tmpVGi6F0", 
+            "date_created": "2000-01-01T00:00:03Z", 
+            "date_modified": "2000-01-01T00:00:03Z", 
             "description": "blahblahblah", 
             "name": "blahblah", 
             "symbolicdataset": 18
@@ -803,7 +814,7 @@
             "dataset_file": "Datasets/fixtures/step2_same_strings.csv", 
             "date_created": "2000-01-01T00:00:04Z", 
             "date_modified": "2000-01-01T00:00:04Z", 
-            "description": "Generated data from a run of pipeline \"p_one:1 (v1)\" started at 2015-09-30 21:55:41.048488+00:00 by bob\nrun: 4\nuser: bob\nstep: 2\noutput: same_strings", 
+            "description": "Generated data from a run of pipeline \"p_one:1 (v1)\" started at 2015-10-09 18:49:18.959354+00:00 by bob\nrun: 4\nuser: bob\nstep: 2\noutput: same_strings", 
             "name": "run4_step2_outputsame_strings", 
             "symbolicdataset": 20
         }, 
@@ -816,7 +827,7 @@
             "dataset_file": "Datasets/fixtures/step2_untouched_strings.csv", 
             "date_created": "2000-01-01T00:00:07Z", 
             "date_modified": "2000-01-01T00:00:07Z", 
-            "description": "Generated data from a run of pipeline \"p_two:1 (v1)\" started at 2015-09-30 21:55:44.224583+00:00 by bob\nrun: 5\nuser: bob\nstep: 2\noutput: untouched_strings", 
+            "description": "Generated data from a run of pipeline \"p_two:1 (v1)\" started at 2015-10-09 18:49:22.259316+00:00 by bob\nrun: 5\nuser: bob\nstep: 2\noutput: untouched_strings", 
             "name": "run5_step2_outputuntouched_strings", 
             "symbolicdataset": 21
         }, 
@@ -895,16 +906,17 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:07Z", 
+            "end_time": "2000-01-01T00:00:08Z", 
             "invoking_record": 10, 
             "record": 10, 
-            "start_time": "2000-01-01T00:00:07Z"
+            "start_time": "2000-01-01T00:00:08Z"
         }, 
         "model": "archive.execlog", 
         "pk": 8
     }, 
     {
         "fields": {
+            "are_checksums_OK": true, 
             "code_redacted": false, 
             "error_log": "Logs/step1_stderr.txt", 
             "error_redacted": false, 
@@ -918,6 +930,7 @@
     }, 
     {
         "fields": {
+            "are_checksums_OK": true, 
             "code_redacted": false, 
             "error_log": "Logs/step2_stderr.txt", 
             "error_redacted": false, 
@@ -931,11 +944,12 @@
     }, 
     {
         "fields": {
+            "are_checksums_OK": true, 
             "code_redacted": false, 
-            "error_log": "Logs/step1_stderr_2wzlVp2.txt", 
+            "error_log": "Logs/step1_stderr_teOdqL0.txt", 
             "error_redacted": false, 
             "execlog": 6, 
-            "output_log": "Logs/step1_stdout_V68nLh9.txt", 
+            "output_log": "Logs/step1_stdout_mWaZs2o.txt", 
             "output_redacted": false, 
             "return_code": 0
         }, 
@@ -944,11 +958,12 @@
     }, 
     {
         "fields": {
+            "are_checksums_OK": true, 
             "code_redacted": false, 
-            "error_log": "Logs/step2_stderr_Eeul3cC.txt", 
+            "error_log": "Logs/step2_stderr_K63lR8z.txt", 
             "error_redacted": false, 
             "execlog": 7, 
-            "output_log": "Logs/step2_stdout_kouqBCo.txt", 
+            "output_log": "Logs/step2_stdout_cATdc47.txt", 
             "output_redacted": false, 
             "return_code": 0
         }, 
@@ -957,7 +972,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
+            "compounddatatype": 14, 
             "num_rows": 10, 
             "symbolicdataset": 1
         }, 
@@ -966,7 +981,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "num_rows": 3, 
             "symbolicdataset": 2
         }, 
@@ -975,7 +990,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "num_rows": 13, 
             "symbolicdataset": 3
         }, 
@@ -984,7 +999,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "num_rows": 3, 
             "symbolicdataset": 4
         }, 
@@ -993,7 +1008,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "num_rows": 10, 
             "symbolicdataset": 6
         }, 
@@ -1002,7 +1017,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
+            "compounddatatype": 14, 
             "num_rows": 3, 
             "symbolicdataset": 7
         }, 
@@ -1011,7 +1026,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "num_rows": 3, 
             "symbolicdataset": 8
         }, 
@@ -1020,7 +1035,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "num_rows": 3, 
             "symbolicdataset": 9
         }, 
@@ -1029,7 +1044,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "num_rows": 3, 
             "symbolicdataset": 10
         }, 
@@ -1038,7 +1053,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
+            "compounddatatype": 14, 
             "num_rows": 3, 
             "symbolicdataset": 13
         }, 
@@ -1047,7 +1062,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "num_rows": 3, 
             "symbolicdataset": 14
         }, 
@@ -1056,7 +1071,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 17, 
+            "compounddatatype": 18, 
             "num_rows": 3, 
             "symbolicdataset": 15
         }, 
@@ -1065,7 +1080,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 18, 
+            "compounddatatype": 19, 
             "num_rows": 3, 
             "symbolicdataset": 16
         }, 
@@ -1074,7 +1089,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 18, 
+            "compounddatatype": 19, 
             "num_rows": 3, 
             "symbolicdataset": 17
         }, 
@@ -1083,7 +1098,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "num_rows": 1, 
             "symbolicdataset": 18
         }, 
@@ -1092,7 +1107,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "num_rows": 1, 
             "symbolicdataset": 19
         }, 
@@ -1101,7 +1116,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "num_rows": 1, 
             "symbolicdataset": 20
         }, 
@@ -1110,7 +1125,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "num_rows": 1, 
             "symbolicdataset": 21
         }, 
@@ -1617,8 +1632,8 @@
     {
         "fields": {
             "cable": 5, 
-            "dest_pin": 32, 
-            "source_pin": 22
+            "dest_pin": 33, 
+            "source_pin": 23
         }, 
         "model": "pipeline.customcablewire", 
         "pk": 1
@@ -1626,8 +1641,8 @@
     {
         "fields": {
             "cable": 5, 
-            "dest_pin": 31, 
-            "source_pin": 24
+            "dest_pin": 32, 
+            "source_pin": 25
         }, 
         "model": "pipeline.customcablewire", 
         "pk": 2
@@ -1635,8 +1650,8 @@
     {
         "fields": {
             "cable": 7, 
-            "dest_pin": 32, 
-            "source_pin": 31
+            "dest_pin": 33, 
+            "source_pin": 32
         }, 
         "model": "pipeline.customcablewire", 
         "pk": 3
@@ -1644,8 +1659,8 @@
     {
         "fields": {
             "cable": 7, 
-            "dest_pin": 31, 
-            "source_pin": 32
+            "dest_pin": 32, 
+            "source_pin": 33
         }, 
         "model": "pipeline.customcablewire", 
         "pk": 4
@@ -1653,8 +1668,8 @@
     {
         "fields": {
             "cable": 9, 
-            "dest_pin": 32, 
-            "source_pin": 23
+            "dest_pin": 33, 
+            "source_pin": 24
         }, 
         "model": "pipeline.customcablewire", 
         "pk": 5
@@ -1662,15 +1677,15 @@
     {
         "fields": {
             "cable": 9, 
-            "dest_pin": 31, 
-            "source_pin": 24
+            "dest_pin": 32, 
+            "source_pin": 25
         }, 
         "model": "pipeline.customcablewire", 
         "pk": 6
     }, 
     {
         "fields": {
-            "output_cdt": 13, 
+            "output_cdt": 14, 
             "output_idx": 1, 
             "output_name": "D1_out", 
             "pipeline": 4, 
@@ -1682,7 +1697,7 @@
     }, 
     {
         "fields": {
-            "output_cdt": 16, 
+            "output_cdt": 17, 
             "output_idx": 1, 
             "output_name": "E1_out", 
             "pipeline": 5, 
@@ -1694,7 +1709,7 @@
     }, 
     {
         "fields": {
-            "output_cdt": 12, 
+            "output_cdt": 13, 
             "output_idx": 2, 
             "output_name": "E2_out", 
             "pipeline": 5, 
@@ -1718,7 +1733,7 @@
     }, 
     {
         "fields": {
-            "output_cdt": 19, 
+            "output_cdt": 20, 
             "output_idx": 1, 
             "output_name": "p_one_out", 
             "pipeline": 9, 
@@ -1730,7 +1745,7 @@
     }, 
     {
         "fields": {
-            "output_cdt": 19, 
+            "output_cdt": 20, 
             "output_idx": 1, 
             "output_name": "p_two_out", 
             "pipeline": 10, 
@@ -1974,7 +1989,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 2
@@ -1984,7 +1999,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 3
@@ -1994,7 +2009,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 4
@@ -2004,7 +2019,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
+            "compounddatatype": 14, 
             "max_row": 5, 
             "min_row": null, 
             "transf_xput": 5
@@ -2014,7 +2029,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
+            "compounddatatype": 14, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 6
@@ -2024,7 +2039,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 7
@@ -2034,7 +2049,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 8
@@ -2044,7 +2059,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 11
@@ -2054,7 +2069,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 12
@@ -2064,7 +2079,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
+            "compounddatatype": 14, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 13
@@ -2074,7 +2089,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "max_row": null, 
             "min_row": 10, 
             "transf_xput": 14
@@ -2084,7 +2099,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
+            "compounddatatype": 14, 
             "max_row": 5, 
             "min_row": null, 
             "transf_xput": 16
@@ -2094,7 +2109,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
+            "compounddatatype": 13, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 18
@@ -2104,7 +2119,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 16, 
+            "compounddatatype": 17, 
             "max_row": 5, 
             "min_row": null, 
             "transf_xput": 19
@@ -2114,7 +2129,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 20
@@ -2124,7 +2139,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 21
@@ -2134,7 +2149,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 22
@@ -2144,7 +2159,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 23
@@ -2154,7 +2169,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 26
@@ -2164,7 +2179,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 28
@@ -2174,7 +2189,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 29
@@ -2184,7 +2199,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 20, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 31
@@ -2466,12 +2481,30 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$6gOrnuaYlBEJ$pHaK5GqdP9BI+mScRmgq18qltX0gOsn+ffv9OIfrJ5Y=", 
+            "password": "pbkdf2_sha256$15000$JoF38TyEIm5T$LZLvMXrdgTK1fngwOg1nCDdp7kChcdZWFxocM4LtTow=", 
             "user_permissions": [], 
             "username": "john"
         }, 
         "model": "auth.user", 
         "pk": 2
+    }, 
+    {
+        "fields": {
+            "date_joined": "2000-01-01T00:00:00Z", 
+            "email": "starr@thebeatles.com", 
+            "first_name": "", 
+            "groups": [], 
+            "is_active": true, 
+            "is_staff": false, 
+            "is_superuser": false, 
+            "last_login": "2000-01-01T00:00:00Z", 
+            "last_name": "", 
+            "password": "pbkdf2_sha256$15000$qg3RLzwAzUWc$8CPm+XbY9LEyxbqzkUi6RE911BshGofD0SOMc20FiyA=", 
+            "user_permissions": [], 
+            "username": "ringo"
+        }, 
+        "model": "auth.user", 
+        "pk": 3
     }, 
     {
         "fields": {
@@ -2486,12 +2519,12 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:01Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$yBg6PQVGI6HL$YCpmz27hKmJhyUTzl/0dkX2JW02/RkKRNRL53Hn2o0Q=", 
+            "password": "pbkdf2_sha256$15000$T92crGCKwzkC$d9LZvTQNg3gXvui+tfyGIzAKwm+0GAq+kycta7AAby8=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
         "model": "auth.user", 
-        "pk": 3
+        "pk": 4
     }, 
     {
         "fields": {
@@ -2531,7 +2564,7 @@
     }, 
     {
         "fields": {
-            "date_created": "2000-01-01T00:00:01Z", 
+            "date_created": "2000-01-01T00:00:02Z", 
             "description": "sequences of ASCII characters", 
             "groups_allowed": [
                 1
@@ -2541,7 +2574,7 @@
             "restricts": [
                 1
             ], 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "metadata.datatype", 
@@ -2560,11 +2593,11 @@
     }, 
     {
         "fields": {
-            "groups_allowed": [
-                1
-            ], 
+            "groups_allowed": [], 
             "user": 2, 
-            "users_allowed": []
+            "users_allowed": [
+                3
+            ]
         }, 
         "model": "metadata.compounddatatype", 
         "pk": 6
@@ -2706,11 +2739,22 @@
             "groups_allowed": [
                 1
             ], 
-            "user": 3, 
+            "user": 2, 
             "users_allowed": []
         }, 
         "model": "metadata.compounddatatype", 
         "pk": 19
+    }, 
+    {
+        "fields": {
+            "groups_allowed": [
+                1
+            ], 
+            "user": 4, 
+            "users_allowed": []
+        }, 
+        "model": "metadata.compounddatatype", 
+        "pk": 20
     }, 
     {
         "fields": {
@@ -2773,8 +2817,8 @@
             "name": "", 
             "parent_runstep": null, 
             "pipeline": 9, 
-            "start_time": "2000-01-01T00:00:02Z", 
-            "user": 3, 
+            "start_time": "2000-01-01T00:00:03Z", 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "archive.run", 
@@ -2791,7 +2835,7 @@
             "parent_runstep": null, 
             "pipeline": 10, 
             "start_time": "2000-01-01T00:00:06Z", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "archive.run", 
@@ -3025,7 +3069,7 @@
             "groups_allowed": [
                 1
             ], 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "librarian.symbolicdataset", 
@@ -3038,7 +3082,7 @@
             "groups_allowed": [
                 1
             ], 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "librarian.symbolicdataset", 
@@ -3051,7 +3095,7 @@
             "groups_allowed": [
                 1
             ], 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "librarian.symbolicdataset", 
@@ -3064,7 +3108,7 @@
             "groups_allowed": [
                 1
             ], 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "librarian.symbolicdataset", 
@@ -3092,7 +3136,7 @@
                 1
             ], 
             "name": "noop", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "method.coderesource", 
@@ -3100,7 +3144,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "", 
+            "MD5_checksum": "ddcae61b8b247ecf5aa7f089f99b55c3", 
             "coderesource": 1, 
             "content_file": "CodeResources/generic_script.py", 
             "groups_allowed": [
@@ -3119,18 +3163,18 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "", 
+            "MD5_checksum": "d218c00725d473639f347d456de381d8", 
             "coderesource": 2, 
             "content_file": "CodeResources/fdopen", 
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:01Z", 
+            "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "1", 
             "revision_number": 1, 
             "revision_parent": null, 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "method.coderesourcerevision", 
@@ -3258,7 +3302,7 @@
                 1
             ], 
             "name": "string noop", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "method.methodfamily", 
@@ -3271,7 +3315,7 @@
                 1
             ], 
             "name": "string trivial", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "method.methodfamily", 
@@ -3284,7 +3328,7 @@
                 1
             ], 
             "name": "raw noop", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "method.methodfamily", 
@@ -3463,7 +3507,7 @@
             "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "transformation.transformation", 
@@ -3477,7 +3521,7 @@
             "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "transformation.transformation", 
@@ -3491,7 +3535,7 @@
             "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
-            "user": 3, 
+            "user": 4, 
             "users_allowed": []
         }, 
         "model": "transformation.transformation", 
@@ -3540,7 +3584,7 @@
         "fields": {
             "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:00Z", 
+            "start_time": "2000-01-01T00:00:01Z", 
             "symbolicdataset": 2, 
             "user": 2
         }, 
@@ -3681,11 +3725,11 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:03Z", 
             "execlog": null, 
             "start_time": "2000-01-01T00:00:02Z", 
             "symbolicdataset": 18, 
-            "user": 3
+            "user": 4
         }, 
         "model": "datachecking.contentchecklog", 
         "pk": 15
@@ -3696,7 +3740,7 @@
             "execlog": 2, 
             "start_time": "2000-01-01T00:00:03Z", 
             "symbolicdataset": 19, 
-            "user": 3
+            "user": 4
         }, 
         "model": "datachecking.contentchecklog", 
         "pk": 16
@@ -3707,7 +3751,7 @@
             "execlog": 4, 
             "start_time": "2000-01-01T00:00:04Z", 
             "symbolicdataset": 20, 
-            "user": 3
+            "user": 4
         }, 
         "model": "datachecking.contentchecklog", 
         "pk": 17
@@ -3718,7 +3762,7 @@
             "execlog": 7, 
             "start_time": "2000-01-01T00:00:07Z", 
             "symbolicdataset": 21, 
-            "user": 3
+            "user": 4
         }, 
         "model": "datachecking.contentchecklog", 
         "pk": 18
@@ -3729,7 +3773,7 @@
             "execlog": 1, 
             "start_time": "2000-01-01T00:00:03Z", 
             "symbolicdataset": 18, 
-            "user": 3
+            "user": 4
         }, 
         "model": "datachecking.integritychecklog", 
         "pk": 1
@@ -3740,7 +3784,7 @@
             "execlog": 3, 
             "start_time": "2000-01-01T00:00:04Z", 
             "symbolicdataset": 19, 
-            "user": 3
+            "user": 4
         }, 
         "model": "datachecking.integritychecklog", 
         "pk": 2
@@ -3751,7 +3795,7 @@
             "execlog": 5, 
             "start_time": "2000-01-01T00:00:05Z", 
             "symbolicdataset": 20, 
-            "user": 3
+            "user": 4
         }, 
         "model": "datachecking.integritychecklog", 
         "pk": 3
@@ -3762,7 +3806,7 @@
             "execlog": 6, 
             "start_time": "2000-01-01T00:00:07Z", 
             "symbolicdataset": 19, 
-            "user": 3
+            "user": 4
         }, 
         "model": "datachecking.integritychecklog", 
         "pk": 4
@@ -3773,7 +3817,7 @@
             "execlog": 8, 
             "start_time": "2000-01-01T00:00:08Z", 
             "symbolicdataset": 21, 
-            "user": 3
+            "user": 4
         }, 
         "model": "datachecking.integritychecklog", 
         "pk": 5

@@ -18,7 +18,7 @@
         "revision_parent": null,
         "revision_desc": "First version",
         "coderesource": 1,
-        "MD5_checksum": "da8ced380c7d4f8f92ae0ce210512517",
+        "MD5_checksum": "c3ab220c717a64eafe1762859d609110",
         "content_file": "CodeResources/fasta2csv.py",
         "revision_number": 1,
         "revision_DateTime": "2015-01-13T21:15:28.307Z",
