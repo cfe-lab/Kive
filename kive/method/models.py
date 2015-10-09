@@ -53,7 +53,7 @@ class CodeResource(metadata.models.AccessControl):
                                                    message="Invalid code resource filename"),
                                 ])
     description = models.TextField("Resource description", blank=True, max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
-    
+
     class Meta:
         ordering = ('name',)
 
@@ -109,7 +109,7 @@ class CodeResource(metadata.models.AccessControl):
                 update_removal_plan(removal_plan, revision.build_removal_plan(removal_plan))
 
         return removal_plan
-    
+
 
 @python_2_unicode_compatible
 class CodeResourceRevision(metadata.models.AccessControl):
@@ -175,7 +175,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
         TODO: use os.path.split() instead of split("/")
         """
         return '_'.join(self.content_file.name.split('/')[-1].split('_')[:-1])
-    
+
     @property
     def display_name(self):
         return self.revision_name or self.coderesource.name
@@ -232,7 +232,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
             # file).
             if dep_fn == "":
                 dep_fn = dep.requirement.coderesource.filename
-            
+
             inner_dep_paths = dep.requirement.list_all_filepaths_h(dep_fn)
 
             # Convert the paths from being relative to the child CRR to being
@@ -257,7 +257,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
         # Base case: self is dependant on itself, in which case, return true.
         if self in dependants:
             return True
-        
+
         # Recursive case: go to all dependencies and check them.
         check_dep = False
         for dep in self.dependencies.all():
@@ -370,7 +370,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
         to write our files into.
         """
         self.install_h(install_path, self.coderesource.filename)
-        
+
     def install_h(self, install_path, base_name):
         """Helper for install."""
         self.logger.debug("Writing code to {}".format(install_path))
@@ -402,13 +402,13 @@ class CodeResourceRevision(metadata.models.AccessControl):
                 os.makedirs(path_for_deps)
             except os.error:
                 pass
-            
+
             # Get the base name of this dependency.  If no special value
             # is specified in dep, then use the dependency's CRR name.
             dep_fn = dep.depFileName
             if dep_fn == "":
                 dep_fn = dep.requirement.coderesource.filename
-            
+
             dep.requirement.install_h(path_for_deps, dep_fn)
 
     def get_absolute_url(self):
@@ -484,7 +484,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
 class CodeResourceDependency(models.Model):
     """
     Dependencies of a CodeResourceRevision - themselves also CRRs.
-    
+
     Related to :model:`method.CodeResourceRevision`
     """
 
@@ -590,7 +590,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
     # Implicitly defined:
     # - execrecords: from ExecRecord
-    
+
     @property
     def display_name(self):
         return '{}: {}'.format(self.revision_number, self.revision_name)
@@ -689,23 +689,25 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         else:
             for parent_input in self.revision_parent.inputs.all():
                 new_input = self.inputs.create(
-                    dataset_name = parent_input.dataset_name,
-                    dataset_idx = parent_input.dataset_idx)
+                    dataset_name=parent_input.dataset_name,
+                    dataset_idx=parent_input.dataset_idx)
                 if not parent_input.is_raw():
                     transformation.models.XputStructure(
-                        transf_xput=new_input, compounddatatype = parent_input.get_cdt(),
-                        min_row = parent_input.get_min_row(), max_row = parent_input.get_max_row()
-                    ).save()
+                        transf_xput=new_input,
+                        compounddatatype=parent_input.get_cdt(),
+                        min_row=parent_input.get_min_row(),
+                        max_row=parent_input.get_max_row()).save()
 
             for parent_output in self.revision_parent.outputs.all():
                 new_output = self.outputs.create(
-                    dataset_name = parent_output.dataset_name,
-                    dataset_idx = parent_output.dataset_idx)
+                    dataset_name=parent_output.dataset_name,
+                    dataset_idx=parent_output.dataset_idx)
                 if not parent_output.is_raw():
                     transformation.models.XputStructure(
-                        transf_xput=new_output, compounddatatype = parent_output.get_cdt(),
-                        min_row = parent_output.get_min_row(), max_row = parent_output.get_max_row()
-                    ).save()
+                        transf_xput=new_output,
+                        compounddatatype=parent_output.get_cdt(),
+                        min_row=parent_output.get_min_row(),
+                        max_row=parent_output.get_max_row()).save()
 
     def find_compatible_ERs(self, input_SDs, runstep):
         """
@@ -743,7 +745,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                     if ERI.symbolicdataset != input_SDs[input_idx-1]:
                         ER_matches = False
                         break
-                        
+
                 if ER_matches:
                     # All ERIs match input SDs, so commit to candidate ER.
                     candidates.append(candidate_ER)
@@ -752,19 +754,25 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
     def _poll_stream(self, source_stream, source_name, dest_streams):
         """ Redirect all input from source_stream to all the dest_streams
-        
+
         This is a helper function for run_code, like the Unix tee command.
         @param source_stream: an input stream to redirect
         @param dest_streams: a sequence of streams to redirect output to
         """
         for line in source_stream:
-            self.logger.debug('%s: %s', source_name, line.rstrip()) #drops \n
+            self.logger.debug('%s: %s', source_name, line.rstrip())  # drops \n
 
             for stream in dest_streams:
                 stream.write(line)
 
-    def run_code(self, run_path, input_paths, output_paths, output_streams,
-            error_streams, log=None, details_to_fill=None):
+    def run_code(self,
+                 run_path,
+                 input_paths,
+                 output_paths,
+                 output_streams,
+                 error_streams,
+                 log=None,
+                 details_to_fill=None):
         """
         SYNOPSIS
         Run the method with the specified inputs and outputs, writing each
@@ -808,10 +816,12 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
             self.logger.debug("Polling Popen + displaying stdout/stderr to console")
 
-            out_thread = threading.Thread(target=self._poll_stream,
-                    args=(method_popen.stdout, 'stdout', output_streams))
-            err_thread = threading.Thread(target=self._poll_stream,
-                    args=(method_popen.stderr, 'stderr', error_streams))
+            out_thread = threading.Thread(
+                target=self._poll_stream,
+                args=(method_popen.stdout, 'stdout', output_streams))
+            err_thread = threading.Thread(
+                target=self._poll_stream,
+                args=(method_popen.stderr, 'stderr', error_streams))
             out_thread.start()
             err_thread.start()
             out_thread.join()
@@ -826,7 +836,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             if log:
                 log.stop(save=True, clean=True)
 
-            # TODO: I'm not sure how this is going to handle huge output, 
+            # TODO: I'm not sure how this is going to handle huge output,
             # it would be better to update the logs as we go.
             if details_to_fill:
                 self.logger.debug('return code is %s for %r.',
@@ -898,7 +908,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
         # At this point, run_path has all of the necessary stuff
         # written into place.  It remains to execute the code.
-        # The code to be executed sits in 
+        # The code to be executed sits in
         # [run_path]/[driver.coderesource.name],
         # and is executable.
         code_to_run = os.path.join(
