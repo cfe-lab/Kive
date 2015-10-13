@@ -9,7 +9,6 @@
 # KIVE_GROUP: the system group containing the typical Kive user and the above
 
 
-
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
@@ -21,13 +20,16 @@ MANAGERS = ADMINS
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
-        'NAME': '[YOUR DB NAME HERE]',                      # Or path to database file if using sqlite3.
+        # Engine can be 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': '[YOUR DB NAME HERE]',  # Or path to db file if using sqlite3.
         # The following settings are not used with sqlite3:
         'USER': '[YOUR DB USER NAME HERE]',
         'PASSWORD': '[YOUR DB USER PASSWORD HERE]',
-        'HOST': '',                      # Empty for localhost through domain sockets or '127.0.0.1' for localhost through TCP.
-        'PORT': '',                      # Set to empty string for default.
+        # Blank host for localhost through domain sockets,
+        # or '127.0.0.1' for localhost through TCP.
+        'HOST': '',
+        'PORT': ''  # Set to empty string for default.
     }
 }
 
@@ -177,17 +179,17 @@ LOGGING = {
         },
         'file': {
             'level': 'DEBUG',
-            'class':'logging.handlers.RotatingFileHandler',
+            'class': 'logging.handlers.RotatingFileHandler',
             'filename': 'kive.log',
             'formatter': 'debug',
-            'maxBytes': 1024*1024*15, # 15MB
+            'maxBytes': 1024*1024*15,  # 15MB
             'backupCount': 10
         }
     },
     'root': {
         # This is the default logger.
         'handlers': ['console', 'file'],
-        'level': 'DEBUG'
+        'level': 'WARN'
     },
     'loggers': {
         # Change the logging level for an individual logger.
@@ -234,9 +236,9 @@ SANDBOX_PURGE_MINUTES = 0
 SANDBOX_KEEP_RECENT = 10
 
 # When to start purging old output datasets
-DATASET_MAX_STORAGE    = 5 << 40 #TB
+DATASET_MAX_STORAGE = 5 << 40  # TB
 # When to stop purging
-DATASET_TARGET_STORAGE = 2 << 40 #TB
+DATASET_TARGET_STORAGE = 2 << 40  # TB
 
 # Worker account configuration
 
