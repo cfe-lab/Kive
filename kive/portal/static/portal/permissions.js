@@ -44,7 +44,7 @@ var permissions = (function() {
         this.$lockSpan = $('<span/>');
 
         this.$navigation_links = $navigation_links;
-        this.page_size = 100;
+        this.page_size = 25;
         this.page = 1;
     };
     
@@ -222,18 +222,29 @@ var permissions = (function() {
 
                     if ("previous" in response && response["previous"] !== null) {
                         permissions_table.$navigation_links.append(
-                            $('<a/>').attr("href", response["previous"])
+                            $('<a class="nav"/>').attr("href", response["previous"])
                                 .text("prev")
                                 .click(permissions_table, navLink)
                         );
                     }
+                    else {
+                        permissions_table.$navigation_links.append($('<span class="nolink"/>').text("prev"));
+                    }
+
+                    permissions_table.$navigation_links.append(
+                        $('<span class="record_count"/>').text(response["count"] + " found")
+                    );
+
 
                     if ("next" in response && response["next"] !== null) {
                         permissions_table.$navigation_links.append(
-                            $('<a/>').attr("href", response["next"])
+                            $('<a class="nav"/>').attr("href", response["next"])
                             .text("next")
                             .click(permissions_table, navLink)
                         );
+                    }
+                    else {
+                        permissions_table.$navigation_links.append($('<span class="nolink"/>').text("next"));
                     }
                 }
 

@@ -15,7 +15,7 @@
 var pollingInterval = 1000, // milliseconds
     runsTable;
 
-var RunsTable = function($table, is_user_admin, $no_results, $active_filters) {
+var RunsTable = function($table, is_user_admin, $navigation_links, $no_results, $active_filters) {
     permissions.PermissionsTable.call(this, $table, is_user_admin);
     this.$no_results = $no_results;
     var runsTable = this;
