@@ -6,7 +6,7 @@ from rest_framework import permissions, status
 from rest_framework.decorators import detail_route
 from rest_framework.response import Response
 
-from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, CleanCreateModelMixin
+from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, CleanCreateModelMixin, StandardPagination
 from method.models import CodeResourceRevision, Method, MethodFamily, CodeResource
 from method.serializers import MethodSerializer, MethodFamilySerializer, \
     CodeResourceSerializer, CodeResourceRevisionSerializer
@@ -19,6 +19,7 @@ class CodeResourceViewSet(RemovableModelViewSet):
     queryset = CodeResource.objects.all()
     serializer_class = CodeResourceSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+    pagination_class = StandardPagination
 
     @detail_route(methods=["get"])
     def revisions(self, request, pk=None):
@@ -41,6 +42,7 @@ class CodeResourceRevisionViewSet(CleanCreateModelMixin, RemovableModelViewSet):
     queryset = CodeResourceRevision.objects.all()
     serializer_class = CodeResourceRevisionSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+    pagination_class = StandardPagination
 
     @detail_route(methods=['get'])
     def download(self, request, pk=None):
@@ -92,6 +94,7 @@ class MethodFamilyViewSet(RemovableModelViewSet):
     queryset = MethodFamily.objects.all()
     serializer_class = MethodFamilySerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+    pagination_class = StandardPagination
 
     @detail_route(methods=["get"])
     def methods(self, request, pk=None):

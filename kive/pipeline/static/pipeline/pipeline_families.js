@@ -11,21 +11,25 @@ var pipeline_families = (function() {
         $td.text(pipeline_family.published_version_display_name || "None");
     }
     
-    var PipelineFamiliesTable = function($table, is_user_admin) {
-        permissions.PermissionsTable.call(this, $table, is_user_admin);
+    var PipelineFamiliesTable = function($table, is_user_admin, $navigation_links) {
+        permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
         this.list_url = "api/pipelinefamilies/";
         this.registerColumn("Family", family_link);
         this.registerColumn("Description", "description");
         this.registerColumn("# revisions", "num_revisions");
         this.registerColumn("Published version", format_published_version);
+
+        this.registerStandardColumn("user");
+        this.registerStandardColumn("users_allowed");
+        this.registerStandardColumn("groups_allowed");
     };
     PipelineFamiliesTable.prototype = Object.create(permissions.PermissionsTable.prototype);
     
     // Code that will be called on loading in the HTML document.
-    my.main = function(is_user_admin, $table, bootstrap){
+    my.main = function(is_user_admin, $table, $navigation_links){
         noXSS();
-        var table = new PipelineFamiliesTable($table, is_user_admin);
-        table.buildTable(bootstrap);
+        var table = new PipelineFamiliesTable($table, is_user_admin, $navigation_links);
+        table.reloadTable();
     };
     
     return my;

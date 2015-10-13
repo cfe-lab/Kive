@@ -67,6 +67,30 @@ var permissions = (function() {
         }
         this.registered_columns.push(column);
     };
+
+    /**
+     * Register one of three standard columns to be added to the table.
+     *
+     *  @param columnName: "user", "users_allowed", or "groups_allowed"
+     */
+    my.PermissionsTable.prototype.registerStandardColumn = function(columnName) {
+
+        if (columnName === "user") {
+            this.registerColumn('Creator', 'user');
+        }
+        else if (columnName === "users_allowed") {
+            this.registerColumn(
+                'Users with access',
+                buildListCell,
+                'users_allowed');
+        }
+        else if (columnName === "groups_allowed") {
+            this.registerColumn(
+                'Groups with access',
+                buildListCell,
+                'groups_allowed');
+        }
+    };
     
     function defaultBuilder($td, row, field_name) {
         $td.text(row[field_name]);
@@ -78,29 +102,19 @@ var permissions = (function() {
             permissions_table = this,
             lock_icon = this.image_path +
                 (this.is_locked ? '/lock-locked-2x.png' : '/lock-unlocked-2x.png');
-        
+
+        if (this.$thead === undefined) {
+            $tr = $('<tr/>');
+            this.buildHeaders($tr);
+            this.$thead = $('<thead/>').append($tr);
+            this.$table.append(this.$thead);
+
+        }
+
         if (this.$tbody !== undefined) {
             this.$tbody.empty();
         }
         else if (rows.length > 0) {
-            $tr = $('<tr/>');
-            if ('user' in rows[0]) {
-                this.registerColumn('Creator', 'user');
-            }
-            if ('users_allowed' in rows[0]) {
-                this.registerColumn(
-                        'Users with access',
-                        buildListCell,
-                'users_allowed');
-            }
-            if ('groups_allowed' in rows[0])
-            this.registerColumn(
-                    'Groups with access',
-                    buildListCell,
-                    'groups_allowed');
-
-            this.buildHeaders($tr);
-            this.$table.append($('<thead/>').append($tr));
             this.$tbody = $('<tbody/>');
             this.$table.append(this.$tbody);
         }

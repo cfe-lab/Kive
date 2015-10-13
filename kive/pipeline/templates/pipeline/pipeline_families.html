@@ -13,7 +13,7 @@
         $(function(){
             pipeline_families.main({{ is_user_admin|lower }},
                     $("#pipelinefamilies"),
-                    JSON.parse($('#initial_data').text()));
+                    $("#navigation_links"));
         });
     </script>
 {% endblock %}
@@ -27,6 +27,8 @@
 
 <div id="initial_data" style="display:none">{{ pipeline_families|escape }}</div>
 <p>A pipeline is the deployment of one or more Methods to process data.</p>
+
+<div id="navigation_links"></div>
 
 <table id="pipelinefamilies"></table>
 

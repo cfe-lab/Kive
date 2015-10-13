@@ -12,6 +12,10 @@ var choose_pipeline = (function() {
         this.registerColumn("Pipeline Family", "name");
         this.registerColumn("Thumbnail", buildThumbnail);
         this.registerColumn("Revision", buildMembers);
+
+        this.registerStandardColumn("user");
+        this.registerStandardColumn("users_allowed");
+        this.registerStandardColumn("groups_allowed");
     };
     my.PipelineFamiliesTable.prototype = Object.create(
             permissions.PermissionsTable.prototype);

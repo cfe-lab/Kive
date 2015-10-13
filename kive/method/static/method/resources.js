@@ -8,22 +8,26 @@
         $td.append($a);
     }
 
-    var CodeResourceTable = function($table, is_user_admin) {
-        permissions.PermissionsTable.call(this, $table, is_user_admin);
+    var CodeResourceTable = function($table, is_user_admin, $navigation_links) {
+        permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
         this.list_url = "api/coderesources/";
         this.registerColumn("Name", revisions_link);
         this.registerColumn("Filename", "filename");
         this.registerColumn("Description", "description");
         this.registerColumn("# of revisions", "num_revisions");
         this.registerColumn("Last revision date", "last_revision_date");
+
+        this.registerStandardColumn("user");
+        this.registerStandardColumn("users_allowed");
+        this.registerStandardColumn("groups_allowed");
     };
 
     CodeResourceTable.prototype = Object.create(permissions.PermissionsTable.prototype);
 
-    function resources_main(is_user_admin, $table, bootstrap){
+    function resources_main(is_user_admin, $table, $navigation_links){
         noXSS();
-        var table = new CodeResourceTable($table, is_user_admin);
-        table.buildTable(bootstrap);
+        var table = new CodeResourceTable($table, is_user_admin, $navigation_links);
+        table.reloadTable();
     }
 
     // Export the main function to the global namespace

@@ -16,7 +16,7 @@
         $(function(){
             resources_main({{ is_user_admin|lower }},
                     $("#coderesources"),
-                    JSON.parse($('#initial_data').text()));
+                    $("#navigation_links"));
         });
     </script>
 {% endblock %}
@@ -44,6 +44,9 @@ in the following table.
 
 
 <div id="initial_data" style="display:none">{{ coderesources|escape }}</div>
+
+<div id="navigation_links"></div>
+
 <table id="coderesources"></table>
 
 {% endblock %}

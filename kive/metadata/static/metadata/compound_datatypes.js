@@ -1,7 +1,11 @@
-var CompoundDatatypesTable = function($table, is_user_admin) {
-    permissions.PermissionsTable.call(this, $table, is_user_admin);
+var CompoundDatatypesTable = function($table, is_user_admin, $navigation_links) {
+    permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
     this.list_url = "api/compounddatatypes/";
     this.registerColumn("Scheme", "representation");
+
+    this.registerStandardColumn("user");
+    this.registerStandardColumn("users_allowed");
+    this.registerStandardColumn("groups_allowed");
 }
 CompoundDatatypesTable.prototype = Object.create(
         permissions.PermissionsTable.prototype);
@@ -21,6 +25,6 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     // Security stuff to prevent cross-site scripting.
     noXSS();
     
-    var table = new CompoundDatatypesTable($('#compounddatatypes'), is_user_admin);
-    table.buildTable($.parseJSON($('#initial_data').text()));
+    var table = new CompoundDatatypesTable($('#compounddatatypes'), is_user_admin, $("#navigation_links"));
+    table.reloadTable()
 });

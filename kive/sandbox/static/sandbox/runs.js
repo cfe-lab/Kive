@@ -16,7 +16,7 @@ var pollingInterval = 1000, // milliseconds
     runsTable;
 
 var RunsTable = function($table, is_user_admin, $navigation_links, $no_results, $active_filters) {
-    permissions.PermissionsTable.call(this, $table, is_user_admin);
+    permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
     this.$no_results = $no_results;
     var runsTable = this;
     this.filterSet = new permissions.FilterSet(
@@ -45,6 +45,8 @@ var RunsTable = function($table, is_user_admin, $navigation_links, $no_results, 
     this.registerColumn("End", function($td, run) {
         $td.text(run.end || '-');
     });
+
+    this.registerStandardColumn("user");
 }
 RunsTable.prototype = Object.create(permissions.PermissionsTable.prototype);
 
@@ -71,13 +73,11 @@ RunsTable.prototype.extractRows = function(response) {
                     response.has_more
                     ? 'Showing ' + runs.length + ' most recent matching runs.'
                     : 'Showing all matching runs.')
-            this.$table.show();
             return runs;
         }
         $no_results.html('<p>No runs match your query.</p>');
     }
-    
-    this.$table.hide();
+
     $no_results.show();
     return []; // no runs
 };
@@ -110,7 +110,9 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     runsTable = new RunsTable(
             $('#runs'),
             is_user_admin,
+            $(".navigation_links"),
             $('.no_results'),
             $('#active_filters'));
     runsTable.filterSet.add('active');
+    runsTable.reloadTable();
 });

@@ -35,6 +35,11 @@ var choose_inputs = (function() {
         this.registerColumn("Name", buildRadioButton, this);
         this.registerColumn("Date", buildDateCreated);
         this.registerColumn("File Size (B)", "filesize");
+
+        this.registerStandardColumn("user");
+        this.registerStandardColumn("users_allowed");
+        this.registerStandardColumn("groups_allowed");
+
         this.$table.click(function(e) {
             var $target = $(e.target),
                 $tr = $target.closest('tr');

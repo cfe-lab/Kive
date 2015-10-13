@@ -39,6 +39,10 @@ var datasets = (function() {
         this.registerColumn("Date Created", buildDateCreated);
         this.registerColumn("File Size", "filesize_display");
         this.registerColumn("", buildDownload);
+
+        this.registerStandardColumn("user");
+        this.registerStandardColumn("users_allowed");
+        this.registerStandardColumn("groups_allowed");
     };
     DatasetsTable.prototype = Object.create(
             permissions.PermissionsTable.prototype);

@@ -7,7 +7,7 @@ from django.core import serializers
 from django.contrib.auth.decorators import login_required, user_passes_test
 from rest_framework import permissions
 
-from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet
+from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, StandardPagination
 from metadata.models import Datatype, get_builtin_types, CompoundDatatype
 from metadata.serializers import DatatypeSerializer, CompoundDatatypeSerializer
 from portal.views import developer_check
@@ -45,6 +45,7 @@ class DatatypeViewSet(RemovableModelViewSet):
     queryset = Datatype.objects.all()
     serializer_class = DatatypeSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+    pagination_class = StandardPagination
 
     
 class CompoundDatatypeViewSet(RemovableModelViewSet):
@@ -59,3 +60,4 @@ class CompoundDatatypeViewSet(RemovableModelViewSet):
     queryset = CompoundDatatype.objects.all()
     serializer_class = CompoundDatatypeSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+    pagination_class = StandardPagination

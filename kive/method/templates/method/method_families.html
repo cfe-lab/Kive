@@ -16,7 +16,7 @@
         $(function(){
             methodfamilies_main({{ is_user_admin|lower }},
                     $("#methodfamilies"),
-                    JSON.parse($('#initial_data').text()));
+                    $("#navigation_links"));
         });
     </script>
 
@@ -33,6 +33,8 @@
 A MethodFamily is a collection of Methods that share a certain function
 in common.
 </p>
+
+    <div id="navigation_links"></div>
 
 <table id="methodfamilies"></table>
 

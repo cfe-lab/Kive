@@ -11,7 +11,7 @@ from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet,\
-    CleanCreateModelMixin, convert_validation
+    CleanCreateModelMixin, convert_validation, StandardPagination
 from metadata.models import AccessControl
 from method.models import MethodFamily, Method
 from pipeline.models import Pipeline, PipelineFamily
@@ -38,6 +38,7 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
     queryset = PipelineFamily.objects.all()
     serializer_class = PipelineFamilySerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+    pagination_class = StandardPagination
 
     @detail_route(methods=["get"])
     def pipelines(self, request, pk=None):
