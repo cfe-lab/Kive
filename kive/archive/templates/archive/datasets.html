@@ -13,15 +13,14 @@
     <script src="/static/portal/permissions.js"></script>
     <script src="/static/archive/datasets.js"></script>
 
+    <link rel="stylesheet" href="/static/sandbox/sandbox.css">
     <link rel="stylesheet" href="/static/portal/permissions.css">
 
     <script type="text/javascript">
         $(function(){
-            var $preload_data = $('#preload_data');
-            $preload_data.detach();
-            datasets.main(
-                {{ is_user_admin|lower }},
-                JSON.parse($preload_data.text()));
+            // var $preload_data = $('#preload_data');
+            // $preload_data.detach();
+            datasets.main({{ is_user_admin|lower }});
         });
     </script>
 
@@ -31,12 +30,64 @@
 
 
 <a href="usr.html" rel="prev">Back to user's portal</a>
+
 <h2>Uploaded datasets</h2>
-<a href="/datasets_add" class="button">+&ensp;<span class="button-lbl">Add Datasets</span></a>&ensp;
-<a href="/datasets_add_bulk" class="button">+&ensp;<span class="button-lbl">Add Bulk Datasets</span></a>&ensp;
-<a href="/datasets_add_archive" class="button">+&ensp;<span class="button-lbl">Add Datasets From Archive</span></a>
-<table id="datasets">
-</table>
+
+<div class="dataset_add_links">
+    <a href="/datasets_add" class="button">+&ensp;<span class="button-lbl">Add Datasets</span></a>&ensp;
+    <a href="/datasets_add_bulk" class="button">+&ensp;<span class="button-lbl">Add Bulk Datasets</span></a>&ensp;
+    <a href="/datasets_add_archive" class="button">+&ensp;<span class="button-lbl">Add Datasets From Archive</span></a>
+</div>
+
+<div class="filter_ctrl">
+    <form class="short-filter">
+    <input name="name" type="text"
+        ><input type="button" class="advanced ctrl" value="Advanced"
+        ><input type="submit" value="Filter">
+    </form>
+
+    <form class="advanced-filter">
+    <h4>Advanced search</h4>
+    <table>
+    <tr>
+        <td><label>Name<input name="name" type="text"/></label></td>
+        <td><label><input
+            name="uploaded"
+            type="checkbox"/>Uploaded</label></td>
+    </tr>
+    <tr>
+        <td><label>Started after<input
+            name="startafter"
+            type="text"
+            class="datetime"/></label>
+        <td><label>Started before<input
+            name="startbefore"
+            type="text"
+            class="datetime"/></label>
+    </tr>
+    <tr>
+        <td><label>Ended after<input
+            name="endafter"
+            type="text"
+            class="datetime"/></label>
+        <td><label>Ended before<input
+            name="endbefore"
+            type="text"
+            class="datetime"/></label>
+    </tr>
+    </table>
+    <input type="submit" value="Filter"/>
+    </form>
+</div>
+
+<div id="active_filters"></div>
+
+<div id="navigation_links"></div>
+
+<div class="results">
+    <table id="datasets">
+    </table>
+</div>
 
 <div style="display:none" id="preload_data">{{dataset_json}}</div>
 {% endblock %}
