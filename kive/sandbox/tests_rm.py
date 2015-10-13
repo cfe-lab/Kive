@@ -17,13 +17,6 @@ from method.models import Method
 import file_access_utils
 
 
-# def rmf(path):
-#     try:
-#         os.remove(path)
-#     except OSError:
-#         pass
-
-
 class SandboxRMTestCase(TestCase):
     fixtures = ["initial_data", "initial_groups", "initial_user"]
 
@@ -128,7 +121,7 @@ class ExecuteResultTestsRM(TestCase):
         symds = execrecord.execrecordouts.first().symbolicdataset
         check = symds.content_checks.first()
 
-        self.assertEqual(symds.content_checks.count(), 1) # should have been checked once
+        self.assertEqual(symds.content_checks.count(), 1)  # should have been checked once
         self.assertEqual(check.symbolicdataset, symds)
         self.assertEqual(check.end_time is None, False)
         self.assertEqual(check.start_time <= check.end_time, True)
@@ -178,7 +171,7 @@ class ExecuteResultTestsRM(TestCase):
         """
         run = self.comp_run
 
-        pipelinestep = self.pipeline_complement.steps.first() # 1 step
+        pipelinestep = self.pipeline_complement.steps.first()  # 1 step
         runstep = run.runsteps.first()
         symds_out = runstep.outputs.first().symbolicdataset
         execlog = runstep.log
@@ -239,7 +232,7 @@ class ExecuteResultTestsRM(TestCase):
 
     def test_execute_pipeline_reuse_within_different_pipeline(self):
         """
-        Running the same dataset through the same Method, in two different 
+        Running the same dataset through the same Method, in two different
         pipelines, should reuse an ExecRecord.
         """
         step1 = self.reverse_run.runsteps.first()  # 1 step
@@ -439,12 +432,14 @@ class FindSDTests(TestCase):
 
         transforms = [self.method_noop_backwords, self.pipeline_twostep, self.method_noop_backwords]
         tools.create_linear_pipeline(self.pipeline_nested,
-            transforms, "data", "unchanged_data")
+                                     transforms,
+                                     "data",
+                                     "unchanged_data")
         cable = self.pipeline_nested.steps.get(step_num=3).cables_in.first()
         tools.make_crisscross_cable(cable)
         self.pipeline_nested.create_outputs()
         self.pipeline_nested.complete_clean()
-    
+
     def setup_twostep_pipeline(self):
         """
         (drow,word) (word,drow) (word,drow)    (drow,word)  (drow,word)    (drow,word)
@@ -468,19 +463,20 @@ class FindSDTests(TestCase):
                 source = self.pipeline_twostep.inputs.first()
             else:
                 source = methods[i-1].outputs.first()
-            cable = step.cables_in.create(source_step = i, 
-                source = source,
-                dest = methods[i].inputs.first())
+            cable = step.cables_in.create(source_step=i,
+                                          source=source,
+                                          dest=methods[i].inputs.first())
             tools.make_crisscross_cable(cable)
 
-        cable = self.pipeline_twostep.create_outcable(output_name = "reversed_words",
-            output_idx = 1,
-            source_step = 2,
-            source = methods[-1].outputs.first())
+        cable = self.pipeline_twostep.create_outcable(
+            output_name="reversed_words",
+            output_idx=1,
+            source_step=2,
+            source=methods[-1].outputs.first())
 
         self.pipeline_twostep.create_outputs()
         self.pipeline_twostep.complete_clean()
-    
+
     def setup_simple_pipeline(self):
         # A simple, one-step pipeline, which does nothing.
         self.pipeline_noop = tools.make_first_pipeline("simple pipeline", "a simple, one-step pipeline",
@@ -600,4 +596,3 @@ class RawTests(SandboxRMTestCase):
 
     def tearDown(self):
         super(RawTests, self).tearDown()
-
