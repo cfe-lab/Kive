@@ -544,6 +544,14 @@ class RemovalTestEnvironmentBuilder(FixtureBuilder):
         tools.create_removal_test_environment()
 
 
+class ExecuteTestsBuilder(FixtureBuilder):
+    def get_name(self):
+        return "execute_tests.json"
+
+    def build(self):
+        sandbox.tests.execute_tests_environment_setup(self)
+
+
 class RunApiTestsEnvironmentBuilder(FixtureBuilder):
     def get_name(self):
         return "run_api_tests.json"
@@ -764,5 +772,6 @@ class Command(BaseCommand):
         ExecuteResultTestsRMEnvironmentBuilder().run()
         ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
         RestoreReusableDatasetBuilder().run()
+        ExecuteTestsBuilder().run()
 
         self.stdout.write('Done.')

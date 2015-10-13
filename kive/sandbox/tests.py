@@ -116,13 +116,55 @@ def execute_tests_environment_setup(case):
     pX_raw.create_outputs()
 
 
+def execute_tests_environment_load(case):
+    case.myUser = User.objects.get(is_staff=False)
+    case.mf = MethodFamily.objects.get()
+    case.pf = PipelineFamily.objects.get()
+    case.mA_cr = CodeResource.objects.get()
+    case.mA_crr = CodeResourceRevision.objects.get()
+    case.string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
+    case.int_dt = Datatype.objects.get(pk=datatypes.INT_PK)
+    case.pX_in_cdt = CompoundDatatype.objects.get(members__column_name='pX_a')
+    case.pX_in_cdtm_1 = case.pX_in_cdt.members.get(column_name="pX_a")
+    case.pX_in_cdtm_2 = case.pX_in_cdt.members.get(column_name="pX_b")
+    case.pX_in_cdtm_3 = case.pX_in_cdt.members.get(column_name="pX_c")
+
+    case.mA_in_cdt = CompoundDatatype.objects.get(members__column_name='a')
+    case.mA_in_cdtm_1 = case.mA_in_cdt.members.get(column_name="a")
+    case.mA_in_cdtm_2 = case.mA_in_cdt.members.get(column_name="b")
+
+    case.mA_out_cdt = CompoundDatatype.objects.get(members__column_name='c')
+    case.mA_out_cdtm_1 = case.mA_out_cdt.members.get(column_name="c")
+    case.mA_out_cdtm_2 = case.mA_out_cdt.members.get(column_name="d")
+
+    case.symDS = SymbolicDataset.objects.get(
+        structure__compounddatatype=case.pX_in_cdt)
+    case.rawDS = SymbolicDataset.objects.get(structure__isnull=True)
+    case.mA = Method.objects.get(revision_name="mA")
+    case.mA_in = case.mA.inputs.get()
+    case.mA_out = case.mA.outputs.get()
+
+    case.pX = Pipeline.objects.get(revision_name="pX_revision")
+    case.X1_in = case.pX.inputs.get()
+    case.step_X1 = case.pX.steps.get()
+
+    case.cable_X1_A1 = case.step_X1.cables_in.get()
+    case.wire1 = case.cable_X1_A1.custom_wires.get(source_pin=case.pX_in_cdtm_2)
+    case.wire2 = case.cable_X1_A1.custom_wires.get(source_pin=case.pX_in_cdtm_3)
+
+    case.X1_outcable = case.pX.outcables.get()
+
+
 class ExecuteTestsBase(TestCase):
+    fixtures = ['execute_tests']
 
     def setUp(self):
-        execute_tests_environment_setup(self)
+        install_fixture_files("execute_tests")
+        execute_tests_environment_load(self)
 
     def tearDown(self):
         clean_up_all_files()
+        restore_production_files()
 
 
 class ExecuteTests(ExecuteTestsBase):
