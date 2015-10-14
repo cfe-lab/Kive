@@ -36,13 +36,10 @@ def get_open_fds():
     """
     pid = os.getpid()
     procs = subprocess.check_output(
-        [ "lsof", '-w', '-Ff', "-p", str( pid ) ] )
+        ["lsof", '-w', '-Ff', "-p", str(pid)])
 
-    nprocs = len(
-        filter(
-            lambda s: s and s[ 0 ] == 'f' and s[1: ].isdigit(),
-            procs.split( '\n' ) )
-        )
+    nprocs = len(filter(lambda s: s and s[0] == 'f' and s[1:].isdigit(),
+                        procs.split('\n')))
     return nprocs
 
 
@@ -357,7 +354,9 @@ def create_eric_martin_test_environment(case):
     case.generic_crRev.grant_everyone_access()
 
     # Method family, methods, and their input/outputs
-    case.mf = MethodFamily(name="method_family",description="Holds methods A/B/C", user=case.myUser)
+    case.mf = MethodFamily(name="method_family",
+                           description="Holds methods A/B/C",
+                           user=case.myUser)
     case.mf.save()
     case.mf.grant_everyone_access()
     case.mA = Method(revision_name="mA_name", revision_desc="A_desc", family=case.mf, driver=case.generic_crRev,
@@ -365,62 +364,126 @@ def create_eric_martin_test_environment(case):
     case.mA.save()
     case.mA.grant_everyone_access()
     case.A1_rawin = case.mA.create_input(dataset_name="A1_rawin", dataset_idx=1)
-    case.A1_out = case.mA.create_output(compounddatatype=case.doublet_cdt,dataset_name="A1_out",dataset_idx=1)
+    case.A1_out = case.mA.create_output(compounddatatype=case.doublet_cdt,
+                                        dataset_name="A1_out",
+                                        dataset_idx=1)
 
     case.mB = Method(revision_name="mB_name", revision_desc="B_desc", family=case.mf, driver=case.generic_crRev,
                      user=case.myUser)
     case.mB.save()
     case.mB.grant_everyone_access()
-    case.B1_in = case.mB.create_input(compounddatatype=case.doublet_cdt,dataset_name="B1_in",dataset_idx=1)
-    case.B2_in = case.mB.create_input(compounddatatype=case.singlet_cdt,dataset_name="B2_in",dataset_idx=2)
-    case.B1_out = case.mB.create_output(compounddatatype=case.triplet_cdt,dataset_name="B1_out",dataset_idx=1,max_row=5)
+    case.B1_in = case.mB.create_input(compounddatatype=case.doublet_cdt,
+                                      dataset_name="B1_in",
+                                      dataset_idx=1)
+    case.B2_in = case.mB.create_input(compounddatatype=case.singlet_cdt,
+                                      dataset_name="B2_in",
+                                      dataset_idx=2)
+    case.B1_out = case.mB.create_output(compounddatatype=case.triplet_cdt,
+                                        dataset_name="B1_out",
+                                        dataset_idx=1,
+                                        max_row=5)
 
     case.mC = Method(revision_name="mC_name", revision_desc="C_desc", family=case.mf, driver=case.generic_crRev,
                      user=case.myUser)
     case.mC.save()
     case.mC.grant_everyone_access()
-    case.C1_in = case.mC.create_input(compounddatatype=case.triplet_cdt,dataset_name="C1_in",dataset_idx=1)
-    case.C2_in = case.mC.create_input(compounddatatype=case.doublet_cdt,dataset_name="C2_in",dataset_idx=2)
-    case.C1_out = case.mC.create_output(compounddatatype=case.singlet_cdt,dataset_name="C1_out",dataset_idx=1)
-    case.C2_rawout = case.mC.create_output(dataset_name="C2_rawout",dataset_idx=2)
-    case.C3_rawout = case.mC.create_output(dataset_name="C3_rawout",dataset_idx=3)
+    case.C1_in = case.mC.create_input(compounddatatype=case.triplet_cdt,
+                                      dataset_name="C1_in",
+                                      dataset_idx=1)
+    case.C2_in = case.mC.create_input(compounddatatype=case.doublet_cdt,
+                                      dataset_name="C2_in",
+                                      dataset_idx=2)
+    case.C1_out = case.mC.create_output(compounddatatype=case.singlet_cdt,
+                                        dataset_name="C1_out",
+                                        dataset_idx=1)
+    case.C2_rawout = case.mC.create_output(dataset_name="C2_rawout",
+                                           dataset_idx=2)
+    case.C3_rawout = case.mC.create_output(dataset_name="C3_rawout",
+                                           dataset_idx=3)
 
     # Pipeline family, pipelines, and their input/outputs
-    case.pf = PipelineFamily(name="Pipeline_family", description="PF desc", user=case.myUser); case.pf.save()
+    case.pf = PipelineFamily(name="Pipeline_family", description="PF desc", user=case.myUser)
+    case.pf.save()
     case.pf.grant_everyone_access()
     case.pD = Pipeline(family=case.pf, revision_name="pD_name", revision_desc="D", user=case.myUser)
     case.pD.save()
     case.pD.grant_everyone_access()
-    case.D1_in = case.pD.create_input(compounddatatype=case.doublet_cdt,dataset_name="D1_in",dataset_idx=1)
-    case.D2_in = case.pD.create_input(compounddatatype=case.singlet_cdt,dataset_name="D2_in",dataset_idx=2)
+    case.D1_in = case.pD.create_input(compounddatatype=case.doublet_cdt,
+                                      dataset_name="D1_in",
+                                      dataset_idx=1)
+    case.D2_in = case.pD.create_input(compounddatatype=case.singlet_cdt,
+                                      dataset_name="D2_in",
+                                      dataset_idx=2)
     case.pE = Pipeline(family=case.pf, revision_name="pE_name", revision_desc="E", user=case.myUser)
     case.pE.save()
     case.pE.grant_everyone_access()
-    case.E1_in = case.pE.create_input(compounddatatype=case.triplet_cdt,dataset_name="E1_in",dataset_idx=1)
-    case.E2_in = case.pE.create_input(compounddatatype=case.singlet_cdt,dataset_name="E2_in",dataset_idx=2,min_row=10)
-    case.E3_rawin = case.pE.create_input(dataset_name="E3_rawin",dataset_idx=3)
+    case.E1_in = case.pE.create_input(compounddatatype=case.triplet_cdt,
+                                      dataset_name="E1_in",
+                                      dataset_idx=1)
+    case.E2_in = case.pE.create_input(compounddatatype=case.singlet_cdt,
+                                      dataset_name="E2_in",
+                                      dataset_idx=2,
+                                      min_row=10)
+    case.E3_rawin = case.pE.create_input(dataset_name="E3_rawin",
+                                         dataset_idx=3)
 
     # Pipeline steps
-    case.step_D1 = case.pD.steps.create(transformation=case.mB,step_num=1)
-    case.step_E1 = case.pE.steps.create(transformation=case.mA,step_num=1)
-    case.step_E2 = case.pE.steps.create(transformation=case.pD,step_num=2)
-    case.step_E3 = case.pE.steps.create(transformation=case.mC,step_num=3)
+    case.step_D1 = case.pD.steps.create(transformation=case.mB,
+                                        step_num=1)
+    case.step_E1 = case.pE.steps.create(transformation=case.mA,
+                                        step_num=1)
+    case.step_E2 = case.pE.steps.create(transformation=case.pD,
+                                        step_num=2)
+    case.step_E3 = case.pE.steps.create(transformation=case.mC,
+                                        step_num=3)
 
     # Pipeline cables and outcables
-    case.D01_11 = case.step_D1.cables_in.create(dest=case.B1_in,source_step=0,source=case.D1_in)
-    case.D02_12 = case.step_D1.cables_in.create(dest=case.B2_in,source_step=0,source=case.D2_in)
-    case.D11_21 = case.pD.outcables.create(output_name="D1_out",output_idx=1,output_cdt=case.triplet_cdt,source_step=1,source=case.B1_out)
+    case.D01_11 = case.step_D1.cables_in.create(dest=case.B1_in,
+                                                source_step=0,
+                                                source=case.D1_in)
+    case.D02_12 = case.step_D1.cables_in.create(dest=case.B2_in,
+                                                source_step=0,
+                                                source=case.D2_in)
+    case.D11_21 = case.pD.outcables.create(output_name="D1_out",
+                                           output_idx=1,
+                                           output_cdt=case.triplet_cdt,
+                                           source_step=1,
+                                           source=case.B1_out)
     case.pD.create_outputs()
     case.D1_out = case.pD.outputs.get(dataset_name="D1_out")
 
-    case.E03_11 = case.step_E1.cables_in.create(dest=case.A1_rawin,source_step=0,source=case.E3_rawin)
-    case.E01_21 = case.step_E2.cables_in.create(dest=case.D1_in,source_step=0,source=case.E1_in)
-    case.E02_22 = case.step_E2.cables_in.create(dest=case.D2_in,source_step=0,source=case.E2_in)
-    case.E11_32 = case.step_E3.cables_in.create(dest=case.C2_in,source_step=1,source=case.A1_out)
-    case.E21_31 = case.step_E3.cables_in.create(dest=case.C1_in,source_step=2,source=case.step_E2.transformation.outputs.get(dataset_name="D1_out"))
-    case.E21_41 = case.pE.outcables.create(output_name="E1_out",output_idx=1,output_cdt=case.doublet_cdt,source_step=2,source=case.step_E2.transformation.outputs.get(dataset_name="D1_out"))
-    case.E31_42 = case.pE.outcables.create(output_name="E2_out",output_idx=2,output_cdt=case.singlet_cdt,source_step=3,source=case.C1_out)
-    case.E33_43 = case.pE.outcables.create(output_name="E3_rawout",output_idx=3,output_cdt=None,source_step=3,source=case.C3_rawout)
+    case.E03_11 = case.step_E1.cables_in.create(dest=case.A1_rawin,
+                                                source_step=0,
+                                                source=case.E3_rawin)
+    case.E01_21 = case.step_E2.cables_in.create(dest=case.D1_in,
+                                                source_step=0,
+                                                source=case.E1_in)
+    case.E02_22 = case.step_E2.cables_in.create(dest=case.D2_in,
+                                                source_step=0,
+                                                source=case.E2_in)
+    case.E11_32 = case.step_E3.cables_in.create(dest=case.C2_in,
+                                                source_step=1,
+                                                source=case.A1_out)
+    case.E21_31 = case.step_E3.cables_in.create(
+        dest=case.C1_in,
+        source_step=2,
+        source=case.step_E2.transformation.outputs.get(dataset_name="D1_out"))
+    case.E21_41 = case.pE.outcables.create(
+        output_name="E1_out",
+        output_idx=1,
+        output_cdt=case.doublet_cdt,
+        source_step=2,
+        source=case.step_E2.transformation.outputs.get(dataset_name="D1_out"))
+    case.E31_42 = case.pE.outcables.create(output_name="E2_out",
+                                           output_idx=2,
+                                           output_cdt=case.singlet_cdt,
+                                           source_step=3,
+                                           source=case.C1_out)
+    case.E33_43 = case.pE.outcables.create(output_name="E3_rawout",
+                                           output_idx=3,
+                                           output_cdt=None,
+                                           source_step=3,
+                                           source=case.C3_rawout)
     case.pE.create_outputs()
     case.E1_out = case.pE.outputs.get(dataset_name="E1_out")
     case.E2_out = case.pE.outputs.get(dataset_name="E2_out")
@@ -594,17 +657,23 @@ def create_librarian_test_environment(case):
     # Some ExecRecords, some failed, others not.
     i = 0
     for step in PipelineStep.objects.all():
-        if step.is_subpipeline: continue
-        run = step.pipeline.pipeline_instances.create(user=step.pipeline.user); run.save()
-        runstep = RunStep(pipelinestep=step, run=run, reused=False); runstep.save()
+        if step.is_subpipeline:
+            continue
+        run = step.pipeline.pipeline_instances.create(user=step.pipeline.user)
+        run.save()
+        runstep = RunStep(pipelinestep=step, run=run, reused=False)
+        runstep.save()
         execlog = ExecLog.create(runstep, runstep)
-        execlog.methodoutput.return_code = i%2; execlog.methodoutput.save()
-        execrecord = ExecRecord(generator=execlog); execrecord.save()
+        execlog.methodoutput.return_code = i % 2
+        execlog.methodoutput.save()
+        execrecord = ExecRecord(generator=execlog)
+        execrecord.save()
         for step_input in step.transformation.inputs.all():
             sd = SymbolicDataset.filter_by_user(step.pipeline.user).filter(
                 structure__compounddatatype=step_input.compounddatatype).first()
             execrecord.execrecordins.create(symbolicdataset=sd, generic_input=step_input)
-        runstep.execrecord = execrecord; runstep.save()
+        runstep.execrecord = execrecord
+        runstep.save()
         i += 1
 
 
@@ -648,8 +717,9 @@ cat "$1" > "$2"
 
     # A toy Datatype.
     nucleotide_seq = new_datatype("Nucleotide sequence", "Sequences of A, C, G, and T",
-                                        Datatype.objects.get(pk=datatypes.STR_PK), remover,
-                                        grant_everyone_access=False)
+                                  Datatype.objects.get(pk=datatypes.STR_PK),
+                                  remover,
+                                  grant_everyone_access=False)
     one_col_nuc_seq = CompoundDatatype(user=remover)
     one_col_nuc_seq.save()
     one_col_nuc_seq.members.create(datatype=nucleotide_seq, column_name="sequence", column_idx=1)
@@ -665,9 +735,13 @@ GGGAGTTC
 CCCTCCTC
 """)
     seq_datafile.close()
-    seq_sd = SymbolicDataset.create_SD(seq_datafile.name,
-        name="Removal test data", cdt=one_col_nuc_seq, user=remover,
-        description="A dataset for use in the removal test case.", make_dataset=True)
+    seq_sd = SymbolicDataset.create_SD(
+        seq_datafile.name,
+        name="Removal test data",
+        cdt=one_col_nuc_seq,
+        user=remover,
+        description="A dataset for use in the removal test case.",
+        make_dataset=True)
 
     nuc_seq_noop = make_first_method(
         "Noop (nucleotide sequence)",
@@ -686,8 +760,10 @@ CCCTCCTC
         )
     create_linear_pipeline(noop_pl, [nuc_seq_noop], "noop_pipeline_in", "noop_pipeline_out")
 
-    p_nested = make_first_pipeline("Nested pipeline", "Pipeline with one nested level", remover,
-                                         grant_everyone_access=False)
+    p_nested = make_first_pipeline("Nested pipeline",
+                                   "Pipeline with one nested level",
+                                   remover,
+                                   grant_everyone_access=False)
     create_linear_pipeline(p_nested, [noop_pl, noop_pl], "nested_in", "nested_out")
     p_nested.create_outputs()
     p_nested.save()
@@ -701,10 +777,11 @@ CCCTCCTC
         "Nucleotide Sequence two-step Noop",
         "A two-step noop pipeline for nucleotide sequences.",
         remover,
-        grant_everyone_access=False
-        )
-    create_linear_pipeline(two_step_noop_pl, [nuc_seq_noop, nuc_seq_noop],
-                                 "noop_pipeline_in", "noop_pipeline_out")
+        grant_everyone_access=False)
+    create_linear_pipeline(two_step_noop_pl,
+                           [nuc_seq_noop, nuc_seq_noop],
+                           "noop_pipeline_in",
+                           "noop_pipeline_out")
 
     two_step_seq_datafile = tempfile.NamedTemporaryFile(delete=False)
     two_step_seq_datafile.write("""sequence
@@ -714,9 +791,13 @@ GGGGGG
 TTTTTTC
 """)
     two_step_seq_datafile.close()
-    two_step_seq_sd = SymbolicDataset.create_SD(two_step_seq_datafile.name,
-        name="Removal test data for a two-step Pipeline", cdt=one_col_nuc_seq, user=remover,
-        description="A dataset for use in the removal test case with the two-step Pipeline.", make_dataset=True)
+    two_step_seq_sd = SymbolicDataset.create_SD(
+        two_step_seq_datafile.name,
+        name="Removal test data for a two-step Pipeline",
+        cdt=one_col_nuc_seq,
+        user=remover,
+        description="A dataset for use in the removal test case with the two-step Pipeline.",
+        make_dataset=True)
 
     two_step_run_sdbx = sandbox.execute.Sandbox(remover, two_step_noop_pl, [two_step_seq_sd], groups_allowed=[])
     two_step_run_sdbx.execute_pipeline()
@@ -869,7 +950,6 @@ def create_method_test_environment(case):
                                                revision_desc="CR1-rev1",
                                                user=case.myUser)
 
-
     case.test_cr_2 = CodeResource(name="test_cr_2",
                                   filename="test_cr_2.py",
                                   description="CR2",
@@ -937,17 +1017,17 @@ def create_method_test_environment(case):
 
     # Add input DNAinput_cdt to DNAcompv1_m
     case.DNAinput_ti = case.DNAcompv1_m.create_input(
-        compounddatatype = case.DNAinput_cdt,
-        dataset_name = "input",
-        dataset_idx = 1)
+        compounddatatype=case.DNAinput_cdt,
+        dataset_name="input",
+        dataset_idx=1)
     case.DNAinput_ti.full_clean()
     case.DNAinput_ti.save()
 
     # Add output DNAoutput_cdt to DNAcompv1_m
     case.DNAoutput_to = case.DNAcompv1_m.create_output(
-        compounddatatype = case.DNAoutput_cdt,
-        dataset_name = "output",
-        dataset_idx = 1)
+        compounddatatype=case.DNAoutput_cdt,
+        dataset_name="output",
+        dataset_idx=1)
     case.DNAoutput_to.full_clean()
     case.DNAoutput_to.save()
 
@@ -985,17 +1065,17 @@ def create_method_test_environment(case):
 
     # Add input RNAinput_cdt to RNAcompv1_m
     case.RNAinput_ti = case.RNAcompv1_m.create_input(
-        compounddatatype = case.RNAinput_cdt,
-        dataset_name = "input",
-        dataset_idx = 1)
+        compounddatatype=case.RNAinput_cdt,
+        dataset_name="input",
+        dataset_idx=1)
     case.RNAinput_ti.full_clean()
     case.RNAinput_ti.save()
 
     # Add output RNAoutput_cdt to RNAcompv1_m
     case.RNAoutput_to = case.RNAcompv1_m.create_output(
-        compounddatatype = case.RNAoutput_cdt,
-        dataset_name = "output",
-        dataset_idx = 1)
+        compounddatatype=case.RNAoutput_cdt,
+        dataset_name="output",
+        dataset_idx=1)
     case.RNAoutput_to.full_clean()
     case.RNAoutput_to.save()
 
@@ -1048,19 +1128,19 @@ def create_method_test_environment(case):
     case.script_1_method = Method(
         revision_name="script1",
         revision_desc="script1",
-        family = case.test_mf,
-        driver = case.script_1_crRev,
+        family=case.test_mf,
+        driver=case.script_1_crRev,
         user=case.myUser)
     case.script_1_method.save()
     case.script_1_method.grant_everyone_access()
 
     # Assign tuple as both an input and an output to script_1_method
-    case.script_1_method.create_input(compounddatatype = case.tuple_cdt,
-                                      dataset_name = "input_tuple",
-                                      dataset_idx = 1)
-    case.script_1_method.create_output(compounddatatype = case.tuple_cdt,
-                                       dataset_name = "input_tuple",
-                                       dataset_idx = 1)
+    case.script_1_method.create_input(compounddatatype=case.tuple_cdt,
+                                      dataset_name="input_tuple",
+                                      dataset_idx=1)
+    case.script_1_method.create_output(compounddatatype=case.tuple_cdt,
+                                       dataset_name="input_tuple",
+                                       dataset_idx=1)
     case.script_1_method.full_clean()
     case.script_1_method.save()
 
@@ -1092,25 +1172,25 @@ def create_method_test_environment(case):
     case.script_2_method = Method(
         revision_name="script2",
         revision_desc="script2",
-        family = case.test_mf,
-        driver = case.script_2_crRev,
+        family=case.test_mf,
+        driver=case.script_2_crRev,
         user=case.myUser)
     case.script_2_method.save()
     case.script_2_method.grant_everyone_access()
 
     # Assign triplet as input and output,
     case.script_2_method.create_input(
-        compounddatatype = case.triplet_cdt,
-        dataset_name = "a_b_c",
-        dataset_idx = 1)
+        compounddatatype=case.triplet_cdt,
+        dataset_name="a_b_c",
+        dataset_idx=1)
     case.script_2_method.create_output(
-        compounddatatype = case.triplet_cdt,
-        dataset_name = "a_b_c_squared",
-        dataset_idx = 1)
+        compounddatatype=case.triplet_cdt,
+        dataset_name="a_b_c_squared",
+        dataset_idx=1)
     case.script_2_method.create_output(
-        compounddatatype = case.singlet_cdt,
-        dataset_name = "a_b_c_mean",
-        dataset_idx = 2)
+        compounddatatype=case.singlet_cdt,
+        dataset_name="a_b_c_mean",
+        dataset_idx=2)
     case.script_2_method.full_clean()
     case.script_2_method.save()
 
@@ -1141,26 +1221,26 @@ def create_method_test_environment(case):
     case.script_3_method = Method(
         revision_name="script3",
         revision_desc="script3",
-        family = case.test_mf,
-        driver = case.script_3_crRev,
+        family=case.test_mf,
+        driver=case.script_3_crRev,
         user=case.myUser)
     case.script_3_method.save()
     case.script_3_method.grant_everyone_access()
 
     # Assign singlet as input and output
-    case.script_3_method.create_input(compounddatatype = case.singlet_cdt,
-                                      dataset_name = "k",
-                                      dataset_idx = 1)
+    case.script_3_method.create_input(compounddatatype=case.singlet_cdt,
+                                      dataset_name="k",
+                                      dataset_idx=1)
 
-    case.script_3_method.create_input(compounddatatype = case.singlet_cdt,
-                                      dataset_name = "r",
-                                      dataset_idx = 2,
-                                      max_row = 1,
-                                      min_row = 1)
+    case.script_3_method.create_input(compounddatatype=case.singlet_cdt,
+                                      dataset_name="r",
+                                      dataset_idx=2,
+                                      max_row=1,
+                                      min_row=1)
 
-    case.script_3_method.create_output(compounddatatype = case.singlet_cdt,
-                                       dataset_name = "kr",
-                                       dataset_idx = 1)
+    case.script_3_method.create_output(compounddatatype=case.singlet_cdt,
+                                       dataset_name="kr",
+                                       dataset_idx=1)
     case.script_3_method.full_clean()
     case.script_3_method.save()
 
@@ -1186,15 +1266,15 @@ def create_method_test_environment(case):
 
     # To this method revision, add inputs with CDT DNAoutput_cdt
     case.DNArecomp_m.create_input(
-        compounddatatype = case.DNAoutput_cdt,
-        dataset_name = "complemented_seqs",
-        dataset_idx = 1)
+        compounddatatype=case.DNAoutput_cdt,
+        dataset_name="complemented_seqs",
+        dataset_idx=1)
 
     # To this method revision, add outputs with CDT DNAinput_cdt
     case.DNArecomp_m.create_output(
-        compounddatatype = case.DNAinput_cdt,
-        dataset_name = "recomplemented_seqs",
-        dataset_idx = 1)
+        compounddatatype=case.DNAinput_cdt,
+        dataset_name="recomplemented_seqs",
+        dataset_idx=1)
 
     # Setup used in the "2nd-wave" tests (this was originally in
     # Copperfish_Raw_Setup).
@@ -1204,7 +1284,8 @@ def create_method_test_environment(case):
     # output: CSV [3 CDT members of the form (a^2, b^2, c^2)]
 
     # Define CR in order to define CRR
-    case.script_4_CR = CodeResource(name="Generate (a^2, b^2, c^2) using RAW input",
+    case.script_4_CR = CodeResource(
+        name="Generate (a^2, b^2, c^2) using RAW input",
         filename="script_4_raw_in_CSV_out.py",
         description="Given (a,b,c), outputs (a^2,b^2,c^2)",
         user=case.myUser)
@@ -1236,26 +1317,29 @@ def create_method_test_environment(case):
     case.script_4_1_M = Method(
         revision_name="s4",
         revision_desc="s4",
-        family = case.test_MF,
-        driver = case.script_4_1_CRR,
+        family=case.test_MF,
+        driver=case.script_4_1_CRR,
         user=case.myUser)
     case.script_4_1_M.save()
     case.script_4_1_M.grant_everyone_access()
 
     case.script_4_1_M.create_input(compounddatatype=case.triplet_cdt,
-        dataset_name="s4_input", dataset_idx = 1)
+                                   dataset_name="s4_input",
+                                   dataset_idx=1)
     case.script_4_1_M.full_clean()
 
     # A shorter alias
     case.testmethod = case.script_4_1_M
 
     # Some code for a no-op method.
-    resource = CodeResource(name="noop", filename="noop.sh", user=case.myUser); resource.save()
+    resource = CodeResource(name="noop", filename="noop.sh", user=case.myUser)
+    resource.save()
     resource.grant_everyone_access()
     with tempfile.NamedTemporaryFile() as f:
         f.write("#!/bin/bash\ncat $1")
         case.noop_data_file = f.name
-        revision = CodeResourceRevision(coderesource = resource, content_file = File(f),
+        revision = CodeResourceRevision(coderesource=resource,
+                                        content_file=File(f),
                                         user=case.myUser)
         revision.clean()
         revision.save()
@@ -1269,14 +1353,18 @@ def create_method_test_environment(case):
     string_cdt.grant_everyone_access()
     string_cdt.full_clean()
 
-    mfamily = MethodFamily(name="noop", user=case.myUser); mfamily.save()
+    mfamily = MethodFamily(name="noop", user=case.myUser)
+    mfamily.save()
     mfamily.grant_everyone_access()
-    case.noop_method = Method(
-        family=mfamily, driver=revision,
-        revision_name = "1", revision_desc = "first version",
-        user=case.myUser)
+    case.noop_method = Method(family=mfamily,
+                              driver=revision,
+                              revision_name="1",
+                              revision_desc="first version",
+                              user=case.myUser)
     case.noop_method.save()
-    case.noop_method.create_input(compounddatatype=string_cdt, dataset_name = "noop_data", dataset_idx=1)
+    case.noop_method.create_input(compounddatatype=string_cdt,
+                                  dataset_name="noop_data",
+                                  dataset_idx=1)
     case.noop_method.grant_everyone_access()
     case.noop_method.full_clean()
 
@@ -1356,7 +1444,6 @@ def create_pipeline_test_environment(case):
     case.DNAcompv1_p.create_outcable(source_step=1,
                                      source=step1.transformation.outputs.get(dataset_name="output"),
                                      output_name="complemented_seqs", output_idx=1)
-
 
     # Define PF in order to define pipeline
     case.test_PF = PipelineFamily(
@@ -1482,8 +1569,10 @@ def create_sequence_manipulation_environment(case):
     case.pipeline_complement_v2 = Pipeline(family=case.pipeline_complement.family, revision_name="2",
                                            revision_desc="second version", user=case.user_alice)
     case.pipeline_complement_v2.save()
-    create_linear_pipeline(case.pipeline_complement_v2, [case.method_complement], "lab_data",
-                                "complemented_lab_data")
+    create_linear_pipeline(case.pipeline_complement_v2,
+                           [case.method_complement],
+                           "lab_data",
+                           "complemented_lab_data")
     case.pipeline_complement_v2.steps.last().add_deletion(case.method_complement.outputs.first())
     case.pipeline_complement_v2.outcables.first().delete()
     case.pipeline_complement_v2.create_outputs()
@@ -1493,8 +1582,10 @@ def create_sequence_manipulation_environment(case):
     case.pipeline_revcomp_v2 = Pipeline(family=case.pipeline_revcomp.family, revision_name="2",
                                         revision_desc="second version", user=case.user_alice)
     case.pipeline_revcomp_v2.save()
-    create_linear_pipeline(case.pipeline_revcomp_v2, [case.method_reverse, case.method_complement],
-                                 "lab_data", "revcomped_lab_data")
+    create_linear_pipeline(case.pipeline_revcomp_v2,
+                           [case.method_reverse, case.method_complement],
+                           "lab_data",
+                           "revcomped_lab_data")
     case.pipeline_revcomp_v2.steps.get(step_num=1).add_deletion(case.method_reverse.outputs.first())
     case.pipeline_revcomp_v2.steps.get(step_num=2).add_deletion(case.method_complement.outputs.first())
     case.pipeline_revcomp_v2.outcables.first().delete()
@@ -1511,11 +1602,15 @@ def create_sequence_manipulation_environment(case):
     case.pipeline_revcomp_v3.create_outputs()
 
     # Another method which turns DNA into RNA.
-    case.coderev_DNA2RNA = make_first_revision("DNA to RNA", "a script to reverse DNA", "DNA2RNA.sh",
-            """#!/bin/bash
-            cat "$1" | cut -d ',' -f 2 | tr 'T' 'U' | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
-            """,
-            case.user_alice)
+    source = """\
+#!/bin/bash
+cat "$1" | cut -d ',' -f 2 | tr 'T' 'U' | paste -d, "$1" - | cut -d ',' -f 1,3 > "$2"
+"""
+    case.coderev_DNA2RNA = make_first_revision("DNA to RNA",
+                                               "a script to reverse DNA",
+                                               "DNA2RNA.sh",
+                                               source,
+                                               case.user_alice)
     case.method_DNA2RNA = make_first_method("DNA to RNA", "a method to turn strings of DNA into RNA",
                                             case.coderev_DNA2RNA, case.user_alice)
     simple_method_io(case.method_DNA2RNA, case.cdt_record, "DNA_to_convert", "RNA")
@@ -1557,7 +1652,10 @@ def create_word_reversal_environment(case):
     create_sandbox_testing_tools_environment(case)
 
     # A code resource which reverses a file.
-    case.coderev_reverse = make_first_revision("reverse", "a script to reverse lines of a file", "reverse.py",
+    case.coderev_reverse = make_first_revision(
+        "reverse",
+        "a script to reverse lines of a file",
+        "reverse.py",
         ("#!/usr/bin/env python\n"
          "import sys\n"
          "import csv\n"
@@ -1623,7 +1721,7 @@ def create_word_reversal_environment(case):
     writer.writerow(["word", "drow"])
     random.seed("Constant seed avoids intermittent failures.")
     for _ in range(20):
-        i = random.randint(1,99171)
+        i = random.randint(1, 99171)
         sed = subprocess.Popen(["sed", "{}q;d".format(i), "/usr/share/dict/words"],
                                stdout=subprocess.PIPE)
         word, _ = sed.communicate()
@@ -1635,7 +1733,7 @@ def create_word_reversal_environment(case):
     writer = csv.writer(case.backwords_datafile)
     writer.writerow(["drow", "word"])
     for _ in range(20):
-        i = random.randint(1,99171)
+        i = random.randint(1, 99171)
         sed = subprocess.Popen(["sed", "{}q;d".format(i), "/usr/share/dict/words"],
                                stdout=subprocess.PIPE)
         word, _ = sed.communicate()
@@ -1750,12 +1848,12 @@ def simple_method_io(method, cdt, indataname, outdataname):
     for both incoming and outgoing data.
     """
     minput = method.create_input(compounddatatype=cdt,
-        dataset_name = indataname,
-        dataset_idx = 1)
+                                 dataset_name=indataname,
+                                 dataset_idx=1)
     minput.clean()
     moutput = method.create_output(compounddatatype=cdt,
-        dataset_name = outdataname,
-        dataset_idx = 1)
+                                   dataset_name=outdataname,
+                                   dataset_idx=1)
     moutput.clean()
     method.clean()
     return minput, moutput
@@ -1795,7 +1893,7 @@ def make_second_pipeline(pipeline, grant_everyone_access=True):
         new_step = new_pipeline.steps.create(transformation=step.transformation, step_num=step.step_num)
         for cable in step.cables_in.all():
             if cable.source.transformation.__class__.__name__ == "PipelineStep":
-                new_step.cables_in.create(source = cable.source, dest = cable.dest)
+                new_step.cables_in.create(source=cable.source, dest=cable.dest)
     return new_pipeline
 
 
@@ -1849,8 +1947,11 @@ def make_words_symDS(case):
     os.system("head -1 /usr/share/dict/words >> {}".
               format(string_datafile.name))
     case.symds_words = SymbolicDataset.create_SD(string_datafile.name,
-        name="blahblah", cdt=case.cdt_string, user=case.user_bob,
-        description="blahblahblah", make_dataset=True)
+                                                 name="blahblah",
+                                                 cdt=case.cdt_string,
+                                                 user=case.user_bob,
+                                                 description="blahblahblah",
+                                                 make_dataset=True)
     case.symds_words.grant_everyone_access()
     case.symds_words.save()
 
@@ -1908,7 +2009,7 @@ def create_grandpa_sandbox_environment(case):
     case.grandpa_datafile.write("word\n")
     random.seed("Constant seed avoids intermittent failures.")
     for _ in range(20):
-        i = random.randint(1,99171)
+        i = random.randint(1, 99171)
         case.grandpa_datafile.write("{}\n".format(i))
     case.grandpa_datafile.close()
     case.symds_grandpa = SymbolicDataset.create_SD(

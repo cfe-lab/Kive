@@ -40,7 +40,7 @@ class ArchiveTestCaseHelpers:
 
     def make_complete_non_reused(self, record, input_SDs, output_SDs):
         """
-        Helper function to do everything necessary to make a RunStep, 
+        Helper function to do everything necessary to make a RunStep,
         RunOutputCable, or RunStepInputCable complete, when it has not
         reused an ExecRecord (ie. make a new ExecRecord).
 
@@ -63,15 +63,15 @@ class ArchiveTestCaseHelpers:
 
     def make_complete_reused(self, record, input_SDs, output_SDs, other_parent):
         """
-        Helper function to do everything necessary to make a RunStep, 
+        Helper function to do everything necessary to make a RunStep,
         RunOutputCable, or RunStepInputCable complete, when it _has_
         reused an ExecRecord (ie. make an ExecRecord for it to resue).
         """
         record_type = record.__class__.__name__
 
         new_record = record.__class__.create(record.component, other_parent)
-    
-        execlog = ExecLog(record=new_record, invoking_record=new_record, start_time=timezone.now(), 
+
+        execlog = ExecLog(record=new_record, invoking_record=new_record, start_time=timezone.now(),
                           end_time=timezone.now())
         execlog.save()
         if record_type == "RunStep":
@@ -97,15 +97,18 @@ class ArchiveTestCaseHelpers:
         Helper function to step through creation of a RunStep, breaking
         at a certain point (see the code for what these points are).
         """
-        if bp == "empty_runs": return
+        if bp == "empty_runs":
+            return
 
         self.step_E1_RS = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
-        if bp == "first_runstep": return
+        if bp == "first_runstep":
+            return
 
         self.E03_11_RSIC = self.E03_11.psic_instances.create(runstep=self.step_E1_RS)
         self.make_complete_non_reused(self.E03_11_RSIC, [self.raw_symDS], [self.raw_symDS])
         self.raw_symDS.integrity_checks.create(execlog=self.E03_11_RSIC.log, user=self.myUser)
-        if bp == "first_rsic": return
+        if bp == "first_rsic":
+            return
 
         self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
         step1_in_ccl = self.doublet_symDS.content_checks.first()
@@ -113,13 +116,16 @@ class ArchiveTestCaseHelpers:
         step1_in_ccl.save()
         self.doublet_DS.created_by = self.step_E1_RS
         self.doublet_DS.save()
-        if bp == "first_runstep_complete": return
+        if bp == "first_runstep_complete":
+            return
 
         self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
-        if bp == "second_runstep": return
+        if bp == "second_runstep":
+            return
 
-        self.complete_RSICs(self.step_E2_RS, [self.triplet_symDS, self.singlet_symDS],
-                                        [self.D1_in_symDS, self.singlet_symDS])
+        self.complete_RSICs(self.step_E2_RS,
+                            [self.triplet_symDS, self.singlet_symDS],
+                            [self.D1_in_symDS, self.singlet_symDS])
         self.E01_21_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E01_21).first()
         self.E02_22_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E02_22).first()
 
@@ -128,14 +134,16 @@ class ArchiveTestCaseHelpers:
         D1_in_ccl.save()
 
         self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log, user=self.myUser)
-        if bp == "second_runstep_complete": return
+        if bp == "second_runstep_complete":
+            return
 
         # Associate and complete sub-Pipeline.
         self.pD_run.parent_runstep = self.step_E2_RS
         self.pD_run.save()
         self.step_D1_RS = self.step_D1.pipelinestep_instances.create(run=self.pD_run)
-        self.complete_RSICs(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS],
-                                        [self.D1_in_symDS, self.singlet_symDS])
+        self.complete_RSICs(self.step_D1_RS,
+                            [self.D1_in_symDS, self.singlet_symDS],
+                            [self.D1_in_symDS, self.singlet_symDS])
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
         self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
@@ -152,7 +160,8 @@ class ArchiveTestCaseHelpers:
         self.make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
         self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log, user=self.myUser)
 
-        if bp == "sub_pipeline": return
+        if bp == "sub_pipeline":
+            return
 
     def step_through_run_creation(self, bp):
         """
@@ -208,27 +217,31 @@ class ArchiveTestCaseHelpers:
             self.E02_22 = self.step_E2.cables_in.get(dest__dataset_idx=2)
             self.E21_31 = self.step_E3.cables_in.get(dest__dataset_idx=1)
             self.E11_32 = self.step_E3.cables_in.get(dest__dataset_idx=2)
-            
+
         # Changed May 14, 2014 to add CCLs/ICLs where appropriate.
         # Empty Runs.
         self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
         self.pD_run.grant_everyone_access()
-        if bp == "empty_runs": return
+        if bp == "empty_runs":
+            return
 
         # First RunStep associated.
         self.step_E1_RS = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
-        if bp == "first_step": return
+        if bp == "first_step":
+            return
 
         # First RunSIC associated and completed.
         step_E1_RSIC = self.step_E1.cables_in.first().psic_instances.create(runstep=self.step_E1_RS)
-        if bp == "first_cable_created": return
+        if bp == "first_cable_created":
+            return
 
         self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
         icl = self.raw_symDS.integrity_checks.create(execlog=step_E1_RSIC.log, user=self.myUser)
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
-        if bp == "first_cable": return
+        if bp == "first_cable":
+            return
 
         # First RunStep completed.
         self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
@@ -237,11 +250,13 @@ class ArchiveTestCaseHelpers:
         step1_in_ccl.save()
         self.doublet_DS.created_by = self.step_E1_RS
         self.doublet_DS.save()
-        if bp == "first_step_complete": return
+        if bp == "first_step_complete":
+            return
 
         # Second RunStep associated.
         self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
-        if bp == "second_step": return
+        if bp == "second_step":
+            return
 
         # Sub-pipeline for step 2 - reset step_E2_RS.
         self.step_E2_RS.delete()
@@ -263,7 +278,8 @@ class ArchiveTestCaseHelpers:
 
         self.pD_run.parent_runstep = self.step_E2_RS
         self.pD_run.save()
-        if bp == "sub_pipeline": return
+        if bp == "sub_pipeline":
+            return
 
         # Complete sub-Pipeline.
         self.step_D1_RS = self.step_D1.pipelinestep_instances.create(run=self.pD_run)
@@ -294,11 +310,13 @@ class ArchiveTestCaseHelpers:
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
-        if bp == "sub_pipeline_complete": return
+        if bp == "sub_pipeline_complete":
+            return
 
         # Third RunStep associated.
         self.step_E3_RS = self.step_E3.pipelinestep_instances.create(run=self.pE_run)
-        if bp == "third_step": return
+        if bp == "third_step":
+            return
 
         # Third RunStep completed.
         self.complete_RSICs(self.step_E3_RS, [self.C1_in_symDS, self.doublet_symDS],
@@ -317,7 +335,8 @@ class ArchiveTestCaseHelpers:
         C2_in_ccl.execlog = self.E11_32_RSIC.log
         C2_in_ccl.save()
 
-        if bp == "third_step_cables_done": return
+        if bp == "third_step_cables_done":
+            return
 
         step3_outs = [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS]
         self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS], step3_outs)
@@ -327,7 +346,8 @@ class ArchiveTestCaseHelpers:
         C1_out_ccl.execlog = self.step_E3_RS.log
         C1_out_ccl.save()
 
-        if bp == "third_step_complete": return
+        if bp == "third_step_complete":
+            return
 
         # Outcables associated.
         roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
@@ -339,7 +359,8 @@ class ArchiveTestCaseHelpers:
         self.E1_out_DS.created_by = roc1
         self.E1_out_DS.save()
 
-        if bp == "first_outcable": return
+        if bp == "first_outcable":
+            return
 
         roc2 = self.pE.outcables.get(output_idx=2).poc_instances.create(run=self.pE_run)
         self.make_complete_non_reused(roc2, [self.C1_out_symDS], [self.C1_out_symDS])
@@ -357,7 +378,8 @@ class ArchiveTestCaseHelpers:
         icl.stop(save=False)
         icl.save()
 
-        if bp == "outcables_done": return
+        if bp == "outcables_done":
+            return
 
     def step_through_runsic_creation(self, bp):
         """
@@ -365,43 +387,51 @@ class ArchiveTestCaseHelpers:
         certain point (see the code).
         """
         self.step_E3_RS = self.step_E3.pipelinestep_instances.create(run=self.pE_run)
-        if bp == "runstep": return
+        if bp == "runstep":
+            return
 
         self.E11_32_RSIC = self.E11_32.psic_instances.create(runstep=self.step_E3_RS)
-        if bp == "rsic_created": return
+        if bp == "rsic_created":
+            return
 
         self.make_complete_non_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS])
         # C2_in_symDS is created by this cable so associate a CCL appropriately.
         C2_ccl = self.C2_in_symDS.content_checks.first()
         C2_ccl.execlog = self.E11_32_RSIC.log
         C2_ccl.save()
-        if bp == "rsic_completed": return
+        if bp == "rsic_completed":
+            return
 
         self.E21_31_RSIC = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
         self.make_complete_non_reused(self.E21_31_RSIC, [self.C1_in_symDS], [self.C1_in_symDS])
         # C1_in_symDS is not created by this RSIC, so associate an ICL.
         self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log, user=self.myUser)
-        self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS],
-                                                  [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS])
+        self.make_complete_non_reused(self.step_E3_RS,
+                                      [self.C1_in_symDS, self.C2_in_symDS],
+                                      [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS])
         # Associate the CCL of C1_out_symDS with step_E3_RS.
         C1_out_ccl = self.C1_out_symDS.content_checks.first()
         C1_out_ccl.execlog = self.step_E3_RS.log
         C1_out_ccl.save()
-        if bp == "runstep_completed": return
+        if bp == "runstep_completed":
+            return
 
     def step_through_roc_creation(self, bp):
         """Break at an intermediate stage of ROC creation."""
         self.E31_42_ROC = self.E31_42.poc_instances.create(run=self.pE_run)
         self.E21_41_ROC = self.E21_41.poc_instances.create(run=self.pE_run)
-        if bp == "roc_created": return
+        if bp == "roc_created":
+            return
 
         self.make_complete_non_reused(self.E31_42_ROC, [self.singlet_symDS], [self.singlet_symDS])
-        if bp == "trivial_roc_completed": return
+        if bp == "trivial_roc_completed":
+            return
 
         self.make_complete_non_reused(self.E21_41_ROC, [self.C1_in_symDS], [self.doublet_symDS])
         self.doublet_DS.created_by = self.E21_41_ROC
         self.doublet_DS.save()
-        if bp == "custom_roc_completed": return
+        if bp == "custom_roc_completed":
+            return
 
         self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
         self.step_E2_RS.start(save=True)
@@ -416,7 +446,8 @@ class ArchiveTestCaseHelpers:
         pin1, pin2, _ = (m for m in self.triplet_cdt.members.all())
         self.D11_21.custom_wires.create(source_pin=pin1, dest_pin=pin2)
         self.D11_21.custom_wires.create(source_pin=pin2, dest_pin=pin1)
-        if bp == "subrun": return
+        if bp == "subrun":
+            return
 
         self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
         self.C1_in_DS.created_by = self.D11_21_ROC
@@ -424,7 +455,8 @@ class ArchiveTestCaseHelpers:
         self.C1_in_symDS.content_checks.create(execlog=self.D11_21_ROC.log, start_time=timezone.now(),
                                                end_time=timezone.now(), user=self.myUser)
         self.D11_21_ROC.stop(save=True)
-        if bp == "subrun_complete": return
+        if bp == "subrun_complete":
+            return
 
     # def run_pipelines_recovering_reused_step(self):
     #     """
@@ -882,7 +914,7 @@ class RunStepTests(ArchiveTestCase):
         self.step_through_runstep_creation("second_runstep")
         self.pD_run.parent_runstep = self.step_E2_RS
         self.pD_run.save()
-        self.assertRaisesRegexp(ValidationError, 
+        self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" inputs not quenched; child_run should not be set'
                                           .format(self.step_E2_RS)),
                                 self.step_E2_RS.clean)
@@ -1072,8 +1104,8 @@ class RunStepTests(ArchiveTestCase):
         self.doublet_symDS.MD5_checksum = self.doublet_DS.compute_md5()
         self.doublet_DS.save()
         self.doublet_symDS.save()
-        self.assertIsNone(self.step_E1_RS.clean())    
-        
+        self.assertIsNone(self.step_E1_RS.clean())
+
     def test_RunStep_clean_good_child_run(self):
         """
         A RunStep with a child_run which is clean, is also clean.
@@ -1104,7 +1136,7 @@ class RunStepTests(ArchiveTestCase):
         self.step_through_runstep_creation("first_runstep_complete")
         execrecord = self.step_E1_RS.execrecord
         execrecord.execrecordins.first().delete()
-        self.assertRaisesRegexp(ValidationError, 
+        self.assertRaisesRegexp(ValidationError,
                                 re.escape('Input(s) to ExecRecord "{}" are not quenched'.format(execrecord)),
                                 self.step_E1_RS.clean)
 
@@ -1198,7 +1230,7 @@ class RunStepTests(ArchiveTestCase):
         """
         self.step_through_runstep_creation("first_runstep")
         self.assertFalse(self.step_E1_RS.is_complete())
-        self.assertRaisesRegexp(ValidationError, 
+        self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" is not complete'.format(self.step_E1_RS)),
                                 self.step_E1_RS.complete_clean)
 
@@ -1400,7 +1432,7 @@ class RunTests(ArchiveTestCase):
 
     def test_Run_clean_not_started(self):
         """
-        A Run which has been created, but nothing in it has executed 
+        A Run which has been created, but nothing in it has executed
         yet, is clean.
         """
         self.step_through_run_creation("empty_runs")
@@ -1519,7 +1551,7 @@ class RunTests(ArchiveTestCase):
         self.step_through_run_creation("sub_pipeline")
         self.E31_42.poc_instances.create(run=self.pE_run)
         self.assertRaisesRegexp(ValidationError,
-                                re.escape('Run "{}" has a RunOutputCable from step {}, but no corresponding RunStep' 
+                                re.escape('Run "{}" has a RunOutputCable from step {}, but no corresponding RunStep'
                                           .format(self.pE_run, 3)),
                                 self.pE_run.clean)
 
@@ -1550,7 +1582,7 @@ class RunTests(ArchiveTestCase):
 
     def test_Run_clean_bad_RunOutputCable_propagation(self):
         """
-        A Run with an bad RunOutputCable is not clean (not quite the 
+        A Run with an bad RunOutputCable is not clean (not quite the
         same as the old test case, I can't make it work).
         """
         self.step_through_run_creation("outcables_done")
@@ -1702,8 +1734,9 @@ class RunSICTests(ArchiveTestCase):
         self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], other_runstep)
         self.E21_31_RSIC = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
         self.make_complete_non_reused(self.E21_31_RSIC, [self.C1_in_symDS], [self.C1_in_symDS])
-        self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS],
-                                                  [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS])
+        self.make_complete_non_reused(self.step_E3_RS,
+                                      [self.C1_in_symDS, self.C2_in_symDS],
+                                      [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS])
 
         self.E11_32_RSIC.execrecord = self.step_E3_RS.execrecord
         self.assertRaisesRegexp(ValidationError,
@@ -1793,7 +1826,7 @@ class RunSICTests(ArchiveTestCase):
         self.E11_32_RSIC.execrecord = None
 
         self.assertFalse(self.E11_32_RSIC.is_complete())
-        self.assertRaisesRegexp(ValidationError, 
+        self.assertRaisesRegexp(ValidationError,
                                 re.escape('{} "{}" is not complete'.format("RunSIC", self.E11_32_RSIC)),
                                 self.E11_32_RSIC.complete_clean)
 
@@ -1818,10 +1851,10 @@ class RunSICTests(ArchiveTestCase):
         self.assertRaisesRegexp(
             ValidationError,
             re.escape(
-                'CDT of SymbolicDataset "{}" is not a restriction of the CDT of the fed TransformationInput "{}"'.format(
+                'CDT of SymbolicDataset "{}" is not a restriction of the '
+                'CDT of the fed TransformationInput "{}"'.format(
                     ero.symbolicdataset, ero.generic_output.definite)),
             self.E11_32_RSIC.clean)
-
 
     def test_RunSIC_clean_not_reused_incompatible_execrecord(self):
         """
@@ -1936,7 +1969,7 @@ class RunSICTests(ArchiveTestCase):
         A RunSIC which is nontrivial, is not reusing an ExecRecord, and
         is for a PipelineStepInputCable which keeps its output, must
         have produced the same Dataset as is recorded in its
-        ExecRecordOut.  
+        ExecRecordOut.
         """
         self.step_through_runsic_creation("rsic_completed")
         self.E11_32_RSIC.reused = False
@@ -1954,13 +1987,13 @@ class RunSICTests(ArchiveTestCase):
                                           'ExecRecord "{}"'.format(self.doublet_DS, self.E11_32_RSIC,
                                                                    self.E11_32_RSIC.execrecord)),
                                 self.E11_32_RSIC.clean)
-    
+
     def test_RunSIC_clean_not_reused_nontrivial_correct_data(self):
         """
         A RunSIC which is nontrivial, is not reusing an ExecRecord, and
         is for a PipelineStepInputCable which keeps its output, must
         have produced the same Dataset as is recorded in its
-        ExecRecordOut.  
+        ExecRecordOut.
         """
         self.step_through_runsic_creation("rsic_completed")
         self.E11_32_RSIC.reused = False
@@ -2004,7 +2037,7 @@ class RunSICTests(ArchiveTestCase):
     def test_RunSIC_incomplete_not_reused(self):
         """
         A RunSIC which is not reusing an ExecRecord, but which does not
-        have an ExecRecord, is not complete.  
+        have an ExecRecord, is not complete.
         """
         self.step_through_runsic_creation("rsic_completed")
         self.E11_32_RSIC.reused = False
@@ -2069,13 +2102,13 @@ class RunOutputCableTests(ArchiveTestCase):
         self.step_through_roc_creation("roc_created")
         pD_run = self.pD.pipeline_instances.create(user=self.myUser)
         self.E31_42_ROC.run = pD_run
-        self.assertRaisesRegexp(ValidationError, 
+        self.assertRaisesRegexp(ValidationError,
                                 re.escape('POC "{}" does not belong to Pipeline "{}"'.format(self.E31_42, self.pD)),
                                 self.E31_42_ROC.clean)
 
     def test_ROC_clean_unset_reused_with_data(self):
-        """Reused is not set but data is associated. 
-        
+        """Reused is not set but data is associated.
+
         A RunOutputCable which has not decided whether to reuse an
         ExecRecord should not have generated any data.
         """
@@ -2174,7 +2207,7 @@ class RunOutputCableTests(ArchiveTestCase):
                                 re.escape('RunOutputCable "{}" should generate at most one Dataset'
                                           .format(self.E21_41_ROC)),
                                 self.E21_41_ROC.clean)
-        
+
     def test_ROC_clean_not_reused_nontrivial_bad_data(self):
         """Propagation: bad data attached to RunOutputCable.
 
@@ -2338,7 +2371,7 @@ class RunOutputCableTests(ArchiveTestCase):
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('Dataset "{}" was produced by RunOutputCable "{}" but is not in an ERO of '
-                                          'ExecRecord "{}"'.format(self.triplet_3_rows_DS, self.D11_21_ROC, 
+                                          'ExecRecord "{}"'.format(self.triplet_3_rows_DS, self.D11_21_ROC,
                                                                    self.D11_21_ROC.execrecord)),
                                 self.D11_21_ROC.clean)
 
@@ -2534,7 +2567,7 @@ class DatasetTests(TestCase):
         self.raw_DS.dataset_file.close()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('File integrity of "{}" lost. Current checksum "{}" does not equal expected '
-                                           'checksum "{}"'.format(self.raw_DS, new_md5, old_md5)),
+                                          'checksum "{}"'.format(self.raw_DS, new_md5, old_md5)),
                                 self.raw_DS.clean)
 
     def test_Dataset_filename_MD5_clash(self):
@@ -2775,7 +2808,7 @@ class GetCoordinatesTests(TestCase, ArchiveTestCaseHelpers):
         self.step_through_run_creation("outcables_done")
 
         # step_D1_RS (as defined by Eric) is at position (2,1).
-        self.assertEquals(self.step_D1_RS.get_coordinates(), (2,1))
+        self.assertEquals(self.step_D1_RS.get_coordinates(), (2, 1))
 
     def test_get_coordinates_top_level_rsic(self):
         """Coordinates of top-level RSICs should be one-entry tuples matching their parent RSs."""
@@ -2794,7 +2827,7 @@ class GetCoordinatesTests(TestCase, ArchiveTestCaseHelpers):
 
         # step_D1_RS (as defined by Eric) is at position (2,1).
         for rsic in self.step_D1_RS.RSICs.all():
-            self.assertEquals(rsic.get_coordinates(), (2,1))
+            self.assertEquals(rsic.get_coordinates(), (2, 1))
             self.assertEquals(rsic.get_coordinates(), self.step_D1_RS.get_coordinates())
 
     def test_get_coordinates_top_level_roc(self):
@@ -3118,7 +3151,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         with tempfile.TemporaryFile() as f:
             f.write("#!/bin/bash\n exit 1")
             os.remove(self.coderev_noop.content_file.path)
-            self.coderev_noop.content_file=File(f)
+            self.coderev_noop.content_file = File(f)
             self.coderev_noop.save()
 
         p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial", self.user_bob)
@@ -3159,16 +3192,16 @@ for i in range(%d):
         expected_output = '\n'.join(map(str, range(iteration_count))) + '\n'
 
         code_revision = tools.make_first_revision(
-            "long_out", 
-            "a script with lots of output", 
+            "long_out",
+            "a script with lots of output",
             "long_out.py",
             python_code,
             self.user_bob)
-        
+
         # A Method telling Shipyard how to use the noop code on string data.
         method = tools.make_first_method(
-            "string long_out", 
-            "a method with lots of output", 
+            "string long_out",
+            "a method with lots of output",
             code_revision,
             self.user_bob)
         tools.simple_method_io(method, self.cdt_string, "strings", "expected")
@@ -3176,7 +3209,7 @@ for i in range(%d):
         tools.create_linear_pipeline(pipeline, [method], "in", "out")
         pipeline.create_outputs()
         pipeline.save()
-        
+
         # Set up a words dataset.
         tools.make_words_symDS(self)
 
@@ -3384,7 +3417,7 @@ year,month,day,hour,minute,second,microsecond
         with tempfile.NamedTemporaryFile() as f:
             f.write("This is a tampered-with file.")
             os.remove(self.raw_symDS.dataset.dataset_file.path)
-            self.raw_symDS.dataset.dataset_file=File(f, name="tampered")
+            self.raw_symDS.dataset.dataset_file = File(f, name="tampered")
             self.raw_symDS.dataset.save()
 
             self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
@@ -3538,7 +3571,7 @@ year,month,day,hour,minute,second,microsecond
 
 class TopLevelRunTests(TestCase, ArchiveTestCaseHelpers):
     fixtures = ['archive_test_environment']
-    
+
     def test_usual_run(self):
         """Test on all elements of a simulated run."""
         self.step_through_run_creation("outcables_done")
@@ -3646,7 +3679,6 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         super(DatasetApiTests, self).setUp()
         num_cols = 12
 
-
         self.list_path = reverse("dataset-list")
         # This should equal archive.ajax.DatasetViewSet.as_view({"get": "list"}).
         self.list_view, _, _ = resolve(self.list_path)
@@ -3706,7 +3738,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
     def test_dataset_add(self):
         """
         Test adding a Dataset via the API.
-        
+
         Each dataset must have unique content.
         """
         num_cols = 12
@@ -3789,7 +3821,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
 
     def test_dataset_removal(self):
         start_count = Dataset.objects.all().count()
-        
+
         request = self.factory.delete(self.detail_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
@@ -3808,7 +3840,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
     def test_dataset_redaction(self):
         symbolic_dataset_id = Dataset.objects.get(
             pk=self.detail_pk).symbolicdataset_id
-        
+
         request = self.factory.patch(self.detail_path,
                                      {'is_redacted': "true"})
         force_authenticate(request, user=self.kive_user)
@@ -3821,7 +3853,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
 
 class MethodOutputApiTests(BaseTestCases.ApiTestCase):
     fixtures = ['simple_run']
-    
+
     def setUp(self):
         super(MethodOutputApiTests, self).setUp()
 
