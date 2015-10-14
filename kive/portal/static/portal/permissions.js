@@ -98,7 +98,6 @@ var permissions = (function() {
     
     my.PermissionsTable.prototype.buildTable = function(rows) {
         var $tr,
-            $a,
             permissions_table = this,
             lock_icon = this.image_path +
                 (this.is_locked ? '/lock-locked-2x.png' : '/lock-unlocked-2x.png');
@@ -121,8 +120,7 @@ var permissions = (function() {
         this.$lockImage.attr('src', lock_icon);
         this.$lockSpan.text(this.is_locked ? '' : 'Administrator');
         $.each(rows, function() {
-            var $a,
-                row = this;
+            var row = this;
             $tr = $('<tr/>');
             permissions_table.buildCells($tr, row);
             permissions_table.$tbody.append($tr);
@@ -145,11 +143,6 @@ var permissions = (function() {
     my.PermissionsTable.prototype.buildCells = function($tr, row) {
         this.buildPermissionCells($tr, row);
     };
-
-    my.PermissionsTable.prototype.buildPageLinks = function() {
-        var $prev, $next;
-
-    }
     
     my.PermissionsTable.prototype.buildPermissionHeaders = function($tr) {
         var $a;
@@ -219,7 +212,7 @@ var permissions = (function() {
             permissions_table.ajax_request = undefined;
         }
 
-        var query_params = undefined;
+        var query_params;
         if (ajax_request_url === undefined) {
             ajax_request_url = permissions_table.list_url + "?page_size=" + permissions_table.page_size;
             // FIXME may need to explicitly set is_granted here.
@@ -234,9 +227,9 @@ var permissions = (function() {
                 if (permissions_table.$navigation_links !== undefined) {
                     permissions_table.$navigation_links.empty();
 
-                    if ("previous" in response && response["previous"] !== null) {
+                    if ("previous" in response && response.previous !== null) {
                         permissions_table.$navigation_links.append(
-                            $('<a class="nav"/>').attr("href", response["previous"])
+                            $('<a class="nav"/>').attr("href", response.previous)
                                 .text("prev")
                                 .click(permissions_table, navLink)
                         );
@@ -246,13 +239,13 @@ var permissions = (function() {
                     }
 
                     permissions_table.$navigation_links.append(
-                        $('<span class="record_count"/>').text(response["count"] + " found")
+                        $('<span class="record_count"/>').text(response.count + " found")
                     );
 
 
-                    if ("next" in response && response["next"] !== null) {
+                    if ("next" in response && response.next !== null) {
                         permissions_table.$navigation_links.append(
-                            $('<a class="nav"/>').attr("href", response["next"])
+                            $('<a class="nav"/>').attr("href", response.next)
                             .text("next")
                             .click(permissions_table, navLink)
                         );
@@ -300,7 +293,7 @@ var permissions = (function() {
      */
     my.PermissionsTable.prototype.extractRows = function(response) {
         if ("count" in response) {
-            return response["results"];
+            return response.results;
         }
         return response;
     };
@@ -452,7 +445,7 @@ var permissions = (function() {
                 $('<span class="value"/>').text(value));
         $duplicates = $('div.filter', filterSet.$active).filter(function() {
             var $f = $(this);
-            return $f.data('key') == key && $f.data('val') == value;
+            return $f.data('key') === key && $f.data('val') === value;
         });
         if ( ! $duplicates.length) {
             $filter.append($('<a class="remove">&times;</a>').click(function() {
