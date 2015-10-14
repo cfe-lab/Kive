@@ -413,79 +413,13 @@ class FindSDTests(TestCase):
     """
     Tests for first_generator_of_SD.
     """
-    def setUp(self):
-        tools.create_word_reversal_environment(self)
+    fixtures = ['find_symbolic_datasets']
 
-        self.setup_simple_pipeline()
-        self.setup_twostep_pipeline()
-        self.setup_nested_pipeline()
+    def setUp(self):
+        install_fixture_files('find_symbolic_datasets')
 
     def tearDown(self):
-        tools.destroy_word_reversal_environment(self)
-
-    def setup_nested_pipeline(self):
-        # A two-step pipeline with custom cable wires at each step.
-        self.pipeline_nested = tools.make_first_pipeline(
-            "nested pipeline",
-            "a pipeline with a sub-pipeline",
-            self.user_bob)
-
-        transforms = [self.method_noop_backwords, self.pipeline_twostep, self.method_noop_backwords]
-        tools.create_linear_pipeline(self.pipeline_nested,
-                                     transforms,
-                                     "data",
-                                     "unchanged_data")
-        cable = self.pipeline_nested.steps.get(step_num=3).cables_in.first()
-        tools.make_crisscross_cable(cable)
-        self.pipeline_nested.create_outputs()
-        self.pipeline_nested.complete_clean()
-
-    def setup_twostep_pipeline(self):
-        """
-        (drow,word) (word,drow) (word,drow)    (drow,word)  (drow,word)    (drow,word)
-                         _____________              ______________
-           [o]====<>====|o           o|=====<>=====|o            o|============[o]
-                        |   reverse   |            |     noop     |
-                        |_____________|            |______________|
-        """
-        # A two-step pipeline with custom cable wires at each step.
-        self.pipeline_twostep = tools.make_first_pipeline(
-            "two-step pipeline",
-            "a two-step pipeline with custom cable wires at each step",
-            self.user_bob)
-        self.pipeline_twostep.create_input(compounddatatype=self.cdt_backwords, dataset_name="words_to_reverse",
-                                           dataset_idx=1)
-
-        methods = [self.method_reverse, self.method_noop_backwords]
-        for i, _method in enumerate(methods):
-            step = self.pipeline_twostep.steps.create(transformation=methods[i], step_num=i+1)
-            if i == 0:
-                source = self.pipeline_twostep.inputs.first()
-            else:
-                source = methods[i-1].outputs.first()
-            cable = step.cables_in.create(source_step=i,
-                                          source=source,
-                                          dest=methods[i].inputs.first())
-            tools.make_crisscross_cable(cable)
-
-        cable = self.pipeline_twostep.create_outcable(
-            output_name="reversed_words",
-            output_idx=1,
-            source_step=2,
-            source=methods[-1].outputs.first())
-
-        self.pipeline_twostep.create_outputs()
-        self.pipeline_twostep.complete_clean()
-
-    def setup_simple_pipeline(self):
-        # A simple, one-step pipeline, which does nothing.
-        self.pipeline_noop = tools.make_first_pipeline("simple pipeline", "a simple, one-step pipeline",
-                                                       self.user_bob)
-        tools.create_linear_pipeline(
-            self.pipeline_noop,
-            [self.method_noop],
-            "lab_data", "complemented_lab_data")
-        self.pipeline_noop.create_outputs()
+        restore_production_files()
 
     def test_find_symds_pipeline_input_and_step_output(self):
         """
@@ -495,6 +429,10 @@ class FindSDTests(TestCase):
         Finding a SymbolicDataset which was output from a step, and also input
         to a cable, should return the step (and in particular, not the cable).
         """
+        self.pipeline_noop = Pipeline.objects.get(family__name="simple pipeline")
+        self.symds_words = SymbolicDataset.objects.get(dataset__name='blahblah')
+        self.user_bob = User.objects.get(username='bob')
+
         sandbox = Sandbox(self.user_bob, self.pipeline_noop, [self.symds_words])
         sandbox.execute_pipeline()
         self.assertIsNone(sandbox.run.complete_clean())
@@ -519,6 +457,10 @@ class FindSDTests(TestCase):
         intermediate step should return the cable as the generator, and the
         top-level run as the run.
         """
+        self.pipeline_twostep = Pipeline.objects.get(family__name="two-step pipeline")
+        self.symds_backwords = SymbolicDataset.objects.get(dataset__name='backwords')
+        self.user_bob = User.objects.get(username='bob')
+
         sandbox = Sandbox(self.user_bob, self.pipeline_twostep, [self.symds_backwords])
         sandbox.execute_pipeline()
         self.assertIsNone(sandbox.run.complete_clean())
@@ -546,6 +488,10 @@ class FindSDTests(TestCase):
         Find a symbolic dataset in a sub-pipeline, which is input to the sub-pipeline
         on a custom cable.
         """
+        self.pipeline_nested = Pipeline.objects.get(family__name="nested pipeline")
+        self.symds_backwords = SymbolicDataset.objects.get(dataset__name='backwords')
+        self.user_bob = User.objects.get(username='bob')
+
         sandbox = Sandbox(self.user_bob, self.pipeline_nested, [self.symds_backwords])
         sandbox.execute_pipeline()
         self.assertIsNone(sandbox.run.complete_clean())

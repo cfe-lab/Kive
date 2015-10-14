@@ -90,6 +90,8 @@ def install_fixture_files(fixture_name):
         dir_to_install = os.path.join(fixture_files_path, target)
         if os.path.isdir(dir_to_install):
             shutil.copytree(dir_to_install, target_path)
+        else:
+            os.mkdir(target_path)
 
 
 def restore_production_files():
