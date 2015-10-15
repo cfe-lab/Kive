@@ -61,7 +61,7 @@
             "execrecord": 2, 
             "is_cancelled": false, 
             "reused": true, 
-            "start_time": "2000-01-01T00:00:03Z"
+            "start_time": "2000-01-01T00:00:02Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 4
@@ -71,11 +71,11 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "execrecord": 1, 
             "is_cancelled": false, 
             "reused": true, 
-            "start_time": "2000-01-01T00:00:03Z"
+            "start_time": "2000-01-01T00:00:02Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 5
@@ -141,11 +141,11 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:05Z", 
             "execrecord": 6, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:06Z"
+            "start_time": "2000-01-01T00:00:05Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 10
@@ -159,7 +159,7 @@
             "execrecord": 8, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:07Z"
+            "start_time": "2000-01-01T00:00:06Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 11
@@ -255,7 +255,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/tmpIVGyiL", 
+            "dataset_file": "Datasets/fixtures/tmpPvIhna", 
             "date_created": "2000-01-01T00:00:00Z", 
             "date_modified": "2000-01-01T00:00:00Z", 
             "description": "A dataset for use in the removal test case.", 
@@ -271,7 +271,7 @@
             "dataset_file": "Datasets/fixtures/step1_nuc_seq_out.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
-            "description": "Generated data from a run of pipeline \"Nucleotide Sequence Noop:1 (v1)\" started at 2015-10-09 18:48:38.724860+00:00 by Rem Over\nrun: 1\nuser: Rem Over\nstep: 1\noutput: nuc_seq_out", 
+            "description": "Generated data from a run of pipeline \"Nucleotide Sequence Noop:1 (v1)\" started at 2015-10-15 18:58:26.792239+00:00 by Rem Over\nrun: 1\nuser: Rem Over\nstep: 1\noutput: nuc_seq_out", 
             "name": "run1_step1_outputnuc_seq_out", 
             "symbolicdataset": 2
         }, 
@@ -281,7 +281,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/tmp1wBnOD", 
+            "dataset_file": "Datasets/fixtures/tmpqi0XSY", 
             "date_created": "2000-01-01T00:00:04Z", 
             "date_modified": "2000-01-01T00:00:04Z", 
             "description": "A dataset for use in the removal test case with the two-step Pipeline.", 
@@ -294,10 +294,10 @@
     {
         "fields": {
             "created_by": 7, 
-            "dataset_file": "Datasets/fixtures/step1_nuc_seq_out_JJWq4l0.csv", 
-            "date_created": "2000-01-01T00:00:05Z", 
-            "date_modified": "2000-01-01T00:00:05Z", 
-            "description": "Generated data from a run of pipeline \"Nucleotide Sequence two-step Noop:1 (v1)\" started at 2015-10-09 18:48:42.462389+00:00 by Rem Over\nrun: 3\nuser: Rem Over\nstep: 1\noutput: nuc_seq_out", 
+            "dataset_file": "Datasets/fixtures/step1_nuc_seq_out_pRYeyjZ.csv", 
+            "date_created": "2000-01-01T00:00:04Z", 
+            "date_modified": "2000-01-01T00:00:04Z", 
+            "description": "Generated data from a run of pipeline \"Nucleotide Sequence two-step Noop:1 (v1)\" started at 2015-10-15 18:58:30.279524+00:00 by Rem Over\nrun: 3\nuser: Rem Over\nstep: 1\noutput: nuc_seq_out", 
             "name": "run3_step1_outputnuc_seq_out", 
             "symbolicdataset": 4
         }, 
@@ -310,7 +310,7 @@
             "dataset_file": "Datasets/fixtures/step2_nuc_seq_out.csv", 
             "date_created": "2000-01-01T00:00:06Z", 
             "date_modified": "2000-01-01T00:00:06Z", 
-            "description": "Generated data from a run of pipeline \"Nucleotide Sequence two-step Noop:1 (v1)\" started at 2015-10-09 18:48:42.462389+00:00 by Rem Over\nrun: 3\nuser: Rem Over\nstep: 2\noutput: nuc_seq_out", 
+            "description": "Generated data from a run of pipeline \"Nucleotide Sequence two-step Noop:1 (v1)\" started at 2015-10-15 18:58:30.279524+00:00 by Rem Over\nrun: 3\nuser: Rem Over\nstep: 2\noutput: nuc_seq_out", 
             "name": "run3_step2_outputnuc_seq_out", 
             "symbolicdataset": 5
         }, 
@@ -359,20 +359,20 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:05Z", 
+            "end_time": "2000-01-01T00:00:04Z", 
             "invoking_record": 7, 
             "record": 7, 
-            "start_time": "2000-01-01T00:00:05Z"
+            "start_time": "2000-01-01T00:00:04Z"
         }, 
         "model": "archive.execlog", 
         "pk": 5
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:05Z", 
             "invoking_record": 10, 
             "record": 10, 
-            "start_time": "2000-01-01T00:00:06Z"
+            "start_time": "2000-01-01T00:00:05Z"
         }, 
         "model": "archive.execlog", 
         "pk": 6
@@ -389,10 +389,10 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:07Z", 
+            "end_time": "2000-01-01T00:00:06Z", 
             "invoking_record": 11, 
             "record": 11, 
-            "start_time": "2000-01-01T00:00:07Z"
+            "start_time": "2000-01-01T00:00:06Z"
         }, 
         "model": "archive.execlog", 
         "pk": 8
@@ -415,10 +415,10 @@
         "fields": {
             "are_checksums_OK": true, 
             "code_redacted": false, 
-            "error_log": "Logs/step1_stderr_zkzAb8B.txt", 
+            "error_log": "Logs/step1_stderr_It4die6.txt", 
             "error_redacted": false, 
             "execlog": 5, 
-            "output_log": "Logs/step1_stdout_d2faJbt.txt", 
+            "output_log": "Logs/step1_stdout_czClEoy.txt", 
             "output_redacted": false, 
             "return_code": 0
         }, 
@@ -1124,7 +1124,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$THphs36hHEDu$PaDX/v0W6ZEzCGgsKUhhLvOyE8nEir9nkJ/8FMjo2Qs=", 
+            "password": "pbkdf2_sha256$15000$SM7snLlPKHPv$8Zz+TkCS3xl3vucjEWMltStlMu4o/5MhiZuFHcG2Apc=", 
             "user_permissions": [], 
             "username": "Rem Over"
         }, 
@@ -1179,7 +1179,7 @@
             "name": "", 
             "parent_runstep": null, 
             "pipeline": 2, 
-            "start_time": "2000-01-01T00:00:03Z", 
+            "start_time": "2000-01-01T00:00:02Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1301,7 +1301,7 @@
         "fields": {
             "MD5_checksum": "83626e348ac566a61cab9d94683446c7", 
             "coderesource": 2, 
-            "content_file": "CodeResources/fdopen_WDHJS2U", 
+            "content_file": "CodeResources/fdopen_Owyjgfr", 
             "groups_allowed": [], 
             "revision_DateTime": "2000-01-01T00:00:00Z", 
             "revision_desc": "first version", 
@@ -1448,7 +1448,7 @@
     {
         "fields": {
             "groups_allowed": [], 
-            "revision_DateTime": "2000-01-01T00:00:04Z", 
+            "revision_DateTime": "2000-01-01T00:00:03Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
             "user": 2, 
@@ -1547,9 +1547,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:05Z", 
             "execlog": 6, 
-            "start_time": "2000-01-01T00:00:06Z", 
+            "start_time": "2000-01-01T00:00:05Z", 
             "symbolicdataset": 4, 
             "user": 2
         }, 

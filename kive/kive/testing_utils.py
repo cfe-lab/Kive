@@ -10,6 +10,7 @@ import hashlib
 from django.contrib.auth.models import User
 from django.core.files import File
 from django.db import transaction
+from django.db.models import Count
 
 from constants import datatypes
 import file_access_utils
@@ -252,12 +253,8 @@ def create_metadata_test_environment(case):
     case.mix_triplet_cdt.members.create(datatype=case.string_dt, column_name="StrCol3", column_idx=3)
     case.mix_triplet_cdt.grant_everyone_access()
 
-    # Define CDT "doublet_cdt" with 2 members for use as an input/output
-    case.doublet_cdt = CompoundDatatype(user=case.myUser)
-    case.doublet_cdt.save()
-    case.doublet_cdt.members.create(datatype=case.string_dt, column_name="x", column_idx=1)
-    case.doublet_cdt.members.create(datatype=case.string_dt, column_name="y", column_idx=2)
-    case.doublet_cdt.grant_everyone_access()
+    # Define CDT "doublet_cdt" same as tuple: x, y
+    case.doublet_cdt = case.tuple_cdt
 
     ####
     # Stuff from this point on is used in librarian and archive
@@ -276,6 +273,56 @@ def create_metadata_test_environment(case):
     case.DNA_doublet_cdt.members.create(datatype=case.DNA_dt, column_name="x", column_idx=1)
     case.DNA_doublet_cdt.members.create(datatype=case.DNA_dt, column_name="y", column_idx=2)
     case.DNA_doublet_cdt.grant_everyone_access()
+
+
+def load_metadata_test_environment(case):
+    case.myUser = User.objects.get(username='john')
+    case.ringoUser = User.objects.get(username='ringo')
+
+    case.STR = Datatype.objects.get(pk=datatypes.STR_PK)
+    case.FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
+    case.INT = Datatype.objects.get(pk=datatypes.INT_PK)
+    case.BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
+    case.string_dt = case.STR
+
+    case.DNA_dt = Datatype.objects.get(name="DNANucSeq")
+    case.RNA_dt = Datatype.objects.get(name="RNANucSeq")
+
+    case.basic_cdt = CompoundDatatype.objects.get(members__column_name='rna')
+    counted = CompoundDatatype.objects.annotate(num_members=Count('members'))
+    case.shared_cdt = counted.get(members__column_name='label',
+                                  num_members=1)
+    case.test_cdt = CompoundDatatype.objects.get(members__column_name='PBMCseq')
+    case.DNAinput_cdt = CompoundDatatype.objects.get(
+        members__datatype=case.DNA_dt,
+        members__column_name='SeqToComplement')
+    case.DNAoutput_cdt = CompoundDatatype.objects.get(
+        members__datatype=case.DNA_dt,
+        members__column_name='ComplementedSeq')
+    case.RNAinput_cdt = CompoundDatatype.objects.get(
+        members__datatype=case.RNA_dt,
+        members__column_name='SeqToComplement')
+    case.RNAoutput_cdt = CompoundDatatype.objects.get(
+        members__datatype=case.RNA_dt,
+        members__column_name='ComplementedSeq')
+    case.tuple_cdt = CompoundDatatype.objects.get(
+        members__datatype=case.string_dt,
+        members__column_name='x')
+    case.singlet_cdt = CompoundDatatype.objects.get(members__column_name='k')
+    case.triplet_cdt = CompoundDatatype.objects.get(
+        members__datatype=case.string_dt,
+        members__column_name='a')
+    case.triplet_squares_cdt = CompoundDatatype.objects.get(
+        members__column_name='a^2')
+    case.mix_triplet_cdt = CompoundDatatype.objects.get(
+        members__column_name='StrCol1')
+    case.doublet_cdt = case.tuple_cdt
+    case.DNA_triplet_cdt = CompoundDatatype.objects.get(
+        members__datatype=case.DNA_dt,
+        members__column_name='a')
+    case.DNA_doublet_cdt = CompoundDatatype.objects.get(
+        members__datatype=case.DNA_dt,
+        members__column_name='x')
 
 
 def clean_up_all_files():
@@ -505,7 +552,8 @@ def create_eric_martin_test_environment(case):
     case.pE.clean()
 
     # Runs for the pipelines.
-    case.pD_run = case.pD.pipeline_instances.create(user=case.myUser)
+    case.pD_run = case.pD.pipeline_instances.create(user=case.myUser,
+                                                    name='pD_run')
     case.pD_run.save()
     case.pD_run.grant_everyone_access()
     case.pE_run = case.pE.pipeline_instances.create(user=case.myUser,
@@ -648,6 +696,146 @@ def create_eric_martin_test_environment(case):
     case.E21_41_DNA_doublet_DS = case.E21_41_DNA_doublet_symDS.dataset
 
 
+def load_eric_martin_test_environment(case):
+    load_metadata_test_environment(case)
+
+    case.generic_cr = CodeResource.objects.get(name="genericCR")
+    case.generic_crRev = case.generic_cr.revisions.get()
+
+    case.mf = MethodFamily.objects.get(name="method_family")
+    case.mA = Method.objects.get(revision_name="mA_name")
+    case.A1_rawin = case.mA.inputs.get()
+    case.A1_out = case.mA.outputs.get()
+
+    case.mB = Method.objects.get(revision_name="mB_name")
+    case.B1_in = case.mB.inputs.get(dataset_name="B1_in")
+    case.B2_in = case.mB.inputs.get(dataset_name="B2_in")
+    case.B1_out = case.mB.outputs.get()
+
+    case.mC = Method.objects.get(revision_name="mC_name")
+    case.C1_in = case.mC.inputs.get(dataset_name="C1_in")
+    case.C2_in = case.mC.inputs.get(dataset_name="C2_in")
+    case.C1_out = case.mC.outputs.get(dataset_name="C1_out")
+    case.C2_rawout = case.mC.outputs.get(dataset_name="C2_rawout")
+    case.C3_rawout = case.mC.outputs.get(dataset_name="C3_rawout")
+
+    case.pf = PipelineFamily.objects.get(name="Pipeline_family")
+    case.pD = Pipeline.objects.get(revision_name="pD_name")
+    case.D1_in = case.pD.inputs.get(dataset_name="D1_in")
+    case.D2_in = case.pD.inputs.get(dataset_name="D2_in")
+    case.pE = Pipeline.objects.get(revision_name="pE_name")
+    case.E1_in = case.pE.inputs.get(dataset_name="E1_in")
+    case.E2_in = case.pE.inputs.get(dataset_name="E2_in")
+    case.E3_rawin = case.pE.inputs.get(dataset_name="E3_rawin")
+
+    case.step_D1 = case.pD.steps.get(step_num=1)
+    case.step_E1 = case.pE.steps.get(step_num=1)
+    case.step_E2 = case.pE.steps.get(step_num=2)
+    case.step_E3 = case.pE.steps.get(step_num=3)
+
+    case.D01_11 = case.step_D1.cables_in.get(dest=case.B1_in)
+    case.D02_12 = case.step_D1.cables_in.get(dest=case.B2_in)
+    case.D11_21 = case.pD.outcables.get(output_name="D1_out")
+    case.D1_out = case.pD.outputs.get(dataset_name="D1_out")
+
+    case.E03_11 = case.step_E1.cables_in.get(dest=case.A1_rawin)
+    case.E01_21 = case.step_E2.cables_in.get(dest=case.D1_in)
+    case.E02_22 = case.step_E2.cables_in.get(dest=case.D2_in)
+    case.E11_32 = case.step_E3.cables_in.get(dest=case.C2_in)
+    case.E21_31 = case.step_E3.cables_in.get(dest=case.C1_in)
+    case.E21_41 = case.pE.outcables.get(output_name="E1_out")
+    case.E31_42 = case.pE.outcables.get(output_name="E2_out")
+    case.E33_43 = case.pE.outcables.get(output_name="E3_rawout")
+    case.E1_out = case.pE.outputs.get(dataset_name="E1_out")
+    case.E2_out = case.pE.outputs.get(dataset_name="E2_out")
+    case.E3_rawout = case.pE.outputs.get(dataset_name="E3_rawout")
+
+    case.E01_21_wire1 = case.E01_21.custom_wires.get(
+        source_pin=case.triplet_cdt.members.get(column_idx=1))
+    case.E01_21_wire2 = case.E01_21.custom_wires.get(
+        source_pin=case.triplet_cdt.members.get(column_idx=3))
+    case.E11_32_wire1 = case.E11_32.custom_wires.get(
+        source_pin=case.doublet_cdt.members.get(column_idx=1))
+    case.E11_32_wire2 = case.E11_32.custom_wires.get(
+        source_pin=case.doublet_cdt.members.get(column_idx=2))
+    case.E21_41_wire1 = case.E21_41.custom_wires.get(
+        source_pin=case.triplet_cdt.members.get(column_idx=2))
+    case.E21_41_wire2 = case.E21_41.custom_wires.get(
+        source_pin=case.triplet_cdt.members.get(column_idx=3))
+
+    case.pD_run = case.pD.pipeline_instances.get(name='pD_run')
+    case.pE_run = case.pE.pipeline_instances.get(name='pE_run')
+
+    case.triplet_symDS = SymbolicDataset.objects.get(
+        dataset__name="triplet",
+        dataset__dataset_file__endswith="step_0_triplet.csv")
+    case.triplet_symDS_structure = case.triplet_symDS.structure
+    case.triplet_DS = case.triplet_symDS.dataset
+    case.doublet_symDS = SymbolicDataset.objects.get(dataset__name="doublet")
+    case.doublet_symDS_structure = case.doublet_symDS.structure
+    case.doublet_DS = case.doublet_symDS.dataset
+    case.singlet_symDS = SymbolicDataset.objects.get(
+        dataset__name="singlet",
+        dataset__dataset_file__endswith="singlet_cdt_large.csv")
+    case.singlet_symDS_structure = case.singlet_symDS.structure
+    case.singlet_DS = case.singlet_symDS.dataset
+    case.singlet_3rows_symDS = SymbolicDataset.objects.get(
+        dataset__name="singlet",
+        dataset__dataset_file__endswith="step_0_singlet.csv")
+    case.singlet_3rows_symDS_structure = case.singlet_3rows_symDS.structure
+    case.singlet_3rows_DS = case.singlet_3rows_symDS.dataset
+    case.raw_symDS = SymbolicDataset.objects.get(dataset__name="raw_DS")
+    case.raw_DS = case.raw_symDS.dataset
+
+    # MD5 calculated on doublet_remuxed_from_triplet.csv file.
+    case.D1_in_symDS = SymbolicDataset.objects.get(
+        MD5_checksum='542676b23e121d16db8d41ccdae65fd1')
+    case.D1_in_symDS_structure = case.D1_in_symDS.structure
+
+    case.C1_in_symDS = SymbolicDataset.objects.get(
+        dataset__name="C1_in_triplet")
+    case.C1_in_symDS_structure = case.C1_in_symDS.structure
+    case.C1_in_DS = case.C1_in_symDS.dataset
+
+    checksum = SymbolicDataset.objects.get(
+        dataset__dataset_file__endswith="E11_32_output.csv").MD5_checksum
+    case.C2_in_symDS = SymbolicDataset.objects.get(MD5_checksum=checksum,
+                                                   dataset__isnull=True)
+    case.C2_in_symDS_structure = case.C2_in_symDS.structure
+    case.E11_32_output_symDS = SymbolicDataset.objects.get(
+        dataset__name="E11_32 output doublet")
+    case.E11_32_output_symDS_structure = case.E11_32_output_symDS.structure
+    case.E11_32_output_DS = case.E11_32_output_symDS.dataset
+    case.C1_out_symDS = SymbolicDataset.objects.get(dataset__name="raw")
+    case.C1_out_symDS_structure = case.C1_out_symDS.structure
+    case.C1_out_DS = case.C1_out_symDS.dataset
+    case.C2_out_symDS = SymbolicDataset.objects.get(dataset__name="C2_out")
+    case.C2_out_DS = case.C2_out_symDS.dataset
+    case.C3_out_symDS = SymbolicDataset.objects.get(dataset__name="C3_out")
+    case.C3_out_DS = case.C3_out_symDS.dataset
+
+    case.triplet_3_rows_symDS = SymbolicDataset.objects.get(
+        dataset__name="triplet",
+        dataset__dataset_file__endswith="step_0_triplet_3_rows.csv")
+    case.triplet_3_rows_symDS_structure = case.triplet_3_rows_symDS.structure
+    case.triplet_3_rows_DS = case.triplet_3_rows_symDS.dataset
+    case.E1_out_symDS = SymbolicDataset.objects.get(dataset__name="E1_out")
+    case.E1_out_symDS_structure = case.E1_out_symDS.structure
+    case.E1_out_DS = case.E1_out_symDS.dataset
+    case.DNA_triplet_symDS = SymbolicDataset.objects.get(
+        dataset__name="DNA_triplet")
+    case.DNA_triplet_symDS_structure = case.DNA_triplet_symDS.structure
+    case.DNA_triplet_DS = case.DNA_triplet_symDS.dataset
+    case.E01_21_DNA_doublet_symDS = SymbolicDataset.objects.get(
+        dataset__name="E01_21_DNA_doublet")
+    case.E01_21_DNA_doublet_symDS_structure = case.E01_21_DNA_doublet_symDS.structure
+    case.E01_21_DNA_doublet_DS = case.E01_21_DNA_doublet_symDS.dataset
+    case.E21_41_DNA_doublet_symDS = SymbolicDataset.objects.get(
+        dataset__name="E21_41_DNA_doublet")
+    case.E21_41_DNA_doublet_symDS_structure = case.E21_41_DNA_doublet_symDS.structure
+    case.E21_41_DNA_doublet_DS = case.E21_41_DNA_doublet_symDS.dataset
+
+
 def create_librarian_test_environment(case):
     """
     Set up default state for Librarian unit testing.
@@ -675,6 +863,10 @@ def create_librarian_test_environment(case):
         runstep.execrecord = execrecord
         runstep.save()
         i += 1
+
+
+def load_librarian_test_environment(case):
+    load_eric_martin_test_environment(case)
 
 
 def create_removal_test_environment():
@@ -855,6 +1047,19 @@ def create_sandbox_testing_tools_environment(case):
     simple_method_io(case.method_noop_raw, None, "raw", "same_raw")
 
 
+def load_sandbox_testing_tools_environment(case):
+    case.STR = Datatype.objects.get(pk=datatypes.STR_PK)
+    case.user_bob = User.objects.get(username='bob')
+    case.datatype_str = Datatype.objects.get(name="my_string")
+    case.cdt_string = CompoundDatatype.objects.get(members__column_name="word")
+    case.coderev_noop = CodeResourceRevision.objects.get(
+        coderesource__name='noop')
+
+    case.method_noop = Method.objects.get(family__name="string noop")
+    case.method_trivial = Method.objects.get(family__name="string trivial")
+    case.method_noop_raw = Method.objects.get(family__name="raw noop")
+
+
 def destroy_sandbox_testing_tools_environment(case):
     """
     Clean up a TestCase where create_sandbox_testing_tools_environment has been called.
@@ -865,8 +1070,11 @@ def destroy_sandbox_testing_tools_environment(case):
 def create_archive_test_environment(case):
     create_librarian_test_environment(case)
     create_sandbox_testing_tools_environment(case)
-    case.pE_run = case.pE.pipeline_instances.create(user=case.myUser)
-    case.pE_run.grant_everyone_access()
+
+
+def load_archive_test_environment(case):
+    load_librarian_test_environment(case)
+    load_sandbox_testing_tools_environment(case)
 
 
 def create_method_test_environment(case):

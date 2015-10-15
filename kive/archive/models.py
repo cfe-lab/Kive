@@ -1024,7 +1024,7 @@ class RunStep(RunComponent):
             general_error = 'RunStep "{}" inputs not quenched'.format(self)
             if self.reused is not None or self.execrecord is not None:
                 raise ValidationError("{}; reused and execrecord should not be set".format(general_error))
-            if self.pipelinestep.transformation.__class__.__name__ == "Pipeline" and self.has_subrun():
+            if self.pipelinestep.transformation.is_pipeline and self.has_subrun():
                 raise ValidationError("{}; child_run should not be set".format(general_error))
             if self.has_log:
                 raise ValidationError("{}; no log should have been generated".format(general_error))

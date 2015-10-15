@@ -527,22 +527,25 @@ class ArchiveTestCaseHelpers:
 
 
 class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
+    fixtures = ["archive_test_environment"]
 
     def setUp(self):
-        tools.create_archive_test_environment(self)
+        install_fixture_files("archive_test_environment")
+        tools.load_archive_test_environment(self)
 
     def tearDown(self):
-        tools.clean_up_all_files()
+        restore_production_files()
 
 
 class ArchiveTransactionTestCase(TransactionTestCase, ArchiveTestCaseHelpers):
-    # fixtures = ["initial_data", "initial_groups", "initial_user"]
+    fixtures = ["archive_test_environment"]
 
     def setUp(self):
-        tools.create_archive_test_environment(self)
+        install_fixture_files("archive_test_environment")
+        tools.load_archive_test_environment(self)
 
     def tearDown(self):
-        tools.clean_up_all_files()
+        restore_production_files()
 
 
 class RunComponentTests(ArchiveTestCase):
@@ -2796,7 +2799,7 @@ class GetCoordinatesTests(TestCase, ArchiveTestCaseHelpers):
 
         top_level_steps = []
         for runstep in RunStep.objects.all():
-            if runstep.run.parent_runstep == None:
+            if runstep.run.parent_runstep is None:
                 top_level_steps.append(runstep)
 
         for top_level_step in top_level_steps:
@@ -2815,7 +2818,7 @@ class GetCoordinatesTests(TestCase, ArchiveTestCaseHelpers):
         self.step_through_run_creation("outcables_done")
 
         for runstep in RunStep.objects.all():
-            if runstep.run.parent_runstep == None:
+            if runstep.run.parent_runstep is None:
                 # Examine the input cables.
                 for rsic in runstep.RSICs.all():
                     self.assertEquals(rsic.get_coordinates(), (runstep.pipelinestep.step_num,))
@@ -2835,7 +2838,7 @@ class GetCoordinatesTests(TestCase, ArchiveTestCaseHelpers):
         self.step_through_run_creation("outcables_done")
 
         for roc in RunOutputCable.objects.all():
-            if roc.run.parent_runstep == None:
+            if roc.run.parent_runstep is None:
                 # Examine the cable.
                 self.assertEquals(roc.get_coordinates(), ())
 

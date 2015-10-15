@@ -92,7 +92,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/input_for_test_C_twostep_with_subpipeline_CaYwjFK.csv", 
+            "dataset_file": "Datasets/fixtures/input_for_test_C_twostep_with_subpipeline_lwg57WT.csv", 
             "date_created": "2000-01-01T00:00:00Z", 
             "date_modified": "2000-01-01T00:00:00Z", 
             "description": "input to pipeline pX", 
@@ -432,7 +432,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$XqprIrLpk8xk$IkWkgwT6x2sYeXD90cVHZXJ9//VnERSM3iVZgP22x6Q=", 
+            "password": "pbkdf2_sha256$15000$4XVGn1dHxOKE$jbox02T7XnwxqMI6+TB0GVRPEZQJvBLHe8EBuXyBPdo=", 
             "user_permissions": [], 
             "username": "john"
         }, 

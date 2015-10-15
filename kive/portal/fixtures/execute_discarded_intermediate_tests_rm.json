@@ -123,7 +123,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/tmpqTWsYW", 
+            "dataset_file": "Datasets/fixtures/tmp6DGtmF", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "data from the lab", 
@@ -1392,7 +1392,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$7v5HQbKyRvL9$yVhUGHTm3xy8FVpqDKuuYMn2lIAMtnaw+r5daySqwbY=", 
+            "password": "pbkdf2_sha256$15000$PetLeh77D9lB$x+rt2+9CHYBWjTiYXoubNuLLrPZQKfACbyqiRADOwdw=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -1412,7 +1412,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$d12lM0fh3UlU$u3sPDf2Y1Z4c3fsondTRV0/zkTfcFzcyVAt/TnbkxTs=", 
+            "password": "pbkdf2_sha256$15000$T9F38HNyMgDr$2oCgnaxUkpymr0eynFXk3pf/v096oMceu/De4IiOgw4=", 
             "user_permissions": [], 
             "username": "alice"
         }, 
@@ -1634,7 +1634,7 @@
         "fields": {
             "MD5_checksum": "5699120b018a7932c07be0412483c622", 
             "coderesource": 2, 
-            "content_file": "CodeResources/fdopen_FqjgZHB", 
+            "content_file": "CodeResources/fdopen_Xf8MT8j", 
             "groups_allowed": [
                 1
             ], 
@@ -1653,7 +1653,7 @@
         "fields": {
             "MD5_checksum": "196144423c5bb98d59d78c729ce842f4", 
             "coderesource": 3, 
-            "content_file": "CodeResources/fdopen_KBTh9e6", 
+            "content_file": "CodeResources/fdopen_IX5zx9N", 
             "groups_allowed": [
                 1
             ], 
@@ -1670,9 +1670,9 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "08a83f41a0a2f4f96d39d4e80a379403", 
+            "MD5_checksum": "30e9a1ac1dad0c134d41bf826a53ba68", 
             "coderesource": 4, 
-            "content_file": "CodeResources/fdopen_boXPBap", 
+            "content_file": "CodeResources/fdopen_MG463Q0", 
             "groups_allowed": [
                 1
             ], 

@@ -296,9 +296,9 @@
         "fields": {
             "blankable": false, 
             "column_idx": 1, 
-            "column_name": "x", 
+            "column_name": "a", 
             "compounddatatype": 17, 
-            "datatype": 1
+            "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 32
@@ -307,9 +307,9 @@
         "fields": {
             "blankable": false, 
             "column_idx": 2, 
-            "column_name": "y", 
+            "column_name": "b", 
             "compounddatatype": 17, 
-            "datatype": 1
+            "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
         "pk": 33
@@ -317,9 +317,9 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 1, 
-            "column_name": "a", 
-            "compounddatatype": 18, 
+            "column_idx": 3, 
+            "column_name": "c", 
+            "compounddatatype": 17, 
             "datatype": 8
         }, 
         "model": "metadata.compounddatatypemember", 
@@ -328,8 +328,8 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "b", 
+            "column_idx": 1, 
+            "column_name": "x", 
             "compounddatatype": 18, 
             "datatype": 8
         }, 
@@ -339,8 +339,8 @@
     {
         "fields": {
             "blankable": false, 
-            "column_idx": 3, 
-            "column_name": "c", 
+            "column_idx": 2, 
+            "column_name": "y", 
             "compounddatatype": 18, 
             "datatype": 8
         }, 
@@ -351,34 +351,12 @@
         "fields": {
             "blankable": false, 
             "column_idx": 1, 
-            "column_name": "x", 
-            "compounddatatype": 19, 
-            "datatype": 8
-        }, 
-        "model": "metadata.compounddatatypemember", 
-        "pk": 37
-    }, 
-    {
-        "fields": {
-            "blankable": false, 
-            "column_idx": 2, 
-            "column_name": "y", 
-            "compounddatatype": 19, 
-            "datatype": 8
-        }, 
-        "model": "metadata.compounddatatypemember", 
-        "pk": 38
-    }, 
-    {
-        "fields": {
-            "blankable": false, 
-            "column_idx": 1, 
             "column_name": "word", 
-            "compounddatatype": 20, 
+            "compounddatatype": 19, 
             "datatype": 10
         }, 
         "model": "metadata.compounddatatypemember", 
-        "pk": 39
+        "pk": 37
     }, 
     {
         "fields": {
@@ -399,7 +377,7 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "execrecord": 1, 
             "is_cancelled": false, 
             "reused": false, 
@@ -584,7 +562,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_singlet_LnaEnGK.csv", 
+            "dataset_file": "Datasets/fixtures/step_0_singlet_87yjfeO.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -597,7 +575,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_raw_MzyV2Hy.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw_R3yjlfg.fasta", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -610,7 +588,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/step_0_raw_dlXdYWh.fasta", 
+            "dataset_file": "Datasets/fixtures/step_0_raw_D88txEe.fasta", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "lol", 
@@ -688,7 +666,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/tmp3MMU3P", 
+            "dataset_file": "Datasets/fixtures/tmpHFvsVP", 
             "date_created": "2000-01-01T00:00:02Z", 
             "date_modified": "2000-01-01T00:00:02Z", 
             "description": "blahblahblah", 
@@ -704,7 +682,7 @@
             "dataset_file": "Datasets/fixtures/step1_same_strings.csv", 
             "date_created": "2000-01-01T00:00:03Z", 
             "date_modified": "2000-01-01T00:00:03Z", 
-            "description": "Generated data from a run of pipeline \"P_basic:1 (v1)\" started at 2015-10-09 18:48:30.449489+00:00 by bob\nrun: 4\nuser: bob\nstep: 1\noutput: same_strings", 
+            "description": "Generated data from a run of pipeline \"P_basic:1 (v1)\" started at 2015-10-15 18:58:18.747413+00:00 by bob\nrun: 4\nuser: bob\nstep: 1\noutput: same_strings", 
             "name": "run4_step1_outputsame_strings", 
             "symbolicdataset": 19
         }, 
@@ -717,7 +695,7 @@
             "dataset_file": "Datasets/fixtures/step2_same_strings.csv", 
             "date_created": "2000-01-01T00:00:04Z", 
             "date_modified": "2000-01-01T00:00:04Z", 
-            "description": "Generated data from a run of pipeline \"P_basic:1 (v1)\" started at 2015-10-09 18:48:30.449489+00:00 by bob\nrun: 4\nuser: bob\nstep: 2\noutput: same_strings", 
+            "description": "Generated data from a run of pipeline \"P_basic:1 (v1)\" started at 2015-10-15 18:58:18.747413+00:00 by bob\nrun: 4\nuser: bob\nstep: 2\noutput: same_strings", 
             "name": "run4_step2_outputsame_strings", 
             "symbolicdataset": 20
         }, 
@@ -813,7 +791,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 17, 
+            "compounddatatype": 12, 
             "num_rows": 3, 
             "symbolicdataset": 2
         }, 
@@ -840,7 +818,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 17, 
+            "compounddatatype": 12, 
             "num_rows": 10, 
             "symbolicdataset": 6
         }, 
@@ -858,7 +836,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 17, 
+            "compounddatatype": 12, 
             "num_rows": 3, 
             "symbolicdataset": 8
         }, 
@@ -867,7 +845,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 17, 
+            "compounddatatype": 12, 
             "num_rows": 3, 
             "symbolicdataset": 9
         }, 
@@ -894,7 +872,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 17, 
+            "compounddatatype": 12, 
             "num_rows": 3, 
             "symbolicdataset": 14
         }, 
@@ -903,7 +881,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 18, 
+            "compounddatatype": 17, 
             "num_rows": 3, 
             "symbolicdataset": 15
         }, 
@@ -912,7 +890,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 18, 
             "num_rows": 3, 
             "symbolicdataset": 16
         }, 
@@ -921,7 +899,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 19, 
+            "compounddatatype": 18, 
             "num_rows": 3, 
             "symbolicdataset": 17
         }, 
@@ -930,7 +908,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 20, 
+            "compounddatatype": 19, 
             "num_rows": 1, 
             "symbolicdataset": 18
         }, 
@@ -939,7 +917,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 20, 
+            "compounddatatype": 19, 
             "num_rows": 1, 
             "symbolicdataset": 19
         }, 
@@ -948,7 +926,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 20, 
+            "compounddatatype": 19, 
             "num_rows": 1, 
             "symbolicdataset": 20
         }, 
@@ -1336,7 +1314,7 @@
     {
         "fields": {
             "cable": 5, 
-            "dest_pin": 33, 
+            "dest_pin": 21, 
             "source_pin": 23
         }, 
         "model": "pipeline.customcablewire", 
@@ -1345,7 +1323,7 @@
     {
         "fields": {
             "cable": 5, 
-            "dest_pin": 32, 
+            "dest_pin": 20, 
             "source_pin": 25
         }, 
         "model": "pipeline.customcablewire", 
@@ -1354,8 +1332,8 @@
     {
         "fields": {
             "cable": 7, 
-            "dest_pin": 33, 
-            "source_pin": 32
+            "dest_pin": 21, 
+            "source_pin": 20
         }, 
         "model": "pipeline.customcablewire", 
         "pk": 3
@@ -1363,8 +1341,8 @@
     {
         "fields": {
             "cable": 7, 
-            "dest_pin": 32, 
-            "source_pin": 33
+            "dest_pin": 20, 
+            "source_pin": 21
         }, 
         "model": "pipeline.customcablewire", 
         "pk": 4
@@ -1372,7 +1350,7 @@
     {
         "fields": {
             "cable": 9, 
-            "dest_pin": 33, 
+            "dest_pin": 21, 
             "source_pin": 24
         }, 
         "model": "pipeline.customcablewire", 
@@ -1381,7 +1359,7 @@
     {
         "fields": {
             "cable": 9, 
-            "dest_pin": 32, 
+            "dest_pin": 20, 
             "source_pin": 25
         }, 
         "model": "pipeline.customcablewire", 
@@ -1401,7 +1379,7 @@
     }, 
     {
         "fields": {
-            "output_cdt": 17, 
+            "output_cdt": 12, 
             "output_idx": 1, 
             "output_name": "E1_out", 
             "pipeline": 5, 
@@ -1437,7 +1415,7 @@
     }, 
     {
         "fields": {
-            "output_cdt": 20, 
+            "output_cdt": 19, 
             "output_idx": 1, 
             "output_name": "basic_out", 
             "pipeline": 9, 
@@ -1665,7 +1643,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 17, 
+            "compounddatatype": 12, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 2
@@ -1675,7 +1653,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 17, 
+            "compounddatatype": 12, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 3
@@ -1715,7 +1693,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 17, 
+            "compounddatatype": 12, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 7
@@ -1735,7 +1713,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 17, 
+            "compounddatatype": 12, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 11
@@ -1795,7 +1773,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 17, 
+            "compounddatatype": 12, 
             "max_row": 5, 
             "min_row": null, 
             "transf_xput": 19
@@ -1805,7 +1783,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 20, 
+            "compounddatatype": 19, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 20
@@ -1815,7 +1793,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 20, 
+            "compounddatatype": 19, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 21
@@ -1825,7 +1803,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 20, 
+            "compounddatatype": 19, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 22
@@ -1835,7 +1813,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 20, 
+            "compounddatatype": 19, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 23
@@ -1845,7 +1823,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 20, 
+            "compounddatatype": 19, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 26
@@ -1855,7 +1833,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 20, 
+            "compounddatatype": 19, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 28
@@ -2119,7 +2097,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$vmGil9IWci7j$/AbntimQlgTo7ZdsglKA8V5AO3yXB9dULv6xWiMa+qk=", 
+            "password": "pbkdf2_sha256$15000$6DhYNC9WF0la$aP+SDlgqq6b3530MaWE0K62s7reROt8HXr447j4y7NI=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -2137,7 +2115,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$cpTqnPzKgQMM$rJHJwIMn4bOiv0Uu3w7iYv5gSqAmtkkp1k494Jb5Q4M=", 
+            "password": "pbkdf2_sha256$15000$QKd6nIgLM2Hr$OMmuO/wNBPz4VBIG8MKxbJ9UO/HKmELjXl/YG963r8o=", 
             "user_permissions": [], 
             "username": "ringo"
         }, 
@@ -2146,7 +2124,7 @@
     }, 
     {
         "fields": {
-            "date_joined": "2000-01-01T00:00:02Z", 
+            "date_joined": "2000-01-01T00:00:01Z", 
             "email": "bob@talabs.com", 
             "first_name": "", 
             "groups": [
@@ -2155,9 +2133,9 @@
             "is_active": true, 
             "is_staff": false, 
             "is_superuser": false, 
-            "last_login": "2000-01-01T00:00:02Z", 
+            "last_login": "2000-01-01T00:00:01Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$6eYiqWsfAtJ8$7KHIeO2p6c7tMxWINfW810Mxx0l/S50DzyXmmqv7jls=", 
+            "password": "pbkdf2_sha256$15000$UnlMLWRKIKXO$VSR0U/W8GxU45rw2gjzx4exhe8KfucW9qxip2lRcGQo=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -2377,22 +2355,11 @@
             "groups_allowed": [
                 1
             ], 
-            "user": 2, 
-            "users_allowed": []
-        }, 
-        "model": "metadata.compounddatatype", 
-        "pk": 19
-    }, 
-    {
-        "fields": {
-            "groups_allowed": [
-                1
-            ], 
             "user": 4, 
             "users_allowed": []
         }, 
         "model": "metadata.compounddatatype", 
-        "pk": 20
+        "pk": 19
     }, 
     {
         "fields": {
@@ -2401,7 +2368,7 @@
             "groups_allowed": [
                 1
             ], 
-            "name": "", 
+            "name": "pD_run", 
             "parent_runstep": null, 
             "pipeline": 4, 
             "start_time": null, 
@@ -2752,7 +2719,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "ddcae61b8b247ecf5aa7f089f99b55c3", 
+            "MD5_checksum": "e353a62fe8cb6a56d31b8c65d70b217d", 
             "coderesource": 1, 
             "content_file": "CodeResources/generic_script.py", 
             "groups_allowed": [
@@ -3325,9 +3292,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "execlog": 1, 
-            "start_time": "2000-01-01T00:00:03Z", 
+            "start_time": "2000-01-01T00:00:02Z", 
             "symbolicdataset": 18, 
             "user": 4
         }, 
