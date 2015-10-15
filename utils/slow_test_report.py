@@ -33,15 +33,18 @@ def parseOptions():
 
 class SlowTestReport(object):
     def load(self, report_files, count):
-        self.tests = []
+        self.tests = []  # [Test()]
+        self.files = []  # [(-time, file_name)]
         total_time = 0
         total_tests = 0
 
         for report_file in report_files:
             doc = ElementTree.parse(report_file)
             suite = doc.getroot()
-            total_time += float(suite.attrib['time'])
+            file_time = float(suite.attrib['time'])
+            total_time += file_time
             total_tests += int(suite.attrib['tests'])
+            bisect.insort(self.files, (-file_time, report_file))
             for testcase in suite.findall('testcase'):
                 bisect.insort(self.tests, Test(testcase))
                 if len(self.tests) > count:
@@ -73,6 +76,10 @@ def main():
     print summary.description
     for test in summary.tests:
         print test.description
+    
+    print 'Slowest test classes:'
+    for time, file in summary.files[0:10]:
+        print -time, file
         
 if __name__ == '__main__':
     main()
