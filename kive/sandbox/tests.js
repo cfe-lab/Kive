@@ -4,7 +4,7 @@
     describe("Pipeline Families table for sandbox", function() {
         beforeEach(function() {
             this.$table = $('<table>');
-            this.$navigation_links = $("<div/>")
+            this.$navigation_links = $("<div/>");
             this.is_user_admin = false;
             this.rows = [{
                 name: "Example",
@@ -82,7 +82,7 @@
     describe("Pipeline inputs table for sandbox", function() {
         beforeEach(function() {
             this.$table = $('<table>');
-            this.$navigation_links = $("<div/>")
+            this.$navigation_links = $("<div/>");
             this.is_user_admin = false;
             this.input_index = 1;
             this.compounddatatype_id = 17;

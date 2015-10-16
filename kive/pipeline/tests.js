@@ -2021,7 +2021,7 @@
     describe('Pipeline families', function() {
         beforeEach(function() {
             this.$table = $('<table/>');
-            this.$navigation_links = $("<div/>")
+            this.$navigation_links = $("<div/>");
             this.is_user_admin = false;
             this.initial_data = [{
                 name: 'Example',
