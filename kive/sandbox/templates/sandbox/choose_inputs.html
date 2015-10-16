@@ -17,6 +17,7 @@ $(function() {
     $('#input_forms table').each(function() {
         var $table = $(this),
             $li = $table.closest('li'),
+            $navigation_links = $li.find(".navigation_links"),
             $active_filters = $li.find('.active_filters'),
             $forms = $li.find('form'),
             compounddatatype_id = $table.data('compounddatatype_id'),
@@ -26,7 +27,9 @@ $(function() {
                 is_user_admin,
                 input_index,
                 compounddatatype_id,
-                $active_filters);
+                $active_filters,
+                $navigation_links
+        );
         table.filterSet.add('uploaded');
         $forms.submit(function(e) {
             e.preventDefault();
@@ -61,6 +64,7 @@ $(function() {
 });
     </script>
     <link rel="stylesheet" href="/static/sandbox/sandbox.css">
+    <link rel="stylesheet" href="/static/portal/permissions.css">
 {% endblock %}
 
 {% block widget_media %}
@@ -95,6 +99,8 @@ $(function() {
     </div>
 
     <div class="active_filters"></div>
+
+    <div class="navigation_links"></div>
 
     <div class="results2">
         <table data-compounddatatype_id="{{ input.compounddatatype.id }}"

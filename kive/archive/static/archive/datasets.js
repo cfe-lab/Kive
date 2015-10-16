@@ -81,7 +81,7 @@ var datasets = (function() {
             $('#datasets'),
             is_user_admin,
             $("#active_filters"),
-            $("#navigation_links")
+            $(".navigation_links")
         );
         table.filterSet.add('uploaded');
         table.reloadTable();

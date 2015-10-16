@@ -13,7 +13,7 @@
         $(function(){
             pipeline_families.main({{ is_user_admin|lower }},
                     $("#pipelinefamilies"),
-                    $("#navigation_links"));
+                    $(".navigation_links"));
         });
     </script>
 {% endblock %}
@@ -25,10 +25,9 @@
 <h2>Pipelines</h2>
 <a href="/pipeline_new" class="button">+&ensp;<span class="button-lbl">Add new</span></a>
 
-<div id="initial_data" style="display:none">{{ pipeline_families|escape }}</div>
 <p>A pipeline is the deployment of one or more Methods to process data.</p>
 
-<div id="navigation_links"></div>
+<div class="navigation_links"></div>
 
 <table id="pipelinefamilies"></table>
 

@@ -16,7 +16,7 @@
         $(function(){
             methodfamilies_main({{ is_user_admin|lower }},
                     $("#methodfamilies"),
-                    $("#navigation_links"));
+                    $(".navigation_links"));
         });
     </script>
 
@@ -28,13 +28,12 @@
 
 <h2>Method Families</h2>
 
-<div id="initial_data" style="display:none">{{ method_families|escape }}</div>
 <p>
 A MethodFamily is a collection of Methods that share a certain function
 in common.
 </p>
 
-    <div id="navigation_links"></div>
+<div class="navigation_links"></div>
 
 <table id="methodfamilies"></table>
 

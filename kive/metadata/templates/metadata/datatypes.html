@@ -25,7 +25,7 @@
 
         datatypes_main({{ is_user_admin|lower }},
                 $("#datatypes"),
-                $("#navigation_links"));
+                $(".navigation_links"));
 
     });
 
@@ -39,11 +39,9 @@
 
 <h2>Datatypes</h2>
 
-<div id="initial_data" style="display:none">{{ datatypes|escape }}</div>
-
 <a href="/datatype_add" class="button">+&ensp;<span class="button-lbl">Add new</span></a>
 
-<div id="navigation_links"></div>
+<div class="navigation_links"></div>
 
 <table id="datatypes"></table>
 

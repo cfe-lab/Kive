@@ -56,24 +56,18 @@
             type="checkbox"/>Uploaded</label></td>
     </tr>
     <tr>
-        <td><label>Started after<input
-            name="startafter"
+        <td>
+            <label>Created after<input
+                name="createdafter"
+                type="text"
+                class="datetime"/></label>
+        </td>
+        <td>
+            <label>Created before<input
+            name="createdbefore"
             type="text"
             class="datetime"/></label>
-        <td><label>Started before<input
-            name="startbefore"
-            type="text"
-            class="datetime"/></label>
-    </tr>
-    <tr>
-        <td><label>Ended after<input
-            name="endafter"
-            type="text"
-            class="datetime"/></label>
-        <td><label>Ended before<input
-            name="endbefore"
-            type="text"
-            class="datetime"/></label>
+        </td>
     </tr>
     </table>
     <input type="submit" value="Filter"/>
@@ -82,12 +76,11 @@
 
 <div id="active_filters"></div>
 
-<div id="navigation_links"></div>
+<div class="navigation_links"></div>
 
 <div class="results">
     <table id="datasets">
     </table>
 </div>
 
-<div style="display:none" id="preload_data">{{dataset_json}}</div>
 {% endblock %}

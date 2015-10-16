@@ -14,7 +14,7 @@ import fleet
 from fleet.models import RunToProcess, RunToProcessInput
 from fleet.serializers import RunToProcessSerializer,\
     RunToProcessOutputsSerializer
-from kive.ajax import IsGrantedReadCreate, RemovableModelViewSet
+from kive.ajax import IsGrantedReadCreate, RemovableModelViewSet, StandardPagination
 from librarian.models import SymbolicDataset
 from sandbox.forms import InputSubmissionForm, RunSubmissionForm
 from sandbox.views import RunSubmissionError
@@ -55,6 +55,7 @@ class RunToProcessViewSet(RemovableModelViewSet):
     queryset = RunToProcess.objects.all()
     serializer_class = RunToProcessSerializer
     permission_classes = (permissions.IsAuthenticated, IsGrantedReadCreate)
+    pagination_class = StandardPagination
 
     def create(self, request):
         """

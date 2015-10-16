@@ -25,6 +25,6 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     // Security stuff to prevent cross-site scripting.
     noXSS();
     
-    var table = new CompoundDatatypesTable($('#compounddatatypes'), is_user_admin, $("#navigation_links"));
-    table.reloadTable()
+    var table = new CompoundDatatypesTable($('#compounddatatypes'), is_user_admin, $(".navigation_links"));
+    table.reloadTable();
 });

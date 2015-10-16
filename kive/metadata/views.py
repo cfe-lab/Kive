@@ -27,19 +27,10 @@ def datatypes(request):
     """
     Render table and form on user request for datatypes.html
     """
-    # Re-cast request.user to our proxy class.
-    accessible_dts = Datatype.filter_by_user(request.user)
-    datatypes_json = json.dumps(
-        DatatypeSerializer(
-            accessible_dts,
-            context={"request": request},
-            many=True).data
-        )
     t = loader.get_template('metadata/datatypes.html')
     c = RequestContext(
         request,
         {
-            "datatypes": datatypes_json,
             "is_user_admin": admin_check(request.user)
         })
     return HttpResponse(t.render(c))
@@ -182,14 +173,8 @@ def compound_datatypes(request):
     """
     Render list of all CompoundDatatypes
     """
-    compound_datatypes = CompoundDatatype.filter_by_user(request.user)
-    compound_datatypes_json = json.dumps(CompoundDatatypeSerializer(
-        compound_datatypes,
-        context={ 'request': request },
-        many=True).data)
     t = loader.get_template('metadata/compound_datatypes.html')
-    c = RequestContext(request, {'compound_datatypes': compound_datatypes_json,
-                                 'is_user_admin': admin_check(request.user)})
+    c = RequestContext(request, {'is_user_admin': admin_check(request.user)})
     return HttpResponse(t.render(c))
 
 

@@ -16,17 +16,16 @@ $(function() {
     // Security stuff to prevent cross-site scripting.
     noXSS();
 
-    var $rows_json = $('#rows_json'),
-        rows = JSON.parse($rows_json.text()),
-        $table = $('#pipeline_families'),
+    var $table = $('#pipeline_families'),
         is_user_admin = false; // Never show admin tools on this page
-    $rows_json.detach();
     
     var table = new choose_pipeline.PipelineFamiliesTable(
             $table,
             is_user_admin,
-            $('#active_filters'));
-    table.buildTable(rows);
+            $('#active_filters'),
+            $(".navigation_links")
+    );
+    table.reloadTable();
 
     $('form.short-filter').submit(function(e) {
         e.preventDefault();
@@ -35,6 +34,7 @@ $(function() {
 });
     </script>
 	<link rel="stylesheet" href="/static/sandbox/sandbox.css">
+    <link rel="stylesheet" href="/static/portal/permissions.css">
 {% endblock %}
 
 {% block content %}
@@ -54,12 +54,12 @@ Select a pipeline
 </div>
 <div id="active_filters"></div>
 
+<div class="navigation_links"></div>
+
 <div class="results2">
     <table id="pipeline_families">
     </table>
 </div>
-
-<div style="display:none" id="rows_json">{{rows_json}}</div>
 
 <div class="errortext">{{ error_msg }}</div>
 <div id="errors" class="errortext"></div>

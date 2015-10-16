@@ -2,8 +2,8 @@ var choose_pipeline = (function() {
     "use strict";
     var my = {};
     
-    my.PipelineFamiliesTable = function($table, is_user_admin, $active_filters) {
-        permissions.PermissionsTable.call(this, $table, is_user_admin);
+    my.PipelineFamiliesTable = function($table, is_user_admin, $active_filters, $navigation_links) {
+        permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
         this.list_url = "/api/pipelinefamilies/";
         var pipelineFamiliesTable = this;
         this.filterSet = new permissions.FilterSet(

@@ -33,15 +33,7 @@ def datasets(request):
     Display a list of all Datasets in database
     """
     t = loader.get_template('archive/datasets.html')
-
-    accessible_SDs = librarian.models.SymbolicDataset.filter_by_user(request.user)
-    datasets = Dataset.objects.filter(symbolicdataset__in=accessible_SDs,
-                                      created_by=None) # Uploaded
-    datasets_json = json.dumps(DatasetSerializer(datasets,
-                                                 context={'request': request},
-                                                 many=True).data)
-    c = RequestContext(request, {'dataset_json': datasets_json})
-
+    c = RequestContext(request)
     c['is_user_admin'] = admin_check(request.user)
 
     return HttpResponse(t.render(c))

@@ -21,14 +21,7 @@ from sandbox.forms import InputSubmissionForm, RunSubmissionForm
 def choose_pipeline(request, error_message=''):
     """Create forms for all Pipelines in Shipyard."""
     template = loader.get_template("sandbox/choose_pipeline.html")
-    
-    families = PipelineFamily.filter_by_user(request.user)
-    families_json = json.dumps(AnalysisSerializer(families,
-                                                  context={'request': request},
-                                                  many=True).data)
-
-    context = RequestContext(request, {"rows_json": families_json,
-                                       "error_msg": error_message })
+    context = RequestContext(request, {"error_msg": error_message })
     return HttpResponse(template.render(context))
 
 

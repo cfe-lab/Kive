@@ -16,7 +16,7 @@
         $(function(){
             resources_main({{ is_user_admin|lower }},
                     $("#coderesources"),
-                    $("#navigation_links"));
+                    $(".navigation_links"));
         });
     </script>
 {% endblock %}
@@ -42,10 +42,7 @@ in the following table.
     <p>You do not have access to the CodeResource with id={{ no_access }}.</p>
 {% endif %}
 
-
-<div id="initial_data" style="display:none">{{ coderesources|escape }}</div>
-
-<div id="navigation_links"></div>
+<div class="navigation_links"></div>
 
 <table id="coderesources"></table>
 

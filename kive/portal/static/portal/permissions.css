@@ -29,18 +29,18 @@
     border: 1px solid transparent;
 }
 
-#navigation_links .record_count {
+.navigation_links .record_count {
     font-style: italic;
     font-size: 0.8em;
     padding-right: 1em;
     padding-left: 1em;
 }
 
-#navigation_links .nav {
+.navigation_links .nav {
     font-size: 0.8em;
 }
 
-#navigation_links .nolink {
+.navigation_links .nolink {
     font-size: 0.8em;
     color: gray;
 }

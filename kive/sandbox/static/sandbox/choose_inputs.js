@@ -23,8 +23,10 @@ var choose_inputs = (function() {
             is_user_admin,
             input_index,
             compounddatatype_id,
-            $active_filters) {
-        permissions.PermissionsTable.call(this, $table, is_user_admin);
+            $active_filters,
+            $navigation_links
+        ) {
+        permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
         this.list_url = "/api/datasets/";
         this.input_index = input_index;
         this.compounddatatype_id = compounddatatype_id;

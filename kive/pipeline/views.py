@@ -29,18 +29,9 @@ def pipeline_families(request):
     root members (without parent).
     """
     t = loader.get_template('pipeline/pipeline_families.html')
-    families = PipelineFamily.filter_by_user(request.user)
-    families_json = json.dumps(
-        PipelineFamilySerializer(
-            families,
-            context={"request": request},
-            many=True).data
-    )
-
     c = RequestContext(
         request,
         {
-            'pipeline_families': families_json,
             "is_user_admin": admin_check(request.user)
         })
     return HttpResponse(t.render(c))

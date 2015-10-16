@@ -32,17 +32,12 @@ def resources(request):
     """
     Display a list of all code resources (parents) in database
     """
-    resources = CodeResource.filter_by_user(request.user)
-    resource_json = JSONRenderer().render(
-        CodeResourceSerializer(resources, many=True, context={"request": request}).data
-    )
-
     t = loader.get_template('method/resources.html')
-    c = RequestContext(request,
-                       {
-                           'coderesources': resource_json,
-                           "is_user_admin": admin_check(request.user)
-                       })
+    c = RequestContext(
+        request,
+        {
+            "is_user_admin": admin_check(request.user)
+        })
 
     return HttpResponse(t.render(c))
 
@@ -451,21 +446,12 @@ def method_families(request):
     """
     Display a list of all MethodFamily objects in database.
     """
-    families = MethodFamily.filter_by_user(request.user)
-    families_json = JSONRenderer().render(
-        MethodFamilySerializer(
-            families,
-            context={"request": request},
-            many=True).data
-    )
-
     t = loader.get_template("method/method_families.html")
     c = RequestContext(
         request,
         {
-            "method_families": families_json,
             "is_user_admin": admin_check(request.user)
-            })
+        })
     return HttpResponse(t.render(c))
 
 
