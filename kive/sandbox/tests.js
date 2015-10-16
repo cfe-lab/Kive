@@ -4,24 +4,32 @@
     describe("Pipeline Families table for sandbox", function() {
         beforeEach(function() {
             this.$table = $('<table>');
+            this.$navigation_links = $("<div/>")
             this.is_user_admin = false;
-            this.rows = [{ name: "Example", members: [] }];
+            this.rows = [{
+                name: "Example",
+                members: [],
+                users_allowed: [],
+                groups_allowed: []
+            }];
         });
         
         it('should build table', function() {
             var table = new choose_pipeline.PipelineFamiliesTable(
                     this.$table,
-                    this.is_user_admin);
+                    this.is_user_admin,
+                    this.$navigation_links
+            );
             table.drawThumbnails = function() {}; // disable AJAX call
             table.buildTable(this.rows);
             
             var $rows = this.$table.find('tr'),
                 $cells = $rows.eq(1).find('td');
             
-            expect($cells.length).toBe(4, 'cell count');
+            expect($cells.length).toBe(7, 'cell count');
             expect($cells.eq(0).text()).toBe('Example');
             expect($cells.eq(1).html()).toContain('<canvas ');
-            expect($cells.eq(3).html()).toBe('&nbsp;', 'hidden column for admin');
+            expect($cells.eq(6).html()).toBe('&nbsp;', 'hidden column for admin');
         });
         
         it('should build list of members', function() {
@@ -74,10 +82,15 @@
     describe("Pipeline inputs table for sandbox", function() {
         beforeEach(function() {
             this.$table = $('<table>');
+            this.$navigation_links = $("<div/>")
             this.is_user_admin = false;
             this.input_index = 1;
             this.compounddatatype_id = 17;
-            this.rows = [{ name: "some_dataset.csv" }];
+            this.rows = [{
+                name: "some_dataset.csv",
+                users_allowed: [],
+                groups_allowed: []
+            }];
         });
         
         it('should build table', function() {
@@ -85,13 +98,16 @@
                     this.$table,
                     this.is_user_admin,
                     this.input_index,
-                    this.compounddatatype_id);
+                    this.compounddatatype_id,
+                    undefined,
+                    this.$navigation_links
+            );
             table.buildTable(this.rows);
             
             var $rows = this.$table.find('tr'),
                 $cells = $rows.eq(1).find('td');
             
-            expect($cells.length).toBe(4, 'cell count');
+            expect($cells.length).toBe(7, 'cell count');
             expect($cells.eq(0).text()).toBe('some_dataset.csv');
         });
         

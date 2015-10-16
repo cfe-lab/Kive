@@ -125,7 +125,7 @@ var permissions = (function() {
             permissions_table.buildCells($tr, row);
             permissions_table.$tbody.append($tr);
         });
-        
+
         // Schedule reload if it's been requested.
         if (this.reload_interval !== undefined) {
             this.timeout_id = setTimeout(
