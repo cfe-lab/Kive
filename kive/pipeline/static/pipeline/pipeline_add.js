@@ -219,20 +219,19 @@ $(function() {
         if (mf_id !== '') {
             $('#id_method_revision_field').show().focus();
             return $.ajax({
-                type: "POST",
-                url: "/get_method_revisions/",
-                data: { mf_id: mf_id }, // specify data as an object
+                type: "GET",
+                url: "/api/methodfamilies/" + mf_id + "/methods/",
+                data: {}, // specify data as an object
                 datatype: "json", // type of data expected back from server
                 success: function(result) {
                     var options = [];
-                    var arr = JSON.parse(result);
-                    $.each(arr, function(index,value) {
+                    $.each(result, function(index, value) {
                         var option = $("<option>");
                         option.attr({
-                            value: value.pk,
-                            title: value.fields.filename
+                            value: value.id,
+                            title: value.revision_desc
                         }).text(
-                            value.fields.method_number + ': ' + value.fields.method_name
+                            value.revision_number + ': ' + value.revision_name
                         );
                         options.push(option);
                     });
@@ -431,7 +430,7 @@ $(function() {
     var documentResizeHandler = function() {
         var shape, i, scale_x, scale_y;
 
-        canvasState.width  = canvas.width  = window.innerWidth,
+        canvasState.width  = canvas.width  = window.innerWidth;
         canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
         
         scale_x = canvas.width  / canvasState.old_width;
@@ -756,7 +755,7 @@ $(function() {
                 "_content_type": "application/json"},
                 dataType: 'json',
                 success: function(result) {
-                    submit_pipeline(result["id"]);
+                    submit_pipeline(result.id);
                 },
                 error: function(xhr, status, error) {
                     var json = xhr.responseJSON,

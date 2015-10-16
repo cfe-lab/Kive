@@ -1,7 +1,3 @@
-import json
-
-from django.http import HttpResponse, Http404
-from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Q
@@ -13,18 +9,16 @@ from rest_framework.response import Response
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet,\
     CleanCreateModelMixin, convert_validation, StandardPagination
 from metadata.models import AccessControl
-from method.models import MethodFamily, Method
 from pipeline.models import Pipeline, PipelineFamily
 from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer,\
     PipelineStepUpdateSerializer
-from portal.views import developer_check, admin_check
-
+from portal.views import admin_check
 
 
 class PipelineFamilyViewSet(CleanCreateModelMixin,
                             RemovableModelViewSet):
     """ Pipeline Families that contain the different versions of each pipeline
-    
+
     Query parameters for the list view:
     * is_granted=true - For administrators, this limits the list to only include
         records that the user has been explicitly granted access to. For other
@@ -80,7 +74,7 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
             new_published_version
         )
         return Response({'message': response_msg})
-    
+
     def filter_queryset(self, queryset):
         queryset = super(PipelineFamilyViewSet, self).filter_queryset(queryset)
         i = 0
@@ -92,7 +86,7 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
             queryset = self._add_filter(queryset, key, value)
             i += 1
         return queryset
-    
+
     def _add_filter(self, queryset, key, value):
         if key == 'smart':
             return queryset.filter(Q(name__icontains=value) |
@@ -142,7 +136,7 @@ class PipelineViewSet(CleanCreateModelMixin,
         return Response(PipelineStepUpdateSerializer(updates,
                                                      context={'request': request},
                                                      many=True).data)
-    
+
     # Override perform_create to call complete_clean, not just clean.
     @transaction.atomic
     def perform_create(self, serializer):
@@ -178,35 +172,3 @@ class PipelineViewSet(CleanCreateModelMixin,
             "" if publish_update else "un"
         )
         return Response({'message': response_msg})
-
-
-@login_required
-@user_passes_test(developer_check)
-def populate_method_revision_dropdown(request):
-    """
-    copied from Method ajax.py
-    """
-    if request.is_ajax():
-        response = HttpResponse()
-        method_family_id = request.POST.get('mf_id')
-        if method_family_id != '':
-            method_family = MethodFamily.objects.get(pk=method_family_id)
-
-            # Go through all Methods with this family and retrieve their primary key and revision_name.
-            method_dicts = []
-            for curr_method in Method.objects.filter(family=method_family).order_by('-pk'):
-                driver = curr_method.driver
-                parent = driver.coderesource
-                method_dicts.append({"pk": curr_method.pk, "model": "method.method",
-                                     "fields": {'driver_number': driver.revision_number,
-                                                'driver_name': driver.revision_name,
-                                                'filename': parent.filename,
-                                                'method_number': curr_method.revision_number,
-                                                'method_name': curr_method.revision_name,
-                                                'method_desc': curr_method.revision_desc
-                                                }})
-
-            response.write(json.dumps(method_dicts))
-        return response
-    else:
-        raise Http404

@@ -66,7 +66,7 @@
 (function() {
     
     if(typeof Math.sgn == "undefined") {
-        Math.sgn = function(x) { return x == 0 ? 0 : x > 0 ? 1 :-1; };
+        Math.sgn = function(x) { return x === 0 ? 0 : x > 0 ? 1 :-1; };
     }
     
     var Vectors = {
@@ -94,11 +94,12 @@
             w = _convertToBezier(point, curve),
             degree = curve.length - 1, higherDegree = (2 * degree) - 1,
             numSolutions = _findRoots(w, higherDegree, candidates, 0),
-            v = Vectors.subtract(point, curve[0]), dist = Vectors.square(v), t = 0.0;
+            v = Vectors.subtract(point, curve[0]), dist = Vectors.square(v), t = 0.0,
+            newDist;
 
         for (var i = 0; i < numSolutions; i++) {
             v = Vectors.subtract(point, _bezier(curve, degree, candidates[i], null, null));
-            var newDist = Vectors.square(v);
+            newDist = Vectors.square(v);
             if (newDist < dist) {
                 dist = newDist;
                 t = candidates[i];
@@ -125,7 +126,7 @@
             z = [ [1.0, 0.6, 0.3, 0.1], [0.4, 0.6, 0.6, 0.4], [0.1, 0.3, 0.6, 1.0] ];
             
         for (var i = 0; i <= degree; i++) c[i] = Vectors.subtract(curve[i], point);
-        for (var i = 0; i <= degree - 1; i++) {
+        for (i = 0; i <= degree - 1; i++) {
             d[i] = Vectors.subtract(curve[i+1], curve[i]);
             d[i] = Vectors.scale(d[i], 3.0);
         }
@@ -179,7 +180,7 @@
         left_count  = _findRoots(left,  degree, left_t, depth+1);
         right_count = _findRoots(right, degree, right_t, depth+1);
         for (var i = 0; i < left_count; i++) t[i] = left_t[i];
-        for (var i = 0; i < right_count; i++) t[i+left_count] = right_t[i];    
+        for (i = 0; i < right_count; i++) t[i+left_count] = right_t[i];    
         return (left_count+right_count);
     };
     var _getCrossingCount = function(curve, degree) {
@@ -235,18 +236,18 @@
     };
     var _bezier = function(curve, degree, t, left, right) {
         var temp = [[]];
-        for (var j =0; j <= degree; j++) temp[0][j] = curve[j];
+        for (var j = 0; j <= degree; j++) temp[0][j] = curve[j];
         for (var i = 1; i <= degree; i++) {    
-            for (var j =0 ; j <= degree - i; j++) {
+            for (j = 0 ; j <= degree - i; j++) {
                 if (!temp[i]) temp[i] = [];
                 if (!temp[i][j]) temp[i][j] = {};
                 temp[i][j].x = (1.0 - t) * temp[i-1][j].x + t * temp[i-1][j+1].x;
                 temp[i][j].y = (1.0 - t) * temp[i-1][j].y + t * temp[i-1][j+1].y;
             }
-        }    
-        if (left != null) 
+        }
+        if (left)
             for (j = 0; j <= degree; j++) left[j]  = temp[j][0];
-        if (right != null)
+        if (right)
             for (j = 0; j <= degree; j++) right[j] = temp[degree-j][j];
         
         return (temp[degree][0]);
@@ -274,7 +275,7 @@
             for (var i = 1; i < order; i++) {
                 var terms = [new c_term(order)];
                 for (var j = 0 ; j < (order - i); j++) terms.push(new t_term());
-                for (var j = 0 ; j < i; j++) terms.push(new one_minus_t_term());
+                for (j = 0 ; j < i; j++) terms.push(new one_minus_t_term());
                 fns.push(new _termFunc(terms));
             }
             fns.push(new l_term());  // last is (1-t) to the power of the curve order
@@ -406,7 +407,7 @@
      * if distance is not supplied, the perpendicular for the given location is computed (ie. we set distance to zero).
      */
     var _perpendicularToPathAt = function(curve, location, length, distance) {
-        distance = distance == null ? 0 : distance;
+        distance = distance ? distance : 0;
         var p = _pointAlongPath(curve, location, distance),
             m = _gradientAtPoint(curve, p.location),
             _theta2 = Math.atan(-1 / m),
