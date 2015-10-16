@@ -1,15 +1,9 @@
 """
 portal.views
 """
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
-
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader, RequestContext
-from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.core.context_processors import csrf
 
 from constants import groups
 
@@ -55,20 +49,3 @@ def usr(request):
     t = loader.get_template('portal/usr.html')
     c = RequestContext(request)
     return HttpResponse(t.render(c))
-
-@api_view(['POST'])
-def api_auth(request):
-    username = request.DATA.get("username")
-    password = request.DATA.get("password")
-    csrf_token = csrf(request)
-
-    user = authenticate(username=username, password=password)
-    if user is None:
-        return Response({'errors': ['Invalid user credentials!']}, status=status.HTTP_401_UNAUTHORIZED)
-    login(request, user)
-
-    response = {
-        'message': ['success'],
-    }
-    response.update(csrf_token)
-    return Response(response)
