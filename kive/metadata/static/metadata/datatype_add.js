@@ -30,20 +30,18 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
             if (selected_options.length > 0) {
                 $.ajax({
-                    type: "POST",
-                    url: "get_python_type/",
-                    data: { restricts: selected_options }, // specify data as an object
+                    type: "GET",
+                    url: "api/datatypes/",
+                    data: { base_for: selected_options }, // specify data as an object
                     datatype: "json", // type of data expected back from server
                     success: function(result) {
-                        var arr = JSON.parse(result)
-
-                        if (arr.length > 1) {
+                        if (result.length > 1) {
                             // reject this combination of restrictions
                             $('#str_constraints, #int_constraints').hide(300); // animated with delay 300 ms
                             $('#bad_restrictions').text('Incompatible restriction of Datatypes');
                         } else {
                             $('#bad_restrictions').text('');
-                            python_type = arr[0].fields.name;
+                            python_type = result[0].name;
 
                             if (python_type == 'integer' || python_type == 'float') {
                                 $('#int_constraints').show(300);
@@ -58,7 +56,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                             $('#id_to_hide').select(python_type);
                         }
                     }
-                })
+                });
             }
         }
     ).change();
@@ -70,7 +68,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     
     $('a[rel="ctrl"]').on('click', function (e) {
         $(this).siblings('.fulltext').show().css({ top: e.pageY, left: e.pageX, 'z-index': 3 });
-        setTimeout("$('.fulltext').fadeOut(300);", 2000);
+        setTimeout(function() { $('.fulltext').fadeOut(300); }, 5000);
     });
 
 });

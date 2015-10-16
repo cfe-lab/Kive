@@ -51,7 +51,6 @@ urlpatterns = patterns(
     url(r'^datatypes$', 'metadata.views.datatypes', name='datatypes'),
     url(r'^datatypes/(?P<id>\d+)/$', 'metadata.views.datatype_detail', name='datatype_detail'),
     url(r'^datatype_add$', 'metadata.views.datatype_add', name='datatype_add'),
-    url(r'^get_python_type/$', 'metadata.ajax.get_python_type', name='get_python_type'),
 
     url(r'^compound_datatypes$', 'metadata.views.compound_datatypes', name='compound_datatypes'),
     url(r'^compound_datatype_add$', 'metadata.views.compound_datatype_add', name='compound_datatype_add'),

@@ -389,7 +389,7 @@ the following commands:
 
     sudo su - postgres  # enter password if it asks
     dropdb kive  # enter kive user's password if it asks
-    createdb kive  # etc.
+    createdb kive
     exit
     ./manage.py migrate
 

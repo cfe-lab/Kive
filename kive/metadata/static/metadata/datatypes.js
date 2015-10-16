@@ -1,5 +1,5 @@
 function datatype_link($td, datatype) {
-    var $a = $("<a/>").attr("href", datatype["absolute_url"]).text(datatype["name"]);
+    var $a = $("<a/>").attr("href", datatype.absolute_url).text(datatype.name);
     $td.append($a);
 }
 
