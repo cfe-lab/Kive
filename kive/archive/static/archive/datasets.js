@@ -36,7 +36,7 @@ var datasets = (function() {
                     .text(dataset.name).attr('href', '/dataset_view/'+dataset.id));
         });
         this.registerColumn("Description", buildDescription);
-        this.registerColumn("Date Created", buildDateCreated);
+        this.registerColumn("Created", buildDateCreated);
         this.registerColumn("File Size", "filesize_display");
         this.registerColumn("", buildDownload);
 

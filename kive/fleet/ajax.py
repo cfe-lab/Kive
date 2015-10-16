@@ -188,6 +188,8 @@ class RunToProcessViewSet(RemovableModelViewSet):
             return runs.filter(
                 Q(pipeline__family__name__icontains=value)|
                 Q(id__in=runs_with_matching_inputs))
+        if key == "user":
+            return runs.filter(user__username__icontains=value)
         if key in ('startafter', 'startbefore', 'endafter', 'endbefore'):
             t = timezone.make_aware(datetime.strptime(value, '%d %b %Y %H:%M'),
                                     timezone.get_current_timezone())

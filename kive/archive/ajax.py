@@ -77,6 +77,10 @@ class DatasetViewSet(RemovableModelViewSet,
                                    Q(description__icontains=value))
         if key == 'name':
             return queryset.filter(name__icontains=value)
+        if key == 'description':
+            return queryset.filter(description__icontains=value)
+        if key == "user":
+            return queryset.filter(symbolicdataset__user__username__icontains=value)
         if key == 'uploaded':
             return queryset.filter(created_by=None)
         if key == 'cdt':
