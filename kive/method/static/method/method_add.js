@@ -5,16 +5,16 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     // trigger ajax on CR drop-down to populate revision select
     $("#id_coderesource").on('change', function() {
         cr_id = this.value;
-        if (cr_id != "") {
+        if (cr_id !== "") {
             $.getJSON(
-                "/get_revisions/",
-                { cr_id: cr_id }, // specify data as an object
+                "/api/coderesources/" + cr_id + "/revisions/",
+                {}, // specify data as an object
                 function(result) {
                     var options = [];
-                    $.each(result, function(index,value) {
+                    $.each(result, function(index, value) {
                         options.push($('<option>').attr('value', value.pk).text(
-                                value.fields.revision_number + ': ' +
-                                value.fields.revision_name));
+                                value.revision_number + ': ' +
+                                value.revision_name));
                     });
                     $("#id_revisions").empty().append(options);
                 }
@@ -42,7 +42,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         function () {
             numberOfInputForms += 1;
             i = numberOfInputForms - 1; // 0-indexing
-            htmlStr = "<tr>"
+            htmlStr = "<tr>";
             htmlStr += "<td>"+numberOfInputForms+"</td>";
 
             htmlStr += "<td><input id=\"id_dataset_name_in_" + i + "\" maxlength=\"128\" name=\"dataset_name_in_" + i + "\" type=\"text\" /></td>";
@@ -53,7 +53,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             htmlStr += "</select></td>";
             htmlStr += "<td><input id=\"id_min_row_in_" + i + "\" class=\"shortIntField\" name=\"min_row_in_" + i + "\" type=\"number\" /></td>";
             htmlStr += "<td><input id=\"id_max_row_in_" + i + "\" class=\"shortIntField\" name=\"max_row_in_" + i + "\" type=\"number\" /></td>";
-            htmlStr += "</tr>"
+            htmlStr += "</tr>";
 
             $('#extraInputForms').find('tr:last').after(htmlStr);
         }
@@ -73,7 +73,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     // we can reuse options
 
     // modify name attributes for extra input forms received from server
-    for (var i = 0; i < numberOfOutputForms; i++) {
+    for (i = 0; i < numberOfOutputForms; i++) {
         $('#id_dataset_name_out_'+i).attr('name', 'dataset_name_out_'+i);
         $('#id_compounddatatype_out_'+i).attr('name', 'compounddatatype_out_'+i);
         $('#id_min_row_out_'+i).attr('name', 'min_row_out_'+i);
@@ -85,7 +85,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         function () {
             numberOfOutputForms += 1;
             i = numberOfOutputForms - 1; // 0-indexing
-            htmlStr = "<tr>"
+            htmlStr = "<tr>";
             htmlStr += "<td>"+numberOfOutputForms+"</td>";
 
             htmlStr += "<td><input id=\"id_dataset_name_out_" + i + "\" maxlength=\"128\" name=\"dataset_name_out_" + i + "\" type=\"text\" /></td>";
@@ -96,7 +96,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             htmlStr += "</select></td>";
             htmlStr += "<td><input id=\"id_min_row_out_" + i + "\" class=\"shortIntField\" name=\"min_row_out_" + i + "\" type=\"number\" /></td>";
             htmlStr += "<td><input id=\"id_max_row_out_" + i + "\" class=\"shortIntField\" name=\"max_row_out_" + i + "\" type=\"number\" /></td>";
-            htmlStr += "</tr>"
+            htmlStr += "</tr>";
 
             $('#extraOutputForms').find('tr:last').after(htmlStr);
         }
@@ -119,13 +119,13 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     
     $('a[rel="ctrl"]').on('click', function (e) {
         $(this).siblings('.fulltext').show().css({ top: e.pageY, left: e.pageX, 'z-index': 3 });
-        setTimeout("$('.fulltext').fadeOut(300);", 2000);
+        setTimeout(function() { $('.fulltext').fadeOut(300); }, 5000);
     });
 
     // hide Method Family form if a pre-existing family is selected
     $('#id_family').on('change', function() {
         this_family = $(this).val();
-        if (this_family == "") {
+        if (this_family === "") {
             $('#id_name').prop('disabled', false);
             $('#id_description').prop('disabled', false);
         } else {

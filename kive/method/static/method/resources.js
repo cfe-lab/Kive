@@ -4,7 +4,7 @@
 (function(window){
 
     function revisions_link($td, coderesource) {
-        var $a = $("<a/>").attr("href", coderesource["absolute_url"]).text(coderesource["name"]);
+        var $a = $("<a/>").attr("href", coderesource.absolute_url).text(coderesource.name);
         $td.append($a);
     }
 

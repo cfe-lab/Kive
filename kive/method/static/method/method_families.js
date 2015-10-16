@@ -1,5 +1,5 @@
 function family_link($td, method_family) {
-    var $a = $("<a/>").attr("href", method_family["absolute_url"]).text(method_family["name"]);
+    var $a = $("<a/>").attr("href", method_family.absolute_url).text(method_family.name);
     $td.append($a);
 }
 

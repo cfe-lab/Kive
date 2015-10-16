@@ -1,5 +1,5 @@
 function method_link($td, method) {
-    var $a = $("<a/>").attr("href", method["absolute_url"]).text(method["display_name"]);
+    var $a = $("<a/>").attr("href", method.absolute_url).text(method.display_name);
     $td.append($a);
 }
 

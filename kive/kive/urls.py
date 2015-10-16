@@ -61,8 +61,6 @@ urlpatterns = patterns(
     url(r'^resource_revision_add/(?P<id>\d+)/$', 'method.views.resource_revision_add', name='resource_revision_add'),
     url(r'^resource_revision_view/(?P<id>\d+)/$', 'method.views.resource_revision_view', name='resource_revision_view'),
 
-    url(r'^get_revisions/$', 'method.ajax.populate_revision_dropdown', name='populate_revision_dropdown'),
-
     url(r'^method_families$', 'method.views.method_families', name='method_families'),
     url(r'^method_new$', 'method.views.method_new', name='method_new'),
     url(r'^methods/(?P<id>\d+)/$', 'method.views.methods', name='methods'),

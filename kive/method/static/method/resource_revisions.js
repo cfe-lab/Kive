@@ -4,21 +4,21 @@
 (function(window){
 
     function coderevision_link($td, revision) {
-        if (revision["content_file"].length !== 0) {
+        if (revision.content_file.length !== 0) {
 
         }
-        var $a = $("<a/>").attr("href", revision["absolute_url"]).text("Revise");
+        var $a = $("<a/>").attr("href", revision.absolute_url).text("Revise");
         $td.append($a);
     }
 
     function coderevision_view_link($td, revision) {
-        var $a = $("<a/>").attr("href", revision["view_url"]).text(revision["display_name"]);
+        var $a = $("<a/>").attr("href", revision.view_url).text(revision.display_name);
         $td.append($a);
     }
 
     function buildDownload($td, revision) {
-        if (revision["content_file"].length !== 0) {
-            $td.append($('<a/>').text('Download').attr('href', revision["download_url"]));
+        if (revision.content_file.length !== 0) {
+            $td.append($('<a/>').text('Download').attr('href', revision.download_url));
         }
     }
 
