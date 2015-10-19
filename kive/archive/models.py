@@ -138,8 +138,11 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
     # If run was spawned within another run, parent_runstep denotes
     # the run step that initiated it
-    parent_runstep = models.OneToOneField("RunStep", related_name="child_run", null=True, blank=True,
-        help_text="Step of parent run initiating this one as a sub-run")
+    parent_runstep = models.OneToOneField("RunStep",
+                                          related_name="child_run",
+                                          null=True,
+                                          blank=True,
+                                          help_text="Step of parent run initiating this one as a sub-run")
 
     # Implicitly, this also has start_time and end_time through inheritance.
 
@@ -192,7 +195,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         for i, runstep in enumerate(self.runsteps.order_by("pipelinestep__step_num"), start=1):
             if runstep.pipelinestep.step_num != i:
                 raise ValidationError('RunSteps of Run "{}" are not consecutively numbered starting from 1'
-                        .format(self))
+                                      .format(self))
             # RunStepInputCables are cleaned within RunStep.clean()
             runstep.clean()
 
@@ -297,11 +300,11 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             return ()
         # Otherwise, return the coordinates of the parent RunStep.
         return self.parent_runstep.get_coordinates()
-    
+
     def describe_run_failure(self):
         """
         Return a tuple (error, reason) describing a Run failure.
-    
+
         TODO: this is very rudimentary at the moment.
         - It does not take recovery into account - should report which step
           was actually executed and failed, not which step tried to recover
@@ -312,26 +315,26 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         total_steps = self.pipeline.steps.count()
         error = ""
-    
+
         # Check each step for failure.
         for i, runstep in enumerate(self.runsteps.order_by("pipelinestep__step_num"), start=1):
-    
+
             if runstep.is_complete() and not runstep.is_successful():
                 error = "Step {} of {} failed".format(i, total_steps)
-    
+
                 # Check each cable.
                 total_cables = runstep.pipelinestep.cables_in.count()
                 for j, runcable in enumerate(runstep.RSICs.order_by("PSIC__dest__dataset_idx"), start=1):
                     if not runcable.is_successful():
                         return (error, "Input cable {} of {} failed".format(j, total_cables))
-    
+
                 # Check the step execution.
                 if not runstep.log:
                     return (error, "Recovery failed")
-                return_code = runstep.log.methodoutput.return_code 
+                return_code = runstep.log.methodoutput.return_code
                 if return_code != 0:
                     return (error, "Return code {}".format(return_code))
-    
+
                 # Check for bad output.
                 for output in runstep.execrecord.execrecordouts.all():
                     try:
@@ -341,19 +344,19 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                             check = runstep.log.integrity_checks.get(symbolicdataset=output.symbolicdataset)
                         except IntegrityCheckLog.DoesNotExist:
                             continue
-    
+
                     if check.is_fail():
                         return (error, "Output {}: {}".format(output.generic_output.definite.dataset_idx, check))
-    
+
                 # Something else went wrong with the step?
                 return (error, "Unknown error")
-                    
+
         # Check each output cable.
         total_cables = self.pipeline.outcables.count()
         for i, runcable in enumerate(self.runoutputcables.order_by("pipelineoutputcable__output_idx")):
             if not runcable.is_successful():
                 return ("Output {} of {} failed".format(i, total_cables), "could not copy file")
-    
+
         # Shouldn't reach here.
         return ("Unknown error", "Unknown reason")
 
@@ -390,7 +393,7 @@ class RunComponent(stopwatch.models.Stopwatch):
     execrecord = models.ForeignKey("librarian.ExecRecord", null=True, blank=True, related_name="used_by_components")
     reused = models.NullBooleanField(help_text="Denotes whether this reuses an ExecRecord", default=None)
     is_cancelled = models.BooleanField(help_text="Denotes whether this has been cancelled",
-                                    default=False)
+                                       default=False)
 
     _complete = models.BooleanField(
         help_text="Denotes whether this run component has been completed. Private use only",
@@ -963,7 +966,7 @@ class RunStep(RunComponent):
 
         INPUTS
         output      TransformationOutput to check
-        
+
         PRE
         The provided output is a TransformationOutput of the RunStep's
         PipelineStep's Transformation.
@@ -1077,10 +1080,10 @@ class RunStep(RunComponent):
         elif self.reused:
             self._clean_reused()
 
-        else: # self.reused is False.
+        else:  # self.reused is False.
             if not RunComponent._clean_not_reused(self):
                 return False
- 
+
             for out_data in self.outputs.all():
                 out_data.clean()
         return True
@@ -1163,7 +1166,7 @@ class RunStep(RunComponent):
          - pipelinestep is consistent with run
          - if pipelinestep is a method, there should be no child_run
 
-         - if pipelinestep is a pipeline, check for coherence (see 
+         - if pipelinestep is a pipeline, check for coherence (see
            _clean_with_subrun)
 
          - if an EL is associated, check it is clean (see the module
@@ -1180,7 +1183,7 @@ class RunStep(RunComponent):
 
         (from here on all RSICs are assumed to be quenched)
 
-         - if this is represents a Method, do relevant coherence checks 
+         - if this is represents a Method, do relevant coherence checks
            (see _clean_with_method).
          - else if this is a Pipeline:
            - clean child_run if it exists
@@ -1228,12 +1231,14 @@ class RunStep(RunComponent):
         self._clean_execlogs()
 
         # If any inputs are not quenched, stop checking.
-        if not self._clean_cables_in(): return
+        if not self._clean_cables_in():
+            return
 
         # From here on, RSICs are assumed to be quenched.
         # Perform tests specific to the Method and Pipeline cases.
         if self.pipelinestep.transformation.is_method:
-            if not self._clean_with_method(): return
+            if not self._clean_with_method():
+                return
         elif self.pipelinestep.transformation.is_pipeline:
             if self.has_subrun():
                 self.child_run.clean()
@@ -1677,8 +1682,10 @@ class RunCable(RunComponent):
 
                     if corresp_ero.symbolicdataset.dataset != self.outputs.first():
                         raise ValidationError('Dataset "{}" was produced by {} "{}" but is not in an ERO of '
-                                              'ExecRecord "{}"'.format(self.outputs.first(), self._cable_type_str(),
-                                              self, self.execrecord))
+                                              'ExecRecord "{}"'.format(self.outputs.first(),
+                                                                       self._cable_type_str(),
+                                                                       self,
+                                                                       self.execrecord))
 
         # June 9, 2014: since PSICs are now allowed to use ERs of POCs and vice versa, the functionality
         # that was previously in RunSIC and RunOutputCable._clean_execrecord can now be folded into here.
@@ -1687,7 +1694,6 @@ class RunCable(RunComponent):
                 self.__class__.__name__, self))
 
         elif not self.component.is_compatible(self.execrecord.general_transf()):
-            #raise ValidationError('PSIC of RunSIC "{}" is incompatible with that of its ExecRecord'.format(self))
             raise ValidationError('{} of {} "{}" is incompatible with the cable of its ExecRecord'.format(
                 self.component.__class__.__name__, self.__class__.__name__, self))
 
@@ -1963,7 +1969,7 @@ class RunOutputCable(RunCable):
         runoutputcable.clean()
         runoutputcable.save()
         return runoutputcable
-    
+
     def __str__(self):
         return 'RunOutputCable("{}")'.format(
             self.pipelineoutputcable.output_name)
@@ -2146,7 +2152,7 @@ class Dataset(models.Model):
         rows = self.all_rows(data_check, insert_at)
         for i, row in enumerate(rows):
             if i == 0:
-                pass # skip header
+                pass  # skip header
             else:
                 yield row
             if limit is not None and i >= limit:
@@ -2208,7 +2214,7 @@ class Dataset(models.Model):
                 [expt.insert(i, "") for _ in xrange(u_score)]
             elif l_score <= u_score and l_score != float('inf'):
                 [obs.insert(i, "") for _ in xrange(l_score)]
-                insert += [i] * l_score # keep track of where to insert columns in the resulting view
+                insert += [i] * l_score  # keep track of where to insert columns in the resulting view
             i += 1
 
         # it would be nice to do a similar soft matching to try to
@@ -2335,8 +2341,8 @@ class Dataset(models.Model):
     def purge(cls,
               max_storage=settings.DATASET_MAX_STORAGE,
               target=settings.DATASET_TARGET_STORAGE):
-        
-        files = [] # [(date, path)]
+
+        files = []  # [(date, path)]
         start_path = os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR)
         total_size = 0
         skipped_count = 0
@@ -2367,7 +2373,7 @@ class Dataset(models.Model):
                         os.remove(filepath)
                         total_size -= filesize
                 else:
-                    creator = dataset.created_by # run component that created it
+                    creator = dataset.created_by  # run component that created it
                     consumers = dataset.symbolicdataset.runtoprocessinputs.all()
                     is_skipped = (creator is None or
                                   not creator.top_level_run.is_complete() or
@@ -2636,7 +2642,7 @@ class ExecLog(stopwatch.models.Stopwatch):
                 redaction_plan["ErrorLogs"].add(self)
             if return_code and not self.methodoutput.is_code_redacted():
                 redaction_plan["ReturnCodes"].add(self)
-            
+
             # Don't need to record RunComponent in the redaction plan, because
             # we don't report those.
         except MethodOutput.DoesNotExist:
@@ -2715,7 +2721,7 @@ class MethodOutput(models.Model):
 
     def is_code_redacted(self):
         return self.code_redacted
-    
+
     def redact_output_log(self):
         self.output_log.delete()
         self.output_redacted = True
