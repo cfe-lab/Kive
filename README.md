@@ -70,6 +70,14 @@ Firefox            | version 3.6   | version 3.6
 Safari             | version 3.1   | version 7
 Internet Explorer  | version 9     | version 10
 
+RESTful API
+-----------
+You can upload data, launch pipelines, and update pipelines all through Kive's
+API. You can also use our [Python library][kive-api] to script calls to the
+API.
+
+[kive-api]: https://github.com/cfe-lab/py-kive-api
+
 
 What are we working on?
 -----------------------

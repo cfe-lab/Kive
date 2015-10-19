@@ -12,7 +12,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                 function(result) {
                     var options = [];
                     $.each(result, function(index, value) {
-                        options.push($('<option>').attr('value', value.pk).text(
+                        options.push($('<option>').attr('value', value.id).text(
                                 value.revision_number + ': ' +
                                 value.revision_name));
                     });

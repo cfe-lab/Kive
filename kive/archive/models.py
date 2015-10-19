@@ -296,7 +296,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         Returns an empty tuple if this is a top-level run.
         """
         # Base case: this is a top-level run.  Return None.
-        if self.parent_runstep == None:
+        if self.parent_runstep is None:
             return ()
         # Otherwise, return the coordinates of the parent RunStep.
         return self.parent_runstep.get_coordinates()
@@ -2097,7 +2097,8 @@ class Dataset(models.Model):
     # a) the SymbolicDataset of this Dataset (if it's uploaded)
     # b) the parent Run of created_by (if it's generated) -- note that this may not be the same
     #    user that created the parent SymbolicDataset.
-    name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH, help_text="Name of this Dataset.")
+    name = models.CharField(max_length=maxlengths.MAX_FILENAME_LENGTH,
+                            help_text="Name of this Dataset.")
     description = models.TextField(help_text="Description of this Dataset.",
                                    max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
                                    blank=True)
