@@ -16,13 +16,11 @@ from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
 from archive.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm, ArchiveAddDatasetForm
 from archive.models import Dataset, MethodOutput
-from archive.serializers import DatasetSerializer
 from portal.views import admin_check
 from kive.settings import DATASET_DISPLAY_MAX
 
 import librarian.models
 import fleet.models
-import json
 
 LOGGER = logging.getLogger(__name__)
 
@@ -108,7 +106,7 @@ def _build_raw_viewer(request, file, name, download=None, return_to_url=None):
     t = loader.get_template("archive/raw_view.html")
     c = RequestContext(request, {"file": file, "name": name, 'download': download, 'return': return_to_url})
     return HttpResponse(t.render(c))
-    
+
 
 @login_required
 def stdout_download(request, methodoutput_id):
@@ -186,19 +184,6 @@ def datasets_add(request):
                 single_dataset_form.add_error(None, "Invalid form submission")
                 success = False
             elif single_dataset_form.is_valid():
-                # calculate md5 checksum for uploaded file
-                checksum = hashlib.md5()
-                for chunk in request.FILES['single-dataset_file'].chunks():
-                    checksum.update(chunk)
-                md5 = checksum.hexdigest()
-
-                # check to see if this md5 already exists in database
-                datasets = librarian.models.SymbolicDataset.filter_by_user(request.user).filter(MD5_checksum=md5)
-                if len(datasets) > 0:
-                    single_dataset_form.add_error('dataset_file', 'Dataset with identical md5 already exists.')
-                    c.update({'singleDataset': single_dataset_form})
-                    return HttpResponse(t.render(c))
-
                 single_dataset_form.create_dataset(request.user)
             else:
                 success = False
@@ -212,7 +197,6 @@ def datasets_add(request):
             return HttpResponseRedirect("datasets")
         else:
             c.update({'singleDataset': single_dataset_form})
-
 
     else:  # return an empty formset for the user to fill in
         single_dataset_form = DatasetForm(user=request.user, prefix="single")
@@ -341,19 +325,19 @@ def datasets_add_bulk(request):
                 uploaded_files = bulk_add_dataset_form.cleaned_data["dataset_files"]
                 if isinstance(add_results[i], basestring):
                     bulk_display_result["name"] = ""
-                    bulk_display_result["description"] =  ""
-                    bulk_display_result["orig_filename"] =  ""
-                    bulk_display_result["filesize"] =  ""
-                    bulk_display_result["md5"] =  ""
+                    bulk_display_result["description"] = ""
+                    bulk_display_result["orig_filename"] = ""
+                    bulk_display_result["filesize"] = ""
+                    bulk_display_result["md5"] = ""
                     bulk_display_result["id"] = ""
                 else:
-                    bulk_display_result["name"] =  add_results[i].name
-                    bulk_display_result["description"] =  add_results[i].description
+                    bulk_display_result["name"] = add_results[i].name
+                    bulk_display_result["description"] = add_results[i].description
                     # This is the original filename as uploaded by the client, not the filename as stored
                     # on the file server.
                     bulk_display_result["orig_filename"] = uploaded_files[i].name
-                    bulk_display_result["filesize"] =  add_results[i].get_formatted_filesize()
-                    bulk_display_result["md5"] =  add_results[i].compute_md5()
+                    bulk_display_result["filesize"] = add_results[i].get_formatted_filesize()
+                    bulk_display_result["md5"] = add_results[i].compute_md5()
                     bulk_display_result["id"] = add_results[i].id
 
                 bulk_display_results.extend([bulk_display_result])
@@ -451,8 +435,8 @@ def dataset_lookup(request, md5_checksum=None):
                 checksum.update(chunk)
             md5_checksum = checksum.hexdigest()
 
-    datasets = librarian.models.SymbolicDataset.filter_by_user(request.user).filter(MD5_checksum=md5_checksum).\
-                exclude(dataset__created_by=None)
+    datasets = librarian.models.SymbolicDataset.filter_by_user(request.user).filter(
+        MD5_checksum=md5_checksum).exclude(dataset__created_by=None)
 
     datasets_as_inputs = []
     rtps = fleet.models.RunToProcess.objects.filter(inputs__symbolicdataset__MD5_checksum=md5_checksum)
