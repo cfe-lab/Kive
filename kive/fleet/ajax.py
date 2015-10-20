@@ -42,6 +42,7 @@ class RunToProcessViewSet(RemovableModelViewSet):
     * filters[n][key]=active - runs that are still running or recently finished.
     * filters[n][key]=name&filters[n][val]=match - runs where an input dataset
         name or the pipeline family name match the value (case insensitive)
+    * filters[n][key]=user&filters[n][val]=match - runs created by the specified user
     * filters[n][key]=startafter&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
         started after the given date and time.
     * filters[n][key]=startbefore&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
