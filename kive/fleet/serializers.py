@@ -1,13 +1,12 @@
 from django.contrib.auth.models import User, Group
 from django.utils import timezone
-from django.db import transaction
 
 from rest_framework import serializers
 from fleet.models import RunToProcess, RunToProcessInput
 from pipeline.models import Pipeline
 from metadata.models import who_cannot_access
 from transformation.models import TransformationInput
-from archive.serializers import TinyRunSerializer, RunOutputsSerializer
+from archive.serializers import RunOutputsSerializer
 from kive.serializers import AccessControlSerializer
 
 
