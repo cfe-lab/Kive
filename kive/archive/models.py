@@ -17,6 +17,7 @@ import os
 import time
 
 from django.db import models, transaction
+from django.db.models import Q
 from django.db.models.signals import post_delete
 from django.conf import settings
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
@@ -28,6 +29,7 @@ import archive.signals
 from constants import maxlengths
 from datachecking.models import ContentCheckLog, IntegrityCheckLog
 import fleet.exceptions
+from librarian.models import ExecRecord
 import metadata.models
 import stopwatch.models
 
@@ -2374,20 +2376,49 @@ class Dataset(models.Model):
                         os.remove(filepath)
                         total_size -= filesize
                 else:
-                    creator = dataset.created_by  # run component that created it
-                    consumers = dataset.symbolicdataset.runtoprocessinputs.all()
-                    is_skipped = (creator is None or
-                                  not creator.top_level_run.is_complete() or
-                                  any(not consumer.runtoprocess.finished
-                                      for consumer in consumers))
+                    if dataset.created_by is None:
+                        is_skipped = True  # it was uploaded, not created
+                    else:
+                        # Check to see if it's being used by an active run.
+                        producers = dataset.symbolicdataset.execrecordouts.all()
+                        consumers = dataset.symbolicdataset.execrecordins.all()
+                        related_execrecords = ExecRecord.objects.filter(
+                            Q(execrecordouts__in=producers) |
+                            Q(execrecordins__in=consumers))
+                        related_components = RunComponent.objects.filter(
+                            execrecord__in=related_execrecords)
+                        related_runs = {component.top_level_run
+                                        for component in related_components}
+                        is_skipped = any((not run.has_ended()
+                                          for run in related_runs))
                     if is_skipped:
                         skipped_count += 1
                     else:
                         dataset.delete()
                         total_size -= filesize
-            cls.logger.info('Dataset purge finished, leaving %s over %d files.',
-                            filesizeformat(total_size),
-                            len(files) + skipped_count)
+
+            remaining = 'Leaving {} over {} files.'.format(
+                filesizeformat(total_size),
+                len(files) + skipped_count)
+            if total_size > settings.DATASET_MAX_STORAGE:
+                target = settings.DATASET_MAX_STORAGE
+                log_method = cls.logger.error
+            elif total_size > settings.DATASET_TARGET_STORAGE:
+                target = settings.DATASET_TARGET_STORAGE
+                log_method = cls.logger.warn
+            else:
+                target = None
+                log_method = cls.logger.info
+            if target:
+                message = 'Cannot purge datasets below {}. {}'.format(
+                    filesizeformat(target),
+                    remaining)
+            else:
+                message = 'Dataset purge finished. ' + remaining
+            message = message.replace('\xa0', ' ')
+            log_method(message)
+            if log_method == cls.logger.error:
+                raise RuntimeError(message)
 
 
 class ExecLog(stopwatch.models.Stopwatch):
