@@ -6,12 +6,9 @@ from django.contrib.auth.models import User, Group
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from kive.serializers import AccessControlSerializer
-
 from archive.models import Dataset, Run, MethodOutput
 from librarian.models import SymbolicDataset
 from metadata.models import CompoundDatatype
-from metadata.serializers import CompoundDatatypeSerializer
 
 
 class TinyRunSerializer(serializers.ModelSerializer):
@@ -89,7 +86,7 @@ class DatasetSerializer(serializers.ModelSerializer):
     def get_filename(self, obj):
         if obj:
             return os.path.basename(obj.dataset_file.name)
-    
+
     def get_filesize_display(self, obj):
         if obj:
             return filesizeformat(obj.get_filesize())
@@ -181,14 +178,14 @@ class _RunDataset(object):
                                       kwargs={'pk': dataset.id},
                                       request=request)
         self.filename = os.path.basename(dataset.dataset_file.name)
-    
+
     def set_redacted(self):
         self.size = self.date = 'redacted'
 
 
 class RunOutputsSerializer(serializers.ModelSerializer):
     """ Serialize a run with a focus on the outputs. """
-    
+
     output_summary = serializers.SerializerMethodField()
     input_summary = serializers.SerializerMethodField()
 
@@ -231,14 +228,13 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 input.date = timezone.localtime(input.date).strftime(
                     '%d %b %Y %H:%M:%S')
             except TypeError:
-                pass # Size was not a number, so leave it alone.
+                pass  # Size was not a number, so leave it alone.
 
         return [inp.__dict__ for inp in inputs]
 
-
     def get_output_summary(self, run):
         """ Get a list of objects that summarize all the outputs from a run.
-        
+
         Outputs include pipeline outputs, as well as output log, error log, and
         output cables for each step.
         """
@@ -248,26 +244,27 @@ class RunOutputsSerializer(serializers.ModelSerializer):
         for i, outcable in enumerate(run.outcables_in_order):
             if outcable.execrecord is not None:
                 execrecordout = outcable.execrecord.execrecordouts.first()
-                output = _RunDataset(step_name=(i == 0 and 'Run outputs' or ''),
-                                output_name=outcable.pipelineoutputcable.dest,
-                                type='dataset')
+                output = _RunDataset(
+                    step_name=(i == 0 and 'Run outputs' or ''),
+                    output_name=outcable.pipelineoutputcable.dest,
+                    type='dataset')
                 if execrecordout.symbolicdataset.has_data():
                     dataset = execrecordout.symbolicdataset.dataset
                     output.set_dataset(dataset, request)
                 elif execrecordout.symbolicdataset.is_redacted():
                     output.set_redacted()
-    
+
                 outputs.append(output)
-            
+
         for runstep in run.runsteps_in_order:
             execlog = runstep.get_log()
             if execlog is None:
                 continue
             methodoutput = execlog.methodoutput
-    
+
             output = _RunDataset(step_name=runstep.pipelinestep,
-                            output_name='Standard out',
-                            type='stdout')
+                                 output_name='Standard out',
+                                 type='stdout')
             if methodoutput.is_output_redacted():
                 output.set_redacted()
                 outputs.append(output)
@@ -287,8 +284,8 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 except ValueError:
                     pass
             output = _RunDataset(step_name="",
-                            output_name='Standard error',
-                            type='stderr')
+                                 output_name='Standard error',
+                                 type='stderr')
             if methodoutput.is_error_redacted():
                 output.set_redacted()
                 outputs.append(output)
@@ -309,16 +306,17 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     pass
             if runstep.execrecord is not None:
                 for execrecordout in runstep.execrecord.execrecordouts_in_order:
-                    output = _RunDataset(step_name='',
-                                    output_name=execrecordout.generic_output,
-                                    is_ok=execrecordout.is_OK(),
-                                    type='dataset')
+                    output = _RunDataset(
+                        step_name='',
+                        output_name=execrecordout.generic_output,
+                        is_ok=execrecordout.is_OK(),
+                        type='dataset')
                     if execrecordout.symbolicdataset.has_data():
                         dataset = execrecordout.symbolicdataset.dataset
                         output.set_dataset(dataset, request)
                     elif execrecordout.symbolicdataset.is_redacted():
                         output.set_redacted()
-        
+
                     outputs.append(output)
         for output in outputs:
             output.is_invalid = not output.is_ok and output.id is not None
@@ -332,6 +330,6 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 output.date = timezone.localtime(output.date).strftime(
                     '%d %b %Y %H:%M:%S')
             except TypeError:
-                pass # Size was not a number, so leave it alone.
-        
+                pass  # Size was not a number, so leave it alone.
+
         return [output.__dict__ for output in outputs]
