@@ -328,6 +328,38 @@ def _check_basic_constraints(columns, data_reader, out_handles={}):
     return rownum, failing_cells
 
 
+def who_cannot_access(user, users_allowed, groups_allowed, acs):
+    """
+    Tells which of the specified users and groups cannot access all of the AccessControl objects specified.
+
+    user: a User
+    users_allowed: an iterable of Users
+    groups_allowed: an iterable of Groups
+    acs: a list of AccessControl instances.
+    """
+    all_users_allowed = set([user]).union(set(users_allowed))
+
+    if acs[0].groups_allowed.filter(pk=groups.EVERYONE_PK).exists():
+        ac_users_allowed = set(User.objects.all())
+        ac_groups_allowed = set(Group.objects.all())
+    else:
+        ac_users_allowed = set([acs[0].user]).union(set(acs[0].users_allowed.all()))
+        ac_groups_allowed = set(acs[0].groups_allowed.all())
+
+    for ac in acs[1:]:
+        if not ac.groups_allowed.filter(pk=groups.EVERYONE_PK).exists():
+            ac_users_allowed.intersection_update(set([ac.user]).union(set(ac.users_allowed.all())))
+            ac_groups_allowed.intersection_update(ac.groups_allowed.all())
+
+    # Special case: everyone is allowed access to all of the elements of acs.
+    if everyone_group() in ac_groups_allowed:
+        return set(), set()
+
+    users_difference = all_users_allowed.difference(ac_users_allowed)
+    groups_difference = set(groups_allowed.all()).difference(ac_groups_allowed)
+    return users_difference, groups_difference
+
+
 class KiveUser(User):
     """
     Proxy model that has some convenience functions for Users.
@@ -392,27 +424,7 @@ class AccessControl(models.Model):
 
         acs: a list of AccessControl instances.
         """
-        self_users_allowed = set([self.user]).union(set(self.users_allowed.all()))
-
-        if acs[0].groups_allowed.filter(pk=groups.EVERYONE_PK).exists():
-            ac_users_allowed = set(User.objects.all())
-            ac_groups_allowed = set(Group.objects.all())
-        else:
-            ac_users_allowed = set([acs[0].user]).union(set(acs[0].users_allowed.all()))
-            ac_groups_allowed = set(acs[0].groups_allowed.all())
-
-        for ac in acs[1:]:
-            if not ac.groups_allowed.filter(pk=groups.EVERYONE_PK).exists():
-                ac_users_allowed.intersection_update(set([ac.user]).union(set(ac.users_allowed.all())))
-                ac_groups_allowed.intersection_update(ac.groups_allowed.all())
-
-        # Special case: everyone is allowed access to all of the elements of acs.
-        if everyone_group() in ac_groups_allowed:
-            return set(), set()
-
-        users_difference = self_users_allowed.difference(ac_users_allowed)
-        groups_difference = set(self.groups_allowed.all()).difference(ac_groups_allowed)
-        return users_difference, groups_difference
+        return who_cannot_access(self.user, self.users_allowed.all(), self.groups_allowed.all(), acs)
 
     def validate_restrict_access(self, acs):
         """
@@ -528,6 +540,7 @@ class AccessControl(models.Model):
         """
         self.grant_from_permissions_list((source.users_allowed.all(),
                                           source.groups_allowed.all()))
+
 
 @python_2_unicode_compatible
 class Datatype(AccessControl):

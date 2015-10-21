@@ -6,21 +6,25 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils.dateparse import parse_datetime
 from django.core.urlresolvers import reverse, resolve
+from django.utils import timezone
 
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable,\
     Dataset
 from fleet.models import RunToProcess, RunToProcessInput
+from fleet.serializers import RunToProcessSerializer
 from fleet.exceptions import SandboxActiveException
 from librarian.models import ExecRecord, SymbolicDataset
 from pipeline.models import Pipeline, PipelineFamily
-from metadata.models import kive_user, RTPNotFinished
+from metadata.models import kive_user, everyone_group, RTPNotFinished, CompoundDatatype, Datatype
 from kive.testing_utils import clean_up_all_files
 from kive import settings
-from kive.tests import install_fixture_files, restore_production_files
+from kive.tests import install_fixture_files, restore_production_files, DuckContext
 from fleet.workers import Manager
 from sandbox.execute import finish_step, finish_cable
+
+from constants import datatypes, CDTs
 
 
 class RunToProcessTest(TestCase):
@@ -726,3 +730,343 @@ class RunApiTests(TestCase):
         response = view(request, *args, **kwargs)
         self.assertEquals(response.render().data, None)
         self.test_run_index(0)
+
+
+class RunToProcessSerializerTests(TestCase):
+    fixtures = ["run_api_tests"]
+
+    def setUp(self):
+        install_fixture_files("run_api_tests")
+        self.kive_user = kive_user()
+        self.myUser = User.objects.get(username="john")
+
+        self.pf = PipelineFamily.objects.get(name="self.pf")
+        self.pX = self.pf.members.get(revision_name="pX_revision")
+        self.duck_context = DuckContext()
+        self.john_context = DuckContext(user=self.myUser)
+
+        self.INT = Datatype.objects.get(pk=datatypes.INT_PK)
+        self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
+
+        # This CDT goes (int pX_a, int pX_b, string pX_c).
+        self.pX_in_cdt = self.pX.inputs.first().get_cdt()
+        self.pX_input_SD = SymbolicDataset.objects.get(
+            dataset__name="pX_in_symDS",
+            dataset__description="input to pipeline pX",
+            user=self.myUser,
+            structure__isnull=False,
+            structure__compounddatatype=self.pX_in_cdt
+        )
+
+    def tearDown(self):
+        clean_up_all_files()
+        restore_production_files()
+
+    def test_validate(self):
+        """
+        Validating a well-specified RunToProcess.
+        """
+        serialized_rtp = {
+            "pipeline": self.pX.pk,
+            "inputs": [
+                {
+                    "symbolicdataset": self.pX_input_SD.pk,
+                    "index": 1
+                }
+            ],
+            "users_allowed": [],
+            "groups_allowed": []
+        }
+        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+
+        self.assertTrue(rtp_serializer.is_valid())
+
+    def test_validate_wrong_number_inputs(self):
+        """
+        Validation fails if the number of inputs is wrong.
+        """
+        serialized_rtp = {
+            "pipeline": self.pX.pk,
+            "inputs": [
+                {
+                    "symbolicdataset": self.pX_input_SD.pk,
+                    "index": 1
+                },
+                {
+                    "symbolicdataset": self.pX_input_SD.pk,
+                    "index": 2
+                }
+            ],
+            "users_allowed": [],
+            "groups_allowed": []
+        }
+        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+
+        self.assertFalse(rtp_serializer.is_valid())
+        self.assertEquals(rtp_serializer.errors["non_field_errors"],
+                          [u"Number of inputs must equal the number of Pipeline inputs"])
+
+
+class RunToProcessSerializerTests(TestCase):
+    fixtures = ["em_sandbox_test_environment"]
+
+    def setUp(self):
+        install_fixture_files("em_sandbox_test_environment")
+        self.kive_user = kive_user()
+        self.myUser = User.objects.get(username="john")
+
+        self.duck_context = DuckContext()
+        self.john_context = DuckContext(user=self.myUser)
+
+        self.em_pf = PipelineFamily.objects.get(name="Pipeline_family")
+        self.em_pipeline = self.em_pf.members.get(revision_name="pE_name")
+
+        # The inputs to this pipeline are (triplet_cdt, singlet_cdt, raw).
+        # The second one has min_row=10.
+        self.triplet_cdt = self.em_pipeline.inputs.get(dataset_idx=1).get_cdt()
+        self.singlet_cdt = self.em_pipeline.inputs.get(dataset_idx=2).get_cdt()
+
+        # SymbolicDatasets to feed the pipeline that are defined in the fixture.
+        self.triplet_SD = SymbolicDataset.objects.get(
+            dataset__name="triplet",
+            dataset__description="lol",
+            dataset__dataset_file__endswith="step_0_triplet.csv",
+            user=self.myUser,
+            structure__isnull=False,
+            structure__compounddatatype=self.triplet_cdt
+        )
+        self.singlet_SD = SymbolicDataset.objects.get(
+            dataset__name="singlet",
+            dataset__description="lol",
+            dataset__dataset_file__endswith="singlet_cdt_large.csv",
+            user=self.myUser,
+            structure__isnull=False,
+            structure__compounddatatype=self.singlet_cdt
+        )
+        self.raw_SD = SymbolicDataset.objects.get(
+            dataset__name="raw_DS",
+            dataset__description="lol",
+            user=self.myUser
+        )
+
+    def test_validate(self):
+        """
+        Validating a well-specified RunToProcess.
+        """
+        serialized_rtp = {
+            "pipeline": self.em_pipeline.pk,
+            "inputs": [
+                {
+                    "symbolicdataset": self.triplet_SD.pk,
+                    "index": 1
+                },
+                {
+                    "symbolicdataset": self.singlet_SD.pk,
+                    "index": 2
+                },
+                {
+                    "symbolicdataset": self.raw_SD.pk,
+                    "index": 3
+                }
+            ],
+            "users_allowed": [],
+            "groups_allowed": []
+        }
+        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+
+        self.assertTrue(rtp_serializer.is_valid())
+
+    def test_validate_wrong_number_inputs(self):
+        """
+        Validation fails if the number of inputs is wrong.
+        """
+        serialized_rtp = {
+            "pipeline": self.em_pipeline.pk,
+            "inputs": [
+                {
+                    "symbolicdataset": self.triplet_SD.pk,
+                    "index": 1
+                },
+                {
+                    "symbolicdataset": self.singlet_SD.pk,
+                    "index": 2
+                }
+            ],
+            "users_allowed": [],
+            "groups_allowed": []
+        }
+        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+
+        self.assertFalse(rtp_serializer.is_valid())
+        self.assertEquals(rtp_serializer.errors["non_field_errors"],
+                          [u"Number of inputs must equal the number of Pipeline inputs"])
+
+    def test_validate_inputs_oversated(self):
+        """
+        Validation fails if an input has more than one input defined.
+        """
+        serialized_rtp = {
+            "pipeline": self.em_pipeline.pk,
+            "inputs": [
+                {
+                    "symbolicdataset": self.triplet_SD.pk,
+                    "index": 1
+                },
+                {
+                    "symbolicdataset": self.singlet_SD.pk,
+                    "index": 2
+                },
+                {
+                    "symbolicdataset": self.triplet_SD.pk,
+                    "index": 1
+                },
+            ],
+            "users_allowed": [],
+            "groups_allowed": []
+        }
+        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+
+        self.assertFalse(rtp_serializer.is_valid())
+        self.assertEquals(rtp_serializer.errors["non_field_errors"],
+                          [u"Pipeline inputs must be uniquely specified"])
+
+    def test_validate_input_index_dne(self):
+        """
+        Validation fails if an input index doesn't exist.
+        """
+        serialized_rtp = {
+            "pipeline": self.em_pipeline.pk,
+            "inputs": [
+                {
+                    "symbolicdataset": self.triplet_SD.pk,
+                    "index": 1
+                },
+                {
+                    "symbolicdataset": self.singlet_SD.pk,
+                    "index": 2
+                },
+                {
+                    "symbolicdataset": self.triplet_SD.pk,
+                    "index": 4
+                },
+            ],
+            "users_allowed": [],
+            "groups_allowed": []
+        }
+        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+
+        self.assertFalse(rtp_serializer.is_valid())
+        self.assertEquals(rtp_serializer.errors["non_field_errors"],
+                          [u"Pipeline {} has no input with index {}".format(
+                              self.em_pipeline, 4
+                          )])
+
+    def test_validate_input_CDT_incompatible(self):
+        """
+        Validation fails if an input SymbolicDataset is incompatible with the Pipeline input.
+        """
+        serialized_rtp = {
+            "pipeline": self.em_pipeline.pk,
+            "inputs": [
+                {
+                    "symbolicdataset": self.triplet_SD.pk,
+                    "index": 1
+                },
+                {
+                    "symbolicdataset": self.singlet_SD.pk,
+                    "index": 2
+                },
+                {
+                    "symbolicdataset": self.triplet_SD.pk,
+                    "index": 3
+                },
+            ],
+            "users_allowed": [],
+            "groups_allowed": []
+        }
+        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+
+        self.assertFalse(rtp_serializer.is_valid())
+        self.assertEquals(rtp_serializer.errors["non_field_errors"],
+                          [u"Input {} is incompatible with SymbolicDataset {}".format(
+                              self.em_pipeline.inputs.get(dataset_idx=3), self.triplet_SD
+                          )])
+
+    def test_validate_overextending_permissions(self):
+        """
+        Validation fails if users_allowed and groups_allowed exceed those on the inputs and the Pipeline.
+        """
+        self.em_pipeline.groups_allowed.remove(everyone_group())
+        serialized_rtp = {
+            "pipeline": self.em_pipeline.pk,
+            "inputs": [
+                {
+                    "symbolicdataset": self.triplet_SD.pk,
+                    "index": 1
+                },
+                {
+                    "symbolicdataset": self.singlet_SD.pk,
+                    "index": 2
+                },
+                {
+                    "symbolicdataset": self.raw_SD.pk,
+                    "index": 3
+                }
+            ],
+            "users_allowed": [self.kive_user],
+            "groups_allowed": [everyone_group()]
+        }
+        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+
+        self.assertFalse(rtp_serializer.is_valid())
+        self.assertEqual(
+            set(rtp_serializer.errors["non_field_errors"]),
+            set([
+                u"User(s) {} may not be granted access".format([self.kive_user]),
+                u"Group(s) {} may not be granted access".format([everyone_group()])
+            ])
+        )
+
+    def test_create(self):
+        """
+        Creating a RunToProcess, i.e. adding a job to the queue.
+        """
+        serialized_rtp = {
+            "pipeline": self.em_pipeline.pk,
+            "inputs": [
+                {
+                    "symbolicdataset": self.triplet_SD.pk,
+                    "index": 1
+                },
+                {
+                    "symbolicdataset": self.singlet_SD.pk,
+                    "index": 2
+                },
+                {
+                    "symbolicdataset": self.raw_SD.pk,
+                    "index": 3
+                }
+            ],
+            "users_allowed": [kive_user()],
+            "groups_allowed": [everyone_group()]
+        }
+
+        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+        self.assertTrue(rtp_serializer.is_valid())
+
+        before = timezone.now()
+        rtp = rtp_serializer.save()
+        after = timezone.now()
+
+        # Probe the RunToProcess to check that it was correctly created.
+        self.assertEqual(rtp.pipeline, self.em_pipeline)
+        self.assertEqual(rtp.user, self.myUser)
+        self.assertEqual(set(rtp.users_allowed.all()), set([kive_user()]))
+        self.assertEqual(set(rtp.groups_allowed.all()), set([everyone_group()]))
+        self.assertTrue(before <= rtp.time_queued)
+        self.assertTrue(after >= rtp.time_queued)
+
+        self.assertEqual(rtp.inputs.count(), 3)
+        self.assertEqual(rtp.inputs.get(index=1).symbolicdataset, self.triplet_SD)
+        self.assertEqual(rtp.inputs.get(index=2).symbolicdataset, self.singlet_SD)
+        self.assertEqual(rtp.inputs.get(index=3).symbolicdataset, self.raw_SD)
