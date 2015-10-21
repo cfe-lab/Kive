@@ -18,12 +18,11 @@ class RunToProcessInputSerializer(serializers.ModelSerializer):
 
 
 class RunToProcessSerializer(AccessControlSerializer, serializers.ModelSerializer):
-    run = TinyRunSerializer(read_only=True)
     run_status = serializers.HyperlinkedIdentityField(view_name='runtoprocess-run-status')
     removal_plan = serializers.HyperlinkedIdentityField(view_name='runtoprocess-removal-plan')
     run_outputs = serializers.HyperlinkedIdentityField(view_name='runtoprocess-run-outputs')
 
-    sandbox_path = serializers.CharField(required=False)
+    sandbox_path = serializers.CharField(read_only=True, required=False)
     inputs = RunToProcessInputSerializer(many=True)
 
     class Meta:
@@ -33,6 +32,7 @@ class RunToProcessSerializer(AccessControlSerializer, serializers.ModelSerialize
             'url',
             'pipeline',
             'time_queued',
+            'name',
             'run',
             'sandbox_path',
             'purged',
@@ -45,6 +45,7 @@ class RunToProcessSerializer(AccessControlSerializer, serializers.ModelSerialize
             'inputs'
         )
         read_only_fields = (
+            "run",
             "purged",
             "time_queued",
         )
@@ -95,8 +96,8 @@ class RunToProcessSerializer(AccessControlSerializer, serializers.ModelSerialize
         # Check that the specified user, users_allowed, and groups_allowed are all okay.
         users_without_access, groups_without_access = who_cannot_access(
             self.context["request"].user,
-            User.objects.filter(username__in=data["users_allowed"]),
-            Group.objects.filter(name__in=data["groups_allowed"]),
+            User.objects.filter(username__in=data.get("users_allowed", [])),
+            Group.objects.filter(name__in=data.get("groups_allowed", [])),
             all_access_controlled_objects)
 
         if len(users_without_access) != 0:
@@ -110,14 +111,15 @@ class RunToProcessSerializer(AccessControlSerializer, serializers.ModelSerialize
 
         return data
 
-    @transaction.atomic
+    # We don't place this in a transaction; when it's called from a ViewSet, it'll already be
+    # in one.
     def create(self, validated_data):
         """
         Create a RunToProcess, i.e. add a job to the work queue.
         """
         inputs = validated_data.pop("inputs")
-        users_allowed = validated_data.pop("users_allowed")
-        groups_allowed = validated_data.pop("groups_allowed")
+        users_allowed = validated_data.pop("users_allowed", [])
+        groups_allowed = validated_data.pop("groups_allowed", [])
 
         # First, create the RunToProcess with the current time.
         rtp = RunToProcess(time_queued=timezone.now(), **validated_data)

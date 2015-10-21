@@ -13,6 +13,8 @@ from pipeline.models import Pipeline
 import metadata.models
 import fleet.exceptions
 
+from constants import maxlengths
+
 # This is an experimental replacement for the runfleet admin command.
 # Disable it by setting worker_count to 0.
 worker_count = 0
@@ -55,8 +57,10 @@ class RunToProcess(metadata.models.AccessControl):
     pipeline = models.ForeignKey(Pipeline)
     sandbox_path = models.CharField(max_length=256, default="", blank=True, null=False)
     time_queued = models.DateTimeField(auto_now_add=True)
-    run = models.OneToOneField(Run, null=True, related_name="runtoprocess")
+    run = models.OneToOneField(Run, null=True, blank=True, related_name="runtoprocess")
     purged = models.BooleanField(default=False)
+    name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH, default="",
+                            blank=True, null=False)
 
     def clean(self):
         self.validate_restrict_access([self.pipeline])
@@ -84,6 +88,15 @@ class RunToProcess(metadata.models.AccessControl):
     
     @property
     def display_name(self):
+        """
+        Produces a human-readable name for the RunToProcess.
+
+        If the name field is not blank, use that; otherwise, give a string
+        combining the Pipeline name and the first input name.
+        """
+        if self.name != "":
+            return self.name
+
         try:
             pipeline_name = self.pipeline.family.name
         except Pipeline.DoesNotExist:

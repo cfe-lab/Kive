@@ -14,13 +14,13 @@ import fleet
 from fleet.models import RunToProcess, RunToProcessInput
 from fleet.serializers import RunToProcessSerializer,\
     RunToProcessOutputsSerializer
-from kive.ajax import IsGrantedReadCreate, RemovableModelViewSet, StandardPagination
+from kive.ajax import IsGrantedReadCreate, RemovableModelViewSet, StandardPagination, CleanCreateModelMixin
 from librarian.models import SymbolicDataset
 from sandbox.forms import InputSubmissionForm, RunSubmissionForm
 from sandbox.views import RunSubmissionError
 
 
-class RunToProcessViewSet(RemovableModelViewSet):
+class RunToProcessViewSet(CleanCreateModelMixin, RemovableModelViewSet):
     """ Runs or requests to start runs
     
     Query parameters for the list view:
@@ -57,56 +57,6 @@ class RunToProcessViewSet(RemovableModelViewSet):
     serializer_class = RunToProcessSerializer
     permission_classes = (permissions.IsAuthenticated, IsGrantedReadCreate)
     pagination_class = StandardPagination
-
-    def create(self, request):
-        """
-        Creates a new run from a pipeline.
-
-        Request parameters are:
-
-        * pipeline - the pipeline id
-        * input_1, input_2, etc. - the *symbolic* dataset ids to use as inputs
-        """
-        try:
-            with transaction.atomic():
-                dummy_rtp = RunToProcess(user=request.user)
-                rsf = RunSubmissionForm(request.POST, instance=dummy_rtp)
-
-                try:
-                    rsf_good = rsf.is_valid()
-                except ValidationError as e:
-                    rsf.add_error(None, e)
-                    rsf_good = False
-
-                curr_pipeline = rsf.cleaned_data["pipeline"]
-                if not rsf_good:
-                    return Response({'errors': rsf.errors}, status=400)
-
-                # All inputs are good, so save then create the inputs
-                rtp = rsf.save()
-                for i in range(1, curr_pipeline.inputs.count()+1):
-                    curr_input_form = InputSubmissionForm({"input_pk": request.POST.get("input_{}".format(i))})
-                    if not curr_input_form.is_valid():
-                        return Response({'errors': curr_input_form.errors}, status=400)
-
-                    # Check that the chosen SD is usable.
-                    curr_SD = SymbolicDataset.objects.get(pk=curr_input_form.cleaned_data["input_pk"])
-                    try:
-                        rtp.validate_restrict_access([curr_SD])
-                    except ValidationError as e:
-                        return Response({'errors': [str(e)]}, status=400)
-                    rtp.inputs.create(symbolicdataset=curr_SD, index=i)
-
-                try:
-                    rtp.clean()
-
-                except ValidationError as e:
-                    return Response({'errors': [str(e)]}, status=400)
-
-        except RunSubmissionError as e:
-            return Response({'errors': [str(e)]}, status=400)
-
-        return Response(RunToProcessSerializer(rtp, context={'request': request}).data)
     
     @list_route(methods=['get'], suffix='Status List')
     def status(self, request):

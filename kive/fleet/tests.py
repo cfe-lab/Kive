@@ -660,7 +660,19 @@ class RunApiTests(TestCase):
         )
 
         # Kick off the run
-        request = self.factory.post(self.run_list_path, {'pipeline': pipeline_to_run.pk, 'input_1': symDS.pk})
+        request = self.factory.post(
+            self.run_list_path,
+            {
+                "pipeline": pipeline_to_run.pk,
+                "inputs": [
+                    {
+                        "index": 1,
+                        "symbolicdataset": symDS.pk
+                    }
+                ]
+            },
+            format="json"
+        )
         force_authenticate(request, user=self.myUser)
         response = self.run_list_view(request).render()
         data = response.render().data
@@ -730,81 +742,6 @@ class RunApiTests(TestCase):
         response = view(request, *args, **kwargs)
         self.assertEquals(response.render().data, None)
         self.test_run_index(0)
-
-
-class RunToProcessSerializerTests(TestCase):
-    fixtures = ["run_api_tests"]
-
-    def setUp(self):
-        install_fixture_files("run_api_tests")
-        self.kive_user = kive_user()
-        self.myUser = User.objects.get(username="john")
-
-        self.pf = PipelineFamily.objects.get(name="self.pf")
-        self.pX = self.pf.members.get(revision_name="pX_revision")
-        self.duck_context = DuckContext()
-        self.john_context = DuckContext(user=self.myUser)
-
-        self.INT = Datatype.objects.get(pk=datatypes.INT_PK)
-        self.STR = Datatype.objects.get(pk=datatypes.STR_PK)
-
-        # This CDT goes (int pX_a, int pX_b, string pX_c).
-        self.pX_in_cdt = self.pX.inputs.first().get_cdt()
-        self.pX_input_SD = SymbolicDataset.objects.get(
-            dataset__name="pX_in_symDS",
-            dataset__description="input to pipeline pX",
-            user=self.myUser,
-            structure__isnull=False,
-            structure__compounddatatype=self.pX_in_cdt
-        )
-
-    def tearDown(self):
-        clean_up_all_files()
-        restore_production_files()
-
-    def test_validate(self):
-        """
-        Validating a well-specified RunToProcess.
-        """
-        serialized_rtp = {
-            "pipeline": self.pX.pk,
-            "inputs": [
-                {
-                    "symbolicdataset": self.pX_input_SD.pk,
-                    "index": 1
-                }
-            ],
-            "users_allowed": [],
-            "groups_allowed": []
-        }
-        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
-
-        self.assertTrue(rtp_serializer.is_valid())
-
-    def test_validate_wrong_number_inputs(self):
-        """
-        Validation fails if the number of inputs is wrong.
-        """
-        serialized_rtp = {
-            "pipeline": self.pX.pk,
-            "inputs": [
-                {
-                    "symbolicdataset": self.pX_input_SD.pk,
-                    "index": 1
-                },
-                {
-                    "symbolicdataset": self.pX_input_SD.pk,
-                    "index": 2
-                }
-            ],
-            "users_allowed": [],
-            "groups_allowed": []
-        }
-        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
-
-        self.assertFalse(rtp_serializer.is_valid())
-        self.assertEquals(rtp_serializer.errors["non_field_errors"],
-                          [u"Number of inputs must equal the number of Pipeline inputs"])
 
 
 class RunToProcessSerializerTests(TestCase):
