@@ -10,6 +10,8 @@ import fleet.models
 
 import metadata.forms
 
+from constants import maxlengths
+
 
 class PipelineSelectionForm(forms.Form):
     """Form for selecting a Pipeline to run."""
@@ -49,9 +51,23 @@ class RunSubmissionForm(forms.ModelForm):
         required=False
     )
 
+    name = forms.CharField(
+        max_length=maxlengths.MAX_NAME_LENGTH,
+        label='Name',
+        help_text='A name to identify this run',
+        required=False
+    )
+
+    description = forms.CharField(
+        widget=forms.Textarea(attrs={'rows':5}),
+        label='Description',
+        help_text='A brief description of this run',
+        required=False
+    )
+
     class Meta:
         model = fleet.models.RunToProcess
-        fields = ("pipeline", "permissions")
+        fields = ("pipeline", "permissions", "name", "description")
 
     def __init__(self, data=None, pipeline_qs=None, users_allowed=None, groups_allowed=None, *args, **kwargs):
         super(RunSubmissionForm, self).__init__(data, *args, **kwargs)

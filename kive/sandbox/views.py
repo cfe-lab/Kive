@@ -163,8 +163,7 @@ def view_results(request, rtp_id):
     four_oh_four = False
     try:
         rtp = fleet.models.RunToProcess.objects.get(id=rtp_id)
-        context['pipeline_name'] = rtp.pipeline.family.name
-        context['pipeline_revision'] = rtp.pipeline.revision_number
+        context["rtp"] = rtp
         if not rtp.can_be_accessed(request.user):
             four_oh_four = True
     except RunToProcess.DoesNotExist:
@@ -184,5 +183,11 @@ def view_run(request, rtp_id, md5=None):
     rtp = fleet.models.RunToProcess.objects.get(id=rtp_id)
 
     template = loader.get_template("sandbox/view_run.html")
-    context = RequestContext(request, {'rtp_id': rtp_id, 'md5': md5, 'pipeline': rtp.pipeline})
+    context = RequestContext(
+        request,
+        {
+            'rtp': rtp,
+            'md5': md5
+        }
+    )
     return HttpResponse(template.render(context))

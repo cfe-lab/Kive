@@ -60,6 +60,17 @@ $(function() {
         $clones.hide();
         $(this).append($clones);
     });
+
+    // Pack help text into an unobtrusive icon
+    $('.helptext', 'form').each(function() {
+        var $this = $(this);
+        $this.wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
+    });
+
+    $('a[rel="ctrl"]').on('click', function (e) {
+        $(this).siblings('.fulltext').show().css({ top: e.pageY, left: e.pageX, 'z-index': 3 });
+        setTimeout(function() { $('.fulltext').fadeOut(300); }, 5000);
+    });
     
 });
     </script>
@@ -115,7 +126,29 @@ $(function() {
 
 <form action="run_pipeline" id="run_pipeline" method="post">
 
+    <div id="name_description">
+    <table>
+        <tr>
+            <td>{{ run_submission_form.name.label }}</td>
+            <td>
+                {{ run_submission_form.name }}
+                <div class="helptext">{{ run_submission_form.name.help_text }}</div>
+                <div class="errortext">{{ run_submission_form.name.errors }}</div>
+            </td>
+        </tr>
+        <tr>
+            <td>{{ run_submission_form.description.label }}</td>
+            <td>
+                {{ run_submission_form.description }}
+                <div class="helptext">{{ run_submission_form.description.help_text }}</div>
+                <div class="errortext">{{ run_submission_form.description.errors }}</div>
+            </td>
+        </tr>
+    </table>
+    </div>
+
     <p>{{ run_submission_form.permissions.label }}:
+        <span class="helptext">{{ run_submission_form.permissions.help_text }}</span>
     {{ run_submission_form.permissions }}
         <div class="errortext">{{ run_submission_form.permissions.errors }}</div>
     </p>

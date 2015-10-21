@@ -17,7 +17,7 @@
     <script src="/static/pipeline/pipeline_load.js"></script>
     <script src="/static/sandbox/view_run.js"></script>
     <script type="text/javascript">
-        $(function(){ setupRunView('{{rtp_id}}', {{pipeline.id}}, '{{ md5 }}'); });
+        $(function(){ setupRunView('{{rtp.id}}', {{rtp.pipeline.id}}, '{{ md5 }}'); });
     </script>
 
     <link rel="stylesheet" href="/static/pipeline/drydock.css">
@@ -38,19 +38,28 @@
 
     <div class="pipeline_rdonly_ctrl">
         <ul class="desc_topleft">
-            {% if  pipeline.revision_name|length <= 0 %}
-                <li> Pipeline family: {{ pipeline.family }} </li>
+            <li>
+                {% if rtp.description != "" %}
+                <span title="{{ rtp.description }}">
+                {% endif %}
+                {{ rtp.display_name }}
+                {% if rtp.description != "" %}
+                </span>
+                {% endif %}
+            </li>
+            {% if rtp.pipeline.revision_name|length <= 0 %}
+                <li> Pipeline family: {{ rtp.pipeline.family }} </li>
             {% else %}
-                <li> Pipeline: {{ pipeline.revision_name }} ({{ pipeline.family }})</li>
+                <li> Pipeline: {{ rtp.pipeline.revision_name }} ({{ rtp.pipeline.family }})</li>
             {% endif %}
-            <li class="new_ctrl">Revision #: {{ pipeline.revision_number }}</li>
+            <li class="new_ctrl">Revision #: {{ rtp.pipeline.revision_number }}</li>
 
-            {% if pipeline.revision_desc|length <= 0 %}
-                {% if pipeline.family.description|length > 0 %}
-                    <li class="new_ctrl">{{ pipeline.family.description }}</li>
+            {% if rtp.pipeline.revision_desc|length <= 0 %}
+                {% if rtp.pipeline.family.description|length > 0 %}
+                    <li class="new_ctrl">{{ rtp.pipeline.family.description }}</li>
                 {% endif %}
             {% else %}
-                    <li class="new_ctrl">{{ pipeline.revision_desc }}</li>
+                    <li class="new_ctrl">{{ rtp.pipeline.revision_desc }}</li>
             {% endif %}
             <li> Run status: <span id="run_status">Checking...</span> </li>
         </ul>

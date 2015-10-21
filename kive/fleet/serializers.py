@@ -33,6 +33,7 @@ class RunToProcessSerializer(AccessControlSerializer, serializers.ModelSerialize
             'pipeline',
             'time_queued',
             'name',
+            'description',
             'run',
             'sandbox_path',
             'purged',

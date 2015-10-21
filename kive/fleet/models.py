@@ -61,6 +61,8 @@ class RunToProcess(metadata.models.AccessControl):
     purged = models.BooleanField(default=False)
     name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH, default="",
                             blank=True, null=False)
+    description = models.CharField(max_length=maxlengths.MAX_DESCRIPTION_LENGTH, default="",
+                                   blank=True, null=False)
 
     def clean(self):
         self.validate_restrict_access([self.pipeline])
