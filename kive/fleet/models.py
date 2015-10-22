@@ -166,8 +166,12 @@ class RunToProcess(metadata.models.AccessControl):
                     log_char = "+"
                     step_status = "RUNNING"
                 except ExecLog.DoesNotExist:
-                    log_char = ":"
-                    step_status = "READY"
+                    if step.has_started():
+                        log_char = ":"
+                        step_status = "READY"
+                    else:
+                        log_char = "."
+                        step_status = "WAITING"
 
             elif not step.is_marked_successful():
                 log_char = "!"

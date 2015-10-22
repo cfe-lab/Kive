@@ -928,10 +928,11 @@ class RunStep(RunComponent):
 
     @classmethod
     @transaction.atomic
-    def create(cls, pipelinestep, run):
+    def create(cls, pipelinestep, run, start=True):
         """Create a new RunStep from a PipelineStep."""
         runstep = cls(pipelinestep=pipelinestep, run=run)
-        runstep.start()
+        if start:
+            runstep.start()
         runstep.clean()
         runstep.save()
         return runstep

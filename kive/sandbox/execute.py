@@ -1651,6 +1651,7 @@ def finish_step(step_execute_dict, worker_rank):
     """
     # Break out the execution info.
     curr_RS = archive.models.RunStep.objects.get(pk=step_execute_dict["runstep_pk"])
+    curr_RS.start()
     step_run_dir = step_execute_dict["step_run_dir"]
     curr_ER = None
     if step_execute_dict["execrecord_pk"] is not None:
@@ -1971,7 +1972,7 @@ class RunPlan(object):
             run_step = self.run.runsteps.filter(
                 pipelinestep__step_num=step_plan.step_num).first()
             if run_step is None:
-                run_step = RunStep.create(step_plan.pipeline_step, self.run)
+                run_step = RunStep.create(step_plan.pipeline_step, self.run, start=False)
             step_plan.run_step = run_step
             input_datasets = [plan.symbolicdataset for plan in step_plan.inputs]
             if all(input_datasets):

@@ -242,6 +242,20 @@ class RunToProcessTest(TestCase):
         self.assertSequenceEqual('Fasta2CSV at 2015-01-13 00:00:00+00:00',
                                  display_name)
 
+    def test_display_name_run_name_set(self):
+        pipeline = Pipeline.objects.get(pk=2)
+        user = User.objects.first()
+
+        run_name = "Test Run name"
+        run_tracker = RunToProcess(user=user, pipeline=pipeline, name=run_name)
+        run_tracker.save()
+        run_tracker.time_queued = parse_datetime('2015-01-13 00:00:00Z')
+        run_tracker.save()
+
+        display_name = run_tracker.display_name
+
+        self.assertEqual(run_name, display_name)
+
 
 class RemoveRedactRunInProgress(TestCase):
     fixtures = ["em_sandbox_test_environment"]
