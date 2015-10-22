@@ -40,8 +40,9 @@ class RunToProcessViewSet(CleanCreateModelMixin, RemovableModelViewSet):
         Some filters just have a key and ignore the val value. The possible
         filters are listed below.
     * filters[n][key]=active - runs that are still running or recently finished.
-    * filters[n][key]=name&filters[n][val]=match - runs where an input dataset
-        name or the pipeline family name match the value (case insensitive)
+    * filters[n][key]=name&filters[n][val]=match - runs whose display name matches
+        the value (case insensitive).  This either means: the Run's assigned name, if
+        it has one; or the Pipeline name and/or the first input Dataset's name.
     * filters[n][key]=user&filters[n][val]=match - runs created by the specified user
     * filters[n][key]=startafter&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
         started after the given date and time.
@@ -137,8 +138,9 @@ class RunToProcessViewSet(CleanCreateModelMixin, RemovableModelViewSet):
                 symbolicdataset__dataset__name__icontains=value).values(
                     'runtoprocess_id')
             return runs.filter(
-                Q(pipeline__family__name__icontains=value)|
-                Q(id__in=runs_with_matching_inputs))
+                Q(name__icontains=value)|
+                (Q(name="") & (Q(pipeline__family__name__icontains=value)|
+                               Q(id__in=runs_with_matching_inputs))))
         if key == "user":
             return runs.filter(user__username__icontains=value)
         if key in ('startafter', 'startbefore', 'endafter', 'endbefore'):
