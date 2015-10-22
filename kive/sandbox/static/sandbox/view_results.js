@@ -4,7 +4,7 @@ var OutputsTable = function($table, is_user_admin, rtp_id) {
     permissions.PermissionsTable.call(this, $table, is_user_admin);
     this.list_url = "/api/runs/" + rtp_id + "/run_outputs/";
     this.registerColumn("Source", "step_name");
-    this.registerColumn("Input/Output", "output_name");
+    this.registerColumn("Input/Output", "display");
     this.registerColumn("Size", "size");
     this.registerColumn("Date created", "date");
     this.registerColumn("", function($td, output) {

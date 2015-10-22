@@ -147,8 +147,9 @@ class MethodOutputSerializer(serializers.ModelSerializer):
 class _RunDataset(object):
     def __init__(self,
                  step_name,
-                 output_name,
+                 name,
                  type,
+                 display=None,
                  id=None,
                  size="removed",
                  date="removed",
@@ -156,8 +157,9 @@ class _RunDataset(object):
                  redaction_plan=None,
                  is_ok=True,
                  filename=None):
-        self.step_name = step_name
-        self.output_name = output_name
+        self.step_name = str(step_name)
+        self.name = name
+        self.display = str(display or name)
         self.type = type
         self.id = id
         self.size = size
@@ -210,7 +212,8 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 pipeline_input = pipeline_inputs.get(dataset_idx=input.index)
                 input_name = pipeline_input.dataset_name
             input_data = _RunDataset(step_name=(i == 0 and 'Run inputs' or ''),
-                                     output_name=input_name,
+                                     name=input_name,
+                                     display='{}: {}'.format(i+1, input_name),
                                      type='dataset')
             if has_data:
                 input_data.set_dataset(input.symbolicdataset.dataset, request)
@@ -218,8 +221,6 @@ class RunOutputsSerializer(serializers.ModelSerializer):
 
         for input in inputs:
             input.is_invalid = not input.is_ok and input.id is not None
-            input.step_name = str(input.step_name)
-            input.output_name = str(input.output_name)
 
             try:
                 input.size += 0
@@ -246,7 +247,8 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 execrecordout = outcable.execrecord.execrecordouts.first()
                 output = _RunDataset(
                     step_name=(i == 0 and 'Run outputs' or ''),
-                    output_name=outcable.pipelineoutputcable.dest,
+                    name=outcable.pipelineoutputcable.dest.dataset_name,
+                    display=outcable.pipelineoutputcable.dest,
                     type='dataset')
                 if execrecordout.symbolicdataset.has_data():
                     dataset = execrecordout.symbolicdataset.dataset
@@ -261,9 +263,11 @@ class RunOutputsSerializer(serializers.ModelSerializer):
             if execlog is None:
                 continue
             methodoutput = execlog.methodoutput
+            step_prefix = 'step_{}_'.format(runstep.pipelinestep.step_num)
 
             output = _RunDataset(step_name=runstep.pipelinestep,
-                                 output_name='Standard out',
+                                 name=step_prefix + 'stdout',
+                                 display='Standard out',
                                  type='stdout')
             if methodoutput.is_output_redacted():
                 output.set_redacted()
@@ -284,7 +288,8 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 except ValueError:
                     pass
             output = _RunDataset(step_name="",
-                                 output_name='Standard error',
+                                 name=step_prefix + 'stderr',
+                                 display='Standard error',
                                  type='stderr')
             if methodoutput.is_error_redacted():
                 output.set_redacted()
@@ -306,9 +311,11 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     pass
             if runstep.execrecord is not None:
                 for execrecordout in runstep.execrecord.execrecordouts_in_order:
+                    transform_output = execrecordout.generic_output.definite
                     output = _RunDataset(
                         step_name='',
-                        output_name=execrecordout.generic_output,
+                        name=step_prefix + transform_output.dataset_name,
+                        display=execrecordout.generic_output,
                         is_ok=execrecordout.is_OK(),
                         type='dataset')
                     if execrecordout.symbolicdataset.has_data():
@@ -320,8 +327,6 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     outputs.append(output)
         for output in outputs:
             output.is_invalid = not output.is_ok and output.id is not None
-            output.step_name = str(output.step_name)
-            output.output_name = str(output.output_name)
 
             try:
                 output.size += 0
