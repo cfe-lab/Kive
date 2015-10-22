@@ -733,8 +733,8 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             for possible_RS in possible_PS.pipelinestep_instances.filter(
                     reused=False,
                     execrecord_id__isnull=False):
-                candidate_ER = possible_RS.execrecord
-                if candidate_ER.is_redacted():
+                candidate_ER = getattr(possible_RS, 'execrecord', None)
+                if not candidate_ER or candidate_ER.is_redacted():
                     continue
 
                 # Check that this ER is accessible by runstep.
@@ -765,7 +765,8 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         @param dest_streams: a sequence of streams to redirect output to
         """
         for line in source_stream:
-            self.logger.debug('%s: %s', source_name, line.rstrip().decode('utf-8')) #drops \n
+            # drops \n
+            self.logger.debug('%s: %s', source_name, line.rstrip().decode('utf-8'))
 
             for stream in dest_streams:
                 stream.write(line)
