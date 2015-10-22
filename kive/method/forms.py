@@ -51,7 +51,8 @@ class CodeResourcePrototypeForm(AccessControlForm):
     content_file = forms.FileField(
         label="File",
         help_text="File containing this new code resource",
-        required=False
+        required=False,
+        allow_empty_file=True
     )
 
 
@@ -61,7 +62,8 @@ class CodeResourceRevisionForm(AccessControlForm):
     content_file = forms.FileField(
         label="File",
         help_text="File contents of this code resource revision",
-        required=False
+        required=False,
+        allow_empty_file=True
     )
 
     revision_name = forms.CharField(
