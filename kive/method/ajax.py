@@ -5,7 +5,8 @@ from rest_framework.decorators import detail_route
 from rest_framework.response import Response
 from rest_framework.exceptions import APIException
 
-from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, CleanCreateModelMixin, StandardPagination
+from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, CleanCreateModelMixin, \
+    StandardPagination, SearchableModelMixin
 from method.models import CodeResourceRevision, Method, MethodFamily, CodeResource
 from method.serializers import MethodSerializer, MethodFamilySerializer, \
     CodeResourceSerializer, CodeResourceRevisionSerializer
@@ -14,7 +15,7 @@ from archive.views import _build_download_response
 from portal.views import admin_check
 
 
-class CodeResourceViewSet(RemovableModelViewSet):
+class CodeResourceViewSet(RemovableModelViewSet, SearchableModelMixin):
     """CodeResources define the code used in putting together Methods.
 
     Query parameters:
@@ -60,35 +61,23 @@ class CodeResourceViewSet(RemovableModelViewSet):
 
     def filter_queryset(self, queryset):
         queryset = super(CodeResourceViewSet, self).filter_queryset(queryset)
-
-        # Parse the request to get all the applied filters, and refine the queryset.
-        idx = 0
-        while True:
-            key = self.request.GET.get('filters[{}][key]'.format(idx))
-            if key is None:
-                break
-            value = self.request.GET.get('filters[{}][val]'.format(idx), '')
-            queryset = self._add_coderesource_filter(queryset, key, value)
-            idx += 1
-
-        return queryset
+        return self.apply_filters(queryset)
 
     @staticmethod
-    def _add_coderesource_filter(coderesource_qs, key, value):
+    def _add_filter(queryset, key, value):
         """
         Filter the specified queryset by the specified key and value.
         """
         if key == 'smart':
-            print("TEST")
-            return coderesource_qs.filter(Q(name__icontains=value) |
-                                          Q(description__icontains=value) |
-                                          Q(filename__icontains=value))
+            return queryset.filter(Q(name__icontains=value) |
+                                   Q(description__icontains=value) |
+                                   Q(filename__icontains=value))
         if key == 'name':
-            return coderesource_qs.filter(name__icontains=value)
+            return queryset.filter(name__icontains=value)
         if key == 'description':
-            return coderesource_qs.filter(description__icontains=value)
+            return queryset.filter(description__icontains=value)
         if key == "user":
-            return coderesource_qs.filter(user__username__icontains=value)
+            return queryset.filter(user__username__icontains=value)
 
         raise APIException('Unknown filter key: {}'.format(key))
 
@@ -116,7 +105,27 @@ class CodeResourceRevisionViewSet(CleanCreateModelMixin, RemovableModelViewSet):
         return _build_download_response(CRR.content_file)
 
 
-class MethodFamilyViewSet(RemovableModelViewSet):
+class MethodFamilyViewSet(RemovableModelViewSet, SearchableModelMixin):
+    """MethodFamilies are collections of Methods grouped by function.
+
+    Query parameters:
+
+    * is_granted - true For administrators, this limits the list to only include
+        records that the user has been explicitly granted access to. For other
+        users, this has no effect.
+    * filters[n][key]=x&filters[n][val]=y - Apply different filters to the
+        search. n starts at 0 and increases by 1 for each added filter.
+        Some filters just have a key and ignore the val value. The possible
+        filters are listed below.
+    * filters[n][key]=smart&filters[n][val]=match - name, description, or filename contains
+        the value (case insensitive)
+    * filters[n][key]=name&filters[n][val]=match - name contains the value (case
+        insensitive)
+    * filters[n][key]=description&filters[n][val]=match - description contains the value (case
+        insensitive)
+    * filters[n][key]=user&filters[n][val]=match - username of creator contains the value (case
+        insensitive)
+    """
     queryset = MethodFamily.objects.all()
     serializer_class = MethodFamilySerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
@@ -137,6 +146,27 @@ class MethodFamilyViewSet(RemovableModelViewSet):
         member_serializer = MethodSerializer(
             member_methods, many=True, context={"request": request})
         return Response(member_serializer.data)
+
+    def filter_queryset(self, queryset):
+        queryset = super(MethodFamilyViewSet, self).filter_queryset(queryset)
+        return self.apply_filters(queryset)
+
+    @staticmethod
+    def _add_filter(queryset, key, value):
+        """
+        Filter the specified queryset by the specified key and value.
+        """
+        if key == 'smart':
+            return queryset.filter(Q(name__icontains=value) |
+                                   Q(description__icontains=value))
+        if key == 'name':
+            return queryset.filter(name__icontains=value)
+        if key == 'description':
+            return queryset.filter(description__icontains=value)
+        if key == "user":
+            return queryset.filter(user__username__icontains=value)
+
+        raise APIException('Unknown filter key: {}'.format(key))
 
 
 class MethodViewSet(CleanCreateModelMixin, RemovableModelViewSet):

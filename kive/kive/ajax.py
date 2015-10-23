@@ -208,3 +208,26 @@ class CleanCreateModelMixin(mixins.CreateModelMixin):
         except DjangoValidationError as ex:
             raise convert_validation(ex.messages)
 
+class SearchableModelMixin(object):
+    """
+    Implements some boilerplate code common to ViewSets that allow filtering.
+    """
+    def apply_filters(self, queryset):
+        # Parse the request to get all the applied filters, and refine the queryset.
+        idx = 0
+        while True:
+            key = self.request.GET.get('filters[{}][key]'.format(idx))
+            if key is None:
+                break
+            value = self.request.GET.get('filters[{}][val]'.format(idx), '')
+            queryset = self._add_filter(queryset, key, value)
+            idx += 1
+
+        return queryset
+
+    @staticmethod
+    def _add_filter(queryset, key, value):
+        """
+        Filter the specified queryset by the specified key and value.
+        """
+        raise NotImplementedError("This must be overridden by the subclass")
