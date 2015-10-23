@@ -2,7 +2,10 @@
 Handle Ajax transaction requests from metadata templates.
 """
 
+from django.db.models import Q
+
 from rest_framework import permissions
+from rest_framework.exceptions import APIException
 
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, StandardPagination
 from metadata.models import Datatype, get_builtin_types, CompoundDatatype
@@ -21,6 +24,18 @@ class DatatypeViewSet(RemovableModelViewSet):
         for. For example, base_for[]=<id of natural number> would return integer.
         You can include more than one of these parameters, and the result will
         include restriction bases for all of the requested parameters.
+    * filters[n][key]=x&filters[n][val]=y - Apply different filters to the
+        search. n starts at 0 and increases by 1 for each added filter.
+        Some filters just have a key and ignore the val value. The possible
+        filters are listed below.
+    * filters[n][key]=smart&filters[n][val]=match - name or description contains the value (case
+        insensitive)
+    * filters[n][key]=name&filters[n][val]=match - name contains the value (case
+        insensitive)
+    * filters[n][key]=description&filters[n][val]=match - description contains the value (case
+        insensitive)
+    * filters[n][key]=user&filters[n][val]=match - username of creator contains the value (case
+        insensitive)
     """
     queryset = Datatype.objects.all()
     serializer_class = DatatypeSerializer
@@ -29,6 +44,9 @@ class DatatypeViewSet(RemovableModelViewSet):
 
     def filter_queryset(self, queryset):
         queryset = super(DatatypeViewSet, self).filter_queryset(queryset)
+
+        # First, if base_for[] is specified, we're getting the builtin types
+        # that this Datatype is based on.
         restricting_datatypes = []
         base_for_values = self.request.GET.getlist('base_for')
         base_for_values.extend(self.request.GET.getlist('base_for[]'))
@@ -38,7 +56,33 @@ class DatatypeViewSet(RemovableModelViewSet):
             base_datatypes = get_builtin_types(restricting_datatypes)
             base_pks = [datatype.pk for datatype in base_datatypes]
             queryset = queryset.filter(pk__in=base_pks)
+
+        # Now, we can apply the filters.
+        idx = 0
+        while True:
+            key = self.request.GET.get('filters[{}][key]'.format(idx))
+            if key is None:
+                break
+            value = self.request.GET.get('filters[{}][val]'.format(idx), '')
+            queryset = self._add_datatype_filter(queryset, key, value)
+            idx += 1
+
         return queryset
+
+    def _add_datatype_filter(self, datatypes_qs, key, value):
+        """
+        Filter the specified queryset by the specified key and value.
+        """
+        if key == 'smart':
+            return datatypes_qs.filter(Q(name__icontains=value) | Q(description__icontains=value))
+        if key == 'name':
+            return datatypes_qs.filter(name__icontains=value)
+        if key == 'description':
+            return datatypes_qs.filter(description__icontains=value)
+        if key == "user":
+            return datatypes_qs.filter(user__username__icontains=value)
+
+        raise APIException('Unknown filter key: {}'.format(key))
 
 
 class CompoundDatatypeViewSet(RemovableModelViewSet):

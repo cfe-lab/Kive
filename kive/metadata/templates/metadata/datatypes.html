@@ -10,6 +10,8 @@
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
     <script src="/static/metadata/datatypes.js"></script>
+
+    <link rel="stylesheet" href="/static/sandbox/sandbox.css">
     <link rel="stylesheet" href="/static/portal/permissions.css">
 
     <script type="text/javascript">
@@ -23,11 +25,11 @@
             $(this).toggleClass('hover');
         });
 
-        datatypes_main({{ is_user_admin|lower }},
-                $("#datatypes"),
-                $(".navigation_links"));
-
+        datatypes_main($("#datatypes"), {{ is_user_admin|lower }},
+                       $("#active_filters"), $(".navigation_links"));
     });
+
+    // var table = new DatatypesTable($table, is_user_admin, $active_filters, $navigation_links);
 
     </script>
 
@@ -40,6 +42,30 @@
 <h2>Datatypes</h2>
 
 <a href="/datatype_add" class="button">+&ensp;<span class="button-lbl">Add new</span></a>
+
+<div class="filter_ctrl">
+    <form class="short-filter">
+    <input name="smart" type="text"
+        ><input type="button" class="advanced ctrl" value="Advanced"
+        ><input type="submit" value="Filter">
+    </form>
+
+    <form class="advanced-filter">
+    <h4>Advanced search</h4>
+    <table>
+    <tr>
+        <td><label>Name<input name="name" type="text"/></label></td>
+        <td><label>Description<input name="description" type="text"/></label></td>
+    </tr>
+    <tr>
+        <td><label>Creator<input name="user" type="text"/></label></td>
+    </tr>
+    </table>
+    <input type="submit" value="Filter"/>
+    </form>
+</div>
+
+<div id="active_filters"></div>
 
 <div class="navigation_links"></div>
 

@@ -22,7 +22,8 @@ class DatatypeSerializer(serializers.ModelSerializer):
                   "absolute_url",
                   "restricts",
                   "date_created",
-                  "name"
+                  "name",
+                  "description"
                   )
 
     def get_absolute_url(self, obj):

@@ -11,12 +11,12 @@
     <script src="/static/portal/permissions.js"></script>
     <script src="/static/method/resources.js"></script>
     <link rel="stylesheet" href="/static/portal/permissions.css">
+    <link rel="stylesheet" href="/static/sandbox/sandbox.css">
 
     <script type="text/javascript">
         $(function(){
-            resources_main({{ is_user_admin|lower }},
-                    $("#coderesources"),
-                    $(".navigation_links"));
+            resources_main($("#coderesources"), {{ is_user_admin|lower }},
+                    $("#active_filters"), $(".navigation_links"));
         });
     </script>
 {% endblock %}
@@ -41,6 +41,31 @@ in the following table.
 {% if no_access %}
     <p>You do not have access to the CodeResource with id={{ no_access }}.</p>
 {% endif %}
+
+<div class="filter_ctrl">
+    <form class="short-filter">
+    <input name="smart" type="text"
+        ><input type="button" class="advanced ctrl" value="Advanced"
+        ><input type="submit" value="Filter">
+    </form>
+
+    <form class="advanced-filter">
+    <h4>Advanced search</h4>
+    <table>
+    <tr>
+        <td><label>Name<input name="name" type="text"/></label></td>
+        <td><label>Description<input name="description" type="text"/></label></td>
+    </tr>
+    <tr>
+        <td><label>Filename<input name="filename" type="text"/></label></td>
+        <td><label>Creator<input name="user" type="text"/></label></td>
+    </tr>
+    </table>
+    <input type="submit" value="Filter"/>
+    </form>
+</div>
+
+<div id="active_filters"></div>
 
 <div class="navigation_links"></div>
 

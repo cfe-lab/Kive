@@ -29,8 +29,6 @@ var datasets = (function() {
             }
         );
 
-        this.$navigation_links = $navigation_links;
-
         this.registerColumn("Name", function($td, dataset) {
             $td.append($('<a/>')
                     .text(dataset.name).attr('href', '/dataset_view/'+dataset.id));
