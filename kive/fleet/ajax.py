@@ -70,26 +70,13 @@ class RunToProcessViewSet(CleanCreateModelMixin, RemovableModelViewSet,
             self._status_paginator = self.status_pagination_class()
 
         page = self._status_paginator.paginate_queryset(runs, request, view=self.status)
-        status_serializer = self.status_serializer_class(page, many=True, context={"request": request})
-        return self._status_paginator.get_paginated_response(status_serializer.data)
+        if page is not None:
+            status_serializer = self.status_serializer_class(page, many=True, context={"request": request})
+            return self._status_paginator.get_paginated_response(status_serializer.data)
 
-        # LIMIT = 30
-        # has_more = False
-        # report = []
-        # for i, run in enumerate(runs[:LIMIT + 1]):
-        #     if i == LIMIT:
-        #         has_more = True
-        #         break
-        #     progress = run.get_run_progress()
-        #     progress['url'] = reverse('runtoprocess-detail',
-        #                               kwargs={'pk': run.pk},
-        #                               request=request)
-        #     progress['removal_plan'] = reverse('runtoprocess-removal-plan',
-        #                                        kwargs={'pk': run.pk},
-        #                                        request=request)
-        #     report.append(progress)
-        #
-        # return Response({'runs': report, 'has_more': has_more})
+        # If we aren't using pagination, use the bare serializer.
+        bare_serializer = self.status_serializer_class(runs, many=True, context={"request": request})
+        return Response(bare_serializer.data)
 
     @detail_route(methods=['get'], suffix='Status')
     def run_status(self, request, pk=None):
