@@ -1140,6 +1140,7 @@ class Sandbox:
         """
         step_plan = self.run_plan.step_plans[pipelinestep.step_num-1]
         curr_RS = step_plan.run_step
+        curr_RS.start()
 
         # Note: bad inputs will be caught by the cables.
         input_names = ", ".join(str(i) for i in inputs)

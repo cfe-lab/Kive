@@ -327,21 +327,23 @@ class Manager:
         Poll the database for new jobs, and handle running of sandboxes.
         """
         while True:
-            if not self.assign_tasks():
+            time_to_poll = time.time() + settings.FLEET_POLLING_INTERVAL
+            if not self.assign_tasks(time_to_poll):
                 return
 
             # Everything in the queue has been started, so we check and see if
             # anything has finished.
-            if not self.wait_for_polling():
+            if not self.wait_for_polling(time_to_poll):
                 return
 
             self.find_new_runs()
             self.purge_sandboxes()
             Dataset.purge()
 
-    def assign_tasks(self):
-        # We can't use a for loop over the task queue because assign_task may add to the queue.
-        while len(self.task_queue) > 0:
+    def assign_tasks(self, time_to_poll):
+        # We can't use a for loop over the task queue because assign_task
+        # may add to the queue.
+        while len(self.task_queue) > 0 and time.time() < time_to_poll:
             # task_queue entries are (sandbox, run_step)
             self.task_queue.sort(key=lambda entry: entry[0].run.start_time)
             curr_task = self.task_queue[0]  # looks like (sandbox, task)
@@ -356,8 +358,7 @@ class Manager:
             self.task_queue = self.task_queue[1:]
         return True
 
-    def wait_for_polling(self):
-        time_to_poll = time.time() + settings.FLEET_POLLING_INTERVAL
+    def wait_for_polling(self, time_to_poll):
         while time.time() < time_to_poll:
             if self.comm.Iprobe(source=MPI.ANY_SOURCE, tag=Worker.FINISHED):
                 lord_rank, result_pk = self.comm.recv(source=MPI.ANY_SOURCE,
