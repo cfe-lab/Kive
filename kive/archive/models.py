@@ -419,6 +419,9 @@ class RunComponent(stopwatch.models.Stopwatch):
         super(RunComponent, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
+    def __str__(self):
+        return 'RunComponent id {}'.format(self.id)
+
     def save(self, *args, **kwargs):
         if 'update_fields' not in kwargs:
             self._complete = self.is_complete()

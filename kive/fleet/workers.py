@@ -18,7 +18,6 @@ from django.utils import timezone
 
 import archive.models
 from archive.models import Dataset
-from fleet.exceptions import SandboxActiveException
 import fleet.models
 import sandbox.execute
 
@@ -31,7 +30,7 @@ SLEEP_SECONDS = 0.1
 
 def adjust_log_files(target_logger, rank):
     """ Configure a different log file for each worker process.
-    
+
     Because multiple processes are not allowed to log to the same file, we have
     to adjust the configuration.
     https://docs.python.org/2/howto/logging-cookbook.html#logging-to-a-single-file-from-multiple-processes
@@ -41,7 +40,7 @@ def adjust_log_files(target_logger, rank):
         if filename is not None:
             handler.close()
             fileRoot, fileExt = os.path.splitext(filename)
-            handler.baseFilename = '{}.{:03}{}'.format(fileRoot, rank, fileExt) 
+            handler.baseFilename = '{}.{:03}{}'.format(fileRoot, rank, fileExt)
     if target_logger.parent is not None:
         adjust_log_files(target_logger.parent, rank)
 
@@ -288,7 +287,7 @@ class Manager:
     def main_procedure(self):
         mpi_info = MPI.Info.Create()
         mpi_info.Set("add-hostfile", "kive/hostfile")
-        
+
         comm = MPI.COMM_SELF.Spawn(sys.executable,
                                    args=[self.manage_script, 'fleetworker'],
                                    maxprocs=self.worker_count,
@@ -339,13 +338,13 @@ class Manager:
             self.find_new_runs()
             self.purge_sandboxes()
             Dataset.purge()
-            
+
     def assign_tasks(self):
         # We can't use a for loop over the task queue because assign_task may add to the queue.
         while len(self.task_queue) > 0:
             # task_queue entries are (sandbox, run_step)
             self.task_queue.sort(key=lambda entry: entry[0].run.start_time)
-            curr_task = self.task_queue[0] # looks like (sandbox, task)
+            curr_task = self.task_queue[0]  # looks like (sandbox, task)
             task_sdbx = self.active_sandboxes[curr_task[1].top_level_run]
             # We assign this task to a worker, and do not proceed until the task
             # is assigned.
@@ -356,7 +355,7 @@ class Manager:
                 return False
             self.task_queue = self.task_queue[1:]
         return True
-    
+
     def wait_for_polling(self):
         time_to_poll = time.time() + settings.FLEET_POLLING_INTERVAL
         while time.time() < time_to_poll:
@@ -375,7 +374,7 @@ class Manager:
             except KeyboardInterrupt:
                 return False
         return True
-        
+
     def find_new_runs(self):
         # Look for new jobs to run.  We will also
         # build in a delay here so we don't clog up the database.
@@ -393,7 +392,7 @@ class Manager:
                     run_to_process.pipeline, run_to_process.user, threads_needed,
                     self.max_host_cpus)
                 esc = fleet.models.ExceedsSystemCapabilities(
-                    runtoprocess = run_to_process,
+                    runtoprocess=run_to_process,
                     threads_requested=threads_needed,
                     max_available=self.max_host_cpus
                 )
@@ -446,11 +445,8 @@ class Manager:
             )
 
         for rtp in ready_to_purge:
-            try:
-                mgr_logger.debug("Removing sandbox at {}".format(rtp.sandbox_path))
-                rtp.collect_garbage()
-            except SandboxActiveException as e:
-                mgr_logger.debug(e)
+            mgr_logger.debug("Removing sandbox at {}".format(rtp.sandbox_path))
+            rtp.collect_garbage()
 
         # Next, look through the sandbox directory and see if there are any orphaned sandboxes
         # to remove.
@@ -518,10 +514,10 @@ class Worker:
                 task = archive.models.RunStep.objects.get(pk=task_info_dict["runstep_pk"])
             worker_logger.info("%s(%d) received by rank %d: %s",
                                task.__class__.__name__,
-                               task.pk, 
+                               task.pk,
                                self.rank,
                                task)
-    
+
             sandbox_result = None
             if type(task) == archive.models.RunStep:
                 sandbox_result = sandbox.execute.finish_step(task_info_dict, self.rank)
@@ -532,11 +528,11 @@ class Worker:
         except:
             result = Worker.FAILURE  # bogus return value
             worker_logger.error("[%d] Task %s failed.", self.rank, task, exc_info=True)
-            
+
         message = (self.rank, result)
         self.comm.send(message, dest=0, tag=Worker.FINISHED)
         worker_logger.debug("Sent {} to Manager".format(message))
-        
+
         return tag
 
     def main_procedure(self):
