@@ -14,6 +14,7 @@
         var is_user_admin = {{ is_user_admin|lower }};
     </script>
     <link rel="stylesheet" href="/static/portal/permissions.css">
+    <link rel="stylesheet" href="/static/sandbox/sandbox.css">
 {% endblock %}
 
 {% block content %}
@@ -26,6 +27,30 @@
 <p>
 A compound datatype is an ordered set of datatypes, describing the expected structure of a data set that would act as the input or output of a Method.
 </p>
+
+<div class="filter_ctrl">
+    <form class="short-filter">
+    <input name="smart" type="text"
+        ><input type="button" class="advanced ctrl" value="Advanced"
+        ><input type="submit" value="Filter">
+    </form>
+
+    <form class="advanced-filter">
+    <h4>Advanced search</h4>
+    <table>
+    <tr>
+        <td><label>Name<input name="name" type="text"/></label></td>
+        <td><label>Datatype<input name="datatype" type="text"/></label></td>
+    </tr>
+    <tr>
+        <td><label>Creator<input name="user" type="text"/></label></td>
+    </tr>
+    </table>
+    <input type="submit" value="Filter"/>
+    </form>
+</div>
+
+<div id="active_filters"></div>
 
 <div class="navigation_links"></div>
 

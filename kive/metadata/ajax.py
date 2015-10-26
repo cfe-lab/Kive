@@ -1,6 +1,7 @@
 """
 Handle Ajax transaction requests from metadata templates.
 """
+import itertools
 
 from django.db.models import Q
 
@@ -9,7 +10,7 @@ from rest_framework.exceptions import APIException
 
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, StandardPagination, \
     SearchableModelMixin
-from metadata.models import Datatype, get_builtin_types, CompoundDatatype
+from metadata.models import Datatype, get_builtin_types, CompoundDatatype, CompoundDatatypeMember
 from metadata.serializers import DatatypeSerializer, CompoundDatatypeSerializer
 
 
@@ -77,16 +78,64 @@ class DatatypeViewSet(RemovableModelViewSet, SearchableModelMixin):
         raise APIException('Unknown filter key: {}'.format(key))
 
 
-class CompoundDatatypeViewSet(RemovableModelViewSet):
-    """ Compound datatypes are used to define a CSV file format.
+class CompoundDatatypeViewSet(RemovableModelViewSet, SearchableModelMixin):
+    """Compound datatypes are used to define a CSV file format.
 
     Query parameters for the list view:
 
     * is_granted=true - For administrators, this limits the list to only include
         records that the user has been explicitly granted access to. For other
         users, this has no effect.
+    * filters[n][key]=x&filters[n][val]=y - Apply different filters to the
+        search. n starts at 0 and increases by 1 for each added filter.
+        Some filters just have a key and ignore the val value. The possible
+        filters are listed below.
     """
     queryset = CompoundDatatype.objects.all()
     serializer_class = CompoundDatatypeSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
     pagination_class = StandardPagination
+
+    def filter_queryset(self, queryset):
+        queryset = super(CompoundDatatypeViewSet, self).filter_queryset(queryset)
+        return self.apply_filters(queryset)
+
+    def _add_filter(self, queryset, key, value):
+        """
+        Filter the specified queryset by the specified key and value.
+        """
+        all_pks = queryset.values_list("id", flat=True)
+        CDT_pks = None
+        if key == "smart":
+            matching_members = CompoundDatatypeMember.objects.filter(
+                (Q(column_name__icontains=value) |
+                 Q(datatype__name__icontains=value)) &
+                Q(compounddatatype__in=all_pks)
+            )
+            CDTs_with_user = queryset.filter(Q(user__username__icontains=value))
+            CDT_pks = itertools.chain(
+                matching_members.values_list("compounddatatype", flat=True),
+                CDTs_with_user.values_list("id", flat=True)
+            )
+            return queryset.filter(pk__in=CDT_pks)
+
+        if key == "name":
+            matching_members = CompoundDatatypeMember.objects.filter(
+                compounddatatype__in=all_pks,
+                column_name__icontains=value
+            )
+
+        if key == "datatype":
+            matching_members = CompoundDatatypeMember.objects.filter(
+                compounddatatype__in=all_pks,
+                datatype__name__icontains=value
+            )
+
+        if CDT_pks:
+            CDT_pks = matching_members.values_list("compounddatatype", flat=True)
+            return queryset.filter(pk__in=CDT_pks)
+
+        if key == "user":
+            return queryset.filter(Q(user__username__icontains=value))
+
+        raise APIException('Unknown filter key: {}'.format(key))
