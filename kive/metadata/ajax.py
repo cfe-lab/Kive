@@ -105,7 +105,7 @@ class CompoundDatatypeViewSet(RemovableModelViewSet, SearchableModelMixin):
         Filter the specified queryset by the specified key and value.
         """
         all_pks = queryset.values_list("id", flat=True)
-        CDT_pks = None
+        matching_members = None
         if key == "smart":
             matching_members = CompoundDatatypeMember.objects.filter(
                 (Q(column_name__icontains=value) |
@@ -131,7 +131,7 @@ class CompoundDatatypeViewSet(RemovableModelViewSet, SearchableModelMixin):
                 datatype__name__icontains=value
             )
 
-        if CDT_pks:
+        if matching_members:
             CDT_pks = matching_members.values_list("compounddatatype", flat=True)
             return queryset.filter(pk__in=CDT_pks)
 

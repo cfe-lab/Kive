@@ -30,7 +30,7 @@ var RunsTable = function($table, is_user_admin, $no_results, $active_filters, $n
         else {
             $name = $('<a/>').attr("href", "view_results/" + run.id);
         }
-        $td.append($name.text(run.name));
+        $td.append($name.text(run.display_name));
     });
 
     this.registerColumn("Start", function($td, run) {

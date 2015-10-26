@@ -7,7 +7,8 @@ from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet,\
-    CleanCreateModelMixin, convert_validation, StandardPagination
+    CleanCreateModelMixin, convert_validation, StandardPagination,\
+    SearchableModelMixin
 from metadata.models import AccessControl
 from pipeline.models import Pipeline, PipelineFamily
 from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer,\
@@ -16,7 +17,8 @@ from portal.views import admin_check
 
 
 class PipelineFamilyViewSet(CleanCreateModelMixin,
-                            RemovableModelViewSet):
+                            RemovableModelViewSet,
+                            SearchableModelMixin):
     """ Pipeline Families that contain the different versions of each pipeline
 
     Query parameters for the list view:
@@ -77,21 +79,25 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
 
     def filter_queryset(self, queryset):
         queryset = super(PipelineFamilyViewSet, self).filter_queryset(queryset)
-        i = 0
-        while True:
-            key = self.request.GET.get('filters[{}][key]'.format(i))
-            if key is None:
-                break
-            value = self.request.GET.get('filters[{}][val]'.format(i), '')
-            queryset = self._add_filter(queryset, key, value)
-            i += 1
-        return queryset
+        return self.apply_filters(queryset)
 
-    def _add_filter(self, queryset, key, value):
+    @staticmethod
+    def _add_filter(queryset, key, value):
+        """
+        Filter the specified queryset by the specified key and value.
+        """
         if key == 'smart':
             return queryset.filter(Q(name__icontains=value) |
                                    Q(description__icontains=value))
+        if key == 'name':
+            return queryset.filter(name__icontains=value)
+        if key == 'description':
+            return queryset.filter(description__icontains=value)
+        if key == "user":
+            return queryset.filter(user__username__icontains=value)
+
         raise APIException('Unknown filter key: {}'.format(key))
+
 
 
 class PipelineViewSet(CleanCreateModelMixin,

@@ -8,11 +8,13 @@
     <script src="/static/portal/permissions.js"></script>
     <script src="/static/pipeline/pipeline_families.js"></script>
     <link rel="stylesheet" href="/static/portal/permissions.css">
+    <link rel="stylesheet" href="/static/portal/search.css">
 
     <script type="text/javascript">
         $(function(){
             pipeline_families.main({{ is_user_admin|lower }},
                     $("#pipelinefamilies"),
+                    $("#active_filters"),
                     $(".navigation_links"));
         });
     </script>
@@ -27,8 +29,34 @@
 
 <p>A pipeline is the deployment of one or more Methods to process data.</p>
 
+<div class="filter_ctrl">
+    <form class="short-filter">
+    <input name="smart" type="text"
+        ><input type="button" class="advanced ctrl" value="Advanced"
+        ><input type="submit" value="Filter">
+    </form>
+
+    <form class="advanced-filter">
+    <h4>Advanced search</h4>
+    <table>
+    <tr>
+        <td><label>Name<input name="name" type="text"/></label></td>
+        <td><label>Description<input name="description" type="text"/></label></td>
+    </tr>
+    <tr>
+        <td><label>Creator<input name="user" type="text"/></label></td>
+    </tr>
+    </table>
+    <input type="submit" value="Filter"/>
+    </form>
+</div>
+
+<div id="active_filters"></div>
+
 <div class="navigation_links"></div>
 
+    <div class="dev_results">
 <table id="pipelinefamilies"></table>
+    </div>
 
 {% endblock %}
