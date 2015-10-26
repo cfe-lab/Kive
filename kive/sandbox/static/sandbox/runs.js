@@ -1,22 +1,13 @@
 "use strict";
 
 /*
- * run_data is a JSON object of the form 
- *
- *     [{"id": integer (optional),
- *       "name": string,
- *       "status": string}]
- *
- * - "id" is the primary key of the Run
- * - "name" is the pipeline and first input name 
- * - "status" is a string describing the Run's status
  */
 
 var pollingInterval = 1000, // milliseconds
     runsTable;
 
-var RunsTable = function($table, is_user_admin, $no_results, $active_filters) {
-    permissions.PermissionsTable.call(this, $table, is_user_admin);
+var RunsTable = function($table, is_user_admin, $no_results, $active_filters, $navigation_links) {
+    permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
     this.$no_results = $no_results;
     var runsTable = this;
     this.filterSet = new permissions.FilterSet(
@@ -24,30 +15,33 @@ var RunsTable = function($table, is_user_admin, $no_results, $active_filters) {
             function() { runsTable.reloadTable(); });
     this.list_url = "/api/runs/status/";
     this.reload_interval = pollingInterval;
+
     this.registerColumn("Status", function($td, run) {
         $td.addClass("code").append($('<a/>')
-                .attr('href', '/view_run/'+run.rtp_id)
-                .text(run.status));
+                .attr('href', '/view_run/' + run.id)
+                .text(run.run_progress.status));
     });
+
     this.registerColumn("Name", function($td, run) {
         var $name;
         if (run.id === undefined) {
             $name = $('<span/>');
         }
         else {
-            $name = $('<a/>').attr("href", "view_results/" + run.rtp_id);
+            $name = $('<a/>').attr("href", "view_results/" + run.id);
         }
         $td.append($name.text(run.name));
     });
+
     this.registerColumn("Start", function($td, run) {
-        $td.text(run.start || '-');
+        $td.text(run.run_progress.start || '-');
     });
     this.registerColumn("End", function($td, run) {
-        $td.text(run.end || '-');
+        $td.text(run.run_progress.end || '-');
     });
 
     this.registerStandardColumn("user");
-}
+};
 RunsTable.prototype = Object.create(permissions.PermissionsTable.prototype);
 
 RunsTable.prototype.getQueryParams = function() {
@@ -60,19 +54,16 @@ RunsTable.prototype.extractRows = function(response) {
     var $no_results = this.$no_results,
         runs;
     $no_results.empty();
-    if ('errors' in response) {
+    if ('detail' in response) {
         $no_results.append($('<h2>Errors:</h2>'));
-        $.each(response.errors, function() {
-            $no_results.append($('<p/>').text(this));
-        });
+        $no_results.append($('<p/>').text(response.detail));
     } else {
-        runs = response.runs;
+        runs = response.results;
         if (runs !== undefined && runs.length > 0) {
             $no_results.hide();
             this.$table.children('caption').text(
-                    response.has_more
-                    ? 'Showing ' + runs.length + ' most recent matching runs.'
-                    : 'Showing all matching runs.')
+                response.count + " matching runs"
+            );
             return runs;
         }
         $no_results.html('<p>No runs match your query.</p>');
@@ -108,10 +99,12 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     });
     
     runsTable = new RunsTable(
-            $('#runs'),
-            is_user_admin,
-            $('.no_results'),
-            $('#active_filters'));
-    runsTable.filterSet.add('active');
+        $('#runs'),
+        is_user_admin,
+        $('.no_results'),
+        $('#active_filters'),
+        $(".navigation_links")
+    );
+    // runsTable.filterSet.add('active');
     runsTable.reloadTable();
 });

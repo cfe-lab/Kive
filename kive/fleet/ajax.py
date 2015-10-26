@@ -1,7 +1,5 @@
 from datetime import timedelta, datetime
 
-from django.core.exceptions import ValidationError
-from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from rest_framework import permissions
@@ -12,15 +10,14 @@ from rest_framework.reverse import reverse
 
 import fleet
 from fleet.models import RunToProcess, RunToProcessInput
-from fleet.serializers import RunToProcessSerializer,\
-    RunToProcessOutputsSerializer
-from kive.ajax import IsGrantedReadCreate, RemovableModelViewSet, StandardPagination, CleanCreateModelMixin
-from librarian.models import SymbolicDataset
-from sandbox.forms import InputSubmissionForm, RunSubmissionForm
-from sandbox.views import RunSubmissionError
+from fleet.serializers import RunToProcessSerializer, RunToProcessOutputsSerializer,\
+    RunToProcessProgressSerializer
+from kive.ajax import IsGrantedReadCreate, RemovableModelViewSet, StandardPagination, CleanCreateModelMixin,\
+    SearchableModelMixin
 
 
-class RunToProcessViewSet(CleanCreateModelMixin, RemovableModelViewSet):
+class RunToProcessViewSet(CleanCreateModelMixin, RemovableModelViewSet,
+                          SearchableModelMixin):
     """ Runs or requests to start runs
     
     Query parameters for the list view:
@@ -58,39 +55,41 @@ class RunToProcessViewSet(CleanCreateModelMixin, RemovableModelViewSet):
     serializer_class = RunToProcessSerializer
     permission_classes = (permissions.IsAuthenticated, IsGrantedReadCreate)
     pagination_class = StandardPagination
+
+    # Special pagination for the status list route.
+    status_pagination_class = StandardPagination
+    status_serializer_class = RunToProcessProgressSerializer
     
     @list_route(methods=['get'], suffix='Status List')
     def status(self, request):
         runs = self.get_queryset().order_by('-time_queued')
-
-        i = 0
-        while True:
-            key = request.GET.get('filters[{}][key]'.format(i))
-            if key is None:
-                break
-            value = request.GET.get('filters[{}][val]'.format(i), '')
-            runs = self._add_run_filter(runs, key, value)
-            i += 1
-
+        runs = self.apply_filters(runs)
         runs = self._build_rtp_prefetch(runs)
 
-        LIMIT = 30
-        has_more = False
-        report = []
-        for i, run in enumerate(runs[:LIMIT + 1]):
-            if i == LIMIT:
-                has_more = True
-                break
-            progress = run.get_run_progress()
-            progress['url'] = reverse('runtoprocess-detail',
-                                      kwargs={'pk': run.pk},
-                                      request=request)
-            progress['removal_plan'] = reverse('runtoprocess-removal-plan',
-                                               kwargs={'pk': run.pk},
-                                               request=request)
-            report.append(progress)
+        if not hasattr(self, "_status_paginator"):
+            self._status_paginator = self.status_pagination_class()
 
-        return Response({'runs': report, 'has_more': has_more})
+        page = self._status_paginator.paginate_queryset(runs, request, view=self.status)
+        status_serializer = self.status_serializer_class(page, many=True, context={"request": request})
+        return self._status_paginator.get_paginated_response(status_serializer.data)
+
+        # LIMIT = 30
+        # has_more = False
+        # report = []
+        # for i, run in enumerate(runs[:LIMIT + 1]):
+        #     if i == LIMIT:
+        #         has_more = True
+        #         break
+        #     progress = run.get_run_progress()
+        #     progress['url'] = reverse('runtoprocess-detail',
+        #                               kwargs={'pk': run.pk},
+        #                               request=request)
+        #     progress['removal_plan'] = reverse('runtoprocess-removal-plan',
+        #                                        kwargs={'pk': run.pk},
+        #                                        request=request)
+        #     report.append(progress)
+        #
+        # return Response({'runs': report, 'has_more': has_more})
 
     @detail_route(methods=['get'], suffix='Status')
     def run_status(self, request, pk=None):
@@ -123,12 +122,12 @@ class RunToProcessViewSet(CleanCreateModelMixin, RemovableModelViewSet):
                                      'run__pipeline__steps')
 
     @staticmethod
-    def _add_run_filter(runs, key, value):
+    def _add_filter(queryset, key, value):
         if key == 'active':
             recent_time = timezone.now() - timedelta(minutes=5)
             old_aborted_runs = fleet.models.ExceedsSystemCapabilities.objects.values(
                 'runtoprocess_id').filter(runtoprocess__time_queued__lt=recent_time)
-            return runs.filter(
+            return queryset.filter(
                 Q(run_id__isnull=True)|
                 Q(run__end_time__isnull=True)|
                 Q(run__end_time__gte=recent_time)).distinct().exclude(
@@ -137,21 +136,21 @@ class RunToProcessViewSet(CleanCreateModelMixin, RemovableModelViewSet):
             runs_with_matching_inputs = RunToProcessInput.objects.filter(
                 symbolicdataset__dataset__name__icontains=value).values(
                     'runtoprocess_id')
-            return runs.filter(
+            return queryset.filter(
                 Q(name__icontains=value)|
                 (Q(name="") & (Q(pipeline__family__name__icontains=value)|
                                Q(id__in=runs_with_matching_inputs))))
         if key == "user":
-            return runs.filter(user__username__icontains=value)
+            return queryset.filter(user__username__icontains=value)
         if key in ('startafter', 'startbefore', 'endafter', 'endbefore'):
             t = timezone.make_aware(datetime.strptime(value, '%d %b %Y %H:%M'),
                                     timezone.get_current_timezone())
             if key == 'startafter':
-                return runs.filter(run__start_time__gte=t)
+                return queryset.filter(run__start_time__gte=t)
             if key == 'startbefore':
-                return runs.filter(run__start_time__lte=t)
+                return queryset.filter(run__start_time__lte=t)
             if key == 'endafter':
-                return runs.filter(run__end_time__gte=t)
+                return queryset.filter(run__end_time__gte=t)
             if key == 'endbefore':
-                return runs.filter(run__end_time__lte=t)
+                return queryset.filter(run__end_time__lte=t)
         raise APIException('Unknown filter key: {}'.format(key))

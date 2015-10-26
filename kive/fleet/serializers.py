@@ -136,6 +136,44 @@ class RunToProcessSerializer(AccessControlSerializer, serializers.ModelSerialize
         return rtp
 
 
+class RunToProcessProgressSerializer(RunToProcessSerializer):
+    """
+    Same as RunToProcessSerializer except run_status is computed instead of linked.
+    """
+    run_progress = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RunToProcess
+        fields = (
+            'id',
+            'url',
+            'pipeline',
+            'time_queued',
+            'name',
+            'description',
+            'run',
+            'sandbox_path',
+            'purged',
+            "run_status",
+            'run_progress',
+            'run_outputs',
+            'removal_plan',
+            'user',
+            'users_allowed',
+            'groups_allowed',
+            'inputs'
+        )
+        read_only_fields = (
+            "run",
+            "purged",
+            "time_queued",
+        )
+
+    def get_run_progress(self, obj):
+        if obj is not None:
+            return obj.get_run_progress()
+
+
 class RunToProcessOutputsSerializer(serializers.ModelSerializer):
     run = RunOutputsSerializer()
     

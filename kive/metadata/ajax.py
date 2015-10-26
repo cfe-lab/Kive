@@ -7,12 +7,13 @@ from django.db.models import Q
 from rest_framework import permissions
 from rest_framework.exceptions import APIException
 
-from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, StandardPagination
+from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, StandardPagination, \
+    SearchableModelMixin
 from metadata.models import Datatype, get_builtin_types, CompoundDatatype
 from metadata.serializers import DatatypeSerializer, CompoundDatatypeSerializer
 
 
-class DatatypeViewSet(RemovableModelViewSet):
+class DatatypeViewSet(RemovableModelViewSet, SearchableModelMixin):
     """Datatypes are used to define the types of data in CSV entries.
 
     Query parameters:
@@ -58,29 +59,20 @@ class DatatypeViewSet(RemovableModelViewSet):
             queryset = queryset.filter(pk__in=base_pks)
 
         # Now, we can apply the filters.
-        idx = 0
-        while True:
-            key = self.request.GET.get('filters[{}][key]'.format(idx))
-            if key is None:
-                break
-            value = self.request.GET.get('filters[{}][val]'.format(idx), '')
-            queryset = self._add_datatype_filter(queryset, key, value)
-            idx += 1
+        return self.apply_filters(queryset)
 
-        return queryset
-
-    def _add_datatype_filter(self, datatypes_qs, key, value):
+    def _add_filter(self, queryset, key, value):
         """
         Filter the specified queryset by the specified key and value.
         """
         if key == 'smart':
-            return datatypes_qs.filter(Q(name__icontains=value) | Q(description__icontains=value))
+            return queryset.filter(Q(name__icontains=value) | Q(description__icontains=value))
         if key == 'name':
-            return datatypes_qs.filter(name__icontains=value)
+            return queryset.filter(name__icontains=value)
         if key == 'description':
-            return datatypes_qs.filter(description__icontains=value)
+            return queryset.filter(description__icontains=value)
         if key == "user":
-            return datatypes_qs.filter(user__username__icontains=value)
+            return queryset.filter(user__username__icontains=value)
 
         raise APIException('Unknown filter key: {}'.format(key))
 
