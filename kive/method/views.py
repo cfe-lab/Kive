@@ -116,18 +116,17 @@ def resource_revisions(request, id):
                             'coderesource': coderesource,
                             'dep_forms': dep_forms})
         return HttpResponse(t.render(c))
-        
-    revisions_json = JSONRenderer().render(
-        CodeResourceRevisionSerializer(revisions, context={'request': request}, many=True).data
-    )
 
     # Load template, setup context
     t = loader.get_template('method/resource_revisions.html')
-    c = RequestContext(request,
-                       {'coderesource': coderesource,
-                        'revisions': revisions,
-                        'is_user_admin': admin_check(request.user),
-                        'coderesourcerevisions': revisions_json})
+    c = RequestContext(
+        request,
+        {
+            'coderesource': coderesource,
+            'revisions': revisions,
+            'is_user_admin': admin_check(request.user)
+        }
+    )
     return HttpResponse(t.render(c))
 
 

@@ -13,14 +13,18 @@
     <script src="/static/portal/permissions.js"></script>
     <script src="/static/method/resource_revisions.js"></script>
     <link rel="stylesheet" href="/static/portal/permissions.css">
+    <link rel="stylesheet" href="/static/portal/search.css">
 
     <script type="text/javascript">
        $(function(){
-            resource_revisions_main({{ is_user_admin|lower }},
-                    $("#coderesourcerevisions"),
-                    {{coderesource.pk}},
-                    JSON.parse($('#initial_data').text()));
-        });
+            resource_revisions_main(
+                {{ is_user_admin|lower }},
+                $("#coderesourcerevisions"),
+                {{coderesource.pk}},
+                $("#active_filters"),
+                $(".navigation_links")
+            )
+       });
     </script>
 {% endblock %}
 
@@ -69,7 +73,35 @@
 
 
 <h3>Revisions:</h3>
-<div id="initial_data" style="display: none">{{ coderesourcerevisions|escape }}</div>
-<table id="coderesourcerevisions"></table>
+
+<div class="filter_ctrl">
+    <form class="short-filter">
+    <input name="smart" type="text"
+        ><input type="button" class="advanced ctrl" value="Advanced"
+        ><input type="submit" value="Filter">
+    </form>
+
+    <form class="advanced-filter">
+    <h4>Advanced search</h4>
+    <table>
+    <tr>
+        <td><label>Name<input name="name" type="text"/></label></td>
+        <td><label>Description<input name="description" type="text"/></label></td>
+    </tr>
+    <tr>
+        <td><label>Creator<input name="user" type="text"/></label></td>
+    </tr>
+    </table>
+    <input type="submit" value="Filter"/>
+    </form>
+</div>
+
+<div id="active_filters"></div>
+
+<div class="navigation_links"></div>
+
+    <div class="dev_results">
+        <table id="coderesourcerevisions"></table>
+    </div>
 
 {% endblock %}

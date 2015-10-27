@@ -457,11 +457,16 @@ var permissions = (function() {
             }));
             filterSet.$active.prepend($filter);
         }
+
+        return $filter;
     }
     
-    my.FilterSet.prototype.add = function(key, value) {
-        addFilter(this, key, value);
-        this.onChange();
+    my.FilterSet.prototype.add = function(key, value, skip_trigger) {
+        var $filter = addFilter(this, key, value);
+        if (skip_trigger === undefined) {
+            this.onChange();
+        }
+        return $filter;
     };
     
     my.FilterSet.prototype.addFromForm = function(form) {

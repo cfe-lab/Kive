@@ -82,7 +82,30 @@ class CodeResourceViewSet(RemovableModelViewSet, SearchableModelMixin):
         raise APIException('Unknown filter key: {}'.format(key))
 
 
-class CodeResourceRevisionViewSet(CleanCreateModelMixin, RemovableModelViewSet):
+class CodeResourceRevisionViewSet(CleanCreateModelMixin, RemovableModelViewSet,
+                                  SearchableModelMixin):
+    """CodeResourceRevisions are the individual revisions of CodeResources.
+
+    Query parameters:
+
+    * is_granted - true For administrators, this limits the list to only include
+        records that the user has been explicitly granted access to. For other
+        users, this has no effect.
+    * filters[n][key]=x&filters[n][val]=y - Apply different filters to the
+        search. n starts at 0 and increases by 1 for each added filter.
+        Some filters just have a key and ignore the val value. The possible
+        filters are listed below.
+    * filters[n][key]=coderesource_id&filters[n][val]=match - parent CodeResource's PK equals
+        the value
+    * filters[n][key]=smart&filters[n][val]=match - revision name or description contains the value (case
+        insensitive)
+    * filters[n][key]=name&filters[n][val]=match - revision name contains the value (case
+        insensitive)
+    * filters[n][key]=description&filters[n][val]=match - revision description contains the value (case
+        insensitive)
+    * filters[n][key]=user&filters[n][val]=match - username of creator contains the value (case
+        insensitive)
+    """
     queryset = CodeResourceRevision.objects.all()
     serializer_class = CodeResourceRevisionSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
@@ -103,6 +126,29 @@ class CodeResourceRevisionViewSet(CleanCreateModelMixin, RemovableModelViewSet):
                             status=status.HTTP_403_FORBIDDEN)
 
         return _build_download_response(CRR.content_file)
+
+    def filter_queryset(self, queryset):
+        queryset = super(CodeResourceRevisionViewSet, self).filter_queryset(queryset)
+        return self.apply_filters(queryset)
+
+    @staticmethod
+    def _add_filter(queryset, key, value):
+        """
+        Filter the specified queryset by the specified key and value.
+        """
+        if key == 'smart':
+            return queryset.filter(Q(revision_name__icontains=value) |
+                                   Q(revision_desc__icontains=value))
+        if key == 'coderesource_id':
+            return queryset.filter(coderesource__id=value)
+        if key == 'name':
+            return queryset.filter(revision_name__icontains=value)
+        if key == 'description':
+            return queryset.filter(revision_desc__icontains=value)
+        if key == "user":
+            return queryset.filter(user__username__icontains=value)
+
+        raise APIException('Unknown filter key: {}'.format(key))
 
 
 class MethodFamilyViewSet(RemovableModelViewSet, SearchableModelMixin):
