@@ -43,6 +43,8 @@ var permissions = (function() {
         this.$lockImage = $('<img/>');
         this.$lockSpan = $('<span/>');
 
+        this.last_ajax_request_url = "";
+
         this.$navigation_links = $navigation_links;
         this.page_size = 25;
         this.page = 1;
@@ -129,10 +131,10 @@ var permissions = (function() {
         // Schedule reload if it's been requested.
         if (this.reload_interval !== undefined) {
             this.timeout_id = setTimeout(
-                    function() {
-                        permissions_table.reloadTable();
-                    },
-                    this.reload_interval);
+                function() {
+                    permissions_table.reloadTable(permissions_table.last_ajax_request_url);
+                },
+                this.reload_interval);
         }
     };
     
@@ -215,9 +217,10 @@ var permissions = (function() {
         var query_params;
         if (ajax_request_url === undefined) {
             ajax_request_url = permissions_table.list_url + "?page_size=" + permissions_table.page_size;
-            // FIXME may need to explicitly set is_granted here.
             query_params = permissions_table.getQueryParams();
         }
+        this.last_ajax_request_url = ajax_request_url;
+
         permissions_table.ajax_request = $.getJSON(
             ajax_request_url,
             query_params).done(function(response) {
