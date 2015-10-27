@@ -22,7 +22,7 @@ worker_count = 0
 if worker_count > 0 and sys.argv[-1] == "runserver":
     # import here, because it causes problems when OpenMPI isn't loaded
     import fleet.workers
-    
+
     manage_script = sys.argv[0]
     manager = fleet.workers.Manager(worker_count, manage_script)
     manager_thread = threading.Thread(target=manager.main_procedure)
@@ -87,7 +87,7 @@ class RunToProcess(metadata.models.AccessControl):
     @transaction.atomic
     def finished(self):
         return (self.started and self.run.is_complete()) or hasattr(self, "not_enough_CPUs")
-    
+
     @property
     def display_name(self):
         """
@@ -110,7 +110,7 @@ class RunToProcess(metadata.models.AccessControl):
                 return "{} at {}".format(pipeline_name, self.time_queued)
             return pipeline_name
         first_input_name = first_input.symbolicdataset.dataset.name
-        return '{} on {}'.format(pipeline_name, first_input_name) 
+        return '{} on {}'.format(pipeline_name, first_input_name)
 
     @transaction.atomic
     def get_run_progress(self, detailed=False):
@@ -131,10 +131,10 @@ class RunToProcess(metadata.models.AccessControl):
                 esc.max_available
             )
             return result
-        
+
         if hasattr(self, 'user'):
             result['user'] = self.user.username
-        
+
         if not self.started:
             result['status'] = '?'
             return result
@@ -150,7 +150,6 @@ class RunToProcess(metadata.models.AccessControl):
                 input_list[_input.index] = {"dataset_id": _input.symbolicdataset.dataset.id,
                                             "dataset_name": _input.symbolicdataset.dataset.name,
                                             "md5": _input.symbolicdataset.MD5_checksum}
-
 
         # One of the steps is in progress?
         total_steps = run.pipeline.steps.count()
