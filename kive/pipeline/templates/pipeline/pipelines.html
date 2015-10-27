@@ -11,13 +11,12 @@
     <script src="/static/portal/permissions.js"></script>
     <script src="/static/pipeline/pipelines.js"></script>
     <link rel="stylesheet" href="/static/portal/permissions.css">
+    <link rel="stylesheet" href="/static/portal/search.css">
 
     <script type="text/javascript">
         $(function(){
-            pipelines.main({{ is_user_admin|lower }},
-                    {{ family.pk }},
-                    $("#pipelines"),
-                    JSON.parse($('#initial_data').text()));
+            pipelines.main({{ is_user_admin|lower }}, $("#pipelines"), {{ family.pk }},
+                           $("#active_filters"), $(".navigation_links"));
         });
     </script>
 {% endblock %}
@@ -32,14 +31,39 @@
 <p>{{ family.description }}</p>
 {% endif %}
 
-<div id="initial_data" style="display:none">{{ pipelines|escape }}</div>
 <p style="font-style: italic; color: gray">
 Click on 'Revise' link to revise the corresponding pipeline, or click 'Add new pipeline' to add a pipeline without specifying a parent revision.
 </p>
 
-<div class="errortext"></div>
+<div class="filter_ctrl">
+    <form class="short-filter">
+    <input name="smart" type="text"
+        ><input type="button" class="advanced ctrl" value="Advanced"
+        ><input type="submit" value="Filter">
+    </form>
 
-<table id="pipelines"></table>
+    <form class="advanced-filter">
+    <h4>Advanced search</h4>
+    <table>
+    <tr>
+        <td><label>Name<input name="name" type="text"/></label></td>
+        <td><label>Description<input name="description" type="text"/></label></td>
+    </tr>
+    <tr>
+        <td><label>Creator<input name="user" type="text"/></label></td>
+    </tr>
+    </table>
+    <input type="submit" value="Filter"/>
+    </form>
+</div>
+
+<div id="active_filters"></div>
+
+<div class="navigation_links"></div>
+
+    <div class="dev_results">
+        <table id="pipelines"></table>
+    </div>
 
 <a href="/pipeline_add/{{ family.pk }}" class="button">+&ensp;<span class="button-lbl">Add a new pipeline</span></a>
 

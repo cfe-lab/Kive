@@ -101,10 +101,12 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
 
 
 class PipelineViewSet(CleanCreateModelMixin,
-                      RemovableModelViewSet):
+                      RemovableModelViewSet,
+                      SearchableModelMixin):
     queryset = Pipeline.objects.all()
     serializer_class = PipelineSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+    pagination_class = StandardPagination
 
     def get_queryset(self):
         prefetchd = Pipeline.objects.prefetch_related(
@@ -178,3 +180,26 @@ class PipelineViewSet(CleanCreateModelMixin,
             "" if publish_update else "un"
         )
         return Response({'message': response_msg})
+
+    def filter_queryset(self, queryset):
+        queryset = super(PipelineViewSet, self).filter_queryset(queryset)
+        return self.apply_filters(queryset)
+
+    @staticmethod
+    def _add_filter(queryset, key, value):
+        """
+        Filter the specified queryset by the specified key and value.
+        """
+        if key == 'smart':
+            return queryset.filter(Q(revision_name__icontains=value) |
+                                   Q(revision_desc__icontains=value))
+        if key == 'pipelinefamily_id':
+            return queryset.filter(family__id=value)
+        if key == 'name':
+            return queryset.filter(revision_name__icontains=value)
+        if key == 'description':
+            return queryset.filter(revision_desc__icontains=value)
+        if key == "user":
+            return queryset.filter(user__username__icontains=value)
+
+        raise APIException('Unknown filter key: {}'.format(key))

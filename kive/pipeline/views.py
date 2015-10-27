@@ -60,15 +60,15 @@ def pipelines(request, id):
         is_admin=False,
         queryset=family.members.all())
 
-    pipelines_json = JSONRenderer().render(
-        PipelineSerializer(member_pipelines, many=True, context={"request": request}).data
-    )
+    # pipelines_json = JSONRenderer().render(
+    #     PipelineSerializer(member_pipelines, many=True, context={"request": request}).data
+    # )
 
     t = loader.get_template('pipeline/pipelines.html')
     c = RequestContext(request,
                        {
                            'family': family,
-                           "pipelines": pipelines_json,
+                           # "pipelines": pipelines_json,
                            "is_user_admin": admin_check(request.user)
                        })
     return HttpResponse(t.render(c))

@@ -73,9 +73,22 @@ var pipelines = (function() {
         $td.append($form);
     }
 
-    var PipelinesTable = function($table, family_pk, is_user_admin) {
-        permissions.PermissionsTable.call(this, $table, is_user_admin);
-        this.list_url = "../../api/pipelinefamilies/" + family_pk + "/pipelines/";
+    var PipelineTable = function($table, is_user_admin, family_pk, $active_filters, $navigation_links) {
+        permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
+        this.list_url = "../../api/pipelines/";
+        this.family_pk = family_pk;
+
+        var plTable = this;
+        this.filterSet = new permissions.FilterSet(
+            $active_filters,
+            function() {
+                plTable.reloadTable();
+            }
+        );
+        // This adds a filter for the current CodeResource.
+        var $pf_filter = this.filterSet.add("pipelinefamily_id", this.family_pk, true);
+        $pf_filter.hide();
+
         this.registerColumn("Name", pipeline_link);
         this.registerColumn("Description", revision_desc);
         this.registerColumn(
@@ -85,14 +98,46 @@ var pipelines = (function() {
                 family_pk: family_pk,
                 table: this
             });
+
+        this.registerStandardColumn("user");
+        this.registerStandardColumn("users_allowed");
+        this.registerStandardColumn("groups_allowed");
     };
-    PipelinesTable.prototype = Object.create(permissions.PermissionsTable.prototype);
+    PipelineTable.prototype = Object.create(permissions.PermissionsTable.prototype);
+
+    PipelineTable.prototype.getQueryParams = function() {
+        var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
+        params.filters = this.filterSet.getFilters();
+        return params;
+    };
 
     // Code that will be called on loading in the HTML document.
-    my.main = function(is_user_admin, family_pk, $table, bootstrap) {
+    my.main = function(is_user_admin, $table, family_pk, $active_filters, $navigation_links) {
         noXSS();
-        var table = new PipelinesTable($table, family_pk, is_user_admin);
-        table.buildTable(bootstrap);
+
+        $('.advanced-filter').prepend('<input type="button" class="close ctrl" value="Close">');
+
+        $('input[value="Advanced"]').on('click', function() {
+            $(this).closest('.short-filter').fadeOut({ complete: function() {
+                $(this).siblings('.advanced-filter').fadeIn()
+                    .closest('li').addClass('advanced');
+            } });
+        });
+
+        $('.advanced-filter input.close.ctrl').on('click', function() {
+            $(this).closest('.advanced-filter').fadeOut({ complete: function() {
+                $(this).siblings('.short-filter').fadeIn()
+                    .closest('li').removeClass('advanced');
+            } });
+        });
+
+        $('form.short-filter, form.advanced-filter').submit(function(e) {
+            e.preventDefault();
+            table.filterSet.addFromForm(this);
+        });
+
+        var table = new PipelineTable($table, is_user_admin, family_pk, $active_filters, $navigation_links);
+        table.reloadTable();
     };
 
     return my;
