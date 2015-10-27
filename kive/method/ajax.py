@@ -215,7 +215,32 @@ class MethodFamilyViewSet(RemovableModelViewSet, SearchableModelMixin):
         raise APIException('Unknown filter key: {}'.format(key))
 
 
-class MethodViewSet(CleanCreateModelMixin, RemovableModelViewSet):
+class MethodViewSet(CleanCreateModelMixin, RemovableModelViewSet,
+                    SearchableModelMixin):
     queryset = Method.objects.all()
     serializer_class = MethodSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+    pagination_class = StandardPagination
+
+    def filter_queryset(self, queryset):
+        queryset = super(MethodViewSet, self).filter_queryset(queryset)
+        return self.apply_filters(queryset)
+
+    @staticmethod
+    def _add_filter(queryset, key, value):
+        """
+        Filter the specified queryset by the specified key and value.
+        """
+        if key == 'smart':
+            return queryset.filter(Q(revision_name__icontains=value) |
+                                   Q(revision_desc__icontains=value))
+        if key == 'methodfamily_id':
+            return queryset.filter(family__id=value)
+        if key == 'name':
+            return queryset.filter(revision_name__icontains=value)
+        if key == 'description':
+            return queryset.filter(revision_desc__icontains=value)
+        if key == "user":
+            return queryset.filter(user__username__icontains=value)
+
+        raise APIException('Unknown filter key: {}'.format(key))

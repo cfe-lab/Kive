@@ -35,6 +35,9 @@
                 CRRTable.reloadTable();
             }
         );
+        // This adds a filter for the current CodeResource.
+        var $cr_filter = this.filterSet.add("coderesource_id", this.cr_pk, true);
+        $cr_filter.hide();
 
         this.registerColumn("#", "revision_number");
         this.registerColumn("Name", coderevision_view_link);
@@ -52,13 +55,7 @@
 
     CodeResourceRevisionTable.prototype.getQueryParams = function() {
         var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
-
-        // This adds a filter for the current CodeResource.
-        var $cr_filter = this.filterSet.add("coderesource_id", this.cr_pk, true);
-        $cr_filter.hide();
-
         params.filters = this.filterSet.getFilters();
-
         return params;
     };
 
@@ -88,6 +85,7 @@
 
         var table = new CodeResourceRevisionTable($table, is_user_admin, cr_pk, $active_filters,
                                                   $navigation_links);
+
         table.reloadTable();
     }
 

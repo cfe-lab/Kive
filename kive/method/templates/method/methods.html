@@ -11,13 +11,12 @@
     <script src="/static/portal/permissions.js"></script>
     <script src="/static/method/methods.js"></script>
     <link rel="stylesheet" href="/static/portal/permissions.css">
+    <link rel="stylesheet" href="/static/portal/search.css">
 
     <script type="text/javascript">
         $(function(){
-            methods_main({{ is_user_admin|lower }},
-                    {{ family.pk }},
-                    $("#methods"),
-                    JSON.parse($('#initial_data').text()));
+            methods_main({{ is_user_admin|lower }}, $("#methods"), {{ family.pk }},
+                         $("#active_filters"), $(".navigation_links"));
         });
     </script>
 {% endblock %}
@@ -32,13 +31,40 @@
 {{ family.description }}
 </p>
 
-<div id="initial_data" style="display:none">{{ methods|escape }}</div>
 <p style="font-style: italic; color: gray">
 Click on 'Revise' link to revise the corresponding method, or click 'Add new method' to
 add a method without specifying a parent revision.
 </p>
 
-<table id="methods"></table>
+<div class="filter_ctrl">
+    <form class="short-filter">
+    <input name="smart" type="text"
+        ><input type="button" class="advanced ctrl" value="Advanced"
+        ><input type="submit" value="Filter">
+    </form>
+
+    <form class="advanced-filter">
+    <h4>Advanced search</h4>
+    <table>
+    <tr>
+        <td><label>Name<input name="name" type="text"/></label></td>
+        <td><label>Description<input name="description" type="text"/></label></td>
+    </tr>
+    <tr>
+        <td><label>Creator<input name="user" type="text"/></label></td>
+    </tr>
+    </table>
+    <input type="submit" value="Filter"/>
+    </form>
+</div>
+
+<div id="active_filters"></div>
+
+<div class="navigation_links"></div>
+
+    <div class="dev_results">
+        <table id="methods"></table>
+    </div>
 
 <a href="/method_add/{{ family.pk }}" class="button">+&ensp;<span class="button-lbl">Add a new method</span></a>
 

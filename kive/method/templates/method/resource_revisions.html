@@ -17,13 +17,8 @@
 
     <script type="text/javascript">
        $(function(){
-            resource_revisions_main(
-                {{ is_user_admin|lower }},
-                $("#coderesourcerevisions"),
-                {{coderesource.pk}},
-                $("#active_filters"),
-                $(".navigation_links")
-            )
+           resource_revisions_main({{ is_user_admin|lower }}, $("#coderesourcerevisions"), {{coderesource.pk}},
+                                   $("#active_filters"), $(".navigation_links"))
        });
     </script>
 {% endblock %}

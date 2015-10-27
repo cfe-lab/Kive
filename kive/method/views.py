@@ -472,20 +472,20 @@ def methods(request, id):
         # Redirect back to the resources page.
         raise Http404("ID {} cannot be accessed".format(id))
 
-    member_methods = AccessControl.filter_by_user(
-        request.user,
-        is_admin=False,
-        queryset=family.members.all())
+    # member_methods = AccessControl.filter_by_user(
+    #     request.user,
+    #     is_admin=False,
+    #     queryset=family.members.all())
 
-    methods_json = JSONRenderer().render(
-        MethodSerializer(member_methods, many=True, context={"request": request}).data
-    )
+    # methods_json = JSONRenderer().render(
+    #     MethodSerializer(member_methods, many=True, context={"request": request}).data
+    # )
 
     t = loader.get_template('method/methods.html')
     c = RequestContext(request,
                        {
                            'family': family,
-                           "methods": methods_json,
+                           # "methods": methods_json,
                            "is_user_admin": admin_check(request.user)
                        })
     return HttpResponse(t.render(c))
