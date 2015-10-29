@@ -31,7 +31,7 @@ import logging
 from portal.views import admin_check
 from fleet.exceptions import SandboxActiveException, RTPNotFinished
 
-LOGGER = logging.getLogger(__name__) # Module level logger.
+LOGGER = logging.getLogger(__name__)  # Module level logger.
 
 
 # We delete objects in this order:
@@ -149,9 +149,9 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
     as well as the number of rows and the header.
 
     INPUTS
-    columns             list of either Datatypes or CompoundDatatypeMembers 
+    columns             list of either Datatypes or CompoundDatatypeMembers
                         to which the columns of the file are supposed to conform
-    data_csv            csv.reader object set to the first line of data (NOT 
+    data_csv            csv.reader object set to the first line of data (NOT
                         the header)
     summary_path        working directory to run verification methods in
     content_check_log   should be provided if this function is called as part
@@ -181,7 +181,7 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
     plural = "" if len(cols_with_cc) == 1 else "s"
     LOGGER.debug("{} column{} with custom constraints found".format(len(cols_with_cc), plural))
 
-    # Each column with custom constraints gets a file handle where 
+    # Each column with custom constraints gets a file handle where
     # the results of the verification method will be written.
     try:
         for column in cols_with_cc:
@@ -247,7 +247,7 @@ def _setup_verification_path(column_test_path):
 
     OUTPUTS
     input_file_path     a file name where the data to verify should be written to,
-                        with a header already in place (ie. the file should be 
+                        with a header already in place (ie. the file should be
                         opened in append mode).
     """
     verif_in = CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK)
@@ -257,7 +257,7 @@ def _setup_verification_path(column_test_path):
     # [summary path]/col[colnum]/input_data/
     # [summary path]/col[colnum]/output_data/
     # [summary path]/col[colnum]/logs/
-    
+
     # We will use the first to actually run the script; the input file will
     # go into the second; the output will go into the third; output and
     # error logs go into the fourth.
@@ -270,7 +270,7 @@ def _setup_verification_path(column_test_path):
         configure_sandbox_permissions(workdir)
 
     input_file_path = os.path.join(input_data, "to_test.csv")
-    
+
     # Write a CSV header.
     with open(input_file_path, "w") as f:
         verif_in_header = [m.column_name for m in verif_in.members.all()]
@@ -292,7 +292,7 @@ def _check_basic_constraints(columns, data_reader, out_handles={}):
     TODO: Make out_handles CSV writers or DictWriters, not file handles.
 
     INPUTS
-    columns         list of Datatypes or CDTM's to which the CSV file is 
+    columns         list of Datatypes or CDTM's to which the CSV file is
                     expected to conform
     data_reader     csv.reader object, open on the CSV file we wish to check.
                     This should be set to the first row of data (NOT the
@@ -317,7 +317,7 @@ def _check_basic_constraints(columns, data_reader, out_handles={}):
         for colnum, col in enumerate(columns, start=1):
             curr_cell_value = row[colnum-1]
             test_result = col.check_basic_constraints(curr_cell_value)
-                
+
             if test_result:
                 LOGGER.debug('Value "{}" failed basic constraints'.format(curr_cell_value))
                 failing_cells[(rownum, colnum)] = test_result
@@ -495,7 +495,7 @@ class AccessControl(models.Model):
     def filter_by_user(cls, user, is_admin=False, queryset=None):
         """ Retrieve a QuerySet of all records of this class that are visible
             to the specified user.
-        
+
         @param is_admin: override the filter, and just return all records.
         @param queryset: add the filter to an existing queryset instead of
             cls.objects.all()
@@ -535,7 +535,7 @@ class AccessControl(models.Model):
 
     def copy_permissions(self, source):
         """ Copy users_allowed and groups_allowed from the source object.
-        
+
         @param source: another AccessControl object
         """
         self.grant_from_permissions_list((source.users_allowed.all(),
@@ -548,10 +548,12 @@ class Datatype(AccessControl):
     Abstract definition of a semantically atomic type of data.
     Related to :model:`metadata.models.CompoundDatatype`
     """
-    name = models.CharField("Datatype name", max_length=maxlengths.MAX_NAME_LENGTH, 
-            help_text="The name for this Datatype")
-    description = models.TextField("Datatype description", help_text="A description for this Datatype",
-            max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
+    name = models.CharField("Datatype name",
+                            max_length=maxlengths.MAX_NAME_LENGTH,
+                            help_text="The name for this Datatype")
+    description = models.TextField("Datatype description",
+                                   help_text="A description for this Datatype",
+                                   max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
 
     # auto_now_add: set to now on instantiation (editable=False)
     date_created = models.DateTimeField("Date created", auto_now_add=True, help_text="Date Datatype was defined")
@@ -617,7 +619,7 @@ class Datatype(AccessControl):
     def has_restriction(self):
         """
         Does this Datatype restrict any others? Note that a Datatype is
-        not complete if it has no restrictions. 
+        not complete if it has no restrictions.
         """
         return hasattr(self, "restricts")
 
@@ -659,7 +661,7 @@ class Datatype(AccessControl):
         """
         Determine if this datatype is ever *properly* restricted,
         directly or indirectly, by a given datatype.
-        
+
         PRE: there is no circular restriction in the possible restrictor
         datatype (this would cause an infinite recursion).
         """
@@ -855,13 +857,18 @@ class Datatype(AccessControl):
         """
         PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
         if self.prototype.symbolicdataset.is_raw():
-            raise ValidationError(('Prototype Dataset for Datatype "{}" should have CompoundDatatype "{}", '
-                    'but it is raw').format(self, PROTOTYPE_CDT))
+            raise ValidationError((
+                'Prototype Dataset for Datatype "{}" should have '
+                'CompoundDatatype "{}", but it is raw').format(self,
+                                                               PROTOTYPE_CDT))
 
         my_prototype_cdt = self.prototype.symbolicdataset.get_cdt()
         if not my_prototype_cdt.is_identical(PROTOTYPE_CDT):
-            raise ValidationError(('Prototype Dataset for Datatype "{}" should have CompoundDatatype "{}", '
-                    'but it has "{}"').format(self, PROTOTYPE_CDT, my_prototype_cdt))
+            raise ValidationError((
+                'Prototype Dataset for Datatype "{}" should have '
+                'CompoundDatatype "{}", but it has "{}"').format(self,
+                                                                 PROTOTYPE_CDT,
+                                                                 my_prototype_cdt))
 
         self.prototype.clean()
 
@@ -874,11 +881,11 @@ class Datatype(AccessControl):
         helper for clean().
 
         INPUTS
-        constraint      the type of constraint to check, one of 
+        constraint      the type of constraint to check, one of
                         BasicConstraint.(MIN|MAX)_(VAL|LENGTH)
         error_message   message to raise if the check fails (see code for
                         format)
-        
+
         PRE
         1) The current Datatype restricts at least one other Datatype
         2) The current Datatype has at most one of the type of constraint
@@ -918,7 +925,7 @@ class Datatype(AccessControl):
         """
         Check constraints for coherence against the supertypes'
         constraints. This is a helper function for clean().
-        
+
         PRE
         1) This Datatype has at least one supertype
         """
@@ -971,7 +978,7 @@ class Datatype(AccessControl):
     def _clean_basic_constraints(self):
         """
         Check the coherence of this Datatype's basic constraints.
-        This is a helper for clean(). Note that we don't check 
+        This is a helper for clean(). Note that we don't check
         the values against the supertypes here.
         """
         # Check that there is at most one BasicConstraint of every type except
@@ -988,7 +995,7 @@ class Datatype(AccessControl):
     def _verify_prototype(self):
         """
         Check that Datatype's prototype correctly identifies values as
-        being valid or invalid. 
+        being valid or invalid.
 
         ASSUMPTIONS
         1) This Datatype has a prototype, and it is clean
@@ -1012,7 +1019,7 @@ class Datatype(AccessControl):
 
         with open(self.prototype.dataset_file.path) as f:
             reader = csv.reader(f)
-            next(reader) # skip header again
+            next(reader)  # skip header again
             for rownum, row in enumerate(reader, start=1):
                 # This has to be not None, since the prototype was
                 # successfully uploaded.
@@ -1170,7 +1177,7 @@ class Datatype(AccessControl):
         failing_cells       a dictionary of cells which failed a custom
                             constraint (see summarize_CSV)
 
-        ASSUMPTIONS 
+        ASSUMPTIONS
         1) this Datatype has a CustomConstraint.
         2) summary_path has been set up using setup_verification_path.
         """
@@ -1183,8 +1190,13 @@ class Datatype(AccessControl):
         stderr_path = os.path.join(summary_path, "logs", "stderr.txt")
 
         with open(stdout_path, "w+") as out, open(stderr_path, "w+") as err:
-            verif_method.run_code(summary_path, [input_path], [output_path],
-                    [out, sys.stdout], [err, sys.stderr], verif_log, verif_log)
+            verif_method.run_code(summary_path,
+                                  [input_path],
+                                  [output_path],
+                                  [out, sys.stdout],
+                                  [err, sys.stderr],
+                                  verif_log,
+                                  verif_log)
 
         return self._check_verification_output(summary_path, output_path)
 
@@ -1196,7 +1208,7 @@ class Datatype(AccessControl):
         check_custom_constraint.
 
         INPUTS
-        summary_path    the working directory where the check on the 
+        summary_path    the working directory where the check on the
                         CustomConstraint was performed
         output_path     the CSV file to check, which was output by a
                         verification method
@@ -1227,14 +1239,14 @@ class Datatype(AccessControl):
         with open(output_path, "r") as test_out:
             output_summary = VERIF_OUT.summarize_CSV(test_out, os.path.join(summary_path, "SHOULDNEVERBEWRITTENTO"))
 
-        if output_summary.has_key("bad_num_cols"):
+        if "bad_num_cols" in output_summary:
             raise ValueError(('Output of verification method for Datatype "{}" had the wrong number of columns'
                               .format(self)))
 
-        if output_summary.has_key("bad_col_indices"):
+        if "bad_col_indices" in output_summary:
             raise ValueError('Output of verification method for Datatype "{}" had a malformed header'.format(self))
 
-        if output_summary.has_key("failing_cells"):
+        if "failing_cells" in output_summary:
             raise ValueError('Output of verification method for Datatype "{}" had malformed entries'.format(self))
 
         # This should really never happen.
@@ -1248,7 +1260,7 @@ class Datatype(AccessControl):
         failing_cells = {}
         with open(output_path, "rb") as test_out:
             test_out_csv = csv.reader(test_out)
-            next(test_out_csv) # skip header
+            next(test_out_csv)  # skip header
             for row in test_out_csv:
                 failing_cells[int(row[0])] = [self.custom_constraint]
 
@@ -1334,7 +1346,7 @@ class BasicConstraint(models.Model):
     # MAX_PREC = "maxprec"
     REGEXP = "regexp"
     DATETIMEFORMAT = "datetimeformat"
-    
+
     CONSTRAINT_TYPES = (
         (MIN_LENGTH, "minimum string length"),
         (MAX_LENGTH, "maximum string length"),
@@ -1345,14 +1357,18 @@ class BasicConstraint(models.Model):
     )
 
     # Added the validator here to ensure that the value of ruletype is one of the allowable choices.
-    ruletype = models.CharField("Type of rule", max_length=32, choices=CONSTRAINT_TYPES,
-        validators=[
-            RegexValidator(
-                re.compile("{}|{}|{}|{}|{}|{}".format(MIN_LENGTH, MAX_LENGTH, MIN_VAL, MAX_VAL, REGEXP, DATETIMEFORMAT)
-                )
-            )])
+    ruletype = models.CharField(
+        "Type of rule",
+        max_length=32,
+        choices=CONSTRAINT_TYPES,
+        validators=[RegexValidator(re.compile("{}|{}|{}|{}|{}|{}".format(MIN_LENGTH,
+                                                                         MAX_LENGTH,
+                                                                         MIN_VAL,
+                                                                         MAX_VAL,
+                                                                         REGEXP,
+                                                                         DATETIMEFORMAT)))])
 
-    rule = models.CharField("Rule specification", max_length = 100)
+    rule = models.CharField("Rule specification", max_length=100)
 
     def __str__(self):
         """
@@ -1426,7 +1442,7 @@ class BasicConstraint(models.Model):
             raise ValidationError('BasicConstraint "{}" specifies a date/time format, but its parent Datatype "{}" '
                                   'has builtin type "{}"'
                                   .format(self, self.datatype, self.datatype.get_builtin_type()))
-                
+
 
 class CustomConstraint(models.Model):
     """
@@ -1462,12 +1478,13 @@ class CustomConstraint(models.Model):
         # Pre-defined CDTs that the verification method must use.
         VERIF_IN = CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK)
         VERIF_OUT = CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK)
-        
+
         verif_method_in = self.verification_method.inputs.all()
         verif_method_out = self.verification_method.outputs.all()
         if verif_method_in.count() != 1 or verif_method_out.count() != 1:
-            raise ValidationError("CustomConstraint \"{}\" verification method does not have exactly one input and one output".
-                                  format(self))
+            raise ValidationError(
+                "CustomConstraint \"{}\" verification method does not have "
+                "exactly one input and one output".format(self))
         # TODO: Quick and dirty check, test later.
         if verif_method_in[0].is_raw():
             raise ValidationError(
@@ -1500,11 +1517,15 @@ class CompoundDatatypeMember(models.Model):
     datatype = models.ForeignKey(Datatype, help_text="Specifies which DataType this member is",
                                  related_name="CDTMs")
 
-    column_name = models.CharField("Column name", blank=False, max_length=maxlengths.MAX_NAME_LENGTH,
+    column_name = models.CharField(
+        "Column name",
+        blank=False,
+        max_length=maxlengths.MAX_NAME_LENGTH,
         help_text="Gives datatype a 'column name' as an alternative to column index")
 
     # MinValueValidator(1) constrains column_idx to be >= 1
-    column_idx = models.PositiveIntegerField(validators=[MinValueValidator(1)],
+    column_idx = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
         help_text="The column number of this DataType")
 
     # There is no concept of "null" in a CSV....
@@ -1587,7 +1608,7 @@ class CompoundDatatype(AccessControl):
 
     def _format(self, limit=None):
         """ Represent CompoundDatatype with a list of its members.
-        
+
         @param limit: The maximum number of members to format before truncating
             the list. In a truncated list, the actual number displayed will be
             limit - 1 to leave room for the "plus X others" message.
@@ -1627,15 +1648,15 @@ class CompoundDatatype(AccessControl):
     @classmethod
     def choices(cls, user):
         """ Load choices for a form field.
-        
+
         @param user: A valid user to filter which compound datatypes are visible.
         @return: [(id, short_name)]
         """
         choices = ((x.id, x.short_name)
                    for x in CompoundDatatype.filter_by_user(user))
-        
-        return sorted(choices, key=lambda x: (x[1], x[0])) # short_name, then id
-    
+
+        return sorted(choices, key=lambda x: (x[1], x[0]))  # short_name, then id
+
     # clean() is executed prior to save() to perform model validation
     def clean(self):
         """
@@ -1664,7 +1685,7 @@ class CompoundDatatype(AccessControl):
         """
         if self == other_CDT:
             return True
-        
+
         # Make sure they have the same number of columns.
         if self.members.count() != other_CDT.members.count():
             return False
@@ -1681,11 +1702,11 @@ class CompoundDatatype(AccessControl):
             except CompoundDatatypeMember.DoesNotExist:
                 return False
         return True
-        
+
     def is_identical(self, other_CDT):
         """
         True if this CDT is identical with its parameter; False otherwise.
-        
+
         This is trivially true if they are the same CDT; otherwise
         the column names and column types must be exactly the same.
 
@@ -1722,7 +1743,7 @@ class CompoundDatatype(AccessControl):
             summary["bad_num_cols"] = len(header)
             self.logger.debug("Number of CSV columns must match number of CDT members")
             return summary
-    
+
         # The ith cdt member must have the same name as the ith CSV header.
         bad_col_indices = []
         for cdtm in self.members.all():
@@ -1733,7 +1754,7 @@ class CompoundDatatype(AccessControl):
 
         if bad_col_indices:
             summary["bad_col_indices"] = bad_col_indices
-        
+
         return summary
 
     def summarize_CSV(self, file_to_check, summary_path, content_check_log=None):
@@ -1766,11 +1787,11 @@ class CompoundDatatype(AccessControl):
         ASSUMPTIONS
         1) content_check_log may only be None if this function is being called
         to check the output of a verification method (ie. we are verifying that
-        file_to_check matches VERIF_OUT). 
+        file_to_check matches VERIF_OUT).
         """
         summary = {}
 
-        # A CSV reader which we will use to check individual 
+        # A CSV reader which we will use to check individual
         # cells in the file, as well as creating external CSVs
         # for columns whose DT has a CustomConstraint.
         data_csv = csv.reader(file_to_check)
@@ -1788,7 +1809,7 @@ class CompoundDatatype(AccessControl):
 
         # If the header was malformed, we don't keep checking
         # constraints.
-        if summary.has_key("bad_num_cols") or summary.has_key("bad_col_indices"):
+        if "bad_num_cols" in summary or "bad_col_indices" in summary:
             return summary
 
         # Check the constraints using the module helper.
