@@ -48,6 +48,15 @@
     display: inline;
 }
 
+a.remove {
+    padding: .5em 0 .5em .5em;
+    font-weight: bold;
+    cursor: pointer;
+}
+a.remove:hover {
+    color: #00f;
+}
+
 /* Remove button padding in FF */
 .short-filter input::-moz-focus-inner {
     border:0;

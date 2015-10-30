@@ -43,8 +43,6 @@ var permissions = (function() {
         this.$lockImage = $('<img/>');
         this.$lockSpan = $('<span/>');
 
-        this.last_ajax_request_url = "";
-
         this.$navigation_links = $navigation_links;
         this.page_size = 25;
         this.page = 1;
@@ -132,7 +130,7 @@ var permissions = (function() {
         if (this.reload_interval !== undefined) {
             this.timeout_id = setTimeout(
                 function() {
-                    permissions_table.reloadTable(permissions_table.last_ajax_request_url);
+                    permissions_table.reloadTable();
                 },
                 this.reload_interval);
         }
@@ -200,10 +198,22 @@ var permissions = (function() {
     function navLink(event) {
         event.preventDefault();
         var permissions_table = event.data;
-        permissions_table.reloadTable(event.target.href);
+        // At this point, the page number has already been incremented/decremented by
+        // prevLink or nextLink.
+        permissions_table.reloadTable();
+    }
+
+    function prevLink(event) {
+        event.data.page = event.data.page - 1;
+        navLink(event);
+    }
+
+    function nextLink(event) {
+        event.data.page = event.data.page + 1;
+        navLink(event);
     }
     
-    my.PermissionsTable.prototype.reloadTable = function(ajax_request_url) {
+    my.PermissionsTable.prototype.reloadTable = function() {
         var permissions_table = this;
         if (permissions_table.timeout_id !== undefined) {
             window.clearTimeout(permissions_table.timeout_id);
@@ -214,15 +224,12 @@ var permissions = (function() {
             permissions_table.ajax_request = undefined;
         }
 
-        var query_params;
-        if (ajax_request_url === undefined) {
-            ajax_request_url = permissions_table.list_url + "?page_size=" + permissions_table.page_size;
-            query_params = permissions_table.getQueryParams();
-        }
-        this.last_ajax_request_url = ajax_request_url;
+        var query_params = permissions_table.getQueryParams();
+        query_params.page_size = permissions_table.page_size;
+        query_params.page = permissions_table.page;
 
         permissions_table.ajax_request = $.getJSON(
-            ajax_request_url,
+            permissions_table.list_url,
             query_params).done(function(response) {
                 var rows;
                 rows = permissions_table.extractRows(response);
@@ -230,31 +237,44 @@ var permissions = (function() {
                 if (permissions_table.$navigation_links !== undefined) {
                     permissions_table.$navigation_links.empty();
 
-                    if ("previous" in response && response.previous !== null) {
-                        permissions_table.$navigation_links.append(
-                            $('<a class="nav"/>').attr("href", response.previous)
-                                .text("prev")
-                                .click(permissions_table, navLink)
-                        );
-                    }
-                    else {
-                        permissions_table.$navigation_links.append($('<span class="nolink"/>').text("prev"));
-                    }
-
                     permissions_table.$navigation_links.append(
                         $('<span class="record_count"/>').text(response.count + " found")
                     );
 
+                    if (response.count > 0) {
 
-                    if ("next" in response && response.next !== null) {
-                        permissions_table.$navigation_links.append(
-                            $('<a class="nav"/>').attr("href", response.next)
-                            .text("next")
-                            .click(permissions_table, navLink)
+                        if ("previous" in response && response.previous !== null) {
+                            permissions_table.$navigation_links.append(
+                                $('<a class="nav"/>').attr("href", response.previous)
+                                    .text("prev")
+                                    .click(permissions_table, prevLink)
+                            );
+                        }
+                        else {
+                            permissions_table.$navigation_links.append($('<span class="nolink"/>').text("prev"));
+                        }
+
+                        var first_row = permissions_table.page_size * (permissions_table.page - 1) + 1;
+                        var last_row = Math.min(
+                            permissions_table.page_size * permissions_table.page,
+                            response.count
                         );
-                    }
-                    else {
-                        permissions_table.$navigation_links.append($('<span class="nolink"/>').text("next"));
+
+                        permissions_table.$navigation_links.append(
+                            $('<span class="page_num"/>').text("Page " + permissions_table.page)
+                                .attr("title", first_row + " to " + last_row)
+                        );
+
+                        if ("next" in response && response.next !== null) {
+                            permissions_table.$navigation_links.append(
+                                $('<a class="nav"/>').attr("href", response.next)
+                                .text("next")
+                                .click(permissions_table, nextLink)
+                            );
+                        }
+                        else {
+                            permissions_table.$navigation_links.append($('<span class="nolink"/>').text("next"));
+                        }
                     }
                 }
 

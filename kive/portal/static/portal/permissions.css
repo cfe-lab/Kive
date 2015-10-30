@@ -32,7 +32,7 @@
 .navigation_links .record_count {
     font-style: italic;
     font-size: 0.8em;
-    padding-right: 1em;
+    padding-right: 2em;
     padding-left: 1em;
 }
 
@@ -41,6 +41,13 @@
 }
 
 .navigation_links .nolink {
+    font-size: 0.8em;
+    color: gray;
+}
+
+.navigation_links .page_num {
+    padding-left: 1.5em;
+    padding-right: 1.5em;
     font-size: 0.8em;
     color: gray;
 }

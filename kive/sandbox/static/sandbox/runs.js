@@ -12,7 +12,10 @@ var RunsTable = function($table, is_user_admin, $no_results, $active_filters, $n
     var runsTable = this;
     this.filterSet = new permissions.FilterSet(
             $active_filters,
-            function() { runsTable.reloadTable(); });
+            function() {
+                runsTable.page = 1;
+                runsTable.reloadTable();
+            });
     this.list_url = "/api/runs/status/";
     this.reload_interval = pollingInterval;
 
