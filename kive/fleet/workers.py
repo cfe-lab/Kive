@@ -19,6 +19,7 @@ from django.utils import timezone
 import archive.models
 from archive.models import Dataset
 import fleet.models
+from fleet.models import RunToProcess
 import sandbox.execute
 
 mgr_logger = logging.getLogger("fleet.Manager")
@@ -381,7 +382,7 @@ class Manager:
         # build in a delay here so we don't clog up the database.
         mgr_logger.debug("Looking for new runs....")
         # with transaction.atomic():
-        pending_runs = [x for x in fleet.models.RunToProcess.objects.order_by("time_queued") if not x.started]
+        pending_runs = RunToProcess.find_unstarted().order_by("time_queued")
 
         mgr_logger.debug("Pending runs: {}".format(pending_runs))
 

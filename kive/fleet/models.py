@@ -78,6 +78,10 @@ class RunToProcess(metadata.models.AccessControl):
     def started(self):
         return (self.run is not None) or hasattr(self, "not_enough_CPUs")
 
+    @classmethod
+    def find_unstarted(cls):
+        return cls.objects.filter(run__isnull=True, not_enough_CPUs__isnull=True)
+
     @property
     @transaction.atomic
     def running(self):
