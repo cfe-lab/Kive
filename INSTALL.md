@@ -193,6 +193,9 @@ This will automatically install the necessary components of OpenMPI.
 
 Project structure
 -----------------
+Download the Kive source code, and install it in a location where the apache
+user can access it.
+
 The root directory of Kive should contain the following subdirectories:
 * `/doc`
 * `/samplecode`
@@ -360,6 +363,14 @@ server on your workstation.
 
 You may also wish to modify the `TIME_ZONE` setting to your region, although 
 this localization is not strictly necessary.
+
+It's easiest to leave `DEBUG` set to `True`, but that can consume a lot of
+memory after you run several pipelines. If you want to process a lot of
+data in your development environment, you will probably need to set it to
+`False`. However, that means you'll have to set
+`ALLOWED_HOSTS` to `['localhost']`. When you launch the server, you'll also
+need to call `./manage.py runserver --insecure`. That lets it serve static
+files.
 
 Another configuration file is `hostfile` in the same folder as `settings.py`.
 Copy `hostfile_default` to `hostfile`, and uncomment the `localhost` line. If
