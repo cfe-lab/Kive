@@ -45,7 +45,7 @@ class CodeResourceViewSet(RemovableModelViewSet, SearchableModelMixin):
 
     @detail_route(methods=["get"])
     def revisions(self, request, pk=None):
-        if self.request.QUERY_PARAMS.get('is_granted') == 'true':
+        if self.request.query_params.get('is_granted') == 'true':
             is_admin = False
         else:
             is_admin = admin_check(self.request.user)
@@ -179,7 +179,7 @@ class MethodFamilyViewSet(RemovableModelViewSet, SearchableModelMixin):
 
     @detail_route(methods=["get"])
     def methods(self, request, pk=None):
-        if self.request.QUERY_PARAMS.get('is_granted') == 'true':
+        if self.request.query_params.get('is_granted') == 'true':
             is_admin = False
         else:
             is_admin = admin_check(self.request.user)
