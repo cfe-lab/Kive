@@ -55,11 +55,14 @@ class SymbolicDataset(metadata.models.AccessControl):
     # For validation of Datasets when being reused, or when being
     # regenerated.  A blank MD5_checksum means that the file was
     # missing (not created when it was supposed to be created).
-    MD5_checksum = models.CharField(max_length=64,
+    MD5_checksum = models.CharField(
+        max_length=64,
         validators=[RegexValidator(
             regex=re.compile("(^[0-9A-Fa-f]{32}$)|(^$)"),
             message="MD5 checksum is not either 32 hex characters or blank")],
-        blank=True, default="", help_text="Validates file integrity")
+        blank=True,
+        default="",
+        help_text="Validates file integrity")
 
     _redacted = models.BooleanField(default=False)
 
@@ -122,7 +125,7 @@ class SymbolicDataset(metadata.models.AccessControl):
         except ObjectDoesNotExist:
             return True
         return self.structure is None
-            
+
     def num_rows(self):
         """Returns number of rows in the associated Dataset.
 
@@ -170,7 +173,7 @@ class SymbolicDataset(metadata.models.AccessControl):
         """
         assert not self.is_raw()
 
-        num_rows = -1 # skip header
+        num_rows = -1  # skip header
         md5gen = hashlib.md5()
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
             for line in f:
@@ -188,7 +191,7 @@ class SymbolicDataset(metadata.models.AccessControl):
 
         Closes the file afterwards if the file source is a string file path.
         Does not close the file afterwards if file source is a file handle.
-        
+
         INPUTS
         file_path           file to upload as the new Dataset
         file_handle         file handle of the file to upload as the new Dataset.
@@ -199,7 +202,7 @@ class SymbolicDataset(metadata.models.AccessControl):
         name                name for the new Dataset
         description         description for the new Dataset
         created_by          a RunAtomic which created this Dataset, or
-                            None if the Dataset was uploaded by the 
+                            None if the Dataset was uploaded by the
                             user
 
         PRE
@@ -225,7 +228,7 @@ class SymbolicDataset(metadata.models.AccessControl):
         INPUTS
         start_time      time when we started checking for the file
         end_time        time when check for file finished
-        execlog         ExecLog of execution which did not produce 
+        execlog         ExecLog of execution which did not produce
                         output
         checking_user   user that discovered the missing output
         """
@@ -272,21 +275,21 @@ class SymbolicDataset(metadata.models.AccessControl):
         empty_SD.save()
 
         return empty_SD
-        
+
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
     def create_SD(cls, file_path, user=None, users_allowed=None, groups_allowed=None, cdt=None,
                   make_dataset=True, name=None, description=None, created_by=None, check=True, file_handle=None):
         """
         Helper function to make defining SDs and Datasets faster.
-    
+
         user and name must both be set if make_dataset=True.
         make_dataset creates a Dataset from the given file path to go
         with the SD. created_by can be a RunAtomic to register the
-        Dataset with, or None if it was uploaded by the user (or if 
+        Dataset with, or None if it was uploaded by the user (or if
         make_dataset=False). If check is True, do a ContentCheck on the
         file.
-    
+
         Returns the SymbolicDataset created.
         """
         users_allowed = users_allowed or []
@@ -402,8 +405,9 @@ class SymbolicDataset(metadata.models.AccessControl):
         Returns the SymbolicDataset created.
         :rtype : object
         :param csv_file_path:  path to csv file.  Not used if csv_file_handle supplied.
-        :param csv_file_handle:  file handle of csv.  If supplied, then does not reopen file and moves handle to beginning of file.
-                If None, then uses csv_file_path.
+        :param csv_file_handle:  file handle of csv.  If supplied, then does not
+            reopen file and moves handle to beginning of file. If None, then
+            uses csv_file_path.
         :param cdt:
         :param make_dataset:
         :param user:
@@ -418,7 +422,10 @@ class SymbolicDataset(metadata.models.AccessControl):
         else:
             raise Exception("Must supply either the csv file path or csv file handle")
 
-        with file_access_utils.FileReadHandler(file_path=csv_file_path, file_handle=csv_file_handle, access_mode='rU') as fh_datasets:
+        with file_access_utils.FileReadHandler(
+                file_path=csv_file_path,
+                file_handle=csv_file_handle,
+                access_mode='rU') as fh_datasets:
             # TODO:  this is a major db blocking call.  Can we break this up?
             try:
                 with transaction.atomic():
@@ -432,7 +439,9 @@ class SymbolicDataset(metadata.models.AccessControl):
 
                         # check for empty entries:
                         if not (name and desc and file_name):
-                            raise ValueError("Line " + str(line) + " is invalid: Name, Description, File must be defined")
+                            raise ValueError(
+                                "Line " + str(line) +
+                                " is invalid: Name, Description, File must be defined")
 
                         symDS = SymbolicDataset.create_SD(file, user=user, users_allowed=users_allowed,
                                                           groups_allowed=groups_allowed, cdt=cdt,
@@ -442,11 +451,11 @@ class SymbolicDataset(metadata.models.AccessControl):
 
                         symDSs.extend([symDS])
             except Exception, e:
-                LOGGER.exception("Error while parsing line " + str(line) + ":\n" + str(row))
-                raise ValueError("Error while parsing line " + str(line) + ":\n" + str(row) + ":\n" + str(e)), None, sys.exc_info()[2]
+                message = "Error while parsing line " + str(line) + ":\n" + str(row)
+                LOGGER.exception(message)
+                raise ValueError(message + ":\n" + str(e)), None, sys.exc_info()[2]
 
         return symDSs
-
 
     # FIXME: use a transaction!
     # TODO: clean this up, end_time is set in too many places
@@ -472,9 +481,9 @@ class SymbolicDataset(metadata.models.AccessControl):
         :param file file_handle: file handle of file to check.
                 Moves file handle to beginning of file before checking.
                 If file_handle empty, then uses file_path_to_check.
-        :param summary_path: 
-        :param min_row: 
-        :param max_row: 
+        :param summary_path:
+        :param min_row:
+        :param max_row:
         :param execlog:
         :rtype ContentCheckLog :
         """
@@ -526,13 +535,13 @@ class SymbolicDataset(metadata.models.AccessControl):
                 csv_baddata = True
 
             for row, col in csv_summary["failing_cells"]:
-                fails = csv_summary["failing_cells"][(row,col)]
+                fails = csv_summary["failing_cells"][(row, col)]
                 for failed_constr in fails:
                     new_cell_error = ccl.baddata.cell_errors.create(row_num=row,
                                                                     column=my_CDT.members.get(column_idx=col))
 
                     if failed_constr == metadata.models.CompoundDatatypeMember.BLANK_ENTRY:
-                        blank_cell = datachecking.models.BlankCell(cellerror = new_cell_error)
+                        blank_cell = datachecking.models.BlankCell(cellerror=new_cell_error)
                         blank_cell.save()
                     # If failure is a string (Ex: "Was not integer"), leave constraint_failed as null.
                     elif not isinstance(failed_constr, basestring):
@@ -542,14 +551,14 @@ class SymbolicDataset(metadata.models.AccessControl):
                     new_cell_error.save()
 
         if csv_baddata:
-            self.logger.debug("Content check failed - file {} does not conform to SymbolicDataset {}".
-                    format(file_path_to_check, self))
+            self.logger.debug(
+                "Content check failed - file {} does not conform to SymbolicDataset {}".
+                format(file_path_to_check, self))
             self._notify_runcomponents_of_failure()
-
-
         else:
-            self.logger.debug("Content check passed - file {} conforms to SymbolicDataset {}".
-                    format(file_path_to_check, self))
+            self.logger.debug(
+                "Content check passed - file {} conforms to SymbolicDataset {}".
+                format(file_path_to_check, self))
         ccl.stop(save=True, clean=True)
         return ccl
 
@@ -569,10 +578,10 @@ class SymbolicDataset(metadata.models.AccessControl):
         icl = self.integrity_checks.create(execlog=execlog, user=checking_user)
         icl.start(save=False)
 
-        if newly_computed_MD5 == None:
+        if newly_computed_MD5 is None:
             with open(new_file_path, "rb") as f:
                 newly_computed_MD5 = file_access_utils.compute_md5(f)
-                
+
         if newly_computed_MD5 != self.MD5_checksum:
             self.logger.warn("md5s do not agree (old: {}; new: {})".format(self.MD5_checksum, newly_computed_MD5))
 
@@ -764,8 +773,8 @@ class ExecRecord(models.Model):
         else:
             # Return a representation for a cable.
             return ("{}".format(", ".join(inputs_list)) +
-                          " ={" + "{}".format(self.general_transf()) + "}=> " +
-                          "{}".format(", ".join(outputs_list)))
+                    " ={" + "{}".format(self.general_transf()) + "}=> " +
+                    "{}".format(", ".join(outputs_list)))
 
     @property
     def execrecordins_in_order(self):
@@ -779,11 +788,11 @@ class ExecRecord(models.Model):
     @transaction.atomic
     def create(cls, generator, component, input_SDs, output_SDs):
         """Create a complete ExecRecord, including inputs and outputs.
-        
+
         INPUTS
         generator       ExecLog generating this ExecRecord
-        component       Pipeline component the ExecRecord is for (a 
-                        PipelineStep, PipelineOutputCable, or 
+        component       Pipeline component the ExecRecord is for (a
+                        PipelineStep, PipelineOutputCable, or
                         PipelineStepInputCable)
         input_SDs       list of SymbolicDatasets input to the component
                         during execution, in order of their index
@@ -839,7 +848,7 @@ class ExecRecord(models.Model):
         if not isinstance(self.general_transf(), method.models.Method):
             # If the cable is quenched:
             if eris.exists() and eros.exists():
-                
+
                 # If the cable is trivial, then the ERI and ERO should
                 # have the same SymbolicDataset (if they both exist).
                 if self.general_transf().is_trivial():
@@ -873,7 +882,7 @@ class ExecRecord(models.Model):
                     for wire in cable_wires:
                         source_idx = wire.source_pin.column_idx
                         dest_idx = wire.dest_pin.column_idx
-                        
+
                         dest_dt = dest_CDT.members.get(column_idx=dest_idx).datatype
                         source_dt = source_CDT.members.get(column_idx=source_idx).datatype
 
@@ -914,7 +923,7 @@ class ExecRecord(models.Model):
             if self.execrecordins.count() != self.general_transf().inputs.count():
                 raise ValidationError(
                     "Input(s) to ExecRecord \"{}\" are not quenched".format(self))
-        
+
             # Similar for EROs.
             if self.execrecordouts.count() != self.general_transf().outputs.count():
                 raise ValidationError(
@@ -939,7 +948,7 @@ class ExecRecord(models.Model):
 
         PRE
         1) outputs must be TransformationOutputs of the Transformation associated
-        with the RunStep/RunSIC/RunOutputCable associated with this ExecRecord 
+        with the RunStep/RunSIC/RunOutputCable associated with this ExecRecord
         (they cannot be arbitrary TransformationOutputs).
         """
         # Load each TO in outputs
@@ -990,7 +999,7 @@ class ExecRecord(models.Model):
         if self.is_redacted():
             return redaction_plan
         redaction_plan["ExecRecords"].add(self)
-        
+
         metadata.models.update_removal_plan(redaction_plan, self.generator.build_redaction_plan())
 
         for ero in self.execrecordouts.exclude(symbolicdataset___redacted=True).select_related("symbolicdataset"):
@@ -1030,7 +1039,7 @@ class ExecRecord(models.Model):
         """
         "Hollow out" this ExecRecord.
 
-        This may be triggered by an input SymbolicDataset or by the ExecLog. 
+        This may be triggered by an input SymbolicDataset or by the ExecLog.
         """
         redaction_plan = self.build_redaction_plan()
         archive.models.redact_helper(redaction_plan)
@@ -1090,12 +1099,12 @@ class ExecRecordIn(models.Model):
     def __str__(self):
         """
         Unicode representation.
-        
+
         If this ERI represents the source of a POC/PSIC, then it looks like
         [symbolic dataset]
         If it represents a TI, then it looks like
         [symbolic dataset]=>[transformation (raw) input name]
-        
+
         Examples:
         S552
         S552=>foo_bar
@@ -1123,7 +1132,7 @@ class ExecRecordIn(models.Model):
           input).
         - If execrecord is for a Method, then generic_input is the TI
           that this ERI represents.
-          
+
         Also, if symbolicdataset refers to existent data, check that it
         is compatible with the input represented.
         """
@@ -1197,9 +1206,9 @@ class ExecRecordIn(models.Model):
                 else:
                     error_str = 'SymbolicDataset "{}" has too few rows for TransformationInput "{}"'
                 raise ValidationError(error_str.format(input_SD, transf_xput_used))
-                    
+
             if (transf_xput_used.get_max_row() != None and
-                input_SD.num_rows() > transf_xput_used.get_max_row()):
+                    input_SD.num_rows() > transf_xput_used.get_max_row()):
                 error_str = ""
                 if type(self.generic_input) == transformation.models.TransformationOutput:
                     error_str = 'SymbolicDataset "{}" has too many rows to have come from TransformationOutput "{}"'
@@ -1316,8 +1325,13 @@ class ExecRecordOut(models.Model):
 
         # Check that the SD is compatible with generic_output.
 
-        self.logger.debug("ERO SD '{}' is raw? {}".format(self.symbolicdataset, self.symbolicdataset.is_raw()))
-        self.logger.debug("ERO generic_output '{}' {} is raw? {}".format(self.generic_output, type(self.generic_output), self.generic_output.is_raw()))
+        self.logger.debug("ERO SD '{}' is raw? {}".format(
+            self.symbolicdataset,
+            self.symbolicdataset.is_raw()))
+        self.logger.debug("ERO generic_output '{}' {} is raw? {}".format(
+            self.generic_output,
+            type(self.generic_output),
+            self.generic_output.is_raw()))
 
         # If SD is raw, the ERO output TO must also be raw
         # Refresh symbolicdataset and generic_output to make sure we get the right information.
@@ -1358,16 +1372,20 @@ class ExecRecordOut(models.Model):
             elif isinstance(self.execrecord.general_transf(), pipeline.models.PipelineOutputCable):
                 if not self.symbolicdataset.structure.compounddatatype.is_identical(self.generic_output.get_cdt()):
                     raise ValidationError(
-                        "CDT of SymbolicDataset \"{}\" is not identical to the CDT of the TransformationOutput \"{}\" of the generating Pipeline".
-                        format(input_SD, self.generic_output))
-                    
+                        "CDT of SymbolicDataset \"{}\" is not identical to the "
+                        "CDT of the TransformationOutput \"{}\" of the "
+                        "generating Pipeline".format(input_SD,
+                                                     self.generic_output))
+
             # If it refers to a PSIC, then SD CDT must be a
             # restriction of generic_output's CDT.
             else:
                 if not input_SD.structure.compounddatatype.is_restriction(self.generic_output.get_cdt()):
                     raise ValidationError(
-                        'CDT of SymbolicDataset "{}" is not a restriction of the CDT of the fed TransformationInput "{}"'.
-                        format(input_SD, self.generic_output))
+                        'CDT of SymbolicDataset "{}" is not a restriction of '
+                        'the CDT of the fed TransformationInput "{}"'.format(
+                            input_SD,
+                            self.generic_output))
 
             # If the input SD has a number of rows, then check that it is coherent.  (If it is -1,
             # then we can't check this.)
