@@ -1,5 +1,6 @@
-import re
+from datetime import datetime
 import os.path
+import re
 import tempfile
 
 from django.contrib.auth.models import User
@@ -17,14 +18,12 @@ from fleet.serializers import RunToProcessSerializer
 from fleet.exceptions import SandboxActiveException
 from librarian.models import ExecRecord, SymbolicDataset
 from pipeline.models import Pipeline, PipelineFamily
-from metadata.models import kive_user, everyone_group, RTPNotFinished, CompoundDatatype, Datatype
+from metadata.models import kive_user, everyone_group, RTPNotFinished
 from kive.testing_utils import clean_up_all_files
 from kive import settings
 from kive.tests import install_fixture_files, restore_production_files, DuckContext
 from fleet.workers import Manager
 from sandbox.execute import finish_step, finish_cable
-
-from constants import datatypes, CDTs
 
 
 class RunToProcessTest(TestCase):
@@ -98,7 +97,9 @@ class RunToProcessTest(TestCase):
         run_tracker = self.create_with_pipeline_step()
         run = run_tracker.run
         pipeline_step = run.pipeline.steps.first()
-        run_step = RunStep(run=run, pipelinestep=pipeline_step)
+        run_step = RunStep(run=run,
+                           pipelinestep=pipeline_step,
+                           start_time=datetime.now())
         run_step.save()
         run_step_input_cable = RunSIC(PSIC=pipeline_step.cables_in.first())
         run_step.RSICs.add(run_step_input_cable)
