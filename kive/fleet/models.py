@@ -56,7 +56,7 @@ class RunToProcess(metadata.models.AccessControl):
     # (access information is in the superclass).
     pipeline = models.ForeignKey(Pipeline)
     sandbox_path = models.CharField(max_length=256, default="", blank=True, null=False)
-    time_queued = models.DateTimeField(auto_now_add=True)
+    time_queued = models.DateTimeField(default=timezone.now)
     run = models.OneToOneField(Run, null=True, blank=True, related_name="runtoprocess")
     purged = models.BooleanField(default=False)
     name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH, default="",

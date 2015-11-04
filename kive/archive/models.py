@@ -15,6 +15,7 @@ import logging
 from operator import attrgetter, itemgetter
 import os
 import time
+import shutil
 
 from django.db import models, transaction
 from django.db.models import Q
@@ -22,16 +23,20 @@ from django.db.models.signals import post_delete
 from django.conf import settings
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.urlresolvers import reverse
+from django.core.validators import MinValueValidator
 from django.template.defaultfilters import filesizeformat
 from django.utils.encoding import python_2_unicode_compatible
+from django.utils import timezone
+from django.contrib.auth.models import User
 
 import archive.signals
 from constants import maxlengths
 from datachecking.models import ContentCheckLog, IntegrityCheckLog
 import fleet.exceptions
-from librarian.models import ExecRecord
+from librarian.models import ExecRecord, SymbolicDataset
 import metadata.models
 import stopwatch.models
+from pipeline.models import Pipeline
 
 
 def empty_redaction_plan():
@@ -127,16 +132,30 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     """
     Stores data associated with an execution of a pipeline.
 
+    When a Pipeline is queued up for execution, a Run is created and time_queued is
+    set.  When the Run actually starts, the start_time attribute (from Stopwatch)
+    gets set (i.e. we call .start()).
+
     Related to :model:`pipeline.models.Pipeline`
     Related to :model:`archive.models.RunStep`
     Related to :model:`archive.models.Dataset`
     """
-    # user = models.ForeignKey(User, help_text="User who performed this run")
+    # Details required by the fleet for execution.  These will be meaningless if
+    # this is not a top-level run.
+    sandbox_path = models.CharField(max_length=256, default="", blank=True, null=False)
+    time_queued = models.DateTimeField(default=timezone.now, null=True)
+    purged = models.BooleanField(default=False)
+    stopped_by = models.ForeignKey(User, help_text="User that stopped this Run", null=True,
+                                   related_name="stopper")
+    paused_by = models.ForeignKey(User, help_text="User that paused this Run", null=True,
+                                  related_name="pauser")
+
     pipeline = models.ForeignKey("pipeline.Pipeline", related_name="pipeline_instances",
                                  help_text="Pipeline used in this run")
 
-    name = models.CharField("Run name", max_length=maxlengths.MAX_NAME_LENGTH)
-    description = models.TextField("Run description", max_length=maxlengths.MAX_DESCRIPTION_LENGTH, blank=True)
+    name = models.CharField("Run name", max_length=maxlengths.MAX_NAME_LENGTH, null=False, blank=True)
+    description = models.TextField("Run description", max_length=maxlengths.MAX_DESCRIPTION_LENGTH, null=False,
+                                   blank=True)
 
     # If run was spawned within another run, parent_runstep denotes
     # the run step that initiated it
@@ -147,6 +166,12 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                                           help_text="Step of parent run initiating this one as a sub-run")
 
     # Implicitly, this also has start_time and end_time through inheritance.
+
+    def is_stopped(self):
+        return self.stopped_by is not None
+
+    def is_paused(self):
+        return self.paused_by is not None
 
     @property
     def top_level_run(self):
@@ -182,6 +207,12 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         # Access to this Run must not exceed that of the pipeline.
         self.validate_restrict_access([self.pipeline])
 
+        for rtp_input in self.inputs.all():
+            rtp_input.clean()
+
+        if hasattr(self, "not_enough_CPUs"):
+            self.not_enough_CPUs.clean()
+
         # If this is not a top-level run it must have the same access as the top-level run.
         my_top_level_run = self.top_level_run
         if self != my_top_level_run:
@@ -190,7 +221,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         # Check that start- and end-time are coherent.
         stopwatch.models.Stopwatch.clean(self)
 
-        if (self.is_subrun() and self.pipeline != self.parent_runstep.pipelinestep.transformation.definite):
+        if self.is_subrun() and self.pipeline != self.parent_runstep.pipelinestep.transformation.definite:
             raise ValidationError('Pipeline of Run "{}" is not consistent with its parent RunStep'.format(self))
 
         # Go through whatever steps are registered. All must be clean.
@@ -211,6 +242,195 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                 raise ValidationError('Run "{}" has a RunOutputCable from step {}, but no corresponding RunStep'
                                       .format(self, source_step))
             run_outcable.clean()
+
+    @transaction.atomic
+    def started(self):
+        return self.has_started() or hasattr(self, "not_enough_CPUs")
+
+    @classmethod
+    def find_unstarted(cls):
+        return cls.objects.filter(start_time__isnull=True, not_enough_CPUs__isnull=True)
+
+    @property
+    @transaction.atomic
+    def running(self):
+        return self.started() and not self.is_complete()
+
+    @transaction.atomic
+    def finished(self):
+        return (self.started() and self.is_complete()) or hasattr(self, "not_enough_CPUs")
+
+    @property
+    def display_name(self):
+        """
+        Produces a human-readable name for the Run.
+
+        If the name field is not blank, use that; otherwise, give a string
+        combining the Pipeline name and the first input name.
+        """
+        if self.name != "":
+            return self.name
+
+        try:
+            pipeline_name = self.pipeline.family.name
+        except Pipeline.DoesNotExist:
+            pipeline_name = "Run"
+        inputs = self.inputs.select_related('symbolicdataset__dataset')
+        first_input = inputs.order_by('index').first()
+        if not (first_input and first_input.symbolicdataset.has_data()):
+            if self.time_queued:
+                return "{} at {}".format(pipeline_name, self.time_queued)
+            return pipeline_name
+        first_input_name = first_input.symbolicdataset.dataset.name
+        return '{} on {}'.format(pipeline_name, first_input_name)
+
+    @transaction.atomic
+    def get_run_progress(self, detailed=False):
+        """
+        Return a dictionary describing the Run's current state.
+
+        If detailed is True, then the returned dictionary contains
+         dictionaries for the run components and cables denoting
+         their completion/success status (indexed by id)
+        @return {'id': run_id, 'status': s, 'name': n, 'start': t, 'end': t,
+            'user': u}
+        """
+        result = {'name': self.display_name}
+        if hasattr(self, "not_enough_CPUs"):
+            esc = self.not_enough_CPUs
+            result['status'] = "Too many threads ({} from {})".format(
+                esc.threads_requested,
+                esc.max_available
+            )
+            return result
+
+        if hasattr(self, 'user'):
+            result['user'] = self.user.username
+
+        if not self.started:
+            result['status'] = '?'
+            return result
+
+        status = ""
+        step_progress = {}
+        cable_progress = {}
+        input_list = {}
+
+        for _input in self.inputs.all():
+            if _input.symbolicdataset.has_data():
+                input_list[_input.index] = {"dataset_id": _input.symbolicdataset.dataset.id,
+                                            "dataset_name": _input.symbolicdataset.dataset.name,
+                                            "md5": _input.symbolicdataset.MD5_checksum}
+
+        # One of the steps is in progress?
+        total_steps = self.pipeline.steps.count()
+        runsteps = sorted(self.runsteps.all(), key=lambda x: x.pipelinestep.step_num)
+
+        for step in runsteps:
+            step_status = ""
+            log_char = ""
+
+            if not step.is_marked_complete():
+                try:
+                    step.log.id
+                    log_char = "+"
+                    step_status = "RUNNING"
+                except ExecLog.DoesNotExist:
+                    if step.has_started():
+                        log_char = ":"
+                        step_status = "READY"
+                    else:
+                        log_char = "."
+                        step_status = "WAITING"
+
+            elif not step.is_marked_successful():
+                log_char = "!"
+                step_status = "FAILURE"
+            else:
+                log_char = "*"
+                step_status = "CLEAR"
+
+            status += log_char
+            if detailed:
+                step_progress[step.pipelinestep.transformation.pk] = {'status': step_status, 'log_id': None}
+                try:
+                    step_progress[step.pipelinestep.transformation.pk]['log_id'] = step.execrecord.generator.\
+                        methodoutput.id
+                except:
+                    pass
+
+        # Just finished a step, but didn't start the next one?
+        status += "." * (total_steps - len(runsteps))
+        status += "-"
+
+        # Which outcables are in progress?
+        cables = sorted(self.pipeline.outcables.all(), key=lambda x: x.output_idx)
+        for pipeline_cable in cables:
+            run_cables = filter(lambda x: x.run == self, pipeline_cable.poc_instances.all())
+            log_char = ""
+            step_status = ""
+            if len(run_cables) <= 0:
+                log_char = "."
+                step_status = "WAITING"
+            elif run_cables[0].is_marked_complete():
+                log_char = "*"
+                step_status = "CLEAR"
+            else:
+                try:
+                    run_cables[0].log.id
+                    log_char = "+"
+                    step_status = "RUNNING"
+                except ExecLog.DoesNotExist:
+                    log_char = ":"
+                    step_status = "READY"
+
+            # Log the status
+            status += log_char
+            if detailed:
+                cable_progress[pipeline_cable.id] = {'status': step_status, 'dataset_id': None, 'md5': None}
+                try:
+                    symbolicdataset = run_cables[0].execrecord.execrecordouts.first().symbolicdataset
+                    cable_progress[pipeline_cable.id]['dataset_id'] = symbolicdataset.dataset.pk \
+                        if symbolicdataset.has_data() else None
+                    cable_progress[pipeline_cable.id]['md5'] = symbolicdataset.MD5_checksum
+                except:
+                    pass
+
+        if detailed:
+            result['step_progress'] = step_progress
+            result['output_progress'] = cable_progress
+            result['inputs'] = input_list
+
+        result['status'] = status
+        result['id'] = self.pk
+        result['start'] = self._format_time(self.start_time)
+        result['end'] = self._format_time(self.end_time)
+
+        return result
+
+    @staticmethod
+    def _format_time(self, t):
+        return t and timezone.localtime(t).strftime('%d %b %Y %H:%M')
+
+    def collect_garbage(self):
+        """
+        Dispose of the sandbox used by the Run.
+        """
+        if self.sandbox_path == "":
+            raise fleet.exceptions.SandboxActiveException(
+                "Run (Run={}, Pipeline={}, queued {}, User={}) has not yet started".format(
+                    self.pk, self.pipeline, self.time_queued, self.user)
+                )
+        elif not self.finished:
+            raise fleet.exceptions.SandboxActiveException(
+                "Run (Run={}, Pipeline={}, queued {}, User={}) is not finished".format(
+                    self.pk, self.pipeline, self.time_queued, self.user)
+                )
+
+        # This may raise OSError; the caller should catch it.
+        shutil.rmtree(self.sandbox_path)
+        self.purged = True
+        self.save()
 
     def is_complete(self):
         """
@@ -380,9 +600,34 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         return removal_plan
 
-    # @property
-    # def runtoprocess(self):
-    #     return self.runtoprocess_set.all()[0] if self.runtoprocess_set.count() > 0 else None
+
+class RunInput(models.Model):
+    """
+    Represents an input to a run.
+
+    This won't exist in single-process execution.
+    """
+    run = models.ForeignKey(Run, related_name="inputs")
+    symbolicdataset = models.ForeignKey(SymbolicDataset, related_name="runinputs")
+    index = models.PositiveIntegerField()
+
+    def clean(self):
+        self.run.validate_restrict_access([self.symbolicdataset])
+
+
+class ExceedsSystemCapabilities(models.Model):
+    """
+    Denotes a Run that could not be run due to requesting too much from the system.
+    """
+    run = models.OneToOneField(Run, related_name="not_enough_CPUs")
+    threads_requested = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    max_available = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+
+    def clean(self):
+        if self.threads_requested <= self.max_available:
+            raise ValidationError("Threads requested ({}) does not exceed maximum available ({})".format(
+                self.threads_requested, self.max_available
+            ))
 
 
 class RunComponent(stopwatch.models.Stopwatch):
