@@ -3,7 +3,6 @@
 	<name>kive</name>
 	<comment></comment>
 	<projects>
-		<project>py-kive-api</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>

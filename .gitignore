@@ -13,6 +13,7 @@ kive/Logs
 kive/Sandboxes
 kive/kive.log*
 kive/testreport.xml
+api/results
 # Ignore nodeJS modules
 node_modules/
 

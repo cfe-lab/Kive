@@ -9,5 +9,6 @@
 <pydev_pathproperty name="org.python.pydev.PROJECT_SOURCE_PATH">
 <path>/${PROJECT_DIR_NAME}/kive</path>
 <path>/${PROJECT_DIR_NAME}/utils</path>
+<path>/${PROJECT_DIR_NAME}/api/kiveapi</path>
 </pydev_pathproperty>
 </pydev_project>
