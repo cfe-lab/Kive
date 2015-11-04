@@ -1,3 +1,0 @@
-eclipse.preferences.version=1
-excluded=//*.pack.js
-included=//tests.js\:archive//*.js\:metadata//*.js\:method//*.js\:pipeline//*.js\:portal/static/portal/permissions.js\:sandbox/static/sandbox/choose*.js

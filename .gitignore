@@ -21,9 +21,10 @@ node_modules/
 doc/*.aux
 doc/*.dvi
 doc/*.pdf
+utils/dump
 *.log
 /.idea/
-kive/.settings/org.eclipse.core.resources.prefs
+.settings/org.eclipse.core.resources.prefs
 .DS_Store
 TEST-*
 

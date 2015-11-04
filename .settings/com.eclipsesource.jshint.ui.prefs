@@ -1,0 +1,3 @@
+eclipse.preferences.version=1
+excluded=//*.pack.js
+included=//tests.js\:kive/archive//*.js\:kive/metadata//*.js\:kive/method//*.js\:kive/pipeline//*.js\:kive/portal/static/portal/permissions.js\:kive/sandbox/static/sandbox/choose*.js
