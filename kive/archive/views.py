@@ -14,13 +14,14 @@ from django.db import transaction
 from django.forms.formsets import formset_factory
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
+
 from archive.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm, ArchiveAddDatasetForm
-from archive.models import Dataset, MethodOutput
+from archive.models import Dataset, MethodOutput, Run
 from portal.views import admin_check
 from kive.settings import DATASET_DISPLAY_MAX
 
 import librarian.models
-import fleet.models
+# import fleet.models
 
 LOGGER = logging.getLogger(__name__)
 
@@ -65,8 +66,8 @@ def dataset_view(request, dataset_id):
     """
     Display the file associated with the dataset in the browser.
     """
-    return_to_rtp = request.GET.get('rtp_id', None)
-    return_url = None if return_to_rtp is None else reverse('view_run', kwargs={'rtp_id': return_to_rtp})
+    return_to_run = request.GET.get('run_id', None)
+    return_url = None if return_to_run is None else reverse('view_run', kwargs={'run_id': return_to_run})
 
     try:
         accessible_SDs = librarian.models.SymbolicDataset.filter_by_user(request.user)
@@ -126,8 +127,8 @@ def stdout_view(request, methodoutput_id):
     """
     Display the standard output associated with the method output in the browser.
     """
-    return_to_rtp = request.GET.get('rtp_id', None)
-    return_url = None if return_to_rtp is None else reverse('view_run', kwargs={'rtp_id': return_to_rtp})
+    return_to_run = request.GET.get('run_id', None)
+    return_url = None if return_to_run is None else reverse('view_run', kwargs={'run_id': return_to_run})
 
     try:
         methodoutput = MethodOutput.objects.get(pk=methodoutput_id)
@@ -156,8 +157,8 @@ def stderr_view(request, methodoutput_id):
     """
     Display the standard error associated with the method output in the browser.
     """
-    return_to_rtp = request.GET.get('rtp_id', None)
-    return_url = None if return_to_rtp is None else reverse('view_run', kwargs={'rtp_id': return_to_rtp})
+    return_to_run = request.GET.get('run_id', None)
+    return_url = None if return_to_run is None else reverse('view_run', kwargs={'run_id': return_to_run})
 
     try:
         methodoutput = MethodOutput.objects.get(pk=methodoutput_id)
@@ -439,22 +440,21 @@ def dataset_lookup(request, md5_checksum=None):
         MD5_checksum=md5_checksum).exclude(dataset__created_by=None)
 
     datasets_as_inputs = []
-    rtps = fleet.models.RunToProcess.objects.filter(inputs__symbolicdataset__MD5_checksum=md5_checksum)
+    runs = Run.objects.filter(inputs__symbolicdataset__MD5_checksum=md5_checksum)
 
-    for rtp in rtps:
-        for input in [x for x in rtp.inputs.all() if x.symbolicdataset.MD5_checksum == md5_checksum]:
+    for run in runs:
+        for input in [x for x in run.inputs.all() if x.symbolicdataset.MD5_checksum == md5_checksum]:
             breakout = False
             for d in datasets_as_inputs:
-                if d["rtp_id"] == rtp.id and d["dataset"].id == input.symbolicdataset.dataset.id:
+                if d["run_id"] == run.id and d["dataset"].id == input.symbolicdataset.dataset.id:
                     breakout = True
                     continue
             if breakout:
                 continue
 
             datasets_as_inputs += [{
-                "rtp_id": rtp.id,
-                "run": rtp.run,
-                "pipeline": rtp.pipeline,
+                "run": run.run,
+                "pipeline": run.pipeline,
                 "dataset": input.symbolicdataset.dataset
             }]
 

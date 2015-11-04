@@ -30,9 +30,9 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 
 import archive.signals
+import archive.exceptions
 from constants import maxlengths
 from datachecking.models import ContentCheckLog, IntegrityCheckLog
-import fleet.exceptions
 from librarian.models import ExecRecord, SymbolicDataset
 import metadata.models
 import stopwatch.models
@@ -56,13 +56,12 @@ def summarize_redaction_plan(redaction_plan):
 
 @transaction.atomic
 def redact_helper(redaction_plan):
-    # FIXME this is going to need retooling when we merge Run and RunToProcess.
     # Check if anything that's currently running will be affected.
     still_in_progress = False
     if "SymbolicDatasets" in redaction_plan:
         for sd in redaction_plan["SymbolicDatasets"]:
-            for rtp_input in sd.runtoprocessinputs.all():
-                if not rtp_input.runtoprocess.finished:
+            for rtp_input in sd.runinputs.all():
+                if not rtp_input.run.finished:
                     still_in_progress = True
 
     if not still_in_progress and "ExecRecords" in redaction_plan:
@@ -73,7 +72,7 @@ def redact_helper(redaction_plan):
                     still_in_progress = True
 
     if still_in_progress:
-        raise fleet.exceptions.RTPNotFinished("Cannot redact: an affected run is still in progress")
+        raise archive.exceptions.RunNotFinished("Cannot redact: an affected run is still in progress")
 
     # Proceed in a fixed order.
     if "SymbolicDatasets" in redaction_plan:
@@ -256,6 +255,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     def running(self):
         return self.started() and not self.is_complete()
 
+    # FIXME this will need to be changed when we introduce flags for a cancelled or paused run.
     @transaction.atomic
     def finished(self):
         return (self.started() and self.is_complete()) or hasattr(self, "not_enough_CPUs")
@@ -417,12 +417,12 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         Dispose of the sandbox used by the Run.
         """
         if self.sandbox_path == "":
-            raise fleet.exceptions.SandboxActiveException(
+            raise archive.exceptions.SandboxActiveException(
                 "Run (Run={}, Pipeline={}, queued {}, User={}) has not yet started".format(
                     self.pk, self.pipeline, self.time_queued, self.user)
                 )
         elif not self.finished:
-            raise fleet.exceptions.SandboxActiveException(
+            raise archive.exceptions.SandboxActiveException(
                 "Run (Run={}, Pipeline={}, queued {}, User={}) is not finished".format(
                     self.pk, self.pipeline, self.time_queued, self.user)
                 )

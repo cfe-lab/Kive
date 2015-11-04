@@ -370,13 +370,6 @@ class Pipeline(transformation.models.Transformation):
                     removal_plan, run.build_removal_plan(removal_plan)
                 )
 
-        # FIXME clean this up when we merge Run and RunToProcess.
-        for rtp in self.runtoprocess_set.all():
-            if rtp not in removal_plan["Runs"] and rtp.run is None:
-                metadata.models.update_removal_plan(
-                    removal_plan, rtp.build_removal_plan(removal_plan)
-                )
-
         # Remove any pipeline that uses this one as a sub-pipeline.
         for ps in self.pipelinesteps.all():
             if ps.pipeline not in removal_plan["Pipelines"]:

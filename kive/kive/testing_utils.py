@@ -54,7 +54,7 @@ def fd_count(msg):
 
 def create_metadata_test_environment(case):
     """Setup default database state from which to perform unit testing."""
-    # Define a user.  This was previously in librarian/tests.py,
+    # Define a user.  This was previously in librarian/tests_queuedrunGETRIDOFTHIS,
     # but we put it here now so all tests can use it.
     case.myUser = User.objects.create_user('john',
                                            'lennon@thebeatles.com',
@@ -381,7 +381,7 @@ def create_eric_martin_test_environment(case):
 
     ####
     # This is the big pipeline Eric developed that was originally
-    # used in copperfish/tests.py.
+    # used in copperfish/tests_queuedrunGETRIDOFTHIS.
     # CRs and CRRs:
     case.generic_cr = CodeResource(
         name="genericCR", description="Just a CR",

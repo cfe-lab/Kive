@@ -9,7 +9,7 @@
     <script src="/static/sandbox/view_results.js"></script>
     <script type="text/javascript">
         var is_user_admin = {{ is_user_admin|lower }},
-            rtp_id = {{ rtp.id }};
+            run_id = {{ run.id }};
     </script>
     <link rel="stylesheet" href="/static/portal/permissions.css">
     <link rel="stylesheet" href="/static/sandbox/sandbox.css">
@@ -22,27 +22,27 @@
 
 {% block content %}
 {% if back_to_view %}
-    <a href="/view_run/{{rtp_id}}" rel="prev">Back to run</a>
+    <a href="/view_run/{{ run.id }}" rel="prev">Back to run</a>
 {% else %}
     <a href="../../runs" rel="prev">Back to runs</a>
 {% endif %}
 
-<h2> {{ rtp.display_name }} </h2>
+<h2> {{ run.display_name }} </h2>
 
     <table id="run_details">
-    {% if rtp.description != "" %}
+    {% if run.description != "" %}
     <tr>
-        <td class="run_description">{{ rtp.description }}</td>
+        <td class="run_description">{{ run.description }}</td>
     </tr>
     {% endif %}
 
     <tr>
         <td>Pipeline Family:</td>
-        <td>{{ rtp.pipeline.family.name }}</td>
+        <td>{{ run.pipeline.family.name }}</td>
     </tr>
     <tr>
         <td>Revision:</td>
-        <td>{{ rtp.pipeline.display_name }}</td>
+        <td>{{ run.pipeline.display_name }}</td>
     </tr>
     </table>
 

@@ -63,7 +63,8 @@ class Sandbox:
 
     # cable_map maps cables to ROC/RSIC.
 
-    def __init__(self, user, my_pipeline, inputs, users_allowed=None, groups_allowed=None, sandbox_path=None):
+    def __init__(self, user, my_pipeline, inputs, users_allowed=None, groups_allowed=None, sandbox_path=None,
+                 run=None):
         """
         Sets up a sandbox environment to run a Pipeline: space on
         the file system, along with sd_fs_map/socket_map/etc.
@@ -72,9 +73,11 @@ class Sandbox:
         user          User running the pipeline.
         my_pipeline   Pipeline to run.
         inputs        List of SDs to feed into the pipeline.
-        users_allowed   Iterable (e.g. list or QuerySet) of Users
-        groups_allowed  Iterable of Groups
+        users_allowed   Iterable (e.g. list or QuerySet) of Users.  Ignored if run != None.
+        groups_allowed  Iterable of Groups.  Ignored if run != None.
         sandbox_path  Where on the filesystem to execute.
+        run           A Run object to fill in (e.g. if we're starting this using the fleet);
+                      if None, we create our own.
 
         PRECONDITIONS
         inputs must have real data
@@ -83,10 +86,13 @@ class Sandbox:
         users_allowed = users_allowed or []
         groups_allowed = groups_allowed or []
 
-        self.run = my_pipeline.pipeline_instances.create(start_time=timezone.now(), user=user)
-        self.run.users_allowed.add(*users_allowed)
-        self.run.groups_allowed.add(*groups_allowed)
-        self.run.save()
+        if run:
+            self.run = run
+        else:
+            self.run = my_pipeline.pipeline_instances.create(start_time=timezone.now(), user=user)
+            self.run.users_allowed.add(*users_allowed)
+            self.run.groups_allowed.add(*groups_allowed)
+            self.run.save()
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.user = user
@@ -103,6 +109,9 @@ class Sandbox:
         self.sandbox_path = sandbox_path or tempfile.mkdtemp(
             prefix=sandbox_prefix.format(self.user, self.run.pk),
             dir=file_access_utils.sandbox_base_path())
+
+        self.run.sandbox_path = self.sandbox_path
+        self.run.save()
 
         in_dir = os.path.join(self.sandbox_path, dirnames.IN_DIR)
         self.out_dir = os.path.join(self.sandbox_path, dirnames.OUT_DIR)

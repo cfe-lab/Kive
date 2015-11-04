@@ -569,7 +569,7 @@ $(function() {
                 sel = sel[0];
                 if(sel instanceof drydock_objects.OutputNode || sel instanceof drydock_objects.CdtNode ||
                    sel instanceof drydock_objects.RawNode) {
-                    window.location = '/dataset_view/' + sel.dataset_id + '?rtp_id=' + sel.rtp_id;
+                    window.location = '/dataset_view/' + sel.dataset_id + '?run_id=' + sel.run_id;
                 }
             }
             if (action == 'download') {
@@ -582,13 +582,13 @@ $(function() {
             if (action == 'viewlog') {
                 sel = sel[0];
                 if(sel instanceof drydock_objects.MethodNode) {
-                    window.location = '/stdout_view/' + sel.log_id + '?rtp_id=' + sel.rtp_id;
+                    window.location = '/stdout_view/' + sel.log_id + '?run_id=' + sel.run_id;
                 }
             }
             if (action == 'viewerrorlog') {
                 sel = sel[0];
                 if(sel instanceof drydock_objects.MethodNode) {
-                    window.location = '/stderr_view/' + sel.log_id + '?rtp_id=' + sel.rtp_id;
+                    window.location = '/stderr_view/' + sel.log_id + '?run_id=' + sel.run_id;
                 }
             }
         }
@@ -604,8 +604,9 @@ $(function() {
 
         // Since a field contains its label on pageload, a field's label as its value is treated as blank
         $('input, textarea', this).each(function() {
-            if (this.value == $(this).data('label'))
+            if (this.value == $(this).data('label')) {
                 this.value = '';
+            }
         });
         
         /*

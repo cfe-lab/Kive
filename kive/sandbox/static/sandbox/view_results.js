@@ -1,8 +1,8 @@
 "use strict";
 
-var OutputsTable = function($table, is_user_admin, rtp_id) {
+var OutputsTable = function($table, is_user_admin, run_id) {
     permissions.PermissionsTable.call(this, $table, is_user_admin);
-    this.list_url = "/api/runs/" + rtp_id + "/run_outputs/";
+    this.list_url = "/api/runs/" + run_id + "/run_outputs/";
     this.registerColumn("Source", "step_name");
     this.registerColumn("Input/Output", "display");
     this.registerColumn("Size", "size");
@@ -21,7 +21,7 @@ var OutputsTable = function($table, is_user_admin, rtp_id) {
             $td.append($('<a>Download</a>').attr('href', href));
         }
     });
-}
+};
 OutputsTable.prototype = Object.create(
         permissions.PermissionsTable.prototype);
 
@@ -41,7 +41,7 @@ OutputsTable.prototype.extractRows = function(response) {
         return [];
     }
     return run.input_summary.concat(run.output_summary);
-}
+};
 
 OutputsTable.prototype.getRedactionField = function(plan_url) {
     var output_ending = "output_redaction_plan/",
@@ -52,12 +52,12 @@ OutputsTable.prototype.getRedactionField = function(plan_url) {
             : ending === error_ending
             ? "error_redacted"
             : "is_redacted");
-}
+};
 
 function clickRemove(event) {
     var $a = $(this),
         permissions_table = event.data,
-        run_url = '/api/runs/' + rtp_id,
+        run_url = '/api/runs/' + run_id,
         plan_url = run_url + '/removal_plan/';
     event.preventDefault();
     $.getJSON(
@@ -74,7 +74,7 @@ function clickRemove(event) {
                         success: function() {
                             location = '../../runs';
                         }
-                    })
+                    });
                 }
             });
 }
@@ -83,6 +83,6 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     // Security stuff to prevent cross-site scripting.
     noXSS();
     
-    var table = new OutputsTable($('#outputs'), is_user_admin, rtp_id);
+    var table = new OutputsTable($('#outputs'), is_user_admin, run_id);
     table.buildTable(table.extractRows($.parseJSON($('#outputs_json').text())));
 });

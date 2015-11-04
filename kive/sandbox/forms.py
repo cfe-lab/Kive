@@ -6,7 +6,7 @@ from django import forms
 from django.contrib.auth.models import User, Group
 
 from pipeline.models import PipelineFamily, Pipeline
-import fleet.models
+from archive.models import Run
 
 import metadata.forms
 
@@ -66,7 +66,7 @@ class RunSubmissionForm(forms.ModelForm):
     )
 
     class Meta:
-        model = fleet.models.RunToProcess
+        model = Run
         fields = ("pipeline", "permissions", "name", "description")
 
     def __init__(self, data=None, pipeline_qs=None, users_allowed=None, groups_allowed=None, *args, **kwargs):

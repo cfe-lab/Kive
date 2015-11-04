@@ -6,9 +6,13 @@ from django.contrib.auth.models import User, Group
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from archive.models import Dataset, Run, MethodOutput
+from archive.models import Dataset, Run, MethodOutput, RunInput
+from transformation.models import TransformationInput
 from librarian.models import SymbolicDataset
-from metadata.models import CompoundDatatype
+from pipeline.models import Pipeline
+from metadata.models import CompoundDatatype, who_cannot_access
+
+from kive.serializers import AccessControlSerializer
 
 
 class TinyRunSerializer(serializers.ModelSerializer):
@@ -202,9 +206,9 @@ class RunOutputsSerializer(serializers.ModelSerializer):
 
         request = self.context.get('request', None)
         inputs = []
-        pipeline_inputs = run.runtoprocess.pipeline.inputs
+        pipeline_inputs = run.pipeline.inputs
 
-        for i, input in enumerate(run.runtoprocess.inputs.all()):
+        for i, input in enumerate(run.inputs.all()):
             has_data = input.symbolicdataset.has_data()
             if has_data:
                 input_name = input.symbolicdataset.dataset.name
@@ -338,3 +342,165 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 pass  # Size was not a number, so leave it alone.
 
         return [output.__dict__ for output in outputs]
+
+
+class RunInputSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RunInput
+        fields = ("symbolicdataset", "index")
+
+
+class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
+    run_status = serializers.HyperlinkedIdentityField(view_name='run-run-status')
+    removal_plan = serializers.HyperlinkedIdentityField(view_name='run-removal-plan')
+    run_outputs = serializers.HyperlinkedIdentityField(view_name='run-run-outputs')
+
+    sandbox_path = serializers.CharField(read_only=True, required=False)
+    inputs = RunInputSerializer(many=True)
+
+    class Meta:
+        model = Run
+        fields = (
+            'id',
+            'url',
+            'pipeline',
+            'time_queued',
+            'name',
+            'description',
+            'display_name',
+            'sandbox_path',
+            'purged',
+            'run_status',
+            'run_outputs',
+            'removal_plan',
+            'user',
+            'users_allowed',
+            'groups_allowed',
+            'inputs'
+        )
+        read_only_fields = (
+            "purged",
+            "time_queued",
+        )
+
+    def validate(self, data):
+        """
+        Check that the run is correctly specified.
+
+        First, check that the inputs are correctly specified; then,
+        check that the permissions are OK.
+        """
+        pipeline = Pipeline.objects.get(pk=data["pipeline"])
+
+        if len(data["inputs"]) != pipeline.inputs.count():
+            raise serializers.ValidationError(
+                'Number of inputs must equal the number of Pipeline inputs'
+            )
+
+        inputs_sated = [x["index"] for x in data["inputs"]]
+        if len(inputs_sated) != len(set(inputs_sated)):
+            raise serializers.ValidationError(
+                'Pipeline inputs must be uniquely specified'
+            )
+
+        all_access_controlled_objects = [pipeline]
+        errors = []
+        for run_input in data["inputs"]:
+            curr_idx = run_input["index"]
+            curr_SD = run_input["symbolicdataset"]
+            try:
+                corresp_input = pipeline.inputs.get(dataset_idx=curr_idx)
+            except TransformationInput.DoesNotExist:
+                errors.append('Pipeline {} has no input with index {}'.format(pipeline, curr_idx))
+
+            if curr_SD.is_raw() and corresp_input.is_raw():
+                continue
+            elif not curr_SD.is_raw() and not corresp_input.is_raw():
+                if curr_SD.get_cdt().is_restriction(corresp_input.get_cdt()):
+                    continue
+            else:
+                errors.append('Input {} is incompatible with SymbolicDataset {}'.format(corresp_input, curr_SD))
+
+            all_access_controlled_objects.append(curr_SD)
+
+        if len(errors) > 0:
+            raise serializers.ValidationError(errors)
+
+        # Check that the specified user, users_allowed, and groups_allowed are all okay.
+        users_without_access, groups_without_access = who_cannot_access(
+            self.context["request"].user,
+            User.objects.filter(username__in=data.get("users_allowed", [])),
+            Group.objects.filter(name__in=data.get("groups_allowed", [])),
+            all_access_controlled_objects)
+
+        if len(users_without_access) != 0:
+            errors.append("User(s) {} may not be granted access".format(list(users_without_access)))
+
+        if len(groups_without_access) != 0:
+            errors.append("Group(s) {} may not be granted access".format(list(groups_without_access)))
+
+        if len(errors) > 0:
+            raise serializers.ValidationError(errors)
+
+        return data
+
+    # We don't place this in a transaction; when it's called from a ViewSet, it'll already be
+    # in one.
+    def create(self, validated_data):
+        """
+        Create a Run to process, i.e. add a job to the work queue.
+        """
+        inputs = validated_data.pop("inputs")
+        users_allowed = validated_data.pop("users_allowed", [])
+        groups_allowed = validated_data.pop("groups_allowed", [])
+
+        # First, create the Run to process with the current time.
+        rtp = Run(time_queued=timezone.now(), **validated_data)
+        rtp.save()
+        rtp.users_allowed.add(*users_allowed)
+        rtp.groups_allowed.add(*groups_allowed)
+
+        # Create the inputs.
+        for input_data in inputs:
+            rtp.inputs.create(**input_data)
+
+        # If this throws an error, we'll break out of the transaction.
+        rtp.clean()
+        return rtp
+
+
+class RunProgressSerializer(RunSerializer):
+    """
+    Same as RunSerializer except run_status is computed instead of linked.
+    """
+    run_progress = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Run
+        fields = (
+            'id',
+            'url',
+            'pipeline',
+            'time_queued',
+            'name',
+            'description',
+            'display_name',
+            'sandbox_path',
+            'purged',
+            "run_status",
+            'run_progress',
+            'run_outputs',
+            'removal_plan',
+            'user',
+            'users_allowed',
+            'groups_allowed',
+            'inputs'
+        )
+        read_only_fields = (
+            "purged",
+            "time_queued",
+        )
+
+    def get_run_progress(self, obj):
+        if obj is not None:
+            return obj.get_run_progress()

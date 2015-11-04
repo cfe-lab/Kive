@@ -7,12 +7,9 @@ from django.http import HttpResponse, Http404, HttpResponseRedirect
 from django.template import loader, RequestContext
 from django.views.decorators.http import require_GET, require_POST
 
-from archive.models import Dataset
-import fleet.models
-from fleet.models import RunToProcess
-from fleet.serializers import RunToProcessOutputsSerializer
-from pipeline.models import PipelineFamily, Pipeline
-from pipeline.serializers import AnalysisSerializer
+from archive.models import Dataset, Run
+from archive.serializers import RunOutputsSerializer
+from pipeline.models import Pipeline
 from portal.views import admin_check
 from sandbox.forms import InputSubmissionForm, RunSubmissionForm
 
@@ -79,7 +76,7 @@ def run_pipeline(request):
 
     try:
         with transaction.atomic():
-            dummy_rtp = fleet.models.RunToProcess(user=request.user)
+            dummy_rtp = Run(user=request.user)
             rsf = RunSubmissionForm(request.POST, instance=dummy_rtp)
     
             try:
@@ -102,7 +99,7 @@ def run_pipeline(request):
             rtp = rsf.save()
             rtp.grant_from_json(rsf.cleaned_data["permissions"])
     
-            # Now try and put together RunToProcessInputs from the specified inputs.
+            # Now try and put together RunInputs from the specified inputs.
             for i in range(1, curr_pipeline.inputs.count()+1):
                 curr_input_form = InputSubmissionForm({"input_pk": request.POST.get("input_{}".format(i))})
                 if not curr_input_form.is_valid():
@@ -151,42 +148,41 @@ def runs(request):
 
 
 @login_required
-def view_results(request, rtp_id):
+def view_results(request, run_id):
     """View outputs from a pipeline run."""
     template = loader.get_template("sandbox/view_results.html")
     context = RequestContext(request)
 
     context['is_user_admin'] = admin_check(request.user)
     context['back_to_view'] = request.GET.get('back_to_view', None) == 'true'
-    context['rtp_id'] = rtp_id
     
     four_oh_four = False
     try:
-        rtp = fleet.models.RunToProcess.objects.get(id=rtp_id)
-        context["rtp"] = rtp
-        if not rtp.can_be_accessed(request.user):
+        run = Run.objects.get(pk=run_id)
+        context["run"] = run
+        if not run.can_be_accessed(request.user):
             four_oh_four = True
-    except RunToProcess.DoesNotExist:
+    except Run.DoesNotExist:
         four_oh_four = True
 
     if four_oh_four:
-        raise Http404("ID {} does not exist or is not accessible".format(rtp_id))
+        raise Http404("ID {} does not exist or is not accessible".format(run_id))
 
-    context["outputs"] = json.dumps(RunToProcessOutputsSerializer(
-        rtp,
+    context["outputs"] = json.dumps(RunOutputsSerializer(
+        run,
         context={'request': request}).data)
     return HttpResponse(template.render(context))
 
 
 @login_required
-def view_run(request, rtp_id, md5=None):
-    rtp = fleet.models.RunToProcess.objects.get(id=rtp_id)
+def view_run(request, run_id, md5=None):
+    run = Run.objects.get(pk=run_id)
 
     template = loader.get_template("sandbox/view_run.html")
     context = RequestContext(
         request,
         {
-            'rtp': rtp,
+            'run': run,
             'md5': md5
         }
     )

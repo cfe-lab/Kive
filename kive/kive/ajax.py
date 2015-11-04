@@ -11,8 +11,9 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework.exceptions import APIException
 
 from archive.models import summarize_redaction_plan
-from metadata.models import AccessControl, RTPNotFinished
+from metadata.models import AccessControl
 from portal.views import developer_check, admin_check
+from archive.exceptions import RunNotFinished
 
 
 def convert_validation(ex):
@@ -145,7 +146,7 @@ class RedactModelMixin(object):
         if is_redacted:
             try:
                 self.get_object().redact()
-            except RTPNotFinished as e:
+            except RunNotFinished as e:
                 raise APIException(e.msg)
             return Response({'message': 'Object redacted.'})
         return self.patch_object(request, pk)
@@ -178,7 +179,7 @@ class RemoveModelMixin(mixins.DestroyModelMixin):
     def perform_destroy(self, instance):
         try:
             instance.remove()
-        except RTPNotFinished as e:
+        except RunNotFinished as e:
             raise APIException(e.msg)
 
 

@@ -8,9 +8,9 @@
  */
 
 
-function setupRunView(rtp_id, pipeline_id, md5) {
+function setupRunView(run_id, pipeline_id, md5) {
     var self = this;
-    rtp_id = parseInt(rtp_id);
+    run_id = parseInt(run_id);
 
     // Instance variables
     self.timer = null;
@@ -23,12 +23,12 @@ function setupRunView(rtp_id, pipeline_id, md5) {
             self.timer = setInterval(grabStatus, self.timerInterval);
 
         // Poll the server
-        $.getJSON("/api/runs/" + rtp_id + "/run_status/", {}, function(run){
+        $.getJSON("/api/runs/" + run_id + "/run_status/", {}, function(run){
             var stat = run.status,
                 $msg = $('<span class="status-message">');
             $msg.append($('<a>Complete</a>').attr(
                     'href',
-                    '/view_results/' + rtp_id +'?back_to_view=true'));
+                    '/view_results/' + run_id +'?back_to_view=true'));
 
             // TODO: Use a better system of reporting overall run status
             if(stat.indexOf('?') >= 0) {
@@ -43,17 +43,17 @@ function setupRunView(rtp_id, pipeline_id, md5) {
                 if(stat.indexOf('!') >= 0) {
                     $msg.empty().append($('<a>Failed!</a>').attr(
                             'href',
-                            '/view_results/' + rtp_id + '?back_to_view=true'));
+                            '/view_results/' + run_id + '?back_to_view=true'));
                     clearInterval(self.timer);
                 } else if(stat.indexOf('.') >= 0 || stat.indexOf('+') >= 0 || stat.indexOf(':') >= 0) {
                     $msg.empty().append($('<a>In progress </a> &nbsp;').attr(
                             'href',
-                            '/view_results/' + rtp_id +'?back_to_view=true')).append(
+                            '/view_results/' + run_id +'?back_to_view=true')).append(
                             $('<img src="/static/sandbox/preload.gif"/>'));
                 } else {
                     clearInterval(self.timer);
                 }
-                pipeline.update(run, md5, rtp_id);
+                pipeline.update(run, md5, run_id);
             }
             $('#run_status').empty().append($msg);
         });

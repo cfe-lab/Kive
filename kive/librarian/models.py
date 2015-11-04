@@ -29,7 +29,7 @@ import transformation.models
 import librarian.models
 import datachecking.models
 import metadata.models
-import fleet.exceptions
+import archive.exceptions
 import file_access_utils
 
 LOGGER = logging.getLogger(__name__)
@@ -1013,12 +1013,12 @@ class ExecRecord(models.Model):
 
         for run in runs_to_purge:
             try:
-                if not run.runtoprocess.purged:
-                    run.runtoprocess.collect_garbage()
+                if not run.purged:
+                    run.collect_garbage()
             except ObjectDoesNotExist:
                 # No RunToProcess exists.
                 pass
-            except fleet.exceptions.SandboxActiveException as e:
+            except archive.exceptions.SandboxActiveException as e:
                 # The Run never started or hasn't finished.
                 self.logger.warning(e)
             except OSError as e:

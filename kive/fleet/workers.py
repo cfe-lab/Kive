@@ -17,9 +17,7 @@ from django.conf import settings
 from django.utils import timezone
 
 import archive.models
-from archive.models import Dataset
-import fleet.models
-from fleet.models import RunToProcess
+from archive.models import Dataset, Run, ExceedsSystemCapabilities
 import sandbox.execute
 
 mgr_logger = logging.getLogger("fleet.Manager")
@@ -382,7 +380,7 @@ class Manager:
         # build in a delay here so we don't clog up the database.
         mgr_logger.debug("Looking for new runs....")
         # with transaction.atomic():
-        pending_runs = RunToProcess.find_unstarted().order_by("time_queued")
+        pending_runs = Run.find_unstarted().order_by("time_queued")
 
         mgr_logger.debug("Pending runs: {}".format(pending_runs))
 
@@ -393,8 +391,8 @@ class Manager:
                     "Cannot run Pipeline %s for user %s: %d threads required, %d available",
                     run_to_process.pipeline, run_to_process.user, threads_needed,
                     self.max_host_cpus)
-                esc = fleet.models.ExceedsSystemCapabilities(
-                    runtoprocess=run_to_process,
+                esc = ExceedsSystemCapabilities(
+                    run=run_to_process,
                     threads_requested=threads_needed,
                     max_available=self.max_host_cpus
                 )
@@ -418,6 +416,7 @@ class Manager:
             mgr_logger.debug("Task queue: {}".format(self.task_queue))
             mgr_logger.debug("Active sandboxes: {}".format(self.active_sandboxes))
 
+    @staticmethod
     def purge_sandboxes(self):
         # Next, look for finished jobs to clean up.
         mgr_logger.debug("Checking for old sandboxes to clean up....")
@@ -427,10 +426,11 @@ class Manager:
                                             minutes=settings.SANDBOX_PURGE_MINUTES)
         keep_recent = settings.SANDBOX_KEEP_RECENT
 
-        purge_candidates = fleet.models.RunToProcess.objects.filter(
-            run__isnull=False, run__end_time__isnull=False,
-            run__end_time__lte=timezone.now()-purge_interval,
-            purged=False)
+        purge_candidates = Run.objects.filter(
+            end_time__isnull=False,
+            end_time__lte=timezone.now()-purge_interval,
+            purged=False
+        )
 
         # Retain the most recent ones for each PipelineFamily.
         pfs_represented = purge_candidates.values_list("pipeline__family")
@@ -457,8 +457,8 @@ class Manager:
         sdbx_path = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
         for putative_sdbx in glob.glob(os.path.join(sdbx_path, sandbox.execute.sandbox_glob)):
 
-            # Remove this sandbox if there is no RunToProcess that is on record as having used it.
-            matching_rtps = fleet.models.RunToProcess.objects.filter(
+            # Remove this sandbox if there is no Run that is on record as having used it.
+            matching_rtps = Run.objects.filter(
                 sandbox_path__startswith=putative_sdbx,
             )
             if not matching_rtps.exists():

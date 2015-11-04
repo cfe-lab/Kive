@@ -210,7 +210,7 @@ var pipeline = (function(exports){
         return form_data;
     };
 
-    my.Pipeline.prototype.update = function(runstat, look_for_md5, rtp_id)  {
+    my.Pipeline.prototype.update = function(runstat, look_for_md5, run_id)  {
         /**
          * Updates the progress of this pipeline with the status
          *
@@ -220,7 +220,7 @@ var pipeline = (function(exports){
          *  components of a run.
          * @param look_for_md5: Marks a dataset if its md5 sum matches
          *  this input
-         * @param rtp_id: Keeps track of the run to process id
+         * @param run_id: Keeps track of the run id
          */
         var self = this;
 
@@ -240,7 +240,7 @@ var pipeline = (function(exports){
             if (shape instanceof drydock_objects.MethodNode) {
                 shape.status = step.status;
                 shape.log_id = step.log_id;
-                shape.rtp_id = rtp_id;
+                shape.run_id = run_id;
             }
         });
 
@@ -253,7 +253,7 @@ var pipeline = (function(exports){
                 shape.dataset_id = output.dataset_id;
                 shape.md5 = output.md5;
 
-                shape.rtp_id = rtp_id;
+                shape.run_id = run_id;
                 shape.found_md5 = (shape.md5 === look_for_md5);
             }
         });
@@ -267,7 +267,7 @@ var pipeline = (function(exports){
                 shape.dataset_id = output.dataset_id;
                 shape.md5 = output.md5;
 
-                shape.rtp_id = rtp_id;
+                shape.run_id = run_id;
                 shape.found_md5 = (shape.md5 === look_for_md5);
             }
         });

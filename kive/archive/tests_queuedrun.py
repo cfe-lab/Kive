@@ -11,23 +11,20 @@ from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable,\
-    Dataset
-from fleet.models import RunToProcess, RunToProcessInput
-from fleet.serializers import RunToProcessSerializer
-from fleet.exceptions import SandboxActiveException
+    Dataset, RunInput
+from archive.serializers import RunSerializer
+from archive.exceptions import SandboxActiveException, RunNotFinished
 from librarian.models import ExecRecord, SymbolicDataset
 from pipeline.models import Pipeline, PipelineFamily
-from metadata.models import kive_user, everyone_group, RTPNotFinished, CompoundDatatype, Datatype
+from metadata.models import kive_user, everyone_group
 from kive.testing_utils import clean_up_all_files
 from kive import settings
 from kive.tests import install_fixture_files, restore_production_files, DuckContext
 from fleet.workers import Manager
 from sandbox.execute import finish_step, finish_cable
 
-from constants import datatypes, CDTs
 
-
-class RunToProcessTest(TestCase):
+class QueuedRunTest(TestCase):
     """ Check various status reports. Status symbols are:
     ? - requested
     . - waiting
@@ -39,30 +36,30 @@ class RunToProcessTest(TestCase):
     fixtures = ['initial_data', "initial_groups", 'initial_user', 'converter_pipeline']
 
     def test_run_progress_no_run(self):
-        run_tracker = RunToProcess()
+        run = Run()
 
-        progress = run_tracker.get_run_progress()
+        progress = run.get_run_progress()
 
         self.assertSequenceEqual('?', progress['status'])
         self.assertSequenceEqual('Run', progress['name'])
 
     def test_owner(self):
         expected_username = 'dave'
-        run_tracker = RunToProcess(user=User(username=expected_username))
+        run = Run(user=User(username=expected_username))
 
-        progress = run_tracker.get_run_progress()
+        progress = run.get_run_progress()
 
         self.assertSequenceEqual(expected_username, progress['user'])
 
     def create_with_empty_pipeline(self):
         pipeline = Pipeline()
-        run_tracker = RunToProcess(run=Run(pipeline=pipeline))
-        return run_tracker
+        run = Run(pipeline=pipeline)
+        return run
 
     def test_run_progress_empty_pipeline(self):
-        run_tracker = self.create_with_empty_pipeline()
+        run = self.create_with_empty_pipeline()
 
-        progress = run_tracker.get_run_progress()
+        progress = run.get_run_progress()
 
         self.assertSequenceEqual('-', progress['status'])
 
@@ -71,13 +68,12 @@ class RunToProcessTest(TestCase):
         user = User.objects.first()
         run = Run(pipeline=pipeline, user=user)
         run.save()
-        run_tracker = RunToProcess(run=run, user=user, pipeline=pipeline)
-        return run_tracker
+        return run
 
     def test_run_progress_starting(self):
-        run_tracker = self.create_with_pipeline_step()
+        run = self.create_with_pipeline_step()
 
-        progress = run_tracker.get_run_progress()
+        progress = run.get_run_progress()
 
         self.assertSequenceEqual('.-.', progress['status'])
         self.assertSequenceEqual('Fasta2CSV', progress['name'])
@@ -95,93 +91,89 @@ class RunToProcessTest(TestCase):
         return execrecord
 
     def create_with_run_step(self):
-        run_tracker = self.create_with_pipeline_step()
-        run = run_tracker.run
+        run = self.create_with_pipeline_step()
         pipeline_step = run.pipeline.steps.first()
         run_step = RunStep(run=run, pipelinestep=pipeline_step)
         run_step.save()
         run_step_input_cable = RunSIC(PSIC=pipeline_step.cables_in.first())
         run_step.RSICs.add(run_step_input_cable)
 
-        return run_tracker
+        return run
 
     def test_run_progress_ready(self):
-        run_tracker = self.create_with_run_step()
+        run = self.create_with_run_step()
 
-        progress = run_tracker.get_run_progress()
+        progress = run.get_run_progress()
 
         self.assertSequenceEqual(':-.', progress['status'])
 
     def create_with_started_run_step(self):
-        run_tracker = self.create_with_run_step()
-        run_step = run_tracker.run.runsteps.first()
+        run = self.create_with_run_step()
+        run_step = run.runsteps.first()
         run_step_input_cable = run_step.RSICs.first()
         self.add_exec_log(run_step_input_cable)
         self.add_exec_record(run_step_input_cable)
         self.add_exec_log(run_step)
-        return run_tracker
+        return run
 
     def create_with_completed_run_step(self):
-        run_tracker = self.create_with_started_run_step()
-        run_step = run_tracker.run.runsteps.first()
+        run = self.create_with_started_run_step()
+        run_step = run.runsteps.first()
         exec_record = self.add_exec_record(run_step)
         exec_record.generator.methodoutput.return_code = 0
         exec_record.generator.methodoutput.save()
-        return run_tracker
+        return run
 
     def test_run_progress_started_steps(self):
-        run_tracker = self.create_with_started_run_step()
+        run = self.create_with_started_run_step()
 
-        progress = run_tracker.get_run_progress()
+        progress = run.get_run_progress()
 
         self.assertSequenceEqual('+-.', progress['status'])
 
     def test_run_progress_completed_steps(self):
-        run_tracker = self.create_with_completed_run_step()
+        run = self.create_with_completed_run_step()
 
-        progress = run_tracker.get_run_progress()
+        progress = run.get_run_progress()
 
         self.assertSequenceEqual('*-.', progress['status'])
 
     def test_run_progress_failed_steps(self):
-        run_tracker = self.create_with_completed_run_step()
-        run_step = run_tracker.run.runsteps.first()
+        run = self.create_with_completed_run_step()
+        run_step = run.runsteps.first()
         exec_log = run_step.invoked_logs.first()
         exec_log.methodoutput.return_code = 5
         exec_log.methodoutput.save()
         run_step.save()
 
-        progress = run_tracker.get_run_progress()
+        progress = run.get_run_progress()
 
         self.assertSequenceEqual('!-.', progress['status'])
 
     def test_run_progress_output_ready(self):
-        run_tracker = self.create_with_completed_run_step()
-        run = run_tracker.run
+        run = self.create_with_completed_run_step()
         pipeline_output_cable = run.pipeline.outcables.first()
         run.runoutputcables.add(RunOutputCable(
             pipelineoutputcable=pipeline_output_cable))
 
-        progress = run_tracker.get_run_progress()
+        progress = run.get_run_progress()
 
         self.assertSequenceEqual('*-:', progress['status'])
 
     def test_run_progress_output_running(self):
-        run_tracker = self.create_with_completed_run_step()
-        run = run_tracker.run
+        run = self.create_with_completed_run_step()
         pipeline_output_cable = run.pipeline.outcables.first()
         run_output_cable = RunOutputCable(
             pipelineoutputcable=pipeline_output_cable)
         run.runoutputcables.add(run_output_cable)
         self.add_exec_log(run_output_cable)
 
-        progress = run_tracker.get_run_progress()
+        progress = run.get_run_progress()
 
         self.assertSequenceEqual('*-+', progress['status'])
 
     def test_run_progress_complete(self):
-        run_tracker = self.create_with_completed_run_step()
-        run = run_tracker.run
+        run = self.create_with_completed_run_step()
         pipeline_output_cable = run.pipeline.outcables.first()
         run_output_cable = RunOutputCable(
             pipelineoutputcable=pipeline_output_cable)
@@ -189,55 +181,53 @@ class RunToProcessTest(TestCase):
         self.add_exec_log(run_output_cable)
         self.add_exec_record(run_output_cable)
 
-        progress = run_tracker.get_run_progress()
+        progress = run.get_run_progress()
 
         self.assertSequenceEqual('*-*', progress['status'])
 
-    def add_input(self, run_tracker):
-        run_tracker.save()
+    def add_input(self, run):
+        run.save()
         symbolicdataset = SymbolicDataset.objects.get(pk=1)
-        run_input = RunToProcessInput(runtoprocess=run_tracker,
-                                      symbolicdataset=symbolicdataset,
-                                      index=1)
+        run_input = RunInput(run=run,
+                             symbolicdataset=symbolicdataset,
+                             index=1)
         run_input.save()
 
     def test_run_progress_display_name(self):
-        run_tracker = self.create_with_pipeline_step()
-        self.add_input(run_tracker)
+        run = self.create_with_pipeline_step()
+        self.add_input(run)
 
-        progress = run_tracker.get_run_progress()
+        progress = run.get_run_progress()
 
         self.assertSequenceEqual('Fasta2CSV on TestFASTA', progress['name'])
 
     def test_run_progress_display_name_but_no_run(self):
         pipeline = Pipeline.objects.get(pk=2)
         user = User.objects.first()
-        run_tracker = RunToProcess(user=user, pipeline=pipeline)
-        self.add_input(run_tracker)
+        run = Run(user=user, pipeline=pipeline)
+        self.add_input(run)
 
-        progress = run_tracker.get_run_progress()
+        progress = run.get_run_progress()
 
         self.assertSequenceEqual('Fasta2CSV on TestFASTA', progress['name'])
 
     def test_display_name(self):
         pipeline = Pipeline.objects.get(pk=2)
         user = User.objects.first()
-        run_tracker = RunToProcess(user=user, pipeline=pipeline)
-        self.add_input(run_tracker)
+        run = Run(user=user, pipeline=pipeline)
+        self.add_input(run)
 
-        display_name = run_tracker.display_name
+        display_name = run.display_name
 
         self.assertSequenceEqual(u'Fasta2CSV on TestFASTA', display_name)
 
     def test_display_name_no_input(self):
         pipeline = Pipeline.objects.get(pk=2)
         user = User.objects.first()
-        run_tracker = RunToProcess(user=user, pipeline=pipeline)
-        run_tracker.save()
-        run_tracker.time_queued = parse_datetime('2015-01-13 00:00:00Z')
-        run_tracker.save()
+        run = Run(user=user, pipeline=pipeline, time_queued=parse_datetime('2015-01-13 00:00:00Z'))
+        run.save()
 
-        display_name = run_tracker.display_name
+        display_name = run.display_name
 
         self.assertSequenceEqual('Fasta2CSV at 2015-01-13 00:00:00+00:00',
                                  display_name)
@@ -247,12 +237,10 @@ class RunToProcessTest(TestCase):
         user = User.objects.first()
 
         run_name = "Test Run name"
-        run_tracker = RunToProcess(user=user, pipeline=pipeline, name=run_name)
-        run_tracker.save()
-        run_tracker.time_queued = parse_datetime('2015-01-13 00:00:00Z')
-        run_tracker.save()
+        run = Run(user=user, pipeline=pipeline, name=run_name, time_queued=parse_datetime('2015-01-13 00:00:00Z'))
+        run.save()
 
-        display_name = run_tracker.display_name
+        display_name = run.display_name
 
         self.assertEqual(run_name, display_name)
 
@@ -278,17 +266,15 @@ class RemoveRedactRunInProgress(TestCase):
         # A run that's mid-progress.
         self.run = Run(pipeline=self.pE, user=self.myUser)
         self.run.save()
-        self.run_tracker = RunToProcess(run=self.run, user=self.myUser, pipeline=self.pE)
-        self.run_tracker.save()
-        self.run_tracker.inputs.create(
+        self.run.inputs.create(
             index=1,
             symbolicdataset=self.triplet_symDS
         )
-        self.run_tracker.inputs.create(
+        self.run.inputs.create(
             index=2,
             symbolicdataset=self.singlet_symDS
         )
-        self.run_tracker.inputs.create(
+        self.run.inputs.create(
             index=3,
             symbolicdataset=self.raw_symDS
         )
@@ -338,7 +324,7 @@ class RemoveRedactRunInProgress(TestCase):
         Removing the Pipeline of a Run that's in progress should fail.
         """
         self.assertRaisesRegexp(
-            RTPNotFinished,
+            RunNotFinished,
             "Cannot remove: an affected run is still in progress",
             lambda: self.pE.remove()
         )
@@ -348,7 +334,7 @@ class RemoveRedactRunInProgress(TestCase):
         Removing a Dataset of a Run that's in progress should fail.
         """
         self.assertRaisesRegexp(
-            RTPNotFinished,
+            RunNotFinished,
             "Cannot remove: an affected run is still in progress",
             lambda: self.triplet_symDS.remove()
         )
@@ -358,7 +344,7 @@ class RemoveRedactRunInProgress(TestCase):
         Redacting a Dataset of a Run that's in progress should fail.
         """
         self.assertRaisesRegexp(
-            RTPNotFinished,
+            RunNotFinished,
             "Cannot redact: an affected run is still in progress",
             lambda: self.triplet_symDS.redact()
         )
@@ -368,7 +354,7 @@ class RemoveRedactRunInProgress(TestCase):
         Removing an ExecRecord of a Run that's in progress should fail.
         """
         self.assertRaisesRegexp(
-            RTPNotFinished,
+            RunNotFinished,
             "Cannot remove: an affected run is still in progress",
             lambda: self.rs_1.execrecord.remove()
         )
@@ -378,7 +364,7 @@ class RemoveRedactRunInProgress(TestCase):
         Redacting an ExecRecord of a Run that's in progress should fail.
         """
         self.assertRaisesRegexp(
-            RTPNotFinished,
+            RunNotFinished,
             "Cannot redact: an affected run is still in progress",
             lambda: self.rs_1.execrecord.redact()
         )
@@ -387,8 +373,6 @@ class RemoveRedactRunInProgress(TestCase):
 class RemoveRedactRunJustStarting(TestCase):
     """
     Testing of removal/redaction of stuff used in a run that's just starting.
-
-    FIXME this might be eliminated when we merge Run and RunToProcess.
     """
     fixtures = ["em_sandbox_test_environment"]
 
@@ -402,17 +386,17 @@ class RemoveRedactRunJustStarting(TestCase):
         self.raw_symDS = SymbolicDataset.objects.get(dataset__name="raw_DS")
 
         # A run that's just starting, to the point that no Run exists yet.
-        self.rtp_just_starting = RunToProcess(user=self.myUser, pipeline=self.pE)
-        self.rtp_just_starting.save()
-        self.rtp_just_starting.inputs.create(
+        self.run_just_starting = Run(user=self.myUser, pipeline=self.pE)
+        self.run_just_starting.save()
+        self.run_just_starting.inputs.create(
             index=1,
             symbolicdataset=self.triplet_symDS
         )
-        self.rtp_just_starting.inputs.create(
+        self.run_just_starting.inputs.create(
             index=2,
             symbolicdataset=self.singlet_symDS
         )
-        self.rtp_just_starting.inputs.create(
+        self.run_just_starting.inputs.create(
             index=3,
             symbolicdataset=self.raw_symDS
         )
@@ -425,7 +409,7 @@ class RemoveRedactRunJustStarting(TestCase):
         Removing the Pipeline of a Run should fail.
         """
         self.assertRaisesRegexp(
-            RTPNotFinished,
+            RunNotFinished,
             "Cannot remove: an affected run is still in progress",
             lambda: self.pE.remove()
         )
@@ -435,7 +419,7 @@ class RemoveRedactRunJustStarting(TestCase):
         Removing a Dataset of a Run should fail.
         """
         self.assertRaisesRegexp(
-            RTPNotFinished,
+            RunNotFinished,
             "Cannot remove: an affected run is still in progress",
             lambda: self.triplet_symDS.remove()
         )
@@ -445,7 +429,7 @@ class RemoveRedactRunJustStarting(TestCase):
         Redacting a Dataset of a Run should fail.
         """
         self.assertRaisesRegexp(
-            RTPNotFinished,
+            RunNotFinished,
             "Cannot redact: an affected run is still in progress",
             lambda: self.triplet_symDS.redact()
         )
@@ -474,7 +458,7 @@ class RestoreReusableDatasetTest(TestCase):
 
     def create_run_to_process(self, pipeline):
         dataset = Dataset.objects.get(name='pairs')
-        run_to_process = RunToProcess(pipeline=pipeline, user=pipeline.user)
+        run_to_process = Run(pipeline=pipeline, user=pipeline.user)
         run_to_process.save()
         run_to_process.clean()
         run_to_process.inputs.create(symbolicdataset=dataset.symbolicdataset, index=1)
@@ -502,7 +486,7 @@ class RestoreReusableDatasetTest(TestCase):
                     sandbox_result = finish_cable(task_info_dict, worker_rank)
                 manager.note_progress(worker_rank, sandbox_result)
 
-        return RunToProcess.objects.get(id=run_to_process.id)
+        return Run.objects.get(id=run_to_process.id)
 
     def test_run_new_pipeline(self):
         pipeline = Pipeline.objects.get(revision_name='sums and products')
@@ -517,7 +501,7 @@ class RestoreReusableDatasetTest(TestCase):
 
         run_to_process = self.execute_pipeline(pipeline)
 
-        self.assertTrue(run_to_process.run.successful_execution())
+        self.assertTrue(run_to_process.successful_execution())
         self.assertEqual(expected_execrecord_count, ExecRecord.objects.count())
 
 
@@ -547,63 +531,55 @@ class GarbageCollectionTest(TestCase):
 
     def test_reap_nonexistent_sandbox_path(self):
         """
-        A RunToProcess that has no sandbox path should raise an exception.
+        A Run that has no sandbox path should raise an exception.
         """
-        rtp = RunToProcess(pipeline=self.noop_pl, user=self.noop_pl.user)
-        rtp.save()
+        run = Run(pipeline=self.noop_pl, user=self.noop_pl.user)
+        run.save()
 
         self.assertRaisesRegexp(
             SandboxActiveException,
-            re.escape("Run (RunToProcess={}, Pipeline={}, queued {}, User=Rem Over) has not yet started".format(
-                rtp.id,
+            re.escape("Run (Run={}, Pipeline={}, queued {}, User=Rem Over) has not yet started".format(
+                run.id,
                 self.noop_pl,
-                rtp.time_queued)),
-            rtp.collect_garbage
+                run.time_queued)),
+            run.collect_garbage
         )
 
     def test_reap_unfinished_run(self):
         """
-        A RunToProcess that is not marked as finished should raise an exception.
+        A Run that is not marked as finished should raise an exception.
         """
-        rtp = RunToProcess(pipeline=self.noop_pl, user=self.noop_pl.user)
-        rtp.save()
         run = Run(pipeline=self.noop_pl, user=self.noop_pl.user)
         run.save()
-        rtp.sandbox_path = self.mock_sandbox_path
-        rtp.save()
+        run.sandbox_path = self.mock_sandbox_path
+        run.save()
 
         self.assertRaisesRegexp(
             SandboxActiveException,
-            re.escape("Run (RunToProcess={}, Pipeline={}, queued {}, User=Rem Over) is not finished".format(
-                rtp.id,
+            re.escape("Run (Run={}, Pipeline={}, queued {}, User=Rem Over) is not finished".format(
+                run.id,
                 self.noop_pl,
-                rtp.time_queued)),
-            rtp.collect_garbage
+                run.time_queued)),
+            run.collect_garbage
         )
 
     def test_reap_finished_run(self):
         """
-        A RunToProcess that is not marked as finished should raise an exception.
+        A Run that is finished should be reaped without issue.
         """
-        rtp = RunToProcess(
-            pipeline=self.noop_pl, run=self.noop_run,
-            sandbox_path=self.mock_sandbox_path,
-            user=self.noop_run.user)
-        rtp.save()
-        rtp.collect_garbage()
+        self.noop_run.sandbox_path = self.mock_sandbox_path
+        self.noop_run.save()
+        self.noop_run.collect_garbage()
 
         self.assertFalse(os.path.exists(self.mock_sandbox_path))
-        self.assertTrue(rtp.purged)
+        self.assertTrue(self.noop_run.purged)
 
     def test_reap_on_removal(self):
         """
         Removing a Run should reap the sandbox.
         """
-        rtp = RunToProcess(
-            pipeline=self.noop_pl, run=self.noop_run,
-            sandbox_path=self.mock_sandbox_path,
-            user=self.noop_run.user)
-        rtp.save()
+        self.noop_run.sandbox_path = self.mock_sandbox_path
+        self.noop_run.save()
 
         self.noop_run.remove()
         self.assertFalse(os.path.exists(self.mock_sandbox_path))
@@ -612,11 +588,8 @@ class GarbageCollectionTest(TestCase):
         """
         Redacting part of a Run should reap the sandbox.
         """
-        rtp = RunToProcess(
-            pipeline=self.noop_pl, run=self.noop_run,
-            sandbox_path=self.mock_sandbox_path,
-            user=self.noop_run.user)
-        rtp.save()
+        self.noop_run.sandbox_path = self.mock_sandbox_path
+        self.noop_run.save()
 
         self.noop_run.runsteps.first().execrecord.redact()
         self.assertFalse(os.path.exists(self.mock_sandbox_path))
@@ -634,7 +607,7 @@ class RunApiTests(TestCase):
         self.myUser = User.objects.get(username="john")
 
         self.factory = APIRequestFactory()
-        self.run_list_path = reverse('runtoprocess-list')
+        self.run_list_path = reverse('run-list')
         self.run_list_view, _, _ = resolve(self.run_list_path)
 
     def tearDown(self):
@@ -691,29 +664,27 @@ class RunApiTests(TestCase):
         response = self.run_list_view(request).render()
         data = response.render().data
 
-        # Check that the run created something sensible
+        # Check that the run created something sensible.
         self.assertIn("id", data)
-        rtp_pk = data["id"]
         self.assertIn('run_outputs', data)
 
-        # Faux-execute the Pipeline.
-        rtp = RunToProcess.objects.get(pk=rtp_pk)
-        rtp.run = pipeline_to_run.pipeline_instances.first()
-        rtp.save()
+        # There should be two runs now: the one we just started (and hasn't run yet)
+        # and the one we already ran that's in the fixture.
+        self.test_run_index(2)
 
-        # Test and make sure we have a Run now
-        self.test_run_index(1)
+        # Let's examine a real execution.
+        real_run_pk = pipeline_to_run.pipeline_instances.first().pk
 
-        # Touch the record detail page
-        path = self.run_list_path + "{}/".format(rtp_pk)
+        # Touch the record detail page.
+        path = self.run_list_path + "{}/".format(real_run_pk)
         request = self.factory.get(path)
         force_authenticate(request, user=self.myUser)
         view, args, kwargs = resolve(path)
         response = view(request, *args, **kwargs)
         data = response.render().data
 
-        # Touch the run status page
-        path = self.run_list_path + "{}/run_status/".format(rtp_pk)
+        # Touch the run status page.
+        path = self.run_list_path + "{}/run_status/".format(real_run_pk)
         request = self.factory.get(path)
         force_authenticate(request, user=self.myUser)
         view, args, kwargs = resolve(path)
@@ -722,22 +693,22 @@ class RunApiTests(TestCase):
         self.assertEquals(data['status'], '**-**')
         self.assertIn('step_progress', data)
 
-        # Touch the outputs
-        path = self.run_list_path + "{}/run_outputs/".format(rtp_pk)
+        # Touch the outputs.
+        path = self.run_list_path + "{}/run_outputs/".format(real_run_pk)
         request = self.factory.get(path)
         force_authenticate(request, user=self.myUser)
         view, args, kwargs = resolve(path)
         response = view(request, *args, **kwargs)
         data = response.render().data
-        self.assertEquals(data['id'], rtp_pk)
+        self.assertEquals(data['id'], real_run_pk)
         self.assertEquals(len(data['run']['output_summary']), 8)
 
         for output in data['run']['output_summary']:
             self.assertEquals(output['is_ok'], True)
             self.assertEquals(output['is_invalid'], False)
 
-        # Touch the removal plan
-        path = self.run_list_path + "{}/removal_plan/".format(rtp_pk)
+        # Touch the removal plan.
+        path = self.run_list_path + "{}/removal_plan/".format(real_run_pk)
         request = self.factory.get(path)
         force_authenticate(request, user=self.myUser)
         view, args, kwargs = resolve(path)
@@ -748,8 +719,8 @@ class RunApiTests(TestCase):
         self.assertEquals(data['Runs'], 1)
         self.assertEquals(data['Datatypes'], 0)
 
-        # Delete the record
-        path = self.run_list_path + "{}/".format(rtp_pk)
+        # Delete the record.
+        path = self.run_list_path + "{}/".format(real_run_pk)
         request = self.factory.delete(path)
         force_authenticate(request, user=self.kive_user)
         view, args, kwargs = resolve(path)
@@ -802,7 +773,7 @@ class RunToProcessSerializerTests(TestCase):
 
     def test_validate(self):
         """
-        Validating a well-specified RunToProcess.
+        Validating a well-specified Run to process.
         """
         serialized_rtp = {
             "pipeline": self.em_pipeline.pk,
@@ -823,7 +794,7 @@ class RunToProcessSerializerTests(TestCase):
             "users_allowed": [],
             "groups_allowed": []
         }
-        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+        rtp_serializer = RunSerializer(data=serialized_rtp, context=self.john_context)
 
         self.assertTrue(rtp_serializer.is_valid())
 
@@ -846,7 +817,7 @@ class RunToProcessSerializerTests(TestCase):
             "users_allowed": [],
             "groups_allowed": []
         }
-        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+        rtp_serializer = RunSerializer(data=serialized_rtp, context=self.john_context)
 
         self.assertFalse(rtp_serializer.is_valid())
         self.assertEquals(rtp_serializer.errors["non_field_errors"],
@@ -875,7 +846,7 @@ class RunToProcessSerializerTests(TestCase):
             "users_allowed": [],
             "groups_allowed": []
         }
-        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+        rtp_serializer = RunSerializer(data=serialized_rtp, context=self.john_context)
 
         self.assertFalse(rtp_serializer.is_valid())
         self.assertEquals(rtp_serializer.errors["non_field_errors"],
@@ -904,7 +875,7 @@ class RunToProcessSerializerTests(TestCase):
             "users_allowed": [],
             "groups_allowed": []
         }
-        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+        rtp_serializer = RunSerializer(data=serialized_rtp, context=self.john_context)
 
         self.assertFalse(rtp_serializer.is_valid())
         self.assertEquals(rtp_serializer.errors["non_field_errors"],
@@ -935,7 +906,7 @@ class RunToProcessSerializerTests(TestCase):
             "users_allowed": [],
             "groups_allowed": []
         }
-        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+        rtp_serializer = RunSerializer(data=serialized_rtp, context=self.john_context)
 
         self.assertFalse(rtp_serializer.is_valid())
         self.assertEquals(rtp_serializer.errors["non_field_errors"],
@@ -967,7 +938,7 @@ class RunToProcessSerializerTests(TestCase):
             "users_allowed": [self.kive_user],
             "groups_allowed": [everyone_group()]
         }
-        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+        rtp_serializer = RunSerializer(data=serialized_rtp, context=self.john_context)
 
         self.assertFalse(rtp_serializer.is_valid())
         self.assertEqual(
@@ -980,7 +951,7 @@ class RunToProcessSerializerTests(TestCase):
 
     def test_create(self):
         """
-        Creating a RunToProcess, i.e. adding a job to the queue.
+        Creating a Run to process, i.e. adding a job to the queue.
         """
         serialized_rtp = {
             "pipeline": self.em_pipeline.pk,
@@ -1002,7 +973,7 @@ class RunToProcessSerializerTests(TestCase):
             "groups_allowed": [everyone_group()]
         }
 
-        rtp_serializer = RunToProcessSerializer(data=serialized_rtp, context=self.john_context)
+        rtp_serializer = RunSerializer(data=serialized_rtp, context=self.john_context)
         self.assertTrue(rtp_serializer.is_valid())
 
         before = timezone.now()

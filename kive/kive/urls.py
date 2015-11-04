@@ -1,7 +1,6 @@
 from django.conf.urls import patterns, url, include
 
-from archive.ajax import DatasetViewSet, MethodOutputViewSet
-from fleet.ajax import RunToProcessViewSet
+from archive.ajax import DatasetViewSet, MethodOutputViewSet, RunViewSet
 from kive.kive_router import KiveRouter
 from metadata.ajax import DatatypeViewSet, CompoundDatatypeViewSet
 from method.ajax import MethodViewSet, MethodFamilyViewSet, CodeResourceViewSet, CodeResourceRevisionViewSet
@@ -24,7 +23,7 @@ router.register(r'methodoutputs', MethodOutputViewSet)
 router.register(r'methods', MethodViewSet)
 router.register(r'pipelinefamilies', PipelineFamilyViewSet)
 router.register(r'pipelines', PipelineViewSet)
-router.register(r'runs', RunToProcessViewSet)
+router.register(r'runs', RunViewSet)
 router.register(r'stagedfiles', portal.ajax.StagedFileViewSet)
 
 urlpatterns = patterns(
@@ -95,10 +94,10 @@ urlpatterns = patterns(
     url(r'^choose_pipeline$', 'sandbox.views.choose_pipeline', name='choose_pipeline'),
     url(r'^choose_inputs$', 'sandbox.views.choose_inputs', name='choose_inputs'),
     url(r'^runs$', 'sandbox.views.runs', name='runs'),
-    url(r'^view_results/(?P<rtp_id>\d+)/$', 'sandbox.views.view_results', name='view_results'),
+    url(r'^view_results/(?P<run_id>\d+)/$', 'sandbox.views.view_results', name='view_results'),
     url(r'^run_pipeline$', 'sandbox.views.run_pipeline', name='run_pipeline'),
-    url(r'^view_run/(?P<rtp_id>\d+)$', 'sandbox.views.view_run', name='view_run'),
-    url(r'^view_run/(?P<rtp_id>\d+)/(?P<md5>[0-9a-fA-F]{32})$', 'sandbox.views.view_run', name='view_run'),
+    url(r'^view_run/(?P<run_id>\d+)$', 'sandbox.views.view_run', name='view_run'),
+    url(r'^view_run/(?P<run_id>\d+)/(?P<md5>[0-9a-fA-F]{32})$', 'sandbox.views.view_run', name='view_run'),
 
     # Urls for django-rest-framework
     url(r'^api/', include(router.urls), name='api_home'),

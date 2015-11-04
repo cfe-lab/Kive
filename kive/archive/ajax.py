@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.db import transaction
 from django.db.models import Q
@@ -6,13 +6,15 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 
 from rest_framework import permissions, status
-from rest_framework.decorators import detail_route
+from rest_framework.decorators import detail_route, list_route
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from archive.serializers import DatasetSerializer, MethodOutputSerializer
-from archive.models import Dataset, MethodOutput, summarize_redaction_plan
+from archive.serializers import DatasetSerializer, MethodOutputSerializer, RunSerializer,\
+    RunProgressSerializer, RunOutputsSerializer
+from archive.models import Run, RunInput, ExceedsSystemCapabilities, Dataset, MethodOutput,\
+    summarize_redaction_plan
 from archive.views import _build_download_response
 
 from kive.ajax import RemovableModelViewSet, RedactModelMixin, IsGrantedReadOnly, IsGrantedReadCreate,\
@@ -190,3 +192,130 @@ class MethodOutputViewSet(ReadOnlyModelViewSet):
                                                       return_code=True)
         return Response(summarize_redaction_plan(redaction_plan))
 
+
+class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
+                          SearchableModelMixin):
+    """ Runs, including those that haven't started yet
+
+    Query parameters for the list view:
+
+    * is_granted=true - For administrators, this limits the list to only include
+        records that the user has been explicitly granted access to. For other
+        users, this has no effect.
+
+    Alternate list view: runs/status/
+    This will return status summaries for all the requested runs, up to a limit.
+    It also returns has_more, which is true if more runs matched the search
+    criteria than the limit. Query parameters:
+
+    * is_granted - same as above
+    * filters[n][key]=x&filters[n][val]=y - Apply different filters to the
+        search for runs. n starts at 0 and increases by 1 for each added filter.
+        Some filters just have a key and ignore the val value. The possible
+        filters are listed below.
+    * filters[n][key]=active - runs that are still running or recently finished.
+    * filters[n][key]=name&filters[n][val]=match - runs whose display name matches
+        the value (case insensitive).  This either means: the Run's assigned name, if
+        it has one; or the Pipeline name and/or the first input Dataset's name.
+    * filters[n][key]=user&filters[n][val]=match - runs created by the specified user
+    * filters[n][key]=startafter&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        started after the given date and time.
+    * filters[n][key]=startbefore&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        started before the given date and time.
+    * filters[n][key]=endafter&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        ended after the given date and time.
+    * filters[n][key]=endbefore&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        ended before the given date and time.
+    """
+
+    queryset = Run.objects.all()
+    serializer_class = RunSerializer
+    permission_classes = (permissions.IsAuthenticated, IsGrantedReadCreate)
+    pagination_class = StandardPagination
+
+    # Special pagination for the status list route.
+    status_pagination_class = StandardPagination
+    status_serializer_class = RunProgressSerializer
+
+    @list_route(methods=['get'], suffix='Status List')
+    def status(self, request):
+        runs = self.get_queryset().order_by('-time_queued')
+        runs = self.apply_filters(runs)
+        runs = self._build_run_prefetch(runs)
+
+        if not hasattr(self, "_status_paginator"):
+            self._status_paginator = self.status_pagination_class()
+
+        page = self._status_paginator.paginate_queryset(runs, request, view=self.status)
+        if page is not None:
+            status_serializer = self.status_serializer_class(page, many=True, context={"request": request})
+            return self._status_paginator.get_paginated_response(status_serializer.data)
+
+        # If we aren't using pagination, use the bare serializer.
+        bare_serializer = self.status_serializer_class(runs, many=True, context={"request": request})
+        return Response(bare_serializer.data)
+
+    @detail_route(methods=['get'], suffix='Status')
+    def run_status(self, request, pk=None):
+        runs = Run.objects.filter(pk=pk)
+        runs = self._build_run_prefetch(runs)
+        run = runs.first()
+
+        progress = None
+        if run is not None:
+            progress = run.get_run_progress(True)
+
+        return Response(progress)
+
+    @detail_route(methods=['get'], suffix='Outputs')
+    def run_outputs(self, request, pk=None):
+        run = self.get_object()
+        return Response(RunOutputsSerializer(
+            run,
+            context={'request': request}).data)
+
+    @staticmethod
+    def _build_run_prefetch(runs):
+        return runs.prefetch_related('pipeline__steps',
+                                     'runsteps__log',
+                                     'runsteps__pipelinestep__cables_in',
+                                     'runsteps__pipelinestep__transformation__method',
+                                     'runsteps__pipelinestep__transformation__pipeline',
+                                     'pipeline__outcables__poc_instances__run',
+                                     'pipeline__outcables__poc_instances__log',
+                                     'pipeline__steps')
+
+    @staticmethod
+    def _add_filter(queryset, key, value):
+        if key == 'active':
+            recent_time = timezone.now() - timedelta(minutes=5)
+            old_aborted_runs = ExceedsSystemCapabilities.objects.values(
+                'run_id').filter(run__time_queued__lt=recent_time)
+            return queryset.filter(
+                Q(end_time__isnull=True)|
+                Q(end_time__gte=recent_time)
+            ).distinct().exclude(
+                pk__in=old_aborted_runs
+            )
+        if key == 'name':
+            runs_with_matching_inputs = RunInput.objects.filter(
+                symbolicdataset__dataset__name__icontains=value).values(
+                    'run_id')
+            return queryset.filter(
+                Q(name__icontains=value)|
+                (Q(name="") & (Q(pipeline__family__name__icontains=value)|
+                               Q(id__in=runs_with_matching_inputs))))
+        if key == "user":
+            return queryset.filter(user__username__icontains=value)
+        if key in ('startafter', 'startbefore', 'endafter', 'endbefore'):
+            t = timezone.make_aware(datetime.strptime(value, '%d %b %Y %H:%M'),
+                                    timezone.get_current_timezone())
+            if key == 'startafter':
+                return queryset.filter(start_time__gte=t)
+            if key == 'startbefore':
+                return queryset.filter(start_time__lte=t)
+            if key == 'endafter':
+                return queryset.filter(end_time__gte=t)
+            if key == 'endbefore':
+                return queryset.filter(end_time__lte=t)
+        raise APIException('Unknown filter key: {}'.format(key))

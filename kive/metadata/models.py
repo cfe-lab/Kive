@@ -29,7 +29,7 @@ from constants import datatypes, CDTs, maxlengths, groups, users
 
 import logging
 from portal.views import admin_check
-from fleet.exceptions import SandboxActiveException, RTPNotFinished
+from archive.exceptions import SandboxActiveException, RunNotFinished
 
 LOGGER = logging.getLogger(__name__)  # Module level logger.
 
@@ -47,14 +47,14 @@ def remove_helper(removal_plan):
     # If we're affecting anything that's currently running, stop immediately.
     still_in_progress = False
     for sd in removal_plan["SymbolicDatasets"]:
-        for rtp_input in sd.runtoprocessinputs.all():
-            if not rtp_input.runtoprocess.finished:
+        for rtp_input in sd.runinputs.all():
+            if not rtp_input.run.finished:
                 still_in_progress = True
 
     if not still_in_progress:
         for pipeline in removal_plan["Pipelines"]:
-            for rtp in pipeline.runtoprocess_set.all():
-                if not rtp.finished:
+            for run in pipeline.pipeline_instances.all():
+                if not run.finished:
                     still_in_progress = True
 
     if not still_in_progress:
@@ -64,20 +64,13 @@ def remove_helper(removal_plan):
                     still_in_progress = True
 
     if still_in_progress:
-        raise RTPNotFinished("Cannot remove: an affected run is still in progress")
+        raise RunNotFinished("Cannot remove: an affected run is still in progress")
 
     # Redact any sandboxes tied to Runs that we're removing.
     for run in removal_plan["Runs"]:
         try:
-            # FIXME run can be either a RunToProcess or a Run.  Clean this up later when we merge Run and RunToProcess.
-            # We're not using isinstance here because that would introduce a circular dependency.
-            rtp = run
-            if run.__class__.__name__ == "Run":
-                rtp = run.runtoprocess
-            else:
-                rtp = run
-            if not rtp.purged:
-                rtp.collect_garbage()
+            if not run.purged:
+                run.collect_garbage()
         except ObjectDoesNotExist:
             # There's no associated RunToProcess, and therefore no sandbox path.
             pass
