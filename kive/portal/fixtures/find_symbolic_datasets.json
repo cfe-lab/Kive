@@ -57,9 +57,9 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/tmps7PQW_", 
-            "date_created": "2000-01-01T00:00:00Z", 
-            "date_modified": "2000-01-01T00:00:00Z", 
+            "dataset_file": "Datasets/fixtures/tmpV4HB6g", 
+            "date_created": "2000-01-01T00:00:01Z", 
+            "date_modified": "2000-01-01T00:00:01Z", 
             "description": "blahblahblah", 
             "name": "blahblah", 
             "symbolicdataset": 1
@@ -70,7 +70,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/tmplOBsXB", 
+            "dataset_file": "Datasets/fixtures/tmpY8N_JK", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "random reversed words", 
@@ -83,7 +83,7 @@
     {
         "fields": {
             "created_by": null, 
-            "dataset_file": "Datasets/fixtures/tmpSklQQy", 
+            "dataset_file": "Datasets/fixtures/tmpQvVRs5", 
             "date_created": "2000-01-01T00:00:01Z", 
             "date_modified": "2000-01-01T00:00:01Z", 
             "description": "random reversed words", 
@@ -938,7 +938,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$73Asv4VYmZu1$1k5gD2S/EyfYfM0EycE3fdskcsaP9CwxBUNpDrtj6P8=", 
+            "password": "pbkdf2_sha256$15000$6dHXxLhTaOnc$2zhl7nBaYtkomLV2Bs06bXoY1Dd2Eb1Hbkr8uBzOsMU=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -1011,7 +1011,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "49d48fef110525c0ea4cd811111934ff", 
+            "MD5_checksum": "a1973a61d21c568692491609397bcc0b", 
             "_redacted": false, 
             "groups_allowed": [
                 1
@@ -1024,7 +1024,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "17bfea23f36dea9f3f68df25c1b1a392", 
+            "MD5_checksum": "ff6ed7de7a665be6b5a023f8eb7c0642", 
             "_redacted": false, 
             "groups_allowed": [
                 1
@@ -1086,7 +1086,7 @@
         "fields": {
             "MD5_checksum": "55d9a706ac81b733f851a279d27d8cf2", 
             "coderesource": 2, 
-            "content_file": "CodeResources/fdopen_bKqfeAb", 
+            "content_file": "CodeResources/fdopen_jQ8ddve", 
             "groups_allowed": [
                 1
             ], 
@@ -1509,7 +1509,7 @@
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:01Z", 
+            "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
             "user": 2, 
@@ -1534,9 +1534,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:00Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:00Z", 
+            "start_time": "2000-01-01T00:00:01Z", 
             "symbolicdataset": 1, 
             "user": 2
         }, 

@@ -745,14 +745,27 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
                 # Check if inputs match.
                 ER_matches = True
+
+                print
+                print "Inputs for this ExecRecord: {}".format(input_SDs)
                 for ERI in candidate_ER.execrecordins.all():
                     input_idx = ERI.generic_input.definite.dataset_idx
+
+                    print "Looking for a match for input number {} with SD={}".format(
+                        input_idx, input_SDs[input_idx-1])
+                    print "Current ExecRecordIn has input index {} with SD={}".format(
+                        ERI.generic_input.definite.dataset_idx,
+                        ERI.symbolicdataset
+                    )
+                    print
+
                     if ERI.symbolicdataset != input_SDs[input_idx-1]:
                         ER_matches = False
                         break
 
                 if ER_matches:
                     # All ERIs match input SDs, so commit to candidate ER.
+                    print "Matched"
                     candidates.append(candidate_ER)
 
         return candidates

@@ -1,14 +1,23 @@
 [
     {
         "fields": {
+            "index": 1, 
+            "run": 1, 
+            "symbolicdataset": 1
+        }, 
+        "model": "archive.runinput", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:01Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "execrecord": 2, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:00Z"
+            "start_time": "2000-01-01T00:00:01Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 1
@@ -18,11 +27,11 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:03Z", 
             "execrecord": 4, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:00Z"
+            "start_time": "2000-01-01T00:00:02Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 2
@@ -36,7 +45,7 @@
             "execrecord": 1, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:00Z"
+            "start_time": "2000-01-01T00:00:01Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 3
@@ -60,11 +69,11 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:04Z", 
             "execrecord": 5, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:03Z"
+            "start_time": "2000-01-01T00:00:04Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 5
@@ -126,9 +135,9 @@
         "fields": {
             "created_by": 2, 
             "dataset_file": "Datasets/fixtures/step2_total_sums.raw", 
-            "date_created": "2000-01-01T00:00:02Z", 
-            "date_modified": "2000-01-01T00:00:02Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2015-10-15 18:59:34.363231+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
+            "date_created": "2000-01-01T00:00:03Z", 
+            "date_modified": "2000-01-01T00:00:03Z", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2015-11-05 01:28:11.902181+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
             "name": "run1_step2_outputtotal_sums", 
             "symbolicdataset": 3
         }, 
@@ -167,20 +176,20 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:03Z", 
             "invoking_record": 2, 
             "record": 2, 
-            "start_time": "2000-01-01T00:00:02Z"
+            "start_time": "2000-01-01T00:00:03Z"
         }, 
         "model": "archive.execlog", 
         "pk": 4
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:04Z", 
             "invoking_record": 5, 
             "record": 5, 
-            "start_time": "2000-01-01T00:00:03Z"
+            "start_time": "2000-01-01T00:00:04Z"
         }, 
         "model": "archive.execlog", 
         "pk": 5
@@ -732,22 +741,18 @@
     }, 
     {
         "fields": {
-            "index": 1, 
-            "runtoprocess": 1, 
-            "symbolicdataset": 1
-        }, 
-        "model": "fleet.runtoprocessinput", 
-        "pk": 1
-    }, 
-    {
-        "fields": {
             "description": "", 
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:05Z", 
             "groups_allowed": [], 
             "name": "", 
             "parent_runstep": null, 
+            "paused_by": null, 
             "pipeline": 4, 
-            "start_time": "2000-01-01T00:00:00Z", 
+            "purged": true, 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userkive_run1_nRg2M3", 
+            "start_time": "2000-01-01T00:00:01Z", 
+            "stopped_by": null, 
+            "time_queued": "2015-11-05T01:28:11.837Z", 
             "user": 1, 
             "users_allowed": []
         }, 
@@ -769,7 +774,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "2f281db741c4a83d5eadbab81fd9b89e", 
+            "MD5_checksum": "043a30d6777212903af08eaed2ae721c", 
             "_redacted": false, 
             "groups_allowed": [], 
             "user": 1, 
@@ -780,7 +785,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "e237ca8bb33ea0dd3f8d6bb8d1ede977", 
+            "MD5_checksum": "ba9d3a9e10d9f54046b7f0199a284b86", 
             "_redacted": false, 
             "groups_allowed": [], 
             "user": 1, 
@@ -1091,9 +1096,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:01Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "execlog": 2, 
-            "start_time": "2000-01-01T00:00:01Z", 
+            "start_time": "2000-01-01T00:00:02Z", 
             "symbolicdataset": 2, 
             "user": 1
         }, 
@@ -1102,9 +1107,9 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:03Z", 
             "execlog": 4, 
-            "start_time": "2000-01-01T00:00:02Z", 
+            "start_time": "2000-01-01T00:00:03Z", 
             "symbolicdataset": 3, 
             "user": 1
         }, 
@@ -1135,27 +1140,13 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:04Z", 
             "execlog": 5, 
-            "start_time": "2000-01-01T00:00:03Z", 
+            "start_time": "2000-01-01T00:00:04Z", 
             "symbolicdataset": 3, 
             "user": 1
         }, 
         "model": "datachecking.integritychecklog", 
         "pk": 3
-    }, 
-    {
-        "fields": {
-            "groups_allowed": [], 
-            "pipeline": 4, 
-            "purged": true, 
-            "run": 1, 
-            "sandbox_path": "/home/don/data/kive/Sandboxes/userkive_run1_KiA9wN", 
-            "time_queued": "2015-10-15T18:59:34.322Z", 
-            "user": 1, 
-            "users_allowed": []
-        }, 
-        "model": "fleet.runtoprocess", 
-        "pk": 1
     }
 ]

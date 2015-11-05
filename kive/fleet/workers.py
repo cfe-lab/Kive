@@ -432,7 +432,7 @@ class Manager:
         ready_to_purge = []
         for pf in set(pfs_represented):
             # Look for the oldest ones.
-            curr_candidates = purge_candidates.filter(pipeline__family=pf).order_by("run__end_time")
+            curr_candidates = purge_candidates.filter(pipeline__family=pf).order_by("end_time")
             num_remaining = curr_candidates.count()
 
             ready_to_purge = itertools.chain(

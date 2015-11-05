@@ -72,7 +72,7 @@ class Sandbox:
         INPUTS
         user          User running the pipeline.*
         my_pipeline   Pipeline to run.*
-        inputs        List of SDs to feed into the pipeline.*
+        inputs        Ordered list of SDs to feed into the pipeline.*
         users_allowed   Iterable (e.g. list or QuerySet) of Users.*
         groups_allowed  Iterable of Groups.*
         sandbox_path  Where on the filesystem to execute.*
@@ -1966,7 +1966,7 @@ class RunPlan(object):
             for output in step.transformation.outputs.all():
                 step_plan.outputs.append(DatasetPlan(step_num=step.step_num,
                                                      output_num=output.dataset_idx))
-            for cable in step.cables_in.all():
+            for cable in step.cables_in.order_by("dest__dataset_idx"):
                 if cable.source_step == 0:
                     input_index = cable.source.definite.dataset_idx-1
                     input_plan = self.inputs[input_index]

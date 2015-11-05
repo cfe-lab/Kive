@@ -291,7 +291,7 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
         if key == 'active':
             recent_time = timezone.now() - timedelta(minutes=5)
             old_aborted_runs = ExceedsSystemCapabilities.objects.values(
-                'run_id').filter(run__time_queued__lt=recent_time)
+                'run_id').filter(time_queued__lt=recent_time)
             return queryset.filter(
                 Q(end_time__isnull=True)|
                 Q(end_time__gte=recent_time)
