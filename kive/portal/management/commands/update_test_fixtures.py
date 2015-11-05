@@ -27,8 +27,7 @@ from pipeline.models import PipelineFamily
 import portal.models
 from sandbox.execute import Sandbox, finish_step, finish_cable
 import sandbox.tests
-from archive.models import Dataset, RunStep
-from fleet.models import RunToProcess
+from archive.models import Dataset, RunStep, Run
 from fleet.workers import Manager
 
 
@@ -266,7 +265,7 @@ x,y
         dataset = Dataset(symbolicdataset=symbolic, name='pairs', user=user)
         dataset.dataset_file.save(name='pairs.csv', content=dataset_file)
 
-        run_to_process = RunToProcess(pipeline=pipeline1, user=user)
+        run_to_process = Run(pipeline=pipeline1, user=user)
         run_to_process.save()
         run_to_process.clean()
         run_to_process.inputs.create(symbolicdataset=symbolic, index=1)
@@ -289,7 +288,7 @@ x,y
                 else:
                     sandbox_result = finish_cable(task_info_dict, worker_rank)
                 manager.note_progress(worker_rank, sandbox_result)
-        run_to_process = RunToProcess.objects.get(id=run_to_process.id)
+        run_to_process = Run.objects.get(id=run_to_process.id)
         run_to_process.collect_garbage()  # Delete sandbox directories
 
     def create_pipelines(self, user):

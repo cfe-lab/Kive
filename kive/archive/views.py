@@ -21,7 +21,6 @@ from portal.views import admin_check
 from kive.settings import DATASET_DISPLAY_MAX
 
 import librarian.models
-# import fleet.models
 
 LOGGER = logging.getLogger(__name__)
 
