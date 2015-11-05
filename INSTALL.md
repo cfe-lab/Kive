@@ -31,7 +31,7 @@ Installing Django
 Instructions for downloading and installing Django can be found at [djangoproject.com](https://www.djangoproject.com/download/).
 If you are already running Django 1.6, installing should be as painless as running
 
-    pip install Django==1.7.5
+    pip install Django==1.7.4
 
 (substitute the appropriate version number if you wish to use a different version -- a newer one, for example).  You will likely need to run this using `sudo` unless you only installed Django locally and not
 system-wide.  Also, many systems have multiple Python installations, so make sure that

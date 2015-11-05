@@ -1,5 +1,6 @@
-import re
+from datetime import datetime
 import os.path
+import re
 import tempfile
 
 from django.contrib.auth.models import User
@@ -93,7 +94,9 @@ class QueuedRunTest(TestCase):
     def create_with_run_step(self):
         run = self.create_with_pipeline_step()
         pipeline_step = run.pipeline.steps.first()
-        run_step = RunStep(run=run, pipelinestep=pipeline_step)
+        run_step = RunStep(run=run,
+                           pipelinestep=pipeline_step,
+                           start_time=datetime.now())
         run_step.save()
         run_step_input_cable = RunSIC(PSIC=pipeline_step.cables_in.first())
         run_step.RSICs.add(run_step_input_cable)

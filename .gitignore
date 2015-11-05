@@ -13,6 +13,7 @@ kive/Logs
 kive/Sandboxes
 kive/kive.log*
 kive/testreport.xml
+api/results
 # Ignore nodeJS modules
 node_modules/
 
@@ -21,9 +22,10 @@ node_modules/
 doc/*.aux
 doc/*.dvi
 doc/*.pdf
+utils/dump
 *.log
 /.idea/
-kive/.settings/org.eclipse.core.resources.prefs
+.settings/org.eclipse.core.resources.prefs
 .DS_Store
 TEST-*
 

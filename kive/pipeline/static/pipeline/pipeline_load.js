@@ -448,27 +448,37 @@ var pipeline = (function(exports){
 
         var method_node_offset = self.pipeline.inputs.length;
 
-        $.each(self.pipeline.outcables, function(_, this_output) {
+        $.each(self.pipeline.outcables, function(_, this_outcable) {
 
             // identify source Method
-            var source = self.canvasState.shapes[method_node_offset + this_output.source_step - 1];
+            var source = self.canvasState.shapes[method_node_offset + this_outcable.source_step - 1];
 
             // Over each out magnet for that source
             $.each(source.out_magnets, function(j, magnet) {
-                if (magnet.label === this_output.source_dataset_name) {
+                if (magnet.label === this_outcable.source_dataset_name) {
+
+                    var output_in_list = $.grep(self.pipeline.outputs,
+                        function(output, _) {
+                            return output.dataset_idx === this_outcable.output_idx;
+                        }
+                    );
+                    if (output_in_list.length !== 1) {
+                        throw "There should be exactly 1 output with dataset_idx=" + this_outcable.output_idx;
+                    }
+                    var output = output_in_list[0];
+
                     var connector = new drydock_objects.Connector(magnet),
-                        output = self.pipeline.outputs[this_output.output_idx - 1],
                         output_node = new drydock_objects.OutputNode(
                             output.x * canvas_x_ratio,
                             output.y * canvas_y_ratio,
-                            this_output.output_name,
-                            this_output.pk
+                            this_outcable.output_name,
+                            this_outcable.pk
                          );
 
                     self.canvasState.addShape(output_node);
 
-                    connector.x = this_output.x * canvas_x_ratio;
-                    connector.y = this_output.y * canvas_y_ratio;
+                    connector.x = output.x * canvas_x_ratio;
+                    connector.y = output.y * canvas_y_ratio;
 
                     connector.dest = output_node.in_magnets[0];
                     connector.dest.connected = [connector];  // bind cable to output node
