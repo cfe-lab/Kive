@@ -1976,7 +1976,7 @@ class RunPlan(object):
                     input_plan = self.step_plans[step_index].outputs[output_index]
                 step_plan.inputs.append(input_plan)
         self.outputs = []
-        for cable in run.pipeline.outcables.all():
+        for cable in run.pipeline.outcables.order_by("output_idx"):
             step_index = cable.source_step-1
             output_index = cable.source.definite.dataset_idx-1
             output_plan = self.step_plans[step_index].outputs[output_index]
