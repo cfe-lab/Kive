@@ -26,7 +26,6 @@ OutputsTable.prototype = Object.create(
         permissions.PermissionsTable.prototype);
 
 OutputsTable.prototype.extractRows = function(response) {
-    var run = response.run;
     if (this.$remove_link !== undefined) {
         this.$remove_link.toggle( ! this.is_locked);
     }
@@ -37,10 +36,10 @@ OutputsTable.prototype.extractRows = function(response) {
         var $tr = this.$table.find('thead tr');
         $tr.append($('<th/>').append(this.$remove_link));
     }
-    if (run === null) {
+    if (response === null) {
         return [];
     }
-    return run.input_summary.concat(run.output_summary);
+    return response.input_summary.concat(response.output_summary);
 };
 
 OutputsTable.prototype.getRedactionField = function(plan_url) {

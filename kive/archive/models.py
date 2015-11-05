@@ -409,7 +409,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         return result
 
     @staticmethod
-    def _format_time(self, t):
+    def _format_time(t):
         return t and timezone.localtime(t).strftime('%d %b %Y %H:%M')
 
     def collect_garbage(self):

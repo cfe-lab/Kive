@@ -200,9 +200,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
         fields = ('id', 'output_summary', 'input_summary')
 
     def get_input_summary(self, run):
-        """ Get a  list of objects that summarize all the inputs for a run.
-
-        """
+        """Get a list of objects that summarize all the inputs for a run."""
 
         request = self.context.get('request', None)
         inputs = []

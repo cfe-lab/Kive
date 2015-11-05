@@ -63,36 +63,42 @@ class Sandbox:
 
     # cable_map maps cables to ROC/RSIC.
 
-    def __init__(self, user, my_pipeline, inputs, users_allowed=None, groups_allowed=None, sandbox_path=None,
-                 run=None):
+    def __init__(self, user=None, my_pipeline=None, inputs=None, users_allowed=None, groups_allowed=None,
+                 sandbox_path=None, run=None):
         """
         Sets up a sandbox environment to run a Pipeline: space on
         the file system, along with sd_fs_map/socket_map/etc.
 
         INPUTS
-        user          User running the pipeline.
-        my_pipeline   Pipeline to run.
-        inputs        List of SDs to feed into the pipeline.
-        users_allowed   Iterable (e.g. list or QuerySet) of Users.  Ignored if run != None.
-        groups_allowed  Iterable of Groups.  Ignored if run != None.
-        sandbox_path  Where on the filesystem to execute.
+        user          User running the pipeline.*
+        my_pipeline   Pipeline to run.*
+        inputs        List of SDs to feed into the pipeline.*
+        users_allowed   Iterable (e.g. list or QuerySet) of Users.*
+        groups_allowed  Iterable of Groups.*
+        sandbox_path  Where on the filesystem to execute.*
         run           A Run object to fill in (e.g. if we're starting this using the fleet);
                       if None, we create our own.
+
+        * parameter is ignored if run is specified
 
         PRECONDITIONS
         inputs must have real data
         """
-        assert all([i.has_data() for i in inputs])
-        users_allowed = users_allowed or []
-        groups_allowed = groups_allowed or []
-
         if run:
             self.run = run
+            user = run.user
+            my_pipeline = run.pipeline
+            inputs = [x.symbolicdataset for x in run.inputs.order_by("index")]
+            sandbox_path = run.sandbox_path
         else:
             self.run = my_pipeline.pipeline_instances.create(start_time=timezone.now(), user=user)
+            users_allowed = users_allowed or []
+            groups_allowed = groups_allowed or []
             self.run.users_allowed.add(*users_allowed)
             self.run.groups_allowed.add(*groups_allowed)
             self.run.save()
+
+        assert all([i.has_data() for i in inputs])
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.user = user

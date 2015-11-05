@@ -108,26 +108,22 @@ class Manager:
     def is_worker_ready(self, rank):
         return self.worker_status[rank] == Worker.READY
 
-    def start_run(self, user, pipeline_to_run, inputs, users_allowed=None, groups_allowed=None,
-                  sandbox_path=""):
+    def start_run(self, run_to_start):
         """
         Receive a request to start a pipeline running.
         """
-        if sandbox_path == "":
-            sandbox_path = None
-        new_sdbx = sandbox.execute.Sandbox(user, pipeline_to_run, inputs, users_allowed=users_allowed,
-                                           groups_allowed=groups_allowed, sandbox_path=sandbox_path)
+        new_sdbx = sandbox.execute.Sandbox(run=run_to_start)
         new_sdbx.advance_pipeline()
 
         # If we were able to reuse throughout, then we're totally done.  Otherwise we
         # need to do some bookkeeping.
-        if new_sdbx.run.is_complete():
+        if run_to_start.is_complete():
             mgr_logger.info('Run "%s" completely reused (Pipeline: %s, User: %s)',
-                            new_sdbx.run, pipeline_to_run, user)
-            new_sdbx.run.stop(save=True)
-            new_sdbx.run.complete_clean()
+                            run_to_start, run_to_start.pipeline, run_to_start.user)
+            run_to_start.stop(save=True)
+            run_to_start.complete_clean()
         else:
-            self.active_sandboxes[new_sdbx.run] = new_sdbx
+            self.active_sandboxes[run_to_start] = new_sdbx
             for task in new_sdbx.hand_tasks_to_fleet():
                 self.task_queue.append((new_sdbx, task))
 
@@ -400,24 +396,22 @@ class Manager:
                 run_to_process.clean()
                 continue
 
-            new_sdbx = self.start_run(run_to_process.user, run_to_process.pipeline,
-                                      [x.symbolicdataset for x in run_to_process.inputs.order_by("index")],
-                                      users_allowed=run_to_process.users_allowed.all(),
-                                      groups_allowed=run_to_process.groups_allowed.all(),
-                                      sandbox_path=run_to_process.sandbox_path)
+            self.start_run(run_to_process)
+            # new_sdbx = self.start_run(run_to_process.user, run_to_process.pipeline,
+            #                           [x.symbolicdataset for x in run_to_process.inputs.order_by("index")],
+            #                           users_allowed=run_to_process.users_allowed.all(),
+            #                           groups_allowed=run_to_process.groups_allowed.all(),
+            #                           sandbox_path=run_to_process.sandbox_path)
             mgr_logger.info("Started run id %d, pipeline %s, user %s",
-                            new_sdbx.run.id,
+                            run_to_process.pk,
                             run_to_process.pipeline,
                             run_to_process.user)
-            run_to_process.run = new_sdbx.run
-            run_to_process.sandbox_path = new_sdbx.sandbox_path
-            run_to_process.save()
 
             mgr_logger.debug("Task queue: {}".format(self.task_queue))
             mgr_logger.debug("Active sandboxes: {}".format(self.active_sandboxes))
 
     @staticmethod
-    def purge_sandboxes(self):
+    def purge_sandboxes():
         # Next, look for finished jobs to clean up.
         mgr_logger.debug("Checking for old sandboxes to clean up....")
 

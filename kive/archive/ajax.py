@@ -18,7 +18,8 @@ from archive.models import Run, RunInput, ExceedsSystemCapabilities, Dataset, Me
 from archive.views import _build_download_response
 
 from kive.ajax import RemovableModelViewSet, RedactModelMixin, IsGrantedReadOnly, IsGrantedReadCreate,\
-    StandardPagination, RemovableModelViewSet, CleanCreateModelMixin, convert_validation
+    StandardPagination, RemovableModelViewSet, CleanCreateModelMixin, SearchableModelMixin,\
+    convert_validation
 
 from librarian.models import SymbolicDataset
 

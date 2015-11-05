@@ -164,7 +164,6 @@ def view_results(request, run_id):
             four_oh_four = True
     except Run.DoesNotExist:
         four_oh_four = True
-
     if four_oh_four:
         raise Http404("ID {} does not exist or is not accessible".format(run_id))
 
