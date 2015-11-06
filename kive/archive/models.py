@@ -144,9 +144,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     sandbox_path = models.CharField(max_length=256, default="", blank=True, null=False)
     time_queued = models.DateTimeField(default=timezone.now, null=True)
     purged = models.BooleanField(default=False)
-    stopped_by = models.ForeignKey(User, help_text="User that stopped this Run", null=True,
+    stopped_by = models.ForeignKey(User, help_text="User that stopped this Run", null=True, blank=True,
                                    related_name="stopper")
-    paused_by = models.ForeignKey(User, help_text="User that paused this Run", null=True,
+    paused_by = models.ForeignKey(User, help_text="User that paused this Run", null=True, blank=True,
                                   related_name="pauser")
 
     pipeline = models.ForeignKey("pipeline.Pipeline", related_name="pipeline_instances",
@@ -242,6 +242,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                                       .format(self, source_step))
             run_outcable.clean()
 
+    @property
     @transaction.atomic
     def started(self):
         return self.has_started() or hasattr(self, "not_enough_CPUs")
@@ -253,12 +254,13 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     @property
     @transaction.atomic
     def running(self):
-        return self.started() and not self.is_complete()
+        return self.started and not self.is_complete()
 
     # FIXME this will need to be changed when we introduce flags for a cancelled or paused run.
+    @property
     @transaction.atomic
     def finished(self):
-        return (self.started() and self.is_complete()) or hasattr(self, "not_enough_CPUs")
+        return (self.started and self.is_complete()) or hasattr(self, "not_enough_CPUs")
 
     @property
     def display_name(self):
@@ -275,6 +277,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             pipeline_name = self.pipeline.family.name
         except Pipeline.DoesNotExist:
             pipeline_name = "Run"
+
         inputs = self.inputs.select_related('symbolicdataset__dataset')
         first_input = inputs.order_by('index').first()
         if not (first_input and first_input.symbolicdataset.has_data()):
@@ -418,12 +421,12 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         if self.sandbox_path == "":
             raise archive.exceptions.SandboxActiveException(
-                "Run (Run={}, Pipeline={}, queued {}, User={}) has not yet started".format(
+                "Run (pk={}, Pipeline={}, queued {}, User={}) has no sandbox path".format(
                     self.pk, self.pipeline, self.time_queued, self.user)
                 )
         elif not self.finished:
             raise archive.exceptions.SandboxActiveException(
-                "Run (Run={}, Pipeline={}, queued {}, User={}) is not finished".format(
+                "Run (pk={}, Pipeline={}, queued {}, User={}) is not finished".format(
                     self.pk, self.pipeline, self.time_queued, self.user)
                 )
 

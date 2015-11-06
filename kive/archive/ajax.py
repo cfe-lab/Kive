@@ -195,7 +195,7 @@ class MethodOutputViewSet(ReadOnlyModelViewSet):
 
 
 class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
-                          SearchableModelMixin):
+                 SearchableModelMixin):
     """ Runs, including those that haven't started yet
 
     Query parameters for the list view:

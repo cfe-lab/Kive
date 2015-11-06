@@ -1,4 +1,3 @@
-from datetime import datetime
 import os.path
 import re
 import tempfile
@@ -36,25 +35,25 @@ class QueuedRunTest(TestCase):
     """
     fixtures = ['initial_data', "initial_groups", 'initial_user', 'converter_pipeline']
 
-    def test_run_progress_no_run(self):
-        run = Run()
-
-        progress = run.get_run_progress()
-
-        self.assertSequenceEqual('?', progress['status'])
-        self.assertSequenceEqual('Run', progress['name'])
+    def setUp(self):
+        self.converter_pf = PipelineFamily.objects.get(name="Fasta2CSV")
+        self.converter_pl = self.converter_pf.members.first()
 
     def test_owner(self):
         expected_username = 'dave'
-        run = Run(user=User(username=expected_username))
+        run = Run(user=User(username=expected_username), pipeline=self.converter_pl)
 
         progress = run.get_run_progress()
 
         self.assertSequenceEqual(expected_username, progress['user'])
 
     def create_with_empty_pipeline(self):
-        pipeline = Pipeline()
-        run = Run(pipeline=pipeline)
+        pipeline = Pipeline(family=self.converter_pf, user=kive_user())
+        pipeline.save()
+
+        run = Run(pipeline=pipeline, user=kive_user())
+        run.save()
+        run.start()
         return run
 
     def test_run_progress_empty_pipeline(self):
@@ -69,6 +68,7 @@ class QueuedRunTest(TestCase):
         user = User.objects.first()
         run = Run(pipeline=pipeline, user=user)
         run.save()
+        run.start()
         return run
 
     def test_run_progress_starting(self):
@@ -77,7 +77,7 @@ class QueuedRunTest(TestCase):
         progress = run.get_run_progress()
 
         self.assertSequenceEqual('.-.', progress['status'])
-        self.assertSequenceEqual('Fasta2CSV', progress['name'])
+        self.assertSequenceEqual('Fasta2CSV at {}'.format(run.time_queued), progress['name'])
 
     def add_exec_log(self, run_component):
         ExecLog.create(record=run_component,
@@ -96,7 +96,7 @@ class QueuedRunTest(TestCase):
         pipeline_step = run.pipeline.steps.first()
         run_step = RunStep(run=run,
                            pipelinestep=pipeline_step,
-                           start_time=datetime.now())
+                           start_time=timezone.now())
         run_step.save()
         run_step_input_cable = RunSIC(PSIC=pipeline_step.cables_in.first())
         run_step.RSICs.add(run_step_input_cable)
@@ -496,7 +496,7 @@ class RestoreReusableDatasetTest(TestCase):
 
         run_to_process = self.execute_pipeline(pipeline)
 
-        self.assertTrue(run_to_process.run.successful_execution())
+        self.assertTrue(run_to_process.successful_execution())
 
     def test_rerun_old_pipeline(self):
         pipeline = Pipeline.objects.get(revision_name='sums only')
@@ -541,7 +541,7 @@ class GarbageCollectionTest(TestCase):
 
         self.assertRaisesRegexp(
             SandboxActiveException,
-            re.escape("Run (Run={}, Pipeline={}, queued {}, User=Rem Over) has not yet started".format(
+            re.escape("Run (pk={}, Pipeline={}, queued {}, User=Rem Over) has no sandbox path".format(
                 run.id,
                 self.noop_pl,
                 run.time_queued)),
@@ -552,14 +552,12 @@ class GarbageCollectionTest(TestCase):
         """
         A Run that is not marked as finished should raise an exception.
         """
-        run = Run(pipeline=self.noop_pl, user=self.noop_pl.user)
-        run.save()
-        run.sandbox_path = self.mock_sandbox_path
+        run = Run(pipeline=self.noop_pl, user=self.noop_pl.user, sandbox_path=self.mock_sandbox_path)
         run.save()
 
         self.assertRaisesRegexp(
             SandboxActiveException,
-            re.escape("Run (Run={}, Pipeline={}, queued {}, User=Rem Over) is not finished".format(
+            re.escape("Run (pk={}, Pipeline={}, queued {}, User=Rem Over) is not finished".format(
                 run.id,
                 self.noop_pl,
                 run.time_queued)),
@@ -617,7 +615,7 @@ class RunApiTests(TestCase):
         clean_up_all_files()
         restore_production_files()
 
-    def test_run_index(self, expected_runs=0):
+    def test_run_index(self, expected_runs=1):
         request = self.factory.get(self.run_list_path)
         response = self.run_list_view(request).render()
         data = response.render().data
@@ -704,9 +702,9 @@ class RunApiTests(TestCase):
         response = view(request, *args, **kwargs)
         data = response.render().data
         self.assertEquals(data['id'], real_run_pk)
-        self.assertEquals(len(data['run']['output_summary']), 8)
+        self.assertEquals(len(data['output_summary']), 8)
 
-        for output in data['run']['output_summary']:
+        for output in data['output_summary']:
             self.assertEquals(output['is_ok'], True)
             self.assertEquals(output['is_invalid'], False)
 
@@ -729,7 +727,7 @@ class RunApiTests(TestCase):
         view, args, kwargs = resolve(path)
         response = view(request, *args, **kwargs)
         self.assertEquals(response.render().data, None)
-        self.test_run_index(0)
+        self.test_run_index(1)  # The run in the fixture should still be there.
 
 
 class RunToProcessSerializerTests(TestCase):

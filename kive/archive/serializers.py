@@ -1,5 +1,6 @@
 import os
 
+from django.core.exceptions import ValidationError
 from django.template.defaultfilters import filesizeformat
 from django.utils import timezone
 from django.contrib.auth.models import User, Group
@@ -462,8 +463,8 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
         for input_data in inputs:
             rtp.inputs.create(**input_data)
 
-        # If this throws an error, we'll break out of the transaction.
-        rtp.clean()
+        # The ViewSet will call full_clean after this, and if it fails then the
+        # transaction will be broken.
         return rtp
 
 
