@@ -329,7 +329,7 @@ class KiveAPI(Session):
     def get_run(self, id):
         """ Get a RunStatus object for the given id.
 
-        :param id: a RunToProcess id
+        :param id: a Run id
         :return: RunStatus object.
         """
         data = self.get('@api_run', context={'run-id': id}).json()

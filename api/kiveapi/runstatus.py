@@ -8,13 +8,14 @@ from .dataset import Dataset
 
 class RunStatus(object):
     """
-    This keeps track of a run in Kive, there's no immediate
-    mapping of this object to an object in Kive, except maype
-    RunToProcess
+    This keeps track of a run in Kive.
+
+    There isn't a direct analogue in Kive for this, but it represents a part of
+    Run's functionality.
     """
 
     def __init__(self, obj, api):
-        self.rtp_id = obj['id']
+        self.run_id = obj['id']
         self.url = obj['run_status']
         self.results_url = obj['run_outputs']
         self.api = api
@@ -22,7 +23,7 @@ class RunStatus(object):
     def _grab_stats(self):
         data = self.api.get(self.url).json()
         if "!" in data["status"]:
-            raise KiveRunFailedException("Run %s failed" % self.rtp_id)
+            raise KiveRunFailedException("Run %s failed" % self.run_id)
         return data
 
     def get_status(self):
@@ -38,7 +39,7 @@ class RunStatus(object):
             return "Waiting to start..."
 
         if '!' in status:
-            raise KiveRunFailedException("Run %s failed" % self.rtp_id)
+            raise KiveRunFailedException("Run %s failed" % self.run_id)
 
         if '*' in status and '.' not in status:
             return 'Complete.'
@@ -115,5 +116,5 @@ class RunStatus(object):
         if not self.is_complete():
             return None
 
-        datasets = self.api.get(self.results_url).json()['run']['output_summary']
+        datasets = self.api.get(self.results_url).json()['output_summary']
         return {d['name']: Dataset(d, self.api) for d in datasets}
