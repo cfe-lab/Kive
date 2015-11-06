@@ -2943,7 +2943,6 @@ class MethodApiTests(BaseTestCases.ApiTestCase):
         self.removal_path = reverse("method-removal-plan",
                                     kwargs={'pk': self.detail_pk})
 
-        # This should equal metadata.ajax.CompoundDatatypeViewSet.as_view({"get": "list"}).
         self.list_view, _, _ = resolve(self.list_path)
         self.detail_view, _, _ = resolve(self.detail_path)
         self.removal_view, _, _ = resolve(self.removal_path)
@@ -2952,13 +2951,12 @@ class MethodApiTests(BaseTestCases.ApiTestCase):
 
     def test_list(self):
         """
-        Test the CompoundDatatype API list view.
+        Test the API list view.
         """
         request = self.factory.get(self.list_path)
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        # There are four CDTs loaded into the Database by default.
         self.assertEquals(len(response.data), 6)
         self.assertEquals(response.data[0]['revision_name'], 'mC_name')
 
@@ -2980,6 +2978,7 @@ class MethodApiTests(BaseTestCases.ApiTestCase):
         request = self.factory.delete(self.detail_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
+
         self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
 
         end_count = Method.objects.all().count()

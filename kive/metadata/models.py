@@ -45,25 +45,26 @@ deletion_order = [
 @transaction.atomic
 def remove_helper(removal_plan):
     # If we're affecting anything that's currently running, stop immediately.
-    still_in_progress = False
-    for sd in removal_plan["SymbolicDatasets"]:
-        for rtp_input in sd.runinputs.all():
-            if not rtp_input.run.finished:
-                still_in_progress = True
 
-    if not still_in_progress:
+    def _any_runs_in_progress():
+        for sd in removal_plan["SymbolicDatasets"]:
+            for rtp_input in sd.runinputs.all():
+                if rtp_input.run.running:
+                    return True
+
         for pipeline in removal_plan["Pipelines"]:
             for run in pipeline.pipeline_instances.all():
-                if not run.finished:
-                    still_in_progress = True
+                if run.running:
+                    return True
 
-    if not still_in_progress:
         for er in removal_plan["ExecRecords"]:
             for affected_rc in er.used_by_components.all():
-                if not affected_rc.top_level_run.is_complete():
-                    still_in_progress = True
+                if affected_rc.top_level_run.running:
+                    return True
 
-    if still_in_progress:
+        return False
+
+    if _any_runs_in_progress():
         raise RunNotFinished("Cannot remove: an affected run is still in progress")
 
     # Redact any sandboxes tied to Runs that we're removing.
