@@ -65,7 +65,7 @@ class RunStatus(object):
         """
 
         status = self._grab_stats()
-        return status.get('start', None) and not status.get('end', None)
+        return status.get('start', False) and not status.get('end', False)
 
     def is_complete(self):
         """
