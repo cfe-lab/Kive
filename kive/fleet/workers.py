@@ -19,6 +19,7 @@ from django.utils import timezone
 import archive.models
 from archive.models import Dataset, Run, ExceedsSystemCapabilities
 import sandbox.execute
+from fleet.exceptions import StopExecution
 
 mgr_logger = logging.getLogger("fleet.Manager")
 worker_logger = logging.getLogger("fleet.Worker")
@@ -56,7 +57,8 @@ class Manager:
         self.worker_count = worker_count
         self.manage_script = manage_script
 
-        # tasks_in_progress tracks what jobs are assigned to what workers.
+        # tasks_in_progress tracks what jobs are assigned to what workers:
+        # foreman -|--> {"task": task, "vassals": vassals}
         self.tasks_in_progress = {}
         # task_queue is a list of 2-tuples (sandbox, runstep/runcable).
         # We don't use a Queue here because we may need to remove tasks from
@@ -129,7 +131,7 @@ class Manager:
 
         return new_sdbx
 
-    def mop_up_failed_sandbox(self, sandbox):
+    def mop_up_terminated_sandbox(self, sandbox):
         """
         Remove all tasks coming from the specified sandbox from the work queue
         and mark them as cancelled.
@@ -161,7 +163,7 @@ class Manager:
                 task, task_info.threads_required, self.max_host_cpus, task.top_level_run)
             task.not_enough_CPUs.create(threads_requested=task_info.threads_required,
                                         max_available=self.max_host_cpus)
-            self.mop_up_failed_sandbox(sandbox)
+            self.mop_up_terminated_sandbox(sandbox)
             return
 
         while True:
@@ -232,7 +234,7 @@ class Manager:
         # we mop up.
         clean_up_now = False
         if not curr_sdbx.run.successful_execution():
-            self.mop_up_failed_sandbox(curr_sdbx)
+            self.mop_up_terminated_sandbox(curr_sdbx)
             if not task_finished.is_successful():
                 mgr_logger.info('Task %s (pk=%d) of run "%s" (pk=%d) (Pipeline: %s, User: %s) failed.',
                                 task_finished, task_finished.pk, curr_sdbx.run, curr_sdbx.run.pk,
@@ -299,10 +301,7 @@ class Manager:
         comm.Disconnect()
 
     def worker_finished(self, lord_rank, result_pk):
-        """
-        Handle bookkeeping when a worker finishes.
-
-        """
+        """Handle bookkeeping when a worker finishes."""
 
         if result_pk == Worker.FAILURE:
             raise WorkerFailedException("Worker {} reports a failed task (PK {})".format(
@@ -322,6 +321,8 @@ class Manager:
         Poll the database for new jobs, and handle running of sandboxes.
         """
         while True:
+            self.find_stopped_runs()
+
             time_to_poll = time.time() + settings.FLEET_POLLING_INTERVAL
             if not self.assign_tasks(time_to_poll):
                 return
@@ -375,7 +376,6 @@ class Manager:
         # Look for new jobs to run.  We will also
         # build in a delay here so we don't clog up the database.
         mgr_logger.debug("Looking for new runs....")
-        # with transaction.atomic():
         pending_runs = Run.find_unstarted().order_by("time_queued")
 
         mgr_logger.debug("Pending runs: {}".format(pending_runs))
@@ -397,11 +397,6 @@ class Manager:
                 continue
 
             self.start_run(run_to_process)
-            # new_sdbx = self.start_run(run_to_process.user, run_to_process.pipeline,
-            #                           [x.symbolicdataset for x in run_to_process.inputs.order_by("index")],
-            #                           users_allowed=run_to_process.users_allowed.all(),
-            #                           groups_allowed=run_to_process.groups_allowed.all(),
-            #                           sandbox_path=run_to_process.sandbox_path)
             mgr_logger.info("Started run id %d, pipeline %s, user %s",
                             run_to_process.pk,
                             run_to_process.pipeline,
@@ -409,6 +404,46 @@ class Manager:
 
             mgr_logger.debug("Task queue: {}".format(self.task_queue))
             mgr_logger.debug("Active sandboxes: {}".format(self.active_sandboxes))
+
+    def find_stopped_runs(self):
+        """
+        Look for currently running Runs that have been stopped by a user.
+        """
+        mgr_logger.debug("Looking for stopped runs....")
+        just_stopped_runs = Run.objects.filter(end_time__isnull=True, stopped_by__isnull=False)
+
+        for run_to_stop in just_stopped_runs:
+            self.stop_run(run_to_stop)
+
+    def stop_run(self, run):
+        """
+        Stop the specified run.
+        """
+        mgr_logger.debug("Stopping run (pk={}) on behalf of user {}".format(run.pk, run.stopped_by))
+        sandbox_to_end = self.active_sandboxes[run]
+
+        # Send a message to the foreman in charge of running this task.
+        foreman_found = False
+        for foreman in self.tasks_in_progress:
+            if self.tasks_in_progress[foreman]["task"].top_level_run == run:
+                foreman_found = True
+                break
+
+        if foreman_found:
+            self.comm.isend("STOP", dest=foreman, tag=Worker.STOP)
+            # Either the foreman got the message and ended the task, or it
+            # finished the task.
+            self.comm.recv(source=foreman, tag=Worker.FINISHED)
+
+            self.worker_status[foreman] = Worker.READY
+            for worker_rank in self.tasks_in_progress[foreman]["vassals"]:
+                self.worker_status[worker_rank] = Worker.READY
+
+        # Cancel all tasks on the task queue pertaining to this run.
+        self.mop_up_terminated_sandbox(sandbox_to_end)
+        run.stop(save=True)
+
+        mgr_logger.debug("Run (pk={}) stopped by user {}".format(run.pk, run.stopped_by))
 
     @staticmethod
     def purge_sandboxes():
@@ -475,6 +510,8 @@ class Worker:
     ASSIGNMENT = 2
     FINISHED = 3
     SHUTDOWN = 4
+    STOP = 5
+
     FAILURE = -1
 
     def __init__(self, comm):
@@ -488,6 +525,12 @@ class Worker:
 
         # Report to the manager.
         self.comm.send((self.wkr_hostname, self.rank), dest=0, tag=Worker.ROLLCALL)
+
+    def check_for_stop(self):
+        """
+        A callback that checks for a Worker.STOP message from the Manager.
+        """
+        return self.comm.Iprobe(source=0, tag=STOP)
 
     def receive_and_perform_task(self):
         """
@@ -514,13 +557,24 @@ class Worker:
                                self.rank,
                                task)
 
-            sandbox_result = None
-            if type(task) == archive.models.RunStep:
-                sandbox_result = sandbox.execute.finish_step(task_info_dict, self.rank)
-            else:
-                sandbox_result = sandbox.execute.finish_cable(task_info_dict, self.rank)
-            worker_logger.debug("{} {} completed.  Returning results to Manager.".format(task.__class__.__name__, task))
-            result = sandbox_result.pk
+            try:
+                if type(task) == archive.models.RunStep:
+                    sandbox_result = sandbox.execute.finish_step(task_info_dict, self.rank, self.check_for_stop)
+
+                else:
+                    sandbox_result = sandbox.execute.finish_cable(task_info_dict, self.rank)
+                worker_logger.debug("{} {} completed.  Returning results to Manager.".format(task.__class__.__name__, task))
+                result = sandbox_result.pk
+            except StopExecution as e:
+                worker_logger.debug(
+                    "[%d] %s %s stopped (%s).",
+                    self.rank,
+                    task.__class__.__name__,
+                    task,
+                    e,
+                    exc_info=True
+                )
+                result = Worker.STOP
         except:
             result = Worker.FAILURE  # bogus return value
             worker_logger.error("[%d] Task %s failed.", self.rank, task, exc_info=True)

@@ -19,6 +19,7 @@ import file_access_utils
 import librarian.models
 import pipeline.models
 from method.models import Method
+from fleet.exceptions import StopExecution
 
 
 logger = logging.getLogger("Sandbox")
@@ -1658,7 +1659,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
 
 
 # The actual running of code happens here.  We copy and modify this from execute_step.
-def finish_step(step_execute_dict, worker_rank):
+def finish_step(step_execute_dict, worker_rank, stop_execution_callback):
     """
     Carry out the task specified by step_execute_dict.
 
@@ -1748,11 +1749,11 @@ def finish_step(step_execute_dict, worker_rank):
                 time.sleep(wait_time)
 
     return _finish_step_h(worker_rank, user, curr_RS, step_run_dir, curr_ER, inputs_after_cable, input_paths,
-                          output_paths, log_dir, recovering_record)
+                          output_paths, log_dir, recovering_record, stop_execution_callback=stop_execution_callback)
 
 
 def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_after_cable, input_paths, output_paths,
-                   log_dir, recovering_record, sandbox_to_update=None):
+                   log_dir, recovering_record, sandbox_to_update=None, stop_execution_callback=None):
     """
     Helper for execute_step and finish_step.
     """
@@ -1783,12 +1784,21 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
         return runstep
 
     # From here on the code is assumed to not be corrupted.
-    with open(stdout_path, "w+") as out_write, open(stderr_path, "w+") as err_write:
-        pipelinestep.transformation.definite.run_code(
-            step_run_dir, input_paths,
-            output_paths, [out_write], [err_write],
-            curr_log, curr_log.methodoutput
-        )
+    try:
+        with open(stdout_path, "w+") as out_write, open(stderr_path, "w+") as err_write:
+            pipelinestep.transformation.definite.run_code(
+                step_run_dir, input_paths,
+                output_paths, [out_write], [err_write],
+                curr_log, curr_log.methodoutput,
+                stop_execution_callback=stop_execution_callback
+            )
+    except StopExecution as e:
+        # Immediately end, marking the RunStep as cancelled, and re-raise e.
+        logger.debug("[%d] Method execution stopped.", worker_rank)
+        runstep.is_cancelled = True
+        runstep.save()
+        raise e
+
     logger.debug("[%d] Method execution complete, ExecLog saved (started = %s, ended = %s)",
                  worker_rank, curr_log.start_time, curr_log.end_time)
 

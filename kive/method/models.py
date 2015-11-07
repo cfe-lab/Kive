@@ -779,7 +779,8 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                  output_streams,
                  error_streams,
                  log=None,
-                 details_to_fill=None):
+                 details_to_fill=None,
+                 stop_execution_callback=None):
         """
         SYNOPSIS
         Run the method with the specified inputs and outputs, writing each
@@ -820,7 +821,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
         # Successful execution.
         if returncode is None:
-
             self.logger.debug("Polling Popen + displaying stdout/stderr to console")
 
             err_thread = threading.Thread(
