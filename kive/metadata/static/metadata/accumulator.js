@@ -44,8 +44,8 @@ $(function() {
   function initializeWidgetDisplay() {
     var widget = getWidget(this);
     
-    initializeFor('users');
     initializeFor('groups');
+    initializeFor('users');
     addToSelected.call(this);
     
     function initializeFor(str) {
