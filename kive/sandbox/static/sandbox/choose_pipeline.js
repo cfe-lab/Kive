@@ -6,9 +6,13 @@ var choose_pipeline = (function() {
         permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
         this.list_url = "/api/pipelinefamilies/";
         var pipelineFamiliesTable = this;
+
         this.filterSet = new permissions.FilterSet(
                 $active_filters,
-                function() { pipelineFamiliesTable.reloadTable(); });
+                function() {
+                    pipelineFamiliesTable.page = 1;
+                    pipelineFamiliesTable.reloadTable();
+                });
         this.registerColumn("Pipeline Family", "name");
         this.registerColumn("Thumbnail", buildThumbnail);
         this.registerColumn("Revision", buildMembers);

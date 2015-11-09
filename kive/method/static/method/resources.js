@@ -16,6 +16,7 @@
         this.filterSet = new permissions.FilterSet(
             $active_filters,
             function() {
+                coderesourceTable.page = 1;
                 coderesourceTable.reloadTable();
             }
         );

@@ -5,6 +5,7 @@ var CompoundDatatypesTable = function($table, is_user_admin, $active_filters, $n
     this.filterSet = new permissions.FilterSet(
         $active_filters,
         function() {
+            CDTTable.page = 1;
             CDTTable.reloadTable();
         }
     );
