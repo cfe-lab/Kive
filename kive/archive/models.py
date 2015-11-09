@@ -2954,6 +2954,8 @@ class MethodOutput(models.Model):
     In that case, stdout will be empty, and stderr will contain the Python stack
     trace produced when we tried to run the code with Popen.
 
+    If the return code is -2, it indicates that the execution was terminated.
+
     If the return code is None, it indicates that the code execution is
     in progress.
     """

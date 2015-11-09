@@ -22,6 +22,8 @@ import file_access_utils
 from constants import maxlengths
 import method.signals
 from metadata.models import empty_removal_plan, remove_helper, update_removal_plan
+from fleet.workers import SLEEP_SECONDS
+from fleet.exceptions import StopExecution
 
 import os
 import stat
@@ -31,6 +33,8 @@ import traceback
 import threading
 import logging
 import shutil
+import time
+
 
 
 @python_2_unicode_compatible
@@ -772,6 +776,15 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             for stream in dest_streams:
                 stream.write(line)
 
+    def _capture_stream(self, source_stream, dest_streams):
+        """
+        Read the source stream and multiplex its output to all destination streams.
+        """
+        source_contents = source_stream.read()
+        # As in _poll_stream, this drops the trailing \n.
+        for dest_stream in dest_streams:
+            dest_stream.write(source_contents)
+
     def run_code(self,
                  run_path,
                  input_paths,
@@ -782,14 +795,21 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                  details_to_fill=None,
                  stop_execution_callback=None):
         """
+        Run this Method with the specified inputs and outputs.
+
         SYNOPSIS
         Run the method with the specified inputs and outputs, writing each
-        line of its stdout/stderr to all of the specified streams.  Return
-        the Method's return code, or -1 if the Method suffers an OS-level
-        error (ie. is not executable). If details_to_fill is not None,
-        fill it in with the return code, and set its output and error logs
-        to the provided handles (meaning these should be files, not
-        standard streams, and they must be open for reading AND writing).
+        line of its stdout/stderr to all of the specified streams.
+
+        Return the Method's return code, or -1 if the Method suffers an
+        OS-level error (ie. is not executable), or -2 if execution is
+        stopped.
+
+        If details_to_fill is not None, fill it in with the return code, and
+        set its output and error logs to the provided handles (meaning
+        these should be files, not standard streams, and they must be open
+        for reading AND writing).
+
         If log is not None, set its start_time and end_time immediately
         before and after calling invoke_code.
 
@@ -811,26 +831,49 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         if log:
             log.start(save=False)
 
-        returncode = None
+        return_code = None
         try:
             method_popen = self.invoke_code(run_path, input_paths, output_paths)
         except OSError:
             for stream in error_streams:
                 traceback.print_exc(file=stream)
-            returncode = -1
+            return_code = -1
 
+        is_terminated = False
         # Successful execution.
-        if returncode is None:
-            self.logger.debug("Polling Popen + displaying stdout/stderr to console")
+        if return_code is None:
+            if stop_execution_callback is None:
+                self.logger.debug("Polling Popen + displaying stdout/stderr to console")
 
-            err_thread = threading.Thread(
-                target=self._poll_stream,
-                args=(method_popen.stderr, 'stderr', error_streams))
-            err_thread.start()
-            self._poll_stream(method_popen.stdout, 'stdout', output_streams)
-            err_thread.join()
+                err_thread = threading.Thread(
+                    target=self._poll_stream,
+                    args=(method_popen.stderr, 'stderr', error_streams))
+                err_thread.start()
+                self._poll_stream(method_popen.stdout, 'stdout', output_streams)
+                err_thread.join()
 
-            returncode = method_popen.wait()
+                return_code = method_popen.wait()
+
+            else:
+                # While periodically checking for a STOP message, we
+                # monitor the progress of method_popen and update the
+                # streams.
+                while method_popen.returncode is not None:
+                    if stop_execution_callback() is not None:
+                        # We have received a STOP message.  Terminate method_popen.
+                        method_popen.terminate()
+                        return_code = -2
+                        is_terminated = True
+                        break
+
+                    time.sleep(SLEEP_SECONDS)
+                    method_popen.poll()
+
+                # Having stopped one way or another, make sure we capture the rest of the output.
+                self._capture_stream(method_popen.stderr, error_streams)
+                self._capture_stream(method_popen.stdout, output_streams)
+                if not is_terminated:
+                    return_code = method_popen.returncode
 
         for stream in output_streams + error_streams:
             stream.flush()
@@ -843,9 +886,9 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             # it would be better to update the logs as we go.
             if details_to_fill:
                 self.logger.debug('return code is %s for %r.',
-                                  returncode,
+                                  return_code,
                                   details_to_fill)
-                details_to_fill.return_code = returncode
+                details_to_fill.return_code = return_code
                 outlog = output_streams[0]
                 errlog = error_streams[0]
                 outlog.seek(0)
@@ -855,6 +898,9 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 details_to_fill.output_log.save(outlog.name, File(outlog))
                 details_to_fill.clean()
                 details_to_fill.save()
+
+        if is_terminated:
+            raise StopExecution("Execution of method {} was stopped.".format(self))
 
     def invoke_code(self, run_path, input_paths, output_paths,
                     ssh_sandbox_worker_account=settings.KIVE_SANDBOX_WORKER_ACCOUNT):

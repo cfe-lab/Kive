@@ -530,7 +530,9 @@ class Worker:
         """
         A callback that checks for a Worker.STOP message from the Manager.
         """
-        return self.comm.Iprobe(source=0, tag=STOP)
+        if self.comm.Iprobe(source=0, tag=Worker.STOP):
+            return self.comm.recv(source=0, tag=Worker.STOP)
+        return
 
     def receive_and_perform_task(self):
         """
