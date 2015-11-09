@@ -19,6 +19,7 @@ var pipeline_families = (function() {
         this.filterSet = new permissions.FilterSet(
             $active_filters,
             function() {
+                pfTable.page = 1;
                 pfTable.reloadTable();
             }
         );

@@ -82,6 +82,7 @@ var pipelines = (function() {
         this.filterSet = new permissions.FilterSet(
             $active_filters,
             function() {
+                plTable.page = 1;
                 plTable.reloadTable();
             }
         );

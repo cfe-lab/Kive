@@ -10,6 +10,7 @@ var RunsTable = function($table, is_user_admin, $no_results, $active_filters, $n
     permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
     this.$no_results = $no_results;
     var runsTable = this;
+
     this.filterSet = new permissions.FilterSet(
             $active_filters,
             function() {

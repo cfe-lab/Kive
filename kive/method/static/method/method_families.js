@@ -11,6 +11,7 @@ var MethodFamiliesTable = function($table, is_user_admin, $active_filters, $navi
     this.filterSet = new permissions.FilterSet(
         $active_filters,
         function() {
+            mfTable.page = 1;
             mfTable.reloadTable();
         }
     );

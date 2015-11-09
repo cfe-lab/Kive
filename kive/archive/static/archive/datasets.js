@@ -25,6 +25,7 @@ var datasets = (function() {
         this.filterSet = new permissions.FilterSet(
             $active_filters,
             function() {
+                datasetsTable.page = 1;
                 datasetsTable.reloadTable();
             }
         );
