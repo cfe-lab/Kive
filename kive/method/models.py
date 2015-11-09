@@ -22,7 +22,6 @@ import file_access_utils
 from constants import maxlengths
 import method.signals
 from metadata.models import empty_removal_plan, remove_helper, update_removal_plan
-from fleet.workers import SLEEP_SECONDS
 from fleet.exceptions import StopExecution
 
 import os
@@ -34,7 +33,6 @@ import threading
 import logging
 import shutil
 import time
-
 
 
 @python_2_unicode_compatible
@@ -866,7 +864,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                         is_terminated = True
                         break
 
-                    time.sleep(SLEEP_SECONDS)
+                    time.sleep(settings.SLEEP_SECONDS)
                     method_popen.poll()
 
                 # Having stopped one way or another, make sure we capture the rest of the output.

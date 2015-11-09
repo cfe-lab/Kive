@@ -24,9 +24,6 @@ from fleet.exceptions import StopExecution
 mgr_logger = logging.getLogger("fleet.Manager")
 worker_logger = logging.getLogger("fleet.Worker")
 
-# Shorter sleep makes worker more responsive, generates more load when idle
-SLEEP_SECONDS = 0.1
-
 
 def adjust_log_files(target_logger, rank):
     """ Configure a different log file for each worker process.
@@ -193,7 +190,7 @@ class Manager:
             mgr_logger.debug("Waiting for host to become ready....")
             while not self.comm.Iprobe(source=MPI.ANY_SOURCE,
                                        tag=Worker.FINISHED):
-                time.sleep(SLEEP_SECONDS)
+                time.sleep(settings.SLEEP_SECONDS)
             lord_rank, result_pk = self.comm.recv(source=MPI.ANY_SOURCE,
                                                   tag=Worker.FINISHED)
 
@@ -367,7 +364,7 @@ class Manager:
                     return False
 
             try:
-                time.sleep(SLEEP_SECONDS)
+                time.sleep(settings.SLEEP_SECONDS)
             except KeyboardInterrupt:
                 return False
         return True
@@ -540,7 +537,7 @@ class Worker:
         """
         status = MPI.Status()
         while not self.comm.Iprobe(source=0, tag=MPI.ANY_TAG):
-            time.sleep(SLEEP_SECONDS)
+            time.sleep(settings.SLEEP_SECONDS)
         task_info_dict = self.comm.recv(source=0, tag=MPI.ANY_TAG, status=status)
         tag = status.Get_tag()
         if tag == self.SHUTDOWN:
