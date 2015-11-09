@@ -11,6 +11,7 @@ var DatatypesTable = function($table, is_user_admin, $active_filters, $navigatio
     this.filterSet = new permissions.FilterSet(
         $active_filters,
         function() {
+            datatypesTable.page = 1;
             datatypesTable.reloadTable();
         }
     );

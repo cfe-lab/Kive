@@ -29,11 +29,15 @@ var choose_inputs = (function() {
         permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
         this.list_url = "/api/datasets/";
         this.input_index = input_index;
+
         this.compounddatatype_id = compounddatatype_id;
         var datasetsTable = this;
         this.filterSet = new permissions.FilterSet(
                 $active_filters,
-                function() { datasetsTable.reloadTable(); });
+                function() {
+                    datasetsTable.page = 1;
+                    datasetsTable.reloadTable();
+                });
         this.registerColumn("Name", buildRadioButton, this);
         this.registerColumn("Date", buildDateCreated);
         this.registerColumn("File Size (B)", "filesize");

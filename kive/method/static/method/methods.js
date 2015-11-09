@@ -13,6 +13,7 @@ var MethodTable = function($table, is_user_admin, family_pk, $active_filters, $n
     this.filterSet = new permissions.FilterSet(
         $active_filters,
         function() {
+            MethodTable.page = 1;
             MethodTable.reloadTable();
         }
     );

@@ -32,6 +32,7 @@
         this.filterSet = new permissions.FilterSet(
             $active_filters,
             function() {
+                CRRTable.page = 1;
                 CRRTable.reloadTable();
             }
         );
