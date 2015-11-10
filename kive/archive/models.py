@@ -145,9 +145,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     time_queued = models.DateTimeField(default=timezone.now, null=True)
     purged = models.BooleanField(default=False)
     stopped_by = models.ForeignKey(User, help_text="User that stopped this Run", null=True, blank=True,
-                                   related_name="stopper")
+                                   related_name="runs_stopped")
     paused_by = models.ForeignKey(User, help_text="User that paused this Run", null=True, blank=True,
-                                  related_name="pauser")
+                                  related_name="runs_paused")
 
     pipeline = models.ForeignKey("pipeline.Pipeline", related_name="pipeline_instances",
                                  help_text="Pipeline used in this run")

@@ -9,6 +9,7 @@ from django.core.urlresolvers import reverse, resolve
 from django.utils import timezone
 
 from rest_framework.test import APIRequestFactory, force_authenticate
+from rest_framework import status
 
 from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable,\
     Dataset, RunInput
@@ -604,8 +605,20 @@ class RunApiTests(TestCase):
 
     def setUp(self):
         install_fixture_files("run_api_tests")
+
         self.kive_user = kive_user()
         self.myUser = User.objects.get(username="john")
+
+        self.pipeline_to_run = Pipeline.objects.get(
+            family__name="self.pf",
+            revision_name="pX_revision_2"
+        )
+
+        self.symDS = SymbolicDataset.objects.get(
+            dataset__name="pX_in_symDS",
+            structure__isnull=False,
+            user=self.myUser
+        )
 
         self.factory = APIRequestFactory()
         self.run_list_path = reverse('run-list')
@@ -637,25 +650,15 @@ class RunApiTests(TestCase):
     def test_pipeline_execute_plus_details_and_run_remove(self):
         # TODO: This should be split into one test to test the pipeline execution
         # Plus many tests to test details (which needs a proper fixture)
-        pipeline_to_run = Pipeline.objects.get(
-            family__name="self.pf",
-            revision_name="pX_revision_2"
-        )
-        symDS = SymbolicDataset.objects.get(
-            dataset__name="pX_in_symDS",
-            structure__isnull=False,
-            user=self.myUser
-        )
-
         # Kick off the run
         request = self.factory.post(
             self.run_list_path,
             {
-                "pipeline": pipeline_to_run.pk,
+                "pipeline": self.pipeline_to_run.pk,
                 "inputs": [
                     {
                         "index": 1,
-                        "symbolicdataset": symDS.pk
+                        "symbolicdataset": self.symDS.pk
                     }
                 ]
             },
@@ -674,7 +677,7 @@ class RunApiTests(TestCase):
         self.test_run_index(2)
 
         # Let's examine a real execution.
-        real_run_pk = pipeline_to_run.pipeline_instances.first().pk
+        real_run_pk = self.pipeline_to_run.pipeline_instances.first().pk
 
         # Touch the record detail page.
         path = self.run_list_path + "{}/".format(real_run_pk)
@@ -728,6 +731,38 @@ class RunApiTests(TestCase):
         response = view(request, *args, **kwargs)
         self.assertEquals(response.render().data, None)
         self.test_run_index(1)  # The run in the fixture should still be there.
+
+    def test_stop_run(self):
+        """
+        Test PATCHing a run to stop.
+        """
+        request = self.factory.post(
+            self.run_list_path,
+            {
+                "pipeline": self.pipeline_to_run.pk,
+                "inputs": [
+                    {
+                        "index": 1,
+                        "symbolicdataset": self.symDS.pk
+                    }
+                ]
+            },
+            format="json"
+        )
+        force_authenticate(request, user=self.myUser)
+        response = self.run_list_view(request).render()
+        data = response.render().data
+
+        detail_path = reverse("run-detail", kwargs={'pk': data["id"]})
+        request = self.factory.patch(detail_path, {'is_stop_requested': "true"})
+        force_authenticate(request, user=self.kive_user)
+
+        detail_view, _, _ = resolve(detail_path)
+        response = detail_view(request, pk=data["id"])
+        self.assertEquals(response.status_code, status.HTTP_200_OK)
+
+        stopped_run = Run.objects.get(pk=data["id"])
+        self.assertEquals(stopped_run.stopped_by, self.kive_user)
 
 
 class RunToProcessSerializerTests(TestCase):

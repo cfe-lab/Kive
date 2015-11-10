@@ -356,6 +356,10 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
 
     sandbox_path = serializers.CharField(read_only=True, required=False)
     inputs = RunInputSerializer(many=True)
+    stopped_by = serializers.SlugRelatedField(
+        slug_field="username",
+        read_only=True
+    )
 
     class Meta:
         model = Run
@@ -364,6 +368,8 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
             'url',
             'pipeline',
             'time_queued',
+            'start_time',
+            'end_time',
             'name',
             'description',
             'display_name',
@@ -375,11 +381,14 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
             'user',
             'users_allowed',
             'groups_allowed',
-            'inputs'
+            'inputs',
+            'stopped_by'
         )
         read_only_fields = (
             "purged",
             "time_queued",
+            "start_time",
+            "end_time"
         )
 
     def validate(self, data):
@@ -481,6 +490,8 @@ class RunProgressSerializer(RunSerializer):
             'url',
             'pipeline',
             'time_queued',
+            'start_time',
+            'end_time',
             'name',
             'description',
             'display_name',
@@ -493,11 +504,14 @@ class RunProgressSerializer(RunSerializer):
             'user',
             'users_allowed',
             'groups_allowed',
-            'inputs'
+            'inputs',
+            'stopped_by'
         )
         read_only_fields = (
             "purged",
             "time_queued",
+            "start_time",
+            "end_time"
         )
 
     def get_run_progress(self, obj):

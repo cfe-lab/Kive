@@ -416,7 +416,13 @@ class Manager:
         """
         Stop the specified run.
         """
+        if run not in self.active_sandboxes:
+            # This hasn't started yet, so we can just skip this one.
+            mgr_logger.debug("Run (pk={}) has not started yet so cannot be stopped".format(run.pk, run.stopped_by))
+            return
+
         mgr_logger.debug("Stopping run (pk={}) on behalf of user {}".format(run.pk, run.stopped_by))
+
         sandbox_to_end = self.active_sandboxes[run]
 
         # Send a message to the foreman in charge of running this task.

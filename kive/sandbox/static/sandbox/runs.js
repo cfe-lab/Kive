@@ -45,6 +45,64 @@ var RunsTable = function($table, is_user_admin, $no_results, $active_filters, $n
     });
 
     this.registerStandardColumn("user");
+
+    this.registerColumn("", function($td, run) {
+
+        if (run.stopped_by !== null) {
+            $td.text("Stopped by user " + run.stopped_by);
+            return;
+        }
+        
+        if (run.end_time !== null) {
+            return;
+        }
+
+        var $a = $("<a/>");
+        $a.attr("href", run.url)
+            .attr("run_id", run.id)
+            .text("Stop")
+            .click(this, clickStop);
+        $td.append($a);
+    });
+
+    function clickStop(event) {
+        var $a = $(this),
+            run_id = $a.attr("run_id"),
+            run_url = $a.attr("href"),
+            permissions_table = event.data;
+        event.preventDefault();
+        $.getJSON(
+            run_url,
+            {},
+            function () {
+                var stop_message = "Are you sure you want to stop this run?";
+                if (window.confirm(stop_message)) {
+                    $.ajax(
+                        {
+                            url: run_url,
+                            method: "PATCH",
+                            data: {
+                                "is_stop_requested": true
+                            },
+                            success: function () {
+                                permissions_table.reloadTable();
+                            }
+                        }
+                    ).fail(
+                        function (request) {
+                            var response = request.responseJSON,
+                                detail = (
+                                    response ?
+                                    response.detail :
+                                    "Failed to redact"
+                                );
+                            window.alert(detail);
+                        }
+                    );
+                }
+            }
+        );
+    }
 };
 RunsTable.prototype = Object.create(permissions.PermissionsTable.prototype);
 

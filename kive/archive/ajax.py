@@ -227,6 +227,9 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
         ended after the given date and time.
     * filters[n][key]=endbefore&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
         ended before the given date and time.
+
+    Parameter for a PATCH:
+    * is_stop_requested(=true) - the Run is marked for stopping.
     """
 
     queryset = Run.objects.all()
@@ -274,6 +277,23 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
         return Response(RunOutputsSerializer(
             run,
             context={'request': request}).data)
+
+    def patch_object(self, request, pk=None):
+        return Response(RunSerializer(self.get_object(), context={'request': request}).data)
+
+    def partial_update(self, request, pk=None):
+        """
+        Add PATCH functionality to this view.
+
+        This is used for stopping runs.
+        """
+        is_stop_requested = request.data.get("is_stop_requested", False)
+        if is_stop_requested:
+            run = self.get_object()
+            with transaction.atomic():
+                run.stopped_by = request.user
+                run.save()
+        return self.patch_object(request, pk)
 
     @staticmethod
     def _build_run_prefetch(runs):
