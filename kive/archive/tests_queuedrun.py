@@ -1,6 +1,7 @@
 import os.path
 import re
 import tempfile
+import itertools
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -755,6 +756,38 @@ class RunApiTests(TestCase):
 
         detail_path = reverse("run-detail", kwargs={'pk': data["id"]})
         request = self.factory.patch(detail_path, {'is_stop_requested': "true"})
+        force_authenticate(request, user=self.myUser)
+
+        detail_view, _, _ = resolve(detail_path)
+        response = detail_view(request, pk=data["id"])
+        self.assertEquals(response.status_code, status.HTTP_200_OK)
+
+        stopped_run = Run.objects.get(pk=data["id"])
+        self.assertEquals(stopped_run.stopped_by, self.myUser)
+
+    def test_stop_run_administrator(self):
+        """
+        An administrator should be allowed to stop a run.
+        """
+        request = self.factory.post(
+            self.run_list_path,
+            {
+                "pipeline": self.pipeline_to_run.pk,
+                "inputs": [
+                    {
+                        "index": 1,
+                        "symbolicdataset": self.symDS.pk
+                    }
+                ]
+            },
+            format="json"
+        )
+        force_authenticate(request, user=self.myUser)
+        response = self.run_list_view(request).render()
+        data = response.render().data
+
+        detail_path = reverse("run-detail", kwargs={'pk': data["id"]})
+        request = self.factory.patch(detail_path, {'is_stop_requested': "true"})
         force_authenticate(request, user=self.kive_user)
 
         detail_view, _, _ = resolve(detail_path)
@@ -764,8 +797,62 @@ class RunApiTests(TestCase):
         stopped_run = Run.objects.get(pk=data["id"])
         self.assertEquals(stopped_run.stopped_by, self.kive_user)
 
+    def test_stop_run_non_owner(self):
+        """
+        A user who does not own the run should not be allowed to stop it.
+        """
+        # First, we have to give other people access to the data and Pipeline.
+        self.symDS.grant_everyone_access()
 
-class RunToProcessSerializerTests(TestCase):
+        # This is only one layer deep so we don't have to recurse.
+        for xput in itertools.chain(self.pipeline_to_run.inputs.all(), self.pipeline_to_run.outputs.all()):
+            if xput.has_structure:
+                xput.structure.compounddatatype.grant_everyone_access()
+
+        for step in self.pipeline_to_run.steps.all():
+            curr_method = step.transformation.definite
+
+            for xput in itertools.chain(curr_method.inputs.all(), curr_method.outputs.all()):
+                if xput.has_structure:
+                    xput.structure.compounddatatype.grant_everyone_access()
+
+            # Fortunately this has no dependencies.
+            curr_method.driver.coderesource.grant_everyone_access()
+            curr_method.driver.grant_everyone_access()
+            step.transformation.definite.family.grant_everyone_access()
+            step.transformation.grant_everyone_access()
+
+        self.pipeline_to_run.family.grant_everyone_access()
+        self.pipeline_to_run.grant_everyone_access()
+
+        request = self.factory.post(
+            self.run_list_path,
+            {
+                "pipeline": self.pipeline_to_run.pk,
+                "inputs": [
+                    {
+                        "index": 1,
+                        "symbolicdataset": self.symDS.pk
+                    }
+                ],
+                "groups_allowed": ["Everyone"]
+            },
+            format="json"
+        )
+        force_authenticate(request, user=self.kive_user)
+        response = self.run_list_view(request).render()
+        data = response.render().data
+
+        detail_path = reverse("run-detail", kwargs={'pk': data["id"]})
+        request = self.factory.patch(detail_path, {'is_stop_requested': "true"})
+        force_authenticate(request, user=self.myUser)
+
+        detail_view, _, _ = resolve(detail_path)
+        response = detail_view(request, pk=data["id"])
+        self.assertEquals(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class RunSerializerTests(TestCase):
     fixtures = ["em_sandbox_test_environment"]
 
     def setUp(self):
