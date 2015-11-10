@@ -25,7 +25,7 @@ class KiveAPI(Session):
     """
     SERVER_URL = ""
 
-    def __init__(self, username, password, server=None, verify=True):
+    def __init__(self, server=None, verify=True):
         self.server_url = server
 
         if server is None:
@@ -41,6 +41,7 @@ class KiveAPI(Session):
 
             'api_get_datasets': '/api/datasets/',
             'api_get_dataset': '/api/datasets/{dataset-id}/',
+            'api_get_datasets_name': '/api/datasets/?filters[0][key]=name&filters[0][val]={name}',
             'api_dataset_add': '/api/datasets/',
             'api_dataset_dl': '/api/datasets/{dataset-id}/download/',
 
@@ -56,6 +57,8 @@ class KiveAPI(Session):
         }
         super(KiveAPI, self).__init__()
         self.verify = verify
+
+    def login(self, username, password):
         self.fetch_csrf_token()  # for the login request
         response = self.post('@api_auth',
                              {'username': username, 'password': password},
@@ -132,10 +135,14 @@ class KiveAPI(Session):
 
     def post(self, *args, **kwargs):
         nargs = list(args)
-        nargs[0] = self._prep_url(nargs[0])
+        url = self._prep_url(nargs[0])
+        nargs[0] = url
         is_json = kwargs.pop('is_json', True)
         if hasattr(self, 'csrf_token'):
             nargs[1]['csrfmiddlewaretoken'] = self.csrf_token
+        headers = kwargs.get('headers', {})
+        kwargs['headers'] = headers
+        headers.setdefault('referer', url)
         return self._validate_response(super(KiveAPI, self).post(*nargs, **kwargs),
                                        is_json=is_json)
 
@@ -176,21 +183,20 @@ class KiveAPI(Session):
         dataset = self.get('@api_get_dataset', context={'dataset-id': dataset_id}).json()
         return Dataset(dataset, self)
 
-    def find_datasets(self, **kwargs):
+    def find_datasets(self, dataset_id=None, dataset_name=None):
         """
 
         :param kwargs:
         :return:
         """
-        datasets = self.get_datasets()
-        ret = []
-        if 'dataset_id' in kwargs:
-            ret += filter(lambda d: d.dataset_id == kwargs['dataset_id'], datasets)
+        if dataset_id is not None:
+            return self.get_dataset(dataset_id)
 
-        if 'dataset_name' in kwargs:
-            ret += filter(lambda d: d.name == kwargs['dataset_name'], datasets)
-
-        return ret
+        if dataset_name is not None:
+            datasets = self.get('@api_get_datasets_name',
+                                context={'name': dataset_name}).json()
+            return [Dataset(d, self) for d in datasets]
+        return self.get_datasets()
 
     def get_pipeline_families(self):
         """
@@ -296,8 +302,8 @@ class KiveAPI(Session):
         if len(inputs) != len(pipeline.inputs):
             raise KiveMalformedDataException(
                 'Number of inputs to pipeline is not equal to the number of given inputs (%d != %d)' % (
-                    len(inputs),
-                    len(pipeline.inputs)
+                    len(pipeline.inputs),
+                    len(inputs)
                 )
             )
 

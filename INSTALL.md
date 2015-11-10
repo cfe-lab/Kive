@@ -16,9 +16,7 @@ Before installing Kive, you need to install some other software.
 * django-extensions (optional, for creating a UML diagram of the backend
   models used to store all the records in the database)
 * pygraphviz (optional, for the UML diagram)
-* [expect][]
 
-[expect]: http://sourceforge.net/projects/expect/
 
 Installing Python
 -----------------

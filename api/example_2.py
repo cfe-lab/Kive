@@ -5,8 +5,11 @@ import time
 from kiveapi import KiveAPI, KiveMalformedDataException
 
 # This is how I would recommend authenticating to Kive
-KiveAPI.SERVER_URL = 'http://127.0.0.1:8000/'
-kive = KiveAPI('kive', 'kive')
+KiveAPI.SERVER_URL = 'http://localhost:8000'
+# Don't put your real password in source code, store it in a text file
+# that is only readable by your user account or some more secure storage.
+kive = KiveAPI()
+kive.login('kive', 'kive')
 
 # Upload data
 try:

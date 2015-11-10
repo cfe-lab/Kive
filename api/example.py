@@ -5,10 +5,11 @@ import time
 from kiveapi import KiveAPI
 
 # Use HTTPS on a real server, so your password is encrypted.
-KiveAPI.SERVER_URL = 'http://127.0.0.1:8000/'
+KiveAPI.SERVER_URL = 'http://localhost:8000'
 # Don't put your real password in source code, store it in a text file
 # that is only readable by your user account or some more secure storage.
-kive = KiveAPI('kive', 'kive')
+kive = KiveAPI()
+kive.login('kive', 'kive')
 
 # Get the data by ID
 fastq1 = kive.get_dataset(2)
@@ -39,6 +40,8 @@ status = kive.run_pipeline(
 
 # Start polling Kive
 s = sched.scheduler(time.time, time.sleep)
+
+
 def check_run(sc, run):
     # do your stuff
     print run.get_status()
