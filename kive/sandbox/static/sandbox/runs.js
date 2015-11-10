@@ -6,10 +6,12 @@
 var pollingInterval = 1000, // milliseconds
     runsTable;
 
-var RunsTable = function($table, is_user_admin, $no_results, $active_filters, $navigation_links) {
+var RunsTable = function($table, user, is_user_admin, $no_results, $active_filters, $navigation_links) {
     permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
     this.$no_results = $no_results;
     var runsTable = this;
+
+    this.user = user;
 
     this.filterSet = new permissions.FilterSet(
             $active_filters,
@@ -51,32 +53,29 @@ var RunsTable = function($table, is_user_admin, $no_results, $active_filters, $n
     // This is a stop/rerun column.
     this.registerColumn(" ", function($td, run) {
 
+        // A "rerun" link, accessible to anyone who can see this Run.
+        var $rerun_link = $("<a/>");
+        $rerun_link.attr("href", runsTable.create_url)
+            .text("Rerun")
+            .click({
+                run: run,
+                run_table: runsTable
+            }, clickRerun);
+        $td.append($rerun_link);
+
         if (run.stopped_by !== null) {
-            // Make a "rerun" link.
-            var $a = $("<a/>");
-            $a.attr("href", run.url)
-                .text("Rerun")
-                .click({
-                    run: run,
-                    run_table: runsTable
-                }, clickRerun);
-
-            $td.text("Stopped by user " + run.stopped_by + " (");
-            $td.append($a)
-            $td.append(")")
-            return;
+            $td.append(" (Stopped by user " + run.stopped_by + ")");
         }
-
-        if (run.end_time !== null) {
-            return;
+        else if (runsTable.user === run.user) {
+            var $stop_link = $("<a/>");
+            $stop_link.attr("href", run.url)
+                .attr("run_id", run.id)
+                .text("Stop")
+                .click(this, clickStop);
+            $td.append(" (");
+            $td.append($stop_link);
+            $td.append(")");
         }
-
-        var $a = $("<a/>");
-        $a.attr("href", run.url)
-            .attr("run_id", run.id)
-            .text("Stop")
-            .click(this, clickStop);
-        $td.append($a);
     });
 
     function clickStop(event) {
@@ -218,6 +217,7 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     
     runsTable = new RunsTable(
         $('#runs'),
+        user,
         is_user_admin,
         $('.no_results'),
         $('#active_filters'),

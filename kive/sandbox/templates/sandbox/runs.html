@@ -13,7 +13,8 @@
     <link rel="stylesheet" href="/static/portal/search.css">
 
     <script type="text/javascript">
-        var is_user_admin = {{ is_user_admin|lower }};
+        var user = "{{ user.get_username }}",
+            is_user_admin = {{ is_user_admin|lower }};
     </script>
 {% endblock %}
 

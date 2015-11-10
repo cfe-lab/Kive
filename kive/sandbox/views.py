@@ -142,6 +142,7 @@ def run_pipeline(request):
 def runs(request):
     """Display all active runs for this user."""
     context = RequestContext(request)
+    context["user"] = request.user
     context['is_user_admin'] = admin_check(request.user)
     template = loader.get_template("sandbox/runs.html")
     return HttpResponse(template.render(context))
