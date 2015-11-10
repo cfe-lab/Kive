@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from django.db import transaction
 from django.db.models import Q
-from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.exceptions import ValidationError as DjangoValidationError, PermissionDenied
 from django.utils import timezone
 
 from rest_framework import permissions, status
@@ -16,6 +16,7 @@ from archive.serializers import DatasetSerializer, MethodOutputSerializer, RunSe
 from archive.models import Run, RunInput, ExceedsSystemCapabilities, Dataset, MethodOutput,\
     summarize_redaction_plan
 from archive.views import _build_download_response
+from portal.views import admin_check
 
 from kive.ajax import RemovableModelViewSet, RedactModelMixin, IsGrantedReadOnly, IsGrantedReadCreate,\
     StandardPagination, RemovableModelViewSet, CleanCreateModelMixin, SearchableModelMixin,\
@@ -194,6 +195,30 @@ class MethodOutputViewSet(ReadOnlyModelViewSet):
         return Response(summarize_redaction_plan(redaction_plan))
 
 
+class RunPermission(permissions.BasePermission):
+    """
+    Custom permission for Runs.
+
+    All users should be allowed to create Runs.  Users should be allowed to
+    rerun any Run visible to them.  However, Runs may only be stopped by
+    administrators or their owner.
+    """
+    def has_permission(self, request, view):
+        return (admin_check(request.user) or
+                request.method in permissions.SAFE_METHODS or
+                request.method == "POST" or
+                request.method == "PATCH")
+
+    def has_object_permission(self, request, view, obj):
+        if admin_check(request.user):
+            return True
+        if not obj.can_be_accessed(request.user):
+            return False
+        if request.method == "PATCH":
+            return obj.user == request.user
+        return request.method in permissions.SAFE_METHODS
+
+
 class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
                  SearchableModelMixin):
     """ Runs, including those that haven't started yet
@@ -234,7 +259,7 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
 
     queryset = Run.objects.all()
     serializer_class = RunSerializer
-    permission_classes = (permissions.IsAuthenticated, IsGrantedReadCreate)
+    permission_classes = (permissions.IsAuthenticated, RunPermission)
     pagination_class = StandardPagination
 
     # Special pagination for the status list route.
@@ -290,9 +315,14 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
         is_stop_requested = request.data.get("is_stop_requested", False)
         if is_stop_requested:
             run = self.get_object()
-            with transaction.atomic():
-                run.stopped_by = request.user
-                run.save()
+
+            if request.user == run.user or admin_check(request.user):
+                with transaction.atomic():
+                    run.stopped_by = request.user
+                    run.save()
+            else:
+                raise PermissionDenied
+
         return self.patch_object(request, pk)
 
     @staticmethod

@@ -20,6 +20,8 @@ var RunsTable = function($table, is_user_admin, $no_results, $active_filters, $n
     this.list_url = "/api/runs/status/";
     this.reload_interval = pollingInterval;
 
+    this.create_url = "/api/runs/";
+
     this.registerColumn("Status", function($td, run) {
         $td.addClass("code").append($('<a/>')
                 .attr('href', '/view_run/' + run.id)
@@ -46,13 +48,25 @@ var RunsTable = function($table, is_user_admin, $no_results, $active_filters, $n
 
     this.registerStandardColumn("user");
 
-    this.registerColumn("", function($td, run) {
+    // This is a stop/rerun column.
+    this.registerColumn(" ", function($td, run) {
 
         if (run.stopped_by !== null) {
-            $td.text("Stopped by user " + run.stopped_by);
+            // Make a "rerun" link.
+            var $a = $("<a/>");
+            $a.attr("href", run.url)
+                .text("Rerun")
+                .click({
+                    run: run,
+                    run_table: runsTable
+                }, clickRerun);
+
+            $td.text("Stopped by user " + run.stopped_by + " (");
+            $td.append($a)
+            $td.append(")")
             return;
         }
-        
+
         if (run.end_time !== null) {
             return;
         }
@@ -69,7 +83,7 @@ var RunsTable = function($table, is_user_admin, $no_results, $active_filters, $n
         var $a = $(this),
             run_id = $a.attr("run_id"),
             run_url = $a.attr("href"),
-            permissions_table = event.data;
+            run_table = event.data;
         event.preventDefault();
         $.getJSON(
             run_url,
@@ -82,10 +96,10 @@ var RunsTable = function($table, is_user_admin, $no_results, $active_filters, $n
                             url: run_url,
                             method: "PATCH",
                             data: {
-                                "is_stop_requested": true
+                                is_stop_requested: true
                             },
                             success: function () {
-                                permissions_table.reloadTable();
+                                run_table.reloadTable();
                             }
                         }
                     ).fail(
@@ -100,6 +114,48 @@ var RunsTable = function($table, is_user_admin, $no_results, $active_filters, $n
                         }
                     );
                 }
+            }
+        );
+    }
+
+    function clickRerun(event) {
+        var $a = $(this),
+            run = event.data.run,
+            run_table = event.data.run_table;
+
+        event.preventDefault();
+
+        $.getJSON(
+            run_table.create_url,
+            {},
+            function () {
+                $.ajax(
+                    {
+                        url: run_table.create_url,
+                        method: "POST",
+                        data: JSON.stringify({
+                            pipeline: run.pipeline,
+                            name: run.name,
+                            description: run.description,
+                            users_allowed: run.users_allowed,
+                            groups_allowed: run.groups_allowed,
+                            inputs: run.inputs
+                        }),
+                        contentType: "application/json",
+                        processData: false,
+                        success: function () {
+                            run_table.reloadTable();
+                        }
+                    }
+                ).fail(
+                    function (request) {
+                        var response = request.responseJSON,
+                            detail = (
+                                "Failed to rerun"
+                            );
+                        window.alert(detail);
+                    }
+                );
             }
         );
     }
