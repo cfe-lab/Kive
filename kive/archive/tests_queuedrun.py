@@ -320,6 +320,7 @@ class RemoveRedactRunInProgress(TestCase):
             generic_output=self.mA.outputs.first(),
             symbolicdataset=self.doublet_symDS
         )
+        self.run.start(save=True)
 
     def tearDown(self):
         clean_up_all_files()
@@ -377,7 +378,7 @@ class RemoveRedactRunInProgress(TestCase):
 
 class RemoveRedactRunJustStarting(TestCase):
     """
-    Testing of removal/redaction of stuff used in a run that's just starting.
+    Removal/redaction of stuff used in an unstarted run should be allowed.
     """
     fixtures = ["em_sandbox_test_environment"]
 
@@ -409,35 +410,38 @@ class RemoveRedactRunJustStarting(TestCase):
     def tearDown(self):
         clean_up_all_files()
 
-    def test_remove_pipeline_fails(self):
+    def test_remove_pipeline(self):
         """
-        Removing the Pipeline of a Run should fail.
+        Removing the Pipeline of an unstarted Run should work.
         """
-        self.assertRaisesRegexp(
-            RunNotFinished,
-            "Cannot remove: an affected run is still in progress",
-            lambda: self.pE.remove()
-        )
+        self.pE.remove()
+        # self.assertRaisesRegexp(
+        #     RunNotFinished,
+        #     "Cannot remove: an affected run is still in progress",
+        #     lambda: self.pE.remove()
+        # )
 
-    def test_remove_dataset_fails(self):
+    def test_remove_dataset(self):
         """
-        Removing a Dataset of a Run should fail.
+        Removing a Dataset of an unstarted Run should work.
         """
-        self.assertRaisesRegexp(
-            RunNotFinished,
-            "Cannot remove: an affected run is still in progress",
-            lambda: self.triplet_symDS.remove()
-        )
+        self.triplet_symDS.remove()
+        # self.assertRaisesRegexp(
+        #     RunNotFinished,
+        #     "Cannot remove: an affected run is still in progress",
+        #     lambda: self.triplet_symDS.remove()
+        # )
 
-    def test_redact_dataset_fails(self):
+    def test_redact_dataset(self):
         """
-        Redacting a Dataset of a Run should fail.
+        Redacting a Dataset of a Run should work.
         """
-        self.assertRaisesRegexp(
-            RunNotFinished,
-            "Cannot redact: an affected run is still in progress",
-            lambda: self.triplet_symDS.redact()
-        )
+        self.triplet_symDS.redact()
+        # self.assertRaisesRegexp(
+        #     RunNotFinished,
+        #     "Cannot redact: an affected run is still in progress",
+        #     lambda: self.triplet_symDS.redact()
+        # )
 
 
 class RestoreReusableDatasetTest(TestCase):

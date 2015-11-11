@@ -57,21 +57,7 @@ def summarize_redaction_plan(redaction_plan):
 @transaction.atomic
 def redact_helper(redaction_plan):
     # Check if anything that's currently running will be affected.
-    still_in_progress = False
-    if "SymbolicDatasets" in redaction_plan:
-        for sd in redaction_plan["SymbolicDatasets"]:
-            for rtp_input in sd.runinputs.all():
-                if not rtp_input.run.finished:
-                    still_in_progress = True
-
-    if not still_in_progress and "ExecRecords" in redaction_plan:
-        for er in redaction_plan["ExecRecords"]:
-            # This marks all RunComponents using the ExecRecord as redacted.
-            for affected_rc in er.used_by_components.all():
-                if not affected_rc.top_level_run.is_complete():
-                    still_in_progress = True
-
-    if still_in_progress:
+    if metadata.models.any_runs_in_progress(redaction_plan):
         raise archive.exceptions.RunNotFinished("Cannot redact: an affected run is still in progress")
 
     # Proceed in a fixed order.

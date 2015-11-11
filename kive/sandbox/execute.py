@@ -1659,7 +1659,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
 
 
 # The actual running of code happens here.  We copy and modify this from execute_step.
-def finish_step(step_execute_dict, worker_rank, stop_execution_callback):
+def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
     """
     Carry out the task specified by step_execute_dict.
 

@@ -42,29 +42,33 @@ deletion_order = [
 ]
 
 
-@transaction.atomic
-def remove_helper(removal_plan):
-    # If we're affecting anything that's currently running, stop immediately.
+# A helper for remove_helper and redact_helper, in archive.models.
+def any_runs_in_progress(plan_of_attack):
 
-    def _any_runs_in_progress():
-        for sd in removal_plan["SymbolicDatasets"]:
-            for rtp_input in sd.runinputs.all():
-                if rtp_input.run.running:
-                    return True
+    for sd in plan_of_attack["SymbolicDatasets"]:
+        for rtp_input in sd.runinputs.all():
+            if rtp_input.run.running:
+                return True
 
-        for pipeline in removal_plan["Pipelines"]:
+    for er in plan_of_attack["ExecRecords"]:
+        for affected_rc in er.used_by_components.all():
+            if affected_rc.top_level_run.running:
+                return True
+
+    if "Pipelines" in plan_of_attack:  # Redaction plans don't have this key
+        for pipeline in plan_of_attack["Pipelines"]:
             for run in pipeline.pipeline_instances.all():
                 if run.running:
                     return True
 
-        for er in removal_plan["ExecRecords"]:
-            for affected_rc in er.used_by_components.all():
-                if affected_rc.top_level_run.running:
-                    return True
+    return False
 
-        return False
 
-    if _any_runs_in_progress():
+@transaction.atomic
+def remove_helper(removal_plan):
+    # If we're affecting anything that's currently running, stop immediately.
+
+    if any_runs_in_progress(removal_plan):
         raise RunNotFinished("Cannot remove: an affected run is still in progress")
 
     # Redact any sandboxes tied to Runs that we're removing.
