@@ -4,16 +4,16 @@
 <div class="permissions-widget">
  <div class="pw-search-wrapper">
    <div class="pw-users_groups pw-panel">
-     <h5>Users</h5>
-     <div class="pw-users_options pw-inner">
-        {% for user in users %}
-        <div class="pw-option pw-user" data-value="{{ user.id }}">{{ user.username }}</div>
-        {% endfor %}
-     </div>
      <h5>Groups</h5>
      <div class="pw-groups_options pw-inner">
         {% for group in groups %}
         <div class="pw-option pw-group" data-value="{{ group.id }}">{{ group.name }}</div>
+        {% endfor %}
+     </div>
+     <h5>Users</h5>
+     <div class="pw-users_options pw-inner">
+        {% for user in users %}
+        <div class="pw-option pw-user" data-value="{{ user.id }}">{{ user.username }}</div>
         {% endfor %}
      </div>
    </div>

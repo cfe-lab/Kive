@@ -262,4 +262,5 @@ KIVE_SANDBOX_WORKER_ACCOUNT = ""
 # the sandbox worker account.  This is ignored if KIVE_SANDBOX_WORKER_ACCOUNT is blank.
 KIVE_GROUP = "kive"
 
+# Number of rows to display on the View Dataset page.
 DATASET_DISPLAY_MAX = 100

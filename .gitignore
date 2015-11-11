@@ -19,6 +19,9 @@ node_modules/
 
 # Generated files and backup files
 *~
+api/build
+api/dist
+api/kiveapi.egg-info
 doc/*.aux
 doc/*.dvi
 doc/*.pdf

@@ -1,13 +1,18 @@
 from argparse import ArgumentParser
+from collections import Counter
+import errno
 import json
+import logging
 import os
 
-from kiveapi.kiveapi import KiveAPI
-import errno
-from collections import Counter
+from requests.adapters import HTTPAdapter
+
+from kiveapi import KiveAPI
 
 
 def main():
+    logging.basicConfig(level=logging.INFO)
+    logging.getLogger('urllib3.connectionpool').setLevel(logging.WARN)
     CONFIG_FILE = os.path.expanduser("~/.dump_pipeline.config")
     UNSET = '***'
 
@@ -30,7 +35,9 @@ def main():
 
     if config['username'] == UNSET:
         exit('Set up your configuration in ' + CONFIG_FILE)
-    kive = KiveAPI(config['username'], config['password'], config['server'])
+    kive = KiveAPI(config['server'])
+    kive.mount('https://', HTTPAdapter(max_retries=20))
+    kive.login(config['username'], config['password'])
     if not os.path.isdir(args.folder):
         os.mkdir(args.folder)
 
@@ -41,7 +48,7 @@ def main():
     code_resources = {}  # {id: {'filename': filename}}
     for code_resource in kive.get('/api/coderesources/').json():
         dump = {}
-        for field in ('groups_allowed', 'users_allowed', 'user', 'filename'):
+        for field in ('groups_allowed', 'users_allowed', 'filename'):
             dump[field] = code_resource[field]
         code_resources[code_resource['name']] = dump
     code_resource_revisions = {}  # {id: revision}
@@ -58,7 +65,6 @@ def main():
         dump = {'driver': code_resource_revisions[method['driver']]}
         for field in ('groups_allowed',
                       'users_allowed',
-                      'user',
                       'reusable',
                       'threads'):
             dump[field] = method[field]
@@ -75,7 +81,9 @@ def main():
     for output_item in pipeline['outputs']:
         del output_item['x']
         del output_item['y']
+        del output_item['dataset_idx']
         replace_structure(output_item, compound_datatypes)
+    pipeline['outputs'].sort()
     dump['outputs'] = pipeline['outputs']
     for step in pipeline['steps']:
         del step['x']
@@ -118,7 +126,6 @@ class CodeResourceRevision(dict):
     def __init__(self, data, code_resources):
         for field in ('groups_allowed',
                       'users_allowed',
-                      'user',
                       'MD5_checksum',
                       'dependencies'):
             self[field] = data[field]

@@ -24,8 +24,9 @@ If you want to see what's currently being worked on, check out the [waffle board
 See the project wiki for instructions on how to [start a production server][wiki].
 Once you have set up your production server, this is how to deploy a new release:
 
-1. Make sure the code works in your development environment. Run all the unit
-    tests.
+1. Make sure the code works in your development environment. Run all the
+    Javascript tests by opening `kive/SpecRunner.html`, and run all the Django
+    unit tests.
     
     ./manage.py test --settings kive.test_settings_pg
     
@@ -99,14 +100,22 @@ Once you have set up your production server, this is how to deploy a new release
         
 9. Launch the fleet.
 
-        sudo -u apache LD_LIBRARY_PATH=$LD_LIBRARY_PATH PATH=$PATH ./manage.py runfleet --workers 151 &>/dev/null &
+        sudo -u apache ls /  # Just test that you can log in as apache
+        sudo -u apache LD_LIBRARY_PATH=$LD_LIBRARY_PATH PATH=$PATH ./manage.py runfleet --workers 191 &>/dev/null &
         
 10. Restart apache:
 
         sudo /usr/sbin/apachectl restart
 
-11. Remove the pre-release flag from the release.
-12. Close the milestone for this release, create one for the next release, and
+11. Update the Kive API library if needed.
+
+        cd /usr/local/share/Kive/api
+        cat setup.py  # look at the new version number
+        python /usr/local/bin/pip show kiveapi  # compare with the installed
+        sudo python setup.py install  # if needed
+
+12. Remove the pre-release flag from the release.
+13. Close the milestone for this release, create one for the next release, and
     decide which issues you will include in that milestone.
 
 [release]: https://help.github.com/categories/85/articles
