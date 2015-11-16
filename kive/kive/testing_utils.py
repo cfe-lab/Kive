@@ -565,133 +565,125 @@ def create_eric_martin_test_environment(case):
     # librarian.models) to define our SymDSs and DSs.
 
     # Define singlet, doublet, triplet, and raw uploaded datasets
-    case.triplet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_triplet.csv"),
-                                                   case.myUser,
-                                                   cdt=case.triplet_cdt, make_dataset=True,
-                                                   name="triplet", description="lol",
-                                                   groups_allowed=[everyone_group()])
+    case.triplet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_triplet.csv"), case.myUser,
+                                                   groups_allowed=[everyone_group()], cdt=case.triplet_cdt,
+                                                   keep_file=True, name="triplet", description="lol")
     case.triplet_symDS_structure = case.triplet_symDS.structure
     case.triplet_DS = case.triplet_symDS.dataset
 
-    case.doublet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "doublet_cdt.csv"),
-                                                   case.myUser,
-                                                   cdt=case.doublet_cdt, name="doublet",
-                                                   description="lol",
-                                                   groups_allowed=[everyone_group()])
+    case.doublet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "doublet_cdt.csv"), case.myUser,
+                                                   groups_allowed=[everyone_group()], cdt=case.doublet_cdt,
+                                                   description="lol", name="doublet", description="lol")
     case.doublet_symDS_structure = case.doublet_symDS.structure
     case.doublet_DS = case.doublet_symDS.dataset
 
-    case.singlet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "singlet_cdt_large.csv"),
-                                                   case.myUser,
-                                                   cdt=case.singlet_cdt, name="singlet",
-                                                   description="lol",
-                                                   groups_allowed=[everyone_group()])
+    case.singlet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "singlet_cdt_large.csv"), case.myUser,
+                                                   groups_allowed=[everyone_group()], cdt=case.singlet_cdt,
+                                                   description="lol", name="singlet", description="lol")
     case.singlet_symDS_structure = case.singlet_symDS.structure
     case.singlet_DS = case.singlet_symDS.dataset
 
     # October 1, 2013: this is the same as the old singlet_symDS.
     case.singlet_3rows_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_singlet.csv"),
-                                                         case.myUser,
-                                                         cdt=case.singlet_cdt, name="singlet",
-                                                         description="lol",
-                                                         groups_allowed=[everyone_group()])
+                                                         case.myUser, groups_allowed=[everyone_group()],
+                                                         cdt=case.singlet_cdt, description="lol", name="singlet",
+                                                         description="lol")
     case.singlet_3rows_symDS_structure = case.singlet_3rows_symDS.structure
     case.singlet_3rows_DS = case.singlet_3rows_symDS.dataset
 
-    case.raw_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
-                                               user=case.myUser, cdt=None, name="raw_DS", description="lol",
-                                               groups_allowed=[everyone_group()])
+    case.raw_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"), file_path=case.myUser,
+                                               user=case.myUser, groups_allowed=[everyone_group()], cdt=None,
+                                               groups_allowed=[everyone_group()], name="raw_DS", description="lol")
     case.raw_DS = case.raw_symDS.dataset
 
     # Added September 30, 2013: symbolic dataset that results from E01_21.
     # November 7, 2013: created a file that this SD actually represented,
     # even though it isn't in the database.
     case.D1_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "doublet_remuxed_from_triplet.csv"),
-                                                 user=case.myUser,
-                                                 cdt=case.doublet_cdt,
-                                                 make_dataset=False,
-                                                 groups_allowed=[everyone_group()])
+                                                 file_path=case.myUser, user=case.myUser,
+                                                 groups_allowed=[everyone_group()], cdt=case.doublet_cdt,
+                                                 keep_file=False)
     case.D1_in_symDS_structure = case.D1_in_symDS.structure
 
-    case.C1_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "C1_in_triplet.csv"),
-                                                 case.myUser,
-                                                 cdt=case.triplet_cdt, name="C1_in_triplet",
-                                                 description="triplet 3 rows",
-                                                 groups_allowed=[everyone_group()])
+    case.C1_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "C1_in_triplet.csv"), case.myUser,
+                                                 groups_allowed=[everyone_group()], cdt=case.triplet_cdt,
+                                                 description="triplet 3 rows", name="C1_in_triplet",
+                                                 description="triplet 3 rows")
     case.C1_in_symDS_structure = case.C1_in_symDS.structure
     case.C1_in_DS = case.C1_in_symDS.dataset
 
     # November 7, 2013: compute the MD5 checksum from the data file,
     # which is the same as below.
-    case.C2_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "E11_32_output.csv"),
-                                                 case.myUser,
-                                                 cdt=case.doublet_cdt, make_dataset=False,
-                                                 groups_allowed=[everyone_group()])
+    case.C2_in_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "E11_32_output.csv"), case.myUser,
+                                                 groups_allowed=[everyone_group()], cdt=case.doublet_cdt,
+                                                 keep_file=False)
     case.C2_in_symDS_structure = case.C2_in_symDS.structure
 
     # October 16: an alternative to C2_in_symDS, which has existent data.
     case.E11_32_output_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "E11_32_output.csv"),
-                                                         case.myUser,
+                                                         case.myUser, groups_allowed=[everyone_group()],
                                                          cdt=case.doublet_cdt,
-                                                         name="E11_32 output doublet",
                                                          description="result of E11_32 fed by doublet_cdt.csv",
-                                                         groups_allowed=[everyone_group()])
+                                                         name="E11_32 output doublet",
+                                                         description="result of E11_32 fed by doublet_cdt.csv")
     case.E11_32_output_symDS_structure = case.E11_32_output_symDS.structure
     case.E11_32_output_DS = case.E11_32_output_symDS.dataset
 
-    case.C1_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_singlet.csv"),
-                                                  case.myUser,
-                                                  cdt=case.singlet_cdt, name="raw", description="lol",
-                                                  groups_allowed=[everyone_group()])
+    case.C1_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_singlet.csv"), case.myUser,
+                                                  groups_allowed=[everyone_group()], cdt=case.singlet_cdt,
+                                                  description="lol", name="raw", description="lol")
     case.C1_out_symDS_structure = case.C1_out_symDS.structure
     case.C1_out_DS = case.C1_out_symDS.dataset
 
-    case.C2_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
-                                                  case.myUser, cdt=None, name="C2_out", description="lol",
-                                                  groups_allowed=[everyone_group()])
+    case.C2_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"), case.myUser,
+                                                  groups_allowed=[everyone_group()], cdt=None, description="lol",
+                                                  name="C2_out", description="lol")
     case.C2_out_DS = case.C2_out_symDS.dataset
 
-    case.C3_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"),
-                                                  case.myUser, cdt=None, name="C3_out", description="lol",
-                                                  groups_allowed=[everyone_group()])
+    case.C3_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_raw.fasta"), case.myUser,
+                                                  groups_allowed=[everyone_group()], cdt=None, description="lol",
+                                                  name="C3_out", description="lol")
     case.C3_out_DS = case.C3_out_symDS.dataset
 
-    case.triplet_3_rows_symDS = SymbolicDataset.create_SD(
-        os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"), case.myUser, cdt=case.triplet_cdt,
-        name="triplet", description="lol", groups_allowed=[everyone_group()])
+    case.triplet_3_rows_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"),
+                                                          case.myUser, groups_allowed=[everyone_group()],
+                                                          cdt=case.triplet_cdt, description="lol", name="triplet",
+                                                          description="lol")
     case.triplet_3_rows_symDS_structure = case.triplet_3_rows_symDS.structure
     case.triplet_3_rows_DS = case.triplet_3_rows_symDS.dataset
 
     # October 9, 2013: added as the result of cable E21_41.
     case.E1_out_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "doublet_remuxed_from_t3r.csv"),
-                                                  case.myUser, cdt=case.doublet_cdt, name="E1_out",
-                                                  description="doublet remuxed from triplet",
-                                                  groups_allowed=[everyone_group()])
+                                                  case.myUser, groups_allowed=[everyone_group()], cdt=case.doublet_cdt,
+                                                  description="doublet remuxed from triplet", name="E1_out",
+                                                  description="doublet remuxed from triplet")
     case.E1_out_symDS_structure = case.E1_out_symDS.structure
     case.E1_out_DS = case.E1_out_symDS.dataset
 
     # October 15, 2013: SymbolicDatasets that go into and come out
     # of cable E01_21 and E21_41.
-    case.DNA_triplet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "DNA_triplet.csv"),
-                                                       case.myUser, cdt=case.DNA_triplet_cdt, name="DNA_triplet",
-                                                       description="DNA triplet data",
-                                                       groups_allowed=[everyone_group()])
+    case.DNA_triplet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "DNA_triplet.csv"), case.myUser,
+                                                       groups_allowed=[everyone_group()], cdt=case.DNA_triplet_cdt,
+                                                       description="DNA triplet data", name="DNA_triplet",
+                                                       description="DNA triplet data")
     case.DNA_triplet_symDS_structure = case.DNA_triplet_symDS.structure
     case.DNA_triplet_DS = case.DNA_triplet_symDS.dataset
 
-    case.E01_21_DNA_doublet_symDS = SymbolicDataset.create_SD(
-        os.path.join(samplecode_path, "E01_21_DNA_doublet.csv"), case.myUser, cdt=case.DNA_doublet_cdt,
-        name="E01_21_DNA_doublet",
-        description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21",
-        groups_allowed=[everyone_group()])
+    case.E01_21_DNA_doublet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "E01_21_DNA_doublet.csv"),
+                                                              case.myUser, groups_allowed=[everyone_group()],
+                                                              cdt=case.DNA_doublet_cdt,
+                                                              description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21",
+                                                              name="E01_21_DNA_doublet",
+                                                              description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21")
     case.E01_21_DNA_doublet_symDS_structure = case.E01_21_DNA_doublet_symDS.structure
     case.E01_21_DNA_doublet_DS = case.E01_21_DNA_doublet_symDS.dataset
 
-    case.E21_41_DNA_doublet_symDS = SymbolicDataset.create_SD(
-        os.path.join(samplecode_path, "E21_41_DNA_doublet.csv"), case.myUser, cdt=case.DNA_doublet_cdt,
-        name="E21_41_DNA_doublet",
-        description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41",
-        groups_allowed=[everyone_group()])
+    case.E21_41_DNA_doublet_symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path, "E21_41_DNA_doublet.csv"),
+                                                              case.myUser, groups_allowed=[everyone_group()],
+                                                              cdt=case.DNA_doublet_cdt,
+                                                              description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41",
+                                                              name="E21_41_DNA_doublet",
+                                                              description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41")
     case.E21_41_DNA_doublet_symDS_structure = case.E21_41_DNA_doublet_symDS.structure
     case.E21_41_DNA_doublet_DS = case.E21_41_DNA_doublet_symDS.dataset
 
@@ -927,13 +919,9 @@ GGGAGTTC
 CCCTCCTC
 """)
     seq_datafile.close()
-    seq_sd = SymbolicDataset.create_SD(
-        seq_datafile.name,
-        name="Removal test data",
-        cdt=one_col_nuc_seq,
-        user=remover,
-        description="A dataset for use in the removal test case.",
-        make_dataset=True)
+    seq_sd = SymbolicDataset.create_SD(seq_datafile.name, file_path="Removal test data", user=remover,
+                                       cdt=one_col_nuc_seq, keep_file=True, name="Removal test data",
+                                       description="A dataset for use in the removal test case.")
 
     nuc_seq_noop = make_first_method(
         "Noop (nucleotide sequence)",
@@ -983,13 +971,11 @@ GGGGGG
 TTTTTTC
 """)
     two_step_seq_datafile.close()
-    two_step_seq_sd = SymbolicDataset.create_SD(
-        two_step_seq_datafile.name,
-        name="Removal test data for a two-step Pipeline",
-        cdt=one_col_nuc_seq,
-        user=remover,
-        description="A dataset for use in the removal test case with the two-step Pipeline.",
-        make_dataset=True)
+    two_step_seq_sd = SymbolicDataset.create_SD(two_step_seq_datafile.name,
+                                                file_path="Removal test data for a two-step Pipeline", user=remover,
+                                                cdt=one_col_nuc_seq, keep_file=True,
+                                                name="Removal test data for a two-step Pipeline",
+                                                description="A dataset for use in the removal test case with the two-step Pipeline.")
 
     two_step_run_sdbx = sandbox.execute.Sandbox(remover, two_step_noop_pl, [two_step_seq_sd], groups_allowed=[])
     two_step_run_sdbx.execute_pipeline()
@@ -1763,10 +1749,9 @@ def create_sequence_manipulation_environment(case):
     file_access_utils.configure_sandbox_permissions(case.datafile.name)
 
     # Alice uploads the data to the system.
-    case.symds_labdata = SymbolicDataset.create_SD(case.datafile.name, user=case.user_alice,
-                                                   name="lab data", cdt=case.cdt_record,
-                                                   description="data from the lab",
-                                                   make_dataset=True)
+    case.symds_labdata = SymbolicDataset.create_SD(case.datafile.name, file_path=case.user_alice, user=case.user_alice,
+                                                   cdt=case.cdt_record, keep_file=True, name="lab data",
+                                                   description="data from the lab")
 
     # Now Alice is ready to run her pipelines. The system creates a Sandbox
     # where she will run each of her pipelines.
@@ -1915,11 +1900,9 @@ def create_word_reversal_environment(case):
     string_datafile.close()
     os.system("head -1 /usr/share/dict/words >> {}".
               format(string_datafile.name))
-    case.symds_words = SymbolicDataset.create_SD(
-        string_datafile.name,
-        name="blahblah", cdt=case.cdt_string, user=case.user_bob,
-        description="blahblahblah", make_dataset=True,
-        groups_allowed=[everyone_group()])
+    case.symds_words = SymbolicDataset.create_SD(string_datafile.name, file_path="blahblah", user=case.user_bob,
+                                                 groups_allowed=[everyone_group()], cdt=case.cdt_string, keep_file=True,
+                                                 name="blahblah", description="blahblahblah")
 
     os.remove(string_datafile.name)
 
@@ -1949,17 +1932,15 @@ def create_word_reversal_environment(case):
         writer.writerow([word[::-1], word])
     case.backwords_datafile.close()
 
-    case.symds_wordbacks = SymbolicDataset.create_SD(
-        case.wordbacks_datafile.name, user=case.user_bob,
-        name="wordbacks", cdt=case.cdt_wordbacks,
-        description="random reversed words", make_dataset=True,
-        groups_allowed=[everyone_group()])
+    case.symds_wordbacks = SymbolicDataset.create_SD(case.wordbacks_datafile.name, file_path=case.user_bob,
+                                                     user=case.user_bob, groups_allowed=[everyone_group()],
+                                                     cdt=case.cdt_wordbacks, keep_file=True, name="wordbacks",
+                                                     description="random reversed words")
 
-    case.symds_backwords = SymbolicDataset.create_SD(
-        case.backwords_datafile.name, user=case.user_bob,
-        name="backwords", cdt=case.cdt_backwords,
-        description="random reversed words", make_dataset=True,
-        groups_allowed=[everyone_group()])
+    case.symds_backwords = SymbolicDataset.create_SD(case.backwords_datafile.name, file_path=case.user_bob,
+                                                     user=case.user_bob, groups_allowed=[everyone_group()],
+                                                     cdt=case.cdt_backwords, keep_file=True, name="backwords",
+                                                     description="random reversed words")
 
 
 def destroy_word_reversal_environment(case):
@@ -2154,12 +2135,9 @@ def make_words_symDS(case):
     string_datafile.close()
     os.system("head -1 /usr/share/dict/words >> {}".
               format(string_datafile.name))
-    case.symds_words = SymbolicDataset.create_SD(string_datafile.name,
-                                                 name="blahblah",
-                                                 cdt=case.cdt_string,
-                                                 user=case.user_bob,
-                                                 description="blahblahblah",
-                                                 make_dataset=True)
+    case.symds_words = SymbolicDataset.create_SD(string_datafile.name, file_path="blahblah", user=case.user_bob,
+                                                 cdt=case.cdt_string, keep_file=True, name="blahblah",
+                                                 description="blahblahblah")
     case.symds_words.grant_everyone_access()
     case.symds_words.save()
 
@@ -2220,10 +2198,9 @@ def create_grandpa_sandbox_environment(case):
         i = random.randint(1, 99171)
         case.grandpa_datafile.write("{}\n".format(i))
     case.grandpa_datafile.close()
-    case.symds_grandpa = SymbolicDataset.create_SD(
-        case.grandpa_datafile.name, user=case.user_grandpa,
-        name="numbers", cdt=case.cdt_string,
-        description="numbers which are actually strings", make_dataset=True)
+    case.symds_grandpa = SymbolicDataset.create_SD(case.grandpa_datafile.name, file_path=case.user_grandpa,
+                                                   user=case.user_grandpa, cdt=case.cdt_string, keep_file=True,
+                                                   name="numbers", description="numbers which are actually strings")
     case.symds_grandpa.clean()
 
 
@@ -2238,8 +2215,7 @@ def make_SD(contents, CDT, make_dataset, user, name, description, created_by, ch
     """
     with tempfile.TemporaryFile() as f:
         f.write(contents)
-        test_SD = SymbolicDataset.create_SD(None, user, cdt=CDT, make_dataset=make_dataset,
-                                            name=name, description=description, created_by=created_by,
-                                            check=check, file_handle=f)
+        test_SD = SymbolicDataset.create_SD(None, user, cdt=CDT, keep_file=make_dataset, name=name,
+                                            description=description, created_by=created_by, check=check, file_handle=f)
 
     return test_SD

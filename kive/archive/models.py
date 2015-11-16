@@ -2351,7 +2351,7 @@ class Dataset(models.Model):
     # Case 2: from the transformation of a RunStep
     # Case 3: from the execution of a POC (i.e. from a ROC)
     # Case 4: from the execution of a PSIC (i.e. from a RunSIC)
-    created_by = models.ForeignKey(RunComponent, related_name="outputs", null=True, blank=True)
+    created_by = models.ForeignKey(RunComponent, related_name="outputs_OLDFIXME", null=True, blank=True)
 
     # Datasets are stored in the "Datasets" folder
     dataset_file = models.FileField(upload_to=get_upload_path, help_text="Physical path where datasets are stored",
@@ -2422,7 +2422,7 @@ class Dataset(models.Model):
     def column_alignment(self):
         """
         This function looks at the expected and observed headers for
-        a dataset, and trys to align them if they don't match
+        a dataset, and tries to align them if they don't match.
 
 
         :return: a tuple whose first element is a list of tuples

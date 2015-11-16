@@ -70,11 +70,13 @@ def execute_tests_environment_setup(case):
 
     case.symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
                                                         "input_for_test_C_twostep_with_subpipeline.csv"),
-                                           user=case.myUser, cdt=case.pX_in_cdt,
-                                           name="pX_in_symDS", description="input to pipeline pX")
+                                           file_path=case.myUser, user=case.myUser, cdt=case.pX_in_cdt,
+                                           description="input to pipeline pX", name="pX_in_symDS",
+                                           description="input to pipeline pX")
     case.rawDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
                                                         "input_for_test_C_twostep_with_subpipeline.csv"),
-                                           user=case.myUser, cdt=None, name="pX_in_symDS",
+                                           file_path=case.myUser, user=case.myUser, cdt=None,
+                                           description="input to pipeline pX", name="pX_in_symDS",
                                            description="input to pipeline pX")
 
     # Method + input/outputs
@@ -351,12 +353,8 @@ class ExecuteTests(ExecuteTestsBase):
 
         # Dataset for input during execution of pipeline
         input_SD = SymbolicDataset.create_SD(
-            os.path.join(samplecode_path, "input_for_test_C_twostep_with_subpipeline.csv"),
-            user=self.myUser,
-            cdt=self.pX_in_cdt,
-            make_dataset=True, name="input_dataset",
-            description="symDS description"
-        )
+            os.path.join(samplecode_path, "input_for_test_C_twostep_with_subpipeline.csv"), file_path=self.myUser,
+            user=self.myUser, cdt=self.pX_in_cdt, keep_file=True, name="input_dataset", description="symDS description")
 
         # Execute pipeline
         pipeline = self.pX
@@ -526,8 +524,8 @@ class SandboxTests(ExecuteTestsBase):
         tf = tempfile.NamedTemporaryFile(delete=False)
         tf.write("foo")
         tf.close()
-        raw_symDS = SymbolicDataset.create_SD(tf.name, user=self.myUser, name="foo",
-                                              description="bar")
+        raw_symDS = SymbolicDataset.create_SD(tf.name, file_path=self.myUser, user=self.myUser, description="bar",
+                                              name="foo", description="bar")
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
                                           .format(p, 1, self.pX_in_cdt)),

@@ -113,8 +113,8 @@ class SymbolicDatasetTests(LibrarianTestCase):
 
         self.dsname = "good data"
         self.dsdesc = "some headers and sequences"
-        self.sym_dataset = SymbolicDataset.create_SD(file_path=self.file_path, user=self.myUser,
-                                                     cdt=self.cdt_record, make_dataset=True, name=self.dsname,
+        self.sym_dataset = SymbolicDataset.create_SD(cls=self.file_path, file_path=self.file_path, user=self.myUser,
+                                                     cdt=self.cdt_record, keep_file=True, name=self.dsname,
                                                      description=self.dsdesc)
 
     def tearDown(self):
@@ -142,13 +142,8 @@ class SymbolicDatasetTests(LibrarianTestCase):
         raw_datatype = None  # raw compound datatype
         name = "Test file handle" + str(dt.microsecond)
         desc = "Test create dataset with file handle"
-        sym_dataset = SymbolicDataset.create_SD(file_path=None,
-                                                cdt=raw_datatype,
-                                                make_dataset=True,
-                                                user=self.myUser,
-                                                name=name,
-                                                description=desc,
-                                                check=True,
+        sym_dataset = SymbolicDataset.create_SD(cls=None, file_path=None, user=self.myUser, cdt=raw_datatype,
+                                                keep_file=True, name=name, description=desc, check=True,
                                                 file_handle=tmpfile)
 
         tmpfile.close()
@@ -181,9 +176,10 @@ class SymbolicDatasetTests(LibrarianTestCase):
         self.assertRaisesRegexp(ValueError,
                                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
                                           .format(data_file.name, self.cdt_record)),
-                                lambda : SymbolicDataset.create_SD(file_path=data_file.name,
+                                lambda : SymbolicDataset.create_SD(cls=data_file.name, file_path=data_file.name,
                                                                    user=self.myUser, cdt=self.cdt_record,
-                                                                   name="lab data", description="patient sequences"))
+                                                                   description="patient sequences", name="lab data",
+                                                                   description="patient sequences"))
         data_file.close()
 
     def test_empty_file(self):
@@ -196,9 +192,10 @@ class SymbolicDatasetTests(LibrarianTestCase):
         self.assertRaisesRegexp(ValueError,
                                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
                                           .format(file_path, self.cdt_record)),
-                                lambda : SymbolicDataset.create_SD(file_path=data_file.name,
+                                lambda : SymbolicDataset.create_SD(cls=data_file.name, file_path=data_file.name,
                                                                    user=self.myUser, cdt=self.cdt_record,
-                                                                   name="missing data", description="oops!"))
+                                                                   description="oops!", name="missing data",
+                                                                   description="oops!"))
         data_file.close()
 
     def test_too_many_columns(self):
@@ -218,10 +215,8 @@ foo,bar,baz
                 ValueError,
                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
                           .format(file_path, self.cdt_record)),
-                lambda : SymbolicDataset.create_SD(file_path=file_path,
-                                                   user=self.myUser,
-                                                   cdt=self.cdt_record,
-                                                   name="bad data",
+                lambda : SymbolicDataset.create_SD(cls=file_path, file_path=file_path, user=self.myUser,
+                                                   cdt=self.cdt_record, description="too many columns", name="bad data",
                                                    description="too many columns")
             )
 
@@ -238,11 +233,8 @@ foo,bar
             data_file.flush()
             file_path = data_file.name
 
-            SymbolicDataset.create_SD(file_path=file_path,
-                                      user=self.myUser,
-                                      cdt=self.cdt_record,
-                                      name="good data", 
-                                      description="right columns")
+            SymbolicDataset.create_SD(cls=file_path, file_path=file_path, user=self.myUser, cdt=self.cdt_record,
+                                      description="right columns", name="good data", description="right columns")
 
     def test_invalid_integer_field(self):
         """
@@ -271,11 +263,9 @@ Bob,tw3nty
                 ValueError,
                 re.escape('The entry at row 1, column 2 of file "{}" did not pass the constraints of Datatype "integer"'
                           .format(file_path)),
-                lambda : SymbolicDataset.create_SD(file_path=file_path,
-                                                   user=self.myUser,
-                                                   cdt=compound_datatype,
-                                                   name="bad data",
-                                                   description="bad integer field"))
+                lambda : SymbolicDataset.create_SD(cls=file_path, file_path=file_path, user=self.myUser,
+                                                   cdt=compound_datatype, description="bad integer field",
+                                                   name="bad data", description="bad integer field"))
 
     def test_dataset_created(self):
         """
@@ -288,8 +278,8 @@ Bob,tw3nty
 
         dsname = "good data"
         dsdesc = "some headers and sequences"
-        sym_dataset = SymbolicDataset.create_SD(file_path=data_file.name, user=self.myUser,
-                                                cdt=self.cdt_record, make_dataset=True, name=dsname, description=dsdesc)
+        sym_dataset = SymbolicDataset.create_SD(cls=data_file.name, file_path=data_file.name, user=self.myUser,
+                                                cdt=self.cdt_record, keep_file=True, name=dsname, description=dsdesc)
         dataset = sym_dataset.dataset
         self.assertEqual(dataset.clean(), None)
         self.assertEqual(dataset.user, self.myUser)
@@ -319,8 +309,8 @@ Bob,tw3nty
             file_paths.extend([file_path])
             bulk_dataset_csv.write("\n" + dsname+str(i) + "," + dsdesc+str(i) + "," + file_path)
 
-        sym_datasets = SymbolicDataset.create_SD_bulk(csv_file_path=bulk_dataset_csv.name,
-                                                      user=self.myUser, cdt=self.cdt_record, make_dataset=True,
+        sym_datasets = SymbolicDataset.create_SD_bulk(cls=bulk_dataset_csv.name, csv_file_path=bulk_dataset_csv.name,
+                                                      user=self.myUser, cdt=self.cdt_record, keep_files=True,
                                                       check=True)
         for f in data_files:
             f.close()

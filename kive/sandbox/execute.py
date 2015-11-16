@@ -1597,13 +1597,14 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
                     if execrecord is not None:
                         output_SD = execrecord.execrecordouts.first().symbolicdataset
                         if make_dataset:
-                            output_SD.register_dataset(output_path, user, dataset_name, dataset_desc, curr_record)
+                            output_SD.register_file(output_path, user, dataset_name, dataset_desc, curr_record)
 
                     else:
-                        output_SD = librarian.models.SymbolicDataset.create_SD(
-                            output_path, cdt=output_CDT, make_dataset=make_dataset,
-                            name=dataset_name, description=dataset_desc, created_by=curr_record,
-                            check=False)
+                        output_SD = librarian.models.SymbolicDataset.create_SD(output_path, file_path=output_CDT,
+                                                                               cdt=output_CDT, keep_file=make_dataset,
+                                                                               name=dataset_name,
+                                                                               description=dataset_desc,
+                                                                               created_by=curr_record, check=False)
 
                 # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
                 if not recover:
@@ -1852,16 +1853,18 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                                         pk=output_ERO.symbolicdataset.pk
                                     ).first()
                                     if make_dataset and not output_SD.has_data():
-                                        output_SD.register_dataset(
+                                        output_SD.register_file(
                                             output_path, user, dataset_name, dataset_desc,
                                             runstep)
 
                             else:
-                                output_SD = librarian.models.SymbolicDataset.create_SD(
-                                    output_path, cdt=output_CDT, make_dataset=make_dataset,
-                                    name=dataset_name, description=dataset_desc, created_by=runstep,
-                                    check=False
-                                )
+                                output_SD = librarian.models.SymbolicDataset.create_SD(output_path,
+                                                                                       file_path=output_CDT,
+                                                                                       cdt=output_CDT,
+                                                                                       keep_file=make_dataset,
+                                                                                       name=dataset_name,
+                                                                                       description=dataset_desc,
+                                                                                       created_by=runstep, check=False)
                                 logger.debug("[%d] First time seeing file: saved md5 %s",
                                              worker_rank, output_SD.MD5_checksum)
                         output_SDs.append(output_SD)

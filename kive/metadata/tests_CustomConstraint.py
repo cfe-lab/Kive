@@ -195,8 +195,9 @@ class CustomConstraintTests(TestCase):
         Helper function to create a SymbolicDataset and ContentCheckLog
         for a given CompoundDatatype.
         """
-        symbolicdataset = SymbolicDataset.create_SD(datafile, user=user, cdt=cdt, name=name,
-                                                    description=desc, groups_allowed=[everyone_group()])
+        symbolicdataset = SymbolicDataset.create_SD(datafile, file_path=user, user=user,
+                                                    groups_allowed=[everyone_group()], cdt=cdt,
+                                                    groups_allowed=[everyone_group()], name=name, description=desc)
         log = ContentCheckLog(symbolicdataset=symbolicdataset, user=user)
         log.save()
         return log
@@ -222,7 +223,7 @@ class CustomConstraintTests(TestCase):
         self.assertRaisesRegexp(
             ValueError,
             re.escape('Verification method for Datatype "{}" produced no output'.format(dt_no_output)),
-            lambda: SymbolicDataset.create_SD(no_output_datafile, self.user_oscar, cdt=cdt_no_output,
+            lambda: SymbolicDataset.create_SD(no_output_datafile, self.user_oscar, cdt=cdt_no_output, name="no output",
                                               name="no output", description="data with a bad verifier")
         )
         os.remove(no_output_datafile)
@@ -255,8 +256,10 @@ class CustomConstraintTests(TestCase):
             ValueError,
             re.escape('Verification method for Datatype "{}" indicated an error in row {}, but '
                       'only {} rows were checked'.format(dt_big_row, 1000, 2)),
-            lambda: SymbolicDataset.create_SD(big_row_datafile,
-                                              user=self.user_oscar, cdt=cdt_big_row, name="big row",
+            lambda: SymbolicDataset.create_SD(big_row_datafile, file_path=self.user_oscar, user=self.user_oscar,
+                                              cdt=cdt_big_row,
+                                              description="data with a verifier outputting too high a row number",
+                                              name="big row",
                                               description="data with a verifier outputting too high a row number")
         )
         os.remove(big_row_datafile)
@@ -289,8 +292,9 @@ class CustomConstraintTests(TestCase):
             ValueError,
             re.escape('The entry at row {}, column {} of file "{}" did not pass the constraints of '
                       'Datatype "{}"'.format(3, 2, self.bad_datafile, self.dt_custom)),
-                      lambda: SymbolicDataset.create_SD(self.bad_datafile,
+                      lambda: SymbolicDataset.create_SD(self.bad_datafile, file_path=self.user_oscar,
                                                         user=self.user_oscar, cdt=self.cdt_constraints,
+                                                        description="invalid data to test custom constraint checking",
                                                         name="bad data",
                                                         description="invalid data to test custom constraint checking")
         )
@@ -313,8 +317,10 @@ class CustomConstraintTests(TestCase):
         """
         Helper function to upload good data.
         """
-        symds_good = SymbolicDataset.create_SD(self.good_datafile, user=self.user_oscar,
-                                               cdt=self.cdt_constraints, name="good data",
+        symds_good = SymbolicDataset.create_SD(self.good_datafile, file_path=self.user_oscar, user=self.user_oscar,
+                                               cdt=self.cdt_constraints,
+                                               description="data which conforms to all its constraints",
+                                               name="good data",
                                                description="data which conforms to all its constraints")
         return symds_good
 
@@ -322,8 +328,10 @@ class CustomConstraintTests(TestCase):
         """
         Helper function to upload bad data.
         """
-        symds_bad = SymbolicDataset.create_SD(self.bad_datafile, user=self.user_oscar,
-                                              cdt=self.cdt_constraints, name="good data",
+        symds_bad = SymbolicDataset.create_SD(self.bad_datafile, file_path=self.user_oscar, user=self.user_oscar,
+                                              cdt=self.cdt_constraints,
+                                              description="data which conforms to all its constraints",
+                                              name="good data",
                                               description="data which conforms to all its constraints")
         return symds_bad
 
@@ -332,8 +340,9 @@ class CustomConstraintTests(TestCase):
         prototype_file = self._setup_datafile(prototype_cdt, 
                 [["hello", "True"], ["hell", "True"], ["hel", "False"],
                  ["he", "True"], ["h", "False"]])
-        prototype_SD = SymbolicDataset.create_SD(prototype_file, user=self.user_oscar,
-                                                 cdt=prototype_cdt, name="good prototype",
+        prototype_SD = SymbolicDataset.create_SD(prototype_file, file_path=self.user_oscar, user=self.user_oscar,
+                                                 cdt=prototype_cdt, description="working prototype for constraint CDT",
+                                                 name="good prototype",
                                                  description="working prototype for constraint CDT")
         os.remove(prototype_file)
 
@@ -349,8 +358,9 @@ class CustomConstraintTests(TestCase):
         prototype_file = self._setup_datafile(prototype_cdt, 
                 [["hello", "False"], ["hell", "True"], ["hel", "False"],
                  ["he", "True"], ["h", "False"]])
-        prototype_SD = SymbolicDataset.create_SD(prototype_file, user=self.user_oscar,
-                                                 cdt=prototype_cdt, name="good prototype",
+        prototype_SD = SymbolicDataset.create_SD(prototype_file, file_path=self.user_oscar, user=self.user_oscar,
+                                                 cdt=prototype_cdt, description="working prototype for constraint CDT",
+                                                 name="good prototype",
                                                  description="working prototype for constraint CDT")
         os.remove(prototype_file)
 
@@ -459,7 +469,8 @@ class CustomConstraintTests(TestCase):
         CustomConstraints is uploaded with a working prototype.
         """
         cdt = self._test_setup_prototype_good()
-        symds_good = SymbolicDataset.create_SD(self.good_datafile, user=self.user_oscar, cdt=cdt,
+        symds_good = SymbolicDataset.create_SD(self.good_datafile, file_path=self.user_oscar, user=self.user_oscar,
+                                               cdt=cdt, description="data which conforms to all its constraints",
                                                name="good data",
                                                description="data which conforms to all its constraints")
         self.assertEqual(symds_good.clean(), None)

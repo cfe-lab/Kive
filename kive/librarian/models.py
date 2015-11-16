@@ -11,6 +11,9 @@ from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import MinValueValidator, RegexValidator
 from django.core.files import File
 from django.utils.encoding import python_2_unicode_compatible
+from django.utils import timezone
+from django.conf import settings
+from django.template.defaultfilters import filesizeformat
 
 import sys
 import csv
@@ -21,8 +24,10 @@ import hashlib
 import shutil
 import os
 import itertools
+import time
+import heapq
+from datetime import datetime, timedelta
 
-import archive.models
 import method.models
 import pipeline.models
 import transformation.models
@@ -31,8 +36,22 @@ import datachecking.models
 import metadata.models
 import archive.exceptions
 import file_access_utils
+from constants import maxlengths
 
 LOGGER = logging.getLogger(__name__)
+
+
+def get_upload_path(instance, filename):
+    """
+    Helper method for uploading dataset_files for Dataset.
+    This is outside of the Dataset class, since @staticmethod and other method decorators were used instead of the
+    method pointer when this method was inside Dataset class.
+
+    :param instance:  Dataset instance
+    :param filename: Dataset.dataset_file.name
+    :return:  The upload directory for Dataset files.
+    """
+    return instance.UPLOAD_DIR + os.sep + time.strftime('%Y_%m') + os.sep + filename
 
 
 @python_2_unicode_compatible
@@ -46,12 +65,32 @@ class SymbolicDataset(metadata.models.AccessControl):
     TransformationOutput/cable (if it was generated), and this
     represents it, whether or not it was saved to the database.
 
-    This holds metadata about the data file.
-
     PRE: the actual file that the SymbolicDataset represents (whether
     it still exists or not) is/was coherent (e.g. checked using
     CDT.summarize_CSV()).
     """
+    name = models.CharField(max_length=maxlengths.MAX_FILENAME_LENGTH,
+                            help_text="Name of this Dataset.",
+                            blank=True)
+    description = models.TextField(help_text="Description of this Dataset.",
+                                   max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
+                                   blank=True)
+    date_created = models.DateTimeField(default=timezone.now, help_text="Date of Dataset creation.")
+
+    # Four cases from which Datasets can originate:
+    #
+    # Case 1: uploaded
+    # Case 2: from the transformation of a RunStep
+    # Case 3: from the execution of a POC (i.e. from a ROC)
+    # Case 4: from the execution of a PSIC (i.e. from a RunSIC)
+    created_by = models.ForeignKey("archive.RunComponent", related_name="outputs", null=True, blank=True)
+
+    # Datasets are stored in the "Datasets" folder
+    dataset_file = models.FileField(upload_to=get_upload_path, help_text="Physical path where datasets are stored",
+                                    null=True, max_length=maxlengths.MAX_FILENAME_LENGTH)
+
+    logger = logging.getLogger('librarian.SymbolicDataset')
+
     # For validation of Datasets when being reused, or when being
     # regenerated.  A blank MD5_checksum means that the file was
     # missing (not created when it was supposed to be created).
@@ -66,6 +105,9 @@ class SymbolicDataset(metadata.models.AccessControl):
 
     _redacted = models.BooleanField(default=False)
 
+    class Meta:
+        ordering = ["-date_created", "name"]
+
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -74,10 +116,117 @@ class SymbolicDataset(metadata.models.AccessControl):
         """
         Unicode representation of a SymbolicDataset.
 
-        This is S[pk] or S[pk]d if it has data.
+        This is simply S[pk] if it has no data.
         """
-        has_data_suffix = "d" if self.has_data() else ""
-        return "S{}{}".format(self.pk, has_data_suffix)
+        if not self.has_data():
+            return "S{}".format(self.pk)
+
+        display_name = self.name if self.name != "" else "[no name specified]"
+
+        return "{} (created by {} on {})".format(display_name, self.user, self.date_created)
+
+    def all_rows(self, data_check=False, insert_at=None):
+        """
+        Returns an iterator over all rows of this Dataset.
+
+        If insert_at is specified, a blank field is inserted
+        at each element of insert_at.
+        """
+        self.dataset_file.open('rU')
+        cdt = self.compounddatatype
+
+        with self.dataset_file:
+            reader = csv.reader(self.dataset_file)
+            for row in reader:
+                if insert_at is not None:
+                    [row.insert(pos, "") for pos in insert_at]
+                if data_check:
+                    row = map(None, row, cdt.check_constraints(row))
+                yield row
+
+    def header(self):
+        rows = self.all_rows()
+        return next(rows)
+
+    def rows(self, data_check=False, insert_at=None, limit=None):
+        rows = self.all_rows(data_check, insert_at)
+        for i, row in enumerate(rows):
+            if i == 0:
+                pass  # skip header
+            else:
+                yield row
+            if limit is not None and i >= limit:
+                break
+
+    def expected_header(self):
+        header = []
+        if not self.is_raw():
+            header = [c.column_name for c in self.compounddatatype.members.order_by("column_idx")]
+        return header
+
+    @property
+    def content_matches_header(self):
+        observed = self.header()
+
+        # Cache this so we only hit the db once here
+        if hasattr(self, "_expected_header_cache"):
+            expected = self._expected_header_cache
+        else:
+            expected = self._expected_header_cache = self.expected_header()
+
+        if len(observed) != len(expected):
+            return False
+        return not any([o != x for (o, x) in zip(observed, expected)])
+
+    def column_alignment(self):
+        """
+        This function looks at the expected and observed headers for
+        a Dataset, and tries to align them if they don't match.
+
+        :return: a tuple whose first element is a list of tuples
+        i.e (expected header name, observed header name), and
+        whose second element is a list of gaps indicating where
+        to insert blank fields in a row
+        """
+        expt = self.expected_header()
+        obs = self.header()
+        i, insert = 0, []
+
+        if self.is_raw() and not self.content_matches_header:
+            return None, None
+
+        # Do a greedy 'hard matching' over the columns
+        while i < max(len(expt), len(obs)) - 1:
+            ex, ob = zip(*(map(None, expt, obs)[i:]))
+            u_score = float('inf')
+            l_score = float('inf')
+
+            for j, val in enumerate(ob):
+                if val == ex[0]:
+                    u_score = j
+            for j, val in enumerate(ex):
+                if val == ob[0]:
+                    l_score = j
+            if l_score == u_score == float('inf'):
+                pass
+            elif u_score < l_score and u_score != float('inf'):
+                [expt.insert(i, "") for _ in xrange(u_score)]
+            elif l_score <= u_score and l_score != float('inf'):
+                [obs.insert(i, "") for _ in xrange(l_score)]
+                insert += [i] * l_score  # keep track of where to insert columns in the resulting view
+            i += 1
+
+        # it would be nice to do a similar soft matching to try to
+        # match columns that are close to being the same string
+
+        # Pad out the arrays
+        diff = abs(len(expt)-len(obs))
+        if len(expt) > len(obs):
+            obs += [""] * diff
+        else:
+            expt += [""] * diff
+
+        return zip(expt, obs), insert
 
     @property
     def compounddatatype(self):
@@ -98,16 +247,68 @@ class SymbolicDataset(metadata.models.AccessControl):
         if self.has_structure():
             self.structure.clean()
 
-        if self.has_data():
-            self.dataset.clean()
+        if self.created_by is not None:
+            # Whatever run created this Dataset must have had access to the parent SymbolicDataset.
+            self.created_by.definite.top_level_run.validate_restrict_access([self])
+
+        if self.has_data() and not self.check_md5():
+            raise ValidationError('File integrity of "{}" lost. Current checksum "{}" does not equal expected checksum '
+                                  '"{}"'.format(self, self.compute_md5(), self.MD5_checksum))
+
+    def validate_unique(self, *args, **kwargs):
+        query = SymbolicDataset.objects.filter(MD5_checksum=self.MD5_checksum,
+                                               name=self.name)
+        if query.exclude(pk=self.pk).exists():
+            raise ValidationError("A Dataset with that name and MD5 already exists.")
+        super(SymbolicDataset, self).validate_unique(*args, **kwargs)
+
+    def get_absolute_url(self):
+        """
+        :return str: URL to access the dataset_file
+        """
+        return reverse('dataset_download', kwargs={"dataset_id": self.id})
+
+    def get_filesize(self):
+        """
+        :return int: size of dataset_file in bytes
+        """
+        return self.dataset_file.size
+
+    def get_formatted_filesize(self):
+        if self.dataset_file.size >= 1099511627776:
+            return "{0:.2f}".format(self.dataset_file.size/1099511627776.0) + ' TB'
+        if self.dataset_file.size >= 1073741824:
+            return "{0:.2f}".format(self.dataset_file.size/1073741824.0) + ' GB'
+        elif self.dataset_file.size >= 1048576:
+            return "{0:.2f}".format(self.dataset_file.size/1048576.0) + ' MB'
+        elif self.dataset_file.size >= 1024:
+            return "{0:.2f}".format(self.dataset_file.size/1024.0) + ' KB'
+        else:
+            return str(self.dataset_file.size) + ' B'
+
+    def compute_md5(self):
+        """Computes the MD5 checksum of the Dataset."""
+        try:
+            self.dataset_file.open()
+            md5 = file_access_utils.compute_md5(self.dataset_file.file)
+        finally:
+            self.dataset_file.close()
+
+        return md5
+
+    def check_md5(self):
+        """
+        Checks the MD5 checksum of the Dataset against its stored value.
+
+        The stored value is used when regenerating data
+        that once existed, as a coherence check.
+        """
+        # Recompute the MD5, see if it equals what is already stored
+        return self.MD5_checksum == self.compute_md5()
 
     def has_data(self):
         """True if associated Dataset exists; False otherwise."""
-        try:
-            self.dataset
-        except ObjectDoesNotExist:
-            return False
-        return self.dataset.pk is not None
+        return self.dataset_file is not None
 
     def has_structure(self):
         """True if associated DatasetStructure exists; False otherwise."""
@@ -184,21 +385,21 @@ class SymbolicDataset(metadata.models.AccessControl):
         self.MD5_checksum = md5gen.hexdigest()
 
     @transaction.atomic
-    def register_dataset(self, file_path, user, name, description, created_by=None, file_handle=None):
-        """Create and register a new Dataset for this SymbolicDataset.
+    def register_file(self, file_path, user, name, description, created_by=None, file_handle=None):
+        """Save and register a new file for this Dataset.
 
-        Compute and set the MD5 for the new Dataset.
+        Compute and set the MD5.
 
         Closes the file afterwards if the file source is a string file path.
         Does not close the file afterwards if file source is a file handle.
 
         INPUTS
-        file_path           file to upload as the new Dataset
-        file_handle         file handle of the file to upload as the new Dataset.
+        file_path           file to upload as the new contents
+        file_handle         file handle of the file to upload as the new contents.
                             If supplied, then does not reopen the file in file_path.
                             Moves handle to beginning of file before calculating MD5.
                             If None, then opens the file in file_path.
-        user                user who uploaded the Dataset
+        user                user who uploaded the file
         name                name for the new Dataset
         description         description for the new Dataset
         created_by          a RunAtomic which created this Dataset, or
@@ -211,16 +412,13 @@ class SymbolicDataset(metadata.models.AccessControl):
         assert not self.has_data()
         if created_by is not None:
             assert user == created_by.top_level_run.user
-
-        dataset = archive.models.Dataset(user=user, name=name, description=description, symbolicdataset=self)
-        if created_by:
-            dataset.created_by = created_by
+            self.created_by = created_by
 
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
-            dataset.dataset_file.save(os.path.basename(f.name), File(f))
+            self.dataset_file.save(os.path.basename(f.name), File(f))
 
-        dataset.clean()
-        dataset.save()
+        self.clean()
+        self.save()
 
     def mark_missing(self, start_time, end_time, execlog, checking_user):
         """Mark a SymbolicDataset as missing output.
@@ -278,8 +476,8 @@ class SymbolicDataset(metadata.models.AccessControl):
 
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
-    def create_SD(cls, file_path, user=None, users_allowed=None, groups_allowed=None, cdt=None,
-                  make_dataset=True, name=None, description=None, created_by=None, check=True, file_handle=None):
+    def create_SD(cls, file_path, user=None, users_allowed=None, groups_allowed=None, cdt=None, keep_file=True,
+                  name=None, description=None, created_by=None, check=True, file_handle=None):
         """
         Helper function to make defining SDs and Datasets faster.
 
@@ -362,8 +560,8 @@ class SymbolicDataset(metadata.models.AccessControl):
                         raise ValueError('The file "{}" was malformed'.format(file_name))
                 LOGGER.debug("Read {} rows from file {}".format(symDS.structure.num_rows, file_name))
 
-            if make_dataset:
-                symDS.register_dataset(file_path=file_path, file_handle=file_handle, user=user, name=name,
+            if keep_file:
+                symDS.register_file(file_path=file_path, file_handle=file_handle, user=user, name=name,
                                        description=description, created_by=created_by)
             else:
                 if symDS.is_raw():
@@ -379,9 +577,8 @@ class SymbolicDataset(metadata.models.AccessControl):
 
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
-    def create_SD_bulk(cls, csv_file_path, user, users_allowed=None, groups_allowed=None,
-                       csv_file_handle=None, cdt=None, make_dataset=True, created_by=None,
-                       check=True):
+    def create_SD_bulk(cls, csv_file_path, user, users_allowed=None, groups_allowed=None, csv_file_handle=None,
+                       cdt=None, keep_files=True, created_by=None, check=True):
         """
         Helper function to make defining multiple SDs and Datasets faster.
         Instead of specifying datasets one by one,
@@ -409,7 +606,7 @@ class SymbolicDataset(metadata.models.AccessControl):
             reopen file and moves handle to beginning of file. If None, then
             uses csv_file_path.
         :param cdt:
-        :param make_dataset:
+        :param keep_files:
         :param user:
         :param created_by:
         :param check:
@@ -443,11 +640,10 @@ class SymbolicDataset(metadata.models.AccessControl):
                                 "Line " + str(line) +
                                 " is invalid: Name, Description, File must be defined")
 
-                        symDS = SymbolicDataset.create_SD(file, user=user, users_allowed=users_allowed,
+                        symDS = SymbolicDataset.create_SD(file, file_path=user, user=user, users_allowed=users_allowed,
                                                           groups_allowed=groups_allowed, cdt=cdt,
-                                                          make_dataset=make_dataset,
-                                                          name=name, description=desc, created_by=created_by,
-                                                          check=check)
+                                                          keep_file=keep_files, name=name, description=desc,
+                                                          created_by=created_by, check=check)
 
                         symDSs.extend([symDS])
             except Exception, e:
@@ -587,9 +783,9 @@ class SymbolicDataset(metadata.models.AccessControl):
 
             # June 4, 2014: this evil_twin should be a raw SD -- we don't really care what it contains,
             # just that it conflicted with the existing one.
-            evil_twin = SymbolicDataset.create_SD(new_file_path, user=checking_user, cdt=None,
-                                                  name="{}eviltwin".format(self),
-                                                  description="MD5 conflictor of {}".format(self))
+            evil_twin = SymbolicDataset.create_SD(new_file_path, file_path=checking_user, user=checking_user, cdt=None,
+                                                  description="MD5 conflictor of {}".format(self),
+                                                  name="{}eviltwin".format(self))
 
             note_of_usurping = datachecking.models.MD5Conflict(integritychecklog=icl, conflicting_SD=evil_twin)
             note_of_usurping.save()
@@ -722,6 +918,86 @@ class SymbolicDataset(metadata.models.AccessControl):
     def remove(self):
         removal_plan = self.build_removal_plan()
         metadata.models.remove_helper(removal_plan)
+
+    @classmethod
+    def purge(cls,
+              max_storage=settings.DATASET_MAX_STORAGE,
+              target=settings.DATASET_TARGET_STORAGE):
+
+        files = []  # [(date, path)]
+        start_path = os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR)
+        total_size = 0
+        skipped_count = 0
+        for dirpath, _dirnames, filenames in os.walk(start_path):
+            for filename in filenames:
+                filepath = os.path.join(dirpath, filename)
+                filedate = os.path.getmtime(filepath)
+                filesize = os.path.getsize(filepath)
+                relpath = os.path.relpath(filepath, settings.MEDIA_ROOT)
+                total_size += filesize
+                heapq.heappush(files, (filedate, relpath, filesize))
+        if total_size >= max_storage:
+            cls.logger.info('Dataset purge triggered at %s over %d files.',
+                            filesizeformat(total_size),
+                            len(files))
+            while total_size > target and files:
+                filedate, relpath, filesize = heapq.heappop(files)
+                dataset = SymbolicDataset.objects.filter(dataset_file=relpath).first()
+                if dataset is None:
+                    filepath = os.path.join(settings.MEDIA_ROOT, relpath)
+                    filedate = os.path.getmtime(filepath)
+                    file_age = datetime.now() - datetime.fromtimestamp(filedate)
+                    if file_age < timedelta(hours=1):
+                        skipped_count += 1
+                    else:
+                        cls.logger.warn('No dataset matches file %r, deleting it.',
+                                        relpath)
+                        os.remove(filepath)
+                        total_size -= filesize
+                else:
+                    if dataset.created_by is None:
+                        is_skipped = True  # it was uploaded, not created
+                    else:
+                        # Check to see if it's being used by an active run.
+                        producers = dataset.execrecordouts.all()
+                        consumers = dataset.execrecordins.all()
+                        related_execrecords = ExecRecord.objects.filter(
+                            Q(execrecordouts__in=producers) |
+                            Q(execrecordins__in=consumers))
+                        related_components = archive.models.RunComponent.objects.filter(
+                            execrecord__in=related_execrecords)
+                        related_runs = {component.top_level_run
+                                        for component in related_components}
+                        is_skipped = any((not run.has_ended()
+                                          for run in related_runs))
+                    if is_skipped:
+                        skipped_count += 1
+                    else:
+                        dataset.delete()
+                        total_size -= filesize
+
+            remaining = 'Leaving {} over {} files.'.format(
+                filesizeformat(total_size),
+                len(files) + skipped_count)
+            if total_size > max_storage:
+                target = max_storage
+                log_method = cls.logger.error
+            elif total_size > target:
+                target = target
+                log_method = cls.logger.warn
+            else:
+                target = None
+                log_method = cls.logger.info
+            if target:
+                message = 'Cannot purge datasets below {}. {}'.format(
+                    filesizeformat(target),
+                    remaining)
+            else:
+                message = 'Dataset purge finished. ' + remaining
+            message = message.replace('\xa0', ' ')
+            log_method(message)
+            if log_method == cls.logger.error:
+                raise RuntimeError(message)
 
 
 class DatasetStructure(models.Model):

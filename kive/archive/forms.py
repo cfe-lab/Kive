@@ -47,9 +47,8 @@ class DatasetForm(metadata.forms.AccessControlForm):
         if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
-        symbolicdataset = SymbolicDataset.create_SD(file_path=None, user=user,
-                                                    cdt=compound_datatype_obj,
-                                                    make_dataset=True, name=self.cleaned_data['name'],
+        symbolicdataset = SymbolicDataset.create_SD(cls=None, file_path=None, user=user, cdt=compound_datatype_obj,
+                                                    keep_file=True, name=self.cleaned_data['name'],
                                                     description=self.cleaned_data['description'], created_by=None,
                                                     check=True, file_handle=self.cleaned_data['dataset_file'])
         symbolicdataset.grant_from_json(self.cleaned_data["permissions"])
@@ -128,11 +127,11 @@ class BulkCSVDatasetForm (metadata.forms.AccessControlForm):
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
         # FIXME this doesn't support PermissionsWidget.
-        SymbolicDataset.create_SD_bulk(csv_file_path=None, user=user,
+        SymbolicDataset.create_SD_bulk(cls=None, csv_file_path=None, user=user,
                                        users_allowed=self.cleaned_data["users_allowed"],
                                        groups_allowed=self.cleaned_data["groups_allowed"],
                                        csv_file_handle=self.cleaned_data['datasets_csv'], cdt=compound_datatype_obj,
-                                       make_dataset=True, created_by=None, check=True)
+                                       keep_files=True, created_by=None, check=True)
 
 
 class MultiFileField(forms.Field):
@@ -229,10 +228,10 @@ class BulkAddDatasetForm (metadata.forms.AccessControlForm):
                 else:
                     auto_description = "Bulk Uploaded File " + uploaded_file.name
 
-                symbolicdataset = SymbolicDataset.create_SD(file_path=None, user=user,
-                                                            cdt=compound_datatype_obj, make_dataset=True,
-                                                            name=auto_name, description=auto_description,
-                                                            created_by=None, check=True, file_handle=uploaded_file)
+                symbolicdataset = SymbolicDataset.create_SD(cls=None, file_path=None, user=user,
+                                                            cdt=compound_datatype_obj, keep_file=True, name=auto_name,
+                                                            description=auto_description, created_by=None, check=True,
+                                                            file_handle=uploaded_file)
                 symbolicdataset.grant_from_json(self.cleaned_data["permissions"])
 
                 dataset = Dataset.objects.filter(symbolicdataset=symbolicdataset).get()
@@ -368,10 +367,10 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
                 else:
                     auto_description = "Bulk Uploaded File " + uploaded_file.name
 
-                symbolicdataset = SymbolicDataset.create_SD(file_path=None, user=user,
-                                                            cdt=compound_datatype_obj, make_dataset=True,
-                                                            name=auto_name, description=auto_description,
-                                                            created_by=None, check=True, file_handle=uploaded_file)
+                symbolicdataset = SymbolicDataset.create_SD(cls=None, file_path=None, user=user,
+                                                            cdt=compound_datatype_obj, keep_file=True, name=auto_name,
+                                                            description=auto_description, created_by=None, check=True,
+                                                            file_handle=uploaded_file)
                 symbolicdataset.grant_from_json(self.cleaned_data["permissions"])
 
                 dataset = Dataset.objects.filter(symbolicdataset=symbolicdataset).get()

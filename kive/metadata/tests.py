@@ -618,7 +618,8 @@ class DatatypeTests(MetadataTestCase):
         # Make a Dataset for the prototype CSV file.
         PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
         DNA_prototype = SymbolicDataset.create_SD(os.path.join(samplecode_path, "DNAprototype.csv"),
-                                                  user=self.myUser, cdt=PROTOTYPE_CDT, name="DNAPrototype",
+                                                  file_path=self.myUser, user=self.myUser, cdt=PROTOTYPE_CDT,
+                                                  description="Prototype for the DNA Datatype", name="DNAPrototype",
                                                   description="Prototype for the DNA Datatype")
 
         self.DNA_dt.prototype = DNA_prototype.dataset
@@ -630,7 +631,8 @@ class DatatypeTests(MetadataTestCase):
         Testing clean() on a Datatype whose prototype is raw.
         """
         DNA_raw_prototype = SymbolicDataset.create_SD(os.path.join(samplecode_path, "DNAprototype.csv"),
-                                                      user=self.myUser, cdt=None, name="RawPrototype",
+                                                      file_path=self.myUser, user=self.myUser, cdt=None,
+                                                      description="Prototype that is raw", name="RawPrototype",
                                                       description="Prototype that is raw")
 
         self.DNA_dt.prototype = DNA_raw_prototype.dataset
@@ -652,7 +654,9 @@ class DatatypeTests(MetadataTestCase):
         wrong_CDT.clean()
 
         DNA_prototype_bad_CDT = SymbolicDataset.create_SD(os.path.join(samplecode_path, "DNAprototype_bad_CDT.csv"),
-                                                          user=self.myUser, cdt=wrong_CDT, name="BadCDTPrototype",
+                                                          file_path=self.myUser, user=self.myUser, cdt=wrong_CDT,
+                                                          description="Prototype with a bad CDT",
+                                                          name="BadCDTPrototype",
                                                           description="Prototype with a bad CDT")
 
         self.DNA_dt.prototype = DNA_prototype_bad_CDT.dataset
@@ -2332,8 +2336,8 @@ class CompoundDatatypeTests(MetadataTestCase):
         Creating a raw SD should pass clean
         """
         path = os.path.join(samplecode_path, "doublet_cdt.csv")
-        raw_SD = SymbolicDataset.create_SD(path, user=self.myUser, make_dataset=True, name="something",
-                                           description="desc")
+        raw_SD = SymbolicDataset.create_SD(path, file_path=self.myUser, user=self.myUser, keep_file=True,
+                                           name="something", description="desc")
         self.assertEqual(raw_SD.clean(), None)
         self.assertEqual(raw_SD.dataset.clean(), None)
 
@@ -2342,8 +2346,8 @@ class CompoundDatatypeTests(MetadataTestCase):
         Creating an SD with a CDT, where the file conforms, should be OK.
         """
         path = os.path.join(samplecode_path, "doublet_cdt.csv")
-        doublet_SD = SymbolicDataset.create_SD(path, user=self.myUser, cdt=self.doublet_cdt,
-                                               make_dataset=True, name="something", description="desc")
+        doublet_SD = SymbolicDataset.create_SD(path, file_path=self.myUser, user=self.myUser, cdt=self.doublet_cdt,
+                                               keep_file=True, name="something", description="desc")
         self.assertEqual(doublet_SD.clean(), None)
         self.assertEqual(doublet_SD.structure.clean(), None)
         self.assertEqual(doublet_SD.dataset.clean(), None)
@@ -2354,8 +2358,8 @@ class CompoundDatatypeTests(MetadataTestCase):
         self.assertRaisesRegexp(ValueError,
                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
                           .format(path, self.doublet_cdt)),
-                lambda: SymbolicDataset.create_SD(path, user=self.myUser,
-                                                  cdt=self.doublet_cdt, name="DS1", description="DS1 desc"))
+                lambda: SymbolicDataset.create_SD(path, file_path=self.myUser, user=self.myUser, cdt=self.doublet_cdt,
+                                                  description="DS1 desc", name="DS1", description="DS1 desc"))
 
     def test_create_SD_bad_col_names(self):
         # Define a dataset with the right number of header columns, but the wrong column names
@@ -2363,8 +2367,8 @@ class CompoundDatatypeTests(MetadataTestCase):
         self.assertRaisesRegexp(ValueError,
                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
                           .format(path, self.triplet_cdt)),
-                lambda: SymbolicDataset.create_SD(path, user=self.myUser,
-                                                  cdt=self.triplet_cdt, name="DS1", description="DS1 desc"))
+                lambda: SymbolicDataset.create_SD(path, file_path=self.myUser, user=self.myUser, cdt=self.triplet_cdt,
+                                                  description="DS1 desc", name="DS1", description="DS1 desc"))
 
     def test_type_constraints_row(self):
 

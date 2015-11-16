@@ -112,19 +112,11 @@ class DatasetSerializer(serializers.ModelSerializer):
         if "groups_allowed" in validated_data["symbolicdataset"]:
             groups_allowed = validated_data["symbolicdataset"]["groups_allowed"]
 
-        symbolicdataset = SymbolicDataset.create_SD(
-            file_path=None,
-            user=self.context["request"].user,
-            users_allowed=users_allowed,
-            groups_allowed=groups_allowed,
-            cdt=cdt,
-            make_dataset=True,
-            name=validated_data["name"],
-            description=validated_data["description"],
-            created_by=None,
-            check=True,
-            file_handle=validated_data["dataset_file"]
-        )
+        symbolicdataset = SymbolicDataset.create_SD(cls=None, file_path=None, user=self.context["request"].user,
+                                                    users_allowed=users_allowed, groups_allowed=groups_allowed, cdt=cdt,
+                                                    keep_file=True, name=validated_data["name"],
+                                                    description=validated_data["description"], created_by=None,
+                                                    check=True, file_handle=validated_data["dataset_file"])
         return symbolicdataset.dataset
 
 

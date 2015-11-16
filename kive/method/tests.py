@@ -2388,10 +2388,11 @@ with open(outfile, "wb") as f:
         datafile.close()
 
         # Alice uploads the data to the system.
-        self.numbers_symDS = librarian.models.SymbolicDataset.create_SD(
-            datafile.name, name="numbers", cdt=self.increment_in_1_cdt,
-            user=self.user_rob, description="1-2-3-4",
-            make_dataset=True, groups_allowed=[everyone_group()])
+        self.numbers_symDS = librarian.models.SymbolicDataset.create_SD(datafile.name, file_path="numbers",
+                                                                        user=self.user_rob,
+                                                                        groups_allowed=[everyone_group()],
+                                                                        cdt=self.increment_in_1_cdt, keep_file=True,
+                                                                        name="numbers", description="1-2-3-4")
 
     def tearDown(self):
         # Our tests fail post-teardown without this.

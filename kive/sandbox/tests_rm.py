@@ -526,9 +526,8 @@ class RawTests(SandboxRMTestCase):
         tools.create_linear_pipeline(self.pipeline_raw, [self.method_noop_raw], "raw_in", "raw_out")
         self.pipeline_raw.create_outputs()
 
-        self.symds_raw = SymbolicDataset.create_SD(
-            "/usr/share/dict/words", user=self.user_bob,
-            cdt=None, make_dataset=True, name="raw", description="some raw data")
+        self.symds_raw = SymbolicDataset.create_SD("/usr/share/dict/words", file_path=self.user_bob, user=self.user_bob,
+                                                   cdt=None, keep_file=True, name="raw", description="some raw data")
 
     def test_execute_pipeline_raw(self):
         """Execute a raw Pipeline."""

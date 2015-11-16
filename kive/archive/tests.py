@@ -3690,11 +3690,9 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
             data = ','.join(map(str, range(num_cols)))
             f.write(data)
             f.seek(0)
-            self.test_dataset = SymbolicDataset.create_SD(file_path=None, user=self.kive_user,
-                                                          users_allowed=None,
-                                                          groups_allowed=None,
-                                                          cdt=None,
-                                                          make_dataset=True, name="Test dataset",
+            self.test_dataset = SymbolicDataset.create_SD(cls=None, file_path=None, user=self.kive_user,
+                                                          users_allowed=None, groups_allowed=None, cdt=None,
+                                                          keep_file=True, name="Test dataset",
                                                           description="Test data for a test that tests test data",
                                                           created_by=None, check=True, file_handle=f)
             self.test_dataset_path = "{}{}/".format(self.list_path,
