@@ -5,7 +5,7 @@ import tempfile
 from django.conf import settings
 
 from metadata.models import CompoundDatatype, Datatype, BasicConstraint, kive_user
-from librarian.models import SymbolicDataset
+from librarian.models import Dataset
 from constants import CDTs, datatypes
 import kive.settings
 
@@ -27,7 +27,7 @@ False,False
 false,false"""
     )
     f.seek(0)
-    proto_SD = SymbolicDataset.create_SD(
+    proto_SD = Dataset.create_dataset(
         file_path=None, user=kive_user(), cdt=CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK),
         name="AlwaysTruePrototype", description="Prototype for dummy Datatype",
         file_handle=f

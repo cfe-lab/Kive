@@ -9,14 +9,14 @@ from django.core.files import File
 from django.contrib.auth.models import User
 
 import metadata.models
-from librarian.models import SymbolicDataset
+from librarian.models import Dataset
 import method.models
 import kive.testing_utils as tools
 
 # This comes from the initial_data fixture.
 kive_user = User.objects.get(pk=1)
 
-test_fasta = SymbolicDataset.create_SD("../samplecode/step_0_raw.fasta", file_path=None, user=kive_user, cdt=None,
+test_fasta = Dataset.create_dataset("../samplecode/step_0_raw.fasta", file_path=None, user=kive_user, cdt=None,
                                        keep_file=True, name="TestFASTA",
                                        description="Toy FASTA file for testing pipelines")
 

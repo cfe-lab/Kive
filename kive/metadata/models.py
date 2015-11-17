@@ -153,7 +153,7 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
                         the header)
     summary_path        working directory to run verification methods in
     content_check_log   should be provided if this function is called as part
-                        of a check on a SymbolicDataset
+                        of a check on a Dataset
 
     OUTPUT
     summary             a dict containing metadata about the CSV, whose keys
@@ -559,10 +559,7 @@ class Datatype(AccessControl):
     restricts = models.ManyToManyField('self', symmetrical=False, related_name="restricted_by", null=True, blank=True,
                                        help_text="Captures hierarchical is-a classifications among Datatypes")
 
-    prototype = models.OneToOneField("archive.Dataset", null=True, blank=True, related_name="datatype_modelled",
-                                     on_delete=models.SET_NULL)
-
-    proto_SD = models.OneToOneField("librarian.SymbolicDataset", null=True, blank=True,
+    proto_SD = models.OneToOneField("librarian.Dataset", null=True, blank=True,
                                     related_name="datatype_modelled", on_delete=models.SET_NULL)
 
     class Meta:
@@ -1294,7 +1291,7 @@ class Datatype(AccessControl):
         removal_plan["Datatypes"].add(self)
 
         if self.prototype is not None:
-            # The prototype is a Dataset so we have to check its SymbolicDataset.
+            # The prototype is a Dataset so we have to check its Dataset.
             if self.prototype.symbolicdataset not in removal_plan["SymbolicDatasets"]:
                 prototype_removal_plan = self.prototype.symbolicdataset.build_removal_plan(removal_plan)
                 update_removal_plan(removal_plan, prototype_removal_plan)
@@ -1771,7 +1768,7 @@ class CompoundDatatype(AccessControl):
                             running a verification method. summary_path is the
                             work directory where we will do that
         content_check_log   summarize_CSV is called as part of a content check
-                            on a SymbolicDataset; this is the log of that check
+                            on a Dataset; this is the log of that check
 
         OUTPUT
         summary             a dict containing metadata about the CSV, whose keys

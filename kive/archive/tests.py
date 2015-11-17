@@ -19,7 +19,7 @@ from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
     RunOutputCable, RunStep, RunSIC
 from datachecking.models import BadData
 from file_access_utils import compute_md5
-from librarian.models import ExecRecord, SymbolicDataset
+from librarian.models import ExecRecord, Dataset
 
 from kive.tests import BaseTestCases, install_fixture_files, restore_production_files, DuckContext
 from method.models import Method
@@ -191,24 +191,24 @@ class ArchiveTestCaseHelpers:
                 step_num=3)
             self.pE_run = Run.objects.get(pipeline=self.pE,
                                           name='pE_run')
-            self.raw_symDS = SymbolicDataset.objects.get(dataset__name='raw_DS')
-            self.singlet_symDS = SymbolicDataset.objects.get(
+            self.raw_symDS = Dataset.objects.get(dataset__name='raw_DS')
+            self.singlet_symDS = Dataset.objects.get(
                 dataset__dataset_file__endswith='singlet_cdt_large.csv')
-            self.doublet_symDS = SymbolicDataset.objects.get(dataset__name='doublet')
+            self.doublet_symDS = Dataset.objects.get(dataset__name='doublet')
             self.doublet_DS = self.doublet_symDS.dataset
-            self.triplet_symDS = SymbolicDataset.objects.get(
+            self.triplet_symDS = Dataset.objects.get(
                 dataset__dataset_file__endswith='step_0_triplet.csv')
-            self.C1_in_symDS = SymbolicDataset.objects.get(dataset__name='C1_in_triplet')
+            self.C1_in_symDS = Dataset.objects.get(dataset__name='C1_in_triplet')
             self.C1_in_DS = self.C1_in_symDS.dataset
-            self.C1_out_symDS = SymbolicDataset.objects.get(
+            self.C1_out_symDS = Dataset.objects.get(
                 dataset__dataset_file__endswith='step_0_singlet.csv')
-            self.C2_in_symDS = SymbolicDataset.objects.get(
+            self.C2_in_symDS = Dataset.objects.get(
                 dataset__dataset_file__endswith='E11_32_output.csv')
-            self.C2_out_symDS = SymbolicDataset.objects.get(dataset__name='C2_out')
-            self.C3_out_symDS = SymbolicDataset.objects.get(dataset__name='C3_out')
-            self.E1_out_symDS = SymbolicDataset.objects.get(dataset__name='E1_out')
+            self.C2_out_symDS = Dataset.objects.get(dataset__name='C2_out')
+            self.C3_out_symDS = Dataset.objects.get(dataset__name='C3_out')
+            self.E1_out_symDS = Dataset.objects.get(dataset__name='E1_out')
             self.E1_out_DS = self.E1_out_symDS.dataset
-            self.D1_in_symDS = SymbolicDataset.objects.get(
+            self.D1_in_symDS = Dataset.objects.get(
                 structure__compounddatatype=self.doublet_symDS.structure.compounddatatype,
                 structure__num_rows=10)
             self.D01_11 = self.step_D1.cables_in.get(dest__dataset_idx=1)
@@ -1356,7 +1356,7 @@ class RunComponentTooManyChecks(TestCase):
         log.integrity_checks.create(symbolicdataset=sd, user=self.user_bob)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" has multiple IntegrityCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
+                                          'Dataset {} of ExecLog "{}"'.format(runstep, sd, log)),
                                 runstep.clean)
 
     def test_RunStep_clean_too_many_integrity_checks_invoked(self):
@@ -1374,7 +1374,7 @@ class RunComponentTooManyChecks(TestCase):
             extra_check_2 = log.integrity_checks.create(symbolicdataset=sd, user=self.user_bob)
             self.assertRaisesRegexp(ValidationError,
                                     re.escape('RunStep "{}" has multiple IntegrityCheckLogs for output '
-                                              'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
+                                              'Dataset {} of ExecLog "{}"'.format(runstep, sd, log)),
                                     runstep.clean)
             extra_check_1.delete()
             extra_check_2.delete()
@@ -1393,7 +1393,7 @@ class RunComponentTooManyChecks(TestCase):
         log.content_checks.create(symbolicdataset=sd, user=self.user_bob)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" has multiple ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
+                                          'Dataset {} of ExecLog "{}"'.format(runstep, sd, log)),
                                 runstep.clean)
 
     def test_RunStep_clean_too_many_content_checks_invoked(self):
@@ -1411,7 +1411,7 @@ class RunComponentTooManyChecks(TestCase):
             extra_check_2 = log.content_checks.create(symbolicdataset=sd, user=self.user_bob)
             self.assertRaisesRegexp(ValidationError,
                                     re.escape('RunStep "{}" has multiple ContentCheckLogs for output '
-                                              'SymbolicDataset {} of ExecLog "{}"'.format(runstep, sd, log)),
+                                              'Dataset {} of ExecLog "{}"'.format(runstep, sd, log)),
                                     runstep.clean)
             extra_check_1.delete()
             extra_check_2.delete()
@@ -1697,7 +1697,7 @@ class RunSICTests(ArchiveTestCase):
         self.C1_in.execrecordouts_referencing.add(ero)
         self.assertRaisesRegexp(
             ValidationError,
-            re.escape('CDT of SymbolicDataset "{}" is not a restriction of the CDT of the fed TransformationInput "{}"'
+            re.escape('CDT of Dataset "{}" is not a restriction of the CDT of the fed TransformationInput "{}"'
                       .format(ero.symbolicdataset, ero.generic_output.definite)),
             self.E11_32_RSIC.clean)
 
@@ -1854,7 +1854,7 @@ class RunSICTests(ArchiveTestCase):
         self.assertRaisesRegexp(
             ValidationError,
             re.escape(
-                'CDT of SymbolicDataset "{}" is not a restriction of the '
+                'CDT of Dataset "{}" is not a restriction of the '
                 'CDT of the fed TransformationInput "{}"'.format(
                     ero.symbolicdataset, ero.generic_output.definite)),
             self.E11_32_RSIC.clean)
@@ -3676,7 +3676,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
     @classmethod
     def setUpClass(cls):
         # Force dataset ids to be different from symbolic dataset ids.
-        SymbolicDataset.create_empty(user=kive_user())
+        Dataset.create_empty(user=kive_user())
 
     def setUp(self):
         super(DatasetApiTests, self).setUp()
@@ -3690,7 +3690,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
             data = ','.join(map(str, range(num_cols)))
             f.write(data)
             f.seek(0)
-            self.test_dataset = SymbolicDataset.create_SD(cls=None, file_path=None, user=self.kive_user,
+            self.test_dataset = Dataset.create_dataset(cls=None, file_path=None, user=self.kive_user,
                                                           users_allowed=None, groups_allowed=None, cdt=None,
                                                           keep_file=True, name="Test dataset",
                                                           description="Test data for a test that tests test data",
@@ -3848,7 +3848,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         response = self.detail_view(request, pk=self.detail_pk)
         self.assertEquals(response.status_code, status.HTTP_200_OK)
 
-        symbolic_dataset = SymbolicDataset.objects.get(pk=symbolic_dataset_id)
+        symbolic_dataset = Dataset.objects.get(pk=symbolic_dataset_id)
         self.assertTrue(symbolic_dataset.is_redacted())
 
 

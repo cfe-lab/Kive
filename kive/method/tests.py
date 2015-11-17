@@ -2388,7 +2388,7 @@ with open(outfile, "wb") as f:
         datafile.close()
 
         # Alice uploads the data to the system.
-        self.numbers_symDS = librarian.models.SymbolicDataset.create_SD(datafile.name, file_path="numbers",
+        self.numbers_symDS = librarian.models.SymbolicDataset.create_dataset(datafile.name, file_path="numbers",
                                                                         user=self.user_rob,
                                                                         groups_allowed=[everyone_group()],
                                                                         cdt=self.increment_in_1_cdt, keep_file=True,

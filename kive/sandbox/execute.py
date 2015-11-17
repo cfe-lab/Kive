@@ -169,13 +169,13 @@ class Sandbox:
         return os.path.join(step_run_dir, xput_dir, file_name)
 
     def register_symbolicdataset(self, symbolicdataset, location):
-        """Set the location of a SymbolicDataset on the file system.
+        """Set the location of a Dataset on the file system.
 
-        If the SymbolicDataset is already in the Sandbox (ie. it is in
+        If the Dataset is already in the Sandbox (ie. it is in
         sd_fs_map), do not update the existing location.
 
         INPUTS
-        symbolicdataset     SymbolicDataset to register
+        symbolicdataset     Dataset to register
         location            file path of symbolicdataset in the Sandbox
         """
         try:
@@ -184,10 +184,10 @@ class Sandbox:
             self.sd_fs_map[symbolicdataset] = location
 
     def find_symbolicdataset(self, symbolicdataset):
-        """Find the location of a SymbolicDataset on the file system.
+        """Find the location of a Dataset on the file system.
 
         INPUTS
-        symbolicdataset     SymbolicDataset to locate
+        symbolicdataset     Dataset to locate
 
         OUTPUTS
         location            the path of symbolicdataset in the Sandbox,
@@ -206,7 +206,7 @@ class Sandbox:
 
         INPUTS
         runcable        RunCable created for cable execution
-        output_SD       SymbolicDataset output by cable
+        output_SD       Dataset output by cable
         output_path     where the cable wrote its output
         """
         self.register_symbolicdataset(output_SD, output_path)
@@ -240,7 +240,7 @@ class Sandbox:
         """Create a failed ContentCheckLog for missing cable output
 
         INPUTS
-        output_SD       SymbolicDataset cable was supposed to output
+        output_SD       Dataset cable was supposed to output
         execlog         ExecLog for cable execution which didn't produce
                         output
         start_time      time when we started checking for missing output
@@ -514,7 +514,7 @@ class Sandbox:
                 if not self.recover(curr_in_SD, invoking_record):
 
                     # Failed recovery. Return RunStep with failed ExecLogs.
-                    self.logger.warn("Recovery of SymbolicDataset {} failed".format(curr_in_SD))
+                    self.logger.warn("Recovery of Dataset {} failed".format(curr_in_SD))
                     curr_RS.stop(save=True, clean=True)
                     return curr_RS
 
@@ -641,7 +641,7 @@ class Sandbox:
             # But if this step contains a subpipeline...
             else:
                 # The generator is the subpipeline's output cable.  Retrieve the subrun so we can
-                # look up the right SymbolicDataset.
+                # look up the right Dataset.
                 generator = source_step.transformation.pipeline.outcables.get(output_idx=socket.dataset_idx)
                 runstep_containing_subrun = curr_run.runsteps.get(pipelinestep__step_num=outcable.source_step)
                 run_to_query = archive.models.Run.objects.get(parent_runstep=runstep_containing_subrun)
@@ -672,7 +672,7 @@ class Sandbox:
 
     def first_generator_of_SD(self, SD_to_find, curr_run=None):
         """
-        Find the (run, generator) pair which first produced a SymbolicDataset.
+        Find the (run, generator) pair which first produced a Dataset.
         If generator is None, it indicates the socket is a Pipeline input. If
         both generator and run are None, it means the SD wasn't found in the
         Pipeline.
@@ -771,10 +771,10 @@ class Sandbox:
         curr_run, generator = self.first_generator_of_SD(SD_to_recover)
 
         if curr_run is None:
-            raise ValueError('SymbolicDataset "{}" was not found in Pipeline "{}" and cannot be recovered'
+            raise ValueError('Dataset "{}" was not found in Pipeline "{}" and cannot be recovered'
                              .format(SD_to_recover, self.pipeline))
         elif generator is None:
-            raise ValueError('SymbolicDataset "{}" is an input to Pipeline "{}" and cannot be recovered'
+            raise ValueError('Dataset "{}" is an input to Pipeline "{}" and cannot be recovered'
                              .format(SD_to_recover, self.pipeline))
 
         self.logger.debug('Executing {} "{}" in recovery mode'.format(generator.__class__.__name__, generator))
@@ -1330,7 +1330,7 @@ class Sandbox:
 
     def queue_recovery(self, SD_to_recover, invoking_record):
         """
-        Determines and enqueues the steps necessary to reproduce the specified SymbolicDataset.
+        Determines and enqueues the steps necessary to reproduce the specified Dataset.
 
         This is an MPI-friendly version of recover.  It only ever handles non-trivial recoveries,
         as trivial recoveries are now performed by cables themselves.
@@ -1353,10 +1353,10 @@ class Sandbox:
         curr_run, generator = self.first_generator_of_SD(SD_to_recover)
 
         if curr_run is None:
-            raise ValueError('SymbolicDataset "{}" was not found in Pipeline "{}" and cannot be recovered'
+            raise ValueError('Dataset "{}" was not found in Pipeline "{}" and cannot be recovered'
                              .format(SD_to_recover, self.pipeline))
         elif generator is None:
-            raise ValueError('SymbolicDataset "{}" is an input to Pipeline "{}" and cannot be recovered'
+            raise ValueError('Dataset "{}" is an input to Pipeline "{}" and cannot be recovered'
                              .format(SD_to_recover, self.pipeline))
 
         # We're now going to look up what we need to run from cable_execute_info and step_execute_info.
@@ -1600,7 +1600,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
                             output_SD.register_file(output_path)
 
                     else:
-                        output_SD = librarian.models.SymbolicDataset.create_SD(output_path, file_path=output_CDT,
+                        output_SD = librarian.models.SymbolicDataset.create_dataset(output_path, file_path=output_CDT,
                                                                                cdt=output_CDT, keep_file=make_dataset,
                                                                                name=dataset_name,
                                                                                description=dataset_desc,
@@ -1838,7 +1838,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                             bad_output_found = True
 
                         else:
-                            # If necessary, create new SymbolicDataset for output, and create the Dataset
+                            # If necessary, create new Dataset for output, and create the Dataset
                             # if it's to be retained.
                             dataset_name = runstep.output_name(curr_output)
                             dataset_desc = runstep.output_description(curr_output)
@@ -1846,7 +1846,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
 
                             if preexisting_ER:
                                 # Wrap in a transaction to prevent concurrent authoring of Datasets to
-                                # an existing SymbolicDataset.
+                                # an existing Dataset.
                                 output_ERO = execrecord.get_execrecordout(curr_output)
                                 with transaction.atomic():
                                     output_SD = librarian.models.SymbolicDataset.objects.select_for_update().filter(
@@ -1856,7 +1856,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                                         output_SD.register_file(output_path)
 
                             else:
-                                output_SD = librarian.models.SymbolicDataset.create_SD(output_path,
+                                output_SD = librarian.models.SymbolicDataset.create_dataset(output_path,
                                                                                        file_path=output_CDT,
                                                                                        cdt=output_CDT,
                                                                                        keep_file=make_dataset,

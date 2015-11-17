@@ -83,7 +83,7 @@ class BlankableColumn(BlankableTestCase):
         bc = BlankCell(cellerror = cell_error)
         self.assertRaisesRegexp(
             ValidationError,
-            'Entry \(4,1\) of SymbolicDataset ".*" is blankable',
+            'Entry \(4,1\) of Dataset ".*" is blankable',
             bc.clean
         )
 

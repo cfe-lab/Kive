@@ -7,7 +7,7 @@ import tempfile
 import shutil
 import os.path
 
-from librarian.models import SymbolicDataset
+from librarian.models import Dataset
 from sandbox.execute import Sandbox
 import kive.testing_utils as tools
 import kive.settings
@@ -70,7 +70,7 @@ class ExecuteResultTestsRM(TestCase):
         self.reverse_run = self.pipeline_reverse.pipeline_instances.first()
         self.revcomp_run = self.pipeline_revcomp.pipeline_instances.first()
 
-        self.symds_labdata = SymbolicDataset.objects.get(
+        self.symds_labdata = Dataset.objects.get(
             dataset__name="lab data",
             user=self.user_alice
         )
@@ -130,7 +130,7 @@ class ExecuteResultTestsRM(TestCase):
 
     def test_execute_pipeline_symbolicdataset(self):
         """
-        Test the integrity of a SymbolicDataset output by a PipelineStep in
+        Test the integrity of a Dataset output by a PipelineStep in
         the middle of a Pipeline.
         """
         # Figure out the MD5 of the output file created when the complement method
@@ -245,7 +245,7 @@ class ExecuteResultTestsRM(TestCase):
 
     def test_execute_pipeline_output_symds(self):
         """
-        A Pipeline with no deleted outputs should have a SymbolicDataset as an output.
+        A Pipeline with no deleted outputs should have a Dataset as an output.
         """
         output = self.comp_run.runoutputcables.first()
         output_symds = output.execrecord.execrecordouts.first().symbolicdataset
@@ -305,7 +305,7 @@ class ExecuteDiscardedIntermediateTests(TestCase):
 
         self.revcomp_v2_run = self.pipeline_revcomp_v2.pipeline_instances.first()  # only one exists
 
-        self.symds_labdata = SymbolicDataset.objects.get(
+        self.symds_labdata = Dataset.objects.get(
             dataset__name="lab data",
             user=self.user_alice
         )
@@ -423,14 +423,14 @@ class FindSDTests(TestCase):
 
     def test_find_symds_pipeline_input_and_step_output(self):
         """
-        Finding a SymbolicDataset which was input to a Pipeline should return None
+        Finding a Dataset which was input to a Pipeline should return None
         as the generator, and the top-level run as the run.
 
-        Finding a SymbolicDataset which was output from a step, and also input
+        Finding a Dataset which was output from a step, and also input
         to a cable, should return the step (and in particular, not the cable).
         """
         self.pipeline_noop = Pipeline.objects.get(family__name="simple pipeline")
-        self.symds_words = SymbolicDataset.objects.get(dataset__name='blahblah')
+        self.symds_words = Dataset.objects.get(dataset__name='blahblah')
         self.user_bob = User.objects.get(username='bob')
 
         sandbox = Sandbox(self.user_bob, self.pipeline_noop, [self.symds_words])
@@ -449,16 +449,16 @@ class FindSDTests(TestCase):
 
     def test_find_symds_pipeline_input_and_intermediate_custom_wire(self):
         """
-        Finding a SymbolicDataset which was passed through a custom wire to a
+        Finding a Dataset which was passed through a custom wire to a
         Pipeline should return the cable as the generator, and the top-level
         run as the run.
 
-        Finding a SymbolicDataset which was produced by a custom wire as an
+        Finding a Dataset which was produced by a custom wire as an
         intermediate step should return the cable as the generator, and the
         top-level run as the run.
         """
         self.pipeline_twostep = Pipeline.objects.get(family__name="two-step pipeline")
-        self.symds_backwords = SymbolicDataset.objects.get(dataset__name='backwords')
+        self.symds_backwords = Dataset.objects.get(dataset__name='backwords')
         self.user_bob = User.objects.get(username='bob')
 
         sandbox = Sandbox(self.user_bob, self.pipeline_twostep, [self.symds_backwords])
@@ -473,7 +473,7 @@ class FindSDTests(TestCase):
         self.assertEqual(run, sandbox.run)
         self.assertEqual(gen, runcable.PSIC)
 
-        # Testing on an intermediate SymbolicDataset.
+        # Testing on an intermediate Dataset.
         runcable_2 = sandbox.run.runsteps.get(pipelinestep__step_num=2).RSICs.first()
         symds_to_find_2 = runcable_2.execrecord.execrecordouts.first().symbolicdataset
 
@@ -489,7 +489,7 @@ class FindSDTests(TestCase):
         on a custom cable.
         """
         self.pipeline_nested = Pipeline.objects.get(family__name="nested pipeline")
-        self.symds_backwords = SymbolicDataset.objects.get(dataset__name='backwords')
+        self.symds_backwords = Dataset.objects.get(dataset__name='backwords')
         self.user_bob = User.objects.get(username='bob')
 
         sandbox = Sandbox(self.user_bob, self.pipeline_nested, [self.symds_backwords])
@@ -526,7 +526,7 @@ class RawTests(SandboxRMTestCase):
         tools.create_linear_pipeline(self.pipeline_raw, [self.method_noop_raw], "raw_in", "raw_out")
         self.pipeline_raw.create_outputs()
 
-        self.symds_raw = SymbolicDataset.create_SD("/usr/share/dict/words", file_path=self.user_bob, user=self.user_bob,
+        self.symds_raw = Dataset.create_dataset("/usr/share/dict/words", file_path=self.user_bob, user=self.user_bob,
                                                    cdt=None, keep_file=True, name="raw", description="some raw data")
 
     def test_execute_pipeline_raw(self):

@@ -7,7 +7,7 @@ from datetime import datetime
 
 from metadata.models import CompoundDatatype
 from archive.models import Dataset
-from librarian.models import SymbolicDataset
+from librarian.models import Dataset
 import metadata.forms
 
 import zipfile
@@ -39,7 +39,7 @@ class DatasetForm(metadata.forms.AccessControlForm):
 
     def create_dataset(self, user):
         """
-        Creates and commits the Dataset and its associated SymbolicDataset to db.
+        Creates and commits the Dataset and its associated Dataset to db.
         Expects that DatasetForm.is_valid() has been called so that DatasetForm.cleaned_data dict has been populated
         with validated data.
         """
@@ -47,7 +47,7 @@ class DatasetForm(metadata.forms.AccessControlForm):
         if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
-        symbolicdataset = SymbolicDataset.create_SD(cls=None, file_path=None, user=user, cdt=compound_datatype_obj,
+        symbolicdataset = Dataset.create_dataset(cls=None, file_path=None, user=user, cdt=compound_datatype_obj,
                                                     keep_file=True, name=self.cleaned_data['name'],
                                                     description=self.cleaned_data['description'], created_by=None,
                                                     check=True, file_handle=self.cleaned_data['dataset_file'])
@@ -127,7 +127,7 @@ class BulkCSVDatasetForm (metadata.forms.AccessControlForm):
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
         # FIXME this doesn't support PermissionsWidget.
-        SymbolicDataset.create_SD_bulk(cls=None, csv_file_path=None, user=user,
+        Dataset.create_dataset_bulk(cls=None, csv_file_path=None, user=user,
                                        users_allowed=self.cleaned_data["users_allowed"],
                                        groups_allowed=self.cleaned_data["groups_allowed"],
                                        csv_file_handle=self.cleaned_data['datasets_csv'], cdt=compound_datatype_obj,
@@ -228,7 +228,7 @@ class BulkAddDatasetForm (metadata.forms.AccessControlForm):
                 else:
                     auto_description = "Bulk Uploaded File " + uploaded_file.name
 
-                symbolicdataset = SymbolicDataset.create_SD(cls=None, file_path=None, user=user,
+                symbolicdataset = Dataset.create_dataset(cls=None, file_path=None, user=user,
                                                             cdt=compound_datatype_obj, keep_file=True, name=auto_name,
                                                             description=auto_description, created_by=None, check=True,
                                                             file_handle=uploaded_file)
@@ -367,7 +367,7 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
                 else:
                     auto_description = "Bulk Uploaded File " + uploaded_file.name
 
-                symbolicdataset = SymbolicDataset.create_SD(cls=None, file_path=None, user=user,
+                symbolicdataset = Dataset.create_dataset(cls=None, file_path=None, user=user,
                                                             cdt=compound_datatype_obj, keep_file=True, name=auto_name,
                                                             description=auto_description, created_by=None, check=True,
                                                             file_handle=uploaded_file)

@@ -16,7 +16,7 @@ from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable,\
     Dataset, RunInput
 from archive.serializers import RunSerializer
 from archive.exceptions import SandboxActiveException, RunNotFinished
-from librarian.models import ExecRecord, SymbolicDataset
+from librarian.models import ExecRecord, Dataset
 from pipeline.models import Pipeline, PipelineFamily
 from metadata.models import kive_user, everyone_group
 from kive.testing_utils import clean_up_all_files
@@ -192,9 +192,9 @@ class QueuedRunTest(TestCase):
 
     def add_input(self, run):
         run.save()
-        symbolicdataset = SymbolicDataset.objects.get(pk=1)
+        dataset = Dataset.objects.get(pk=1)
         run_input = RunInput(run=run,
-                             symbolicdataset=symbolicdataset,
+                             dataset=dataset,
                              index=1)
         run_input.save()
 
@@ -261,10 +261,10 @@ class RemoveRedactRunInProgress(TestCase):
         self.pf = PipelineFamily.objects.get(name="Pipeline_family")
         self.myUser = self.pf.user
         self.pE = self.pf.members.get(revision_name="pE_name")
-        self.triplet_symDS = SymbolicDataset.objects.filter(dataset__name="triplet").first()
-        self.doublet_symDS = SymbolicDataset.objects.get(dataset__name="doublet")
-        self.singlet_symDS = SymbolicDataset.objects.filter(dataset__name="singlet").first()
-        self.raw_symDS = SymbolicDataset.objects.get(dataset__name="raw_DS")
+        self.triplet_symDS = Dataset.objects.filter(dataset__name="triplet").first()
+        self.doublet_symDS = Dataset.objects.get(dataset__name="doublet")
+        self.singlet_symDS = Dataset.objects.filter(dataset__name="singlet").first()
+        self.raw_symDS = Dataset.objects.get(dataset__name="raw_DS")
         self.step_E1 = self.pE.steps.get(step_num=1)
         self.mA = self.step_E1.transformation.definite
 
@@ -273,15 +273,15 @@ class RemoveRedactRunInProgress(TestCase):
         self.run.save()
         self.run.inputs.create(
             index=1,
-            symbolicdataset=self.triplet_symDS
+            dataset=self.triplet_symDS
         )
         self.run.inputs.create(
             index=2,
-            symbolicdataset=self.singlet_symDS
+            dataset=self.singlet_symDS
         )
         self.run.inputs.create(
             index=3,
-            symbolicdataset=self.raw_symDS
+            dataset=self.raw_symDS
         )
 
         self.rs_1 = self.run.runsteps.create(
@@ -298,11 +298,11 @@ class RemoveRedactRunInProgress(TestCase):
         self.rsic.save()
         self.rsic.execrecord.execrecordins.create(
             generic_input=self.pE.inputs.get(dataset_idx=3),
-            symbolicdataset=self.raw_symDS
+            dataset=self.raw_symDS
         )
         self.rsic.execrecord.execrecordouts.create(
             generic_output=self.step_E1.transformation.definite.inputs.first(),
-            symbolicdataset=self.raw_symDS
+            dataset=self.raw_symDS
         )
 
         self.rs_1_log = ExecLog.create(self.rs_1, self.rs_1)
@@ -314,11 +314,11 @@ class RemoveRedactRunInProgress(TestCase):
         self.rs_1.save()
         self.rs_1.execrecord.execrecordins.create(
             generic_input=self.mA.inputs.first(),
-            symbolicdataset=self.raw_symDS
+            dataset=self.raw_symDS
         )
         self.rs_1.execrecord.execrecordouts.create(
             generic_output=self.mA.outputs.first(),
-            symbolicdataset=self.doublet_symDS
+            dataset=self.doublet_symDS
         )
         self.run.start(save=True)
 
@@ -386,25 +386,25 @@ class RemoveRedactRunJustStarting(TestCase):
         self.pf = PipelineFamily.objects.get(name="Pipeline_family")
         self.myUser = self.pf.user
         self.pE = self.pf.members.get(revision_name="pE_name")
-        self.triplet_symDS = SymbolicDataset.objects.filter(dataset__name="triplet").first()
-        self.doublet_symDS = SymbolicDataset.objects.get(dataset__name="doublet")
-        self.singlet_symDS = SymbolicDataset.objects.filter(dataset__name="singlet").first()
-        self.raw_symDS = SymbolicDataset.objects.get(dataset__name="raw_DS")
+        self.triplet_symDS = Dataset.objects.filter(dataset__name="triplet").first()
+        self.doublet_symDS = Dataset.objects.get(dataset__name="doublet")
+        self.singlet_symDS = Dataset.objects.filter(dataset__name="singlet").first()
+        self.raw_symDS = Dataset.objects.get(dataset__name="raw_DS")
 
         # A run that's just starting, to the point that no Run exists yet.
         self.run_just_starting = Run(user=self.myUser, pipeline=self.pE)
         self.run_just_starting.save()
         self.run_just_starting.inputs.create(
             index=1,
-            symbolicdataset=self.triplet_symDS
+            dataset=self.triplet_symDS
         )
         self.run_just_starting.inputs.create(
             index=2,
-            symbolicdataset=self.singlet_symDS
+            dataset=self.singlet_symDS
         )
         self.run_just_starting.inputs.create(
             index=3,
-            symbolicdataset=self.raw_symDS
+            dataset=self.raw_symDS
         )
 
     def tearDown(self):
@@ -470,7 +470,7 @@ class RestoreReusableDatasetTest(TestCase):
         run_to_process = Run(pipeline=pipeline, user=pipeline.user)
         run_to_process.save()
         run_to_process.clean()
-        run_to_process.inputs.create(symbolicdataset=dataset.symbolicdataset, index=1)
+        run_to_process.inputs.create(dataset=dataset, index=1)
         return run_to_process
 
     def execute_pipeline(self, pipeline):
@@ -619,7 +619,7 @@ class RunApiTests(TestCase):
             revision_name="pX_revision_2"
         )
 
-        self.symDS = SymbolicDataset.objects.get(
+        self.symDS = Dataset.objects.get(
             dataset__name="pX_in_symDS",
             structure__isnull=False,
             user=self.myUser
@@ -663,7 +663,7 @@ class RunApiTests(TestCase):
                 "inputs": [
                     {
                         "index": 1,
-                        "symbolicdataset": self.symDS.pk
+                        "dataset": self.symDS.pk
                     }
                 ]
             },
@@ -724,7 +724,7 @@ class RunApiTests(TestCase):
         response = view(request, *args, **kwargs)
         data = response.render().data
 
-        self.assertEquals(data['SymbolicDatasets'], 3)
+        self.assertEquals(data['Datasets'], 3)
         self.assertEquals(data['Runs'], 1)
         self.assertEquals(data['Datatypes'], 0)
 
@@ -748,7 +748,7 @@ class RunApiTests(TestCase):
                 "inputs": [
                     {
                         "index": 1,
-                        "symbolicdataset": self.symDS.pk
+                        "dataset": self.symDS.pk
                     }
                 ]
             },
@@ -780,7 +780,7 @@ class RunApiTests(TestCase):
                 "inputs": [
                     {
                         "index": 1,
-                        "symbolicdataset": self.symDS.pk
+                        "dataset": self.symDS.pk
                     }
                 ]
             },
@@ -836,7 +836,7 @@ class RunApiTests(TestCase):
                 "inputs": [
                     {
                         "index": 1,
-                        "symbolicdataset": self.symDS.pk
+                        "dataset": self.symDS.pk
                     }
                 ],
                 "groups_allowed": ["Everyone"]
@@ -875,8 +875,8 @@ class RunSerializerTests(TestCase):
         self.triplet_cdt = self.em_pipeline.inputs.get(dataset_idx=1).get_cdt()
         self.singlet_cdt = self.em_pipeline.inputs.get(dataset_idx=2).get_cdt()
 
-        # SymbolicDatasets to feed the pipeline that are defined in the fixture.
-        self.triplet_SD = SymbolicDataset.objects.get(
+        # Datasets to feed the pipeline that are defined in the fixture.
+        self.triplet_SD = Dataset.objects.get(
             dataset__name="triplet",
             dataset__description="lol",
             dataset__dataset_file__endswith="step_0_triplet.csv",
@@ -884,7 +884,7 @@ class RunSerializerTests(TestCase):
             structure__isnull=False,
             structure__compounddatatype=self.triplet_cdt
         )
-        self.singlet_SD = SymbolicDataset.objects.get(
+        self.singlet_SD = Dataset.objects.get(
             dataset__name="singlet",
             dataset__description="lol",
             dataset__dataset_file__endswith="singlet_cdt_large.csv",
@@ -892,7 +892,7 @@ class RunSerializerTests(TestCase):
             structure__isnull=False,
             structure__compounddatatype=self.singlet_cdt
         )
-        self.raw_SD = SymbolicDataset.objects.get(
+        self.raw_SD = Dataset.objects.get(
             dataset__name="raw_DS",
             dataset__description="lol",
             user=self.myUser
@@ -906,15 +906,15 @@ class RunSerializerTests(TestCase):
             "pipeline": self.em_pipeline.pk,
             "inputs": [
                 {
-                    "symbolicdataset": self.triplet_SD.pk,
+                    "dataset": self.triplet_SD.pk,
                     "index": 1
                 },
                 {
-                    "symbolicdataset": self.singlet_SD.pk,
+                    "dataset": self.singlet_SD.pk,
                     "index": 2
                 },
                 {
-                    "symbolicdataset": self.raw_SD.pk,
+                    "dataset": self.raw_SD.pk,
                     "index": 3
                 }
             ],
@@ -933,11 +933,11 @@ class RunSerializerTests(TestCase):
             "pipeline": self.em_pipeline.pk,
             "inputs": [
                 {
-                    "symbolicdataset": self.triplet_SD.pk,
+                    "dataset": self.triplet_SD.pk,
                     "index": 1
                 },
                 {
-                    "symbolicdataset": self.singlet_SD.pk,
+                    "dataset": self.singlet_SD.pk,
                     "index": 2
                 }
             ],
@@ -958,15 +958,15 @@ class RunSerializerTests(TestCase):
             "pipeline": self.em_pipeline.pk,
             "inputs": [
                 {
-                    "symbolicdataset": self.triplet_SD.pk,
+                    "dataset": self.triplet_SD.pk,
                     "index": 1
                 },
                 {
-                    "symbolicdataset": self.singlet_SD.pk,
+                    "dataset": self.singlet_SD.pk,
                     "index": 2
                 },
                 {
-                    "symbolicdataset": self.triplet_SD.pk,
+                    "dataset": self.triplet_SD.pk,
                     "index": 1
                 },
             ],
@@ -987,15 +987,15 @@ class RunSerializerTests(TestCase):
             "pipeline": self.em_pipeline.pk,
             "inputs": [
                 {
-                    "symbolicdataset": self.triplet_SD.pk,
+                    "dataset": self.triplet_SD.pk,
                     "index": 1
                 },
                 {
-                    "symbolicdataset": self.singlet_SD.pk,
+                    "dataset": self.singlet_SD.pk,
                     "index": 2
                 },
                 {
-                    "symbolicdataset": self.triplet_SD.pk,
+                    "dataset": self.triplet_SD.pk,
                     "index": 4
                 },
             ],
@@ -1012,21 +1012,21 @@ class RunSerializerTests(TestCase):
 
     def test_validate_input_CDT_incompatible(self):
         """
-        Validation fails if an input SymbolicDataset is incompatible with the Pipeline input.
+        Validation fails if an input Dataset is incompatible with the Pipeline input.
         """
         serialized_rtp = {
             "pipeline": self.em_pipeline.pk,
             "inputs": [
                 {
-                    "symbolicdataset": self.triplet_SD.pk,
+                    "dataset": self.triplet_SD.pk,
                     "index": 1
                 },
                 {
-                    "symbolicdataset": self.singlet_SD.pk,
+                    "dataset": self.singlet_SD.pk,
                     "index": 2
                 },
                 {
-                    "symbolicdataset": self.triplet_SD.pk,
+                    "dataset": self.triplet_SD.pk,
                     "index": 3
                 },
             ],
@@ -1037,7 +1037,7 @@ class RunSerializerTests(TestCase):
 
         self.assertFalse(rtp_serializer.is_valid())
         self.assertEquals(rtp_serializer.errors["non_field_errors"],
-                          [u"Input {} is incompatible with SymbolicDataset {}".format(
+                          [u"Input {} is incompatible with Dataset {}".format(
                               self.em_pipeline.inputs.get(dataset_idx=3), self.triplet_SD
                           )])
 
@@ -1050,15 +1050,15 @@ class RunSerializerTests(TestCase):
             "pipeline": self.em_pipeline.pk,
             "inputs": [
                 {
-                    "symbolicdataset": self.triplet_SD.pk,
+                    "dataset": self.triplet_SD.pk,
                     "index": 1
                 },
                 {
-                    "symbolicdataset": self.singlet_SD.pk,
+                    "dataset": self.singlet_SD.pk,
                     "index": 2
                 },
                 {
-                    "symbolicdataset": self.raw_SD.pk,
+                    "dataset": self.raw_SD.pk,
                     "index": 3
                 }
             ],
@@ -1084,15 +1084,15 @@ class RunSerializerTests(TestCase):
             "pipeline": self.em_pipeline.pk,
             "inputs": [
                 {
-                    "symbolicdataset": self.triplet_SD.pk,
+                    "dataset": self.triplet_SD.pk,
                     "index": 1
                 },
                 {
-                    "symbolicdataset": self.singlet_SD.pk,
+                    "dataset": self.singlet_SD.pk,
                     "index": 2
                 },
                 {
-                    "symbolicdataset": self.raw_SD.pk,
+                    "dataset": self.raw_SD.pk,
                     "index": 3
                 }
             ],
@@ -1116,6 +1116,6 @@ class RunSerializerTests(TestCase):
         self.assertTrue(after >= rtp.time_queued)
 
         self.assertEqual(rtp.inputs.count(), 3)
-        self.assertEqual(rtp.inputs.get(index=1).symbolicdataset, self.triplet_SD)
-        self.assertEqual(rtp.inputs.get(index=2).symbolicdataset, self.singlet_SD)
-        self.assertEqual(rtp.inputs.get(index=3).symbolicdataset, self.raw_SD)
+        self.assertEqual(rtp.inputs.get(index=1).dataset, self.triplet_SD)
+        self.assertEqual(rtp.inputs.get(index=2).dataset, self.singlet_SD)
+        self.assertEqual(rtp.inputs.get(index=3).dataset, self.raw_SD)

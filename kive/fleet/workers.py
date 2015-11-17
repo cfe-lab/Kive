@@ -244,7 +244,7 @@ class Manager:
             # Was this task a recovery or novel progress?
             if task_execute_info.is_recovery():
                 execrecordouts = task_execute_info.execrecord.execrecordouts.all()
-                data_newly_available = [execrecordout.symbolicdataset
+                data_newly_available = [execrecordout.dataset
                                         for execrecordout in execrecordouts]
                 # Add anything that was waiting on this recovery to the queue.
                 curr_sdbx.enqueue_runnable_tasks(data_newly_available)

@@ -14,11 +14,10 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from archive.models import ExecLog, MethodOutput, Run, RunStep, Dataset
+from archive.models import ExecLog, MethodOutput, Run, RunStep
 from constants import datatypes
-from librarian.models import SymbolicDataset, ExecRecord
+from librarian.models import Dataset, ExecRecord
 from metadata.models import Datatype, CompoundDatatype
-import metadata.tests
 from method.models import CodeResource, CodeResourceRevision, Method, \
     MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
@@ -73,13 +72,13 @@ class LibrarianTestCase(TestCase):
         tools.clean_up_all_files()
 
 
-class SymbolicDatasetTests(LibrarianTestCase):
+class DatasetTests(LibrarianTestCase):
 
     def setUp(self):
-        super(SymbolicDatasetTests, self).setUp()
+        super(DatasetTests, self).setUp()
 
         # Turn off logging, so the test output isn't polluted.
-        logging.getLogger('SymbolicDataset').setLevel(logging.CRITICAL)
+        logging.getLogger('Dataset').setLevel(logging.CRITICAL)
         logging.getLogger('CompoundDatatype').setLevel(logging.CRITICAL)
         
         rows = 10
@@ -113,22 +112,22 @@ class SymbolicDatasetTests(LibrarianTestCase):
 
         self.dsname = "good data"
         self.dsdesc = "some headers and sequences"
-        self.sym_dataset = SymbolicDataset.create_SD(cls=self.file_path, file_path=self.file_path, user=self.myUser,
-                                                     cdt=self.cdt_record, keep_file=True, name=self.dsname,
-                                                     description=self.dsdesc)
+        self.dataset = Dataset.create_dataset(file_path=self.file_path, user=self.myUser,
+                                              cdt=self.cdt_record, keep_file=True, name=self.dsname,
+                                              description=self.dsdesc)
 
     def tearDown(self):
-        super(SymbolicDatasetTests, self).tearDown()
+        super(DatasetTests, self).tearDown()
         os.remove(self.file_path)
 
     def test_filehandle(self):
         """
-        Test that you can pass a filehandle to create_SD() to make a dataset.
+        Test that you can pass a filehandle to create_dataset() to make a dataset.
         """
         import datetime
         dt = datetime.datetime.now()
         # Turn off logging, so the test output isn't polluted.
-        logging.getLogger('SymbolicDataset').setLevel(logging.CRITICAL)
+        logging.getLogger('Dataset').setLevel(logging.CRITICAL)
         logging.getLogger('CompoundDatatype').setLevel(logging.CRITICAL)
 
         tmpfile = tempfile.NamedTemporaryFile(delete=False)
@@ -142,9 +141,9 @@ class SymbolicDatasetTests(LibrarianTestCase):
         raw_datatype = None  # raw compound datatype
         name = "Test file handle" + str(dt.microsecond)
         desc = "Test create dataset with file handle"
-        sym_dataset = SymbolicDataset.create_SD(cls=None, file_path=None, user=self.myUser, cdt=raw_datatype,
-                                                keep_file=True, name=name, description=desc, check=True,
-                                                file_handle=tmpfile)
+        dataset = Dataset.create_dataset(file_path=None, user=self.myUser, cdt=raw_datatype,
+                                         keep_file=True, name=name, description=desc, check=True,
+                                         file_handle=tmpfile)
 
         tmpfile.close()
         os.remove(tmpfile.name)
@@ -152,9 +151,9 @@ class SymbolicDatasetTests(LibrarianTestCase):
         self.assertIsNotNone(Dataset.objects.filter(name=name).get(),
                              msg="Can't find Dataset in DB for name=" + name)
 
-        actual_md5 = SymbolicDataset.objects.filter(id=sym_dataset.id).get().MD5_checksum
+        actual_md5 = Dataset.objects.filter(id=dataset.id).get().MD5_checksum
         self.assertEqual(actual_md5, expected_md5,
-                         msg="Checksum for SymbolicDataset ({}) file does not match expected ({})".format(
+                         msg="Checksum for Dataset ({}) file does not match expected ({})".format(
                              actual_md5,
                              expected_md5
                          ))
@@ -165,26 +164,25 @@ class SymbolicDatasetTests(LibrarianTestCase):
 
     def test_forgot_header(self):
         """
-        Symbolic dataset creation with a CDT fails when the header is left off
+        Dataset creation with a CDT fails when the header is left off
         the data file.
         """
         # Write the data with no header.
         data_file = tempfile.NamedTemporaryFile()
         data_file.write(self.data)
 
-        # Try to create a symbolic dataset.
+        # Try to create a dataset.
         self.assertRaisesRegexp(ValueError,
                                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
                                           .format(data_file.name, self.cdt_record)),
-                                lambda : SymbolicDataset.create_SD(cls=data_file.name, file_path=data_file.name,
-                                                                   user=self.myUser, cdt=self.cdt_record,
-                                                                   description="patient sequences", name="lab data",
-                                                                   description="patient sequences"))
+                                lambda: Dataset.create_dataset(file_path=data_file.name,
+                                                               user=self.myUser, cdt=self.cdt_record,
+                                                               name="lab data", description="patient sequences"))
         data_file.close()
 
     def test_empty_file(self):
         """
-        SymbolicDataset creation fails if the file passed is empty.
+        Dataset creation fails if the file passed is empty.
         """
         data_file = tempfile.NamedTemporaryFile()
         file_path = data_file.name
@@ -192,15 +190,14 @@ class SymbolicDatasetTests(LibrarianTestCase):
         self.assertRaisesRegexp(ValueError,
                                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
                                           .format(file_path, self.cdt_record)),
-                                lambda : SymbolicDataset.create_SD(cls=data_file.name, file_path=data_file.name,
-                                                                   user=self.myUser, cdt=self.cdt_record,
-                                                                   description="oops!", name="missing data",
-                                                                   description="oops!"))
+                                lambda: Dataset.create_dataset(file_path=data_file.name,
+                                                               user=self.myUser, cdt=self.cdt_record,
+                                                               name="missing data", description="oops!"))
         data_file.close()
 
     def test_too_many_columns(self):
         """
-        Symbolic dataset creation fails if the data file has too many
+        Dataset creation fails if the data file has too many
         columns.
         """
         with tempfile.NamedTemporaryFile() as data_file:
@@ -215,14 +212,14 @@ foo,bar,baz
                 ValueError,
                 re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
                           .format(file_path, self.cdt_record)),
-                lambda : SymbolicDataset.create_SD(cls=file_path, file_path=file_path, user=self.myUser,
-                                                   cdt=self.cdt_record, description="too many columns", name="bad data",
-                                                   description="too many columns")
+                lambda: Dataset.create_dataset(file_path=file_path, user=self.myUser,
+                                               cdt=self.cdt_record, name="bad data",
+                                               description="too many columns")
             )
 
     def test_right_columns(self):
         """
-        Symbolic dataset creation fails if the data file has too many
+        Dataset creation fails if the data file has too many
         columns.
         """
         with tempfile.NamedTemporaryFile() as data_file:
@@ -233,12 +230,12 @@ foo,bar
             data_file.flush()
             file_path = data_file.name
 
-            SymbolicDataset.create_SD(cls=file_path, file_path=file_path, user=self.myUser, cdt=self.cdt_record,
-                                      description="right columns", name="good data", description="right columns")
+            Dataset.create_dataset(file_path=file_path, user=self.myUser, cdt=self.cdt_record,
+                                   description="right columns", name="good data")
 
     def test_invalid_integer_field(self):
         """
-        Symbolic dataset creation fails if the data file has too many
+        Dataset creation fails if the data file has too many
         columns.
         """
         compound_datatype = CompoundDatatype(user=self.myUser)
@@ -263,38 +260,29 @@ Bob,tw3nty
                 ValueError,
                 re.escape('The entry at row 1, column 2 of file "{}" did not pass the constraints of Datatype "integer"'
                           .format(file_path)),
-                lambda : SymbolicDataset.create_SD(cls=file_path, file_path=file_path, user=self.myUser,
-                                                   cdt=compound_datatype, description="bad integer field",
-                                                   name="bad data", description="bad integer field"))
+                lambda: Dataset.create_dataset(file_path=file_path, user=self.myUser, cdt=compound_datatype,
+                                               name="bad data", description="bad integer field"))
 
-    def test_dataset_created(self):
+    def test_dataset_creation(self):
         """
-        Test coherence of the Dataset created alongsite a SymbolicDataset.
+        Test coherence of a freshly created Dataset.
         """
-        data_file = tempfile.NamedTemporaryFile()
-        data_file.write(self.header + "\n" + self.data)
-        data_file.seek(0)
-        file_path = data_file.name
+        self.assertEqual(self.dataset.clean(), None)
+        self.assertEqual(self.dataset.has_data(), True)
+        self.assertEqual(self.dataset.is_raw(), False)
 
-        dsname = "good data"
-        dsdesc = "some headers and sequences"
-        sym_dataset = SymbolicDataset.create_SD(cls=data_file.name, file_path=data_file.name, user=self.myUser,
-                                                cdt=self.cdt_record, keep_file=True, name=dsname, description=dsdesc)
-        dataset = sym_dataset.dataset
-        self.assertEqual(dataset.clean(), None)
-        self.assertEqual(dataset.user, self.myUser)
-        self.assertEqual(dataset.name, dsname)
-        self.assertEqual(dataset.description, dsdesc)
-        self.assertEqual(dataset.date_created.date(), timezone.now().date())
-        self.assertEqual(dataset.date_created < timezone.now(), True)
-        self.assertEqual(dataset.symbolicdataset, sym_dataset)
-        self.assertEqual(dataset.created_by, None)
-        self.assertEqual(os.path.basename(dataset.dataset_file.path), os.path.basename(file_path))
+        self.assertEqual(self.dataset.user, self.myUser)
+        self.assertEqual(self.dataset.name, dsname)
+        self.assertEqual(self.dataset.description, dsdesc)
+        self.assertEqual(self.dataset.date_created.date(), timezone.now().date())
+        self.assertEqual(self.dataset.date_created < timezone.now(), True)
+        self.assertEqual(self.dataset.created_by, None)
+        self.assertEqual(os.path.basename(self.dataset.dataset_file.path), os.path.basename(file_path))
         data_file.close()
 
     def test_dataset_bulk_created(self):
         """
-        Test coherence of the Dataset created alongsite a SymbolicDataset.
+        Test coherence of the Dataset created alongsite a Dataset.
         """
         bulk_dataset_csv = tempfile.NamedTemporaryFile(suffix="csv")
         bulk_dataset_csv.write("Name,Description,File")
@@ -309,47 +297,22 @@ Bob,tw3nty
             file_paths.extend([file_path])
             bulk_dataset_csv.write("\n" + dsname+str(i) + "," + dsdesc+str(i) + "," + file_path)
 
-        sym_datasets = SymbolicDataset.create_SD_bulk(cls=bulk_dataset_csv.name, csv_file_path=bulk_dataset_csv.name,
-                                                      user=self.myUser, cdt=self.cdt_record, keep_files=True,
-                                                      check=True)
+        datasets = Dataset.create_dataset_bulk(csv_file_path=bulk_dataset_csv.name,
+                                               user=self.myUser, cdt=self.cdt_record, keep_files=True,
+                                               check=True)
         for f in data_files:
             f.close()
         bulk_dataset_csv.close()
-        for i, sym_dataset in enumerate(sym_datasets):
+        for i, dataset in enumerate(datasets):
 
-            dataset = sym_dataset.dataset
             self.assertEqual(dataset.clean(), None)
             self.assertEqual(dataset.user, self.myUser)
             self.assertEqual(dataset.name, dsname+str(i))
             self.assertEqual(dataset.description, dsdesc+str(i))
             self.assertEqual(dataset.date_created.date(), timezone.now().date())
             self.assertEqual(dataset.date_created < timezone.now(), True)
-            self.assertEqual(dataset.symbolicdataset, sym_dataset)
             self.assertEqual(dataset.created_by, None)
             self.assertEqual(os.path.basename(dataset.dataset_file.path), os.path.basename(file_paths[i]))
-
-    def test_dataset_created2(self):
-        """
-        Test coherence of the Dataset created alongsite a SymbolicDataset.
-        """
-        dataset = self.sym_dataset.dataset
-        self.assertEqual(dataset.clean(), None)
-        self.assertEqual(dataset.user, self.myUser)
-        self.assertEqual(dataset.name, self.dsname)
-        self.assertEqual(dataset.description, self.dsdesc)
-        self.assertEqual(dataset.date_created.date(), timezone.now().date())
-        self.assertEqual(dataset.date_created < timezone.now(), True)
-        self.assertEqual(dataset.symbolicdataset, self.sym_dataset)
-        self.assertEqual(dataset.created_by, None)
-        self.assertEqual(os.path.basename(dataset.dataset_file.path), os.path.basename(self.file_path))
-
-    def test_symds_creation(self):
-        """
-        Test coherence of newly created SymbolicDataset.
-        """
-        self.assertEqual(self.sym_dataset.clean(), None)
-        self.assertEqual(self.sym_dataset.has_data(), True)
-        self.assertEqual(self.sym_dataset.is_raw(), False)
 
 
 class DatasetStructureTests(LibrarianTestCase):
@@ -376,7 +339,7 @@ class ExecRecordTests(LibrarianTestCase):
         myROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
         myER = ER_from_record(myROC)
         myERI_bad = myER.execrecordins.create(
-            symbolicdataset = self.singlet_symDS,
+            dataset = self.singlet_symDS,
             generic_input = self.C1_out)
 
         self.assertRaisesRegexp(
@@ -387,7 +350,7 @@ class ExecRecordTests(LibrarianTestCase):
     def test_ER_links_PSIC_so_ERI_must_link_TX_that_PSIC_is_fed_by(self):
         # ER links PSIC: ERI must link to the TO/TI that the PSIC is fed by
         myER = ER_from_PSIC(self.pE_run, self.step_E3, self.E11_32)
-        myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,
+        myERI_bad = myER.execrecordins.create(dataset=self.singlet_symDS,
                                               generic_input=self.C1_out)
         self.assertRaisesRegexp(
             ValidationError,
@@ -395,7 +358,7 @@ class ExecRecordTests(LibrarianTestCase):
             myERI_bad.clean)
         
         yourER = ER_from_PSIC(self.pE_run, self.step_E2, self.E02_22)
-        yourERI_bad = yourER.execrecordins.create(symbolicdataset=self.singlet_symDS,
+        yourERI_bad = yourER.execrecordins.create(dataset=self.singlet_symDS,
                                                   generic_input=self.D2_in)
         self.assertRaisesRegexp(
             ValidationError,
@@ -406,7 +369,7 @@ class ExecRecordTests(LibrarianTestCase):
         # ER's EL doesn't refer to a RSIC or ROC (So, RunStep): ERI must refer to a TI
         myRS = self.pE_run.runsteps.create(pipelinestep=self.step_E1)
         myER = ER_from_record(myRS)
-        myERI_bad = myER.execrecordins.create(symbolicdataset=self.singlet_symDS,
+        myERI_bad = myER.execrecordins.create(dataset=self.singlet_symDS,
                                               generic_input=self.C1_out)
         self.assertRaisesRegexp(
             ValidationError,
@@ -428,13 +391,13 @@ class ExecRecordTests(LibrarianTestCase):
         myRS = self.pD_run.runsteps.create(pipelinestep=self.step_D1)
         myER = ER_from_record(myRS)
         myERI_good = myER.execrecordins.create(
-            symbolicdataset=self.D1_in_symDS,
+            dataset=self.D1_in_symDS,
             generic_input=self.B1_in)
 
         self.assertEqual(myERI_good.clean(), None)
         
         myERI_bad = myER.execrecordins.create(
-            symbolicdataset=self.triplet_symDS,
+            dataset=self.triplet_symDS,
             generic_input=self.mB.outputs.all()[0])
         self.assertRaisesRegexp(
             ValidationError,
@@ -448,32 +411,32 @@ class ExecRecordTests(LibrarianTestCase):
         myER_C = ER_from_record(myRS_C)
 
         myERI_unraw_unraw = myER_C.execrecordins.create(
-            symbolicdataset=self.triplet_symDS,
+            dataset=self.triplet_symDS,
             generic_input=self.C1_in)
         self.assertEqual(myERI_unraw_unraw.clean(), None)
 
         myERI_raw_unraw_BAD = myER_C.execrecordins.create(
-            symbolicdataset=self.raw_symDS,
+            dataset=self.raw_symDS,
             generic_input=self.C2_in)
         self.assertRaisesRegexp(
             ValidationError,
-            r'SymbolicDataset ".*" \(raw\) cannot feed source ".*" \(non-raw\)',
+            r'Dataset ".*" \(raw\) cannot feed source ".*" \(non-raw\)',
             myERI_raw_unraw_BAD.clean)
         myERI_raw_unraw_BAD.delete()
 
         myRS_A = self.pE_run.runsteps.create(pipelinestep=self.step_E1)
         myER_A = ER_from_record(myRS_A)
         myERI_unraw_raw_BAD = myER_A.execrecordins.create(
-            symbolicdataset=self.triplet_symDS,
+            dataset=self.triplet_symDS,
             generic_input=self.A1_rawin)
         self.assertRaisesRegexp(
             ValidationError,
-            r'SymbolicDataset ".*" \(non-raw\) cannot feed source ".*" \(raw\)',
+            r'Dataset ".*" \(non-raw\) cannot feed source ".*" \(raw\)',
             myERI_unraw_raw_BAD.clean)
         myERI_unraw_raw_BAD.delete()
     
         myERI_raw_raw = myER_A.execrecordins.create(
-            symbolicdataset=self.raw_symDS,
+            dataset=self.raw_symDS,
             generic_input=self.A1_rawin)
         self.assertEqual(myERI_raw_raw.clean(), None)
 
@@ -484,21 +447,21 @@ class ExecRecordTests(LibrarianTestCase):
 
         # We annotate that triplet was fed from D1_out into E21_41
         myERI_wrong_CDT = myER.execrecordins.create(
-            symbolicdataset=self.singlet_symDS,
+            dataset=self.singlet_symDS,
             generic_input=self.pD.outputs.get(dataset_name="D1_out"))
         self.assertRaisesRegexp(
             ValidationError,
-            "CDT of SymbolicDataset .* is not a restriction of the required CDT",
+            "CDT of Dataset .* is not a restriction of the required CDT",
             myERI_wrong_CDT.clean)
         myERI_wrong_CDT.delete()
 
         # Right CDT but wrong number of rows (It needs < 5, we have 10)
         myERI_too_many_rows = myER.execrecordins.create(
-            symbolicdataset=self.triplet_symDS,
+            dataset=self.triplet_symDS,
             generic_input=self.pD.outputs.get(dataset_name="D1_out"))
         self.assertRaisesRegexp(
             ValidationError,
-            "SymbolicDataset \".*\" has too many rows to have come from TransformationOutput \".*\"",
+            "Dataset \".*\" has too many rows to have come from TransformationOutput \".*\"",
             myERI_too_many_rows.clean)
 
     def test_ER_links_pipelinestep_ERI_links_TI_which_constrains_input_CDT(self):
@@ -507,16 +470,16 @@ class ExecRecordTests(LibrarianTestCase):
         myROC = self.pE_run.runsteps.create(pipelinestep=self.step_E3)
         myER = ER_from_record(myROC)
         myERI_wrong_CDT = myER.execrecordins.create(
-            symbolicdataset=self.singlet_symDS,
+            dataset=self.singlet_symDS,
             generic_input=self.C2_in)
         self.assertRaisesRegexp(
             ValidationError,
-            "CDT of SymbolicDataset .* is not a restriction of the required CDT",
+            "CDT of Dataset .* is not a restriction of the required CDT",
             myERI_wrong_CDT.clean)
         myERI_wrong_CDT.delete()
 
         myERI_right_CDT = myER.execrecordins.create(
-            symbolicdataset=self.doublet_symDS, generic_input=self.C2_in)
+            dataset=self.doublet_symDS, generic_input=self.C2_in)
         self.assertEqual(myERI_right_CDT.clean(), None)
 
     def test_ER_links_with_POC_ERO_TO_must_belong_to_same_pipeline_as_ER_POC(self):
@@ -528,14 +491,14 @@ class ExecRecordTests(LibrarianTestCase):
 
         # This ERO has a TO that belongs to this pipeline
         myERO_good = myER.execrecordouts.create(
-            symbolicdataset=self.singlet_symDS,
+            dataset=self.singlet_symDS,
             generic_output=self.pE.outputs.get(dataset_name="E2_out"))
         self.assertEqual(myERO_good.clean(), None)
         myERO_good.delete()
 
         # This ERO has a TO that does NOT belong to this pipeline
         myERO_bad = myER.execrecordouts.create(
-            symbolicdataset=self.triplet_3_rows_symDS,
+            dataset=self.triplet_3_rows_symDS,
             generic_output=self.pD.outputs.get(dataset_name="D1_out"))
         self.assertRaisesRegexp(
             ValidationError,
@@ -551,7 +514,7 @@ class ExecRecordTests(LibrarianTestCase):
 
         # Define ERO with a TO that is part of pipeline E but with the wrong name from the POC
         myERO_bad = myER.execrecordouts.create(
-            symbolicdataset=self.triplet_3_rows_symDS,
+            dataset=self.triplet_3_rows_symDS,
             generic_output=self.pE.outputs.get(dataset_name="E2_out"))
         self.assertRaisesRegexp(
             ValidationError,
@@ -565,37 +528,37 @@ class ExecRecordTests(LibrarianTestCase):
         myER = ER_from_record(myRS)
 
         myERO_rawDS_rawTO = myER.execrecordouts.create(
-            symbolicdataset=self.raw_symDS, generic_output=self.C3_rawout)
+            dataset=self.raw_symDS, generic_output=self.C3_rawout)
         self.assertEqual(myERO_rawDS_rawTO.clean(), None)
         myERO_rawDS_rawTO.delete()
 
         myERO_rawDS_nonrawTO = myER.execrecordouts.create(
-            symbolicdataset=self.raw_symDS, generic_output=self.C1_out)
+            dataset=self.raw_symDS, generic_output=self.C1_out)
         self.assertRaisesRegexp(
             ValidationError,
-            r'SymbolicDataset ".*" \(raw\) cannot have come from output ".*" \(non-raw\)',
+            r'Dataset ".*" \(raw\) cannot have come from output ".*" \(non-raw\)',
             myERO_rawDS_nonrawTO.clean)
         myERO_rawDS_nonrawTO.delete()
 
         myERO_DS_rawTO = myER.execrecordouts.create(
-            symbolicdataset=self.singlet_symDS, generic_output=self.C3_rawout)
+            dataset=self.singlet_symDS, generic_output=self.C3_rawout)
         self.assertRaisesRegexp(
             ValidationError,
-            r'SymbolicDataset ".*" \(non-raw\) cannot have come from output ".*" \(raw\)',
+            r'Dataset ".*" \(non-raw\) cannot have come from output ".*" \(raw\)',
             myERO_DS_rawTO.clean)
         myERO_DS_rawTO.delete()
 
         myERO_DS_TO = myER.execrecordouts.create(
-            symbolicdataset=self.singlet_symDS, generic_output=self.C1_out)
+            dataset=self.singlet_symDS, generic_output=self.C1_out)
         self.assertEqual(myERO_DS_TO.clean(), None)
         myERO_DS_TO.delete()
         
-        # 2) SymbolicDataset must have the same CDT of the producing TO
+        # 2) Dataset must have the same CDT of the producing TO
         myERO_invalid_CDT = myER.execrecordouts.create(
-            symbolicdataset=self.triplet_symDS, generic_output=self.C1_out)
+            dataset=self.triplet_symDS, generic_output=self.C1_out)
         self.assertRaisesRegexp(
             ValidationError,
-            'CDT of SymbolicDataset ".*" is not the CDT of the TransformationOutput ".*" of the generating Method',
+            'CDT of Dataset ".*" is not the CDT of the TransformationOutput ".*" of the generating Method',
             myERO_invalid_CDT.clean)
         myERO_invalid_CDT.delete()
 
@@ -604,10 +567,10 @@ class ExecRecordTests(LibrarianTestCase):
         myRS = self.pD_run.runsteps.create(pipelinestep=self.step_D1)
         myER_2 = ER_from_record(myRS)
         myERO_too_many_rows = myER_2.execrecordouts.create(
-            symbolicdataset=self.triplet_symDS, generic_output=self.B1_out)
+            dataset=self.triplet_symDS, generic_output=self.B1_out)
         self.assertRaisesRegexp(
             ValidationError,
-            'SymbolicDataset ".*" was produced by TransformationOutput ".*" but has too many rows',
+            'Dataset ".*" was produced by TransformationOutput ".*" but has too many rows',
             myERO_too_many_rows.clean)
         myERO_too_many_rows.delete()
 
@@ -618,13 +581,13 @@ class ExecRecordTests(LibrarianTestCase):
         mC_ER = ER_from_record(mC_RS)
         mC_ER_in_1 = mC_ER.execrecordins.create(
             generic_input=self.C1_in,
-            symbolicdataset=self.C1_in_symDS)
+            dataset=self.C1_in_symDS)
 
-        # Good case: input SymbolicDataset has the CDT of
+        # Good case: input Dataset has the CDT of
         # generic_input.
         self.assertEqual(mC_ER_in_1.clean(), None)
 
-        # Good case: input SymbolicDataset has an identical CDT of
+        # Good case: input Dataset has an identical CDT of
         # generic_input.
         other_CDT = CompoundDatatype(user=self.myUser)
         other_CDT.save()
@@ -648,7 +611,7 @@ class ExecRecordTests(LibrarianTestCase):
         self.C1_in_symDS.structure.compounddatatype = self.doublet_cdt
         self.assertRaisesRegexp(
             ValidationError,
-            "CDT of SymbolicDataset .* is not a restriction of the required CDT",
+            "CDT of Dataset .* is not a restriction of the required CDT",
             mC_ER_in_1.clean)
         
     def test_ERO_CDT_restrictions_Method(self):
@@ -658,13 +621,13 @@ class ExecRecordTests(LibrarianTestCase):
         mA_ER = ER_from_record(mA_RS)
         mA_ERO = mA_ER.execrecordouts.create(
             generic_output=self.A1_out,
-            symbolicdataset=self.doublet_symDS)
+            dataset=self.doublet_symDS)
 
-        # Good case: output SymbolicDataset has the CDT of
+        # Good case: output Dataset has the CDT of
         # generic_output.
         self.assertEqual(mA_ERO.clean(), None)
 
-        # Bad case: output SymbolicDataset has an identical CDT.
+        # Bad case: output Dataset has an identical CDT.
         other_CDT = CompoundDatatype(user=self.myUser)
         other_CDT.save()
         other_CDT.members.create(datatype=self.string_dt,
@@ -677,15 +640,15 @@ class ExecRecordTests(LibrarianTestCase):
 
         self.assertRaisesRegexp(
             ValidationError,
-            "CDT of SymbolicDataset .* is not the CDT of the TransformationOutput .* of the generating Method",
+            "CDT of Dataset .* is not the CDT of the TransformationOutput .* of the generating Method",
             mA_ERO.clean)
 
-        # Bad case: output SymbolicDataset has another CDT altogether.
-        mA_ERO.symbolicdataset=self.triplet_symDS
+        # Bad case: output Dataset has another CDT altogether.
+        mA_ERO.dataset=self.triplet_symDS
 
         self.assertRaisesRegexp(
             ValidationError,
-            "CDT of SymbolicDataset .* is not the CDT of the TransformationOutput .* of the generating Method",
+            "CDT of Dataset .* is not the CDT of the TransformationOutput .* of the generating Method",
             mA_ERO.clean)
 
     def test_ERO_CDT_restrictions_POC(self):
@@ -695,12 +658,12 @@ class ExecRecordTests(LibrarianTestCase):
         outcable_ER = ER_from_record(outcable_ROC)
         outcable_ERO = outcable_ER.execrecordouts.create(
             generic_output=self.E1_out,
-            symbolicdataset=self.E1_out_symDS)
+            dataset=self.E1_out_symDS)
 
-        # Good case: output SymbolicDataset has the CDT of generic_output.
+        # Good case: output Dataset has the CDT of generic_output.
         self.assertEqual(outcable_ERO.clean(), None)
 
-        # Good case: output SymbolicDataset has an identical CDT.
+        # Good case: output Dataset has an identical CDT.
         other_CDT = CompoundDatatype(user=self.myUser)
         other_CDT.save()
         col1 = other_CDT.members.create(datatype=self.string_dt,
@@ -712,21 +675,21 @@ class ExecRecordTests(LibrarianTestCase):
         self.E1_out_symDS.structure.save()
         self.assertEqual(outcable_ERO.clean(), None)
 
-        # Bad case: output SymbolicDataset has a CDT that is a restriction of
+        # Bad case: output Dataset has a CDT that is a restriction of
         # generic_output.
         col1.datatype = self.DNA_dt
         col1.save()
         self.assertRaisesRegexp(
             ValidationError,
-            "CDT of SymbolicDataset .* is not identical to the CDT of the TransformationOutput .* of the generating Pipeline",
+            "CDT of Dataset .* is not identical to the CDT of the TransformationOutput .* of the generating Pipeline",
             outcable_ERO.clean)
 
-        # Bad case: output SymbolicDataset has another CDT altogether.
-        outcable_ERO.symbolicdataset = self.singlet_symDS
+        # Bad case: output Dataset has another CDT altogether.
+        outcable_ERO.dataset = self.singlet_symDS
 
         self.assertRaisesRegexp(
             ValidationError,
-            "CDT of SymbolicDataset .* is not identical to the CDT of the TransformationOutput .* of the generating Pipeline",
+            "CDT of Dataset .* is not identical to the CDT of the TransformationOutput .* of the generating Pipeline",
             outcable_ERO.clean)
 
     def test_ERO_CDT_restrictions_PSIC(self):
@@ -735,7 +698,7 @@ class ExecRecordTests(LibrarianTestCase):
         cable_ER = ER_from_PSIC(self.pE_run, self.step_E3, self.E11_32)
         cable_ERO = cable_ER.execrecordouts.create(
             generic_output=self.C2_in,
-            symbolicdataset=self.doublet_symDS)
+            dataset=self.doublet_symDS)
 
         # Good case: output Dataset has the CDT of generic_output.
         self.assertEqual(cable_ERO.clean(), None)
@@ -759,51 +722,51 @@ class ExecRecordTests(LibrarianTestCase):
         self.assertEqual(cable_ERO.clean(), None)
 
         # Bad case: output Dataset has another CDT altogether.
-        cable_ERO.symbolicdataset = self.singlet_symDS
+        cable_ERO.dataset = self.singlet_symDS
 
         self.assertRaisesRegexp(
             ValidationError,
-            "CDT of SymbolicDataset .* is not a restriction of the CDT of the fed TransformationInput .*",
+            "CDT of Dataset .* is not a restriction of the CDT of the fed TransformationInput .*",
             cable_ERO.clean)
 
-    def test_ER_trivial_PSICs_have_same_SD_on_both_sides(self):
-        """ERs representing trivial PSICs must have the same SymbolicDataset on both sides."""
+    def test_ER_trivial_PSICs_have_same_dataset_on_both_sides(self):
+        """ERs representing trivial PSICs must have the same Dataset on both sides."""
         cable_ER = ER_from_PSIC(self.pE_run, self.step_E2, self.E02_22)
         cable_ER.execrecordins.create(
             generic_input=self.E2_in,
-            symbolicdataset = self.singlet_symDS)
+            dataset = self.singlet_symDS)
         cable_ERO = cable_ER.execrecordouts.create(
             generic_output=self.D2_in,
-            symbolicdataset = self.singlet_symDS)
+            dataset = self.singlet_symDS)
 
-        # Good case: SDs on either side of this trivial cable match.
+        # Good case: datasets on either side of this trivial cable match.
         self.assertEqual(cable_ER.clean(), None)
 
-        # Bad case: SDs don't match.
-        cable_ERO.symbolicdataset = self.C1_out_symDS
+        # Bad case: datasets don't match.
+        cable_ERO.dataset = self.C1_out_symDS
         cable_ERO.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('ExecRecord "{}" represents a trivial cable but its input and output do not '
                                           'match'.format(cable_ER)),
                                 cable_ER.clean)
 
-    def test_ER_trivial_POCs_have_same_SD_on_both_sides(self):
-        """ERs representing trivial POCs must have the same SymbolicDataset on both sides."""
+    def test_ER_trivial_POCs_have_same_dataset_on_both_sides(self):
+        """ERs representing trivial POCs must have the same Dataset on both sides."""
         # E31_42 belongs to pipeline E
         outcable_ROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E31_42)
         outcable_ER = ER_from_record(outcable_ROC)
         outcable_ER.execrecordins.create(
             generic_input=self.C1_out,
-            symbolicdataset = self.C1_out_symDS)
+            dataset=self.C1_out_symDS)
         outcable_ERO = outcable_ER.execrecordouts.create(
             generic_output=self.E2_out,
-            symbolicdataset = self.C1_out_symDS)
+            dataset=self.C1_out_symDS)
 
-        # Good case: SDs on either side of this trivial POC match.
+        # Good case: datasets on either side of this trivial POC match.
         self.assertEqual(outcable_ER.clean(), None)
 
-        # Bad case: SDs don't match.
-        outcable_ERO.symbolicdataset = self.singlet_symDS
+        # Bad case: datasets don't match.
+        outcable_ERO.dataset = self.singlet_symDS
         outcable_ERO.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('ExecRecord "{}" represents a trivial cable but its input and output do not '
@@ -815,8 +778,8 @@ class ExecRecordTests(LibrarianTestCase):
         """Test that the Datatypes of Datasets passing through POCs are properly preserved."""
         outcable_ROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
         outcable_ER = ER_from_record(outcable_ROC)
-        outcable_ERI = outcable_ER.execrecordins.create(generic_input=self.D1_out, symbolicdataset=self.C1_in_symDS)
-        outcable_ERO = outcable_ER.execrecordouts.create(generic_output=self.E1_out, symbolicdataset=self.E1_out_symDS)
+        outcable_ERI = outcable_ER.execrecordins.create(generic_input=self.D1_out, dataset=self.C1_in_symDS)
+        outcable_ERO = outcable_ER.execrecordouts.create(generic_output=self.E1_out, dataset=self.E1_out_symDS)
 
         # Good case: the Datatypes are exactly those needed.
         self.assertEqual(outcable_ER.clean(), None)
@@ -829,9 +792,9 @@ class ExecRecordTests(LibrarianTestCase):
         E1_out_structure.compounddatatype = self.DNA_doublet_cdt
         E1_out_structure.save()
         
-        outcable_ERI.symbolicdataset = self.DNA_triplet_symDS
+        outcable_ERI.dataset = self.DNA_triplet_symDS
         outcable_ERI.save()
-        outcable_ERO.symbolicdataset = self.E21_41_DNA_doublet_symDS
+        outcable_ERO.dataset = self.E21_41_DNA_doublet_symDS
         outcable_ERO.save()
         self.assertIsNone(outcable_ER.clean())
 
@@ -840,7 +803,7 @@ class ExecRecordTests(LibrarianTestCase):
         output_col1.datatype = self.string_dt
         output_col1.save()
 
-        source_datatype = outcable_ERI.symbolicdataset.structure.compounddatatype.members.get(column_idx=1).datatype
+        source_datatype = outcable_ERI.dataset.structure.compounddatatype.members.get(column_idx=1).datatype
         dest_datatype = output_col1.datatype
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('ExecRecord "{}" represents a cable, but the Datatype of its destination '
@@ -853,10 +816,10 @@ class ExecRecordTests(LibrarianTestCase):
         cable_ER = ER_from_PSIC(self.pE_run, self.step_E2, self.E01_21)
         cable_ERI = cable_ER.execrecordins.create(
             generic_input=self.E1_in,
-            symbolicdataset=self.triplet_symDS)
+            dataset=self.triplet_symDS)
         cable_ERO = cable_ER.execrecordouts.create(
             generic_output=self.D1_in,
-            symbolicdataset=self.D1_in_symDS)
+            dataset=self.D1_in_symDS)
 
         # Good case: the Datatypes are exactly those needed.
         self.assertEqual(cable_ER.clean(), None)
@@ -869,9 +832,9 @@ class ExecRecordTests(LibrarianTestCase):
         out_structure.compounddatatype = self.DNA_doublet_cdt
         out_structure.save()
         
-        cable_ERI.symbolicdataset = self.DNA_triplet_symDS
+        cable_ERI.dataset = self.DNA_triplet_symDS
         cable_ERI.save()
-        cable_ERO.symbolicdataset = self.E01_21_DNA_doublet_symDS
+        cable_ERO.dataset = self.E01_21_DNA_doublet_symDS
         cable_ERO.save()
         self.assertEqual(cable_ER.clean(), None)
 
@@ -880,7 +843,7 @@ class ExecRecordTests(LibrarianTestCase):
                        compounddatatype.members.get(column_idx=1))
         output_col1.datatype = self.string_dt
         output_col1.save()
-        source_datatype = cable_ERI.symbolicdataset.structure.compounddatatype.members.get(column_idx=1).datatype
+        source_datatype = cable_ERI.dataset.structure.compounddatatype.members.get(column_idx=1).datatype
         dest_datatype = output_col1.datatype
 
         self.assertRaisesRegexp(ValidationError,
@@ -982,16 +945,16 @@ class FindCompatibleERTests(LibrarianTestCase):
                 execrecord = e
                 break
         self.assertIsNotNone(execrecord)
-        input_SDs_decorated = [(eri.generic_input.definite.dataset_idx, eri.symbolicdataset)
+        input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.dataset)
                                for eri in execrecord.execrecordins.all()]
-        input_SDs_decorated.sort()
-        input_SDs = [entry[1] for entry in input_SDs_decorated]
+        input_datasets_decorated.sort()
+        input_datasets = [entry[1] for entry in input_datasets_decorated]
         runstep = execrecord.used_by_components.first().definite
         runstep.reused = False
         runstep.save()
         method = runstep.pipelinestep.transformation.method
         self.assertFalse(execrecord.has_ever_failed())
-        self.assertIn(execrecord, method.find_compatible_ERs(input_SDs, runstep))
+        self.assertIn(execrecord, method.find_compatible_ERs(input_datasets, runstep))
 
     def test_find_compatible_ER_failed(self):
         """Should also find a compatible ExecRecord which failed."""
@@ -1001,16 +964,16 @@ class FindCompatibleERTests(LibrarianTestCase):
                 execrecord = e
                 break
         self.assertIsNotNone(execrecord)
-        input_SDs_decorated = [(eri.generic_input.definite.dataset_idx, eri.symbolicdataset)
+        input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.dataset)
                                for eri in execrecord.execrecordins.all()]
-        input_SDs_decorated.sort()
-        input_SDs = [entry[1] for entry in input_SDs_decorated]
+        input_datasets_decorated.sort()
+        input_datasets = [entry[1] for entry in input_datasets_decorated]
         runstep = execrecord.used_by_components.first().definite
         runstep.reused = False
         runstep.save()
         method = runstep.pipelinestep.transformation.method
         self.assertTrue(execrecord.has_ever_failed())
-        self.assertIn(execrecord, method.find_compatible_ERs(input_SDs, runstep))
+        self.assertIn(execrecord, method.find_compatible_ERs(input_datasets, runstep))
 
     def test_find_compatible_ER_skips_nulls(self):
         """
@@ -1021,10 +984,10 @@ class FindCompatibleERTests(LibrarianTestCase):
         for execrecord in ExecRecord.objects.all():
             if not execrecord.has_ever_failed():
                 break
-        input_SDs_decorated = [(eri.generic_input.definite.dataset_idx, eri.symbolicdataset)
+        input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.dataset)
                                for eri in execrecord.execrecordins.all()]
-        input_SDs_decorated.sort()
-        input_SDs = [entry[1] for entry in input_SDs_decorated]
+        input_datasets_decorated.sort()
+        input_datasets = [entry[1] for entry in input_datasets_decorated]
 
         method = execrecord.general_transf()
         pipeline = execrecord.generating_run.pipeline
@@ -1044,7 +1007,7 @@ class FindCompatibleERTests(LibrarianTestCase):
         run2.start()
         rs2 = run2.runsteps.create(pipelinestep=ps)
 
-        self.assertIn(execrecord, method.find_compatible_ERs(input_SDs, rs2))
+        self.assertIn(execrecord, method.find_compatible_ERs(input_datasets, rs2))
 
 
 class RemovalTests(TestCase):
@@ -1056,7 +1019,7 @@ class RemovalTests(TestCase):
         self.noop_pl = self.noop_plf.members.get(revision_name="v1")
         self.first_run = self.noop_pl.pipeline_instances.order_by("start_time").first()
         self.second_run = self.noop_pl.pipeline_instances.order_by("start_time").last()
-        self.input_SD = Dataset.objects.get(name="Removal test data").symbolicdataset
+        self.input_DS = Dataset.objects.get(name="Removal test data")
         self.nuc_seq_noop_mf = MethodFamily.objects.get(name="Noop (nucleotide sequence)")
         self.nuc_seq_noop = self.nuc_seq_noop_mf.members.get(revision_name="v1")
         self.p_nested_plf = PipelineFamily.objects.get(name="Nested pipeline")
@@ -1070,31 +1033,31 @@ class RemovalTests(TestCase):
 
         self.two_step_noop_plf = PipelineFamily.objects.get(name="Nucleotide Sequence two-step Noop")
         self.two_step_noop_pl = self.two_step_noop_plf.members.get(revision_name="v1")
-        self.two_step_input_SD = Dataset.objects.get(name="Removal test data for a two-step Pipeline").symbolicdataset
+        self.two_step_input_DS = Dataset.objects.get(name="Removal test data for a two-step Pipeline").dataset
 
-        # SymbolicDatasets and ExecRecords produced by the first run.
+        # Datasets and ExecRecords produced by the first run.
         self.produced_data = set()
         self.execrecords = set()
         for runstep in self.first_run.runsteps.all():
-            curr_produced_SDs = [x.symbolicdataset for x in runstep.outputs.all()]
-            self.produced_data.update(curr_produced_SDs)
+            curr_produced_DSs = [x.dataset for x in runstep.outputs.all()]
+            self.produced_data.update(curr_produced_DSs)
             self.execrecords.add(runstep.execrecord)
             for rsic in runstep.RSICs.all():
-                curr_produced_SDs = [x.symbolicdataset for x in rsic.outputs.all()]
-                self.produced_data.update(curr_produced_SDs)
+                curr_produced_DSs = [x.dataset for x in rsic.outputs.all()]
+                self.produced_data.update(curr_produced_DSs)
                 self.execrecords.add(rsic.execrecord)
         for roc in self.first_run.runoutputcables.all():
-            curr_produced_SDs = [x.symbolicdataset for x in roc.outputs.all()]
-            self.produced_data.update(curr_produced_SDs)
+            curr_produced_DSs = [x.dataset for x in roc.outputs.all()]
+            self.produced_data.update(curr_produced_DSs)
             self.execrecords.add(roc.execrecord)
 
         self.step_log = self.first_run.runsteps.first().log
 
         self.two_step_run = self.two_step_noop_pl.pipeline_instances.first()
         self.two_step_intermediate_data = self.two_step_run.runsteps.get(
-            pipelinestep__step_num=1).outputs.first().symbolicdataset
+            pipelinestep__step_num=1).outputs.first().dataset
         self.two_step_output_data = self.two_step_run.runsteps.get(
-            pipelinestep__step_num=2).outputs.first().symbolicdataset
+            pipelinestep__step_num=2).outputs.first().dataset
         self.two_step_execrecords = set()
         for runstep in self.two_step_run.runsteps.all():
             self.two_step_execrecords.add(runstep.execrecord)
@@ -1106,10 +1069,10 @@ class RemovalTests(TestCase):
     def tearDown(self):
         tools.clean_up_all_files()
 
-    def removal_plan_tester(self, obj_to_remove, SDs=None, ERs=None, runs=None, pipelines=None,
-                            pfs=None, methods=None, mfs=None, CDTs=None, DTs=None, CRRs=None, CRs=None):
+    def removal_plan_tester(self, obj_to_remove, datasets=None, ERs=None, runs=None, pipelines=None, pfs=None,
+                            methods=None, mfs=None, CDTs=None, DTs=None, CRRs=None, CRs=None):
         removal_plan = obj_to_remove.build_removal_plan()
-        self.assertSetEqual(removal_plan["SymbolicDatasets"], set(SDs) if SDs is not None else set())
+        self.assertSetEqual(removal_plan["Datasets"], set(datasets) if datasets is not None else set())
         self.assertSetEqual(removal_plan["ExecRecords"], set(ERs) if ERs is not None else set())
         self.assertSetEqual(removal_plan["Runs"], set(runs) if runs is not None else set())
         self.assertSetEqual(removal_plan["Pipelines"], set(pipelines) if pipelines is not None else set())
@@ -1123,204 +1086,140 @@ class RemovalTests(TestCase):
 
     def test_run_build_removal_plan(self):
         """Removing a Run should remove all intermediate/output data and ExecRecords, and all Runs that reused it."""
-        self.removal_plan_tester(
-            self.first_run,
-            SDs=self.produced_data,
-            ERs=self.execrecords,
-            runs={self.first_run, self.second_run}
-        )
+        self.removal_plan_tester(self.first_run, datasets=self.produced_data, ERs=self.execrecords,
+                                 runs={self.first_run, self.second_run})
 
     def test_reused_run_build_removal_plan(self):
         """Removing a reused Run should leave reused data/ExecRecords alone."""
-        self.removal_plan_tester(
-            self.second_run,
-            runs={self.second_run}
-        )
+        self.removal_plan_tester(self.second_run, runs={self.second_run}, runs={self.second_run})
 
     def test_input_data_build_removal_plan(self):
         """Removing input data to a Run should remove any Run started from it."""
         all_data = self.produced_data
-        all_data.add(self.input_SD)
+        all_data.add(self.input_DS)
 
-        self.removal_plan_tester(
-            self.input_SD,
-            SDs=all_data,
-            ERs=self.execrecords,
-            runs={self.first_run, self.second_run}
-        )
+        self.removal_plan_tester(self.input_DS, datasets=all_data, ERs=self.execrecords,
+                                 runs={self.first_run, self.second_run})
 
     def test_produced_data_build_removal_plan(self):
         """Removing data produced by the Run should have the same effect as removing the Run itself."""
-        produced_SD = list(self.produced_data)[0]
+        produced_dataset = list(self.produced_data)[0]
 
-        self.removal_plan_tester(
-            produced_SD,
-            SDs=self.produced_data,
-            ERs=self.execrecords,
-            runs={self.first_run, self.second_run}
-        )
+        self.removal_plan_tester(produced_dataset, datasets=self.produced_data, ERs=self.execrecords,
+                                 runs={self.first_run, self.second_run})
 
     def test_step_ER_build_removal_plan(self):
         """Removing the ExecRecord of the first RunStep should be like removing the whole Run."""
         first_step_ER = self.first_run.runsteps.get(pipelinestep__step_num=1).execrecord
 
-        self.removal_plan_tester(
-            first_step_ER,
-            SDs=self.produced_data,
-            ERs=self.execrecords,
-            runs={self.first_run, self.second_run}
-        )
+        self.removal_plan_tester(first_step_ER, datasets=self.produced_data, ERs=self.execrecords,
+                                 runs={self.first_run, self.second_run})
 
     def test_rsic_ER_build_removal_plan(self):
         """Removing the ExecRecord of a RunSIC should be like removing the whole Run."""
         first_RSIC_ER = self.first_run.runsteps.get(pipelinestep__step_num=1).RSICs.first().execrecord
 
-        self.removal_plan_tester(
-            first_RSIC_ER,
-            SDs=self.produced_data,
-            ERs=self.execrecords,
-            runs={self.first_run, self.second_run}
-        )
+        self.removal_plan_tester(first_RSIC_ER, datasets=self.produced_data, ERs=self.execrecords,
+                                 runs={self.first_run, self.second_run})
 
     def test_roc_ER_build_removal_plan(self):
         """Removing the ExecRecord of a RunOutputCable should be like removing the whole Run."""
         first_ROC_ER = self.first_run.runoutputcables.first().execrecord
 
-        self.removal_plan_tester(
-            first_ROC_ER,
-            SDs=self.produced_data,
-            ERs=self.execrecords,
-            runs={self.first_run, self.second_run}
-        )
+        self.removal_plan_tester(first_ROC_ER, datasets=self.produced_data, ERs=self.execrecords,
+                                 runs={self.first_run, self.second_run})
 
     def test_pipeline_build_removal_plan(self):
         """Removing a Pipeline."""
-        self.removal_plan_tester(
-            self.noop_pl,
-            SDs=self.produced_data,
-            ERs=self.execrecords,
-            runs={self.first_run, self.second_run},
-            pipelines={self.noop_pl, self.p_nested}
-        )
+        self.removal_plan_tester(self.noop_pl, datasets=self.produced_data, ERs=self.execrecords,
+                                 runs={self.first_run, self.second_run}, pipelines={self.noop_pl, self.p_nested})
 
     def test_nested_pipeline_build_removal_plan(self):
         """Removing a nested Pipeline."""
-        self.removal_plan_tester(
-            self.p_nested,
-            pipelines={self.p_nested}
-        )
+        self.removal_plan_tester(self.p_nested, pipelines={self.p_nested}, pipelines={self.p_nested})
 
     def test_pipelinefamily_build_removal_plan(self):
         """Removing a PipelineFamily removes everything that goes along with it."""
-        self.removal_plan_tester(
-            self.noop_plf,
-            SDs=self.produced_data,
-            ERs=self.execrecords,
-            runs={self.first_run, self.second_run},
-            pipelines={self.noop_pl, self.p_nested},
-            pfs={self.noop_plf}
-        )
+        self.removal_plan_tester(self.noop_plf, datasets=self.produced_data, ERs=self.execrecords,
+                                 runs={self.first_run, self.second_run}, pipelines={self.noop_pl, self.p_nested},
+                                 pfs={self.noop_plf})
 
     def test_method_build_removal_plan(self):
         """Removing a Method removes all Pipelines containing it and all of the associated stuff."""
-        self.removal_plan_tester(
-            self.nuc_seq_noop,
-            SDs=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
-            ERs=self.execrecords.union(self.two_step_execrecords),
-            runs={self.first_run, self.second_run, self.two_step_run},
-            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
-            methods={self.nuc_seq_noop}
-        )
+        self.removal_plan_tester(self.nuc_seq_noop, datasets=self.produced_data.union(
+            {self.two_step_intermediate_data, self.two_step_output_data}),
+                                 ERs=self.execrecords.union(self.two_step_execrecords),
+                                 runs={self.first_run, self.second_run, self.two_step_run},
+                                 pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
+                                 methods={self.nuc_seq_noop})
 
     def test_methodfamily_build_removal_plan(self):
         """Removing a MethodFamily."""
-        self.removal_plan_tester(
-            self.nuc_seq_noop_mf,
-            SDs=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
-            ERs=self.execrecords.union(self.two_step_execrecords),
-            runs={self.first_run, self.second_run, self.two_step_run},
-            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
-            methods={self.nuc_seq_noop},
-            mfs={self.nuc_seq_noop_mf}
-        )
+        self.removal_plan_tester(self.nuc_seq_noop_mf, datasets=self.produced_data.union(
+            {self.two_step_intermediate_data, self.two_step_output_data}),
+                                 ERs=self.execrecords.union(self.two_step_execrecords),
+                                 runs={self.first_run, self.second_run, self.two_step_run},
+                                 pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
+                                 methods={self.nuc_seq_noop}, mfs={self.nuc_seq_noop_mf})
 
     def test_crr_build_removal_plan(self):
         """Removing a CodeResourceRevision."""
-        self.removal_plan_tester(
-            self.noop_crr,
-            SDs=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
-            ERs=self.execrecords.union(self.two_step_execrecords),
-            runs={self.first_run, self.second_run, self.two_step_run},
-            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
-            methods={self.nuc_seq_noop},
-            CRRs={self.noop_crr, self.pass_through_crr}
-        )
+        self.removal_plan_tester(self.noop_crr, datasets=self.produced_data.union(
+            {self.two_step_intermediate_data, self.two_step_output_data}),
+                                 ERs=self.execrecords.union(self.two_step_execrecords),
+                                 runs={self.first_run, self.second_run, self.two_step_run},
+                                 pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
+                                 methods={self.nuc_seq_noop}, CRRs={self.noop_crr, self.pass_through_crr})
 
     def test_crr_nodep_build_removal_plan(self):
         """Removing a CodeResourceRevision that is dependent on another leaves the other alone."""
-        self.removal_plan_tester(
-            self.pass_through_crr,
-            CRRs={self.pass_through_crr}
-        )
+        self.removal_plan_tester(self.pass_through_crr, CRRs={self.pass_through_crr}, CRRs={self.pass_through_crr})
 
     def test_cr_build_removal_plan(self):
         """Removing a CodeResource removes its revisions."""
-        self.removal_plan_tester(
-            self.noop_cr,
-            SDs=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
-            ERs=self.execrecords.union(self.two_step_execrecords),
-            runs={self.first_run, self.second_run, self.two_step_run},
-            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
-            methods={self.nuc_seq_noop},
-            CRRs={self.noop_crr, self.pass_through_crr},
-            CRs={self.noop_cr}
-        )
+        self.removal_plan_tester(self.noop_cr, datasets=self.produced_data.union(
+            {self.two_step_intermediate_data, self.two_step_output_data}),
+                                 ERs=self.execrecords.union(self.two_step_execrecords),
+                                 runs={self.first_run, self.second_run, self.two_step_run},
+                                 pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
+                                 methods={self.nuc_seq_noop}, CRRs={self.noop_crr, self.pass_through_crr},
+                                 CRs={self.noop_cr})
 
     def test_cdt_build_removal_plan(self):
         """Removing a CompoundDatatype."""
         all_data = self.produced_data.union(
             {
-                self.input_SD,
-                self.two_step_input_SD,
+                self.input_DS,
+                self.two_step_input_DS,
                 self.two_step_intermediate_data,
                 self.two_step_output_data
             }
         )
-        self.removal_plan_tester(
-            self.one_col_nuc_seq,
-            SDs=all_data,
-            ERs=self.execrecords.union(self.two_step_execrecords),
-            runs={self.first_run, self.second_run, self.two_step_run},
-            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
-            methods={self.nuc_seq_noop},
-            CDTs={self.one_col_nuc_seq}
-        )
+        self.removal_plan_tester(self.one_col_nuc_seq, datasets=all_data,
+                                 ERs=self.execrecords.union(self.two_step_execrecords),
+                                 runs={self.first_run, self.second_run, self.two_step_run},
+                                 pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
+                                 methods={self.nuc_seq_noop}, CDTs={self.one_col_nuc_seq})
 
     def test_dt_build_removal_plan(self):
         """Removing a Datatype."""
         all_data = self.produced_data.union(
             {
-                self.input_SD,
-                self.two_step_input_SD,
+                self.input_DS,
+                self.two_step_input_DS,
                 self.two_step_intermediate_data,
                 self.two_step_output_data
             }
         )
-        self.removal_plan_tester(
-            self.nuc_seq,
-            SDs=all_data,
-            ERs=self.execrecords.union(self.two_step_execrecords),
-            runs={self.first_run, self.second_run, self.two_step_run},
-            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
-            methods={self.nuc_seq_noop},
-            CDTs={self.one_col_nuc_seq},
-            DTs={self.nuc_seq}
-        )
+        self.removal_plan_tester(self.nuc_seq, datasets=all_data, ERs=self.execrecords.union(self.two_step_execrecords),
+                                 runs={self.first_run, self.second_run, self.two_step_run},
+                                 pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
+                                 methods={self.nuc_seq_noop}, CDTs={self.one_col_nuc_seq}, DTs={self.nuc_seq})
 
     def remove_tester(self, obj_to_remove):
         removal_plan = obj_to_remove.build_removal_plan()
 
-        SD_pks = [x.pk for x in removal_plan["SymbolicDatasets"]]
+        dataset_pks = [x.pk for x in removal_plan["Datasets"]]
         ER_pks = [x.pk for x in removal_plan["ExecRecords"]]
         run_pks = [x.pk for x in removal_plan["Runs"]]
         pipeline_pks = [x.pk for x in removal_plan["Pipelines"]]
@@ -1333,7 +1232,7 @@ class RemovalTests(TestCase):
         CR_pks = [x.pk for x in removal_plan["CodeResources"]]
 
         obj_to_remove.remove()
-        self.assertFalse(SymbolicDataset.objects.filter(pk__in=SD_pks).exists())
+        self.assertFalse(Dataset.objects.filter(pk__in=dataset_pks).exists())
         self.assertFalse(ExecRecord.objects.filter(pk__in=ER_pks).exists())
         self.assertFalse(Run.objects.filter(pk__in=run_pks).exists())
         self.assertFalse(Pipeline.objects.filter(pk__in=pipeline_pks).exists())
@@ -1381,16 +1280,16 @@ class RemovalTests(TestCase):
         self.remove_tester(self.noop_cr)
 
     def test_cdt_remove(self):
-        """Removing a CDT should remove the Methods/Pipelines/SymbolicDatasets using it."""
+        """Removing a CDT should remove the Methods/Pipelines/Datasets using it."""
         self.remove_tester(self.one_col_nuc_seq)
 
     def test_datatype_remove(self):
         """Removing a Datatype should remove the CDTs that use it."""
         self.remove_tester(self.nuc_seq)
 
-    def test_sd_remove(self):
-        """Removing a SymbolicDataset should remove anything that touches it."""
-        self.remove_tester(self.input_SD)
+    def test_dataset_remove(self):
+        """Removing a Dataset should remove anything that touches it."""
+        self.remove_tester(self.input_DS)
 
     def test_run_remove(self):
         """Removing a Run."""
@@ -1402,8 +1301,8 @@ class RemovalTests(TestCase):
 
     def test_produced_data_remove(self):
         """Removing data produced by the Run should have the same effect as removing the Run itself."""
-        produced_SD = list(self.produced_data)[0]
-        self.remove_tester(produced_SD)
+        produced_dataset = list(self.produced_data)[0]
+        self.remove_tester(produced_dataset)
 
     def test_step_ER_remove(self):
         """Removing the ExecRecord of the first RunStep should be like removing the whole Run."""
@@ -1420,33 +1319,34 @@ class RemovalTests(TestCase):
         first_ROC_ER = self.first_run.runoutputcables.first().execrecord
         self.remove_tester(first_ROC_ER)
 
-    def SD_redaction_plan_tester(self, SD_to_redact, SDs=None, output_logs=None, error_logs=None, return_codes=None):
-        redaction_plan = SD_to_redact.build_redaction_plan()
+    def dataset_redaction_plan_tester(self, dataset_to_redact, datasets=None, output_logs=None, error_logs=None,
+                                      return_codes=None):
+        redaction_plan = dataset_to_redact.build_redaction_plan()
 
         # The following ExecRecords should also be in the redaction plan.
         redaction_plan_execrecords = set()
-        SD_set = SDs or set()
-        for sd in SD_set:
-            for eri in sd.execrecordins.all():
+        dataset_set = datasets or set()
+        for dataset in dataset_set:
+            for eri in dataset.execrecordins.all():
                 redaction_plan_execrecords.add(eri.execrecord)
 
-        self.assertSetEqual(redaction_plan["SymbolicDatasets"], set(SDs) if SDs is not None else set())
+        self.assertSetEqual(redaction_plan["Datasets"], set(datasets) if datasets is not None else set())
         self.assertSetEqual(redaction_plan["OutputLogs"], set(output_logs) if output_logs is not None else set())
         self.assertSetEqual(redaction_plan["ErrorLogs"], set(error_logs) if error_logs is not None else set())
         self.assertSetEqual(redaction_plan["ReturnCodes"], set(return_codes) if return_codes is not None else set())
         self.assertSetEqual(redaction_plan["ExecRecords"], redaction_plan_execrecords)
 
-    def SD_redaction_tester(self, SD_to_redact):
-        redaction_plan = SD_to_redact.build_redaction_plan()
-        SD_to_redact.redact()
+    def dataset_redaction_tester(self, dataset_to_redact):
+        redaction_plan = dataset_to_redact.build_redaction_plan()
+        dataset_to_redact.redact()
         self.redaction_tester_helper(redaction_plan)
 
     def redaction_tester_helper(self, redaction_plan):
         # Check that all of the objects in the plan, and the RunComponents/ExecRecords that
         # reference them, got redacted.
-        for sd in redaction_plan["SymbolicDatasets"]:
-            reloaded_sd = SymbolicDataset.objects.get(pk=sd.pk)
-            self.assertTrue(reloaded_sd.is_redacted())
+        for dataset in redaction_plan["Datasets"]:
+            reloaded_dataset = Dataset.objects.get(pk=dataset.pk)
+            self.assertTrue(reloaded_dataset.is_redacted())
 
         execlogs_affected = redaction_plan["OutputLogs"].union(
             redaction_plan["ErrorLogs"]).union(redaction_plan["ReturnCodes"])
@@ -1477,7 +1377,7 @@ class RemovalTests(TestCase):
         redaction_plan = log_to_redact.build_redaction_plan(output_log=output_log, error_log=error_log,
                                                             return_code=return_code)
 
-        self.assertSetEqual(redaction_plan["SymbolicDatasets"], set())
+        self.assertSetEqual(redaction_plan["Datasets"], set())
         self.assertSetEqual(redaction_plan["ExecRecords"], set())
         self.assertSetEqual(redaction_plan["OutputLogs"],
                             {log_to_redact} if output_log and not output_already_redacted else set())
@@ -1498,55 +1398,55 @@ class RemovalTests(TestCase):
 
         self.redaction_tester_helper(redaction_plan)
 
-    def test_input_SD_build_redaction_plan(self):
-        """Test redaction of the input SD to a Run."""
+    def test_input_dataset_build_redaction_plan(self):
+        """Test redaction of the input dataset to a Run."""
         logs_to_redact = {self.step_log}
 
-        self.SD_redaction_plan_tester(
-            self.input_SD,
-            SDs=self.produced_data.union({self.input_SD}),
+        self.dataset_redaction_plan_tester(
+            self.input_DS,
+            datasets=self.produced_data.union({self.input_DS}),
             output_logs=logs_to_redact,
             error_logs=logs_to_redact,
             return_codes=logs_to_redact
         )
 
-    def test_input_SD_redact(self):
-        self.SD_redaction_tester(self.input_SD)
+    def test_input_dataset_redact(self):
+        self.dataset_redaction_tester(self.input_DS)
 
-    def test_SD_redact_idempotent(self):
-        """Redacting an already-redacted SymbolicDataset should give an empty redaction plan."""
-        self.input_SD.redact()
+    def test_dataset_redact_idempotent(self):
+        """Redacting an already-redacted Dataset should give an empty redaction plan."""
+        self.input_DS.redact()
         # All of the parameters to this function are None, indicating nothing gets redacted.
-        self.SD_redaction_plan_tester(self.input_SD)
+        self.dataset_redaction_plan_tester(self.input_DS)
 
-    def test_produced_SD_build_redaction_plan(self):
+    def test_produced_dataset_build_redaction_plan(self):
         """Redacting produced data."""
         # The run we're dealing with has a single step, and that's the only produced data.
-        produced_SD = list(self.produced_data)[0]
+        produced_dataset = list(self.produced_data)[0]
 
-        self.SD_redaction_plan_tester(
-            produced_SD,
-            SDs=self.produced_data
+        self.dataset_redaction_plan_tester(
+            produced_dataset,
+            datasets=self.produced_data
         )
 
-    def test_produced_SD_redact(self):
-        produced_SD = list(self.produced_data)[0]
-        self.SD_redaction_tester(produced_SD)
+    def test_produced_dataset_redact(self):
+        produced_dataset = list(self.produced_data)[0]
+        self.dataset_redaction_tester(produced_dataset)
 
-    def test_intermediate_SD_build_redaction_plan(self):
-        """Redacting a SymbolicDataset from the middle of a Run only redacts the stuff following it."""
+    def test_intermediate_dataset_build_redaction_plan(self):
+        """Redacting a Dataset from the middle of a Run only redacts the stuff following it."""
         logs_to_redact = {self.two_step_run.runsteps.get(pipelinestep__step_num=2).log}
 
-        self.SD_redaction_plan_tester(
+        self.dataset_redaction_plan_tester(
             self.two_step_intermediate_data,
-            SDs={self.two_step_intermediate_data, self.two_step_output_data},
+            datasets={self.two_step_intermediate_data, self.two_step_output_data},
             output_logs=logs_to_redact,
             error_logs=logs_to_redact,
             return_codes=logs_to_redact
         )
 
-    def test_intermediate_SD_redact(self):
-        self.SD_redaction_tester(self.two_step_intermediate_data)
+    def test_intermediate_dataset_redact(self):
+        self.dataset_redaction_tester(self.two_step_intermediate_data)
 
     def test_step_log_build_redaction_plan_remove_all(self):
         # There's only one step in self.first_run.

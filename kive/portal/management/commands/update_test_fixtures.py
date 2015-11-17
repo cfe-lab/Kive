@@ -17,7 +17,7 @@ import datachecking.models
 from file_access_utils import compute_md5
 import kive.settings
 import kive.testing_utils as tools
-from librarian.models import SymbolicDataset
+from librarian.models import Dataset
 from metadata.models import CompoundDatatype, everyone_group
 import method.models
 from method.models import CodeResource, MethodFamily, Method,\
@@ -257,7 +257,7 @@ x,y
 8,9
 """
         dataset_file = ContentFile(DATASET_CONTENT)
-        symbolic = SymbolicDataset(user=user,
+        symbolic = Dataset(user=user,
                                    MD5_checksum=compute_md5(dataset_file))
         symbolic.save()
         symbolic.clean()

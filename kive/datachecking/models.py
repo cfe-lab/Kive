@@ -18,14 +18,14 @@ import stopwatch.models
 @python_2_unicode_compatible
 class ContentCheckLog(stopwatch.models.Stopwatch):
     """
-    Denotes a check performed on a SymbolicDataset's contents.
+    Denotes a check performed on a Dataset's contents.
 
     One of these should be created basically every time the contents
-    of the SymbolicDataset are verified, whether that be during the
+    of the Dataset are verified, whether that be during the
     execution of a Pipeline (i.e. a Run), on the uploading of data,
     or on a manually-specified check.
     """
-    symbolicdataset = models.ForeignKey("librarian.SymbolicDataset", related_name="content_checks")
+    cdataset = models.ForeignKey("librarian.Dataset", related_name="content_checks")
 
     # The execution during which this check occurred, if applicable.
     execlog = models.ForeignKey("archive.ExecLog", null=True, related_name="content_checks")
@@ -64,16 +64,16 @@ class ContentCheckLog(stopwatch.models.Stopwatch):
 
         First, this calls clean on any BadData associated to it.  Second,
         it checks that end_time is later than start_time.  Last, it checks that
-        the user has access to the parent SymbolicDataset.
+        the user has access to the parent Dataset.
         """
         if self.is_fail():
             self.baddata.clean()
 
         stopwatch.models.Stopwatch.clean(self)
 
-        if not self.symbolicdataset.can_be_accessed(self.user):
-            raise ValidationError('User "{}" does not have access to SymbolicDataset "{}"'.
-                                  format(self.user, self.symbolicdataset))
+        if not self.cdataset.can_be_accessed(self.user):
+            raise ValidationError('User "{}" does not have access to Dataset "{}"'.
+                                  format(self.user, self.cdataset))
 
     def is_complete(self):
         """
@@ -193,14 +193,14 @@ class CellError(models.Model):
         except ObjectDoesNotExist:
             pass
 
-        bad_SD = self.baddata.contentchecklog.symbolicdataset
+        bad_SD = self.baddata.contentchecklog.cdataset
 
         if self.baddata.missing_output:
             raise ValidationError(
                 "Parent of CellError \"{}\" has missing output, so it should not exist".
                 format(self))
 
-        if self.baddata.contentchecklog.symbolicdataset.is_raw():
+        if self.baddata.contentchecklog.cdataset.is_raw():
             raise ValidationError(
                 "Parent of CellError \"{}\" is raw, so it should not exist".
                 format(self))
@@ -213,7 +213,7 @@ class CellError(models.Model):
         if not bad_SD.structure.compounddatatype.members.filter(
                 pk=self.column.pk).exists():
             raise ValidationError(
-                "Column of CellError \"{}\" is not one of the columns of its associated SymbolicDataset".
+                "Column of CellError \"{}\" is not one of the columns of its associated Dataset".
                 format(self))
 
         if bad_SD.structure.num_rows != -1:
@@ -251,13 +251,13 @@ class CellError(models.Model):
 
 class IntegrityCheckLog(stopwatch.models.Stopwatch):
     """
-    Denotes an integrity check performed on a SymbolicDataset.
+    Denotes an integrity check performed on a Dataset.
 
     One of these should be created basically every time the MD5
     checksum of the SD is confirmed, be it during the execution
     of a Pipeline (i.e. a Run) or on a manual check.
     """
-    symbolicdataset = models.ForeignKey("librarian.SymbolicDataset", related_name="integrity_checks")
+    dataset = models.ForeignKey("librarian.Dataset", related_name="integrity_checks")
 
     # The execution during which this check occurred, if applicable.
     execlog = models.ForeignKey("archive.ExecLog", null=True, related_name="integrity_checks")
@@ -284,9 +284,9 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
 
         stopwatch.models.Stopwatch.clean(self)
 
-        if not self.symbolicdataset.can_be_accessed(self.user):
-            raise ValidationError('User "{}" does not have access to SymbolicDataset "{}"'.
-                                  format(self.user, self.symbolicdataset))
+        if not self.dataset.can_be_accessed(self.user):
+            raise ValidationError('User "{}" does not have access to Dataset "{}"'.
+                                  format(self.user, self.dataset))
 
     def is_complete(self):
         """
@@ -350,7 +350,7 @@ class MD5Conflict(models.Model):
     Denotes an MD5 conflict found during an integrity check.
     """
     integritychecklog = models.OneToOneField(IntegrityCheckLog, related_name="usurper")
-    conflicting_SD = models.OneToOneField("librarian.SymbolicDataset", related_name="usurps",
+    conflicting_SD = models.OneToOneField("librarian.Dataset", related_name="usurps",
                                           null=True, on_delete=models.SET_NULL)
 
 
@@ -362,10 +362,10 @@ class BlankCell(models.Model):
     cellerror = models.OneToOneField(CellError, related_name="blank")
 
     def clean(self):
-        sd = self.cellerror.baddata.contentchecklog.symbolicdataset
+        sd = self.cellerror.baddata.contentchecklog.cdataset
         if self.cellerror.column.blankable:
             raise ValidationError(
-                'Entry ({},{}) of SymbolicDataset "{}" is blankable'.format(
+                'Entry ({},{}) of Dataset "{}" is blankable'.format(
                     self.cellerror.row_num, self.cellerror.column.column_idx, sd
                 )
             )

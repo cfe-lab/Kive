@@ -1,17 +1,15 @@
 import os
 
-from django.core.exceptions import ValidationError
 from django.template.defaultfilters import filesizeformat
 from django.utils import timezone
 from django.contrib.auth.models import User, Group
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from archive.models import Dataset, Run, MethodOutput, RunInput
+from archive.models import Run, MethodOutput, RunInput
 from transformation.models import TransformationInput
-from librarian.models import SymbolicDataset
 from pipeline.models import Pipeline
-from metadata.models import CompoundDatatype, who_cannot_access
+from metadata.models import who_cannot_access
 
 from kive.serializers import AccessControlSerializer
 
@@ -21,103 +19,6 @@ class TinyRunSerializer(serializers.ModelSerializer):
     class Meta:
         model = Run
         fields = ('id',)
-
-
-class DatasetSerializer(serializers.ModelSerializer):
-
-    user = serializers.SlugRelatedField(
-        source="symbolicdataset.user",
-        slug_field='username',
-        read_only=True,
-        default=serializers.CurrentUserDefault())
-
-    compounddatatype = serializers.PrimaryKeyRelatedField(
-        source="symbolicdataset.structure.compounddatatype",
-        queryset=CompoundDatatype.objects.all(),
-        required=False
-    )
-
-    filename = serializers.SerializerMethodField()
-    filesize = serializers.IntegerField(source='get_filesize', read_only=True)
-    filesize_display = serializers.SerializerMethodField()
-
-    users_allowed = serializers.SlugRelatedField(
-        source="symbolicdataset.users_allowed",
-        slug_field='username',
-        queryset=User.objects.all(),
-        many=True, allow_null=True, required=False
-    )
-    groups_allowed = serializers.SlugRelatedField(
-        source="symbolicdataset.groups_allowed",
-        slug_field='name',
-        queryset=Group.objects.all(),
-        many=True, allow_null=True, required=False
-    )
-
-    download_url = serializers.HyperlinkedIdentityField(view_name='dataset-download')
-    removal_plan = serializers.HyperlinkedIdentityField(view_name='dataset-removal-plan')
-    redaction_plan = serializers.HyperlinkedIdentityField(view_name='dataset-redaction-plan')
-    symbolic_id = serializers.IntegerField(source='symbolicdataset.id', read_only=True)
-
-    class Meta():
-        model = Dataset
-        fields = (
-            'id',
-            'symbolic_id',
-            'url',
-            'name',
-            'description',
-            "dataset_file",
-            'filename',
-            'date_created',
-            'date_modified',
-            'download_url',
-            'compounddatatype',
-            'filesize',
-            'filesize_display',
-
-            'user',  # inherited
-            'users_allowed',
-            'groups_allowed',
-
-            'removal_plan',
-            'redaction_plan'
-        )
-
-    def __init__(self, *args, **kwargs):
-        super(DatasetSerializer, self).__init__(*args, **kwargs)
-        self.fields["compounddatatype"].queryset = CompoundDatatype.filter_by_user(self.context["request"].user)
-
-    def get_filename(self, obj):
-        if obj:
-            return os.path.basename(obj.dataset_file.name)
-
-    def get_filesize_display(self, obj):
-        if obj:
-            return filesizeformat(obj.get_filesize())
-
-    def create(self, validated_data):
-        """
-        Create a Dataset object from deserialized and validated data.
-        """
-        cdt = None
-        if "structure" in validated_data["symbolicdataset"]:
-            cdt = validated_data["symbolicdataset"]["structure"].get("compounddatatype", None)
-
-        users_allowed = None
-        groups_allowed = None
-        if "users_allowed" in validated_data["symbolicdataset"]:
-            users_allowed = validated_data["symbolicdataset"]["users_allowed"]
-
-        if "groups_allowed" in validated_data["symbolicdataset"]:
-            groups_allowed = validated_data["symbolicdataset"]["groups_allowed"]
-
-        symbolicdataset = SymbolicDataset.create_SD(cls=None, file_path=None, user=self.context["request"].user,
-                                                    users_allowed=users_allowed, groups_allowed=groups_allowed, cdt=cdt,
-                                                    keep_file=True, name=validated_data["name"],
-                                                    description=validated_data["description"], created_by=None,
-                                                    check=True, file_handle=validated_data["dataset_file"])
-        return symbolicdataset.dataset
 
 
 class MethodOutputSerializer(serializers.ModelSerializer):
@@ -200,9 +101,9 @@ class RunOutputsSerializer(serializers.ModelSerializer):
         pipeline_inputs = run.pipeline.inputs
 
         for i, input in enumerate(run.inputs.all()):
-            has_data = input.symbolicdataset.has_data()
+            has_data = input.dataset.has_data()
             if has_data:
-                input_name = input.symbolicdataset.dataset.name
+                input_name = input.dataset.name
             else:
                 pipeline_input = pipeline_inputs.get(dataset_idx=input.index)
                 input_name = pipeline_input.dataset_name
@@ -211,7 +112,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                                      display='{}: {}'.format(i+1, input_name),
                                      type='dataset')
             if has_data:
-                input_data.set_dataset(input.symbolicdataset.dataset, request)
+                input_data.set_dataset(input.dataset, request)
             inputs += [input_data]
 
         for input in inputs:
@@ -245,10 +146,10 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     name=outcable.pipelineoutputcable.dest.dataset_name,
                     display=outcable.pipelineoutputcable.dest,
                     type='dataset')
-                if execrecordout.symbolicdataset.has_data():
-                    dataset = execrecordout.symbolicdataset.dataset
+                if execrecordout.dataset.has_data():
+                    dataset = execrecordout.dataset
                     output.set_dataset(dataset, request)
-                elif execrecordout.symbolicdataset.is_redacted():
+                elif execrecordout.dataset.is_redacted():
                     output.set_redacted()
 
                 outputs.append(output)
@@ -313,10 +214,9 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                         display=execrecordout.generic_output,
                         is_ok=execrecordout.is_OK(),
                         type='dataset')
-                    if execrecordout.symbolicdataset.has_data():
-                        dataset = execrecordout.symbolicdataset.dataset
-                        output.set_dataset(dataset, request)
-                    elif execrecordout.symbolicdataset.is_redacted():
+                    if execrecordout.dataset.has_data():
+                        output.set_dataset(execrecordout.dataset, request)
+                    elif execrecordout.dataset.is_redacted():
                         output.set_redacted()
 
                     outputs.append(output)
@@ -338,7 +238,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
 class RunInputSerializer(serializers.ModelSerializer):
     class Meta:
         model = RunInput
-        fields = ("symbolicdataset", "index")
+        fields = ("dataset", "index")
 
 
 class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
@@ -407,7 +307,7 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
         errors = []
         for run_input in data["inputs"]:
             curr_idx = run_input["index"]
-            curr_SD = run_input["symbolicdataset"]
+            curr_SD = run_input["dataset"]
             try:
                 corresp_input = pipeline.inputs.get(dataset_idx=curr_idx)
             except TransformationInput.DoesNotExist:
@@ -419,7 +319,7 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
                 if curr_SD.get_cdt().is_restriction(corresp_input.get_cdt()):
                     continue
             else:
-                errors.append('Input {} is incompatible with SymbolicDataset {}'.format(corresp_input, curr_SD))
+                errors.append('Input {} is incompatible with Dataset {}'.format(corresp_input, curr_SD))
 
             all_access_controlled_objects.append(curr_SD)
 

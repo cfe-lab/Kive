@@ -316,7 +316,7 @@ class Pipeline(transformation.models.Transformation):
         # Check each individual input.
         for i, supplied_input in enumerate(inputs, start=1):
             if not supplied_input.is_OK():
-                raise ValueError('SymbolicDataset {} passed as input {} to Pipeline "{}" is not OK'
+                raise ValueError('Dataset {} passed as input {} to Pipeline "{}" is not OK'
                                  .format(supplied_input, i, self))
 
             pipeline_input = self.inputs.get(dataset_idx=i)
@@ -901,7 +901,7 @@ class PipelineCable(models.Model):
         """Find an ExecRecord which may be reused by this PipelineCable.
 
         INPUTS
-        input_SD        SymbolicDataset to feed the cable
+        input_SD        Dataset to feed the cable
 
         OUTPUTS
         execrecord      ExecRecord which may be reused, or None if no

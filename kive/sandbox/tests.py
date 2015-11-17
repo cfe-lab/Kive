@@ -13,7 +13,7 @@ from constants import datatypes
 from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
 from kive.testing_utils import clean_up_all_files
 from kive.tests import install_fixture_files, restore_production_files
-from librarian.models import SymbolicDataset, DatasetStructure
+from librarian.models import Dataset, DatasetStructure
 from metadata.models import Datatype, CompoundDatatype, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from method.tests import samplecode_path
@@ -68,12 +68,12 @@ def execute_tests_environment_setup(case):
     case.mA_out_cdtm_1 = case.mA_out_cdt.members.create(datatype=case.int_dt, column_name="c", column_idx=1)
     case.mA_out_cdtm_2 = case.mA_out_cdt.members.create(datatype=case.string_dt, column_name="d", column_idx=2)
 
-    case.symDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
+    case.symDS = Dataset.create_dataset(os.path.join(samplecode_path,
                                                         "input_for_test_C_twostep_with_subpipeline.csv"),
                                            file_path=case.myUser, user=case.myUser, cdt=case.pX_in_cdt,
                                            description="input to pipeline pX", name="pX_in_symDS",
                                            description="input to pipeline pX")
-    case.rawDS = SymbolicDataset.create_SD(os.path.join(samplecode_path,
+    case.rawDS = Dataset.create_dataset(os.path.join(samplecode_path,
                                                         "input_for_test_C_twostep_with_subpipeline.csv"),
                                            file_path=case.myUser, user=case.myUser, cdt=None,
                                            description="input to pipeline pX", name="pX_in_symDS",
@@ -139,9 +139,9 @@ def execute_tests_environment_load(case):
     case.mA_out_cdtm_1 = case.mA_out_cdt.members.get(column_name="c")
     case.mA_out_cdtm_2 = case.mA_out_cdt.members.get(column_name="d")
 
-    case.symDS = SymbolicDataset.objects.get(
+    case.symDS = Dataset.objects.get(
         structure__compounddatatype=case.pX_in_cdt)
-    case.rawDS = SymbolicDataset.objects.get(structure__isnull=True)
+    case.rawDS = Dataset.objects.get(structure__isnull=True)
     case.mA = Method.objects.get(revision_name="mA")
     case.mA_in = case.mA.inputs.get()
     case.mA_out = case.mA.outputs.get()
@@ -195,7 +195,7 @@ class ExecuteTests(ExecuteTestsBase):
         pipeline_owner = pipeline.user
         for input in pipeline.inputs.all():
             if input.is_raw():
-                candidate_SDs = SymbolicDataset.objects.filter(user=pipeline_owner)
+                candidate_SDs = Dataset.objects.filter(user=pipeline_owner)
                 if candidate_SDs.exists():
                     for sd in candidate_SDs:
                         if sd.is_raw():
@@ -352,7 +352,7 @@ class ExecuteTests(ExecuteTestsBase):
         self.pX.create_outputs()
 
         # Dataset for input during execution of pipeline
-        input_SD = SymbolicDataset.create_SD(
+        input_SD = Dataset.create_dataset(
             os.path.join(samplecode_path, "input_for_test_C_twostep_with_subpipeline.csv"), file_path=self.myUser,
             user=self.myUser, cdt=self.pX_in_cdt, keep_file=True, name="input_dataset", description="symDS description")
 
@@ -413,7 +413,7 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertFalse(all(i.is_OK() for i in inputs))
         self.assertRaisesRegexp(
             ValueError,
-            re.escape('SymbolicDataset {} passed as input {} to Pipeline "{}" is not OK'
+            re.escape('Dataset {} passed as input {} to Pipeline "{}" is not OK'
                       .format(bad_input, bad_index, pipeline)),
             lambda: sandbox.execute_pipeline(pipeline, inputs, sandbox.sandbox_path, runstep))
 
@@ -443,7 +443,7 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertFalse(all(i.is_OK() for i in inputs))
         self.assertRaisesRegexp(
             ValueError,
-            re.escape('SymbolicDataset {} passed as input {} to Pipeline "{}" is not OK'
+            re.escape('Dataset {} passed as input {} to Pipeline "{}" is not OK'
                       .format(bad_input, bad_index, pipeline)),
             lambda: sandbox.execute_pipeline(pipeline, inputs, sandbox.sandbox_path, runstep))
 
@@ -524,7 +524,7 @@ class SandboxTests(ExecuteTestsBase):
         tf = tempfile.NamedTemporaryFile(delete=False)
         tf.write("foo")
         tf.close()
-        raw_symDS = SymbolicDataset.create_SD(tf.name, file_path=self.myUser, user=self.myUser, description="bar",
+        raw_symDS = Dataset.create_dataset(tf.name, file_path=self.myUser, user=self.myUser, description="bar",
                                               name="foo", description="bar")
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
@@ -631,8 +631,8 @@ class RestoreReusableDatasetTest(TestCase):
     def test_create_run_steps_for_rerun(self):
         pipeline = Pipeline.objects.get(revision_name='sums only')
         input_dataset = Dataset.objects.get(name='pairs').symbolicdataset
-        step1_output_dataset = SymbolicDataset.objects.get(id=2)
-        step2_output_dataset = SymbolicDataset.objects.get(id=3)
+        step1_output_dataset = Dataset.objects.get(id=2)
+        step2_output_dataset = Dataset.objects.get(id=3)
         sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)

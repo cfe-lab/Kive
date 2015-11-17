@@ -6,10 +6,6 @@ Dataset, etc.
 """
 from __future__ import unicode_literals
 
-import csv
-from datetime import datetime, timedelta
-import file_access_utils
-import heapq
 import itertools
 import logging
 from operator import attrgetter, itemgetter
@@ -18,13 +14,9 @@ import time
 import shutil
 
 from django.db import models, transaction
-from django.db.models import Q
-from django.db.models.signals import post_delete
-from django.conf import settings
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.urlresolvers import reverse
 from django.core.validators import MinValueValidator
-from django.template.defaultfilters import filesizeformat
 from django.utils.encoding import python_2_unicode_compatible
 from django.utils import timezone
 from django.contrib.auth.models import User
@@ -33,7 +25,7 @@ import archive.signals
 import archive.exceptions
 from constants import maxlengths
 from datachecking.models import ContentCheckLog, IntegrityCheckLog
-from librarian.models import ExecRecord, SymbolicDataset
+from librarian.models import Dataset
 import metadata.models
 import stopwatch.models
 from pipeline.models import Pipeline
@@ -64,7 +56,7 @@ def redact_helper(redaction_plan):
     if "SymbolicDatasets" in redaction_plan:
         for sd in redaction_plan["SymbolicDatasets"]:
             sd.redact_this()
-            # reloaded_sd = SymbolicDataset.objects.get(pk=sd.pk)
+            # reloaded_sd = Dataset.objects.get(pk=sd.pk)
             # print "After calling {}.redact_this(), {}.is_redacted() is {}".format(sd, reloaded_sd,
             #                                                                       reloaded_sd.is_redacted())
 
@@ -264,13 +256,13 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         except Pipeline.DoesNotExist:
             pipeline_name = "Run"
 
-        inputs = self.inputs.select_related('symbolicdataset__dataset')
+        inputs = self.inputs.select_related('dataset')
         first_input = inputs.order_by('index').first()
-        if not (first_input and first_input.symbolicdataset.has_data()):
+        if not (first_input and first_input.dataset.has_data()):
             if self.time_queued:
                 return "{} at {}".format(pipeline_name, self.time_queued)
             return pipeline_name
-        first_input_name = first_input.symbolicdataset.dataset.name
+        first_input_name = first_input.dataset.name
         return '{} on {}'.format(pipeline_name, first_input_name)
 
     @transaction.atomic
@@ -306,10 +298,10 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         input_list = {}
 
         for _input in self.inputs.all():
-            if _input.symbolicdataset.has_data():
-                input_list[_input.index] = {"dataset_id": _input.symbolicdataset.dataset.id,
-                                            "dataset_name": _input.symbolicdataset.dataset.name,
-                                            "md5": _input.symbolicdataset.MD5_checksum}
+            if _input.dataset.has_data():
+                input_list[_input.index] = {"dataset_id": _input.dataset.dataset.id,
+                                            "dataset_name": _input.dataset.dataset.name,
+                                            "md5": _input.dataset.MD5_checksum}
 
         # One of the steps is in progress?
         total_steps = self.pipeline.steps.count()
@@ -378,10 +370,10 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             if detailed:
                 cable_progress[pipeline_cable.id] = {'status': step_status, 'dataset_id': None, 'md5': None}
                 try:
-                    symbolicdataset = run_cables[0].execrecord.execrecordouts.first().symbolicdataset
-                    cable_progress[pipeline_cable.id]['dataset_id'] = symbolicdataset.dataset.pk \
-                        if symbolicdataset.has_data() else None
-                    cable_progress[pipeline_cable.id]['md5'] = symbolicdataset.MD5_checksum
+                    dataset = run_cables[0].execrecord.execrecordouts.first().dataset
+                    cable_progress[pipeline_cable.id]['dataset_id'] = dataset.pk \
+                        if dataset.has_data() else None
+                    cable_progress[pipeline_cable.id]['md5'] = dataset.MD5_checksum
                 except:
                     pass
 
@@ -549,10 +541,10 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                 # Check for bad output.
                 for output in runstep.execrecord.execrecordouts.all():
                     try:
-                        check = runstep.log.content_checks.get(symbolicdataset=output.symbolicdataset)
+                        check = runstep.log.content_checks.get(dataset=output.dataset)
                     except ContentCheckLog.DoesNotExist:
                         try:
-                            check = runstep.log.integrity_checks.get(symbolicdataset=output.symbolicdataset)
+                            check = runstep.log.integrity_checks.get(dataset=output.dataset)
                         except IntegrityCheckLog.DoesNotExist:
                             continue
 
@@ -597,11 +589,11 @@ class RunInput(models.Model):
     This won't exist in single-process execution.
     """
     run = models.ForeignKey(Run, related_name="inputs")
-    symbolicdataset = models.ForeignKey(SymbolicDataset, related_name="runinputs")
+    dataset = models.ForeignKey(Dataset, related_name="runinputs")
     index = models.PositiveIntegerField()
 
     def clean(self):
-        self.run.validate_restrict_access([self.symbolicdataset])
+        self.run.validate_restrict_access([self.dataset])
 
 
 class ExceedsSystemCapabilities(models.Model):
@@ -852,20 +844,20 @@ class RunComponent(stopwatch.models.Stopwatch):
             # when there is lots of parallelism.)
             outputs_integrity_checked = set([])
             for check in curr_log.integrity_checks.all():
-                if check.symbolicdataset.pk in outputs_integrity_checked:
+                if check.dataset.pk in outputs_integrity_checked:
                     raise ValidationError('{} "{}" has multiple IntegrityCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'
-                                          .format(self.__class__.__name__, self, check.symbolicdataset, curr_log))
-                outputs_integrity_checked.add(check.symbolicdataset.pk)
+                                          'Dataset {} of ExecLog "{}"'
+                                          .format(self.__class__.__name__, self, check.dataset, curr_log))
+                outputs_integrity_checked.add(check.dataset.pk)
                 check.clean()
 
             outputs_content_checked = set([])
             for check in curr_log.content_checks.all():
-                if check.symbolicdataset.pk in outputs_content_checked:
+                if check.dataset.pk in outputs_content_checked:
                     raise ValidationError('{} "{}" has multiple ContentCheckLogs for output '
-                                          'SymbolicDataset {} of ExecLog "{}"'
-                                          .format(self.__class__.__name__, self, check.symbolicdataset, curr_log))
-                outputs_content_checked.add(check.symbolicdataset.pk)
+                                          'Dataset {} of ExecLog "{}"'
+                                          .format(self.__class__.__name__, self, check.dataset, curr_log))
+                outputs_content_checked.add(check.dataset.pk)
                 check.clean()
 
         # If log exists and there are invoked_logs, log should be among
@@ -1075,8 +1067,8 @@ class RunComponent(stopwatch.models.Stopwatch):
         removal_plan = removal_accumulator or metadata.models.empty_removal_plan()
 
         for ds in self.outputs.all():
-            if ds.symbolicdataset not in removal_plan["SymbolicDatasets"]:
-                metadata.models.update_removal_plan(removal_plan, ds.symbolicdataset.build_removal_plan(removal_plan))
+            if ds.dataset not in removal_plan["SymbolicDatasets"]:
+                metadata.models.update_removal_plan(removal_plan, ds.dataset.build_removal_plan(removal_plan))
 
         if self.has_log and self.execrecord and self.execrecord.generator == self.log:
             if self.execrecord not in removal_plan["ExecRecords"]:
@@ -1375,25 +1367,25 @@ class RunStep(RunComponent):
 
             if self.pipelinestep.outputs_to_delete.filter(dataset_name=to.dataset_name).exists():
                 # This output is deleted; there should be no associated Dataset.
-                if self.outputs.filter(symbolicdataset=corresp_ero.symbolicdataset).exists():
+                if self.outputs.filter(dataset=corresp_ero.dataset).exists():
                     raise ValidationError('Output "{}" of RunStep "{}" is deleted; no data should be associated'
                                           .format(to, self))
 
-            elif corresp_ero.symbolicdataset in outputs_missing:
+            elif corresp_ero.dataset in outputs_missing:
                 # This output is missing; there should be no associated Dataset.
-                if self.outputs.filter(symbolicdataset=corresp_ero.symbolicdataset).exists():
+                if self.outputs.filter(dataset=corresp_ero.dataset).exists():
                     raise ValidationError('Output "{}" of RunStep "{}" is missing; no data should be associated'
                                           .format(to, self))
 
             # The corresponding ERO should have existent data.
-            elif not corresp_ero.symbolicdataset.has_data():
+            elif not corresp_ero.dataset.has_data():
                 raise ValidationError('ExecRecordOut "{}" of RunStep "{}" should reference existent data'
                                       .format(corresp_ero, self))
 
         # Check that any associated data belongs to an ERO of this ER
         # Supposed to be the datasets attached to this runstep (Produced by this runstep)
         for out_data in self.outputs.all():
-            if not self.execrecord.execrecordouts.filter(symbolicdataset=out_data.symbolicdataset).exists():
+            if not self.execrecord.execrecordouts.filter(dataset=out_data.dataset).exists():
                 raise ValidationError('RunStep "{}" generated Dataset "{}" but it is not in its ExecRecord'
                                       .format(self, out_data))
 
@@ -1920,7 +1912,7 @@ class RunCable(RunComponent):
                         raise ValidationError('{} "{}" was not reused, trivial, or deleted; it should have '
                                               'produced data'.format(self._cable_type_str(), self))
 
-                    if corresp_ero.symbolicdataset.dataset != self.outputs.first():
+                    if corresp_ero.dataset.dataset != self.outputs.first():
                         raise ValidationError('Dataset "{}" was produced by {} "{}" but is not in an ERO of '
                                               'ExecRecord "{}"'.format(self.outputs.first(),
                                                                        self._cable_type_str(),
@@ -2007,7 +1999,7 @@ class RunCable(RunComponent):
         Find ExecRecords which may be used by this RunCable.
 
         INPUTS
-        input_SD        SymbolicDataset to feed the cable
+        input_SD        Dataset to feed the cable
 
         OUTPUTS
         list of ExecRecords that are compatible with this cable and input (may be empty).
@@ -2021,7 +2013,7 @@ class RunCable(RunComponent):
         """
         summary = {"fully reusable": False, "successful": True}
 
-        output_SD = execrecord.execrecordouts.first().symbolicdataset
+        output_SD = execrecord.execrecordouts.first().dataset
 
         # Terminal case 1: the found ExecRecord has failed some checks.  In this case,
         # we just return and the RunCable fails.
@@ -2315,350 +2307,6 @@ def get_upload_path(instance, filename):
     return instance.UPLOAD_DIR + os.sep + time.strftime('%Y_%m') + os.sep + filename
 
 
-@python_2_unicode_compatible
-class Dataset(models.Model):
-    """
-    Data files uploaded by users or created by transformations.
-
-    Related to :model:`archive.models.RunStep`
-    Related to :model:`archive.models.RunOutputCable`
-    Related to :model:`librarian.models.SymbolicDataset`
-
-    The clean() function should be used when a pipeline is executed to
-    confirm that the dataset structure is consistent with what's
-    expected from the pipeline definition.
-
-    Pipeline.clean() checks that the pipeline is well-defined in theory,
-    while Dataset.clean() ensures the Pipeline produces what is expected.
-    """
-    UPLOAD_DIR = "Datasets"  # This is relative to kive.settings.MEDIA_ROOT
-
-    # The user who created this Dataset is stored in one of
-    # a) the SymbolicDataset of this Dataset (if it's uploaded)
-    # b) the parent Run of created_by (if it's generated) -- note that this may not be the same
-    #    user that created the parent SymbolicDataset.
-    name = models.CharField(max_length=maxlengths.MAX_FILENAME_LENGTH,
-                            help_text="Name of this Dataset.")
-    description = models.TextField(help_text="Description of this Dataset.",
-                                   max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
-                                   blank=True)
-    date_created = models.DateTimeField(default=timezone.now, help_text="Date of Dataset creation.")
-    date_modified = models.DateTimeField(auto_now_add=True, help_text="Date of Dataset modification.")
-
-    # Four cases from which Datasets can originate:
-    #
-    # Case 1: uploaded
-    # Case 2: from the transformation of a RunStep
-    # Case 3: from the execution of a POC (i.e. from a ROC)
-    # Case 4: from the execution of a PSIC (i.e. from a RunSIC)
-    created_by = models.ForeignKey(RunComponent, related_name="outputs_OLDFIXME", null=True, blank=True)
-
-    # Datasets are stored in the "Datasets" folder
-    dataset_file = models.FileField(upload_to=get_upload_path, help_text="Physical path where datasets are stored",
-                                    null=False, max_length=maxlengths.MAX_FILENAME_LENGTH)
-
-    # Datasets always have a referring SymbolicDataset
-    symbolicdataset = models.OneToOneField("librarian.SymbolicDataset", related_name="dataset")
-
-    logger = logging.getLogger('archive.Dataset')
-
-    class Meta:
-        ordering = ["-date_created", "name"]
-
-    @property
-    def user(self):
-        if self.created_by is None:
-            return self.symbolicdataset.user
-        return self.created_by.parent_run.user
-
-    @property
-    def can_be_accessed(self):
-        if self.symbolicdataset is None:
-            return False
-        return self.symbolicdataset.can_be_accessed
-
-    def __str__(self):
-        """
-        Unicode representation of this Dataset.
-
-        This looks like "[name] (created by [user] on [date])"
-        """
-        return "{} (created by {} on {})".format(self.name, self.user, self.date_created)
-
-    def header(self):
-        rows = self.all_rows()
-        return next(rows)
-
-    def rows(self, data_check=False, insert_at=None, limit=None):
-        rows = self.all_rows(data_check, insert_at)
-        for i, row in enumerate(rows):
-            if i == 0:
-                pass  # skip header
-            else:
-                yield row
-            if limit is not None and i >= limit:
-                break
-
-    def expected_header(self):
-        header = []
-        if not self.symbolicdataset.is_raw():
-            header = [c.column_name for c in self.symbolicdataset.compounddatatype.members.order_by("column_idx")]
-        return header
-
-    @property
-    def content_matches_header(self):
-        observed = self.header()
-
-        # Cache this so we only hit the db once here
-        if hasattr(self, "_expected_header_cache"):
-            expected = self._expected_header_cache
-        else:
-            expected = self._expected_header_cache = self.expected_header()
-
-        if len(observed) != len(expected):
-            return False
-        return not any([o != x for (o, x) in zip(observed, expected)])
-
-    def column_alignment(self):
-        """
-        This function looks at the expected and observed headers for
-        a dataset, and tries to align them if they don't match.
-
-
-        :return: a tuple whose first element is a list of tuples
-        i.e (expected header name, observed header name), and
-        whose second element is a list of gaps indicating where
-        to insert blank fields in a row
-        """
-        expt = self.expected_header()
-        obs = self.header()
-        i, insert = 0, []
-
-        if self.symbolicdataset.is_raw() and not self.content_matches_header:
-            return None, None
-
-        # Do a greedy 'hard matching' over the columns
-        while i < max(len(expt), len(obs)) - 1:
-            ex, ob = zip(*(map(None, expt, obs)[i:]))
-            u_score = float('inf')
-            l_score = float('inf')
-
-            for j, val in enumerate(ob):
-                if val == ex[0]:
-                    u_score = j
-            for j, val in enumerate(ex):
-                if val == ob[0]:
-                    l_score = j
-            if l_score == u_score == float('inf'):
-                pass
-            elif u_score < l_score and u_score != float('inf'):
-                [expt.insert(i, "") for _ in xrange(u_score)]
-            elif l_score <= u_score and l_score != float('inf'):
-                [obs.insert(i, "") for _ in xrange(l_score)]
-                insert += [i] * l_score  # keep track of where to insert columns in the resulting view
-            i += 1
-
-        # it would be nice to do a similar soft matching to try to
-        # match columns that are close to being the same string
-
-        # Pad out the arrays
-        diff = abs(len(expt)-len(obs))
-        if len(expt) > len(obs):
-            obs += [""] * diff
-        else:
-            expt += [""] * diff
-
-        return zip(expt, obs), insert
-
-    def all_rows(self, data_check=False, insert_at=None):
-        """
-        Returns an iterator over all rows of this dataset
-
-        If insert_at is specified, a blank field is inserted
-        at each element of insert_at.
-        """
-        self.dataset_file.open('rU')
-        cdt = self.symbolicdataset.compounddatatype
-
-        with self.dataset_file:
-            reader = csv.reader(self.dataset_file)
-            for row in reader:
-                if insert_at is not None:
-                    [row.insert(pos, "") for pos in insert_at]
-                if data_check:
-                    row = map(None, row, cdt.check_constraints(row))
-                yield row
-
-    def validate_unique(self, *args, **kwargs):
-        query = Dataset.objects.filter(symbolicdataset__MD5_checksum=self.symbolicdataset.MD5_checksum,
-                                       name=self.name)
-        if query.exclude(pk=self.pk).exists():
-            raise ValidationError("A Dataset with that name and MD5 already exists.")
-        super(Dataset, self).validate_unique(*args, **kwargs)
-
-    def get_absolute_url(self):
-        """
-        :return str: URL to access the dataset_file
-        """
-        return reverse('dataset_download', kwargs={"dataset_id": self.id})
-
-    def get_filesize(self):
-        """
-        :return int: size of dataset_file in bytes
-        """
-        return self.dataset_file.size
-
-    def get_formatted_filesize(self):
-        if self.dataset_file.size >= 1099511627776:
-            return "{0:.2f}".format(self.dataset_file.size/1099511627776.0) + ' TB'
-        if self.dataset_file.size >= 1073741824:
-            return "{0:.2f}".format(self.dataset_file.size/1073741824.0) + ' GB'
-        elif self.dataset_file.size >= 1048576:
-            return "{0:.2f}".format(self.dataset_file.size/1048576.0) + ' MB'
-        elif self.dataset_file.size >= 1024:
-            return "{0:.2f}".format(self.dataset_file.size/1024.0) + ' KB'
-        else:
-            return str(self.dataset_file.size) + ' B'
-
-    def clean(self):
-        """
-        Validate this Dataset for putting into the database.
-
-        If this Dataset has an MD5 set, verify the dataset file integrity.
-        Also, make sure its permissions match those of the creating RunComponent
-        if there is one.
-        """
-        if self.created_by is not None:
-            # Whatever run created this Dataset must have had access to the parent SymbolicDataset.
-            self.created_by.definite.top_level_run.validate_restrict_access([self.symbolicdataset])
-
-        if not self.check_md5():
-            raise ValidationError('File integrity of "{}" lost. Current checksum "{}" does not equal expected checksum '
-                                  '"{}"'.format(self, self.compute_md5(), self.symbolicdataset.MD5_checksum))
-
-    def compute_md5(self):
-        """Computes the MD5 checksum of the Dataset."""
-        md5 = None
-        try:
-            self.dataset_file.open()
-            md5 = file_access_utils.compute_md5(self.dataset_file.file)
-        finally:
-            self.dataset_file.close()
-
-        return md5
-
-    def check_md5(self):
-        """
-        Checks the MD5 checksum of the Dataset against its stored value.
-
-        The stored value is in the Dataset's associated
-        SymbolicDataset.  This will be used when regenerating data
-        that once existed, as a coherence check.
-
-        If there is no SymbolicDataset, then fails the check (returns False).
-        """
-        # Recompute the MD5, see if it equals what is already stored
-        return self.symbolicdataset.MD5_checksum == self.compute_md5()
-
-    def remove(self):
-        if self.symbolicdataset is not None:
-            self.symbolicdataset.remove()
-
-    def build_removal_plan(self):
-        if self.symbolicdataset is not None:
-            return self.symbolicdataset.build_removal_plan()
-        return []
-
-    def redact(self):
-        if self.symbolicdataset is not None:
-            self.symbolicdataset.redact()
-
-    def build_redaction_plan(self):
-        if self.symbolicdataset is not None:
-            return self.symbolicdataset.build_redaction_plan()
-        return []
-
-    @classmethod
-    def purge(cls,
-              max_storage=settings.DATASET_MAX_STORAGE,
-              target=settings.DATASET_TARGET_STORAGE):
-
-        files = []  # [(date, path)]
-        start_path = os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR)
-        total_size = 0
-        skipped_count = 0
-        for dirpath, _dirnames, filenames in os.walk(start_path):
-            for filename in filenames:
-                filepath = os.path.join(dirpath, filename)
-                filedate = os.path.getmtime(filepath)
-                filesize = os.path.getsize(filepath)
-                relpath = os.path.relpath(filepath, settings.MEDIA_ROOT)
-                total_size += filesize
-                heapq.heappush(files, (filedate, relpath, filesize))
-        if total_size >= settings.DATASET_MAX_STORAGE:
-            cls.logger.info('Dataset purge triggered at %s over %d files.',
-                            filesizeformat(total_size),
-                            len(files))
-            while total_size > settings.DATASET_TARGET_STORAGE and files:
-                filedate, relpath, filesize = heapq.heappop(files)
-                dataset = Dataset.objects.filter(dataset_file=relpath).first()
-                if dataset is None:
-                    filepath = os.path.join(settings.MEDIA_ROOT, relpath)
-                    filedate = os.path.getmtime(filepath)
-                    file_age = datetime.now() - datetime.fromtimestamp(filedate)
-                    if file_age < timedelta(hours=1):
-                        skipped_count += 1
-                    else:
-                        cls.logger.warn('No dataset matches file %r, deleting it.',
-                                        relpath)
-                        os.remove(filepath)
-                        total_size -= filesize
-                else:
-                    if dataset.created_by is None:
-                        is_skipped = True  # it was uploaded, not created
-                    else:
-                        # Check to see if it's being used by an active run.
-                        producers = dataset.symbolicdataset.execrecordouts.all()
-                        consumers = dataset.symbolicdataset.execrecordins.all()
-                        related_execrecords = ExecRecord.objects.filter(
-                            Q(execrecordouts__in=producers) |
-                            Q(execrecordins__in=consumers))
-                        related_components = RunComponent.objects.filter(
-                            execrecord__in=related_execrecords)
-                        related_runs = {component.top_level_run
-                                        for component in related_components}
-                        is_skipped = any((not run.has_ended()
-                                          for run in related_runs))
-                    if is_skipped:
-                        skipped_count += 1
-                    else:
-                        dataset.delete()
-                        total_size -= filesize
-
-            remaining = 'Leaving {} over {} files.'.format(
-                filesizeformat(total_size),
-                len(files) + skipped_count)
-            if total_size > settings.DATASET_MAX_STORAGE:
-                target = settings.DATASET_MAX_STORAGE
-                log_method = cls.logger.error
-            elif total_size > settings.DATASET_TARGET_STORAGE:
-                target = settings.DATASET_TARGET_STORAGE
-                log_method = cls.logger.warn
-            else:
-                target = None
-                log_method = cls.logger.info
-            if target:
-                message = 'Cannot purge datasets below {}. {}'.format(
-                    filesizeformat(target),
-                    remaining)
-            else:
-                message = 'Dataset purge finished. ' + remaining
-            message = message.replace('\xa0', ' ')
-            log_method(message)
-            if log_method == cls.logger.error:
-                raise RuntimeError(message)
-
-
 class ExecLog(stopwatch.models.Stopwatch):
     """
     Logs of Method/PSIC/POC execution.
@@ -2770,7 +2418,7 @@ class ExecLog(stopwatch.models.Stopwatch):
         for ccl in self.content_checks.all():
             try:
                 if ccl.baddata.missing_output:
-                    missing.append(ccl.symbolicdataset)
+                    missing.append(ccl.dataset)
             except ObjectDoesNotExist:
                 pass
 
@@ -2844,19 +2492,19 @@ class ExecLog(stopwatch.models.Stopwatch):
                     record_is_trivial_cable = True
 
                 if record_is_trivial_cable:
-                    corresp_icls = self.integrity_checks.filter(symbolicdataset=ero.symbolicdataset)
+                    corresp_icls = self.integrity_checks.filter(dataset=ero.dataset)
                     if not corresp_icls.exists():
                         return False
 
-                elif not ero.symbolicdataset.is_raw():
-                    corresp_ccls = self.content_checks.filter(symbolicdataset=ero.symbolicdataset)
+                elif not ero.dataset.is_raw():
+                    corresp_ccls = self.content_checks.filter(dataset=ero.dataset)
                     if not corresp_ccls.exists():
                         return False
 
         else:
             # This is either a filling-in or a recovery, so just look for ICLs.
             for ero in self.record.execrecord.execrecordouts.all():
-                corresp_icls = self.integrity_checks.filter(symbolicdataset=ero.symbolicdataset)
+                corresp_icls = self.integrity_checks.filter(dataset=ero.dataset)
                 if not corresp_icls.exists():
                     return False
 
@@ -2879,12 +2527,12 @@ class ExecLog(stopwatch.models.Stopwatch):
         # EROs and check that all of the corresponding ICL/CCLs are
         # present and passed.
         for ero in self.record.execrecord.execrecordouts.all():
-            corresp_icls = self.integrity_checks.filter(symbolicdataset=ero.symbolicdataset)
+            corresp_icls = self.integrity_checks.filter(dataset=ero.dataset)
             if corresp_icls.exists():
                 if corresp_icls.first().is_fail():
                     return False
 
-            corresp_ccls = self.content_checks.filter(symbolicdataset=ero.symbolicdataset)
+            corresp_ccls = self.content_checks.filter(dataset=ero.dataset)
             if corresp_ccls.exists():
                 if corresp_ccls.first().is_fail():
                     return False
@@ -3012,6 +2660,3 @@ class MethodOutput(models.Model):
         self.save()
         self.execlog.record.redact()
 
-
-# Register signals.
-post_delete.connect(archive.signals.dataset_post_delete, sender=Dataset)
