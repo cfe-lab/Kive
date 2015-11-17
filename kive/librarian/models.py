@@ -69,6 +69,8 @@ class SymbolicDataset(metadata.models.AccessControl):
     it still exists or not) is/was coherent (e.g. checked using
     CDT.summarize_CSV()).
     """
+    UPLOAD_DIR = "Datasets"  # This is relative to kive.settings.MEDIA_ROOT
+
     name = models.CharField(max_length=maxlengths.MAX_FILENAME_LENGTH,
                             help_text="Name of this Dataset.",
                             blank=True)
@@ -308,7 +310,10 @@ class SymbolicDataset(metadata.models.AccessControl):
 
     def has_data(self):
         """True if associated Dataset exists; False otherwise."""
-        return self.dataset_file is not None
+        # Note: "is not" won't work here because self.dataset_file
+        # is a FieldFile with no file, not None.  However, == and != have
+        # have been appropriately overloaded to handle this.
+        return self.dataset_file != None
 
     def has_structure(self):
         """True if associated DatasetStructure exists; False otherwise."""
@@ -385,7 +390,7 @@ class SymbolicDataset(metadata.models.AccessControl):
         self.MD5_checksum = md5gen.hexdigest()
 
     @transaction.atomic
-    def register_file(self, file_path, user, name, description, created_by=None, file_handle=None):
+    def register_file(self, file_path, file_handle=None):
         """Save and register a new file for this Dataset.
 
         Compute and set the MD5.
@@ -399,20 +404,11 @@ class SymbolicDataset(metadata.models.AccessControl):
                             If supplied, then does not reopen the file in file_path.
                             Moves handle to beginning of file before calculating MD5.
                             If None, then opens the file in file_path.
-        user                user who uploaded the file
-        name                name for the new Dataset
-        description         description for the new Dataset
-        created_by          a RunAtomic which created this Dataset, or
-                            None if the Dataset was uploaded by the
-                            user
 
         PRE
         self must not have a Dataset already associated
         """
         assert not self.has_data()
-        if created_by is not None:
-            assert user == created_by.top_level_run.user
-            self.created_by = created_by
 
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
             self.dataset_file.save(os.path.basename(f.name), File(f))
@@ -516,6 +512,10 @@ class SymbolicDataset(metadata.models.AccessControl):
             symDS = cls.create_empty(user, cdt=cdt,
                                      users_allowed=users_allowed, groups_allowed=groups_allowed)
 
+            symDS.name = name
+            symDS.description = description
+            symDS.created_by = created_by
+
             if symDS.is_raw():
                 symDS.set_MD5(file_path, file_handle)
             else:
@@ -561,8 +561,7 @@ class SymbolicDataset(metadata.models.AccessControl):
                 LOGGER.debug("Read {} rows from file {}".format(symDS.structure.num_rows, file_name))
 
             if keep_file:
-                symDS.register_file(file_path=file_path, file_handle=file_handle, user=user, name=name,
-                                       description=description, created_by=created_by)
+                symDS.register_file(file_path=file_path, file_handle=file_handle)
             else:
                 if symDS.is_raw():
                     symDS.set_MD5(file_name, file_handle)

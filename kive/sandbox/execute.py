@@ -1597,7 +1597,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
                     if execrecord is not None:
                         output_SD = execrecord.execrecordouts.first().symbolicdataset
                         if make_dataset:
-                            output_SD.register_file(output_path, user, dataset_name, dataset_desc, curr_record)
+                            output_SD.register_file(output_path)
 
                     else:
                         output_SD = librarian.models.SymbolicDataset.create_SD(output_path, file_path=output_CDT,
@@ -1853,9 +1853,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                                         pk=output_ERO.symbolicdataset.pk
                                     ).first()
                                     if make_dataset and not output_SD.has_data():
-                                        output_SD.register_file(
-                                            output_path, user, dataset_name, dataset_desc,
-                                            runstep)
+                                        output_SD.register_file(output_path)
 
                             else:
                                 output_SD = librarian.models.SymbolicDataset.create_SD(output_path,

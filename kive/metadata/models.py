@@ -562,6 +562,9 @@ class Datatype(AccessControl):
     prototype = models.OneToOneField("archive.Dataset", null=True, blank=True, related_name="datatype_modelled",
                                      on_delete=models.SET_NULL)
 
+    proto_SD = models.OneToOneField("librarian.SymbolicDataset", null=True, blank=True,
+                                    related_name="datatype_modelled", on_delete=models.SET_NULL)
+
     class Meta:
         unique_together = ("user", "name")
 

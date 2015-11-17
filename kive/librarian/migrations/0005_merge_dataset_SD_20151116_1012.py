@@ -9,7 +9,7 @@ import librarian.models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('archive', '0019_auto_20151116_1012'),
+        ('archive', '0019_prepare_merge_dataset_SD_20151116_1012'),
         ('librarian', '0004_redacted_20150417_1128'),
     ]
 
