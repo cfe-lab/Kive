@@ -1015,7 +1015,6 @@ class DatasetStructure(models.Model):
     # Note: previously we were tracking the exact TransformationOutput
     # this came from (both for its Run and its RunStep) but this is
     # now done more cleanly using ExecRecord.
-
     dataset = models.OneToOneField(Dataset, related_name="structure")
     compounddatatype = models.ForeignKey("metadata.CompoundDatatype", related_name="conforming_datasets")
 
@@ -1362,7 +1361,7 @@ class ExecRecordIn(models.Model):
     """
     execrecord = models.ForeignKey(ExecRecord, help_text="Parent ExecRecord", related_name="execrecordins")
     dataset = models.ForeignKey(Dataset, help_text="Dataset fed to this input",
-                                        related_name="execrecordins")
+                                related_name="execrecordins")
 
     # For a Method/Pipeline, this denotes the input that this ERI refers to;
     # for a cable, this denotes the thing that "feeds" it.
@@ -1510,10 +1509,12 @@ class ExecRecordOut(models.Model):
     """
     execrecord = models.ForeignKey(ExecRecord, help_text="Parent ExecRecord",
                                    related_name="execrecordouts")
+
     dataset = models.ForeignKey(
         Dataset,
         help_text="Dataset coming from this output",
-        related_name="execrecordouts")
+        related_name="execrecordouts"
+    )
 
     # For a Method/Pipeline this represents the TO that produces this output.
     # For a cable, this represents the TO (for a POC) or TI (for a PSIC) that
