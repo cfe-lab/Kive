@@ -74,6 +74,271 @@
 },
 {
     "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 5
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 6
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 7
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 8
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 9
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 10
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 11
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 12
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 13
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 14
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 15
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 16
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 17
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 18
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 19
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 20
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1,
+            2,
+            3
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 21
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 2,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 22
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 2,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 23
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 2,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 24
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 2,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 25
+},
+{
+    "fields": {
         "datatype": 4,
         "column_idx": 1,
         "column_name": "x",
@@ -1622,270 +1887,5 @@
     },
     "model": "metadata.compounddatatypemember",
     "pk": 147
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 5
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 6
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 7
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 8
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 9
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 10
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 11
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 12
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 13
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 14
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 15
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 16
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 17
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 18
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 19
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 20
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 1,
-        "groups_allowed": [
-            1,
-            2,
-            3
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 21
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 2,
-        "groups_allowed": [
-            1
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 22
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 2,
-        "groups_allowed": [
-            1
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 23
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 2,
-        "groups_allowed": [
-            1
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 24
-},
-{
-    "fields": {
-        "users_allowed": [],
-        "user": 2,
-        "groups_allowed": [
-            1
-        ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 25
 }
 ]

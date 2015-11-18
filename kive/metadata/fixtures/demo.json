@@ -1,1484 +1,1773 @@
 [
 {
-    "pk": 7, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 1, 
-        "column_name": "x", 
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 1
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 2
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 3
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 4
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 5
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 6
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 7
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 8
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 9
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 10
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 11
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 12
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 13
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 14
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 15
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 16
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 17
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 18
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 19
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 20
+},
+{
+    "fields": {
+        "users_allowed": [],
+        "user": 1,
+        "groups_allowed": [
+            1
+        ]
+    },
+    "model": "metadata.compounddatatype",
+    "pk": 21
+},
+{
+    "fields": {
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "to_test",
+        "blankable": true,
+        "compounddatatype": 1
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 1
+},
+{
+    "fields": {
+        "datatype": 5,
+        "column_idx": 1,
+        "column_name": "failed_row",
+        "blankable": false,
+        "compounddatatype": 2
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 2
+},
+{
+    "fields": {
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "example",
+        "blankable": true,
+        "compounddatatype": 3
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 3
+},
+{
+    "fields": {
+        "datatype": 2,
+        "column_idx": 2,
+        "column_name": "valid",
+        "blankable": false,
+        "compounddatatype": 3
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 4
+},
+{
+    "fields": {
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "FASTA header",
+        "blankable": true,
+        "compounddatatype": 4
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 5
+},
+{
+    "fields": {
+        "datatype": 6,
+        "column_idx": 2,
+        "column_name": "FASTA sequence",
+        "blankable": true,
+        "compounddatatype": 4
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 6
+},
+{
+    "fields": {
+        "datatype": 4,
+        "column_idx": 1,
+        "column_name": "x",
+        "blankable": false,
         "compounddatatype": 5
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 7
 },
 {
-    "pk": 8, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 2, 
-        "column_name": "y", 
+        "datatype": 4,
+        "column_idx": 2,
+        "column_name": "y",
+        "blankable": false,
         "compounddatatype": 5
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 8
 },
 {
-    "pk": 9, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 1, 
-        "column_name": "sum", 
+        "datatype": 4,
+        "column_idx": 1,
+        "column_name": "sum",
+        "blankable": false,
         "compounddatatype": 6
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 9
 },
 {
-    "pk": 10, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 2, 
-        "column_name": "product", 
+        "datatype": 4,
+        "column_idx": 2,
+        "column_name": "product",
+        "blankable": false,
         "compounddatatype": 6
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 10
 },
 {
-    "pk": 11, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "qname", 
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "qname",
+        "blankable": false,
         "compounddatatype": 7
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 11
 },
 {
-    "pk": 12, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 2, 
-        "column_name": "flag", 
+        "datatype": 4,
+        "column_idx": 2,
+        "column_name": "flag",
+        "blankable": false,
         "compounddatatype": 7
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 12
 },
 {
-    "pk": 13, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 3, 
-        "column_name": "rname", 
+        "datatype": 1,
+        "column_idx": 3,
+        "column_name": "rname",
+        "blankable": false,
         "compounddatatype": 7
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 13
 },
 {
-    "pk": 14, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 4, 
-        "column_name": "pos", 
+        "datatype": 4,
+        "column_idx": 4,
+        "column_name": "pos",
+        "blankable": false,
         "compounddatatype": 7
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 14
 },
 {
-    "pk": 15, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 5, 
-        "column_name": "mapq", 
+        "datatype": 4,
+        "column_idx": 5,
+        "column_name": "mapq",
+        "blankable": false,
         "compounddatatype": 7
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 15
 },
 {
-    "pk": 16, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 6, 
-        "column_name": "cigar", 
+        "datatype": 1,
+        "column_idx": 6,
+        "column_name": "cigar",
+        "blankable": false,
         "compounddatatype": 7
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 16
 },
 {
-    "pk": 17, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 7, 
-        "column_name": "rnext", 
+        "datatype": 1,
+        "column_idx": 7,
+        "column_name": "rnext",
+        "blankable": false,
         "compounddatatype": 7
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 17
 },
 {
-    "pk": 18, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 8, 
-        "column_name": "pnext", 
+        "datatype": 4,
+        "column_idx": 8,
+        "column_name": "pnext",
+        "blankable": false,
         "compounddatatype": 7
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 18
 },
 {
-    "pk": 19, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 9, 
-        "column_name": "tlen", 
+        "datatype": 4,
+        "column_idx": 9,
+        "column_name": "tlen",
+        "blankable": false,
         "compounddatatype": 7
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 19
 },
 {
-    "pk": 20, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 7, 
-        "column_idx": 10, 
-        "column_name": "seq", 
+        "datatype": 7,
+        "column_idx": 10,
+        "column_name": "seq",
+        "blankable": false,
         "compounddatatype": 7
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 20
 },
 {
-    "pk": 21, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 11, 
-        "column_name": "qual", 
+        "datatype": 1,
+        "column_idx": 11,
+        "column_name": "qual",
+        "blankable": false,
         "compounddatatype": 7
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 21
 },
 {
-    "pk": 22, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "sample_name", 
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "sample_name",
+        "blankable": false,
         "compounddatatype": 8
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 22
 },
 {
-    "pk": 23, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 2, 
-        "column_name": "qname", 
+        "datatype": 1,
+        "column_idx": 2,
+        "column_name": "qname",
+        "blankable": false,
         "compounddatatype": 8
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 23
 },
 {
-    "pk": 24, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 3, 
-        "column_name": "flag", 
+        "datatype": 4,
+        "column_idx": 3,
+        "column_name": "flag",
+        "blankable": false,
         "compounddatatype": 8
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 24
 },
 {
-    "pk": 25, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 4, 
-        "column_name": "rname", 
+        "datatype": 1,
+        "column_idx": 4,
+        "column_name": "rname",
+        "blankable": false,
         "compounddatatype": 8
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 25
 },
 {
-    "pk": 26, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 5, 
-        "column_name": "pos", 
+        "datatype": 4,
+        "column_idx": 5,
+        "column_name": "pos",
+        "blankable": false,
         "compounddatatype": 8
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 26
 },
 {
-    "pk": 27, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 6, 
-        "column_name": "mapq", 
+        "datatype": 4,
+        "column_idx": 6,
+        "column_name": "mapq",
+        "blankable": false,
         "compounddatatype": 8
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 27
 },
 {
-    "pk": 28, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 7, 
-        "column_name": "cigar", 
+        "datatype": 1,
+        "column_idx": 7,
+        "column_name": "cigar",
+        "blankable": false,
         "compounddatatype": 8
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 28
 },
 {
-    "pk": 29, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 8, 
-        "column_name": "rnext", 
+        "datatype": 1,
+        "column_idx": 8,
+        "column_name": "rnext",
+        "blankable": false,
         "compounddatatype": 8
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 29
 },
 {
-    "pk": 30, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 9, 
-        "column_name": "pnext", 
+        "datatype": 4,
+        "column_idx": 9,
+        "column_name": "pnext",
+        "blankable": false,
         "compounddatatype": 8
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 30
 },
 {
-    "pk": 31, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 10, 
-        "column_name": "tlen", 
+        "datatype": 4,
+        "column_idx": 10,
+        "column_name": "tlen",
+        "blankable": false,
         "compounddatatype": 8
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 31
 },
 {
-    "pk": 32, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 7, 
-        "column_idx": 11, 
-        "column_name": "seq", 
+        "datatype": 7,
+        "column_idx": 11,
+        "column_name": "seq",
+        "blankable": false,
         "compounddatatype": 8
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 32
 },
 {
-    "pk": 33, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 12, 
-        "column_name": "qual", 
+        "datatype": 1,
+        "column_idx": 12,
+        "column_name": "qual",
+        "blankable": false,
         "compounddatatype": 8
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 33
 },
 {
-    "pk": 34, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "sample_name", 
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "sample_name",
+        "blankable": false,
         "compounddatatype": 9
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 34
 },
 {
-    "pk": 35, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 2, 
-        "column_name": "type", 
+        "datatype": 1,
+        "column_idx": 2,
+        "column_name": "type",
+        "blankable": false,
         "compounddatatype": 9
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 35
 },
 {
-    "pk": 36, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 3, 
-        "column_name": "count", 
+        "datatype": 4,
+        "column_idx": 3,
+        "column_name": "count",
+        "blankable": false,
         "compounddatatype": 9
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 36
 },
 {
-    "pk": 37, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "region", 
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "region",
+        "blankable": false,
         "compounddatatype": 10
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 37
 },
 {
-    "pk": 38, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 7, 
-        "column_idx": 2, 
-        "column_name": "sequence", 
+        "datatype": 7,
+        "column_idx": 2,
+        "column_name": "sequence",
+        "blankable": false,
         "compounddatatype": 10
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 38
 },
 {
-    "pk": 39, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "sample", 
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "sample",
+        "blankable": false,
         "compounddatatype": 11
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 39
 },
 {
-    "pk": 40, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 2, 
-        "column_name": "refname", 
+        "datatype": 1,
+        "column_idx": 2,
+        "column_name": "refname",
+        "blankable": false,
         "compounddatatype": 11
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 40
 },
 {
-    "pk": 41, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 3, 
-        "column_name": "qcut", 
+        "datatype": 4,
+        "column_idx": 3,
+        "column_name": "qcut",
+        "blankable": false,
         "compounddatatype": 11
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 41
 },
 {
-    "pk": 42, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 4, 
-        "column_name": "rank", 
+        "datatype": 4,
+        "column_idx": 4,
+        "column_name": "rank",
+        "blankable": false,
         "compounddatatype": 11
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 42
 },
 {
-    "pk": 43, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 5, 
-        "column_name": "count", 
+        "datatype": 4,
+        "column_idx": 5,
+        "column_name": "count",
+        "blankable": false,
         "compounddatatype": 11
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 43
 },
 {
-    "pk": 44, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 6, 
-        "column_name": "offset", 
+        "datatype": 4,
+        "column_idx": 6,
+        "column_name": "offset",
+        "blankable": false,
         "compounddatatype": 11
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 44
 },
 {
-    "pk": 45, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 7, 
-        "column_idx": 7, 
-        "column_name": "seq", 
+        "datatype": 7,
+        "column_idx": 7,
+        "column_name": "seq",
+        "blankable": false,
         "compounddatatype": 11
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 45
 },
 {
-    "pk": 46, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "sample", 
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "sample",
+        "blankable": false,
         "compounddatatype": 12
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 46
 },
 {
-    "pk": 47, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 2, 
-        "column_name": "qname", 
+        "datatype": 1,
+        "column_idx": 2,
+        "column_name": "qname",
+        "blankable": false,
         "compounddatatype": 12
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 47
 },
 {
-    "pk": 48, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 3, 
-        "column_name": "fwd_rev", 
+        "datatype": 1,
+        "column_idx": 3,
+        "column_name": "fwd_rev",
+        "blankable": false,
         "compounddatatype": 12
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 48
 },
 {
-    "pk": 49, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 4, 
-        "column_name": "refname", 
+        "datatype": 1,
+        "column_idx": 4,
+        "column_name": "refname",
+        "blankable": false,
         "compounddatatype": 12
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 49
 },
 {
-    "pk": 50, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 5, 
-        "column_name": "pos", 
+        "datatype": 4,
+        "column_idx": 5,
+        "column_name": "pos",
+        "blankable": false,
         "compounddatatype": 12
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 50
 },
 {
-    "pk": 51, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 7, 
-        "column_idx": 6, 
-        "column_name": "insert", 
+        "datatype": 7,
+        "column_idx": 6,
+        "column_name": "insert",
+        "blankable": false,
         "compounddatatype": 12
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 51
 },
 {
-    "pk": 52, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 7, 
-        "column_name": "qual", 
+        "datatype": 1,
+        "column_idx": 7,
+        "column_name": "qual",
+        "blankable": false,
         "compounddatatype": 12
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 52
 },
 {
-    "pk": 53, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "sample", 
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "sample",
+        "blankable": false,
         "compounddatatype": 13
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 53
 },
 {
-    "pk": 54, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 2, 
-        "column_name": "qname", 
+        "datatype": 1,
+        "column_idx": 2,
+        "column_name": "qname",
+        "blankable": false,
         "compounddatatype": 13
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 54
 },
 {
-    "pk": 55, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 3, 
-        "column_name": "qcut", 
+        "datatype": 4,
+        "column_idx": 3,
+        "column_name": "qcut",
+        "blankable": false,
         "compounddatatype": 13
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 55
 },
 {
-    "pk": 56, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 7, 
-        "column_idx": 4, 
-        "column_name": "seq1", 
+        "datatype": 7,
+        "column_idx": 4,
+        "column_name": "seq1",
+        "blankable": false,
         "compounddatatype": 13
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 56
 },
 {
-    "pk": 57, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 5, 
-        "column_name": "qual1", 
+        "datatype": 1,
+        "column_idx": 5,
+        "column_name": "qual1",
+        "blankable": false,
         "compounddatatype": 13
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 57
 },
 {
-    "pk": 58, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 7, 
-        "column_idx": 6, 
-        "column_name": "seq2", 
+        "datatype": 7,
+        "column_idx": 6,
+        "column_name": "seq2",
+        "blankable": false,
         "compounddatatype": 13
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 58
 },
 {
-    "pk": 59, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 7, 
-        "column_name": "qual2", 
+        "datatype": 1,
+        "column_idx": 7,
+        "column_name": "qual2",
+        "blankable": false,
         "compounddatatype": 13
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 59
 },
 {
-    "pk": 60, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 3, 
-        "column_idx": 8, 
-        "column_name": "prop_N", 
+        "datatype": 3,
+        "column_idx": 8,
+        "column_name": "prop_N",
+        "blankable": false,
         "compounddatatype": 13
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 60
 },
 {
-    "pk": 61, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 7, 
-        "column_idx": 9, 
-        "column_name": "mseq", 
+        "datatype": 7,
+        "column_idx": 9,
+        "column_name": "mseq",
+        "blankable": false,
         "compounddatatype": 13
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 61
 },
 {
-    "pk": 62, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "sample", 
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "sample",
+        "blankable": false,
         "compounddatatype": 14
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 62
 },
 {
-    "pk": 63, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 2, 
-        "column_name": "seed", 
+        "datatype": 1,
+        "column_idx": 2,
+        "column_name": "seed",
+        "blankable": false,
         "compounddatatype": 14
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 63
 },
 {
-    "pk": 64, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 3, 
-        "column_name": "region", 
+        "datatype": 1,
+        "column_idx": 3,
+        "column_name": "region",
+        "blankable": false,
         "compounddatatype": 14
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 64
 },
 {
-    "pk": 65, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 4, 
-        "column_name": "q-cutoff", 
+        "datatype": 4,
+        "column_idx": 4,
+        "column_name": "q-cutoff",
+        "blankable": false,
         "compounddatatype": 14
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 65
 },
 {
-    "pk": 66, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 5, 
-        "column_name": "query.nuc.pos", 
-        "compounddatatype": 14,
-        "blankable": true
-    }
-},
-{
-    "pk": 67, 
-    "model": "metadata.compounddatatypemember", 
-    "fields": {
-        "datatype": 4, 
-        "column_idx": 6, 
-        "column_name": "refseq.nuc.pos", 
+        "datatype": 1,
+        "column_idx": 5,
+        "column_name": "query.nuc.pos",
+        "blankable": true,
         "compounddatatype": 14
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 66
 },
 {
-    "pk": 68, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 7, 
-        "column_name": "A", 
+        "datatype": 4,
+        "column_idx": 6,
+        "column_name": "refseq.nuc.pos",
+        "blankable": false,
         "compounddatatype": 14
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 67
 },
 {
-    "pk": 69, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 8, 
-        "column_name": "C", 
+        "datatype": 1,
+        "column_idx": 7,
+        "column_name": "A",
+        "blankable": false,
         "compounddatatype": 14
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 68
 },
 {
-    "pk": 70, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 9, 
-        "column_name": "G", 
+        "datatype": 1,
+        "column_idx": 8,
+        "column_name": "C",
+        "blankable": false,
         "compounddatatype": 14
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 69
 },
 {
-    "pk": 71, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 10, 
-        "column_name": "T", 
+        "datatype": 1,
+        "column_idx": 9,
+        "column_name": "G",
+        "blankable": false,
         "compounddatatype": 14
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 70
 },
 {
-    "pk": 72, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "sample", 
+        "datatype": 1,
+        "column_idx": 10,
+        "column_name": "T",
+        "blankable": false,
+        "compounddatatype": 14
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 71
+},
+{
+    "fields": {
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "sample",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 72
 },
 {
-    "pk": 73, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 2, 
-        "column_name": "seed", 
+        "datatype": 1,
+        "column_idx": 2,
+        "column_name": "seed",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 73
 },
 {
-    "pk": 74, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 3, 
-        "column_name": "region", 
+        "datatype": 1,
+        "column_idx": 3,
+        "column_name": "region",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 74
 },
 {
-    "pk": 75, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 4, 
-        "column_name": "q-cutoff", 
+        "datatype": 4,
+        "column_idx": 4,
+        "column_name": "q-cutoff",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 75
 },
 {
-    "pk": 76, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 5, 
-        "column_name": "query.aa.pos", 
-        "compounddatatype": 15,
-        "blankable": true
-    }
-},
-{
-    "pk": 77, 
-    "model": "metadata.compounddatatypemember", 
-    "fields": {
-        "datatype": 4, 
-        "column_idx": 6, 
-        "column_name": "refseq.aa.pos", 
+        "datatype": 1,
+        "column_idx": 5,
+        "column_name": "query.aa.pos",
+        "blankable": true,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 76
 },
 {
-    "pk": 78, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 7, 
-        "column_name": "A", 
+        "datatype": 4,
+        "column_idx": 6,
+        "column_name": "refseq.aa.pos",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 77
 },
 {
-    "pk": 79, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 8, 
-        "column_name": "C", 
+        "datatype": 4,
+        "column_idx": 7,
+        "column_name": "A",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 78
 },
 {
-    "pk": 80, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 9, 
-        "column_name": "D", 
+        "datatype": 4,
+        "column_idx": 8,
+        "column_name": "C",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 79
 },
 {
-    "pk": 81, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 10, 
-        "column_name": "E", 
+        "datatype": 4,
+        "column_idx": 9,
+        "column_name": "D",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 80
 },
 {
-    "pk": 82, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 11, 
-        "column_name": "F", 
+        "datatype": 4,
+        "column_idx": 10,
+        "column_name": "E",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 81
 },
 {
-    "pk": 83, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 12, 
-        "column_name": "G", 
+        "datatype": 4,
+        "column_idx": 11,
+        "column_name": "F",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 82
 },
 {
-    "pk": 84, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 13, 
-        "column_name": "H", 
+        "datatype": 4,
+        "column_idx": 12,
+        "column_name": "G",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 83
 },
 {
-    "pk": 85, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 14, 
-        "column_name": "I", 
+        "datatype": 4,
+        "column_idx": 13,
+        "column_name": "H",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 84
 },
 {
-    "pk": 86, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 15, 
-        "column_name": "K", 
+        "datatype": 4,
+        "column_idx": 14,
+        "column_name": "I",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 85
 },
 {
-    "pk": 87, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 16, 
-        "column_name": "L", 
+        "datatype": 4,
+        "column_idx": 15,
+        "column_name": "K",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 86
 },
 {
-    "pk": 88, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 17, 
-        "column_name": "M", 
+        "datatype": 4,
+        "column_idx": 16,
+        "column_name": "L",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 87
 },
 {
-    "pk": 89, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 18, 
-        "column_name": "N", 
+        "datatype": 4,
+        "column_idx": 17,
+        "column_name": "M",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 88
 },
 {
-    "pk": 90, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 19, 
-        "column_name": "P", 
+        "datatype": 4,
+        "column_idx": 18,
+        "column_name": "N",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 89
 },
 {
-    "pk": 91, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 20, 
-        "column_name": "Q", 
+        "datatype": 4,
+        "column_idx": 19,
+        "column_name": "P",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 90
 },
 {
-    "pk": 92, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 21, 
-        "column_name": "R", 
+        "datatype": 4,
+        "column_idx": 20,
+        "column_name": "Q",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 91
 },
 {
-    "pk": 93, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 22, 
-        "column_name": "S", 
+        "datatype": 4,
+        "column_idx": 21,
+        "column_name": "R",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 92
 },
 {
-    "pk": 94, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 23, 
-        "column_name": "T", 
+        "datatype": 4,
+        "column_idx": 22,
+        "column_name": "S",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 93
 },
 {
-    "pk": 95, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 24, 
-        "column_name": "V", 
+        "datatype": 4,
+        "column_idx": 23,
+        "column_name": "T",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 94
 },
 {
-    "pk": 96, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 25, 
-        "column_name": "W", 
+        "datatype": 4,
+        "column_idx": 24,
+        "column_name": "V",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 95
 },
 {
-    "pk": 97, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 26, 
-        "column_name": "Y", 
+        "datatype": 4,
+        "column_idx": 25,
+        "column_name": "W",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 96
 },
 {
-    "pk": 98, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 27, 
-        "column_name": "*", 
+        "datatype": 4,
+        "column_idx": 26,
+        "column_name": "Y",
+        "blankable": false,
         "compounddatatype": 15
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 97
 },
 {
-    "pk": 99, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "sample", 
+        "datatype": 4,
+        "column_idx": 27,
+        "column_name": "*",
+        "blankable": false,
+        "compounddatatype": 15
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 98
+},
+{
+    "fields": {
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "sample",
+        "blankable": false,
         "compounddatatype": 16
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 99
 },
 {
-    "pk": 100, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 2, 
-        "column_name": "seed", 
+        "datatype": 1,
+        "column_idx": 2,
+        "column_name": "seed",
+        "blankable": false,
         "compounddatatype": 16
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 100
 },
 {
-    "pk": 101, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 3, 
-        "column_name": "region", 
+        "datatype": 1,
+        "column_idx": 3,
+        "column_name": "region",
+        "blankable": false,
         "compounddatatype": 16
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 101
 },
 {
-    "pk": 102, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 4, 
-        "column_name": "qcut", 
+        "datatype": 4,
+        "column_idx": 4,
+        "column_name": "qcut",
+        "blankable": false,
         "compounddatatype": 16
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 102
 },
 {
-    "pk": 103, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 5, 
-        "column_name": "left", 
+        "datatype": 4,
+        "column_idx": 5,
+        "column_name": "left",
+        "blankable": false,
         "compounddatatype": 16
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 103
 },
 {
-    "pk": 104, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 6, 
-        "column_idx": 6, 
-        "column_name": "insert", 
+        "datatype": 6,
+        "column_idx": 6,
+        "column_name": "insert",
+        "blankable": false,
         "compounddatatype": 16
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 104
 },
 {
-    "pk": 105, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 7, 
-        "column_name": "count", 
+        "datatype": 4,
+        "column_idx": 7,
+        "column_name": "count",
+        "blankable": false,
         "compounddatatype": 16
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 105
 },
 {
-    "pk": 106, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "sample", 
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "sample",
+        "blankable": false,
         "compounddatatype": 17
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 106
 },
 {
-    "pk": 107, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 2, 
-        "column_name": "region", 
+        "datatype": 1,
+        "column_idx": 2,
+        "column_name": "region",
+        "blankable": false,
         "compounddatatype": 17
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 107
 },
 {
-    "pk": 108, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 3, 
-        "column_name": "q-cutoff", 
+        "datatype": 4,
+        "column_idx": 3,
+        "column_name": "q-cutoff",
+        "blankable": false,
         "compounddatatype": 17
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 108
 },
 {
-    "pk": 109, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 4, 
-        "column_name": "s-number", 
+        "datatype": 1,
+        "column_idx": 4,
+        "column_name": "s-number",
+        "blankable": false,
         "compounddatatype": 17
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 109
 },
 {
-    "pk": 110, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 5, 
-        "column_name": "consensus-percent-cutoff", 
+        "datatype": 1,
+        "column_idx": 5,
+        "column_name": "consensus-percent-cutoff",
+        "blankable": false,
         "compounddatatype": 17
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 110
 },
 {
-    "pk": 111, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 7, 
-        "column_idx": 6, 
-        "column_name": "sequence", 
+        "datatype": 7,
+        "column_idx": 6,
+        "column_name": "sequence",
+        "blankable": false,
         "compounddatatype": 17
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 111
 },
 {
-    "pk": 112, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "sample", 
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "sample",
+        "blankable": false,
         "compounddatatype": 18
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 112
 },
 {
-    "pk": 113, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 2, 
-        "column_name": "seed", 
+        "datatype": 1,
+        "column_idx": 2,
+        "column_name": "seed",
+        "blankable": false,
         "compounddatatype": 18
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 113
 },
 {
-    "pk": 114, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 3, 
-        "column_name": "region", 
+        "datatype": 1,
+        "column_idx": 3,
+        "column_name": "region",
+        "blankable": false,
         "compounddatatype": 18
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 114
 },
 {
-    "pk": 115, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 4, 
-        "column_name": "qcut", 
+        "datatype": 4,
+        "column_idx": 4,
+        "column_name": "qcut",
+        "blankable": false,
         "compounddatatype": 18
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 115
 },
 {
-    "pk": 116, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 6, 
-        "column_idx": 5, 
-        "column_name": "queryseq", 
+        "datatype": 6,
+        "column_idx": 5,
+        "column_name": "queryseq",
+        "blankable": false,
         "compounddatatype": 18
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 116
 },
 {
-    "pk": 117, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 6, 
-        "column_idx": 6, 
-        "column_name": "refseq", 
+        "datatype": 6,
+        "column_idx": 6,
+        "column_name": "refseq",
+        "blankable": false,
         "compounddatatype": 18
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 117
 },
 {
-    "pk": 118, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "sample", 
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "sample",
+        "blankable": false,
         "compounddatatype": 19
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 118
 },
 {
-    "pk": 119, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 2, 
-        "column_name": "seed", 
+        "datatype": 1,
+        "column_idx": 2,
+        "column_name": "seed",
+        "blankable": false,
         "compounddatatype": 19
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 119
 },
 {
-    "pk": 120, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 3, 
-        "column_name": "qcut", 
+        "datatype": 4,
+        "column_idx": 3,
+        "column_name": "qcut",
+        "blankable": false,
         "compounddatatype": 19
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 120
 },
 {
-    "pk": 121, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 4, 
-        "column_name": "region", 
+        "datatype": 1,
+        "column_idx": 4,
+        "column_name": "region",
+        "blankable": false,
         "compounddatatype": 19
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 121
 },
 {
-    "pk": 122, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 5, 
-        "column_name": "index", 
+        "datatype": 4,
+        "column_idx": 5,
+        "column_name": "index",
+        "blankable": false,
         "compounddatatype": 19
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 122
 },
 {
-    "pk": 123, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 6, 
-        "column_name": "count", 
+        "datatype": 4,
+        "column_idx": 6,
+        "column_name": "count",
+        "blankable": false,
         "compounddatatype": 19
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 123
 },
 {
-    "pk": 124, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 7, 
-        "column_idx": 7, 
-        "column_name": "seq", 
+        "datatype": 7,
+        "column_idx": 7,
+        "column_name": "seq",
+        "blankable": false,
         "compounddatatype": 19
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 124
 },
 {
-    "pk": 125, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "sample", 
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "sample",
+        "blankable": false,
         "compounddatatype": 20
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 125
 },
 {
-    "pk": 126, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 2, 
-        "column_name": "rank", 
+        "datatype": 4,
+        "column_idx": 2,
+        "column_name": "rank",
+        "blankable": false,
         "compounddatatype": 20
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 126
 },
 {
-    "pk": 127, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 3, 
-        "column_name": "count", 
+        "datatype": 4,
+        "column_idx": 3,
+        "column_name": "count",
+        "blankable": false,
         "compounddatatype": 20
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 127
 },
 {
-    "pk": 128, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 4, 
-        "column_name": "g2p", 
-        "compounddatatype": 20,
-        "blankable": true
-    }
+        "datatype": 1,
+        "column_idx": 4,
+        "column_name": "g2p",
+        "blankable": true,
+        "compounddatatype": 20
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 128
 },
 {
-    "pk": 129, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 5, 
-        "column_name": "fpr", 
-        "compounddatatype": 20,
-        "blankable": true
-    }
+        "datatype": 1,
+        "column_idx": 5,
+        "column_name": "fpr",
+        "blankable": true,
+        "compounddatatype": 20
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 129
 },
 {
-    "pk": 130, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 6, 
-        "column_idx": 6, 
-        "column_name": "aligned", 
-        "compounddatatype": 20,
-        "blankable": true
-    }
+        "datatype": 6,
+        "column_idx": 6,
+        "column_name": "aligned",
+        "blankable": true,
+        "compounddatatype": 20
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 130
 },
 {
-    "pk": 131, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 7, 
-        "column_name": "error", 
-        "compounddatatype": 20,
-        "blankable": true
-    }
+        "datatype": 1,
+        "column_idx": 7,
+        "column_name": "error",
+        "blankable": true,
+        "compounddatatype": 20
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 131
 },
 {
-    "pk": 132, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 1, 
-        "column_name": "sample", 
+        "datatype": 1,
+        "column_idx": 1,
+        "column_name": "sample",
+        "blankable": false,
         "compounddatatype": 21
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 132
 },
 {
-    "pk": 133, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 2, 
-        "column_name": "project", 
+        "datatype": 1,
+        "column_idx": 2,
+        "column_name": "project",
+        "blankable": false,
         "compounddatatype": 21
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 133
 },
 {
-    "pk": 134, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 3, 
-        "column_name": "region", 
+        "datatype": 1,
+        "column_idx": 3,
+        "column_name": "region",
+        "blankable": false,
         "compounddatatype": 21
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 134
 },
 {
-    "pk": 135, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 1, 
-        "column_idx": 4, 
-        "column_name": "seed", 
+        "datatype": 1,
+        "column_idx": 4,
+        "column_name": "seed",
+        "blankable": false,
         "compounddatatype": 21
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 135
 },
 {
-    "pk": 136, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 5, 
-        "column_name": "q.cut", 
+        "datatype": 4,
+        "column_idx": 5,
+        "column_name": "q.cut",
+        "blankable": false,
         "compounddatatype": 21
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 136
 },
 {
-    "pk": 137, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 6, 
-        "column_name": "min.coverage", 
+        "datatype": 4,
+        "column_idx": 6,
+        "column_name": "min.coverage",
+        "blankable": false,
         "compounddatatype": 21
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 137
 },
 {
-    "pk": 138, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 7, 
-        "column_name": "which.key.pos", 
+        "datatype": 4,
+        "column_idx": 7,
+        "column_name": "which.key.pos",
+        "blankable": false,
         "compounddatatype": 21
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 138
 },
 {
-    "pk": 139, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 8, 
-        "column_name": "off.score", 
+        "datatype": 4,
+        "column_idx": 8,
+        "column_name": "off.score",
+        "blankable": false,
         "compounddatatype": 21
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 139
 },
 {
-    "pk": 140, 
-    "model": "metadata.compounddatatypemember", 
     "fields": {
-        "datatype": 4, 
-        "column_idx": 9, 
-        "column_name": "on.score", 
+        "datatype": 4,
+        "column_idx": 9,
+        "column_name": "on.score",
+        "blankable": false,
         "compounddatatype": 21
-    }
-},
-{
-    "pk": 5, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 6, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 7, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 8, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 9, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 10, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 11, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 12, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 13, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 14, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 15, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 16, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 17, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 18, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 19, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 20, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
-},
-{
-    "pk": 21, 
-    "model": "metadata.compounddatatype", 
-    "fields": {
-        "user": 1,
-        "groups_allowed": [1]
-    }
+    },
+    "model": "metadata.compounddatatypemember",
+    "pk": 140
 }
 ]

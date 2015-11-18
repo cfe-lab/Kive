@@ -1,35 +1,59 @@
 [
 {
-    "pk": 1, 
-    "model": "librarian.symbolicdataset", 
     "fields": {
+        "_redacted": false,
+        "description": "Pairs of integers as examples for script 1.",
+        "groups_allowed": [],
         "MD5_checksum": "d7fb24458b3b25e0962e55e874117710",
-        "user": 1
-    }
+        "created_by": null,
+        "users_allowed": [],
+        "user": 1,
+        "date_created": "2014-08-07T23:42:45.955Z",
+        "dataset_file": "Datasets/2014_08/script_1_sum_and_products_input.csv",
+        "name": "pairs"
+    },
+    "model": "librarian.dataset",
+    "pk": 1
 },
 {
-    "pk": 1, 
-    "model": "librarian.datasetstructure", 
     "fields": {
-        "num_rows": 5, 
-        "symbolicdataset": 1, 
-        "compounddatatype": 5
-    }
-},
-{
-    "pk": 2, 
-    "model": "librarian.symbolicdataset", 
-    "fields": {
+        "_redacted": false,
+        "description": "Tiny FASTQ example - forward read",
+        "groups_allowed": [],
         "MD5_checksum": "8f5e421b1d9761927e0bd2128a786840",
-        "user": 1
-    }
+        "created_by": null,
+        "users_allowed": [],
+        "user": 1,
+        "date_created": "2014-08-11T19:27:33.327Z",
+        "dataset_file": "Datasets/2014_08/1234A-V3LOOP_S1_L001_R1_001.fastq",
+        "name": "1234A_R1.fastq"
+    },
+    "model": "librarian.dataset",
+    "pk": 2
 },
 {
-    "pk": 3, 
-    "model": "librarian.symbolicdataset", 
     "fields": {
+        "_redacted": false,
+        "description": "Tiny FASTQ example - reverse read",
+        "groups_allowed": [],
         "MD5_checksum": "814bcabb72e2624858827bcc74b36b82",
-        "user": 1
-    }
+        "created_by": null,
+        "users_allowed": [],
+        "user": 1,
+        "date_created": "2014-08-11T19:27:58.100Z",
+        "dataset_file": "Datasets/2014_08/1234A-V3LOOP_S1_L001_R2_001.fastq",
+        "name": "1234A_R2.fastq"
+    },
+    "model": "librarian.dataset",
+    "pk": 3
+},
+{
+    "fields": {
+        "num_rows": 5,
+        "compounddatatype": 5,
+        "dataset": 1
+    },
+    "model": "librarian.datasetstructure",
+    "pk": 1
 }
 ]
