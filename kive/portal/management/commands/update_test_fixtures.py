@@ -192,7 +192,7 @@ class SimpleRunBuilder(FixtureBuilder):
         p_basic.create_outputs()
         p_basic.save()
 
-        # Set up a dataset with words in it called self.symds_words.
+        # Set up a dataset with words in it called self.dataset_words.
         tools.make_words_symDS(self)
 
         run_sandbox = Sandbox(self.user_bob,
@@ -232,7 +232,7 @@ class DeepNestedRunBuilder(FixtureBuilder):
         p_top.create_outputs()
         p_top.save()
 
-        # Set up a dataset with words in it called self.symds_words.
+        # Set up a dataset with words in it called self.dataset_words.
         tools.make_words_symDS(self)
 
         run_sandbox = Sandbox(self.user_bob, p_top, [self.symds_words],

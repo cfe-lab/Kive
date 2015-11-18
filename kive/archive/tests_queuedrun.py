@@ -261,10 +261,10 @@ class RemoveRedactRunInProgress(TestCase):
         self.pf = PipelineFamily.objects.get(name="Pipeline_family")
         self.myUser = self.pf.user
         self.pE = self.pf.members.get(revision_name="pE_name")
-        self.triplet_symDS = Dataset.objects.filter(dataset__name="triplet").first()
-        self.doublet_symDS = Dataset.objects.get(dataset__name="doublet")
-        self.singlet_symDS = Dataset.objects.filter(dataset__name="singlet").first()
-        self.raw_symDS = Dataset.objects.get(dataset__name="raw_DS")
+        self.triplet_dataset = Dataset.objects.filter(dataset__name="triplet").first()
+        self.doublet_dataset = Dataset.objects.get(dataset__name="doublet")
+        self.singlet_dataset = Dataset.objects.filter(dataset__name="singlet").first()
+        self.raw_dataset = Dataset.objects.get(dataset__name="raw_DS")
         self.step_E1 = self.pE.steps.get(step_num=1)
         self.mA = self.step_E1.transformation.definite
 
@@ -273,15 +273,15 @@ class RemoveRedactRunInProgress(TestCase):
         self.run.save()
         self.run.inputs.create(
             index=1,
-            dataset=self.triplet_symDS
+            dataset=self.triplet_dataset
         )
         self.run.inputs.create(
             index=2,
-            dataset=self.singlet_symDS
+            dataset=self.singlet_dataset
         )
         self.run.inputs.create(
             index=3,
-            dataset=self.raw_symDS
+            dataset=self.raw_dataset
         )
 
         self.rs_1 = self.run.runsteps.create(
@@ -298,11 +298,11 @@ class RemoveRedactRunInProgress(TestCase):
         self.rsic.save()
         self.rsic.execrecord.execrecordins.create(
             generic_input=self.pE.inputs.get(dataset_idx=3),
-            dataset=self.raw_symDS
+            dataset=self.raw_dataset
         )
         self.rsic.execrecord.execrecordouts.create(
             generic_output=self.step_E1.transformation.definite.inputs.first(),
-            dataset=self.raw_symDS
+            dataset=self.raw_dataset
         )
 
         self.rs_1_log = ExecLog.create(self.rs_1, self.rs_1)
@@ -314,11 +314,11 @@ class RemoveRedactRunInProgress(TestCase):
         self.rs_1.save()
         self.rs_1.execrecord.execrecordins.create(
             generic_input=self.mA.inputs.first(),
-            dataset=self.raw_symDS
+            dataset=self.raw_dataset
         )
         self.rs_1.execrecord.execrecordouts.create(
             generic_output=self.mA.outputs.first(),
-            dataset=self.doublet_symDS
+            dataset=self.doublet_dataset
         )
         self.run.start(save=True)
 
@@ -342,7 +342,7 @@ class RemoveRedactRunInProgress(TestCase):
         self.assertRaisesRegexp(
             RunNotFinished,
             "Cannot remove: an affected run is still in progress",
-            lambda: self.triplet_symDS.remove()
+            lambda: self.triplet_dataset.remove()
         )
 
     def test_redact_dataset_fails(self):
@@ -352,7 +352,7 @@ class RemoveRedactRunInProgress(TestCase):
         self.assertRaisesRegexp(
             RunNotFinished,
             "Cannot redact: an affected run is still in progress",
-            lambda: self.triplet_symDS.redact()
+            lambda: self.triplet_dataset.redact()
         )
 
     def test_remove_execrecord_fails(self):
@@ -386,25 +386,25 @@ class RemoveRedactRunJustStarting(TestCase):
         self.pf = PipelineFamily.objects.get(name="Pipeline_family")
         self.myUser = self.pf.user
         self.pE = self.pf.members.get(revision_name="pE_name")
-        self.triplet_symDS = Dataset.objects.filter(dataset__name="triplet").first()
-        self.doublet_symDS = Dataset.objects.get(dataset__name="doublet")
-        self.singlet_symDS = Dataset.objects.filter(dataset__name="singlet").first()
-        self.raw_symDS = Dataset.objects.get(dataset__name="raw_DS")
+        self.triplet_dataset = Dataset.objects.filter(dataset__name="triplet").first()
+        self.doublet_dataset = Dataset.objects.get(dataset__name="doublet")
+        self.singlet_dataset = Dataset.objects.filter(dataset__name="singlet").first()
+        self.raw_dataset = Dataset.objects.get(dataset__name="raw_DS")
 
         # A run that's just starting, to the point that no Run exists yet.
         self.run_just_starting = Run(user=self.myUser, pipeline=self.pE)
         self.run_just_starting.save()
         self.run_just_starting.inputs.create(
             index=1,
-            dataset=self.triplet_symDS
+            dataset=self.triplet_dataset
         )
         self.run_just_starting.inputs.create(
             index=2,
-            dataset=self.singlet_symDS
+            dataset=self.singlet_dataset
         )
         self.run_just_starting.inputs.create(
             index=3,
-            dataset=self.raw_symDS
+            dataset=self.raw_dataset
         )
 
     def tearDown(self):
@@ -425,22 +425,22 @@ class RemoveRedactRunJustStarting(TestCase):
         """
         Removing a Dataset of an unstarted Run should work.
         """
-        self.triplet_symDS.remove()
+        self.triplet_dataset.remove()
         # self.assertRaisesRegexp(
         #     RunNotFinished,
         #     "Cannot remove: an affected run is still in progress",
-        #     lambda: self.triplet_symDS.remove()
+        #     lambda: self.triplet_dataset.remove()
         # )
 
     def test_redact_dataset(self):
         """
         Redacting a Dataset of a Run should work.
         """
-        self.triplet_symDS.redact()
+        self.triplet_dataset.redact()
         # self.assertRaisesRegexp(
         #     RunNotFinished,
         #     "Cannot redact: an affected run is still in progress",
-        #     lambda: self.triplet_symDS.redact()
+        #     lambda: self.triplet_dataset.redact()
         # )
 
 
@@ -619,8 +619,8 @@ class RunApiTests(TestCase):
             revision_name="pX_revision_2"
         )
 
-        self.symDS = Dataset.objects.get(
-            dataset__name="pX_in_symDS",
+        self.dataset = Dataset.objects.get(
+            dataset__name="pX_in_dataset",
             structure__isnull=False,
             user=self.myUser
         )
@@ -663,7 +663,7 @@ class RunApiTests(TestCase):
                 "inputs": [
                     {
                         "index": 1,
-                        "dataset": self.symDS.pk
+                        "dataset": self.dataset.pk
                     }
                 ]
             },
@@ -748,7 +748,7 @@ class RunApiTests(TestCase):
                 "inputs": [
                     {
                         "index": 1,
-                        "dataset": self.symDS.pk
+                        "dataset": self.dataset.pk
                     }
                 ]
             },
@@ -780,7 +780,7 @@ class RunApiTests(TestCase):
                 "inputs": [
                     {
                         "index": 1,
-                        "dataset": self.symDS.pk
+                        "dataset": self.dataset.pk
                     }
                 ]
             },
@@ -806,7 +806,7 @@ class RunApiTests(TestCase):
         A user who does not own the run should not be allowed to stop it.
         """
         # First, we have to give other people access to the data and Pipeline.
-        self.symDS.grant_everyone_access()
+        self.dataset.grant_everyone_access()
 
         # This is only one layer deep so we don't have to recurse.
         for xput in itertools.chain(self.pipeline_to_run.inputs.all(), self.pipeline_to_run.outputs.all()):
@@ -836,7 +836,7 @@ class RunApiTests(TestCase):
                 "inputs": [
                     {
                         "index": 1,
-                        "dataset": self.symDS.pk
+                        "dataset": self.dataset.pk
                     }
                 ],
                 "groups_allowed": ["Everyone"]

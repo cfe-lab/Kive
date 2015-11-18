@@ -49,33 +49,40 @@ class BlankableColumn(BlankableTestCase):
                                           blankable=True)
         self.blankable_CDT.clean()
 
-        self.good_SD = tools.make_SD(self.canucks_lineup, self.blankable_CDT,
-                                     True, self.user_doug, "SD with blankable column",
-                                     "Canucks starting lineup", None, False)
+        self.good_dataset = tools.make_dataset(
+            self.canucks_lineup,
+            self.blankable_CDT,
+            True,
+            self.user_doug,
+            "Dataset with blankable column",
+            "Canucks starting lineup",
+            None,
+            False
+        )
 
-        run_dir = tempfile.mkdtemp(prefix="SD{}".format(self.good_SD.pk))
+        run_dir = tempfile.mkdtemp(prefix="dataset{}".format(self.good_dataset.pk))
         try:
-            self.good_SD.dataset.dataset_file.open("rb")
-            self.ccl = self.good_SD.check_file_contents(
-                file_path_to_check=None, file_handle=self.good_SD.dataset.dataset_file,
+            self.good_dataset.dataset.dataset_file.open("rb")
+            self.ccl = self.good_dataset.check_file_contents(
+                file_path_to_check=None, file_handle=self.good_dataset.dataset.dataset_file,
                 summary_path=run_dir, min_row=None, max_row=None, execlog=None,
                 checking_user=self.user_doug
             )
         finally:
-            self.good_SD.dataset.dataset_file.close()
+            self.good_dataset.dataset.dataset_file.close()
         shutil.rmtree(run_dir)
 
     def test_blank_on_blankable_column_OK(self):
         """
         No error applied to a column that allows blanks.
         """
-        self.assertTrue(self.good_SD.is_OK())
+        self.assertTrue(self.good_dataset.is_OK())
 
     def test_clean_blank_on_blankable_column(self):
         """
         There should be no BlankCell attached to an entry from a blankable column.
         """
-        ccl = self.good_SD.content_checks.first()
+        ccl = self.good_dataset.content_checks.first()
         baddata = BadData(contentchecklog=ccl)
         baddata.save()
         cell_error = baddata.cell_errors.create(row_num=4, column=self.blankable_CDT.members.first())
@@ -97,20 +104,27 @@ class BlankCellNonBlankable(BlankableTestCase):
         self.test_CDT.members.create(datatype=self.INT, column_name="firstcol", column_idx=1)
         self.test_CDT.clean()
 
-        self.bad_SD = tools.make_SD(self.canucks_lineup, self.test_CDT,
-                                    True, self.user_doug, "SD with non-blankable column",
-                                    "Canucks starting lineup", None, False)
+        self.bad_dataset = tools.make_dataset(
+            self.canucks_lineup,
+            self.test_CDT,
+            True,
+            self.user_doug,
+            "Dataset with non-blankable column",
+            "Canucks starting lineup",
+            None,
+            False
+        )
 
-        run_dir = tempfile.mkdtemp(prefix="SD{}".format(self.bad_SD.pk))
+        run_dir = tempfile.mkdtemp(prefix="dataset{}".format(self.bad_dataset.pk))
         try:
-            self.bad_SD.dataset.dataset_file.open("rb")
-            self.ccl = self.bad_SD.check_file_contents(
-                file_path_to_check=None, file_handle=self.bad_SD.dataset.dataset_file,
+            self.bad_dataset.dataset.dataset_file.open("rb")
+            self.ccl = self.bad_dataset.check_file_contents(
+                file_path_to_check=None, file_handle=self.bad_dataset.dataset.dataset_file,
                 summary_path=run_dir, min_row=None, max_row=None,
                 execlog=None, checking_user=self.user_doug
             )
         finally:
-            self.bad_SD.dataset.dataset_file.close()
+            self.bad_dataset.dataset.dataset_file.close()
         shutil.rmtree(run_dir)
 
     def test_blank_on_non_blankable_column_creates_baddata(self):
@@ -118,14 +132,14 @@ class BlankCellNonBlankable(BlankableTestCase):
         A blank cell causes an error when the CDT doesn't allow blanks.
         """
 
-        self.assertFalse(self.bad_SD.is_OK())
+        self.assertFalse(self.bad_dataset.is_OK())
 
     def test_blank_on_non_blankable_column_creates_cellerror(self):
         """
         A blank cell creates a BlankCell object when the CDT doesn't allow blanks.
         """
-        self.assertEquals(self.bad_SD.content_checks.count(), 1)
-        ccl = self.bad_SD.content_checks.first()
+        self.assertEquals(self.bad_dataset.content_checks.count(), 1)
+        ccl = self.bad_dataset.content_checks.first()
         self.assertTrue(ccl.is_fail())
         baddata = ccl.baddata
         self.assertTrue(baddata.cell_errors.count(), 1)
@@ -138,5 +152,5 @@ class BlankCellNonBlankable(BlankableTestCase):
         """
         A blank cell creates a BlankCell object when the CDT doesn't allow blanks.
         """
-        cell_error = self.bad_SD.content_checks.first().baddata.cell_errors.first()
+        cell_error = self.bad_dataset.content_checks.first().baddata.cell_errors.first()
         self.assertTrue(cell_error.has_blank_error())

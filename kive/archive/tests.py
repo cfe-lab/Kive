@@ -484,11 +484,11 @@ class ArchiveTestCaseHelpers:
     #     # Set up a words dataset.
     #     tools.make_words_symDS(self)
     #
-    #     self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
+    #     self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.dataset_words],
     #                                                groups_allowed=[everyone_group()])
     #     self.sandbox_one.execute_pipeline()
     #
-    #     self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words],
+    #     self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.dataset_words],
     #                                                groups_allowed=[everyone_group()])
     #     self.sandbox_two.execute_pipeline()
 
@@ -517,7 +517,7 @@ class ArchiveTestCaseHelpers:
         p_top.create_outputs()
         p_top.save()
 
-        # Set up a dataset with words in it called self.symds_words.
+        # Set up a dataset with words in it called self.dataset_words.
         tools.make_words_symDS(self)
 
         run_sandbox = sandbox.execute.Sandbox(self.user_bob, p_top, [self.symds_words],
@@ -1314,7 +1314,7 @@ class RunComponentTooManyChecks(TestCase):
         # first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
         # first_step.save()
         #
-        # self.two_step_sdbx = sandbox.execute.Sandbox(self.user_bob, self.two_step_pl, [self.symds_wordbacks],
+        # self.two_step_sdbx = sandbox.execute.Sandbox(self.user_bob, self.two_step_pl, [self.dataset_wordbacks],
         #                                              groups_allowed=[everyone_group()])
         # self.two_step_sdbx.execute_pipeline()
         #
@@ -1331,7 +1331,7 @@ class RunComponentTooManyChecks(TestCase):
         # first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
         # first_step.save()
         #
-        # self.following_sdbx = sandbox.execute.Sandbox(self.user_bob, self.following_pl, [self.symds_wordbacks],
+        # self.following_sdbx = sandbox.execute.Sandbox(self.user_bob, self.following_pl, [self.dataset_wordbacks],
         #                                               groups_allowed=[everyone_group()])
         # self.following_sdbx.execute_pipeline()
         # second_step = self.following_sdbx.run.runsteps.get(pipelinestep__step_num=2)

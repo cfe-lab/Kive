@@ -562,113 +562,181 @@ def create_eric_martin_test_environment(case):
     case.pE_run.grant_everyone_access()
 
     # November 7, 2013: use a helper function (defined in
-    # librarian.models) to define our SymDSs and DSs.
+    # librarian.models) to define our Datasets.
 
     # Define singlet, doublet, triplet, and raw uploaded datasets
-    case.triplet_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "step_0_triplet.csv"), case.myUser,
-                                                groups_allowed=[everyone_group()], cdt=case.triplet_cdt,
-                                                keep_file=True, name="triplet", description="lol")
-    case.triplet_symDS_structure = case.triplet_symDS.structure
+    case.triplet_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "step_0_triplet.csv"),
+        case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=case.triplet_cdt,
+        keep_file=True,
+        name="triplet",
+        description="lol"
+    )
+    case.triplet_dataset_structure = case.triplet_dataset.structure
 
-    case.doublet_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "doublet_cdt.csv"), case.myUser,
-                                                groups_allowed=[everyone_group()], cdt=case.doublet_cdt,
-                                                name="doublet", description="lol")
-    case.doublet_symDS_structure = case.doublet_symDS.structure
+    case.doublet_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "doublet_cdt.csv"),
+        case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=case.doublet_cdt,
+        name="doublet",
+        description="lol"
+    )
+    case.doublet_dataset_structure = case.doublet_dataset.structure
 
-    case.singlet_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "singlet_cdt_large.csv"), case.myUser,
-                                                groups_allowed=[everyone_group()], cdt=case.singlet_cdt,
-                                                name="singlet", description="lol")
-    case.singlet_symDS_structure = case.singlet_symDS.structure
+    case.singlet_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "singlet_cdt_large.csv"),
+        case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=case.singlet_cdt,
+        name="singlet",
+        description="lol"
+    )
+    case.singlet_dataset_structure = case.singlet_dataset.structure
 
-    # October 1, 2013: this is the same as the old singlet_symDS.
-    case.singlet_3rows_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "step_0_singlet.csv"),
-                                                      case.myUser, groups_allowed=[everyone_group()],
-                                                      cdt=case.singlet_cdt, name="singlet",
-                                                      description="lol")
-    case.singlet_3rows_symDS_structure = case.singlet_3rows_symDS.structure
+    case.singlet_3rows_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "step_0_singlet.csv"),
+        case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=case.singlet_cdt,
+        name="singlet",
+        description="lol"
+    )
+    case.singlet_3rows_dataset_structure = case.singlet_3rows_dataset.structure
 
-    case.raw_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "step_0_raw.fasta"), file_path=case.myUser,
-                                            user=case.myUser, groups_allowed=[everyone_group()], cdt=None,
-                                            groups_allowed=[everyone_group()], name="raw_DS", description="lol")
+    case.raw_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "step_0_raw.fasta"),
+        user=case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=None,
+        name="raw_DS",
+        description="lol"
+    )
 
     # Added September 30, 2013: dataset that results from E01_21.
-    # November 7, 2013: created a file that this SD actually represented,
+    # November 7, 2013: created a file that this Dataset actually represented,
     # even though it isn't in the database.
-    case.D1_in_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "doublet_remuxed_from_triplet.csv"),
-                                              file_path=case.myUser, user=case.myUser,
-                                              groups_allowed=[everyone_group()], cdt=case.doublet_cdt,
-                                              keep_file=False)
-    case.D1_in_symDS_structure = case.D1_in_symDS.structure
+    case.D1_in_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "doublet_remuxed_from_triplet.csv"),
+        user=case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=case.doublet_cdt,
+        keep_file=False
+    )
+    case.D1_in_dataset_structure = case.D1_in_dataset.structure
 
-    case.C1_in_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "C1_in_triplet.csv"), case.myUser,
-                                              groups_allowed=[everyone_group()], cdt=case.triplet_cdt,
-                                              name="C1_in_triplet", description="triplet 3 rows")
-    case.C1_in_symDS_structure = case.C1_in_symDS.structure
+    case.C1_in_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "C1_in_triplet.csv"),
+        case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=case.triplet_cdt,
+        name="C1_in_triplet",
+        description="triplet 3 rows"
+    )
+    case.C1_in_dataset_structure = case.C1_in_dataset.structure
 
     # November 7, 2013: compute the MD5 checksum from the data file,
     # which is the same as below.
-    case.C2_in_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "E11_32_output.csv"), case.myUser,
-                                              groups_allowed=[everyone_group()], cdt=case.doublet_cdt,
-                                              keep_file=False)
-    case.C2_in_symDS_structure = case.C2_in_symDS.structure
+    case.C2_in_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "E11_32_output.csv"),
+        case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=case.doublet_cdt,
+        keep_file=False
+    )
+    case.C2_in_dataset_structure = case.C2_in_dataset.structure
 
-    # October 16: an alternative to C2_in_symDS, which has existent data.
-    case.E11_32_output_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "E11_32_output.csv"),
-                                                      case.myUser, groups_allowed=[everyone_group()],
-                                                      cdt=case.doublet_cdt,
-                                                      name="E11_32 output doublet",
-                                                      description="result of E11_32 fed by doublet_cdt.csv")
-    case.E11_32_output_symDS_structure = case.E11_32_output_symDS.structure
+    # October 16: an alternative to C2_in_dataset, which has existent data.
+    case.E11_32_output_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "E11_32_output.csv"),
+        case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=case.doublet_cdt,
+        name="E11_32 output doublet",
+        description="result of E11_32 fed by doublet_cdt.csv"
+    )
+    case.E11_32_output_dataset_structure = case.E11_32_output_dataset.structure
 
-    case.C1_out_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "step_0_singlet.csv"), case.myUser,
-                                               groups_allowed=[everyone_group()], cdt=case.singlet_cdt,
-                                               name="raw", description="lol")
-    case.C1_out_symDS_structure = case.C1_out_symDS.structure
+    case.C1_out_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "step_0_singlet.csv"),
+        case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=case.singlet_cdt,
+        name="raw",
+        description="lol"
+    )
+    case.C1_out_dataset_structure = case.C1_out_dataset.structure
 
-    case.C2_out_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "step_0_raw.fasta"), case.myUser,
-                                               groups_allowed=[everyone_group()], cdt=None,
-                                               name="C2_out", description="lol")
+    case.C2_out_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "step_0_raw.fasta"),
+        case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=None,
+        name="C2_out",
+        description="lol"
+    )
 
-    case.C3_out_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "step_0_raw.fasta"), case.myUser,
-                                               groups_allowed=[everyone_group()], cdt=None,
-                                               name="C3_out", description="lol")
+    case.C3_out_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "step_0_raw.fasta"),
+        case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=None,
+        name="C3_out",
+        description="lol"
+    )
 
-    case.triplet_3_rows_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"),
-                                                       case.myUser, groups_allowed=[everyone_group()],
-                                                       cdt=case.triplet_cdt, name="triplet",
-                                                       description="lol")
-    case.triplet_3_rows_symDS_structure = case.triplet_3_rows_symDS.structure
+    case.triplet_3_rows_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "step_0_triplet_3_rows.csv"),
+        case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=case.triplet_cdt,
+        name="triplet",
+        description="lol"
+    )
+    case.triplet_3_rows_dataset_structure = case.triplet_3_rows_dataset.structure
 
     # October 9, 2013: added as the result of cable E21_41.
-    case.E1_out_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "doublet_remuxed_from_t3r.csv"),
-                                               case.myUser, groups_allowed=[everyone_group()], cdt=case.doublet_cdt,
-                                               name="E1_out", description="doublet remuxed from triplet")
-    case.E1_out_symDS_structure = case.E1_out_symDS.structure
+    case.E1_out_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "doublet_remuxed_from_t3r.csv"),
+        case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=case.doublet_cdt,
+        name="E1_out",
+        description="doublet remuxed from triplet"
+    )
+    case.E1_out_dataset_structure = case.E1_out_dataset.structure
 
-    # October 15, 2013: SymbolicDatasets that go into and come out
+    # October 15, 2013: Datasets that go into and come out
     # of cable E01_21 and E21_41.
-    case.DNA_triplet_symDS = Dataset.create_dataset(os.path.join(samplecode_path, "DNA_triplet.csv"), case.myUser,
-                                                    groups_allowed=[everyone_group()], cdt=case.DNA_triplet_cdt,
-                                                    name="DNA_triplet", description="DNA triplet data")
-    case.DNA_triplet_symDS_structure = case.DNA_triplet_symDS.structure
+    case.DNA_triplet_dataset = Dataset.create_dataset(
+        os.path.join(samplecode_path, "DNA_triplet.csv"),
+        case.myUser,
+        groups_allowed=[everyone_group()],
+        cdt=case.DNA_triplet_cdt,
+        name="DNA_triplet",
+        description="DNA triplet data"
+    )
+    case.DNA_triplet_dataset_structure = case.DNA_triplet_dataset.structure
 
-    case.E01_21_DNA_doublet_symDS = Dataset.create_dataset(
+    case.E01_21_DNA_doublet_dataset = Dataset.create_dataset(
         os.path.join(samplecode_path, "E01_21_DNA_doublet.csv"),
         case.myUser, groups_allowed=[everyone_group()],
         cdt=case.DNA_doublet_cdt,
         name="E01_21_DNA_doublet",
         description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21"
     )
-    case.E01_21_DNA_doublet_symDS_structure = case.E01_21_DNA_doublet_symDS.structure
+    case.E01_21_DNA_doublet_dataset_structure = case.E01_21_DNA_doublet_dataset.structure
 
-    case.E21_41_DNA_doublet_symDS = Dataset.create_dataset(
+    case.E21_41_DNA_doublet_dataset = Dataset.create_dataset(
         os.path.join(samplecode_path, "E21_41_DNA_doublet.csv"),
         case.myUser, groups_allowed=[everyone_group()],
         cdt=case.DNA_doublet_cdt,
         name="E21_41_DNA_doublet",
         description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41"
     )
-    case.E21_41_DNA_doublet_symDS_structure = case.E21_41_DNA_doublet_symDS.structure
+    case.E21_41_DNA_doublet_dataset_structure = case.E21_41_DNA_doublet_dataset.structure
 
 
 def load_eric_martin_test_environment(case):
@@ -741,59 +809,59 @@ def load_eric_martin_test_environment(case):
     case.pD_run = case.pD.pipeline_instances.get(name='pD_run')
     case.pE_run = case.pE.pipeline_instances.get(name='pE_run')
 
-    case.triplet_symDS = Dataset.objects.get(
+    case.triplet_dataset = Dataset.objects.get(
         dataset__name="triplet",
         dataset__dataset_file__endswith="step_0_triplet.csv")
-    case.triplet_symDS_structure = case.triplet_symDS.structure
-    case.doublet_symDS = Dataset.objects.get(dataset__name="doublet")
-    case.doublet_symDS_structure = case.doublet_symDS.structure
-    case.singlet_symDS = Dataset.objects.get(
+    case.triplet_dataset_structure = case.triplet_dataset.structure
+    case.doublet_dataset = Dataset.objects.get(dataset__name="doublet")
+    case.doublet_dataset_structure = case.doublet_dataset.structure
+    case.singlet_dataset = Dataset.objects.get(
         dataset__name="singlet",
         dataset__dataset_file__endswith="singlet_cdt_large.csv")
-    case.singlet_symDS_structure = case.singlet_symDS.structure
-    case.singlet_3rows_symDS = Dataset.objects.get(
+    case.singlet_dataset_structure = case.singlet_dataset.structure
+    case.singlet_3rows_dataset = Dataset.objects.get(
         dataset__name="singlet",
         dataset__dataset_file__endswith="step_0_singlet.csv")
-    case.singlet_3rows_symDS_structure = case.singlet_3rows_symDS.structure
-    case.raw_symDS = Dataset.objects.get(dataset__name="raw_DS")
+    case.singlet_3rows_dataset_structure = case.singlet_3rows_dataset.structure
+    case.raw_dataset = Dataset.objects.get(dataset__name="raw_DS")
 
     # MD5 calculated on doublet_remuxed_from_triplet.csv file.
-    case.D1_in_symDS = Dataset.objects.get(
+    case.D1_in_dataset = Dataset.objects.get(
         MD5_checksum='542676b23e121d16db8d41ccdae65fd1')
-    case.D1_in_symDS_structure = case.D1_in_symDS.structure
+    case.D1_in_dataset_structure = case.D1_in_dataset.structure
 
-    case.C1_in_symDS = Dataset.objects.get(
+    case.C1_in_dataset = Dataset.objects.get(
         dataset__name="C1_in_triplet")
-    case.C1_in_symDS_structure = case.C1_in_symDS.structure
+    case.C1_in_dataset_structure = case.C1_in_dataset.structure
 
     checksum = Dataset.objects.get(
         dataset__dataset_file__endswith="E11_32_output.csv").MD5_checksum
-    case.C2_in_symDS = Dataset.objects.get(MD5_checksum=checksum,
+    case.C2_in_dataset = Dataset.objects.get(MD5_checksum=checksum,
                                                    dataset__isnull=True)
-    case.C2_in_symDS_structure = case.C2_in_symDS.structure
-    case.E11_32_output_symDS = Dataset.objects.get(
+    case.C2_in_dataset_structure = case.C2_in_dataset.structure
+    case.E11_32_output_dataset = Dataset.objects.get(
         dataset__name="E11_32 output doublet")
-    case.E11_32_output_symDS_structure = case.E11_32_output_symDS.structure
-    case.C1_out_symDS = Dataset.objects.get(dataset__name="raw")
-    case.C1_out_symDS_structure = case.C1_out_symDS.structure
-    case.C2_out_symDS = Dataset.objects.get(dataset__name="C2_out")
-    case.C3_out_symDS = Dataset.objects.get(dataset__name="C3_out")
+    case.E11_32_output_dataset_structure = case.E11_32_output_dataset.structure
+    case.C1_out_dataset = Dataset.objects.get(dataset__name="raw")
+    case.C1_out_dataset_structure = case.C1_out_dataset.structure
+    case.C2_out_dataset = Dataset.objects.get(dataset__name="C2_out")
+    case.C3_out_dataset = Dataset.objects.get(dataset__name="C3_out")
 
-    case.triplet_3_rows_symDS = Dataset.objects.get(
+    case.triplet_3_rows_dataset = Dataset.objects.get(
         dataset__name="triplet",
         dataset__dataset_file__endswith="step_0_triplet_3_rows.csv")
-    case.triplet_3_rows_symDS_structure = case.triplet_3_rows_symDS.structure
-    case.E1_out_symDS = Dataset.objects.get(dataset__name="E1_out")
-    case.E1_out_symDS_structure = case.E1_out_symDS.structure
-    case.DNA_triplet_symDS = Dataset.objects.get(
+    case.triplet_3_rows_dataset_structure = case.triplet_3_rows_dataset.structure
+    case.E1_out_dataset = Dataset.objects.get(dataset__name="E1_out")
+    case.E1_out_dataset_structure = case.E1_out_dataset.structure
+    case.DNA_triplet_dataset = Dataset.objects.get(
         dataset__name="DNA_triplet")
-    case.DNA_triplet_symDS_structure = case.DNA_triplet_symDS.structure
-    case.E01_21_DNA_doublet_symDS = Dataset.objects.get(
+    case.DNA_triplet_dataset_structure = case.DNA_triplet_dataset.structure
+    case.E01_21_DNA_doublet_dataset = Dataset.objects.get(
         dataset__name="E01_21_DNA_doublet")
-    case.E01_21_DNA_doublet_symDS_structure = case.E01_21_DNA_doublet_symDS.structure
-    case.E21_41_DNA_doublet_symDS = Dataset.objects.get(
+    case.E01_21_DNA_doublet_dataset_structure = case.E01_21_DNA_doublet_dataset.structure
+    case.E21_41_DNA_doublet_dataset = Dataset.objects.get(
         dataset__name="E21_41_DNA_doublet")
-    case.E21_41_DNA_doublet_symDS_structure = case.E21_41_DNA_doublet_symDS.structure
+    case.E21_41_DNA_doublet_dataset_structure = case.E21_41_DNA_doublet_dataset.structure
 
 
 def create_librarian_test_environment(case):
@@ -817,9 +885,9 @@ def create_librarian_test_environment(case):
         execrecord = ExecRecord(generator=execlog)
         execrecord.save()
         for step_input in step.transformation.inputs.all():
-            sd = Dataset.filter_by_user(step.pipeline.user).filter(
+            dataset = Dataset.filter_by_user(step.pipeline.user).filter(
                 structure__compounddatatype=step_input.compounddatatype).first()
-            execrecord.execrecordins.create(dataset=sd, generic_input=step_input)
+            execrecord.execrecordins.create(dataset=dataset, generic_input=step_input)
         runstep.execrecord = execrecord
         runstep.save()
         i += 1
@@ -887,9 +955,14 @@ GGGAGTTC
 CCCTCCTC
 """)
     seq_datafile.close()
-    seq_sd = Dataset.create_dataset(file_path=seq_datafile.name, user=remover,
-                                    cdt=one_col_nuc_seq, keep_file=True, name="Removal test data",
-                                    description="A dataset for use in the removal test case.")
+    seq_dataset = Dataset.create_dataset(
+        file_path=seq_datafile.name,
+        user=remover,
+        cdt=one_col_nuc_seq,
+        keep_file=True,
+        name="Removal test data",
+        description="A dataset for use in the removal test case."
+    )
 
     nuc_seq_noop = make_first_method(
         "Noop (nucleotide sequence)",
@@ -916,9 +989,9 @@ CCCTCCTC
     p_nested.create_outputs()
     p_nested.save()
 
-    first_run_sdbx = sandbox.execute.Sandbox(remover, noop_pl, [seq_sd], groups_allowed=[])
+    first_run_sdbx = sandbox.execute.Sandbox(remover, noop_pl, [seq_dataset], groups_allowed=[])
     first_run_sdbx.execute_pipeline()
-    second_run_sdbx = sandbox.execute.Sandbox(remover, noop_pl, [seq_sd], groups_allowed=[])
+    second_run_sdbx = sandbox.execute.Sandbox(remover, noop_pl, [seq_dataset], groups_allowed=[])
     second_run_sdbx.execute_pipeline()
 
     two_step_noop_pl = make_first_pipeline(
@@ -939,7 +1012,7 @@ GGGGGG
 TTTTTTC
 """)
     two_step_seq_datafile.close()
-    two_step_seq_sd = Dataset.create_dataset(
+    two_step_seq_dataset = Dataset.create_dataset(
         file_path=two_step_seq_datafile.name,
         user=remover,
         cdt=one_col_nuc_seq, keep_file=True,
@@ -947,7 +1020,7 @@ TTTTTTC
         description="A dataset for use in the removal test case with the two-step Pipeline."
     )
 
-    two_step_run_sdbx = sandbox.execute.Sandbox(remover, two_step_noop_pl, [two_step_seq_sd], groups_allowed=[])
+    two_step_run_sdbx = sandbox.execute.Sandbox(remover, two_step_noop_pl, [two_step_seq_dataset], groups_allowed=[])
     two_step_run_sdbx.execute_pipeline()
 
 
@@ -1719,14 +1792,14 @@ def create_sequence_manipulation_environment(case):
     file_access_utils.configure_sandbox_permissions(case.datafile.name)
 
     # Alice uploads the data to the system.
-    case.symds_labdata = Dataset.create_dataset(file_path=case.datafile.name, user=case.user_alice,
+    case.dataset_labdata = Dataset.create_dataset(file_path=case.datafile.name, user=case.user_alice,
                                                 cdt=case.cdt_record, keep_file=True, name="lab data",
                                                 description="data from the lab")
 
     # Now Alice is ready to run her pipelines. The system creates a Sandbox
     # where she will run each of her pipelines.
-    case.sandbox_complement = sandbox.execute.Sandbox(case.user_alice, case.pipeline_complement, [case.symds_labdata])
-    case.sandbox_revcomp = sandbox.execute.Sandbox(case.user_alice, case.pipeline_revcomp, [case.symds_labdata])
+    case.sandbox_complement = sandbox.execute.Sandbox(case.user_alice, case.pipeline_complement, [case.dataset_labdata])
+    case.sandbox_revcomp = sandbox.execute.Sandbox(case.user_alice, case.pipeline_revcomp, [case.dataset_labdata])
 
     # A second version of the complement Pipeline which doesn't keep any output.
     case.pipeline_complement_v2 = Pipeline(family=case.pipeline_complement.family, revision_name="2",
@@ -1870,9 +1943,15 @@ def create_word_reversal_environment(case):
     string_datafile.close()
     os.system("head -1 /usr/share/dict/words >> {}".
               format(string_datafile.name))
-    case.symds_words = Dataset.create_dataset(file_path=string_datafile.name, user=case.user_bob,
-                                              groups_allowed=[everyone_group()], cdt=case.cdt_string, keep_file=True,
-                                              name="blahblah", description="blahblahblah")
+    case.dataset_words = Dataset.create_dataset(
+        file_path=string_datafile.name,
+        user=case.user_bob,
+        groups_allowed=[everyone_group()],
+        cdt=case.cdt_string,
+        keep_file=True,
+        name="blahblah",
+        description="blahblahblah"
+    )
 
     os.remove(string_datafile.name)
 
@@ -1902,15 +1981,25 @@ def create_word_reversal_environment(case):
         writer.writerow([word[::-1], word])
     case.backwords_datafile.close()
 
-    case.symds_wordbacks = Dataset.create_dataset(file_path=case.wordbacks_datafile.name,
-                                                  user=case.user_bob, groups_allowed=[everyone_group()],
-                                                  cdt=case.cdt_wordbacks, keep_file=True, name="wordbacks",
-                                                  description="random reversed words")
+    case.dataset_wordbacks = Dataset.create_dataset(
+        file_path=case.wordbacks_datafile.name,
+        user=case.user_bob,
+        groups_allowed=[everyone_group()],
+        cdt=case.cdt_wordbacks,
+        keep_file=True,
+        name="wordbacks",
+        description="random reversed words"
+    )
 
-    case.symds_backwords = Dataset.create_dataset(file_path=case.backwords_datafile.name,
-                                                  user=case.user_bob, groups_allowed=[everyone_group()],
-                                                  cdt=case.cdt_backwords, keep_file=True, name="backwords",
-                                                  description="random reversed words")
+    case.dataset_backwords = Dataset.create_dataset(
+        file_path=case.backwords_datafile.name,
+        user=case.user_bob,
+        groups_allowed=[everyone_group()],
+        cdt=case.cdt_backwords,
+        keep_file=True,
+        name="backwords",
+        description="random reversed words"
+    )
 
 
 def destroy_word_reversal_environment(case):
@@ -2094,7 +2183,7 @@ def create_linear_pipeline(pipeline, methods, indata, outdata):
 
 # This is potentially slow so we don't just build it into the create_... function above.
 # This is also kind of a hack -- depends on case.user_bob and case.cdt_string being present.
-def make_words_symDS(case):
+def make_words_dataset(case):
     """
     Set up a data file of words in the specified test case.
 
@@ -2105,11 +2194,16 @@ def make_words_symDS(case):
     string_datafile.close()
     os.system("head -1 /usr/share/dict/words >> {}".
               format(string_datafile.name))
-    case.symds_words = Dataset.create_dataset(file_path=string_datafile.name, user=case.user_bob,
-                                              cdt=case.cdt_string, keep_file=True, name="blahblah",
-                                              description="blahblahblah")
-    case.symds_words.grant_everyone_access()
-    case.symds_words.save()
+    case.dataset_words = Dataset.create_dataset(
+        file_path=string_datafile.name,
+        user=case.user_bob,
+        cdt=case.cdt_string,
+        keep_file=True,
+        name="blahblah",
+        description="blahblahblah"
+    )
+    case.dataset_words.grant_everyone_access()
+    case.dataset_words.save()
 
     os.remove(string_datafile.name)
 
@@ -2168,10 +2262,15 @@ def create_grandpa_sandbox_environment(case):
         i = random.randint(1, 99171)
         case.grandpa_datafile.write("{}\n".format(i))
     case.grandpa_datafile.close()
-    case.symds_grandpa = Dataset.create_dataset(file_path=case.grandpa_datafile.name,
-                                                user=case.user_grandpa, cdt=case.cdt_string, keep_file=True,
-                                                name="numbers", description="numbers which are actually strings")
-    case.symds_grandpa.clean()
+    case.dataset_grandpa = Dataset.create_dataset(
+        file_path=case.grandpa_datafile.name,
+        user=case.user_grandpa,
+        cdt=case.cdt_string,
+        keep_file=True,
+        name="numbers",
+        description="numbers which are actually strings"
+    )
+    case.dataset_grandpa.clean()
 
 
 def destroy_grandpa_sandbox_environment(case):
@@ -2179,13 +2278,22 @@ def destroy_grandpa_sandbox_environment(case):
     os.remove(case.grandpa_datafile.name)
 
 
-def make_SD(contents, CDT, make_dataset, user, name, description, created_by, check):
+def make_dataset(contents, CDT, keep_file, user, name, description, created_by, check):
     """
-    Wrapper for create_SD that creates a Dataset from a string.
+    Wrapper for create_dataset that creates a Dataset from a string.
     """
     with tempfile.TemporaryFile() as f:
         f.write(contents)
-        test_SD = Dataset.create_dataset(None, user, cdt=CDT, keep_file=make_dataset, name=name,
-                                         description=description, created_by=created_by, check=check, file_handle=f)
+        test_dataset = Dataset.create_dataset(
+            None,
+            user,
+            cdt=CDT,
+            keep_file=keep_file,
+            name=name,
+            description=description,
+            created_by=created_by,
+            check=check,
+            file_handle=f
+        )
 
-    return test_SD
+    return test_dataset
