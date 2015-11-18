@@ -257,18 +257,18 @@ x,y
 8,9
 """
         dataset_file = ContentFile(DATASET_CONTENT)
-        symbolic = Dataset(user=user,
-                                   MD5_checksum=compute_md5(dataset_file))
-        symbolic.save()
-        symbolic.clean()
-        symbolic.grant_everyone_access()
-        dataset = Dataset(symbolicdataset=symbolic, name='pairs', user=user)
+        dataset = Dataset(user=user,
+                          name="pairs",
+                          MD5_checksum=compute_md5(dataset_file))
         dataset.dataset_file.save(name='pairs.csv', content=dataset_file)
+        dataset.save()
+        dataset.clean()
+        dataset.grant_everyone_access()
 
         run_to_process = Run(pipeline=pipeline1, user=user)
         run_to_process.save()
         run_to_process.clean()
-        run_to_process.inputs.create(symbolicdataset=symbolic, index=1)
+        run_to_process.inputs.create(dataset=dataset, index=1)
 
         manager = Manager(0, None)
         manager.max_host_cpus = 1
@@ -756,12 +756,11 @@ class ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder(FixtureBuilder):
             os.remove(self.datafile.name)
 
 
-class FindSymbolicDatasetsBuilder(FixtureBuilder):
-    """ Test out the tools for finding symbolic datasets from a sandbox.
-    """
+class FindDatasetsBuilder(FixtureBuilder):
+    """For testing the tools that find datasets in a sandbox."""
 
     def get_name(self):
-        return "find_symbolic_datasets.json"
+        return "find_datasets.json"
 
     def build(self):
         tools.create_word_reversal_environment(self)

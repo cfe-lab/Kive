@@ -70,7 +70,7 @@ class ExecuteResultTestsRM(TestCase):
         self.reverse_run = self.pipeline_reverse.pipeline_instances.first()
         self.revcomp_run = self.pipeline_revcomp.pipeline_instances.first()
 
-        self.symds_labdata = Dataset.objects.get(
+        self.dataset_labdata = Dataset.objects.get(
             dataset__name="lab data",
             user=self.user_alice
         )
@@ -110,7 +110,7 @@ class ExecuteResultTestsRM(TestCase):
         self.assertEqual(runstep.successful_execution(), True)
         self.assertEqual(runstep.outputs.count(), 1)
 
-    def test_execute_pipeline_symds_contents(self):
+    def test_execute_pipeline_dataset_contents(self):
         """
         Test that the content checks, which take place as part of Pipeline
         execution, pass in the ordinary Pipeline execution case.
@@ -118,17 +118,17 @@ class ExecuteResultTestsRM(TestCase):
         run = self.comp_run
         runstep = run.runsteps.first()
         execrecord = runstep.execrecord
-        symds = execrecord.execrecordouts.first().symbolicdataset
-        check = symds.content_checks.first()
+        dataset = execrecord.execrecordouts.first().dataset
+        check = dataset.content_checks.first()
 
-        self.assertEqual(symds.content_checks.count(), 1)  # should have been checked once
-        self.assertEqual(check.symbolicdataset, symds)
+        self.assertEqual(dataset.content_checks.count(), 1)  # should have been checked once
+        self.assertEqual(check.dataset, dataset)
         self.assertEqual(check.end_time is None, False)
         self.assertEqual(check.start_time <= check.end_time, True)
         self.assertEqual(check.start_time.date(), check.end_time.date())
         self.assertEqual(check.is_fail(), False)
 
-    def test_execute_pipeline_symbolicdataset(self):
+    def test_execute_pipeline_dataset(self):
         """
         Test the integrity of a Dataset output by a PipelineStep in
         the middle of a Pipeline.
@@ -140,7 +140,7 @@ class ExecuteResultTestsRM(TestCase):
         outfile = os.path.join(tmpdir, "output")
         complement_popen = self.method_complement.invoke_code(
             tmpdir,
-            [self.symds_labdata.dataset.dataset_file.file.name],
+            [self.dataset_labdata.dataset.dataset_file.file.name],
             [outfile]
         )
         complement_popen.wait()
@@ -150,19 +150,19 @@ class ExecuteResultTestsRM(TestCase):
         run = self.comp_run
         runstep = run.runsteps.first()
         execrecord = runstep.execrecord
-        symds = execrecord.execrecordouts.first().symbolicdataset
+        dataset = execrecord.execrecordouts.first().dataset
         ds = runstep.outputs.first()
 
-        self.assertEqual(symds.MD5_checksum, labdata_compd_md5)
-        self.assertEqual(symds.dataset, ds)
-        self.assertEqual(hasattr(symds, "usurps"), False)
-        self.assertEqual(symds.has_data(), True)
-        self.assertEqual(symds.num_rows(), 10)
-        self.assertEqual(symds.is_raw(), False)
-        self.assertEqual(symds.get_cdt(), self.cdt_record)
-        self.assertEqual(symds.structure.compounddatatype, self.cdt_record)
-        self.assertEqual(symds.structure.num_rows, 10)
-        self.assertEqual(symds.is_OK(), True)
+        self.assertEqual(dataset.MD5_checksum, labdata_compd_md5)
+        self.assertEqual(dataset, ds)
+        self.assertEqual(hasattr(dataset, "usurps"), False)
+        self.assertEqual(dataset.has_data(), True)
+        self.assertEqual(dataset.num_rows(), 10)
+        self.assertEqual(dataset.is_raw(), False)
+        self.assertEqual(dataset.get_cdt(), self.cdt_record)
+        self.assertEqual(dataset.structure.compounddatatype, self.cdt_record)
+        self.assertEqual(dataset.structure.num_rows, 10)
+        self.assertEqual(dataset.is_OK(), True)
 
     def test_execute_pipeline_runstep_execrecordout(self):
         """
@@ -173,14 +173,14 @@ class ExecuteResultTestsRM(TestCase):
 
         pipelinestep = self.pipeline_complement.steps.first()  # 1 step
         runstep = run.runsteps.first()
-        symds_out = runstep.outputs.first().symbolicdataset
+        dataset_out = runstep.outputs.first().dataset
         execlog = runstep.log
         execrecord = runstep.execrecord
         execrecordout = execrecord.execrecordouts.first()
 
         self.assertEqual(execrecordout is None, False)
         self.assertEqual(execrecordout.execrecord, execrecord)
-        self.assertEqual(execrecordout.symbolicdataset, symds_out)
+        self.assertEqual(execrecordout.dataset, dataset_out)
         self.assertEqual(execrecordout.generic_output.definite, pipelinestep.transformation.outputs.first())
         self.assertEqual(execrecordout.has_data(), True)
         self.assertEqual(execrecordout.is_OK(), True)
@@ -243,53 +243,53 @@ class ExecuteResultTestsRM(TestCase):
         self.assertFalse(step2.has_log)
         self.assertEqual(step1.execrecord, step2.execrecord)
 
-    def test_execute_pipeline_output_symds(self):
+    def test_execute_pipeline_output_dataset(self):
         """
         A Pipeline with no deleted outputs should have a Dataset as an output.
         """
         output = self.comp_run.runoutputcables.first()
-        output_symds = output.execrecord.execrecordouts.first().symbolicdataset
-        self.assertEqual(output_symds is not None, True)
+        output_dataset = output.execrecord.execrecordouts.first().dataset
+        self.assertEqual(output_dataset is not None, True)
 
     def test_trivial_cable_num_rows(self):
         """
         A trivial cable should have the same dataset all the way through.
         """
         step = self.comp_run.runsteps.first()
-        step_output_SD = step.execrecord.execrecordouts.first().symbolicdataset
+        step_output_dataset = step.execrecord.execrecordouts.first().dataset
 
         outcable = self.comp_run.runoutputcables.first()
-        outcable_input_SD = outcable.execrecord.execrecordins.first().symbolicdataset
-        outcable_output_SD = outcable.execrecord.execrecordouts.first().symbolicdataset
+        outcable_input_dataset = outcable.execrecord.execrecordins.first().dataset
+        outcable_output_dataset = outcable.execrecord.execrecordouts.first().dataset
 
-        self.assertEqual(step_output_SD, outcable_input_SD)
-        self.assertEqual(outcable_input_SD, outcable_output_SD)
-        self.assertEqual(step_output_SD.num_rows(), outcable_input_SD.num_rows())
-        self.assertEqual(outcable_input_SD.num_rows(), outcable_output_SD.num_rows())
+        self.assertEqual(step_output_dataset, outcable_input_dataset)
+        self.assertEqual(outcable_input_dataset, outcable_output_dataset)
+        self.assertEqual(step_output_dataset.num_rows(), outcable_input_dataset.num_rows())
+        self.assertEqual(outcable_input_dataset.num_rows(), outcable_output_dataset.num_rows())
 
     def test_execute_pipeline_num_rows(self):
         """
         A pipeline which does not change the number of rows in a dataset,
-        should have the same number of rows in all SD's along the way.
+        should have the same number of rows in all datasets along the way.
         """
         incable = self.comp_run.runsteps.first().RSICs.first()
-        incable_input_SD = incable.execrecord.execrecordins.first().symbolicdataset
-        incable_output_SD = incable.execrecord.execrecordins.first().symbolicdataset
+        incable_input_dataset = incable.execrecord.execrecordins.first().dataset
+        incable_output_dataset = incable.execrecord.execrecordins.first().dataset
 
         step = self.comp_run.runsteps.first()
-        step_input_SD = step.execrecord.execrecordins.first().symbolicdataset
-        step_output_SD = step.execrecord.execrecordouts.first().symbolicdataset
+        step_input_dataset = step.execrecord.execrecordins.first().dataset
+        step_output_dataset = step.execrecord.execrecordouts.first().dataset
 
         outcable = self.comp_run.runoutputcables.first()
-        outcable_input_SD = outcable.execrecord.execrecordins.first().symbolicdataset
-        outcable_output_SD = outcable.execrecord.execrecordouts.first().symbolicdataset
+        outcable_input_dataset = outcable.execrecord.execrecordins.first().dataset
+        outcable_output_dataset = outcable.execrecord.execrecordouts.first().dataset
 
-        self.assertEqual(incable_input_SD.num_rows(), self.symds_labdata.num_rows())
-        self.assertEqual(incable_input_SD.num_rows(), incable_output_SD.num_rows())
-        self.assertEqual(incable_output_SD.num_rows(), step_input_SD.num_rows())
-        self.assertEqual(step_input_SD.num_rows(), step_output_SD.num_rows())
-        self.assertEqual(step_output_SD.num_rows(), outcable_input_SD.num_rows())
-        self.assertEqual(outcable_input_SD.num_rows(), outcable_output_SD.num_rows())
+        self.assertEqual(incable_input_dataset.num_rows(), self.dataset_labdata.num_rows())
+        self.assertEqual(incable_input_dataset.num_rows(), incable_output_dataset.num_rows())
+        self.assertEqual(incable_output_dataset.num_rows(), step_input_dataset.num_rows())
+        self.assertEqual(step_input_dataset.num_rows(), step_output_dataset.num_rows())
+        self.assertEqual(step_output_dataset.num_rows(), outcable_input_dataset.num_rows())
+        self.assertEqual(outcable_input_dataset.num_rows(), outcable_output_dataset.num_rows())
 
 
 class ExecuteDiscardedIntermediateTests(TestCase):
@@ -305,7 +305,7 @@ class ExecuteDiscardedIntermediateTests(TestCase):
 
         self.revcomp_v2_run = self.pipeline_revcomp_v2.pipeline_instances.first()  # only one exists
 
-        self.symds_labdata = Dataset.objects.get(
+        self.dataset_labdata = Dataset.objects.get(
             dataset__name="lab data",
             user=self.user_alice
         )
@@ -320,7 +320,7 @@ class ExecuteDiscardedIntermediateTests(TestCase):
         should not create any datasets for that output.
         """
         runstep = self.revcomp_v2_run.runsteps.get(pipelinestep__step_num=1)
-        output = runstep.execrecord.execrecordouts.first().symbolicdataset
+        output = runstep.execrecord.execrecordouts.first().dataset
         step = self.pipeline_revcomp_v2.steps.get(step_num=1)
         self.assertEqual(runstep.pipelinestep.outputs_to_retain(), [])
         self.assertEqual(output.has_data(), False)
@@ -332,7 +332,7 @@ class ExecuteDiscardedIntermediateTests(TestCase):
         """
         # In the fixture, we already ran self.pipeline_revcomp_v2, which discards the intermediate
         # output.  We now run v3, which will recover it.
-        sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v3, [self.symds_labdata])
+        sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v3, [self.dataset_labdata])
         sandbox.execute_pipeline()
 
 
@@ -377,19 +377,19 @@ class BadRunTests(TestCase):
 
         Note that this doesn't occur if using ssh to an unprivileged account for execution.
         """
-        sandbox = Sandbox(self.user_grandpa, self.pipeline_faulty, [self.symds_grandpa])
+        sandbox = Sandbox(self.user_grandpa, self.pipeline_faulty, [self.dataset_grandpa])
         sandbox.execute_pipeline()
         runstep1 = sandbox.run.runsteps.first()
         log = runstep1.log
-        interm_SD = runstep1.execrecord.execrecordouts.first().symbolicdataset
+        interm_dataset = runstep1.execrecord.execrecordouts.first().dataset
 
         self.assertEqual(log.is_successful(), False)
         self.assertEqual(log.methodoutput.return_code, -1)
-        self.assertEqual(log.missing_outputs(), [interm_SD])
+        self.assertEqual(log.missing_outputs(), [interm_dataset])
 
     def test_method_fails(self):
         """Properly handle a failed method in a pipeline."""
-        sandbox = Sandbox(self.user_grandpa, self.pipeline_fubar, [self.symds_grandpa])
+        sandbox = Sandbox(self.user_grandpa, self.pipeline_fubar, [self.dataset_grandpa])
         sandbox.execute_pipeline()
         self.assertIsNone(sandbox.run.complete_clean())
         self.assertFalse(sandbox.run.successful_execution())
@@ -406,22 +406,22 @@ class BadRunTests(TestCase):
 
         self.assertFalse(log.is_successful())
         self.assertEqual(log.methodoutput.return_code, 1)
-        self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().symbolicdataset])
+        self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().dataset])
 
 
-class FindSDTests(TestCase):
+class FindDatasetTests(TestCase):
     """
-    Tests for first_generator_of_SD.
+    Tests for first_generator_of_dataset.
     """
-    fixtures = ['find_symbolic_datasets']
+    fixtures = ['find_datasets']
 
     def setUp(self):
-        install_fixture_files('find_symbolic_datasets')
+        install_fixture_files('find_datasets')
 
     def tearDown(self):
         restore_production_files()
 
-    def test_find_symds_pipeline_input_and_step_output(self):
+    def test_find_dataset_pipeline_input_and_step_output(self):
         """
         Finding a Dataset which was input to a Pipeline should return None
         as the generator, and the top-level run as the run.
@@ -430,24 +430,24 @@ class FindSDTests(TestCase):
         to a cable, should return the step (and in particular, not the cable).
         """
         self.pipeline_noop = Pipeline.objects.get(family__name="simple pipeline")
-        self.symds_words = Dataset.objects.get(dataset__name='blahblah')
+        self.dataset_words = Dataset.objects.get(dataset__name='blahblah')
         self.user_bob = User.objects.get(username='bob')
 
-        sandbox = Sandbox(self.user_bob, self.pipeline_noop, [self.symds_words])
+        sandbox = Sandbox(self.user_bob, self.pipeline_noop, [self.dataset_words])
         sandbox.execute_pipeline()
         self.assertIsNone(sandbox.run.complete_clean())
         self.assertTrue(sandbox.run.successful_execution())
 
-        run, gen = sandbox.first_generator_of_SD(self.symds_words)
+        run, gen = sandbox.first_generator_of_dataset(self.dataset_words)
         self.assertEqual(run, sandbox.run)
         self.assertEqual(gen, None)
 
-        symds_out_intermediate = sandbox.run.runsteps.first().execrecord.execrecordouts.first().symbolicdataset
-        run_2, gen_2 = sandbox.first_generator_of_SD(symds_out_intermediate)
+        dataset_out_intermediate = sandbox.run.runsteps.first().execrecord.execrecordouts.first().dataset
+        run_2, gen_2 = sandbox.first_generator_of_dataset(dataset_out_intermediate)
         self.assertEqual(run_2, sandbox.run)
         self.assertEqual(gen_2, self.pipeline_noop.steps.first())
 
-    def test_find_symds_pipeline_input_and_intermediate_custom_wire(self):
+    def test_find_dataset_pipeline_input_and_intermediate_custom_wire(self):
         """
         Finding a Dataset which was passed through a custom wire to a
         Pipeline should return the cable as the generator, and the top-level
@@ -458,41 +458,41 @@ class FindSDTests(TestCase):
         top-level run as the run.
         """
         self.pipeline_twostep = Pipeline.objects.get(family__name="two-step pipeline")
-        self.symds_backwords = Dataset.objects.get(dataset__name='backwords')
+        self.dataset_backwords = Dataset.objects.get(dataset__name='backwords')
         self.user_bob = User.objects.get(username='bob')
 
-        sandbox = Sandbox(self.user_bob, self.pipeline_twostep, [self.symds_backwords])
+        sandbox = Sandbox(self.user_bob, self.pipeline_twostep, [self.dataset_backwords])
         sandbox.execute_pipeline()
         self.assertIsNone(sandbox.run.complete_clean())
         self.assertTrue(sandbox.run.successful_execution())
 
         runcable = sandbox.run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
-        symds_to_find = runcable.execrecord.execrecordouts.first().symbolicdataset
+        dataset_to_find = runcable.execrecord.execrecordouts.first().dataset
 
-        run, gen = sandbox.first_generator_of_SD(symds_to_find)
+        run, gen = sandbox.first_generator_of_dataset(dataset_to_find)
         self.assertEqual(run, sandbox.run)
         self.assertEqual(gen, runcable.PSIC)
 
         # Testing on an intermediate Dataset.
         runcable_2 = sandbox.run.runsteps.get(pipelinestep__step_num=2).RSICs.first()
-        symds_to_find_2 = runcable_2.execrecord.execrecordouts.first().symbolicdataset
+        dataset_to_find_2 = runcable_2.execrecord.execrecordouts.first().dataset
 
-        run_2, gen_2 = sandbox.first_generator_of_SD(symds_to_find_2)
+        run_2, gen_2 = sandbox.first_generator_of_dataset(dataset_to_find_2)
         self.assertEqual(run_2, sandbox.run)
         self.assertEqual(gen_2, runcable_2.PSIC)
 
-    def test_find_symds_subpipeline_input_and_intermediate(self):
+    def test_find_dataset_subpipeline_input_and_intermediate(self):
         """
-        Find a symbolic dataset in a sub-pipeline, which is output from a step.
+        Find a dataset in a sub-pipeline, which is output from a step.
 
-        Find a symbolic dataset in a sub-pipeline, which is input to the sub-pipeline
+        Find a dataset in a sub-pipeline, which is input to the sub-pipeline
         on a custom cable.
         """
         self.pipeline_nested = Pipeline.objects.get(family__name="nested pipeline")
-        self.symds_backwords = Dataset.objects.get(dataset__name='backwords')
+        self.dataset_backwords = Dataset.objects.get(dataset__name='backwords')
         self.user_bob = User.objects.get(username='bob')
 
-        sandbox = Sandbox(self.user_bob, self.pipeline_nested, [self.symds_backwords])
+        sandbox = Sandbox(self.user_bob, self.pipeline_nested, [self.dataset_backwords])
         sandbox.execute_pipeline()
         self.assertIsNone(sandbox.run.complete_clean())
         self.assertTrue(sandbox.run.successful_execution())
@@ -501,16 +501,16 @@ class FindSDTests(TestCase):
         subrun = subpipeline_step.child_run
         runstep = subrun.runsteps.first()
         outrecord = runstep.execrecord.execrecordouts.first()
-        symds_to_find = outrecord.symbolicdataset
+        dataset_to_find = outrecord.dataset
 
-        run, gen = sandbox.first_generator_of_SD(symds_to_find)
+        run, gen = sandbox.first_generator_of_dataset(dataset_to_find)
         self.assertEqual(run, subrun)
         self.assertEqual(gen, runstep.pipelinestep)
 
         cable = runstep.RSICs.first()
-        symds_to_find_2 = runstep.execrecord.execrecordins.first().symbolicdataset
+        dataset_to_find_2 = runstep.execrecord.execrecordins.first().dataset
 
-        run_2, gen_2 = sandbox.first_generator_of_SD(symds_to_find_2)
+        run_2, gen_2 = sandbox.first_generator_of_dataset(dataset_to_find_2)
         self.assertEqual(run_2, subrun)
         self.assertEqual(gen_2, cable.PSIC)
 
@@ -526,18 +526,24 @@ class RawTests(SandboxRMTestCase):
         tools.create_linear_pipeline(self.pipeline_raw, [self.method_noop_raw], "raw_in", "raw_out")
         self.pipeline_raw.create_outputs()
 
-        self.symds_raw = Dataset.create_dataset("/usr/share/dict/words", file_path=self.user_bob, user=self.user_bob,
-                                                   cdt=None, keep_file=True, name="raw", description="some raw data")
+        self.dataset_raw = Dataset.create_dataset(
+            "/usr/share/dict/words",
+            user=self.user_bob,
+            cdt=None,
+            keep_file=True,
+            name="raw",
+            description="some raw data"
+        )
 
     def test_execute_pipeline_raw(self):
         """Execute a raw Pipeline."""
-        sandbox = Sandbox(self.user_bob, self.pipeline_raw, [self.symds_raw])
+        sandbox = Sandbox(self.user_bob, self.pipeline_raw, [self.dataset_raw])
         sandbox.execute_pipeline()
 
     def test_execute_pipeline_raw_twice(self):
         """Execute a raw Pipeline and reuse an ExecRecord."""
-        Sandbox(self.user_bob, self.pipeline_raw, [self.symds_raw]).execute_pipeline()
-        Sandbox(self.user_bob, self.pipeline_raw, [self.symds_raw]).execute_pipeline()
+        Sandbox(self.user_bob, self.pipeline_raw, [self.dataset_raw]).execute_pipeline()
+        Sandbox(self.user_bob, self.pipeline_raw, [self.dataset_raw]).execute_pipeline()
 
     def tearDown(self):
         super(RawTests, self).tearDown()

@@ -98,19 +98,19 @@ class PipelineFamily(transformation.models.TransformationFamily):
         return removal_plan
 
     def remove_list(self):
-        SDs_listed = set()
+        datasets_listed = set()
         ERs_listed = set()
         runs_listed = set()
         pipelines_listed = set()
 
         for pipeline in self.members.all():
-            curr_SDs_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = pipeline.remove_list()
-            SDs_listed.update(curr_SDs_listed)
+            curr_datasets_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = pipeline.remove_list()
+            datasets_listed.update(curr_datasets_listed)
             ERs_listed.update(curr_ERs_listed)
             runs_listed.update(curr_runs_listed)
             pipelines_listed.update(curr_pipelines_listed)
 
-        return SDs_listed, ERs_listed, runs_listed, pipelines_listed
+        return datasets_listed, ERs_listed, runs_listed, pipelines_listed
 
 
 class PipelineSerializationException(exceptions.Exception):
@@ -381,26 +381,26 @@ class Pipeline(transformation.models.Transformation):
 
     @transaction.atomic
     def remove_list(self):
-        SDs_to_remove = set()
+        datasets_to_remove = set()
         ERs_to_remove = set()
         runs_to_remove = set()
         pipelines_to_remove = {self}
 
         for run in self.pipeline_instances.all():
-            curr_SDs_to_remove, curr_ERs_to_remove, curr_runs_to_remove = run.remove_list()
-            SDs_to_remove.update(curr_SDs_to_remove)
+            curr_datasets_to_remove, curr_ERs_to_remove, curr_runs_to_remove = run.remove_list()
+            datasets_to_remove.update(curr_datasets_to_remove)
             ERs_to_remove.update(curr_ERs_to_remove)
             runs_to_remove.update(curr_runs_to_remove)
 
         # Remove any pipeline that uses this one as a sub-pipeline.
         for ps in self.pipelinesteps.all():
-            curr_SDs_to_remove, curr_ERs_to_remove, curr_runs_to_remove = ps.pipeline.remove_list()
-            SDs_to_remove.update(curr_SDs_to_remove)
+            curr_datasets_to_remove, curr_ERs_to_remove, curr_runs_to_remove = ps.pipeline.remove_list()
+            datasets_to_remove.update(curr_datasets_to_remove)
             ERs_to_remove.update(curr_ERs_to_remove)
             runs_to_remove.update(curr_runs_to_remove)
             pipelines_to_remove.add(ps.pipeline)
 
-        return SDs_to_remove, ERs_to_remove, runs_to_remove, pipelines_to_remove
+        return datasets_to_remove, ERs_to_remove, runs_to_remove, pipelines_to_remove
     
     def find_step_updates(self):
         updates = []
@@ -897,18 +897,18 @@ class PipelineCable(models.Model):
         if not self.is_incable and not self.is_outcable:
             raise ValidationError("PipelineCable with pk={} is neither a PSIC nor a POC".format(self.pk))
 
-    def find_compatible_ERs(self, input_SD, runcable):
+    def find_compatible_ERs(self, input_dataset, runcable):
         """Find an ExecRecord which may be reused by this PipelineCable.
 
         INPUTS
-        input_SD        Dataset to feed the cable
+        input_dataset        Dataset to feed the cable
 
         OUTPUTS
         execrecord      ExecRecord which may be reused, or None if no
                         ExecRecord exists
         """
-        # Look at ERIs with matching input SD.
-        candidate_ERIs = librarian.models.ExecRecordIn.objects.filter(symbolicdataset=input_SD)
+        # Look at ERIs with matching input dataset.
+        candidate_ERIs = librarian.models.ExecRecordIn.objects.filter(dataset=input_dataset)
 
         candidates = []
         for candidate_ERI in candidate_ERIs:

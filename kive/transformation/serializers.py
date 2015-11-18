@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from transformation.models import TransformationXput, TransformationInput, \
-    TransformationOutput, XputStructure, Transformation
+    TransformationOutput, XputStructure
 
 
 class XputStructureSerializer(serializers.ModelSerializer):

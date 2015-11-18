@@ -475,7 +475,7 @@ class Dataset(metadata.models.AccessControl):
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
     def create_dataset(cls, file_path, user=None, users_allowed=None, groups_allowed=None, cdt=None, keep_file=True,
-                  name=None, description=None, created_by=None, check=True, file_handle=None):
+                       name=None, description=None, created_by=None, check=True, file_handle=None):
         """
         Helper function to make defining SDs and Datasets faster.
 
@@ -511,26 +511,26 @@ class Dataset(metadata.models.AccessControl):
             raise Exception("Must supply either the file path or file handle")
 
         with transaction.atomic():
-            symDS = cls.create_empty(user, cdt=cdt,
-                                     users_allowed=users_allowed, groups_allowed=groups_allowed)
+            new_dataset = cls.create_empty(user, cdt=cdt,
+                                           users_allowed=users_allowed, groups_allowed=groups_allowed)
 
-            symDS.name = name
-            symDS.description = description
-            symDS.created_by = created_by
+            new_dataset.name = name
+            new_dataset.description = description
+            new_dataset.created_by = created_by
 
-            if symDS.is_raw():
-                symDS.set_MD5(file_path, file_handle)
+            if new_dataset.is_raw():
+                new_dataset.set_MD5(file_path, file_handle)
             else:
-                symDS.set_MD5_and_count_rows(file_path, file_handle)
+                new_dataset.set_MD5_and_count_rows(file_path, file_handle)
 
             if cdt is not None and check:
                 run_dir = tempfile.mkdtemp(
-                    prefix="SD{}_".format(symDS.pk),
+                    prefix="SD{}_".format(new_dataset.pk),
                     dir=file_access_utils.sandbox_base_path()
                 )
                 file_access_utils.configure_sandbox_permissions(run_dir)
 
-                content_check = symDS.check_file_contents(
+                content_check = new_dataset.check_file_contents(
                     file_path_to_check=file_path,
                     file_handle=file_handle,
                     summary_path=run_dir,
@@ -560,26 +560,26 @@ class Dataset(metadata.models.AccessControl):
                     else:
                         # Shouldn't reach here.
                         raise ValueError('The file "{}" was malformed'.format(file_name))
-                LOGGER.debug("Read {} rows from file {}".format(symDS.structure.num_rows, file_name))
+                LOGGER.debug("Read {} rows from file {}".format(new_dataset.structure.num_rows, file_name))
 
             if keep_file:
-                symDS.register_file(file_path=file_path, file_handle=file_handle)
+                new_dataset.register_file(file_path=file_path, file_handle=file_handle)
             else:
-                if symDS.is_raw():
-                    symDS.set_MD5(file_name, file_handle)
+                if new_dataset.is_raw():
+                    new_dataset.set_MD5(file_name, file_handle)
                 else:
-                    symDS.set_MD5_and_count_rows(file_name, file_handle)
+                    new_dataset.set_MD5_and_count_rows(file_name, file_handle)
 
-            symDS.clean()
-            if not symDS.is_raw():
-                symDS.structure.save()
-            symDS.save()
-        return symDS
+            new_dataset.clean()
+            if not new_dataset.is_raw():
+                new_dataset.structure.save()
+            new_dataset.save()
+        return new_dataset
 
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
     def create_dataset_bulk(cls, csv_file_path, user, users_allowed=None, groups_allowed=None, csv_file_handle=None,
-                       cdt=None, keep_files=True, created_by=None, check=True):
+                            cdt=None, keep_files=True, created_by=None, check=True):
         """
         Helper function to make defining multiple SDs and Datasets faster.
         Instead of specifying datasets one by one,
@@ -612,7 +612,7 @@ class Dataset(metadata.models.AccessControl):
         :param created_by:
         :param check:
         """
-        symDSs = []
+        new_datasets = []
         if csv_file_path:
             LOGGER.debug("Creating Datasets from csv {}".format(csv_file_path))
         elif csv_file_handle:
@@ -641,18 +641,20 @@ class Dataset(metadata.models.AccessControl):
                                 "Line " + str(line) +
                                 " is invalid: Name, Description, File must be defined")
 
-                        symDS = Dataset.create_dataset(file, file_path=user, user=user, users_allowed=users_allowed,
-                                                          groups_allowed=groups_allowed, cdt=cdt,
-                                                          keep_file=keep_files, name=name, description=desc,
-                                                          created_by=created_by, check=check)
+                        new_dataset = Dataset.create_dataset(
+                            file_path=file_name, user=user, users_allowed=users_allowed,
+                            groups_allowed=groups_allowed, cdt=cdt,
+                            keep_file=keep_files, name=name, description=desc,
+                            created_by=created_by, check=check
+                        )
 
-                        symDSs.extend([symDS])
+                        new_datasets.extend([new_dataset])
             except Exception, e:
                 message = "Error while parsing line " + str(line) + ":\n" + str(row)
                 LOGGER.exception(message)
                 raise ValueError(message + ":\n" + str(e)), None, sys.exc_info()[2]
 
-        return symDSs
+        return new_datasets
 
     # FIXME: use a transaction!
     # TODO: clean this up, end_time is set in too many places
@@ -784,9 +786,9 @@ class Dataset(metadata.models.AccessControl):
 
             # June 4, 2014: this evil_twin should be a raw SD -- we don't really care what it contains,
             # just that it conflicted with the existing one.
-            evil_twin = Dataset.create_dataset(new_file_path, file_path=checking_user, user=checking_user, cdt=None,
-                                                  description="MD5 conflictor of {}".format(self),
-                                                  name="{}eviltwin".format(self))
+            evil_twin = Dataset.create_dataset(file_path=new_file_path, user=checking_user, cdt=None,
+                                               description="MD5 conflictor of {}".format(self),
+                                               name="{}eviltwin".format(self))
 
             note_of_usurping = datachecking.models.MD5Conflict(integritychecklog=icl, conflicting_SD=evil_twin)
             note_of_usurping.save()

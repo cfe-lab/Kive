@@ -1,3 +1,6 @@
+"""
+Generate an HTML form to create a new DataSet object
+"""
 from django import forms
 from django.forms.widgets import ClearableFileInput
 from django.utils.translation import ugettext_lazy as _, ungettext_lazy
@@ -6,7 +9,6 @@ import logging
 from datetime import datetime
 
 from metadata.models import CompoundDatatype
-from archive.models import Dataset
 from librarian.models import Dataset
 import metadata.forms
 
@@ -16,17 +18,14 @@ import StringIO
 from zipfile import ZipFile
 
 from constants import maxlengths
-"""
-Generate an HTML form to create a new DataSet object
-"""
 
 LOGGER = logging.getLogger(__name__)
 
 
+# FIXME convert this to a ModelForm?
 class DatasetForm(metadata.forms.AccessControlForm):
     """
-    User-entered single dataset.  We avoid using ModelForm since we can't set Dataset.user and Dataset.symbolicdataset
-    before checking if the ModelForm.is_valid().  As a result, the internal calls to Model.clean() fail.
+    User-entered single dataset.
     """
     RAW_CDT_CHOICE = (CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)
 
@@ -47,13 +46,13 @@ class DatasetForm(metadata.forms.AccessControlForm):
         if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
-        symbolicdataset = Dataset.create_dataset(cls=None, file_path=None, user=user, cdt=compound_datatype_obj,
-                                                    keep_file=True, name=self.cleaned_data['name'],
-                                                    description=self.cleaned_data['description'], created_by=None,
-                                                    check=True, file_handle=self.cleaned_data['dataset_file'])
-        symbolicdataset.grant_from_json(self.cleaned_data["permissions"])
+        dataset = Dataset.create_dataset(file_path=None, user=user, cdt=compound_datatype_obj,
+                                         keep_file=True, name=self.cleaned_data['name'],
+                                         description=self.cleaned_data['description'], created_by=None,
+                                         check=True, file_handle=self.cleaned_data['dataset_file'])
+        dataset.grant_from_json(self.cleaned_data["permissions"])
 
-        return symbolicdataset
+        return dataset
 
     def __init__(self, data=None, files=None, user=None, *args, **kwargs):
         super(DatasetForm, self).__init__(data, files, *args, **kwargs)
@@ -127,11 +126,11 @@ class BulkCSVDatasetForm (metadata.forms.AccessControlForm):
             compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
 
         # FIXME this doesn't support PermissionsWidget.
-        Dataset.create_dataset_bulk(cls=None, csv_file_path=None, user=user,
-                                       users_allowed=self.cleaned_data["users_allowed"],
-                                       groups_allowed=self.cleaned_data["groups_allowed"],
-                                       csv_file_handle=self.cleaned_data['datasets_csv'], cdt=compound_datatype_obj,
-                                       keep_files=True, created_by=None, check=True)
+        Dataset.create_dataset_bulk(csv_file_path=None, user=user,
+                                    users_allowed=self.cleaned_data["users_allowed"],
+                                    groups_allowed=self.cleaned_data["groups_allowed"],
+                                    csv_file_handle=self.cleaned_data['datasets_csv'], cdt=compound_datatype_obj,
+                                    keep_files=True, created_by=None, check=True)
 
 
 class MultiFileField(forms.Field):
@@ -228,13 +227,12 @@ class BulkAddDatasetForm (metadata.forms.AccessControlForm):
                 else:
                     auto_description = "Bulk Uploaded File " + uploaded_file.name
 
-                symbolicdataset = Dataset.create_dataset(cls=None, file_path=None, user=user,
-                                                            cdt=compound_datatype_obj, keep_file=True, name=auto_name,
-                                                            description=auto_description, created_by=None, check=True,
-                                                            file_handle=uploaded_file)
-                symbolicdataset.grant_from_json(self.cleaned_data["permissions"])
+                dataset = Dataset.create_dataset(file_path=None, user=user,
+                                                 cdt=compound_datatype_obj, keep_file=True, name=auto_name,
+                                                 description=auto_description, created_by=None, check=True,
+                                                 file_handle=uploaded_file)
+                dataset.grant_from_json(self.cleaned_data["permissions"])
 
-                dataset = Dataset.objects.filter(symbolicdataset=symbolicdataset).get()
             except Exception, e:
                 error_str = str(e)
                 LOGGER.exception("Error while creating Dataset for file with original file name=" +
@@ -367,13 +365,12 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
                 else:
                     auto_description = "Bulk Uploaded File " + uploaded_file.name
 
-                symbolicdataset = Dataset.create_dataset(cls=None, file_path=None, user=user,
-                                                            cdt=compound_datatype_obj, keep_file=True, name=auto_name,
-                                                            description=auto_description, created_by=None, check=True,
-                                                            file_handle=uploaded_file)
-                symbolicdataset.grant_from_json(self.cleaned_data["permissions"])
+                dataset = Dataset.create_dataset(file_path=None, user=user,
+                                                 cdt=compound_datatype_obj, keep_file=True, name=auto_name,
+                                                 description=auto_description, created_by=None, check=True,
+                                                 file_handle=uploaded_file)
+                dataset.grant_from_json(self.cleaned_data["permissions"])
 
-                dataset = Dataset.objects.filter(symbolicdataset=symbolicdataset).get()
             except Exception, e:
                 error_str = str(e)
                 LOGGER.exception("Error while creating Dataset for file with original file name=" +

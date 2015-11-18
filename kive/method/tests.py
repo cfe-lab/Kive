@@ -2388,11 +2388,13 @@ with open(outfile, "wb") as f:
         datafile.close()
 
         # Alice uploads the data to the system.
-        self.numbers_symDS = librarian.models.SymbolicDataset.create_dataset(datafile.name, file_path="numbers",
-                                                                        user=self.user_rob,
-                                                                        groups_allowed=[everyone_group()],
-                                                                        cdt=self.increment_in_1_cdt, keep_file=True,
-                                                                        name="numbers", description="1-2-3-4")
+        self.numbers_dataset = librarian.models.Dataset.create_dataset(
+            datafile.name,
+            user=self.user_rob,
+            groups_allowed=[everyone_group()],
+            cdt=self.increment_in_1_cdt, keep_file=True,
+            name="numbers", description="1-2-3-4"
+        )
 
     def tearDown(self):
         # Our tests fail post-teardown without this.
@@ -2402,7 +2404,7 @@ with open(outfile, "wb") as f:
         """
         The ExecRecord of a non-reusable Method should not be found compatible.
         """
-        sdbx = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_symDS])
+        sdbx = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_dataset])
         sdbx.execute_pipeline()
 
         rng_step = self.test_nonreusable.steps.get(step_num=1)
@@ -2413,13 +2415,13 @@ with open(outfile, "wb") as f:
         Running a non-reusable Method twice does not reuse an ExecRecord, and
         subsequent steps and cables in the same Pipeline will have different ExecRecords also.
         """
-        sdbx = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_symDS])
+        sdbx = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_dataset])
         sdbx.execute_pipeline()
         first_step_1 = sdbx.run.runsteps.get(pipelinestep__step_num=1)
         second_step_1 = sdbx.run.runsteps.get(pipelinestep__step_num=2)
         joining_cable_1 = second_step_1.RSICs.get(PSIC__dest=self.inc_method.inputs.get(dataset_name="incrementor"))
 
-        sdbx2 = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_symDS])
+        sdbx2 = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_dataset])
         sdbx2.execute_pipeline()
         first_step_2 = sdbx2.run.runsteps.get(pipelinestep__step_num=1)
         second_step_2 = sdbx2.run.runsteps.get(pipelinestep__step_num=2)

@@ -41,11 +41,11 @@ class Sandbox:
     Sandbox.
     """
 
-    # sd_fs_map: maps SymDS to a FS path: the path where a data
+    # dataset_fs_map: maps Dataset to a FS path: the path where a data
     # file would be if it were created (Whether or not it is there)
-    # If the path is None, the SD is on the DB.
+    # If the path is None, the Dataset is on the DB.
 
-    # socket_map: maps (run, generator, socket) to SDs.
+    # socket_map: maps (run, generator, socket) to Datasets.
     # A generator is a cable, or a pipeline step. A socket is a TI/TO.
     # If the generator is none, the socket is a pipeline input.
     # This will be used to look up inputs when running a pipeline.
@@ -53,7 +53,7 @@ class Sandbox:
     # ps_map: maps PS to (path, RunStep of PS): the path tells you
     # the directory that the PS would have been run in
     # (whether or not it was): the RunStep tells you what inputs are
-    # needed (Which in turn will lead back to an sd_fs_map lookup),
+    # needed (Which in turn will lead back to an dataset_fs_map lookup),
     # and allows you to fill it in on recovery.
 
     # queue_for_processing: list of tasks that are ready to be processed, i.e.
@@ -68,12 +68,12 @@ class Sandbox:
                  sandbox_path=None, run=None):
         """
         Sets up a sandbox environment to run a Pipeline: space on
-        the file system, along with sd_fs_map/socket_map/etc.
+        the file system, along with dataset_fs_map/socket_map/etc.
 
         INPUTS
         user          User running the pipeline.*
         my_pipeline   Pipeline to run.*
-        inputs        Ordered list of SDs to feed into the pipeline.*
+        inputs        Ordered list of datasets to feed into the pipeline.*
         users_allowed   Iterable (e.g. list or QuerySet) of Users.*
         groups_allowed  Iterable of Groups.*
         sandbox_path  Where on the filesystem to execute.*
@@ -89,7 +89,7 @@ class Sandbox:
             self.run = run
             user = run.user
             my_pipeline = run.pipeline
-            inputs = [x.symbolicdataset for x in run.inputs.order_by("index")]
+            inputs = [x.dataset for x in run.inputs.order_by("index")]
             sandbox_path = run.sandbox_path
         else:
             self.run = my_pipeline.pipeline_instances.create(start_time=timezone.now(), user=user)
@@ -105,7 +105,7 @@ class Sandbox:
         self.user = user
         self.pipeline = my_pipeline
         self.inputs = inputs
-        self.sd_fs_map = {}
+        self.dataset_fs_map = {}
         self.socket_map = {}
         self.cable_map = {}
         self.ps_map = {}
@@ -127,7 +127,7 @@ class Sandbox:
         for i, pipeline_input in enumerate(inputs, start=1):
             corresp_pipeline_input = self.pipeline.inputs.get(dataset_idx=i)
             self.socket_map[(self.run, None, corresp_pipeline_input)] = pipeline_input
-            self.sd_fs_map[pipeline_input] = os.path.join(in_dir,
+            self.dataset_fs_map[pipeline_input] = os.path.join(in_dir,
                                                           "run{}_{}".format(self.run.pk, corresp_pipeline_input.pk))
 
         # Make the sandbox directory.
@@ -150,11 +150,11 @@ class Sandbox:
         # A table of RunSteps/RunCables completed.
         # self.tasks_completed = {}
 
-        # A table keyed by SymbolicDatasets, whose values are lists of the RunSteps/RunCables waiting on them.
+        # A table keyed by Datasets, whose values are lists of the RunSteps/RunCables waiting on them.
         self.tasks_waiting = defaultdict(list)
 
-        # The inverse table to the above: the keys are RunSteps/RunCables waiting on recovering SymbolicDatasets,
-        # and the values are all of the SymbolicDatasets they're waiting for.
+        # The inverse table to the above: the keys are RunSteps/RunCables waiting on recovering Datasets,
+        # and the values are all of the Datasets they're waiting for.
         self.waiting_for = {}
 
     def step_xput_path(self, runstep, transformationxput, step_run_dir):
@@ -168,50 +168,50 @@ class Sandbox:
             xput_dir = dirnames.OUT_DIR
         return os.path.join(step_run_dir, xput_dir, file_name)
 
-    def register_symbolicdataset(self, symbolicdataset, location):
+    def register_dataset(self, dataset, location):
         """Set the location of a Dataset on the file system.
 
         If the Dataset is already in the Sandbox (ie. it is in
-        sd_fs_map), do not update the existing location.
+        dataset_fs_map), do not update the existing location.
 
         INPUTS
-        symbolicdataset     Dataset to register
-        location            file path of symbolicdataset in the Sandbox
+        dataset     Dataset to register
+        location            file path of dataset in the Sandbox
         """
         try:
-            self.sd_fs_map[symbolicdataset] = self.sd_fs_map[symbolicdataset] or location
+            self.dataset_fs_map[dataset] = self.dataset_fs_map[dataset] or location
         except KeyError:
-            self.sd_fs_map[symbolicdataset] = location
+            self.dataset_fs_map[dataset] = location
 
-    def find_symbolicdataset(self, symbolicdataset):
+    def find_dataset(self, dataset):
         """Find the location of a Dataset on the file system.
 
         INPUTS
-        symbolicdataset     Dataset to locate
+        dataset     Dataset to locate
 
         OUTPUTS
-        location            the path of symbolicdataset in the Sandbox,
+        location            the path of dataset in the Sandbox,
                             or None if it's not there
         """
         try:
-            location = self.sd_fs_map[symbolicdataset]
+            location = self.dataset_fs_map[dataset]
         except KeyError:
-            self.logger.debug("Dataset {} is not in the Sandbox".format(symbolicdataset))
+            self.logger.debug("Dataset {} is not in the Sandbox".format(dataset))
             return None
 
         return (location if location and file_access_utils.file_exists(location) else None)
 
-    def update_cable_maps(self, runcable, output_SD, output_path):
+    def update_cable_maps(self, runcable, output_dataset, output_path):
         """Update maps after cable execution.
 
         INPUTS
         runcable        RunCable created for cable execution
-        output_SD       Dataset output by cable
+        output_dataset       Dataset output by cable
         output_path     where the cable wrote its output
         """
-        self.register_symbolicdataset(output_SD, output_path)
+        self.register_dataset(output_dataset, output_path)
         cable = runcable.component
-        self.socket_map[(runcable.parent_run, cable, cable.dest)] = output_SD
+        self.socket_map[(runcable.parent_run, cable, cable.dest)] = output_dataset
         self.cable_map[(runcable.parent, cable)] = runcable
 
     def update_step_maps(self, runstep, step_run_dir, output_paths):
@@ -230,33 +230,33 @@ class Sandbox:
 
         for i, step_output in enumerate(pipelinestep.transformation.outputs.order_by("dataset_idx")):
             corresp_ero = execrecordouts.get(generic_output=step_output)
-            corresp_SD = corresp_ero.symbolicdataset
-            self.register_symbolicdataset(corresp_SD, output_paths[i])
+            corresp_dataset = corresp_ero.dataset
+            self.register_dataset(corresp_dataset, output_paths[i])
 
-            # This pipeline step, with the downstream TI, maps to corresp_SD
-            self.socket_map[(runstep.parent_run, pipelinestep, step_output)] = corresp_SD
+            # This pipeline step, with the downstream TI, maps to corresp_dataset
+            self.socket_map[(runstep.parent_run, pipelinestep, step_output)] = corresp_dataset
 
-    def _register_missing_output(self, output_SD, execlog, start_time, end_time):
+    def _register_missing_output(self, output_dataset, execlog, start_time, end_time):
         """Create a failed ContentCheckLog for missing cable output
 
         INPUTS
-        output_SD       Dataset cable was supposed to output
+        output_dataset       Dataset cable was supposed to output
         execlog         ExecLog for cable execution which didn't produce
                         output
         start_time      time when we started checking for missing output
         end_time        time when we finished checking for missing output
         """
         self.logger.error("File doesn't exist - creating CCL with BadData")
-        ccl = output_SD.content_checks.create(start_time=start_time, end_time=end_time, execlog=execlog,
+        ccl = output_dataset.content_checks.create(start_time=start_time, end_time=end_time, execlog=execlog,
                                               user=self.user)
         ccl.add_missing_output()
 
-    def execute_cable(self, cable, parent_record, recovering_record=None, input_SD=None, output_path=None):
+    def execute_cable(self, cable, parent_record, recovering_record=None, input_dataset=None, output_path=None):
         """Execute cable on the input.
 
         INPUTS
         cable           PSIC/POC to execute
-        input_SD        SD fed into the PSIC/POC
+        input_dataset        dataset fed into the PSIC/POC
         output_path     Where the output file should be written
         parent_record   If not a recovery, the Run or RunStep
                         executing the cable; if a recovery, the
@@ -270,20 +270,20 @@ class Sandbox:
         NOTES
         Recovering is to re-compute something reused to recover the data
         output_path is recovered using the maps.
-        sd_fs_map and cable_map will have been updated.
+        dataset_fs_map and cable_map will have been updated.
 
         PRECONDITIONS
-        1) input_SD has an appropriate CDT for feeding this cable.
+        1) input_dataset has an appropriate CDT for feeding this cable.
         2) All the _maps are "up to date" for this step
-        3) input_SD is clean
-        4) If not recovering, input_SD and output_path must both be set
+        3) input_dataset is clean
+        4) If not recovering, input_dataset and output_path must both be set
         """
         recover = recovering_record is not None
 
         # TODO: assertion for precondition 1?
         # FIXME: do we need this clean?
-        assert input_SD is None or input_SD.clean() is None
-        assert recover or (input_SD and output_path)
+        assert input_dataset is None or input_dataset.clean() is None
+        assert recover or (input_dataset and output_path)
 
         self.logger.debug("STARTING EXECUTING CABLE")
 
@@ -296,8 +296,8 @@ class Sandbox:
             self.logger.debug("Cable keeps output? {}".format(curr_record.keeps_output()))
 
             # We bail out if the input has somehow been corrupted.
-            if not input_SD.is_OK():
-                self.logger.debug("Input %s has corrupted.  Cancelling.", input_SD)
+            if not input_dataset.is_OK():
+                self.logger.debug("Input %s has corrupted.  Cancelling.", input_dataset)
                 curr_record.is_cancelled = True
                 curr_record.stop(save=True, clean=False)
                 curr_record.complete_clean()
@@ -309,9 +309,9 @@ class Sandbox:
             while not succeeded_yet:
                 try:
                     with transaction.atomic():
-                        curr_ER, can_reuse = curr_record.get_suitable_ER(input_SD)
+                        curr_ER, can_reuse = curr_record.get_suitable_ER(input_dataset)
                         if curr_ER is not None:
-                            output_SD = curr_ER.execrecordouts.first().symbolicdataset
+                            output_dataset = curr_ER.execrecordouts.first().dataset
                             # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now
                             # and don't need to execute it for a parent step, we can return.
                             if not can_reuse["successful"] or can_reuse["fully reusable"]:
@@ -324,7 +324,7 @@ class Sandbox:
                                 curr_record.stop(save=False, clean=False)
                                 curr_record.complete_clean()
                                 curr_record.save()
-                                self.update_cable_maps(curr_record, output_SD, output_path)
+                                self.update_cable_maps(curr_record, output_dataset, output_path)
                                 return curr_record
                     succeeded_yet = True
                 except (OperationalError, InternalError):
@@ -339,7 +339,7 @@ class Sandbox:
 
             # Get or create CDT for cable output (Evaluate cable wiring)
             if cable.is_trivial():
-                output_CDT = input_SD.get_cdt()
+                output_CDT = input_dataset.get_cdt()
             else:
                 output_CDT = cable.find_compounddatatype() or cable.create_compounddatatype()
 
@@ -350,21 +350,21 @@ class Sandbox:
             # Retrieve appropriate RSIC/ROC
             curr_record = self.cable_map[(parent_record, cable)]
 
-            # Retrieve input_SD and output_path from maps
+            # Retrieve input_dataset and output_path from maps
             curr_ER = curr_record.execrecord
-            input_SD = curr_ER.execrecordins.first().symbolicdataset
-            output_SD = curr_ER.execrecordouts.first().symbolicdataset
-            output_CDT = output_SD.get_cdt()
-            output_path = self.find_symbolicdataset(output_SD)
+            input_dataset = curr_ER.execrecordins.first().dataset
+            output_dataset = curr_ER.execrecordouts.first().dataset
+            output_CDT = output_dataset.get_cdt()
+            output_path = self.find_dataset(output_dataset)
 
-        dataset_path = self.find_symbolicdataset(input_SD)
+        dataset_path = self.find_dataset(input_dataset)
         # Is input in the sandbox? No.
         if dataset_path is None:
 
             # Recover dataset.
-            self.logger.debug("Symbolic only: running recover({})".format(input_SD))
+            self.logger.debug("Symbolic only: running recover({})".format(input_dataset))
 
-            successful_recovery = self.recover(input_SD, curr_record)
+            successful_recovery = self.recover(input_dataset, curr_record)
             successful_str = "successful" if successful_recovery else "unsuccessful"
             self.logger.debug("Recovery was {}".format(successful_str))
             # Success? No.
@@ -378,11 +378,11 @@ class Sandbox:
                 return curr_record
 
             # Success? Yes.
-            dataset_path = self.find_symbolicdataset(input_SD)
+            dataset_path = self.find_dataset(input_dataset)
             self.logger.debug("Dataset recovered: running run_cable({})".format(dataset_path))
 
         # This is only meant for single-threaded execution so we set worker rank to 1.
-        return _finish_cable_h(1, curr_record, cable, self.user, curr_ER, input_SD, dataset_path,
+        return _finish_cable_h(1, curr_record, cable, self.user, curr_ER, input_dataset, dataset_path,
                                output_path, output_CDT, recovering_record=recovering_record,
                                sandbox_to_update=self)
 
@@ -425,8 +425,8 @@ class Sandbox:
         output_paths = []
         for curr_output in pipelinestep.outputs:
             if recover:
-                corresp_SD = self.socket_map[(parent_run, pipelinestep, curr_output)]
-                output_paths.append(self.sd_fs_map[corresp_SD])
+                corresp_dataset = self.socket_map[(parent_run, pipelinestep, curr_output)]
+                output_paths.append(self.dataset_fs_map[corresp_dataset])
             else:
                 output_paths.append(self.step_xput_path(curr_RS, curr_output, step_run_dir))
 
@@ -438,7 +438,7 @@ class Sandbox:
                 corresp_cable = pipelinestep.cables_in.get(dest=curr_input)
                 cable_path = self.step_xput_path(curr_RS, curr_input, step_run_dir)
                 curr_RSIC = self.execute_cable(corresp_cable, curr_RS, recovering_record=None,
-                                               input_SD=inputs[i], output_path=cable_path)
+                                               input_dataset=inputs[i], output_path=cable_path)
 
                 # Cable failed, return incomplete RunStep.
                 if not curr_RSIC.is_successful():
@@ -452,10 +452,10 @@ class Sandbox:
                     return curr_RS
 
                 # Cable succeeded.
-                inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().symbolicdataset)
+                inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
             else:
                 corresp_ERI = curr_RS.execrecord.execrecordins.get(generic_input=curr_input)
-                inputs_after_cable.append(corresp_ERI.symbolicdataset)
+                inputs_after_cable.append(corresp_ERI.dataset)
 
         # Look for ExecRecord.
         succeeded_yet = False
@@ -504,45 +504,45 @@ class Sandbox:
         invoking_record = recovering_record if recover else curr_RS
 
         # Gather inputs.
-        for curr_in_SD in inputs_after_cable:
+        for curr_in_dataset in inputs_after_cable:
 
-            # Check if required SymbolicDatasets are on the file system for running code.
-            if self.find_symbolicdataset(curr_in_SD) is None:
-                self.logger.debug("Dataset {} not on file system: recovering".format(curr_in_SD))
+            # Check if required Datasets are on the file system for running code.
+            if self.find_dataset(curr_in_dataset) is None:
+                self.logger.debug("Dataset {} not on file system: recovering".format(curr_in_dataset))
 
                 # Run recover() on missing datasets.
-                if not self.recover(curr_in_SD, invoking_record):
+                if not self.recover(curr_in_dataset, invoking_record):
 
                     # Failed recovery. Return RunStep with failed ExecLogs.
-                    self.logger.warn("Recovery of Dataset {} failed".format(curr_in_SD))
+                    self.logger.warn("Recovery of Dataset {} failed".format(curr_in_dataset))
                     curr_RS.stop(save=True, clean=True)
                     return curr_RS
 
         # Run code.
         # If the step is a sub-Pipeline, execute it and return the RunStep.
         if pipelinestep.is_subpipeline:
-            self.execute_pipeline(pipeline=pipelinestep.transformation.pipeline, input_SDs=inputs_after_cable,
+            self.execute_pipeline(pipeline=pipelinestep.transformation.pipeline, input_datasets=inputs_after_cable,
                                   sandbox_path=step_run_dir, parent_runstep=curr_RS)
             curr_RS.stop(save=True, clean=True)
             return curr_RS
 
-        input_paths = [self.sd_fs_map[x] for x in inputs_after_cable]
+        input_paths = [self.dataset_fs_map[x] for x in inputs_after_cable]
 
         # This is only meant for single-threaded use so we just say the worker rank is 1.
         return _finish_step_h(1, self.user, curr_RS, step_run_dir, curr_ER, inputs_after_cable, input_paths,
                               output_paths, log_dir, recovering_record, sandbox_to_update=self)
 
-    def execute_pipeline(self, pipeline=None, input_SDs=None, sandbox_path=None, parent_runstep=None):
+    def execute_pipeline(self, pipeline=None, input_datasets=None, sandbox_path=None, parent_runstep=None):
         """
         Execute the specified Pipeline with the given inputs.
 
         INPUTS
-        If a top level pipeline, pipeline, input_SDs, sandbox_path,
+        If a top level pipeline, pipeline, input_datasets, sandbox_path,
         and parent_runstep are all None.
 
         Outputs written to: [sandbox_path]/output_data/run[run PK]_[output name].(csv|raw)
         """
-        is_set = (pipeline is not None, input_SDs is not None, sandbox_path is not None, parent_runstep is not None)
+        is_set = (pipeline is not None, input_datasets is not None, sandbox_path is not None, parent_runstep is not None)
         if any(is_set) and not all(is_set):
             raise ValueError("Either none or all parameters must be None")
 
@@ -553,8 +553,8 @@ class Sandbox:
         curr_run = self.run
 
         if pipeline:
-            pipeline.check_inputs(input_SDs)
-            self.logger.debug("executing a sub-pipeline with input_SDs {}".format(input_SDs))
+            pipeline.check_inputs(input_datasets)
+            self.logger.debug("executing a sub-pipeline with input_datasets {}".format(input_datasets))
             curr_run = pipeline.pipeline_instances.create(user=self.user, parent_runstep=parent_runstep)
             curr_run.users_allowed.add(*self.run.users_allowed.all())
             curr_run.groups_allowed.add(*self.run.groups_allowed.all())
@@ -570,9 +570,9 @@ class Sandbox:
             step_inputs = []
             run_dir = os.path.join(sandbox_path, "step{}".format(step.step_num))
 
-            # Before executing a step, we need to know what input SDs to feed into the step for execution.
+            # Before executing a step, we need to know what input datasets to feed into the step for execution.
             # Because pipeline steps includes the cable execution prior to the transformation,
-            # the SDs we need are upstream of the *PSIC* leading to this step.
+            # the datasets we need are upstream of the *PSIC* leading to this step.
 
             # For each PSIC leading to this step...
             for psic in step.cables_in.order_by("dest__dataset_idx"):
@@ -646,12 +646,12 @@ class Sandbox:
                 runstep_containing_subrun = curr_run.runsteps.get(pipelinestep__step_num=outcable.source_step)
                 run_to_query = archive.models.Run.objects.get(parent_runstep=runstep_containing_subrun)
 
-            source_SD = self.socket_map[(run_to_query, generator, socket)]
+            source_dataset = self.socket_map[(run_to_query, generator, socket)]
             file_suffix = "raw" if outcable.is_raw() else "csv"
             out_file_name = "run{}_{}.{}".format(curr_run.pk, outcable.output_name, file_suffix)
             output_path = os.path.join(self.out_dir, out_file_name)
             curr_ROC = self.execute_cable(outcable, curr_run, recovering_record=None,
-                                          input_SD=source_SD, output_path=output_path)
+                                          input_dataset=source_dataset, output_path=output_path)
 
             if not curr_ROC.is_successful():
                 if curr_ROC.is_cancelled:
@@ -670,11 +670,11 @@ class Sandbox:
 
         return curr_run
 
-    def first_generator_of_SD(self, SD_to_find, curr_run=None):
+    def first_generator_of_dataset(self, dataset_to_find, curr_run=None):
         """
         Find the (run, generator) pair which first produced a Dataset.
         If generator is None, it indicates the socket is a Pipeline input. If
-        both generator and run are None, it means the SD wasn't found in the
+        both generator and run are None, it means the dataset wasn't found in the
         Pipeline.
         """
         # Is this a sub-run or a top-level run?
@@ -683,11 +683,11 @@ class Sandbox:
             curr_run = self.run
         pipeline = curr_run.pipeline
 
-        # First check if the SD we're looking for is a Pipeline input.
+        # First check if the dataset we're looking for is a Pipeline input.
         if curr_run == self.run:
             for socket in pipeline.inputs.order_by("dataset_idx"):
                 key = (self.run, None, socket)
-                if key in self.socket_map and self.socket_map[key] == SD_to_find:
+                if key in self.socket_map and self.socket_map[key] == dataset_to_find:
                     return (self.run, None)
 
         # If it's not a pipeline input, check all the steps.
@@ -695,7 +695,7 @@ class Sandbox:
         steps = sorted(steps, key=lambda step: step.pipelinestep.step_num)
 
         for step in steps:
-            # First check if the SD is an input to this step. In that case, it
+            # First check if the dataset is an input to this step. In that case, it
             # had to come in from a nontrivial cable (since we're checking the
             # steps in order, and we already checked everything produced prior to
             # this step).
@@ -703,13 +703,13 @@ class Sandbox:
             for socket in pipelinestep.transformation.inputs.order_by("dataset_idx"):
                 generator = pipelinestep.cables_in.get(dest=socket)
                 key = (curr_run, generator, socket)
-                if key in self.socket_map and self.socket_map[key] == SD_to_find:
+                if key in self.socket_map and self.socket_map[key] == dataset_to_find:
                     return (curr_run, generator)
 
             # If it wasn't an input to this step, but this step is a sub-pipeline,
             # it might be somewhere within the sub-pipeline. Search recursively.
             if hasattr(step, "child_run") and step.child_run is not None:
-                run, generator = self.first_generator_of_SD(SD_to_find, step.child_run)
+                run, generator = self.first_generator_of_dataset(dataset_to_find, step.child_run)
                 if run is not None:
 
                     # Did we find it somewhere inside the sub-Pipeline?
@@ -727,37 +727,37 @@ class Sandbox:
             generator = pipelinestep
             for socket in pipelinestep.transformation.outputs.order_by("dataset_idx"):
                 key = (curr_run, generator, socket)
-                if key in self.socket_map and self.socket_map[key] == SD_to_find:
+                if key in self.socket_map and self.socket_map[key] == dataset_to_find:
                     return (curr_run, generator)
 
         # Finally, check if it's at the end of a nontrivial Pipeline output cable.
         for outcable in pipeline.outcables.order_by("output_idx"):
             socket = outcable.dest
             key = (curr_run, outcable, socket)
-            if key in self.socket_map and self.socket_map[key] == SD_to_find:
+            if key in self.socket_map and self.socket_map[key] == dataset_to_find:
                 return (curr_run, outcable)
 
         # If we're here, we didn't find it.
         return (None, None)
 
-    def recover(self, SD_to_recover, invoking_record):
+    def recover(self, dataset_to_recover, invoking_record):
         """
-        Writes SD_to_recover to the file system.
+        Writes dataset_to_recover to the file system.
 
         INPUTS
-        SD_to_recover   The symbolic dataset we want to recover.
+        dataset_to_recover   The dataset we want to recover.
         invoking_record RunAtomic initiating the recovery
 
         OUTPUTS
         Returns True if successful - otherwise False.
 
         PRE
-        SD_to_recover is in the maps but no corresponding file is on the file system.
+        dataset_to_recover is in the maps but no corresponding file is on the file system.
         """
-        if SD_to_recover.has_data():
+        if dataset_to_recover.has_data():
             self.logger.debug("Dataset is in the DB - writing it to the file system")
-            location = self.sd_fs_map[SD_to_recover]
-            saved_data = SD_to_recover.dataset
+            location = self.dataset_fs_map[dataset_to_recover]
+            saved_data = dataset_to_recover.dataset
             try:
                 shutil.copyfile(saved_data.dataset_file.path, location)
             except IOError:
@@ -767,15 +767,15 @@ class Sandbox:
 
         self.logger.debug("Performing computation to create missing Dataset")
 
-        # Search for the generator of the SD in the Pipeline.
-        curr_run, generator = self.first_generator_of_SD(SD_to_recover)
+        # Search for the generator of the dataset in the Pipeline.
+        curr_run, generator = self.first_generator_of_dataset(dataset_to_recover)
 
         if curr_run is None:
             raise ValueError('Dataset "{}" was not found in Pipeline "{}" and cannot be recovered'
-                             .format(SD_to_recover, self.pipeline))
+                             .format(dataset_to_recover, self.pipeline))
         elif generator is None:
             raise ValueError('Dataset "{}" is an input to Pipeline "{}" and cannot be recovered'
-                             .format(SD_to_recover, self.pipeline))
+                             .format(dataset_to_recover, self.pipeline))
 
         self.logger.debug('Executing {} "{}" in recovery mode'.format(generator.__class__.__name__, generator))
         if type(generator) == pipeline.models.PipelineStep:
@@ -802,23 +802,23 @@ class Sandbox:
         """
         Function that queues steps/outcables that are ready to run now that new data is available.
         """
-        for SD in data_newly_available:
-            assert SD.has_data() or self.find_symbolicdataset(SD) is not None
+        for dataset in data_newly_available:
+            assert dataset.has_data() or self.find_dataset(dataset) is not None
 
         # First, get anything that was waiting on this data to proceed.
         taxiing_for_takeoff = []
-        for SD in data_newly_available:
-            if SD in self.tasks_waiting:
-                # Notify all tasks waiting on this SD that it's now available.
+        for dataset in data_newly_available:
+            if dataset in self.tasks_waiting:
+                # Notify all tasks waiting on this dataset that it's now available.
                 # Trigger any tasks for which that was the last piece it was waiting on.
-                for task in self.tasks_waiting[SD]:
-                    self.waiting_for[task].remove(SD)
+                for task in self.tasks_waiting[dataset]:
+                    self.waiting_for[task].remove(dataset)
                     if len(self.waiting_for[task]) == 0:
                         # Add this to the list of things that are ready to go.
                         taxiing_for_takeoff.append(task)
 
                 # Remove this entry from self.tasks_waiting.
-                self.tasks_waiting.pop(SD)
+                self.tasks_waiting.pop(dataset)
 
         self.queue_for_processing = self.queue_for_processing + taxiing_for_takeoff
 
@@ -914,7 +914,7 @@ class Sandbox:
             # Examine this step and see if all of the inputs are (at least symbolically) available.
             step_inputs = []
 
-            # For each PSIC leading to this step, check if its required SD is in the maps.
+            # For each PSIC leading to this step, check if its required dataset is in the maps.
             all_inputs_fed = True
             for psic in step.cables_in.order_by("dest__dataset_idx"):
                 socket = psic.source.definite
@@ -985,11 +985,11 @@ class Sandbox:
                 continue
 
             # Check if this cable has just had its input made available.
-            source_SD = None
+            source_dataset = None
             fed_by_newly_completed = False
             for idx in step_nums_completed:
                 if outcable.source_step == idx:
-                    source_SD = self.socket_map[(run_to_resume, pipeline_to_resume.steps.get(step_num=idx),
+                    source_dataset = self.socket_map[(run_to_resume, pipeline_to_resume.steps.get(step_num=idx),
                                                  outcable.source)]
                     fed_by_newly_completed = True
                     break
@@ -1003,7 +1003,7 @@ class Sandbox:
                         continue
                     output_fed = parent_runstep.transformation.outputs.get(dataset_idx=cable.output_idx)
                     if outcable.source_step == parent_runstep.step_num and outcable.source == output_fed:
-                        source_SD = self.socket_map[(cable.parent_run, cable.pipelineoutputcable, output_fed)]
+                        source_dataset = self.socket_map[(cable.parent_run, cable.pipelineoutputcable, output_fed)]
                         fed_by_newly_completed = True
                         break
 
@@ -1011,7 +1011,7 @@ class Sandbox:
                 file_suffix = "raw" if outcable.is_raw() else "csv"
                 out_file_name = "run{}_{}.{}".format(run_to_resume.pk, outcable.output_name, file_suffix)
                 output_path = os.path.join(self.out_dir, out_file_name)
-                cable_exec_info = self.reuse_or_prepare_cable(outcable, run_to_resume, source_SD, output_path)
+                cable_exec_info = self.reuse_or_prepare_cable(outcable, run_to_resume, source_dataset, output_path)
                 cr = cable_exec_info.cable_record
                 if cr.is_cancelled:
                     self.logger.debug("Cable %s cancelled", roc.pipelineoutputcable)
@@ -1021,12 +1021,12 @@ class Sandbox:
                     return
 
     # Modified from execute_cable.
-    def reuse_or_prepare_cable(self, cable, parent_record, input_SD, output_path):
+    def reuse_or_prepare_cable(self, cable, parent_record, input_dataset, output_path):
         """
         Attempt to reuse the cable; prepare it for finishing if unable.
         """
-        assert input_SD.clean() is None
-        assert input_SD in self.sd_fs_map
+        assert input_dataset.clean() is None
+        assert input_dataset in self.dataset_fs_map
 
         self.logger.debug("Checking whether cable can be reused")
 
@@ -1038,14 +1038,14 @@ class Sandbox:
         by_step = parent_record if isinstance(parent_record, archive.models.RunStep) else None
 
         # We bail out if the input has somehow been corrupted.
-        if not input_SD.is_OK():
-            self.logger.debug("Input %s has corrupted.  Cancelling.", input_SD)
+        if not input_dataset.is_OK():
+            self.logger.debug("Input %s has corrupted.  Cancelling.", input_dataset)
             curr_record.is_cancelled = True
             curr_record.stop(save=True, clean=False)
             curr_record.complete_clean()
 
             # Return a RunCableExecuteInfo that is marked as cancelled.
-            exec_info = RunCableExecuteInfo(curr_record, self.user, None, input_SD, self.sd_fs_map[input_SD],
+            exec_info = RunCableExecuteInfo(curr_record, self.user, None, input_dataset, self.dataset_fs_map[input_dataset],
                                             output_path, by_step=by_step)
             exec_info.cancel()
             self.cable_execute_info[(curr_record.parent_run, cable)] = exec_info
@@ -1058,10 +1058,10 @@ class Sandbox:
         while not succeeded_yet:
             try:
                 with transaction.atomic():
-                    curr_ER, can_reuse = curr_record.get_suitable_ER(input_SD)
+                    curr_ER, can_reuse = curr_record.get_suitable_ER(input_dataset)
 
                     if curr_ER is not None:
-                        output_SD = curr_ER.execrecordouts.first().symbolicdataset
+                        output_dataset = curr_ER.execrecordouts.first().dataset
                         # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
                         # execute it for a parent step, we can return.
                         if not can_reuse["successful"] or can_reuse["fully reusable"]:
@@ -1073,7 +1073,7 @@ class Sandbox:
                             curr_record.stop(save=False, clean=False)
                             curr_record.complete_clean()
                             curr_record.save()
-                            self.update_cable_maps(curr_record, output_SD, output_path)
+                            self.update_cable_maps(curr_record, output_dataset, output_path)
                             return_now = True
                 succeeded_yet = True
             except (OperationalError, InternalError):
@@ -1082,7 +1082,7 @@ class Sandbox:
                 time.sleep(wait_time)
 
         # Bundle up execution info in case this needs to be run, either by recovery or as a first execution.
-        exec_info = RunCableExecuteInfo(curr_record, self.user, curr_ER, input_SD, self.sd_fs_map[input_SD],
+        exec_info = RunCableExecuteInfo(curr_record, self.user, curr_ER, input_dataset, self.dataset_fs_map[input_dataset],
                                         output_path, by_step=by_step)
         self.cable_execute_info[(curr_record.parent_run, cable)] = exec_info
         if return_now:
@@ -1093,7 +1093,7 @@ class Sandbox:
         curr_record.reused = False
         self.logger.debug("No ER to completely reuse - preparing execution of this cable")
 
-        # Check the availability of input_SD; recover if necessary.  Queue for execution
+        # Check the availability of input_dataset; recover if necessary.  Queue for execution
         # if cable is an outcable (incables are handled by their parent step to ensure
         # that the data is written onto the host and filesystem handling the step).
         exec_info.ready_to_go = self.enqueue_cable(exec_info, force=False)
@@ -1109,7 +1109,7 @@ class Sandbox:
         """
         # Unpack info from cable_info.
         cable_record = cable_info.cable_record
-        input_SD = cable_info.input_SD
+        input_dataset = cable_info.input_dataset
         curr_ER = cable_info.execrecord
         recovering_record = cable_info.recovering_record
         by_step = cable_info.by_step
@@ -1122,18 +1122,18 @@ class Sandbox:
         ready_to_go = False
         if force:
             assert curr_ER is not None
-        dataset_path = self.find_symbolicdataset(input_SD)
+        dataset_path = self.find_dataset(input_dataset)
         # Add this cable to the queue, unlike in reuse_or_prepare_cable.
         # If this is independent of any step recovery, we add it to the queue; either by marking it as
         # waiting for stuff that's going to recover, or by throwing it directly onto the list of tasks to
         # perform.
-        if dataset_path is None and not input_SD.has_data():
+        if dataset_path is None and not input_dataset.has_data():
             self.logger.debug("Cable input requires non-trivial recovery")
-            self.queue_recovery(input_SD, recovering_record=recovering_record)
+            self.queue_recovery(input_dataset, recovering_record=recovering_record)
 
             if cable_record.component.is_outcable or (force and by_step is None):
-                self.tasks_waiting[input_SD].append(cable_record)
-                self.waiting_for[cable_record] = [input_SD]
+                self.tasks_waiting[input_dataset].append(cable_record)
+                self.waiting_for[cable_record] = [input_dataset]
 
         else:
             ready_to_go = True
@@ -1166,8 +1166,8 @@ class Sandbox:
         # Check which steps we're waiting on.
         # Make a note of those steps that feed cables that are reused, but do not retain their output,
         # i.e. those cables that are *symbolically* reusable but not *actually* reusable.
-        SDs_to_recover = []
-        symbolically_okay_SDs = []
+        datasets_to_recover = []
+        symbolically_okay_datasets = []
         cable_info_list = []
         for i, curr_input in enumerate(pipelinestep.inputs):  # This is already ordered!
             # The cable that feeds this input and where it will write its eventual output.
@@ -1187,9 +1187,9 @@ class Sandbox:
             # If the cable is not complete and not ready to go, we need to recover its input.
             elif not cable_exec_info.cable_record.is_complete():
                 if not cable_exec_info.ready_to_go:
-                    SDs_to_recover.append(inputs[i])
-            elif not cable_exec_info.execrecord.execrecordouts.first().symbolicdataset.has_data():
-                symbolically_okay_SDs.append(inputs[i])
+                    datasets_to_recover.append(inputs[i])
+            elif not cable_exec_info.execrecord.execrecordouts.first().dataset.has_data():
+                symbolically_okay_datasets.append(inputs[i])
 
         # Bundle up the information required to process this step.
         _in_dir, _out_dir, log_dir = _setup_step_paths(step_run_dir, False)
@@ -1206,10 +1206,10 @@ class Sandbox:
         # recover the feeders that were only symbolically OK, so we add those to the pile.
         # The steps that need to precede it have already been added to the queue above by
         # reuse_or_prepare_cable.
-        if len(SDs_to_recover) > 0:
-            for input_SD in SDs_to_recover + symbolically_okay_SDs:
-                self.tasks_waiting[input_SD].append(curr_RS)
-            self.waiting_for[curr_RS] = SDs_to_recover + symbolically_okay_SDs
+        if len(datasets_to_recover) > 0:
+            for input_dataset in datasets_to_recover + symbolically_okay_datasets:
+                self.tasks_waiting[input_dataset].append(curr_RS)
+            self.waiting_for[curr_RS] = datasets_to_recover + symbolically_okay_datasets
             return curr_RS
 
         # At this point we know that we're at least symbolically OK to proceed.
@@ -1222,13 +1222,13 @@ class Sandbox:
             if not curr_RSIC.is_complete():
                 all_inputs_present = False
                 break
-            inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().symbolicdataset)
+            inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
 
         if all_inputs_present:
             # Recurse if this step is a sub-pipeline.
             if pipelinestep.is_subpipeline:
                 # Start the sub-pipeline.
-                self.logger.debug("Executing a sub-pipeline with input_SD(s): {}".format(inputs_after_cable))
+                self.logger.debug("Executing a sub-pipeline with input_dataset(s): {}".format(inputs_after_cable))
                 subpipeline_to_run = pipelinestep.transformation.definite
                 curr_run = subpipeline_to_run.pipeline_instances.create(user=self.user, parent_runstep=curr_RS)
                 curr_run.users_allowed.add(self.run.users_allowed.all())
@@ -1277,11 +1277,11 @@ class Sandbox:
         # We found no reusable ER, so we add this step to the queue.
         # If there were any inputs that were only symbolically OK, we call queue_recover on them and register
         # this step as waiting for them.
-        if len(symbolically_okay_SDs) > 0:
-            for missing_data in symbolically_okay_SDs:
+        if len(symbolically_okay_datasets) > 0:
+            for missing_data in symbolically_okay_datasets:
                 self.queue_recovery(missing_data, invoking_record=curr_RS)
                 self.tasks_waiting[missing_data].append(curr_RS)
-            self.waiting_for[curr_RS] = symbolically_okay_SDs
+            self.waiting_for[curr_RS] = symbolically_okay_datasets
         else:
             # We're not waiting for any inputs.  Add this step to the queue.
             self.queue_for_processing.append(curr_RS)
@@ -1308,56 +1308,56 @@ class Sandbox:
         # Check which cables need to be re-run.  Since we're forcing this step, we can't have
         # cables which are only symbolically OK, we need their output to be available either in the
         # sandbox or in the database.
-        SDs_to_recover_first = []
+        datasets_to_recover_first = []
         for cable in cable_info_list:
             # We use the sandbox's version of the execute information for this cable.
             cable_info = self.cable_execute_info[(cable.cable_record.parent_run, cable.cable_record.PSIC)]
 
             # If the cable needs its feeding steps to recover, we throw them onto the queue if they're not there
             # already.
-            cable_out_SD = cable_info.execrecord.execrecordouts.first().symbolicdataset
-            if not cable_out_SD.has_data() and not self.find_symbolicdataset(cable_out_SD):
-                SDs_to_recover_first.append(cable_info.input_SD)
+            cable_out_dataset = cable_info.execrecord.execrecordouts.first().dataset
+            if not cable_out_dataset.has_data() and not self.find_dataset(cable_out_dataset):
+                datasets_to_recover_first.append(cable_info.input_dataset)
                 execute_info.flag_for_recovery(recovering_record, by_step=runstep)
                 self.enqueue_cable(execute_info, force=True)
 
-        if len(SDs_to_recover_first) > 0:
-            for SD in SDs_to_recover_first:
-                self.tasks_waiting[SD].append(runstep)
-            self.waiting_for[runstep] = SDs_to_recover_first
+        if len(datasets_to_recover_first) > 0:
+            for dataset in datasets_to_recover_first:
+                self.tasks_waiting[dataset].append(runstep)
+            self.waiting_for[runstep] = datasets_to_recover_first
         else:
             self.queue_for_processing.append(runstep)
 
-    def queue_recovery(self, SD_to_recover, invoking_record):
+    def queue_recovery(self, dataset_to_recover, invoking_record):
         """
         Determines and enqueues the steps necessary to reproduce the specified Dataset.
 
         This is an MPI-friendly version of recover.  It only ever handles non-trivial recoveries,
         as trivial recoveries are now performed by cables themselves.
 
-        @param SD_to_recover: symbolic dataset that needs to be recovered
-        @param invoking_record: the run component that needs the symbolic
+        @param dataset_to_recover: dataset that needs to be recovered
+        @param invoking_record: the run component that needs the
             dataset as an input
 
         PRE
-        SD_to_recover is in the maps but no corresponding file is on the file system.
+        dataset_to_recover is in the maps but no corresponding file is on the file system.
         """
-        # NOTE before we recover an SD, we should look to see if it's already being recovered
+        # NOTE before we recover an dataset, we should look to see if it's already being recovered
         # by something else.  If so we can just wait for that to finish.
-        assert SD_to_recover in self.sd_fs_map
-        assert not self.find_symbolicdataset(SD_to_recover)
+        assert dataset_to_recover in self.dataset_fs_map
+        assert not self.find_dataset(dataset_to_recover)
 
         self.logger.debug("Performing computation to create missing Dataset")
 
-        # Search for the generator of the SD in the Pipeline.
-        curr_run, generator = self.first_generator_of_SD(SD_to_recover)
+        # Search for the generator of the dataset in the Pipeline.
+        curr_run, generator = self.first_generator_of_dataset(dataset_to_recover)
 
         if curr_run is None:
             raise ValueError('Dataset "{}" was not found in Pipeline "{}" and cannot be recovered'
-                             .format(SD_to_recover, self.pipeline))
+                             .format(dataset_to_recover, self.pipeline))
         elif generator is None:
             raise ValueError('Dataset "{}" is an input to Pipeline "{}" and cannot be recovered'
-                             .format(SD_to_recover, self.pipeline))
+                             .format(dataset_to_recover, self.pipeline))
 
         # We're now going to look up what we need to run from cable_execute_info and step_execute_info.
 
@@ -1407,14 +1407,14 @@ class Sandbox:
             # of the step itself.
             for rsic in task_finished.RSICs.all():
                 curr_cable_task_info = self.get_task_info(rsic)
-                curr_cable_out_SD = rsic.execrecord.execrecordouts.first().symbolicdataset
-                self.update_cable_maps(rsic, curr_cable_out_SD, curr_cable_task_info.output_path)
+                curr_cable_out_dataset = rsic.execrecord.execrecordouts.first().dataset
+                self.update_cable_maps(rsic, curr_cable_out_dataset, curr_cable_task_info.output_path)
 
             self.update_step_maps(task_finished, task_execute_info.step_run_dir, task_execute_info.output_paths)
 
         else:
-            cable_out_SD = task_finished.execrecord.execrecordouts.first().symbolicdataset
-            self.update_cable_maps(task_finished, cable_out_SD, task_execute_info.output_path)
+            cable_out_dataset = task_finished.execrecord.execrecordouts.first().dataset
+            self.update_cable_maps(task_finished, cable_out_dataset, task_execute_info.output_path)
 
 
 def _setup_step_paths(step_run_dir, recover):
@@ -1447,7 +1447,7 @@ def finish_cable(cable_execute_dict, worker_rank):
     """
     Finishes an un-reused cable that has already been prepared for execution.
 
-    If we are reaching this point, we know that the data required for input_SD is either
+    If we are reaching this point, we know that the data required for input_dataset is either
     in place in the sandbox or available in the database.
 
     This function is called by finish_step, because we want it to be called by the same
@@ -1456,7 +1456,7 @@ def finish_cable(cable_execute_dict, worker_rank):
     """
     # Retrieve info from the database using the PKs passed.
     curr_record = archive.models.RunComponent.objects.get(pk=cable_execute_dict["cable_record_pk"]).definite
-    input_SD = librarian.models.SymbolicDataset.objects.get(pk=cable_execute_dict["input_SD_pk"])
+    input_dataset = librarian.models.Dataset.objects.get(pk=cable_execute_dict["input_dataset_pk"])
     output_path = cable_execute_dict["output_path"]
     recovering_record = None
     if cable_execute_dict["recovering_record_pk"] is not None:
@@ -1476,7 +1476,7 @@ def finish_cable(cable_execute_dict, worker_rank):
                     curr_ER = librarian.models.ExecRecord.objects.get(pk=cable_execute_dict["execrecord_pk"])
                     can_reuse = curr_record.check_ER_usable(curr_ER)
                 else:
-                    curr_ER, can_reuse = curr_record.get_suitable_ER(input_SD)
+                    curr_ER, can_reuse = curr_record.get_suitable_ER(input_dataset)
 
                 if curr_ER is not None:
                     # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
@@ -1498,49 +1498,47 @@ def finish_cable(cable_execute_dict, worker_rank):
             time.sleep(wait_time)
 
     # We're now committed to actually running this cable.
-    input_SD_path = cable_execute_dict["input_SD_path"]
+    input_dataset_path = cable_execute_dict["input_dataset_path"]
     user = User.objects.get(pk=cable_execute_dict["user_pk"])
 
     # Preconditions to test.
     # assert curr_record is not None
-    input_SD_in_sdbx = file_access_utils.file_exists(input_SD_path)
-    assert input_SD_in_sdbx or input_SD.has_data()
+    input_dataset_in_sdbx = file_access_utils.file_exists(input_dataset_path)
+    assert input_dataset_in_sdbx or input_dataset.has_data()
 
     cable = curr_record.definite.component
 
     recover = recovering_record is not None
 
-    # Write the input SD to the sandbox if necessary.
+    # Write the input dataset to the sandbox if necessary.
     # FIXME at some point in the future this will have to be updated to mean "write to the local sandbox".
-    if not input_SD_in_sdbx:
+    if not input_dataset_in_sdbx:
         logger.debug("[%d] Dataset is in the DB - writing it to the file system", worker_rank)
-        saved_data = input_SD.dataset
+        saved_data = input_dataset.dataset
         try:
-            shutil.copyfile(saved_data.dataset_file.path, input_SD_path)
+            shutil.copyfile(saved_data.dataset_file.path, input_dataset_path)
         except IOError:
             logger.error("[%d] could not copy file %s to file %s.",
-                         worker_rank, saved_data.dataset_file.path, input_SD_path)
+                         worker_rank, saved_data.dataset_file.path, input_dataset_path)
             curr_record.stop(save=True, clean=True)
             return curr_record
 
-    output_CDT = None
-    output_SD = None
     if not recover:
         # Get or create CDT for cable output (Evaluate cable wiring)
-        output_CDT = input_SD.get_cdt()
+        output_CDT = input_dataset.get_cdt()
         if not cable.is_trivial():
             output_CDT = cable.find_compounddatatype() or cable.create_compounddatatype()
 
     else:
         logger.debug("[%d] Recovering - will update old ER", worker_rank)
-        output_SD = curr_ER.execrecordouts.first().symbolicdataset
-        output_CDT = output_SD.get_cdt()
+        output_dataset = curr_ER.execrecordouts.first().dataset
+        output_CDT = output_dataset.get_cdt()
 
-    return _finish_cable_h(worker_rank, curr_record, cable, user, curr_ER, input_SD, input_SD_path, output_path,
-                           output_CDT, recovering_record)
+    return _finish_cable_h(worker_rank, curr_record, cable, user, curr_ER, input_dataset, input_dataset_path,
+                           output_path, output_CDT, recovering_record)
 
 
-def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD, input_SD_path, output_path,
+def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_dataset, input_dataset_path, output_path,
                     output_CDT, recovering_record, sandbox_to_update=None):
     """
     Helper for finish_cable and execute_cable.
@@ -1556,7 +1554,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
     curr_log = archive.models.ExecLog.create(curr_record, invoking_record)
 
     # Run cable (this completes EL).
-    cable.run_cable(input_SD_path, output_path, curr_record, curr_log)
+    cable.run_cable(input_dataset_path, output_path, curr_record, curr_log)
 
     # Here, we're authoring/modifying an ExecRecord, so we use a transaction.
     preexisting_ER = execrecord is not None
@@ -1570,21 +1568,21 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
                     end_time = timezone.now()
                     # It's conceivable that the linking could fail in the
                     # trivial case; in which case we should associate a "missing data"
-                    # check to input_SD == output_SD.
+                    # check to input_dataset == output_dataset.
                     if cable.is_trivial():
-                        output_SD = input_SD
+                        output_dataset = input_dataset
                     if execrecord is None:
-                        output_SD = librarian.models.SymbolicDataset.create_empty(
+                        output_dataset = librarian.models.Dataset.create_empty(
                             cdt=output_CDT,
                             created_by=curr_record
                         )
                     else:
-                        output_SD = execrecord.execrecordouts.first().symbolicdataset
-                    output_SD.mark_missing(start_time, end_time, curr_log, user)
+                        output_dataset = execrecord.execrecordouts.first().dataset
+                    output_dataset.mark_missing(start_time, end_time, curr_log, user)
                     missing_output = True
 
                 elif cable.is_trivial():
-                    output_SD = input_SD
+                    output_dataset = input_dataset
 
                 else:
                     # Do we need to keep this output?
@@ -1595,16 +1593,20 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
                         logger.debug("[%d] Cable doesn't keep output: not creating a dataset", worker_rank)
 
                     if execrecord is not None:
-                        output_SD = execrecord.execrecordouts.first().symbolicdataset
+                        output_dataset = execrecord.execrecordouts.first().dataset
                         if make_dataset:
-                            output_SD.register_file(output_path)
+                            output_dataset.register_file(output_path)
 
                     else:
-                        output_SD = librarian.models.SymbolicDataset.create_dataset(output_path, file_path=output_CDT,
-                                                                               cdt=output_CDT, keep_file=make_dataset,
-                                                                               name=dataset_name,
-                                                                               description=dataset_desc,
-                                                                               created_by=curr_record, check=False)
+                        output_dataset = librarian.models.Dataset.create_dataset(
+                            output_path,
+                            cdt=output_CDT,
+                            keep_file=make_dataset,
+                            name=dataset_name,
+                            description=dataset_desc,
+                            created_by=curr_record,
+                            check=False
+                        )
 
                 # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
                 if not recover:
@@ -1612,7 +1614,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
                         logger.debug("[%d] No ExecRecord already in use - creating fresh cable ExecRecord",
                                      worker_rank)
                         # Make ExecRecord, linking it to the ExecLog.
-                        execrecord = librarian.models.ExecRecord.create(curr_log, cable, [input_SD], [output_SD])
+                        execrecord = librarian.models.ExecRecord.create(curr_log, cable, [input_dataset], [output_dataset])
                     # Link ER to RunCable (this may have already been linked; that's fine).
                     curr_record.link_execrecord(execrecord, reused=False)
 
@@ -1632,23 +1634,23 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_SD,
 
     if not missing_output:
         # Did ER already exist (with vetted output), or is cable trivial, or recovering? Yes.
-        if (preexisting_ER and (output_SD.is_OK() or output_SD.any_failed_checks())) or cable.is_trivial() or recover:
+        if (preexisting_ER and (output_dataset.is_OK() or output_dataset.any_failed_checks())) or cable.is_trivial() or recover:
             logger.debug("[%d] Performing integrity check of trivial or previously generated output", worker_rank)
             # Perform integrity check.
-            output_SD.check_integrity(output_path, user, curr_log, output_SD.MD5_checksum)
+            output_dataset.check_integrity(output_path, user, curr_log, output_dataset.MD5_checksum)
 
         # Did ER already exist, or is cable trivial, or recovering? No.
         else:
             logger.debug("[%d] Performing content check for output generated for the first time", worker_rank)
             summary_path = "{}_summary".format(output_path)
             # Perform content check.
-            output_SD.check_file_contents(output_path, summary_path, cable.min_rows_out,
+            output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
                                           cable.max_rows_out, curr_log, user)
 
         # If a sandbox was specified and we were successful, update the sandbox.
-        if sandbox_to_update is not None and output_SD.is_OK() and not recover:
-            # Success! Update sd_fs/socket/cable_map.
-            sandbox_to_update.update_cable_maps(curr_record, output_SD, output_path)
+        if sandbox_to_update is not None and output_dataset.is_OK() and not recover:
+            # Success! Update dataset_fs/socket/cable_map.
+            sandbox_to_update.update_cable_maps(curr_record, output_dataset, output_path)
 
     logger.debug("[%d] DONE EXECUTING %s '%s'", worker_rank, type(cable).__name__, cable)
 
@@ -1709,7 +1711,7 @@ def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
             return curr_RS
 
         # Cable succeeded.
-        inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().symbolicdataset)
+        inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
         input_paths.append(curr_execute_dict["output_path"])
 
     # Check again to see if a compatible ER was completed while this task
@@ -1811,14 +1813,14 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                 # Create outputs.
                 # bad_output_found indicates we have detected problems with the output.
                 bad_output_found = not curr_log.is_successful()
-                output_SDs = []
+                output_datasets = []
                 logger.debug("[%d] ExecLog.is_successful() == %s", worker_rank, curr_log.is_successful())
 
                 if not recover:
                     if preexisting_ER:
                         logger.debug("[%d] Filling in pre-existing ExecRecord with PipelineStep outputs", worker_rank)
                     else:
-                        logger.debug("[%d] Creating new SymbolicDatasets for PipelineStep outputs", worker_rank)
+                        logger.debug("[%d] Creating new Datasets for PipelineStep outputs", worker_rank)
 
                     for i, curr_output in enumerate(pipelinestep.outputs):
                         output_path = output_paths[i]
@@ -1829,11 +1831,11 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                         if not file_access_utils.file_exists(output_path):
                             end_time = timezone.now()
                             if preexisting_ER:
-                                output_SD = execrecord.get_execrecordout(curr_output).symbolicdataset
+                                output_dataset = execrecord.get_execrecordout(curr_output).dataset
                             else:
-                                output_SD = librarian.models.SymbolicDataset.create_empty(
+                                output_dataset = librarian.models.Dataset.create_empty(
                                     cdt=output_CDT, created_by=runstep)
-                            output_SD.mark_missing(start_time, end_time, curr_log, user)
+                            output_dataset.mark_missing(start_time, end_time, curr_log, user)
 
                             bad_output_found = True
 
@@ -1849,30 +1851,32 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                                 # an existing Dataset.
                                 output_ERO = execrecord.get_execrecordout(curr_output)
                                 with transaction.atomic():
-                                    output_SD = librarian.models.SymbolicDataset.objects.select_for_update().filter(
-                                        pk=output_ERO.symbolicdataset.pk
+                                    output_dataset = librarian.models.Dataset.objects.select_for_update().filter(
+                                        pk=output_ERO.dataset.pk
                                     ).first()
-                                    if make_dataset and not output_SD.has_data():
-                                        output_SD.register_file(output_path)
+                                    if make_dataset and not output_dataset.has_data():
+                                        output_dataset.register_file(output_path)
 
                             else:
-                                output_SD = librarian.models.SymbolicDataset.create_dataset(output_path,
-                                                                                       file_path=output_CDT,
-                                                                                       cdt=output_CDT,
-                                                                                       keep_file=make_dataset,
-                                                                                       name=dataset_name,
-                                                                                       description=dataset_desc,
-                                                                                       created_by=runstep, check=False)
+                                output_dataset = librarian.models.Dataset.create_dataset(
+                                    output_path,
+                                    cdt=output_CDT,
+                                    keep_file=make_dataset,
+                                    name=dataset_name,
+                                    description=dataset_desc,
+                                    created_by=runstep,
+                                    check=False
+                                )
                                 logger.debug("[%d] First time seeing file: saved md5 %s",
-                                             worker_rank, output_SD.MD5_checksum)
-                        output_SDs.append(output_SD)
+                                             worker_rank, output_dataset.MD5_checksum)
+                        output_datasets.append(output_dataset)
 
                     # Create ExecRecord if there isn't already one.
                     if not preexisting_ER:
                         # Make new ExecRecord, linking it to the ExecLog
                         logger.debug("[%d] Creating fresh ExecRecord", worker_rank)
                         execrecord = librarian.models.ExecRecord.create(curr_log, pipelinestep,
-                                                                        inputs_after_cable, output_SDs)
+                                                                        inputs_after_cable, output_datasets)
 
                     # Link ExecRecord to RunStep (it may already have been linked; that's fine).
                     runstep.link_execrecord(execrecord, False)
@@ -1886,7 +1890,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
     # Check outputs.
     for i, curr_output in enumerate(pipelinestep.outputs):
         output_path = output_paths[i]
-        output_SD = execrecord.get_execrecordout(curr_output).symbolicdataset
+        output_dataset = execrecord.get_execrecordout(curr_output).dataset
         check = None
 
         if bad_output_found:
@@ -1901,23 +1905,23 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                 start_time = timezone.now()
                 if not file_access_utils.file_exists(output_path):
                     end_time = timezone.now()
-                    check = output_SD.mark_missing(start_time, end_time, curr_log, user)
+                    check = output_dataset.mark_missing(start_time, end_time, curr_log, user)
                     logger.debug("[%d] During recovery, output (%s) is missing", worker_rank, output_path)
                     file_is_present = False
 
             if file_is_present:
                 # Perform integrity check.
-                logger.debug("[%d] SD has been computed before, checking integrity of %s",
-                             worker_rank, output_SD)
-                check = output_SD.check_integrity(output_path, user, curr_log)
+                logger.debug("[%d] Dataset has been computed before, checking integrity of %s",
+                             worker_rank, output_dataset)
+                check = output_dataset.check_integrity(output_path, user, curr_log)
 
                 if check.is_fail():
                     logger.warn("[%d] IntegrityCheckLog failed for %s", worker_rank, output_path)
                     bad_output_found = True
 
-                elif not output_SD.content_checks.exists():
+                elif not output_dataset.content_checks.exists():
                     summary_path = "{}_summary".format(output_path)
-                    check = output_SD.check_file_contents(
+                    check = output_dataset.check_file_contents(
                         output_path, summary_path, curr_output.get_min_row(),
                         curr_output.get_max_row(), curr_log, user)
 
@@ -1928,9 +1932,9 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
         # Recovering or filling in old ER? No.
         else:
             # Perform content check.
-            logger.debug("[%d] %s is new data - performing content check", worker_rank, output_SD)
+            logger.debug("[%d] %s is new data - performing content check", worker_rank, output_dataset)
             summary_path = "{}_summary".format(output_path)
-            check = output_SD.check_file_contents(output_path, summary_path, curr_output.get_min_row(),
+            check = output_dataset.check_file_contents(output_path, summary_path, curr_output.get_min_row(),
                                                   curr_output.get_max_row(), curr_log, user)
 
         # Check OK? No.
@@ -2001,7 +2005,7 @@ class RunPlan(object):
             if run_step is None:
                 run_step = RunStep.create(step_plan.pipeline_step, self.run, start=False)
             step_plan.run_step = run_step
-            input_datasets = [plan.symbolicdataset for plan in step_plan.inputs]
+            input_datasets = [plan.dataset for plan in step_plan.inputs]
             if all(input_datasets):
                 method = step_plan.pipeline_step.transformation.definite
                 if method.reusable == Method.NON_REUSABLE:
@@ -2018,7 +2022,7 @@ class RunPlan(object):
                 execrecordouts = execrecord.execrecordouts.all()
                 for i, execrecordout in enumerate(execrecordouts):
                     output = step_plan.outputs[i]
-                    output.symbolicdataset = execrecordout.symbolicdataset
+                    output.dataset = execrecordout.dataset
 
         is_changed = True
         while is_changed:
@@ -2046,10 +2050,10 @@ class RunPlan(object):
         is_changed = False
         for step_plan in self.step_plans:
             for input_plan in step_plan.inputs:
-                if not input_plan.symbolicdataset and step_plan.execrecord:
+                if not input_plan.dataset and step_plan.execrecord:
                     step_plan.execrecord = None
                     for output_plan in step_plan.outputs:
-                        output_plan.symbolicdataset = None
+                        output_plan.dataset = None
                     is_changed = True
         return is_changed
 
@@ -2080,7 +2084,7 @@ class StepPlan(object):
 
         self.execrecord = None
         for output_plan in self.outputs:
-            output_plan.symbolicdataset = None
+            output_plan.dataset = None
         return True
 
     def __repr__(self):
@@ -2094,17 +2098,17 @@ class StepPlan(object):
 
 
 class DatasetPlan(object):
-    def __init__(self, symbolicdataset=None, step_num=None, output_num=None):
-        self.symbolicdataset = symbolicdataset
+    def __init__(self, dataset=None, step_num=None, output_num=None):
+        self.dataset = dataset
         self.step_num = step_num
         self.output_num = output_num
 
     def has_data(self):
-        return self.symbolicdataset and self.symbolicdataset.has_data()
+        return self.dataset and self.dataset.has_data()
 
     def __repr__(self):
-        if self.symbolicdataset is not None:
-            args = repr(self.symbolicdataset)
+        if self.dataset is not None:
+            args = repr(self.dataset)
         elif self.step_num is not None:
             args = 'step_num={}, output_num={}'.format(self.step_num,
                                                        self.output_num)
@@ -2115,16 +2119,16 @@ class DatasetPlan(object):
     def __eq__(self, other):
         if not isinstance(other, DatasetPlan):
             return False
-        if self.symbolicdataset is not None or other.symbolicdataset is not None:
-            return self.symbolicdataset == other.symbolicdataset
+        if self.dataset is not None or other.dataset is not None:
+            return self.dataset == other.dataset
         if self.step_num is not None:
             return (self.step_num == other.step_num and
                     self.output_num == other.output_num)
         return other is self
 
     def __hash__(self):
-        if self.symbolicdataset is not None:
-            return hash(self.symbolicdataset)
+        if self.dataset is not None:
+            return hash(self.dataset)
         if self.step_num is not None:
             return hash((self.step_num, self.output_num))
         return hash(self)
@@ -2174,16 +2178,16 @@ class RunStepExecuteInfo:
 
 
 class RunCableExecuteInfo:
-    def __init__(self, cable_record, user, execrecord, input_SD, input_SD_path, output_path, recovering_record=None,
-                 by_step=None):
+    def __init__(self, cable_record, user, execrecord, input_dataset, input_dataset_path, output_path,
+                 recovering_record=None, by_step=None):
         """
         Constructor.
         """
         self.cable_record = cable_record
         self.user = user
         self.execrecord = execrecord
-        self.input_SD = input_SD
-        self.input_SD_path = input_SD_path
+        self.input_dataset = input_dataset
+        self.input_dataset_path = input_dataset_path
         self.output_path = output_path
         self.recovering_record = recovering_record
         self.by_step = by_step
@@ -2208,8 +2212,8 @@ class RunCableExecuteInfo:
             "cable_record_pk": self.cable_record.pk,
             "user_pk": self.user.pk,
             "execrecord_pk": self.execrecord.pk if self.execrecord is not None else None,
-            "input_SD_pk": self.input_SD.pk,
-            "input_SD_path": self.input_SD_path,
+            "input_dataset_pk": self.input_dataset.pk,
+            "input_dataset_path": self.input_dataset_path,
             "output_path": self.output_path,
             "recovering_record_pk": self.recovering_record.pk if self.recovering_record is not None else None,
             "by_step_pk": None if self.by_step is None else self.by_step.pk,

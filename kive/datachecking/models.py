@@ -25,7 +25,7 @@ class ContentCheckLog(stopwatch.models.Stopwatch):
     execution of a Pipeline (i.e. a Run), on the uploading of data,
     or on a manually-specified check.
     """
-    cdataset = models.ForeignKey("librarian.Dataset", related_name="content_checks")
+    dataset = models.ForeignKey("librarian.Dataset", related_name="content_checks")
 
     # The execution during which this check occurred, if applicable.
     execlog = models.ForeignKey("archive.ExecLog", null=True, related_name="content_checks")
@@ -71,9 +71,9 @@ class ContentCheckLog(stopwatch.models.Stopwatch):
 
         stopwatch.models.Stopwatch.clean(self)
 
-        if not self.cdataset.can_be_accessed(self.user):
+        if not self.dataset.can_be_accessed(self.user):
             raise ValidationError('User "{}" does not have access to Dataset "{}"'.
-                                  format(self.user, self.cdataset))
+                                  format(self.user, self.dataset))
 
     def is_complete(self):
         """
@@ -174,10 +174,10 @@ class CellError(models.Model):
         If the parent BadData object has missing output, is raw, or has
         a bad header, this should not exist.
 
-        The column must be a CDTM belonging to the associated SD's
+        The column must be a CDTM belonging to the associated dataset's
         CDT.
 
-        If the associated SD has num_rows != -1, then row_num must be
+        If the associated dataset has num_rows != -1, then row_num must be
         less than or equal to that.
 
         The constraint failed, if it is not null, must belong to
@@ -193,14 +193,14 @@ class CellError(models.Model):
         except ObjectDoesNotExist:
             pass
 
-        bad_SD = self.baddata.contentchecklog.cdataset
+        bad_dataset = self.baddata.contentchecklog.dataset
 
         if self.baddata.missing_output:
             raise ValidationError(
                 "Parent of CellError \"{}\" has missing output, so it should not exist".
                 format(self))
 
-        if self.baddata.contentchecklog.cdataset.is_raw():
+        if self.baddata.contentchecklog.dataset.is_raw():
             raise ValidationError(
                 "Parent of CellError \"{}\" is raw, so it should not exist".
                 format(self))
@@ -210,14 +210,14 @@ class CellError(models.Model):
                 "Parent of CellError \"{}\" has a malformed header, so it should not exist".
                 format(self))
 
-        if not bad_SD.structure.compounddatatype.members.filter(
+        if not bad_dataset.structure.compounddatatype.members.filter(
                 pk=self.column.pk).exists():
             raise ValidationError(
                 "Column of CellError \"{}\" is not one of the columns of its associated Dataset".
                 format(self))
 
-        if bad_SD.structure.num_rows != -1:
-            if self.row_num > bad_SD.structure.num_rows:
+        if bad_dataset.structure.num_rows != -1:
+            if self.row_num > bad_dataset.structure.num_rows:
                 raise ValidationError(
                     "CellError \"{}\" refers to a row that does not exist".
                     format(self))
@@ -254,7 +254,7 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
     Denotes an integrity check performed on a Dataset.
 
     One of these should be created basically every time the MD5
-    checksum of the SD is confirmed, be it during the execution
+    checksum of the dataset is confirmed, be it during the execution
     of a Pipeline (i.e. a Run) or on a manual check.
     """
     dataset = models.ForeignKey("librarian.Dataset", related_name="integrity_checks")
@@ -350,8 +350,8 @@ class MD5Conflict(models.Model):
     Denotes an MD5 conflict found during an integrity check.
     """
     integritychecklog = models.OneToOneField(IntegrityCheckLog, related_name="usurper")
-    conflicting_SD = models.OneToOneField("librarian.Dataset", related_name="usurps",
-                                          null=True, on_delete=models.SET_NULL)
+    conflicting_dataset = models.OneToOneField("librarian.Dataset", related_name="usurps",
+                                               null=True, on_delete=models.SET_NULL)
 
 
 class BlankCell(models.Model):
@@ -362,10 +362,10 @@ class BlankCell(models.Model):
     cellerror = models.OneToOneField(CellError, related_name="blank")
 
     def clean(self):
-        sd = self.cellerror.baddata.contentchecklog.cdataset
+        dataset = self.cellerror.baddata.contentchecklog.dataset
         if self.cellerror.column.blankable:
             raise ValidationError(
                 'Entry ({},{}) of Dataset "{}" is blankable'.format(
-                    self.cellerror.row_num, self.cellerror.column.column_idx, sd
+                    self.cellerror.row_num, self.cellerror.column.column_idx, dataset
                 )
             )

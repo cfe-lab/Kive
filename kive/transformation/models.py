@@ -192,11 +192,13 @@ class Transformation(metadata.models.AccessControl):
         transformation = cls(*args, **kwargs)
         transformation.save()
         for i in range(len(names)):
-            transformation.create_xput(names[i], 
-                    compounddatatype=compounddatatypes[i], 
-                    row_limits=row_limits[i],
-                    coords=coords[i],
-                    input=i<num_inputs)
+            transformation.create_xput(
+                names[i],
+                compounddatatype=compounddatatypes[i],
+                row_limits=row_limits[i],
+                coords=coords[i],
+                input=i<num_inputs
+            )
 
         # Hack: complete_clean() for Methods only (Pipelines can be
         # created without being complete).

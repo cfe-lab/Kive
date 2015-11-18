@@ -9,6 +9,7 @@ import kive.settings  # @UnresolvedImport
 import file_access_utils
 import method.models
 import archive.models
+import librarian.models
 import datachecking.models
 import portal.models
 
@@ -24,7 +25,7 @@ class Command(BaseCommand):
 
         targets = [
             method.models.CodeResourceRevision.UPLOAD_DIR,
-            archive.models.Dataset.UPLOAD_DIR,
+            librarian.models.Dataset.UPLOAD_DIR,
             archive.models.MethodOutput.UPLOAD_DIR,
             datachecking.models.VerificationLog.UPLOAD_DIR,
             portal.models.StagedFile.UPLOAD_DIR,

@@ -88,10 +88,9 @@ class DatasetViewSet(RemovableModelViewSet,
             return queryset.filter(created_by=None)
         if key == 'cdt':
             if value == '':
-                return queryset.filter(symbolicdataset__structure__isnull=True)
+                return queryset.filter(structure__isnull=True)
             else:
-                return queryset.filter(
-                    symbolicdataset__structure__compounddatatype=value)
+                return queryset.filter(structure__compounddatatype=value)
 
         if key in ('createdafter', 'createdbefore'):
             t = timezone.make_aware(datetime.strptime(value, '%d %b %Y %H:%M'),
@@ -119,10 +118,10 @@ class DatasetViewSet(RemovableModelViewSet,
         """
         Handles downloading of the Dataset.
         """
-        accessible_SDs = Dataset.filter_by_user(request.user)
+        accessible_datasets = Dataset.filter_by_user(request.user)
         dataset = self.get_object()
 
-        if dataset.symbolicdataset not in accessible_SDs:
+        if dataset not in accessible_datasets:
             return Response(None, status=status.HTTP_404_NOT_FOUND)
 
         return _build_download_response(dataset.dataset_file)

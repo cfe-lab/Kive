@@ -457,7 +457,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
     @transaction.atomic
     def remove_list(self):
-        SDs_listed = set()
+        datasets_listed = set()
         ERs_listed = set()
         runs_listed = set()
         pipelines_listed = set()
@@ -466,7 +466,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
         for dependant in self.needed_by.all().select_related("coderesourcerevision"):
             stuff_removed = dependant.coderesourcerevision.remove_list()
-            SDs_listed.update(stuff_removed[0])
+            datasets_listed.update(stuff_removed[0])
             ERs_listed.update(stuff_removed[1])
             runs_listed.update(stuff_removed[2])
             pipelines_listed.update(stuff_removed[3])
@@ -475,12 +475,12 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
         for method in self.members.all():
             stuff_removed = method.remove_list()
-            SDs_listed.update(stuff_removed[0])
+            datasets_listed.update(stuff_removed[0])
             ERs_listed.update(stuff_removed[1])
             runs_listed.update(stuff_removed[2])
             pipelines_listed.update(stuff_removed[3])
 
-        return SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed, CRRs_listed
+        return datasets_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed, CRRs_listed
 
     def find_update(self):
         update = self.coderesource.revisions.latest('revision_number')
@@ -716,9 +716,9 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                         min_row=parent_output.get_min_row(),
                         max_row=parent_output.get_max_row()).save()
 
-    def find_compatible_ERs(self, input_SDs, runstep):
+    def find_compatible_ERs(self, input_datasets, runstep):
         """
-        Given a set of input SDs, find any ExecRecords that use these inputs that
+        Given a set of input datasets, find any ExecRecords that use these inputs that
         are accessible by the calling RunStep.
 
         Note that this ExecRecord may be a failure, which the calling function
@@ -750,12 +750,12 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
                 for ERI in candidate_ER.execrecordins.all():
                     input_idx = ERI.generic_input.definite.dataset_idx
-                    if ERI.symbolicdataset != input_SDs[input_idx-1]:
+                    if ERI.dataset != input_datasets[input_idx-1]:
                         ER_matches = False
                         break
 
                 if ER_matches:
-                    # All ERIs match input SDs, so commit to candidate ER.
+                    # All ERIs match input datasets, so commit to candidate ER.
                     candidates.append(candidate_ER)
 
         return candidates
@@ -1013,20 +1013,20 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         return removal_plan
 
     def remove_list(self):
-        SDs_listed = set()
+        datasets_listed = set()
         ERs_listed = set()
         runs_listed = set()
         pipelines_listed = set()
 
         pipelines_affected = set([ps.pipeline for ps in self.pipelinesteps.all()])
         for pipeline_affected in pipelines_affected:
-            curr_SDs_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = pipeline_affected.remove_list()
-            SDs_listed.update(curr_SDs_listed)
+            curr_datasets_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = pipeline_affected.remove_list()
+            datasets_listed.update(curr_datasets_listed)
             ERs_listed.update(curr_ERs_listed)
             runs_listed.update(curr_runs_listed)
             pipelines_listed.update(curr_pipelines_listed)
 
-        return SDs_listed, ERs_listed, runs_listed, pipelines_listed
+        return datasets_listed, ERs_listed, runs_listed, pipelines_listed
 
 
 @python_2_unicode_compatible
@@ -1081,21 +1081,21 @@ class MethodFamily(transformation.models.TransformationFamily):
         return removal_plan
 
     def remove_list(self):
-        SDs_listed = set()
+        datasets_listed = set()
         ERs_listed = set()
         runs_listed = set()
         pipelines_listed = set()
         methods_listed = set()
 
         for method in self.members.all():
-            curr_SDs_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = method.remove_list()
-            SDs_listed.update(curr_SDs_listed)
+            curr_datasets_lsited, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = method.remove_list()
+            datasets_listed.update(curr_datasets_lsited)
             ERs_listed.update(curr_ERs_listed)
             runs_listed.update(curr_runs_listed)
             pipelines_listed.update(curr_pipelines_listed)
             methods_listed.add(method)
 
-        return SDs_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed
+        return datasets_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed
 
 
 # Register signals.

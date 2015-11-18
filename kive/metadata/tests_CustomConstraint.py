@@ -195,10 +195,9 @@ class CustomConstraintTests(TestCase):
         Helper function to create a Dataset and ContentCheckLog
         for a given CompoundDatatype.
         """
-        symbolicdataset = Dataset.create_dataset(datafile, file_path=user, user=user,
-                                                    groups_allowed=[everyone_group()], cdt=cdt,
-                                                    groups_allowed=[everyone_group()], name=name, description=desc)
-        log = ContentCheckLog(symbolicdataset=symbolicdataset, user=user)
+        dataset = Dataset.create_dataset(datafile, user=user,
+                                         cdt=cdt, groups_allowed=[everyone_group()], name=name, description=desc)
+        log = ContentCheckLog(dataset=dataset, user=user)
         log.save()
         return log
 
@@ -299,14 +298,14 @@ class CustomConstraintTests(TestCase):
                                                         description="invalid data to test custom constraint checking")
         )
 
-    def _test_content_check_integrity(self, content_check, execlog, symds):
+    def _test_content_check_integrity(self, content_check, execlog, dataset):
         """
         Things which should be true about a ContentCheckLog, whether or not
         it indicated errors.
         """
         self.assertEqual(content_check.clean(), None)
         self.assertEqual(content_check.execlog, execlog)
-        self.assertEqual(content_check.symbolicdataset, symds)
+        self.assertEqual(content_check.dataset, dataset)
         self.assertIsNotNone(content_check.end_time)
         self.assertEqual(content_check.start_time.date(),
                 content_check.end_time.date())
@@ -317,23 +316,23 @@ class CustomConstraintTests(TestCase):
         """
         Helper function to upload good data.
         """
-        symds_good = Dataset.create_dataset(self.good_datafile, file_path=self.user_oscar, user=self.user_oscar,
+        dataset_good = Dataset.create_dataset(self.good_datafile, file_path=self.user_oscar, user=self.user_oscar,
                                                cdt=self.cdt_constraints,
                                                description="data which conforms to all its constraints",
                                                name="good data",
                                                description="data which conforms to all its constraints")
-        return symds_good
+        return dataset_good
 
     def _test_upload_data_bad(self):
         """
         Helper function to upload bad data.
         """
-        symds_bad = Dataset.create_dataset(self.bad_datafile, file_path=self.user_oscar, user=self.user_oscar,
+        dataset_bad = Dataset.create_dataset(self.bad_datafile, file_path=self.user_oscar, user=self.user_oscar,
                                               cdt=self.cdt_constraints,
                                               description="data which conforms to all its constraints",
                                               name="good data",
                                               description="data which conforms to all its constraints")
-        return symds_bad
+        return dataset_bad
 
     def _test_setup_prototype_good(self):
         prototype_cdt = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
@@ -374,22 +373,22 @@ class CustomConstraintTests(TestCase):
         Helper function to execute a pipeline with the cdt_constraints 
         compound datatype as input.
         """
-        symds_good = self._test_upload_data_good()
-        sandbox = Sandbox(self.user_oscar, pipeline, [symds_good])
+        good_dataset = self._test_upload_data_good()
+        sandbox = Sandbox(self.user_oscar, pipeline, [good_dataset])
         sandbox.execute_pipeline()
         runstep = sandbox.run.runsteps.first()
         execlog = runstep.log
-        symds_out = runstep.execrecord.execrecordouts.first().symbolicdataset
-        content_check = symds_out.content_checks.first()
-        return (content_check, execlog, symds_out)
+        output_dataset = runstep.execrecord.execrecordouts.first().dataset
+        content_check = output_dataset.content_checks.first()
+        return (content_check, execlog, output_dataset)
 
     def test_execute_pipeline_content_check_good(self):
         """
         Test the integrity of the ContentCheck created while running a
         Pipeline on some data with CustomConstraints.
         """
-        content_check, execlog, symds_out = self._test_execute_pipeline_constraints(self.pipeline_noop)
-        self._test_content_check_integrity(content_check, execlog, symds_out)
+        content_check, execlog, dataset_out = self._test_execute_pipeline_constraints(self.pipeline_noop)
+        self._test_content_check_integrity(content_check, execlog, dataset_out)
         self.assertEqual(content_check.is_fail(), False)
 
     def test_execute_pipeline_content_check_bad(self):
@@ -398,17 +397,17 @@ class CustomConstraintTests(TestCase):
         Pipeline on some data with CustomConstraints, where the output data
         does not pass the content check.
         """
-        content_check, execlog, symds_out = self._test_execute_pipeline_constraints(self.pipeline_mangle)
-        self._test_content_check_integrity(content_check, execlog, symds_out)
+        content_check, execlog, dataset_out = self._test_execute_pipeline_constraints(self.pipeline_mangle)
+        self._test_content_check_integrity(content_check, execlog, dataset_out)
         self.assertEqual(content_check.is_fail(), True)
 
     def test_upload_data_content_check_good(self):
         """
         Test the integrity of a ContentCheck created when uploading a dataset.
         """
-        symds_good = self._test_upload_data_good()
-        content_check = symds_good.content_checks.first()
-        self._test_content_check_integrity(content_check, None, symds_good)
+        dataset_good = self._test_upload_data_good()
+        content_check = dataset_good.content_checks.first()
+        self._test_content_check_integrity(content_check, None, dataset_good)
         self.assertEqual(content_check.is_fail(), False)
 
     def _test_verification_log(self, verif_log, content_check, CDTM):
@@ -429,7 +428,7 @@ class CustomConstraintTests(TestCase):
         Test the integrity of the VerificationLog created while running a
         Pipeline on some data with CustomConstraints.
         """
-        content_check, execlog, symds_out = self._test_execute_pipeline_constraints(self.pipeline_noop)
+        content_check, execlog, dataset_out = self._test_execute_pipeline_constraints(self.pipeline_noop)
 
         verif_log = content_check.verification_logs.first()
         self._test_verification_log(verif_log, content_check, self.cdt_constraints.members.last())
@@ -443,7 +442,7 @@ class CustomConstraintTests(TestCase):
         Pipeline on some data with CustomConstraints, when the data does not
         conform.
         """
-        content_check, execlog, symds_out = self._test_execute_pipeline_constraints(self.pipeline_mangle)
+        content_check, execlog, dataset_out = self._test_execute_pipeline_constraints(self.pipeline_mangle)
         verif_log = content_check.verification_logs.first()
         self._test_verification_log(verif_log, content_check, self.cdt_constraints.members.last())
         self.assertEqual(verif_log.return_code, 0)
@@ -455,8 +454,8 @@ class CustomConstraintTests(TestCase):
         Test the integrity of the VerificationLog created while uploading
         conforming data with CustomConstraints.
         """
-        symds_good = self._test_upload_data_good()
-        content_check = symds_good.content_checks.first()
+        dataset_good = self._test_upload_data_good()
+        content_check = dataset_good.content_checks.first()
         verif_log = content_check.verification_logs.first()
         self._test_verification_log(verif_log, content_check, self.cdt_constraints.members.last())
         self.assertEqual(verif_log.return_code, 0)
@@ -469,13 +468,13 @@ class CustomConstraintTests(TestCase):
         CustomConstraints is uploaded with a working prototype.
         """
         cdt = self._test_setup_prototype_good()
-        symds_good = Dataset.create_dataset(self.good_datafile, file_path=self.user_oscar, user=self.user_oscar,
+        dataset_good = Dataset.create_dataset(self.good_datafile, file_path=self.user_oscar, user=self.user_oscar,
                                                cdt=cdt, description="data which conforms to all its constraints",
                                                name="good data",
                                                description="data which conforms to all its constraints")
-        self.assertEqual(symds_good.clean(), None)
-        content_check = symds_good.content_checks.first()
-        self._test_content_check_integrity(content_check, None, symds_good)
+        self.assertEqual(dataset_good.clean(), None)
+        content_check = dataset_good.content_checks.first()
+        self._test_content_check_integrity(content_check, None, dataset_good)
         self.assertEqual(content_check.is_fail(), False)
 
     def test_upload_data_prototype_bad(self):

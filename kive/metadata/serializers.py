@@ -13,18 +13,19 @@ class DatatypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Datatype
-        fields = ('id',
-                  'url',
-                  'user',
-                  'users_allowed',
-                  'groups_allowed',
-                  'removal_plan',
-                  "absolute_url",
-                  "restricts",
-                  "date_created",
-                  "name",
-                  "description"
-                  )
+        fields = (
+            'id',
+            'url',
+            'user',
+            'users_allowed',
+            'groups_allowed',
+            'removal_plan',
+            "absolute_url",
+            "restricts",
+            "date_created",
+            "name",
+            "description"
+        )
 
     def get_absolute_url(self, obj):
         if not obj:
@@ -42,14 +43,15 @@ class CompoundDatatypeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CompoundDatatype
-        fields = ('id',
-                  'url',
-                  'representation',
-                  'user',
-                  'users_allowed',
-                  'groups_allowed',
-                  'removal_plan'
-                  )
+        fields = (
+            'id',
+            'url',
+            'representation',
+            'user',
+            'users_allowed',
+            'groups_allowed',
+            'removal_plan'
+        )
 
     def get_representation(self, obj):
         if obj:

@@ -68,16 +68,20 @@ def execute_tests_environment_setup(case):
     case.mA_out_cdtm_1 = case.mA_out_cdt.members.create(datatype=case.int_dt, column_name="c", column_idx=1)
     case.mA_out_cdtm_2 = case.mA_out_cdt.members.create(datatype=case.string_dt, column_name="d", column_idx=2)
 
-    case.symDS = Dataset.create_dataset(os.path.join(samplecode_path,
-                                                        "input_for_test_C_twostep_with_subpipeline.csv"),
-                                           file_path=case.myUser, user=case.myUser, cdt=case.pX_in_cdt,
-                                           description="input to pipeline pX", name="pX_in_symDS",
-                                           description="input to pipeline pX")
-    case.rawDS = Dataset.create_dataset(os.path.join(samplecode_path,
-                                                        "input_for_test_C_twostep_with_subpipeline.csv"),
-                                           file_path=case.myUser, user=case.myUser, cdt=None,
-                                           description="input to pipeline pX", name="pX_in_symDS",
-                                           description="input to pipeline pX")
+    case.symDS = Dataset.create_dataset(
+        os.path.join(samplecode_path, "input_for_test_C_twostep_with_subpipeline.csv"),
+        user=case.myUser,
+        cdt=case.pX_in_cdt,
+        name="pX_in_symDS",
+        description="input to pipeline pX"
+    )
+    case.rawDS = Dataset.create_dataset(
+        os.path.join(samplecode_path, "input_for_test_C_twostep_with_subpipeline.csv"),
+        user=case.myUser,
+        cdt=None,
+        name="pX_in_symDS",
+        description="input to pipeline pX"
+    )
 
     # Method + input/outputs
     case.mA = Method(revision_name="mA", revision_desc="mA_desc", family=case.mf, driver=case.mA_crr,
@@ -190,29 +194,29 @@ class ExecuteTests(ExecuteTestsBase):
                 return p
 
     def find_inputs_for_pipeline(self, pipeline):
-        """Find appropriate input SymbolicDatasets for a Pipeline."""
-        input_SDs = []
+        """Find appropriate input Datasets for a Pipeline."""
+        input_datasets = []
         pipeline_owner = pipeline.user
         for input in pipeline.inputs.all():
             if input.is_raw():
-                candidate_SDs = Dataset.objects.filter(user=pipeline_owner)
-                if candidate_SDs.exists():
-                    for sd in candidate_SDs:
-                        if sd.is_raw():
-                            dataset = sd
+                candidate_datasets = Dataset.objects.filter(user=pipeline_owner)
+                if candidate_datasets.exists():
+                    for dataset in candidate_datasets:
+                        if dataset.is_raw():
+                            dataset = dataset
                             break
                 else:
                     dataset = None
             else:
                 datatype = input.structure.compounddatatype
                 structure = DatasetStructure.objects.filter(
-                    compounddatatype=datatype, symbolicdataset__user=pipeline_owner)
+                    compounddatatype=datatype, dataset__user=pipeline_owner)
                 if structure.exists():
-                    dataset = structure.first().symbolicdataset
+                    dataset = structure.first().dataset
                 else:
                     dataset = None
-            input_SDs.append(dataset)
-        return input_SDs
+            input_datasets.append(dataset)
+        return input_datasets
 
     def test_pipeline_execute_A_simple_onestep_pipeline(self):
         """Execution of a one-step pipeline."""
@@ -352,13 +356,18 @@ class ExecuteTests(ExecuteTestsBase):
         self.pX.create_outputs()
 
         # Dataset for input during execution of pipeline
-        input_SD = Dataset.create_dataset(
-            os.path.join(samplecode_path, "input_for_test_C_twostep_with_subpipeline.csv"), file_path=self.myUser,
-            user=self.myUser, cdt=self.pX_in_cdt, keep_file=True, name="input_dataset", description="symDS description")
+        input_dataset = Dataset.create_dataset(
+            os.path.join(samplecode_path, "input_for_test_C_twostep_with_subpipeline.csv"),
+            user=self.myUser,
+            cdt=self.pX_in_cdt,
+            keep_file=True,
+            name="input_dataset",
+            description="symDS description"
+        )
 
         # Execute pipeline
         pipeline = self.pX
-        inputs = [input_SD]
+        inputs = [input_dataset]
         mySandbox = Sandbox(self.myUser, pipeline, inputs)
         mySandbox.execute_pipeline()
 
@@ -397,10 +406,10 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertFalse(all(i.is_raw() for i in inputs))
         sandbox = Sandbox(self.myUser, pipeline, inputs)
 
-        for i, sd in enumerate(inputs, start=1):
-            if not sd.is_raw():
-                bad_input, bad_index = sd, i
-                bad_ccl = ContentCheckLog(symbolicdataset=sd, user=self.myUser)
+        for i, dataset in enumerate(inputs, start=1):
+            if not dataset.is_raw():
+                bad_input, bad_index = dataset, i
+                bad_ccl = ContentCheckLog(dataset=dataset, user=self.myUser)
                 bad_ccl.save()
                 bad_ccl.add_missing_output()
                 break
@@ -427,12 +436,12 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertTrue(any(i.is_raw() for i in inputs))
         sandbox = Sandbox(user, pipeline, inputs)
 
-        for i, sd in enumerate(inputs, start=1):
-            if sd.is_raw():
-                bad_input, bad_index = sd, i
-                bad_icl = IntegrityCheckLog(symbolicdataset=sd, user=user)
+        for i, dataset in enumerate(inputs, start=1):
+            if dataset.is_raw():
+                bad_input, bad_index = dataset, i
+                bad_icl = IntegrityCheckLog(dataset=dataset, user=user)
                 bad_icl.save()
-                MD5Conflict(integritychecklog=bad_icl, conflicting_SD=sd).save()
+                MD5Conflict(integritychecklog=bad_icl, conflicting_dataset=dataset).save()
                 break
 
         run = pipeline.pipeline_instances.create(user=user)
@@ -524,8 +533,12 @@ class SandboxTests(ExecuteTestsBase):
         tf = tempfile.NamedTemporaryFile(delete=False)
         tf.write("foo")
         tf.close()
-        raw_symDS = Dataset.create_dataset(tf.name, file_path=self.myUser, user=self.myUser, description="bar",
-                                              name="foo", description="bar")
+        raw_symDS = Dataset.create_dataset(
+            tf.name,
+            user=self.myUser,
+            name="foo",
+            description="bar"
+        )
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
                                           .format(p, 1, self.pX_in_cdt)),
@@ -608,7 +621,7 @@ class RestoreReusableDatasetTest(TestCase):
 
     def test_load_run_plan(self):
         pipeline = Pipeline.objects.get(revision_name='sums only')
-        dataset = Dataset.objects.get(name='pairs').symbolicdataset
+        dataset = Dataset.objects.get(name='pairs').dataset
 
         sandbox = Sandbox(pipeline.user, pipeline, [dataset])
         run_plan = RunPlan()
@@ -630,7 +643,7 @@ class RestoreReusableDatasetTest(TestCase):
 
     def test_create_run_steps_for_rerun(self):
         pipeline = Pipeline.objects.get(revision_name='sums only')
-        input_dataset = Dataset.objects.get(name='pairs').symbolicdataset
+        input_dataset = Dataset.objects.get(name='pairs').dataset
         step1_output_dataset = Dataset.objects.get(id=2)
         step2_output_dataset = Dataset.objects.get(id=3)
         sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
@@ -647,7 +660,7 @@ class RestoreReusableDatasetTest(TestCase):
 
     def test_create_run_steps_for_new_run(self):
         pipeline = Pipeline.objects.get(revision_name='sums and products')
-        input_dataset = Dataset.objects.get(name='pairs').symbolicdataset
+        input_dataset = Dataset.objects.get(name='pairs').dataset
         sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)
@@ -666,7 +679,7 @@ class RestoreReusableDatasetTest(TestCase):
         pipeline = Pipeline.objects.get(revision_name='sums only')
         pipeline.steps.get(step_num=1).outputs_to_delete.clear()
 
-        input_dataset = Dataset.objects.get(name='pairs').symbolicdataset
+        input_dataset = Dataset.objects.get(name='pairs').dataset
         sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)
@@ -685,7 +698,7 @@ class RestoreReusableDatasetTest(TestCase):
         method.save()
         method.clean()
 
-        input_dataset = Dataset.objects.get(name='pairs').symbolicdataset
+        input_dataset = Dataset.objects.get(name='pairs').dataset
         sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)

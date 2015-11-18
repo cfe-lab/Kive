@@ -36,7 +36,7 @@ LOGGER = logging.getLogger(__name__)  # Module level logger.
 
 # We delete objects in this order:
 deletion_order = [
-    "ExecRecords", "SymbolicDatasets", "Runs", "Pipelines", "PipelineFamilies", "Methods",
+    "ExecRecords", "Datasets", "Runs", "Pipelines", "PipelineFamilies", "Methods",
     "MethodFamilies", "CompoundDatatypes", "Datatypes",
     "CodeResourceRevisions", "CodeResources"
 ]
@@ -45,7 +45,7 @@ deletion_order = [
 # A helper for remove_helper and redact_helper, in archive.models.
 def any_runs_in_progress(plan_of_attack):
 
-    for sd in plan_of_attack["SymbolicDatasets"]:
+    for sd in plan_of_attack["Datasets"]:
         for rtp_input in sd.runinputs.all():
             if rtp_input.run.running:
                 return True
@@ -559,8 +559,8 @@ class Datatype(AccessControl):
     restricts = models.ManyToManyField('self', symmetrical=False, related_name="restricted_by", null=True, blank=True,
                                        help_text="Captures hierarchical is-a classifications among Datatypes")
 
-    proto_SD = models.OneToOneField("librarian.Dataset", null=True, blank=True,
-                                    related_name="datatype_modelled", on_delete=models.SET_NULL)
+    prototype = models.OneToOneField("librarian.Dataset", null=True, blank=True,
+                                     related_name="datatype_modelled", on_delete=models.SET_NULL)
 
     class Meta:
         unique_together = ("user", "name")
@@ -854,13 +854,13 @@ class Datatype(AccessControl):
         This datatype has a prototype.
         """
         PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
-        if self.prototype.symbolicdataset.is_raw():
+        if self.prototype.is_raw():
             raise ValidationError((
                 'Prototype Dataset for Datatype "{}" should have '
                 'CompoundDatatype "{}", but it is raw').format(self,
                                                                PROTOTYPE_CDT))
 
-        my_prototype_cdt = self.prototype.symbolicdataset.get_cdt()
+        my_prototype_cdt = self.prototype.get_cdt()
         if not my_prototype_cdt.is_identical(PROTOTYPE_CDT):
             raise ValidationError((
                 'Prototype Dataset for Datatype "{}" should have '
@@ -1292,8 +1292,8 @@ class Datatype(AccessControl):
 
         if self.prototype is not None:
             # The prototype is a Dataset so we have to check its Dataset.
-            if self.prototype.symbolicdataset not in removal_plan["SymbolicDatasets"]:
-                prototype_removal_plan = self.prototype.symbolicdataset.build_removal_plan(removal_plan)
+            if self.prototype not in removal_plan["Datasets"]:
+                prototype_removal_plan = self.prototype.build_removal_plan(removal_plan)
                 update_removal_plan(removal_plan, prototype_removal_plan)
 
         for descendant_dt in self.restricted_by.all():
@@ -1869,9 +1869,9 @@ class CompoundDatatype(AccessControl):
 
         removal_plan["CompoundDatatypes"].add(self)
 
-        for ds in self.conforming_datasets.all().select_related("symbolicdataset"):
-            if ds.symbolicdataset not in removal_plan["SymbolicDatasets"]:
-                update_removal_plan(removal_plan, ds.symbolicdataset.build_removal_plan(removal_plan))
+        for dataset_structure in self.conforming_datasets.all().select_related("dataset"):
+            if dataset_structure.dataset not in removal_plan["Datasets"]:
+                update_removal_plan(removal_plan, dataset_structure.dataset.build_removal_plan(removal_plan))
 
         # Remove any Transformations that had this CDT.
         transfs_to_remove = set((xs.transf_xput.definite.transformation.definite

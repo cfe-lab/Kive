@@ -71,7 +71,7 @@ def run_pipeline(request):
     Request parameters are:
 
     * pipeline - the pipeline id
-    * input_1, input_2, etc. - the *symbolic* dataset ids to use as inputs
+    * input_1, input_2, etc. - the dataset ids to use as inputs
     """
 
     try:
@@ -109,12 +109,10 @@ def run_pipeline(request):
                         rsf,
                         "Input {} is invalid".format(i)))
     
-                # Check that the chosen SD is usable.
-                dataset = Dataset.objects.get(
-                    pk=curr_input_form.cleaned_data["input_pk"])
-                curr_SD = dataset.symbolicdataset
+                # Check that the chosen dataset is usable.
+                dataset = Dataset.objects.get(pk=curr_input_form.cleaned_data["input_pk"])
                 try:
-                    rtp.validate_restrict_access([curr_SD])
+                    rtp.validate_restrict_access([dataset])
                 except ValidationError as e:
                     raise RunSubmissionError(_choose_inputs_for_pipeline(
                         request,
@@ -122,7 +120,7 @@ def run_pipeline(request):
                         rsf,
                         e.messages))
     
-                rtp.inputs.create(symbolicdataset=curr_SD, index=i)
+                rtp.inputs.create(dataset=dataset, index=i)
     
             try:
                 rtp.clean()
