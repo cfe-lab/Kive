@@ -261,10 +261,10 @@ class RemoveRedactRunInProgress(TestCase):
         self.pf = PipelineFamily.objects.get(name="Pipeline_family")
         self.myUser = self.pf.user
         self.pE = self.pf.members.get(revision_name="pE_name")
-        self.triplet_dataset = Dataset.objects.filter(dataset__name="triplet").first()
-        self.doublet_dataset = Dataset.objects.get(dataset__name="doublet")
-        self.singlet_dataset = Dataset.objects.filter(dataset__name="singlet").first()
-        self.raw_dataset = Dataset.objects.get(dataset__name="raw_DS")
+        self.triplet_dataset = Dataset.objects.filter(name="triplet").first()
+        self.doublet_dataset = Dataset.objects.get(name="doublet")
+        self.singlet_dataset = Dataset.objects.filter(name="singlet").first()
+        self.raw_dataset = Dataset.objects.get(name="raw_DS")
         self.step_E1 = self.pE.steps.get(step_num=1)
         self.mA = self.step_E1.transformation.definite
 
@@ -386,10 +386,10 @@ class RemoveRedactRunJustStarting(TestCase):
         self.pf = PipelineFamily.objects.get(name="Pipeline_family")
         self.myUser = self.pf.user
         self.pE = self.pf.members.get(revision_name="pE_name")
-        self.triplet_dataset = Dataset.objects.filter(dataset__name="triplet").first()
-        self.doublet_dataset = Dataset.objects.get(dataset__name="doublet")
-        self.singlet_dataset = Dataset.objects.filter(dataset__name="singlet").first()
-        self.raw_dataset = Dataset.objects.get(dataset__name="raw_DS")
+        self.triplet_dataset = Dataset.objects.filter(name="triplet").first()
+        self.doublet_dataset = Dataset.objects.get(name="doublet")
+        self.singlet_dataset = Dataset.objects.filter(name="singlet").first()
+        self.raw_dataset = Dataset.objects.get(name="raw_DS")
 
         # A run that's just starting, to the point that no Run exists yet.
         self.run_just_starting = Run(user=self.myUser, pipeline=self.pE)
@@ -620,7 +620,7 @@ class RunApiTests(TestCase):
         )
 
         self.dataset = Dataset.objects.get(
-            dataset__name="pX_in_dataset",
+            name="pX_in_dataset",
             structure__isnull=False,
             user=self.myUser
         )
@@ -877,24 +877,24 @@ class RunSerializerTests(TestCase):
 
         # Datasets to feed the pipeline that are defined in the fixture.
         self.triplet_SD = Dataset.objects.get(
-            dataset__name="triplet",
-            dataset__description="lol",
-            dataset__dataset_file__endswith="step_0_triplet.csv",
+            name="triplet",
+            description="lol",
+            dataset_file__endswith="step_0_triplet.csv",
             user=self.myUser,
             structure__isnull=False,
             structure__compounddatatype=self.triplet_cdt
         )
         self.singlet_SD = Dataset.objects.get(
-            dataset__name="singlet",
-            dataset__description="lol",
-            dataset__dataset_file__endswith="singlet_cdt_large.csv",
+            name="singlet",
+            description="lol",
+            dataset_file__endswith="singlet_cdt_large.csv",
             user=self.myUser,
             structure__isnull=False,
             structure__compounddatatype=self.singlet_cdt
         )
         self.raw_SD = Dataset.objects.get(
-            dataset__name="raw_DS",
-            dataset__description="lol",
+            name="raw_DS",
+            description="lol",
             user=self.myUser
         )
 

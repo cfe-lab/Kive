@@ -804,8 +804,8 @@ class Dataset(metadata.models.AccessControl):
         """
         Mark RunComponents that use this as an output as failed.
         """
-        if self.has_data() and self.dataset.file_source is not None:
-            creating_ER = self.dataset.file_source.execrecord
+        if self.has_data() and self.file_source is not None:
+            creating_ER = self.file_source.execrecord
             for rc in creating_ER.used_by_components.all():
                 rc.mark_unsuccessful()
 
@@ -891,7 +891,7 @@ class Dataset(metadata.models.AccessControl):
         self.save(update_fields=["_redacted", "MD5_checksum"])
 
         if self.has_data():
-            self.dataset.delete()
+            self.dataset_file.delete(save=True)
         if self.has_structure():
             self.structure.delete()
 

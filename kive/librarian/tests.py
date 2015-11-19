@@ -13,17 +13,24 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.core.urlresolvers import reverse, resolve
+from django.core.files import File
+
+from rest_framework.test import force_authenticate, APIRequestFactory
+from rest_framework import status
 
 from archive.models import ExecLog, MethodOutput, Run, RunStep
 from constants import datatypes
 from librarian.models import Dataset, ExecRecord
-from metadata.models import Datatype, CompoundDatatype
+from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, \
     MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
+from librarian.serializers import DatasetSerializer
+
 import file_access_utils
 import kive.testing_utils as tools
-
+from kive.tests import BaseTestCases, DuckContext
 
 def ER_from_record(record):
     """
@@ -272,13 +279,13 @@ Bob,tw3nty
         self.assertEqual(self.dataset.is_raw(), False)
 
         self.assertEqual(self.dataset.user, self.myUser)
-        self.assertEqual(self.dataset.name, dsname)
-        self.assertEqual(self.dataset.description, dsdesc)
+        self.assertEqual(self.dataset.name, self.dsname)
+        self.assertEqual(self.dataset.description, self.dsdesc)
         self.assertEqual(self.dataset.date_created.date(), timezone.now().date())
         self.assertEqual(self.dataset.date_created < timezone.now(), True)
         self.assertEqual(self.dataset.file_source, None)
-        self.assertEqual(os.path.basename(self.dataset.dataset_file.path), os.path.basename(file_path))
-        data_file.close()
+        self.assertEqual(os.path.basename(self.dataset.dataset_file.path), os.path.basename(self.file_path))
+        self.data_file.close()
 
     def test_dataset_bulk_created(self):
         """
@@ -1033,31 +1040,28 @@ class RemovalTests(TestCase):
 
         self.two_step_noop_plf = PipelineFamily.objects.get(name="Nucleotide Sequence two-step Noop")
         self.two_step_noop_pl = self.two_step_noop_plf.members.get(revision_name="v1")
-        self.two_step_input_DS = Dataset.objects.get(name="Removal test data for a two-step Pipeline").dataset
+        self.two_step_input_dataset = Dataset.objects.get(name="Removal test data for a two-step Pipeline")
 
         # Datasets and ExecRecords produced by the first run.
         self.produced_data = set()
         self.execrecords = set()
         for runstep in self.first_run.runsteps.all():
-            curr_produced_DSs = [x.dataset for x in runstep.outputs.all()]
-            self.produced_data.update(curr_produced_DSs)
+            self.produced_data.update(runstep.outputs.all())
             self.execrecords.add(runstep.execrecord)
             for rsic in runstep.RSICs.all():
-                curr_produced_DSs = [x.dataset for x in rsic.outputs.all()]
-                self.produced_data.update(curr_produced_DSs)
+                self.produced_data.update(rsic.outputs.all())
                 self.execrecords.add(rsic.execrecord)
         for roc in self.first_run.runoutputcables.all():
-            curr_produced_DSs = [x.dataset for x in roc.outputs.all()]
-            self.produced_data.update(curr_produced_DSs)
+            self.produced_data.update(roc.outputs.all())
             self.execrecords.add(roc.execrecord)
 
         self.step_log = self.first_run.runsteps.first().log
 
         self.two_step_run = self.two_step_noop_pl.pipeline_instances.first()
         self.two_step_intermediate_data = self.two_step_run.runsteps.get(
-            pipelinestep__step_num=1).outputs.first().dataset
+            pipelinestep__step_num=1).outputs.first()
         self.two_step_output_data = self.two_step_run.runsteps.get(
-            pipelinestep__step_num=2).outputs.first().dataset
+            pipelinestep__step_num=2).outputs.first()
         self.two_step_execrecords = set()
         for runstep in self.two_step_run.runsteps.all():
             self.two_step_execrecords.add(runstep.execrecord)
@@ -1091,7 +1095,7 @@ class RemovalTests(TestCase):
 
     def test_reused_run_build_removal_plan(self):
         """Removing a reused Run should leave reused data/ExecRecords alone."""
-        self.removal_plan_tester(self.second_run, runs={self.second_run}, runs={self.second_run})
+        self.removal_plan_tester(self.second_run, runs={self.second_run})
 
     def test_input_data_build_removal_plan(self):
         """Removing input data to a Run should remove any Run started from it."""
@@ -1136,7 +1140,7 @@ class RemovalTests(TestCase):
 
     def test_nested_pipeline_build_removal_plan(self):
         """Removing a nested Pipeline."""
-        self.removal_plan_tester(self.p_nested, pipelines={self.p_nested}, pipelines={self.p_nested})
+        self.removal_plan_tester(self.p_nested, pipelines={self.p_nested})
 
     def test_pipelinefamily_build_removal_plan(self):
         """Removing a PipelineFamily removes everything that goes along with it."""
@@ -1173,7 +1177,7 @@ class RemovalTests(TestCase):
 
     def test_crr_nodep_build_removal_plan(self):
         """Removing a CodeResourceRevision that is dependent on another leaves the other alone."""
-        self.removal_plan_tester(self.pass_through_crr, CRRs={self.pass_through_crr}, CRRs={self.pass_through_crr})
+        self.removal_plan_tester(self.pass_through_crr, CRRs={self.pass_through_crr})
 
     def test_cr_build_removal_plan(self):
         """Removing a CodeResource removes its revisions."""
@@ -1190,7 +1194,7 @@ class RemovalTests(TestCase):
         all_data = self.produced_data.union(
             {
                 self.input_DS,
-                self.two_step_input_DS,
+                self.two_step_input_dataset,
                 self.two_step_intermediate_data,
                 self.two_step_output_data
             }
@@ -1206,7 +1210,7 @@ class RemovalTests(TestCase):
         all_data = self.produced_data.union(
             {
                 self.input_DS,
-                self.two_step_input_DS,
+                self.two_step_input_dataset,
                 self.two_step_intermediate_data,
                 self.two_step_output_data
             }
@@ -1495,3 +1499,433 @@ class RemovalTests(TestCase):
         self.log_redaction_plan_tester(
             self.step_log, output_log=True, error_log=True, return_code=True
         )
+
+
+class DatasetWithFileTests(TestCase):
+
+    def setUp(self):
+        tools.create_librarian_test_environment(self)
+
+    def tearDown(self):
+        tools.clean_up_all_files()
+
+    def test_Dataset_check_MD5(self):
+        old_md5 = "7dc85e11b5c02e434af5bd3b3da9938e"
+        new_md5 = "d41d8cd98f00b204e9800998ecf8427e"
+
+        self.assertEqual(self.raw_dataset.compute_md5(), old_md5)
+
+        # Initially, no change to the raw dataset has occured, so the md5 check will pass
+        self.assertEqual(self.raw_dataset.clean(), None)
+
+        # The contents of the file are changed, disrupting file integrity
+        self.raw_dataset.dataset_file.close()
+        self.raw_dataset.dataset_file.open(mode='w')
+        self.raw_dataset.dataset_file.close()
+        self.assertRaisesRegexp(ValidationError,
+                                re.escape('File integrity of "{}" lost. Current checksum "{}" does not equal expected '
+                                          'checksum "{}"'.format(self.raw_dataset, new_md5, old_md5)),
+                                self.raw_dataset.clean)
+
+    def test_Dataset_filename_MD5_clash(self):
+        ds1, ds2 = Dataset.objects.all()[:2]
+        ds1.name = ds2.name
+        ds1.MD5_checksum = ds2.MD5_checksum
+        ds1.save()
+        msg = "A Dataset with that name and MD5 already exists"
+        self.assertRaisesRegexp(ValidationError, msg, ds1.validate_unique)
+
+
+class DatasetApiTests(BaseTestCases.ApiTestCase):
+
+    def setUp(self):
+        super(DatasetApiTests, self).setUp()
+        num_cols = 12
+
+        self.list_path = reverse("dataset-list")
+        # This should equal librarian.ajax.DatasetViewSet.as_view({"get": "list"}).
+        self.list_view, _, _ = resolve(self.list_path)
+
+        with tempfile.TemporaryFile() as f:
+            data = ','.join(map(str, range(num_cols)))
+            f.write(data)
+            f.seek(0)
+            self.test_dataset = Dataset.create_dataset(
+                file_path=None,
+                user=self.kive_user,
+                users_allowed=None,
+                groups_allowed=None,
+                cdt=None,
+                keep_file=True,
+                name="Test dataset",
+                description="Test data for a test that tests test data",
+                file_source=None,
+                check=True,
+                file_handle=f
+            )
+            self.test_dataset_path = "{}{}/".format(self.list_path,
+                                                    self.test_dataset.pk)
+            self.n_preexisting_datasets = 1
+
+        self.detail_pk = self.test_dataset.pk
+        self.detail_path = reverse("dataset-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.redaction_path = reverse("dataset-redaction-plan",
+                                      kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("dataset-removal-plan",
+                                    kwargs={'pk': self.detail_pk})
+
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.redaction_view, _, _ = resolve(self.redaction_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+    def tearDown(self):
+        for d in Dataset.objects.all():
+            d.dataset_file.delete()
+
+    def test_dataset_list(self, expected_entries=0):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(self.list_path)
+
+        force_authenticate(request, user=self.kive_user)
+        resp = self.list_view(request).data
+
+        self.assertEquals(len(resp), expected_entries + self.n_preexisting_datasets)
+        self.assertEquals(resp[-1]['description'],
+                          "Test data for a test that tests test data")
+
+    def test_dataset_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(
+            response.data['description'],
+            "Test data for a test that tests test data")
+
+    def test_dataset_add(self):
+        """
+        Test adding a Dataset via the API.
+
+        Each dataset must have unique content.
+        """
+        num_cols = 12
+        num_files = 2
+        FROM_FILE_END = 2
+
+        with tempfile.TemporaryFile() as f:
+            data = ','.join(map(str, range(num_cols)))
+            f.write(data)
+            for i in xrange(num_files):
+                f.seek(0, FROM_FILE_END)
+                f.write('data file {}\n'.format(i))
+                f.seek(0)
+                request = self.factory.post(
+                    self.list_path,
+                    {
+                        'name': "My cool file %d" % i,
+                        'description': 'A really cool file',
+                        # No CompoundDatatype -- this is raw.
+                        'dataset_file': f
+                    }
+                )
+
+                force_authenticate(request, user=self.kive_user)
+                resp = self.list_view(request).render().data
+
+                self.assertIsNone(resp.get('errors'))
+                self.assertEquals(resp['name'], "My cool file %d" % i)
+
+        self.test_dataset_list(expected_entries=num_files)
+
+    def test_dataset_add_duplicate(self):
+        """
+        Test adding a duplicate Dataset via the API.
+
+        Each dataset must have unique content.
+        """
+        num_cols = 12
+
+        with tempfile.TemporaryFile() as f:
+            data = ','.join(map(str, range(num_cols)))
+            f.write(data)
+            f.seek(0)
+
+            # First, we add this file and it works.
+            request = self.factory.post(
+                self.list_path,
+                {
+                    'name': "Original",
+                    'description': 'Totes unique',
+                    # No CompoundDatatype -- this is raw.
+                    'dataset_file': f
+                }
+            )
+            force_authenticate(request, user=self.kive_user)
+            self.list_view(request).render()
+
+            # Now we add the same file again.
+            request = self.factory.post(
+                self.list_path,
+                {
+                    'name': "CarbonCopy",
+                    'description': "Maybe not so unique",
+                    'dataset_file': f
+                }
+            )
+            force_authenticate(request, user=self.kive_user)
+            resp = self.list_view(request).render().data
+
+        self.assertEqual({'dataset_file': [u'The submitted file is empty.']},
+                         resp)
+
+    def test_dataset_removal_plan(self):
+        request = self.factory.get(self.removal_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.removal_view(request, pk=self.detail_pk)
+
+        self.assertEquals(response.data['Datasets'], 1)
+        self.assertEquals(response.data['CompoundDatatypes'], 0)
+
+    def test_dataset_removal(self):
+        start_count = Dataset.objects.all().count()
+
+        request = self.factory.delete(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+
+        end_count = Method.objects.all().count()
+        self.assertEquals(end_count, start_count - 1)
+
+    def test_dataset_redaction_plan(self):
+        request = self.factory.get(self.redaction_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.redaction_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['Datasets'], 1)
+        self.assertEquals(response.data['OutputLogs'], 0)
+
+    def test_dataset_redaction(self):
+
+        request = self.factory.patch(self.detail_path,
+                                     {'is_redacted': "true"})
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_200_OK)
+
+        dataset = Dataset.objects.get(pk=self.detail_pk)
+        self.assertTrue(dataset.is_redacted())
+
+
+class DatasetSerializerTests(TestCase):
+    """
+    Tests of DatasetSerializer.
+    """
+    fixtures = ["initial_data", "initial_groups", "initial_user"]
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.list_path = reverse("dataset-list")
+
+        # This defines a user named "john" which is now accessible as self.myUser.
+        tools.create_metadata_test_environment(self)
+        self.kive_user = kive_user()
+        self.duck_context = DuckContext()
+
+        num_cols = 12
+        self.raw_file_contents = ','.join(map(str, range(num_cols)))
+
+        # A CompoundDatatype that belongs to the Kive user.
+        self.kive_CDT = CompoundDatatype(user=self.kive_user)
+        self.kive_CDT.save()
+        self.kive_CDT.members.create(
+            datatype=self.string_dt,
+            column_name="col1",
+            column_idx=1
+        )
+        self.kive_CDT.full_clean()
+
+        self.kive_file_contents = """col1
+foo
+bar
+baz
+"""
+
+        self.data_to_serialize = {
+            "name": "SerializedData",
+            "description": "Dataset for testing deserialization",
+            "users_allowed": [],
+            "groups_allowed": []
+        }
+
+    def test_validate(self):
+        """
+        Test validating a new Dataset.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            self.assertTrue(ds.is_valid())
+
+    def test_validate_with_users_allowed(self):
+        """
+        Test validating a new Dataset with users allowed.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["users_allowed"].append(self.myUser.username)
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            self.assertTrue(ds.is_valid())
+
+    def test_validate_with_groups_allowed(self):
+        """
+        Test validating a new Dataset with groups allowed.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["groups_allowed"].append(everyone_group().name)
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            self.assertTrue(ds.is_valid())
+
+    def test_validate_with_CDT(self):
+        """
+        Test validating a Dataset with a CDT.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.kive_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["compounddatatype"] = self.kive_CDT.pk
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            self.assertTrue(ds.is_valid())
+
+    def test_validate_ineligible_CDT(self):
+        """
+        Test validating a Dataset with a CDT that the user doesn't have access to.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.kive_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["compounddatatype"] = self.kive_CDT.pk
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=DuckContext(self.myUser)
+            )
+            self.assertFalse(ds.is_valid())
+            self.assertEquals(len(ds.errors["compounddatatype"]), 1)
+
+    def test_create(self):
+        """
+        Test creating a Dataset.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            ds.is_valid()
+            dataset = ds.save()
+
+            # Probe the Dataset to make sure everything looks fine.
+            self.assertEquals(dataset.name, self.data_to_serialize["name"])
+            self.assertEquals(dataset.description, self.data_to_serialize["description"])
+            self.assertIsNone(dataset.compounddatatype)
+            self.assertEquals(dataset.user, self.kive_user)
+
+    def test_create_with_CDT(self):
+        """
+        Test creating a Dataset with a CDT.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.kive_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["compounddatatype"] = self.kive_CDT.pk
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            ds.is_valid()
+            dataset = ds.save()
+
+            # Probe to make sure the CDT got set correctly.
+            self.assertEquals(dataset.compounddatatype, self.kive_CDT)
+
+    def test_create_with_users_allowed(self):
+        """
+        Test validating a new Dataset with users allowed.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["users_allowed"].append(self.myUser.username)
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            ds.is_valid()
+            dataset = ds.save()
+
+            self.assertListEqual(list(dataset.users_allowed.all()),
+                                 [self.myUser])
+
+    def test_create_with_groups_allowed(self):
+        """
+        Test validating a new Dataset with groups allowed.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["groups_allowed"].append(everyone_group().name)
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            ds.is_valid()
+            dataset = ds.save()
+
+            self.assertListEqual(list(dataset.groups_allowed.all()),
+                                 [everyone_group()])

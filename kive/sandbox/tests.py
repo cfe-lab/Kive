@@ -621,7 +621,7 @@ class RestoreReusableDatasetTest(TestCase):
 
     def test_load_run_plan(self):
         pipeline = Pipeline.objects.get(revision_name='sums only')
-        dataset = Dataset.objects.get(name='pairs').dataset
+        dataset = Dataset.objects.get(name='pairs')
 
         sandbox = Sandbox(pipeline.user, pipeline, [dataset])
         run_plan = RunPlan()
@@ -643,7 +643,7 @@ class RestoreReusableDatasetTest(TestCase):
 
     def test_create_run_steps_for_rerun(self):
         pipeline = Pipeline.objects.get(revision_name='sums only')
-        input_dataset = Dataset.objects.get(name='pairs').dataset
+        input_dataset = Dataset.objects.get(name='pairs')
         step1_output_dataset = Dataset.objects.get(id=2)
         step2_output_dataset = Dataset.objects.get(id=3)
         sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
@@ -660,7 +660,7 @@ class RestoreReusableDatasetTest(TestCase):
 
     def test_create_run_steps_for_new_run(self):
         pipeline = Pipeline.objects.get(revision_name='sums and products')
-        input_dataset = Dataset.objects.get(name='pairs').dataset
+        input_dataset = Dataset.objects.get(name='pairs')
         sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)
@@ -679,7 +679,7 @@ class RestoreReusableDatasetTest(TestCase):
         pipeline = Pipeline.objects.get(revision_name='sums only')
         pipeline.steps.get(step_num=1).outputs_to_delete.clear()
 
-        input_dataset = Dataset.objects.get(name='pairs').dataset
+        input_dataset = Dataset.objects.get(name='pairs')
         sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)
@@ -698,7 +698,7 @@ class RestoreReusableDatasetTest(TestCase):
         method.save()
         method.clean()
 
-        input_dataset = Dataset.objects.get(name='pairs').dataset
+        input_dataset = Dataset.objects.get(name='pairs')
         sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)

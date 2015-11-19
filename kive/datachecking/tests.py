@@ -62,14 +62,14 @@ class BlankableColumn(BlankableTestCase):
 
         run_dir = tempfile.mkdtemp(prefix="dataset{}".format(self.good_dataset.pk))
         try:
-            self.good_dataset.dataset.dataset_file.open("rb")
+            self.good_dataset.dataset_file.open("rb")
             self.ccl = self.good_dataset.check_file_contents(
-                file_path_to_check=None, file_handle=self.good_dataset.dataset.dataset_file,
+                file_path_to_check=None, file_handle=self.good_dataset.dataset_file,
                 summary_path=run_dir, min_row=None, max_row=None, execlog=None,
                 checking_user=self.user_doug
             )
         finally:
-            self.good_dataset.dataset.dataset_file.close()
+            self.good_dataset.dataset_file.close()
         shutil.rmtree(run_dir)
 
     def test_blank_on_blankable_column_OK(self):
@@ -117,14 +117,14 @@ class BlankCellNonBlankable(BlankableTestCase):
 
         run_dir = tempfile.mkdtemp(prefix="dataset{}".format(self.bad_dataset.pk))
         try:
-            self.bad_dataset.dataset.dataset_file.open("rb")
+            self.bad_dataset.dataset_file.open("rb")
             self.ccl = self.bad_dataset.check_file_contents(
-                file_path_to_check=None, file_handle=self.bad_dataset.dataset.dataset_file,
+                file_path_to_check=None, file_handle=self.bad_dataset.dataset_file,
                 summary_path=run_dir, min_row=None, max_row=None,
                 execlog=None, checking_user=self.user_doug
             )
         finally:
-            self.bad_dataset.dataset.dataset_file.close()
+            self.bad_dataset.dataset_file.close()
         shutil.rmtree(run_dir)
 
     def test_blank_on_non_blankable_column_creates_baddata(self):

@@ -35,7 +35,6 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             "dataset_file",
             'filename',
             'date_created',
-            'date_modified',
             'download_url',
             'compounddatatype',
             'filesize',
@@ -66,20 +65,28 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
         Create a Dataset object from deserialized and validated data.
         """
         cdt = None
-        if "structure" in validated_data["dataset"]:
-            cdt = validated_data["dataset"]["structure"].get("compounddatatype", None)
+        if "structure" in validated_data:
+            cdt = validated_data["structure"].get("compounddatatype", None)
 
-        users_allowed = None
-        groups_allowed = None
-        if "users_allowed" in validated_data["dataset"]:
-            users_allowed = validated_data["dataset"]["users_allowed"]
+        # users_allowed = None
+        # groups_allowed = None
+        # if "users_allowed" in validated_data:
+        #     users_allowed = validated_data["users_allowed"]
+        #
+        # if "groups_allowed" in validated_data:
+        #     groups_allowed = validated_data["groups_allowed"]
 
-        if "groups_allowed" in validated_data["dataset"]:
-            groups_allowed = validated_data["dataset"]["groups_allowed"]
-
-        dataset = Dataset.create_dataset(file_path=None, user=self.context["request"].user,
-                                         users_allowed=users_allowed, groups_allowed=groups_allowed, cdt=cdt,
-                                         keep_file=True, name=validated_data["name"],
-                                         description=validated_data["description"], file_source=None,
-                                         check=True, file_handle=validated_data["dataset_file"])
+        dataset = Dataset.create_dataset(
+            file_path=None,
+            user=self.context["request"].user,
+            users_allowed=validated_data["users_allowed"],
+            groups_allowed=validated_data["groups_allowed"],
+            cdt=cdt,
+            keep_file=True,
+            name=validated_data["name"],
+            description=validated_data["description"],
+            file_source=None,
+            check=True,
+            file_handle=validated_data["dataset_file"]
+        )
         return dataset

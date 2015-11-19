@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.test import TestCase, TransactionTestCase
 from django.core.urlresolvers import reverse, resolve
 from rest_framework import status
-from rest_framework.test import force_authenticate, APIRequestFactory
+from rest_framework.test import force_authenticate
 
 from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
     RunOutputCable, RunStep, RunSIC
@@ -21,17 +21,16 @@ from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, Dataset
 
-from kive.tests import BaseTestCases, install_fixture_files, restore_production_files, DuckContext
+from kive.tests import BaseTestCases, install_fixture_files, restore_production_files
 from method.models import Method
 from pipeline.models import Pipeline, PipelineStep
 
-from archive.serializers import DatasetSerializer
 import sandbox.execute
 import kive.testing_utils as tools
 
 # Rather than define everyone_group here, we import this function to prevent compile-time
 # database access.
-from metadata.models import everyone_group, kive_user, CompoundDatatype
+from metadata.models import everyone_group, CompoundDatatype
 
 
 class ArchiveTestCaseHelpers:
@@ -86,7 +85,7 @@ class ArchiveTestCaseHelpers:
         """
         Helper function to create and complete all the RunSIC's needed for
         a given RunStep. input_SDs and output_SDs are lists of the input and
-        output symbolic datasets for each cable, in order.
+        output datasets for each cable, in order.
         """
         for i, cable in enumerate(runstep.pipelinestep.cables_in.order_by("dest__dataset_idx")):
             rsic = cable.psic_instances.create(runstep=runstep)
@@ -105,17 +104,17 @@ class ArchiveTestCaseHelpers:
             return
 
         self.E03_11_RSIC = self.E03_11.psic_instances.create(runstep=self.step_E1_RS)
-        self.make_complete_non_reused(self.E03_11_RSIC, [self.raw_symDS], [self.raw_symDS])
-        self.raw_symDS.integrity_checks.create(execlog=self.E03_11_RSIC.log, user=self.myUser)
+        self.make_complete_non_reused(self.E03_11_RSIC, [self.raw_dataset], [self.raw_dataset])
+        self.raw_dataset.integrity_checks.create(execlog=self.E03_11_RSIC.log, user=self.myUser)
         if bp == "first_rsic":
             return
 
-        self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
-        step1_in_ccl = self.doublet_symDS.content_checks.first()
+        self.make_complete_non_reused(self.step_E1_RS, [self.raw_dataset], [self.doublet_dataset])
+        step1_in_ccl = self.doublet_dataset.content_checks.first()
         step1_in_ccl.execlog = self.step_E1_RS.log
         step1_in_ccl.save()
-        self.doublet_DS.file_source = self.step_E1_RS
-        self.doublet_DS.save()
+        self.doublet_dataset.file_source = self.step_E1_RS
+        self.doublet_dataset.save()
         if bp == "first_runstep_complete":
             return
 
@@ -124,16 +123,16 @@ class ArchiveTestCaseHelpers:
             return
 
         self.complete_RSICs(self.step_E2_RS,
-                            [self.triplet_symDS, self.singlet_symDS],
-                            [self.D1_in_symDS, self.singlet_symDS])
+                            [self.triplet_dataset, self.singlet_dataset],
+                            [self.D1_in_dataset, self.singlet_dataset])
         self.E01_21_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E01_21).first()
         self.E02_22_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E02_22).first()
 
-        D1_in_ccl = self.D1_in_symDS.content_checks.first()
+        D1_in_ccl = self.D1_in_dataset.content_checks.first()
         D1_in_ccl.execlog = self.E01_21_RSIC.log
         D1_in_ccl.save()
 
-        self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log, user=self.myUser)
+        self.singlet_dataset.integrity_checks.create(execlog=self.E02_22_RSIC.log, user=self.myUser)
         if bp == "second_runstep_complete":
             return
 
@@ -142,23 +141,23 @@ class ArchiveTestCaseHelpers:
         self.pD_run.save()
         self.step_D1_RS = self.step_D1.pipelinestep_instances.create(run=self.pD_run)
         self.complete_RSICs(self.step_D1_RS,
-                            [self.D1_in_symDS, self.singlet_symDS],
-                            [self.D1_in_symDS, self.singlet_symDS])
+                            [self.D1_in_dataset, self.singlet_dataset],
+                            [self.D1_in_dataset, self.singlet_dataset])
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-        self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
-        self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
+        self.D1_in_dataset.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
+        self.singlet_dataset.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
 
-        self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
-        C1_ccl = self.C1_in_symDS.content_checks.first()
+        self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_dataset, self.singlet_dataset], [self.C1_in_dataset])
+        C1_ccl = self.C1_in_dataset.content_checks.first()
         C1_ccl.execlog = self.step_D1_RS.log
         C1_ccl.save()
-        self.C1_in_DS.file_source = self.step_D1_RS
-        self.C1_in_DS.save()
+        self.C1_in_dataset.file_source = self.step_D1_RS
+        self.C1_in_dataset.save()
 
         pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
-        self.make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log, user=self.myUser)
+        self.make_complete_non_reused(pD_ROC, [self.C1_in_dataset], [self.C1_in_dataset])
+        self.C1_in_dataset.integrity_checks.create(execlog=pD_ROC.log, user=self.myUser)
 
         if bp == "sub_pipeline":
             return
@@ -191,25 +190,22 @@ class ArchiveTestCaseHelpers:
                 step_num=3)
             self.pE_run = Run.objects.get(pipeline=self.pE,
                                           name='pE_run')
-            self.raw_symDS = Dataset.objects.get(dataset__name='raw_DS')
-            self.singlet_symDS = Dataset.objects.get(
-                dataset__dataset_file__endswith='singlet_cdt_large.csv')
-            self.doublet_symDS = Dataset.objects.get(dataset__name='doublet')
-            self.doublet_DS = self.doublet_symDS.dataset
-            self.triplet_symDS = Dataset.objects.get(
-                dataset__dataset_file__endswith='step_0_triplet.csv')
-            self.C1_in_symDS = Dataset.objects.get(dataset__name='C1_in_triplet')
-            self.C1_in_DS = self.C1_in_symDS.dataset
-            self.C1_out_symDS = Dataset.objects.get(
-                dataset__dataset_file__endswith='step_0_singlet.csv')
-            self.C2_in_symDS = Dataset.objects.get(
-                dataset__dataset_file__endswith='E11_32_output.csv')
-            self.C2_out_symDS = Dataset.objects.get(dataset__name='C2_out')
-            self.C3_out_symDS = Dataset.objects.get(dataset__name='C3_out')
-            self.E1_out_symDS = Dataset.objects.get(dataset__name='E1_out')
-            self.E1_out_DS = self.E1_out_symDS.dataset
-            self.D1_in_symDS = Dataset.objects.get(
-                structure__compounddatatype=self.doublet_symDS.structure.compounddatatype,
+            self.raw_dataset = Dataset.objects.get(name='raw_DS')
+            self.singlet_dataset = Dataset.objects.get(
+                dataset_file__endswith='singlet_cdt_large.csv')
+            self.doublet_dataset = Dataset.objects.get(name='doublet')
+            self.triplet_dataset = Dataset.objects.get(
+                dataset_file__endswith='step_0_triplet.csv')
+            self.C1_in_dataset = Dataset.objects.get(name='C1_in_triplet')
+            self.C1_out_dataset = Dataset.objects.get(
+                dataset_file__endswith='step_0_singlet.csv')
+            self.C2_in_dataset = Dataset.objects.get(
+                dataset_file__endswith='E11_32_output.csv')
+            self.C2_out_dataset = Dataset.objects.get(name='C2_out')
+            self.C3_out_dataset = Dataset.objects.get(name='C3_out')
+            self.E1_out_dataset = Dataset.objects.get(name='E1_out')
+            self.D1_in_dataset = Dataset.objects.get(
+                structure__compounddatatype=self.doublet_dataset.structure.compounddatatype,
                 structure__num_rows=10)
             self.D01_11 = self.step_D1.cables_in.get(dest__dataset_idx=1)
             self.D02_12 = self.step_D1.cables_in.get(dest__dataset_idx=2)
@@ -235,8 +231,8 @@ class ArchiveTestCaseHelpers:
         if bp == "first_cable_created":
             return
 
-        self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
-        icl = self.raw_symDS.integrity_checks.create(execlog=step_E1_RSIC.log, user=self.myUser)
+        self.make_complete_non_reused(step_E1_RSIC, [self.raw_dataset], [self.raw_dataset])
+        icl = self.raw_dataset.integrity_checks.create(execlog=step_E1_RSIC.log, user=self.myUser)
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
@@ -244,12 +240,12 @@ class ArchiveTestCaseHelpers:
             return
 
         # First RunStep completed.
-        self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
-        step1_in_ccl = self.doublet_symDS.content_checks.first()
+        self.make_complete_non_reused(self.step_E1_RS, [self.raw_dataset], [self.doublet_dataset])
+        step1_in_ccl = self.doublet_dataset.content_checks.first()
         step1_in_ccl.execlog = self.step_E1_RS.log
         step1_in_ccl.save()
-        self.doublet_DS.file_source = self.step_E1_RS
-        self.doublet_DS.save()
+        self.doublet_dataset.file_source = self.step_E1_RS
+        self.doublet_dataset.save()
         if bp == "first_step_complete":
             return
 
@@ -261,17 +257,17 @@ class ArchiveTestCaseHelpers:
         # Sub-pipeline for step 2 - reset step_E2_RS.
         self.step_E2_RS.delete()
         self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run, reused=None)
-        self.complete_RSICs(self.step_E2_RS, [self.triplet_symDS, self.singlet_symDS],
-                                             [self.D1_in_symDS, self.singlet_symDS])
+        self.complete_RSICs(self.step_E2_RS, [self.triplet_dataset, self.singlet_dataset],
+                                             [self.D1_in_dataset, self.singlet_dataset])
 
         self.E01_21_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E01_21).first()
         self.E02_22_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E02_22).first()
 
-        D1_in_ccl = self.D1_in_symDS.content_checks.first()
+        D1_in_ccl = self.D1_in_dataset.content_checks.first()
         D1_in_ccl.execlog = self.E01_21_RSIC.log
         D1_in_ccl.save()
 
-        icl = self.singlet_symDS.integrity_checks.create(execlog=self.E02_22_RSIC.log, user=self.myUser)
+        icl = self.singlet_dataset.integrity_checks.create(execlog=self.E02_22_RSIC.log, user=self.myUser)
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
@@ -283,30 +279,30 @@ class ArchiveTestCaseHelpers:
 
         # Complete sub-Pipeline.
         self.step_D1_RS = self.step_D1.pipelinestep_instances.create(run=self.pD_run)
-        self.complete_RSICs(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS],
-                                             [self.D1_in_symDS, self.singlet_symDS])
+        self.complete_RSICs(self.step_D1_RS, [self.D1_in_dataset, self.singlet_dataset],
+                                             [self.D1_in_dataset, self.singlet_dataset])
 
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
+        icl = self.D1_in_dataset.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
-        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
+        icl = self.singlet_dataset.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
 
-        self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
-        C1_ccl = self.C1_in_symDS.content_checks.first()
+        self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_dataset, self.singlet_dataset], [self.C1_in_dataset])
+        C1_ccl = self.C1_in_dataset.content_checks.first()
         C1_ccl.execlog = self.step_D1_RS.log
         C1_ccl.save()
-        self.C1_in_DS.file_source = self.step_D1_RS
-        self.C1_in_DS.save()
+        self.C1_in_dataset.file_source = self.step_D1_RS
+        self.C1_in_dataset.save()
 
         pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
-        self.make_complete_non_reused(pD_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        icl = self.C1_in_symDS.integrity_checks.create(execlog=pD_ROC.log, user=self.myUser)
+        self.make_complete_non_reused(pD_ROC, [self.C1_in_dataset], [self.C1_in_dataset])
+        icl = self.C1_in_dataset.integrity_checks.create(execlog=pD_ROC.log, user=self.myUser)
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
@@ -319,30 +315,30 @@ class ArchiveTestCaseHelpers:
             return
 
         # Third RunStep completed.
-        self.complete_RSICs(self.step_E3_RS, [self.C1_in_symDS, self.doublet_symDS],
-                                             [self.C1_in_symDS, self.C2_in_symDS])
+        self.complete_RSICs(self.step_E3_RS, [self.C1_in_dataset, self.doublet_dataset],
+                                             [self.C1_in_dataset, self.C2_in_dataset])
 
         self.E21_31_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E21_31).first()
         self.E11_32_RSIC = self.step_E3_RS.RSICs.filter(PSIC=self.E11_32).first()
-        icl = self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log, user=self.myUser)
+        icl = self.C1_in_dataset.integrity_checks.create(execlog=self.E21_31_RSIC.log, user=self.myUser)
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
 
-        # C2_in_symDS was created here so we associate its CCL with cable
+        # C2_in_dataset was created here so we associate its CCL with cable
         # E11_32.
-        C2_in_ccl = self.C2_in_symDS.content_checks.first()
+        C2_in_ccl = self.C2_in_dataset.content_checks.first()
         C2_in_ccl.execlog = self.E11_32_RSIC.log
         C2_in_ccl.save()
 
         if bp == "third_step_cables_done":
             return
 
-        step3_outs = [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS]
-        self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_symDS, self.C2_in_symDS], step3_outs)
-        # All of these were first created here, so associate the CCL of C1_out_symDS to step_E3_RS.
+        step3_outs = [self.C1_out_dataset, self.C2_out_dataset, self.C3_out_dataset]
+        self.make_complete_non_reused(self.step_E3_RS, [self.C1_in_dataset, self.C2_in_dataset], step3_outs)
+        # All of these were first created here, so associate the CCL of C1_out_dataset to step_E3_RS.
         # The others are raw and don't have CCLs.
-        C1_out_ccl = self.C1_out_symDS.content_checks.first()
+        C1_out_ccl = self.C1_out_dataset.content_checks.first()
         C1_out_ccl.execlog = self.step_E3_RS.log
         C1_out_ccl.save()
 
@@ -351,29 +347,29 @@ class ArchiveTestCaseHelpers:
 
         # Outcables associated.
         roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
-        self.make_complete_non_reused(roc1, [self.C1_in_symDS], [self.E1_out_symDS])
+        self.make_complete_non_reused(roc1, [self.C1_in_dataset], [self.E1_out_dataset])
         # This was first created here, so associate the CCL appropriately.
-        E1_out_ccl = self.E1_out_symDS.content_checks.first()
+        E1_out_ccl = self.E1_out_dataset.content_checks.first()
         E1_out_ccl.execlog = roc1.log
         E1_out_ccl.save()
-        self.E1_out_DS.file_source = roc1
-        self.E1_out_DS.save()
+        self.E1_out_dataset.file_source = roc1
+        self.E1_out_dataset.save()
 
         if bp == "first_outcable":
             return
 
         roc2 = self.pE.outcables.get(output_idx=2).poc_instances.create(run=self.pE_run)
-        self.make_complete_non_reused(roc2, [self.C1_out_symDS], [self.C1_out_symDS])
+        self.make_complete_non_reused(roc2, [self.C1_out_dataset], [self.C1_out_dataset])
         roc3 = self.pE.outcables.get(output_idx=3).poc_instances.create(run=self.pE_run)
-        self.make_complete_non_reused(roc3, [self.C3_out_symDS], [self.C3_out_symDS])
+        self.make_complete_non_reused(roc3, [self.C3_out_dataset], [self.C3_out_dataset])
 
-        # roc2 and roc3 are trivial cables, so we associate integrity checks with C1_out_symDS
-        # and C3_out_symDS.
-        icl = self.C1_out_symDS.integrity_checks.create(execlog=roc2.log, user=self.myUser)
+        # roc2 and roc3 are trivial cables, so we associate integrity checks with C1_out_dataset
+        # and C3_out_dataset.
+        icl = self.C1_out_dataset.integrity_checks.create(execlog=roc2.log, user=self.myUser)
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
-        icl = self.C3_out_symDS.integrity_checks.create(execlog=roc3.log, user=self.myUser)
+        icl = self.C3_out_dataset.integrity_checks.create(execlog=roc3.log, user=self.myUser)
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
@@ -394,23 +390,23 @@ class ArchiveTestCaseHelpers:
         if bp == "rsic_created":
             return
 
-        self.make_complete_non_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS])
-        # C2_in_symDS is created by this cable so associate a CCL appropriately.
-        C2_ccl = self.C2_in_symDS.content_checks.first()
+        self.make_complete_non_reused(self.E11_32_RSIC, [self.doublet_dataset], [self.C2_in_dataset])
+        # C2_in_dataset is created by this cable so associate a CCL appropriately.
+        C2_ccl = self.C2_in_dataset.content_checks.first()
         C2_ccl.execlog = self.E11_32_RSIC.log
         C2_ccl.save()
         if bp == "rsic_completed":
             return
 
         self.E21_31_RSIC = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
-        self.make_complete_non_reused(self.E21_31_RSIC, [self.C1_in_symDS], [self.C1_in_symDS])
-        # C1_in_symDS is not created by this RSIC, so associate an ICL.
-        self.C1_in_symDS.integrity_checks.create(execlog=self.E21_31_RSIC.log, user=self.myUser)
+        self.make_complete_non_reused(self.E21_31_RSIC, [self.C1_in_dataset], [self.C1_in_dataset])
+        # C1_in_dataset is not created by this RSIC, so associate an ICL.
+        self.C1_in_dataset.integrity_checks.create(execlog=self.E21_31_RSIC.log, user=self.myUser)
         self.make_complete_non_reused(self.step_E3_RS,
-                                      [self.C1_in_symDS, self.C2_in_symDS],
-                                      [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS])
-        # Associate the CCL of C1_out_symDS with step_E3_RS.
-        C1_out_ccl = self.C1_out_symDS.content_checks.first()
+                                      [self.C1_in_dataset, self.C2_in_dataset],
+                                      [self.C1_out_dataset, self.C2_out_dataset, self.C3_out_dataset])
+        # Associate the CCL of C1_out_dataset with step_E3_RS.
+        C1_out_ccl = self.C1_out_dataset.content_checks.first()
         C1_out_ccl.execlog = self.step_E3_RS.log
         C1_out_ccl.save()
         if bp == "runstep_completed":
@@ -423,13 +419,13 @@ class ArchiveTestCaseHelpers:
         if bp == "roc_created":
             return
 
-        self.make_complete_non_reused(self.E31_42_ROC, [self.singlet_symDS], [self.singlet_symDS])
+        self.make_complete_non_reused(self.E31_42_ROC, [self.singlet_dataset], [self.singlet_dataset])
         if bp == "trivial_roc_completed":
             return
 
-        self.make_complete_non_reused(self.E21_41_ROC, [self.C1_in_symDS], [self.doublet_symDS])
-        self.doublet_DS.file_source = self.E21_41_ROC
-        self.doublet_DS.save()
+        self.make_complete_non_reused(self.E21_41_ROC, [self.C1_in_dataset], [self.doublet_dataset])
+        self.doublet_dataset.file_source = self.E21_41_ROC
+        self.doublet_dataset.save()
         if bp == "custom_roc_completed":
             return
 
@@ -449,10 +445,10 @@ class ArchiveTestCaseHelpers:
         if bp == "subrun":
             return
 
-        self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        self.C1_in_DS.file_source = self.D11_21_ROC
-        self.C1_in_DS.save()
-        self.C1_in_symDS.content_checks.create(execlog=self.D11_21_ROC.log, start_time=timezone.now(),
+        self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_dataset], [self.C1_in_dataset])
+        self.C1_in_dataset.file_source = self.D11_21_ROC
+        self.C1_in_dataset.save()
+        self.C1_in_dataset.content_checks.create(execlog=self.D11_21_ROC.log, start_time=timezone.now(),
                                                end_time=timezone.now(), user=self.myUser)
         self.D11_21_ROC.stop(save=True)
         if bp == "subrun_complete":
@@ -482,7 +478,7 @@ class ArchiveTestCaseHelpers:
     #     p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
     #
     #     # Set up a words dataset.
-    #     tools.make_words_symDS(self)
+    #     tools.make_words_dataset(self)
     #
     #     self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.dataset_words],
     #                                                groups_allowed=[everyone_group()])
@@ -518,7 +514,7 @@ class ArchiveTestCaseHelpers:
         p_top.save()
 
         # Set up a dataset with words in it called self.dataset_words.
-        tools.make_words_symDS(self)
+        tools.make_words_dataset(self)
 
         run_sandbox = sandbox.execute.Sandbox(self.user_bob, p_top, [self.symds_words],
                                               groups_allowed=[everyone_group()])
@@ -825,7 +821,7 @@ class RunStepTests(ArchiveTestCase):
         self.step_through_runstep_creation("first_rsic")
 
         # Make this RunSIC incomplete by removing the ICL.
-        icl_to_remove = self.raw_symDS.integrity_checks.filter(execlog=self.E03_11_RSIC.log).first()
+        icl_to_remove = self.raw_dataset.integrity_checks.filter(execlog=self.E03_11_RSIC.log).first()
         icl_to_remove.execlog = None
         icl_to_remove.save()
 
@@ -846,8 +842,8 @@ class RunStepTests(ArchiveTestCase):
         Dataset, is not clean.
         """
         self.step_through_runstep_creation("first_runstep")
-        self.doublet_DS.file_source = self.step_E1_RS
-        self.doublet_DS.save()
+        self.doublet_dataset.file_source = self.step_E1_RS
+        self.doublet_dataset.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" inputs not quenched; no data should have been generated'
                                           .format(self.step_E1_RS)),
@@ -940,8 +936,8 @@ class RunStepTests(ArchiveTestCase):
         other_run.grant_everyone_access()
         other_runstep = self.step_E1.pipelinestep_instances.create(run=other_run)
         rsic = self.E03_11.psic_instances.create(runstep=other_runstep)
-        self.make_complete_non_reused(rsic, [self.raw_symDS], [self.raw_symDS])
-        self.make_complete_non_reused(other_runstep, [self.raw_symDS], [self.doublet_symDS])
+        self.make_complete_non_reused(rsic, [self.raw_dataset], [self.raw_dataset])
+        self.make_complete_non_reused(other_runstep, [self.raw_dataset], [self.doublet_dataset])
 
         self.step_E1_RS.execrecord = other_runstep.execrecord
 
@@ -965,7 +961,7 @@ class RunStepTests(ArchiveTestCase):
     def test_RunStep_clean_undecided_reused_with_data(self):
         """
         A RunStep which has not decided whether to reuse an ExecRecord,
-        but which has output SymbolicDatasets, is not clean.
+        but which has output Datasets, is not clean.
         """
         # Give step_E1_RS a complete ExecLog.
         self.step_through_runstep_creation("first_runstep_complete")
@@ -976,8 +972,8 @@ class RunStepTests(ArchiveTestCase):
         other_run.grant_everyone_access()
         other_runstep = self.step_E1.pipelinestep_instances.create(run=other_run)
         rsic = self.E03_11.psic_instances.create(runstep=other_runstep)
-        self.make_complete_non_reused(rsic, [self.raw_symDS], [self.raw_symDS])
-        self.make_complete_non_reused(other_runstep, [self.raw_symDS], [self.doublet_symDS])
+        self.make_complete_non_reused(rsic, [self.raw_dataset], [self.raw_dataset])
+        self.make_complete_non_reused(other_runstep, [self.raw_dataset], [self.doublet_dataset])
 
         self.step_E1_RS.reused = None
         self.step_E1_RS.execrecord = other_runstep.execrecord
@@ -990,12 +986,12 @@ class RunStepTests(ArchiveTestCase):
     def test_RunStep_clean_reused_with_data(self):
         """
         A RunStep which has decided to reuse an ExecRecord, but which
-        has output SymbolicDatasets, is not clean.
+        has output Datasets, is not clean.
         """
         self.step_through_runstep_creation("first_runstep_complete")
         self.step_E1_RS.reused = True
-        self.doublet_DS.file_source = self.step_E1_RS
-        self.doublet_DS.save()
+        self.doublet_dataset.file_source = self.step_E1_RS
+        self.doublet_dataset.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" reused an ExecRecord and should not have generated any Datasets'
                                           .format(self.step_E1_RS)),
@@ -1019,7 +1015,7 @@ class RunStepTests(ArchiveTestCase):
         Datasets.
         """
         self.step_through_runstep_creation("second_runstep_complete")
-        self.step_E2_RS.outputs.add(self.singlet_symDS.dataset)
+        self.step_E2_RS.outputs.add(self.singlet_dataset)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" represents a sub-pipeline and should not have generated any '
                                           'data'.format(self.step_E2_RS)),
@@ -1073,7 +1069,7 @@ class RunStepTests(ArchiveTestCase):
 
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_run.grant_everyone_access()
-        self.make_complete_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS], other_run)
+        self.make_complete_reused(self.step_E1_RS, [self.raw_dataset], [self.doublet_dataset], other_run)
 
         self.step_E1_RS.execrecord = None
         self.step_E1_RS.outputs.clear()
@@ -1086,16 +1082,15 @@ class RunStepTests(ArchiveTestCase):
         """
         self.step_through_runstep_creation("first_runstep_complete")
         self.step_E1_RS.reused = False
-        self.doublet_DS.file_source = self.step_E1_RS
-        self.doublet_symDS.MD5_checksum = "foo"
-        self.doublet_DS.save()
-        self.doublet_symDS.save()
-        with open(self.doublet_DS.dataset_file.path) as f:
+        self.doublet_dataset.file_source = self.step_E1_RS
+        self.doublet_dataset.MD5_checksum = "foo"
+        self.doublet_dataset.save()
+        with open(self.doublet_dataset.dataset_file.path) as f:
             checksum = compute_md5(f)
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('File integrity of "{}" lost. Current checksum "{}" does not equal expected '
-                                          'checksum "{}"'.format(self.doublet_DS, checksum, "foo")),
+                                          'checksum "{}"'.format(self.doublet_dataset, checksum, "foo")),
                                 self.step_E1_RS.clean)
 
     def test_RunStep_clean_non_reused_good_data(self):
@@ -1104,9 +1099,8 @@ class RunStepTests(ArchiveTestCase):
         clean output data, is clean.
         """
         self.step_through_runstep_creation("first_runstep_complete")
-        self.doublet_symDS.MD5_checksum = self.doublet_DS.compute_md5()
-        self.doublet_DS.save()
-        self.doublet_symDS.save()
+        self.doublet_dataset.MD5_checksum = self.doublet_dataset.compute_md5()
+        self.doublet_dataset.save()
         self.assertIsNone(self.step_E1_RS.clean())
 
     def test_RunStep_clean_good_child_run(self):
@@ -1200,7 +1194,7 @@ class RunStepTests(ArchiveTestCase):
         """
         self.step_through_runstep_creation("first_step_complete")
         ero = self.step_E1_RS.execrecord.execrecordouts.first()
-        ero.symbolicdataset.dataset.delete()
+        ero.dataset.delete()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('ExecRecordOut "{}" of RunStep "{}" should reference existent data'
                                           .format(ero, self.step_E1_RS)),
@@ -1211,11 +1205,11 @@ class RunStepTests(ArchiveTestCase):
         A RunStep with a Dataset not in its ExecRecord is not clean.
         """
         self.step_through_runstep_creation("first_step")
-        self.triplet_DS.file_source = self.step_E1_RS
-        self.triplet_DS.save()
+        self.triplet_dataset.file_source = self.step_E1_RS
+        self.triplet_dataset.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" generated Dataset "{}" but it is not in its ExecRecord'
-                                          .format(self.step_E1_RS, self.triplet_DS)),
+                                          .format(self.step_E1_RS, self.triplet_dataset)),
                                 self.step_E1_RS.clean)
 
     def test_RunStep_subpipeline_complete(self):
@@ -1243,8 +1237,8 @@ class RunStepTests(ArchiveTestCase):
         complete_clean.
         """
         self.step_through_runstep_creation("first_runstep")
-        self.doublet_DS.file_source = self.step_E1_RS
-        self.doublet_DS.save()
+        self.doublet_dataset.file_source = self.step_E1_RS
+        self.doublet_dataset.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" inputs not quenched; no data should have been generated'
                                           .format(self.step_E1_RS)),
@@ -1351,9 +1345,9 @@ class RunComponentTooManyChecks(TestCase):
                     runstep.has_log):
                 break
         log = runstep.log
-        sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-        log.integrity_checks.create(symbolicdataset=sd, user=self.user_bob)
-        log.integrity_checks.create(symbolicdataset=sd, user=self.user_bob)
+        sd = runstep.execrecord.execrecordouts.first().dataset
+        log.integrity_checks.create(dataset=sd, user=self.user_bob)
+        log.integrity_checks.create(dataset=sd, user=self.user_bob)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" has multiple IntegrityCheckLogs for output '
                                           'Dataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1369,9 +1363,9 @@ class RunComponentTooManyChecks(TestCase):
                     runstep.invoked_logs.count() > 1):
                 break
         for log in runstep.invoked_logs.all():
-            sd = log.record.execrecord.execrecordouts.first().symbolicdataset
-            extra_check_1 = log.integrity_checks.create(symbolicdataset=sd, user=self.user_bob)
-            extra_check_2 = log.integrity_checks.create(symbolicdataset=sd, user=self.user_bob)
+            sd = log.record.execrecord.execrecordouts.first().dataset
+            extra_check_1 = log.integrity_checks.create(dataset=sd, user=self.user_bob)
+            extra_check_2 = log.integrity_checks.create(dataset=sd, user=self.user_bob)
             self.assertRaisesRegexp(ValidationError,
                                     re.escape('RunStep "{}" has multiple IntegrityCheckLogs for output '
                                               'Dataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1388,9 +1382,9 @@ class RunComponentTooManyChecks(TestCase):
                     runstep.has_log):
                 break
         log = runstep.log
-        sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-        log.content_checks.create(symbolicdataset=sd, user=self.user_bob)
-        log.content_checks.create(symbolicdataset=sd, user=self.user_bob)
+        sd = runstep.execrecord.execrecordouts.first().dataset
+        log.content_checks.create(dataset=sd, user=self.user_bob)
+        log.content_checks.create(dataset=sd, user=self.user_bob)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" has multiple ContentCheckLogs for output '
                                           'Dataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1406,9 +1400,9 @@ class RunComponentTooManyChecks(TestCase):
                     runstep.invoked_logs.count() > 1):
                 break
         for log in runstep.invoked_logs.all():
-            sd = runstep.execrecord.execrecordouts.first().symbolicdataset
-            extra_check_1 = log.content_checks.create(symbolicdataset=sd, user=self.user_bob)
-            extra_check_2 = log.content_checks.create(symbolicdataset=sd, user=self.user_bob)
+            sd = runstep.execrecord.execrecordouts.first().dataset
+            extra_check_1 = log.content_checks.create(dataset=sd, user=self.user_bob)
+            extra_check_2 = log.content_checks.create(dataset=sd, user=self.user_bob)
             self.assertRaisesRegexp(ValidationError,
                                     re.escape('RunStep "{}" has multiple ContentCheckLogs for output '
                                               'Dataset {} of ExecLog "{}"'.format(runstep, sd, log)),
@@ -1490,7 +1484,7 @@ class RunTests(ArchiveTestCase):
         is not complete, is clean.
 
         TODO: when we add the check to RunStep.clean that the
-        SymbolicDatasets feeding it are present, this will fail by
+        Datasets feeding it are present, this will fail by
         propagation. The test setup will need to be modified to put in
         place the inputs to steps 1 and 2.
         """
@@ -1642,8 +1636,8 @@ class RunSICTests(ArchiveTestCase):
         but which has associated data, is not clean.
         """
         self.step_through_runsic_creation("rsic_created")
-        self.doublet_DS.file_source = self.E11_32_RSIC
-        self.doublet_DS.save()
+        self.doublet_dataset.file_source = self.E11_32_RSIC
+        self.doublet_dataset.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" has not decided whether or not to reuse an ExecRecord; '
                                           'no Datasets should be associated'.format(self.E11_32_RSIC)),
@@ -1661,7 +1655,7 @@ class RunSICTests(ArchiveTestCase):
         other_run.grant_everyone_access()
         other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
         other_rsic = self.E11_32.psic_instances.create(runstep=other_runstep)
-        self.make_complete_non_reused(other_rsic, [self.doublet_symDS], [self.C2_in_symDS])
+        self.make_complete_non_reused(other_rsic, [self.doublet_dataset], [self.C2_in_dataset])
         self.E11_32_RSIC.execrecord = other_rsic.execrecord
 
         self.assertRaisesRegexp(ValidationError,
@@ -1676,8 +1670,8 @@ class RunSICTests(ArchiveTestCase):
         """
         self.step_through_runsic_creation("rsic_completed")
         self.E11_32_RSIC.reused = True
-        self.doublet_DS.file_source = self.E11_32_RSIC
-        self.doublet_DS.save()
+        self.doublet_dataset.file_source = self.E11_32_RSIC
+        self.doublet_dataset.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" reused an ExecRecord and should not have generated any Datasets'
                                           .format(self.E11_32_RSIC)),
@@ -1691,14 +1685,14 @@ class RunSICTests(ArchiveTestCase):
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_run.grant_everyone_access()
         other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
-        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], other_runstep)
+        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_dataset], [self.C2_in_dataset], other_runstep)
 
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
         self.C1_in.execrecordouts_referencing.add(ero)
         self.assertRaisesRegexp(
             ValidationError,
             re.escape('CDT of Dataset "{}" is not a restriction of the CDT of the fed TransformationInput "{}"'
-                      .format(ero.symbolicdataset, ero.generic_output.definite)),
+                      .format(ero.dataset, ero.generic_output.definite)),
             self.E11_32_RSIC.clean)
 
     def test_RunSIC_clean_reused_incompatible_execrecord(self):
@@ -1710,12 +1704,12 @@ class RunSICTests(ArchiveTestCase):
 
         # Create an incompatible RunSIC.
         runsic = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
-        self.make_complete_non_reused(runsic, [self.C1_in_symDS], [self.C1_in_symDS])
+        self.make_complete_non_reused(runsic, [self.C1_in_dataset], [self.C1_in_dataset])
 
         run = self.pE.pipeline_instances.create(user=self.myUser)
         run.grant_everyone_access()
         runstep = self.step_E3.pipelinestep_instances.create(run=run)
-        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], runstep)
+        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_dataset], [self.C2_in_dataset], runstep)
 
         self.E11_32_RSIC.execrecord = runsic.execrecord
         self.assertRaisesRegexp(
@@ -1734,12 +1728,12 @@ class RunSICTests(ArchiveTestCase):
         other_run.grant_everyone_access()
         other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
 
-        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], other_runstep)
+        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_dataset], [self.C2_in_dataset], other_runstep)
         self.E21_31_RSIC = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
-        self.make_complete_non_reused(self.E21_31_RSIC, [self.C1_in_symDS], [self.C1_in_symDS])
+        self.make_complete_non_reused(self.E21_31_RSIC, [self.C1_in_dataset], [self.C1_in_dataset])
         self.make_complete_non_reused(self.step_E3_RS,
-                                      [self.C1_in_symDS, self.C2_in_symDS],
-                                      [self.C1_out_symDS, self.C2_out_symDS, self.C3_out_symDS])
+                                      [self.C1_in_dataset, self.C2_in_dataset],
+                                      [self.C1_out_dataset, self.C2_out_dataset, self.C3_out_dataset])
 
         self.E11_32_RSIC.execrecord = self.step_E3_RS.execrecord
         self.assertRaisesRegexp(ValidationError,
@@ -1763,7 +1757,7 @@ class RunSICTests(ArchiveTestCase):
         runstep = self.step_E3.pipelinestep_instances.create(run=run)
         self.E11_32.keep_output = True
         self.E11_32.save()
-        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], runstep)
+        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_dataset], [self.C2_in_dataset], runstep)
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
 
         self.assertTrue(self.E11_32_RSIC.keeps_output())
@@ -1788,7 +1782,7 @@ class RunSICTests(ArchiveTestCase):
         other_run.save()
         other_RS = self.step_E3.pipelinestep_instances.create(run=other_run)
 
-        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], other_RS)
+        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_dataset], [self.C2_in_dataset], other_RS)
 
         self.assertIsNone(self.E11_32_RSIC.clean())
 
@@ -1803,11 +1797,11 @@ class RunSICTests(ArchiveTestCase):
         other_run.grant_everyone_access()
         other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
 
-        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS], other_runstep)
+        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_dataset], [self.C2_in_dataset], other_runstep)
         self.E11_32.keep_output = True
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
-        self.E11_32_output_DS.symbolicdataset = ero.symbolicdataset
-        self.E11_32_output_DS.save()
+        self.E11_32_output_dataset = ero.dataset
+        self.E11_32_output_dataset.save()
 
         self.assertTrue(self.E11_32_RSIC.is_complete())
         self.assertIsNone(self.E11_32_RSIC.complete_clean())
@@ -1822,7 +1816,7 @@ class RunSICTests(ArchiveTestCase):
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_run.grant_everyone_access()
         other_RS = self.step_E3.pipelinestep_instances.create(run=other_run)
-        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_symDS], [self.C2_in_symDS],
+        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_dataset], [self.C2_in_dataset],
                                   other_RS)
 
         self.E11_32.keep_output = True
@@ -1856,7 +1850,7 @@ class RunSICTests(ArchiveTestCase):
             re.escape(
                 'CDT of Dataset "{}" is not a restriction of the '
                 'CDT of the fed TransformationInput "{}"'.format(
-                    ero.symbolicdataset, ero.generic_output.definite)),
+                    ero.dataset, ero.generic_output.definite)),
             self.E11_32_RSIC.clean)
 
     def test_RunSIC_clean_not_reused_incompatible_execrecord(self):
@@ -1871,7 +1865,7 @@ class RunSICTests(ArchiveTestCase):
         # Create an incompatible RunSIC.
         runstep = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
         runsic = self.E02_22.psic_instances.create(runstep=runstep)
-        self.make_complete_non_reused(runsic, [self.singlet_symDS], [self.singlet_symDS])
+        self.make_complete_non_reused(runsic, [self.singlet_dataset], [self.singlet_dataset])
         self.E11_32_RSIC.execrecord = runsic.execrecord
         self.assertRaisesRegexp(
             ValidationError,
@@ -1914,7 +1908,7 @@ class RunSICTests(ArchiveTestCase):
         """
         self.step_through_runsic_creation("rsic_completed")
         self.E11_32_RSIC.reused = False
-        self.E11_32_RSIC.outputs.add(self.E11_32_output_DS)
+        self.E11_32_RSIC.outputs.add(self.E11_32_output_dataset)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" does not keep its output but a dataset was registered'
                                           .format(self.E11_32_RSIC)),
@@ -1943,11 +1937,11 @@ class RunSICTests(ArchiveTestCase):
         self.E11_32_RSIC.reused = False
         self.E11_32.keep_output = True
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
-        self.E11_32_output_DS.symbolicdataset = ero.symbolicdataset
-        ero.symbolicdataset.MD5_checksum = self.E11_32_output_DS.compute_md5()
-        self.E11_32_output_DS.save()
-        ero.symbolicdataset.save()
-        self.E11_32_RSIC.outputs.add(self.E11_32_output_DS)
+        self.E11_32_output_dataset = ero.dataset
+        ero.dataset.MD5_checksum = self.E11_32_output_dataset.compute_md5()
+        self.E11_32_output_dataset.save()
+        ero.dataset.save()
+        self.E11_32_RSIC.outputs.add(self.E11_32_output_dataset)
         self.assertIsNone(self.E11_32_RSIC.clean())
 
     def test_RunSIC_clean_not_reused_nontrivial_no_data(self):
@@ -1960,8 +1954,8 @@ class RunSICTests(ArchiveTestCase):
         self.E11_32_RSIC.reused = False
         self.E11_32.keep_output = True
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
-        self.E11_32_output_DS.symbolicdataset = ero.symbolicdataset
-        self.E11_32_output_DS.save()
+        self.E11_32_output_dataset = ero.dataset
+        self.E11_32_output_dataset.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" was not reused, trivial, or deleted; it should have produced '
                                           'data'.format(self.E11_32_RSIC)),
@@ -1979,15 +1973,15 @@ class RunSICTests(ArchiveTestCase):
         self.E11_32.keep_output = True
 
         # Associate different datasets to RSIC and associated ERO.
-        self.doublet_DS.file_source = self.E11_32_RSIC
-        self.doublet_DS.save()
+        self.doublet_dataset.file_source = self.E11_32_RSIC
+        self.doublet_dataset.save()
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
-        self.E11_32_output_DS.symbolicdataset = ero.symbolicdataset
-        self.E11_32_output_DS.save()
+        self.E11_32_output_dataset = ero.dataset
+        self.E11_32_output_dataset.save()
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('Dataset "{}" was produced by RunSIC "{}" but is not in an ERO of '
-                                          'ExecRecord "{}"'.format(self.doublet_DS, self.E11_32_RSIC,
+                                          'ExecRecord "{}"'.format(self.doublet_dataset, self.E11_32_RSIC,
                                                                    self.E11_32_RSIC.execrecord)),
                                 self.E11_32_RSIC.clean)
 
@@ -2002,11 +1996,11 @@ class RunSICTests(ArchiveTestCase):
         self.E11_32_RSIC.reused = False
         self.E11_32.keep_output = True
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
-        self.E11_32_output_DS.file_source = self.E11_32_RSIC
-        self.E11_32_output_DS.symbolicdataset = ero.symbolicdataset
-        ero.symbolicdataset.MD5_checksum = self.E11_32_output_DS.compute_md5()
-        self.E11_32_output_DS.save()
-        ero.symbolicdataset.save()
+        self.E11_32_output_dataset.file_source = self.E11_32_RSIC
+        self.E11_32_output_dataset.dataset = ero.dataset
+        ero.dataset.MD5_checksum = self.E11_32_output_dataset.compute_md5()
+        self.E11_32_output_dataset.save()
+        ero.dataset.save()
         self.assertIsNone(self.E11_32_RSIC.clean())
 
     def test_RunSIC_complete_not_reused(self):
@@ -2018,19 +2012,19 @@ class RunSICTests(ArchiveTestCase):
         """
         self.step_through_runsic_creation("rsic_completed")
 
-        # Swap the output of E11_32_RSIC (i.e. C2_in_symDS) for E11_32_output_symDS,
+        # Swap the output of E11_32_RSIC (i.e. C2_in_dataset) for E11_32_output_dataset,
         # which has data.
         self.E11_32_RSIC.reused = False
         self.E11_32.keep_output = True
-        self.E11_32_output_DS.file_source = self.E11_32_RSIC
-        self.E11_32_output_DS.save()
+        self.E11_32_output_dataset.file_source = self.E11_32_RSIC
+        self.E11_32_output_dataset.save()
 
         ero_to_change = self.E11_32_RSIC.execrecord.execrecordouts.first()
-        ero_to_change.symbolicdataset = self.E11_32_output_symDS
+        ero_to_change.dataset = self.E11_32_output_dataset
         ero_to_change.save()
 
-        # Point the CCL of E11_32_output_symDS to the ExecLog of E11_32_RSIC.
-        ccl = self.E11_32_output_symDS.content_checks.first()
+        # Point the CCL of E11_32_output_dataset to the ExecLog of E11_32_RSIC.
+        ccl = self.E11_32_output_dataset.content_checks.first()
         ccl.execlog = self.E11_32_RSIC.log
         ccl.save()
 
@@ -2047,7 +2041,7 @@ class RunSICTests(ArchiveTestCase):
 
         # May 14, 2014: we now make it incomplete by removing the CCL, not by
         # removing the ExecRecord.
-        C2_ccl = self.C2_in_symDS.content_checks.first()
+        C2_ccl = self.C2_in_dataset.content_checks.first()
         C2_ccl.execlog = None
         C2_ccl.save()
 
@@ -2116,8 +2110,8 @@ class RunOutputCableTests(ArchiveTestCase):
         ExecRecord should not have generated any data.
         """
         self.step_through_roc_creation("roc_created")
-        self.C1_out_DS.file_source = self.E31_42_ROC
-        self.C1_out_DS.save()
+        self.C1_out_dataset.file_source = self.E31_42_ROC
+        self.C1_out_dataset.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" has not decided whether or not to reuse an ExecRecord; '
                                           'no Datasets should be associated'.format(self.E31_42_ROC)),
@@ -2135,7 +2129,7 @@ class RunOutputCableTests(ArchiveTestCase):
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_run.grant_everyone_access()
         other_roc = self.E31_42.poc_instances.create(run=other_run)
-        self.make_complete_non_reused(other_roc, [self.C1_out_symDS], [self.C1_out_symDS])
+        self.make_complete_non_reused(other_roc, [self.C1_out_dataset], [self.C1_out_dataset])
         self.E31_42_ROC.execrecord = other_roc.execrecord
 
         self.assertRaisesRegexp(ValidationError,
@@ -2151,8 +2145,8 @@ class RunOutputCableTests(ArchiveTestCase):
         """
         self.step_through_roc_creation("roc_created")
         self.E31_42_ROC.reused = True
-        self.singlet_DS.file_source = self.E31_42_ROC
-        self.singlet_DS.save()
+        self.singlet_dataset.file_source = self.E31_42_ROC
+        self.singlet_dataset.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" reused an ExecRecord and should not have generated any '
                                           'Datasets'.format(self.E31_42_ROC)),
@@ -2181,8 +2175,8 @@ class RunOutputCableTests(ArchiveTestCase):
                             start_time=timezone.now(), end_time=timezone.now())
         cable_log.save()
 
-        self.singlet_DS.file_source = self.E31_42_ROC
-        self.singlet_DS.save()
+        self.singlet_dataset.file_source = self.E31_42_ROC
+        self.singlet_dataset.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" is trivial and should not have generated any Datasets'
                                           .format(self.E31_42_ROC)),
@@ -2204,8 +2198,8 @@ class RunOutputCableTests(ArchiveTestCase):
         ExecRecord, should generate at most one Dataset.
         """
         self.step_through_roc_creation("custom_roc_completed")
-        self.E1_out_DS.file_source = self.E21_41_ROC
-        self.E1_out_DS.save()
+        self.E1_out_dataset.file_source = self.E21_41_ROC
+        self.E1_out_dataset.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" should generate at most one Dataset'
                                           .format(self.E21_41_ROC)),
@@ -2217,15 +2211,15 @@ class RunOutputCableTests(ArchiveTestCase):
         A RunOutputCable which produced a bad Dataset is not clean.
         """
         self.step_through_roc_creation("custom_roc_completed")
-        old_checksum = self.doublet_DS.symbolicdataset.MD5_checksum
-        self.doublet_DS.symbolicdataset.MD5_checksum = "foo"
-        self.doublet_DS.symbolicdataset.save()
+        old_checksum = self.doublet_dataset.MD5_checksum
+        self.doublet_dataset.MD5_checksum = "foo"
+        self.doublet_dataset.save()
 
         self.assertFalse(self.E21_41_ROC.reused)
         self.assertFalse(self.E21_41_ROC.component.is_trivial())
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('File integrity of "{}" lost. Current checksum "{}" does not equal expected '
-                                          'checksum "{}"'.format(self.doublet_DS, old_checksum, "foo")),
+                                          'checksum "{}"'.format(self.doublet_dataset, old_checksum, "foo")),
                                 self.E21_41_ROC.clean)
 
     def test_ROC_clean_not_reused_incomplete_execrecord(self):
@@ -2259,8 +2253,8 @@ class RunOutputCableTests(ArchiveTestCase):
         """
         self.step_through_roc_creation("custom_roc_completed")
         runstep = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
-        self.complete_RSICs(runstep, [self.raw_symDS], [self.raw_symDS])
-        self.make_complete_non_reused(runstep, [self.raw_symDS], [self.doublet_symDS])
+        self.complete_RSICs(runstep, [self.raw_dataset], [self.raw_dataset])
+        self.make_complete_non_reused(runstep, [self.raw_dataset], [self.doublet_dataset])
         self.E31_42_ROC.execrecord = runstep.execrecord
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('ExecRecord of RunOutputCable "{}" does not represent a PipelineCable'
@@ -2305,10 +2299,10 @@ class RunOutputCableTests(ArchiveTestCase):
 
         # May 12, 2014: this caused the test to fail.  We just want the ERO to not have
         # data.
-        # self.triplet_3_rows_DS.file_source = self.D11_21_ROC
-        # self.triplet_3_rows_DS.save()
+        # self.triplet_3_rows_dataset.file_source = self.D11_21_ROC
+        # self.triplet_3_rows_dataset.save()
 
-        self.C1_in_DS.delete()
+        self.C1_in_dataset.delete()
         ero = self.D11_21_ROC.execrecord.execrecordouts.first()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('ExecRecordOut "{}" should reference existent data'.format(ero)),
@@ -2347,7 +2341,7 @@ class RunOutputCableTests(ArchiveTestCase):
         for deletion, should produce data.
         """
         self.step_through_roc_creation("subrun")
-        self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
+        self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_dataset], [self.C1_in_dataset])
 
         self.assertTrue(self.D11_21_ROC.keeps_output())
         self.assertListEqual(self.D11_21_ROC.log.missing_outputs(), [])
@@ -2364,17 +2358,18 @@ class RunOutputCableTests(ArchiveTestCase):
         ExecRecordOut is not clean.
         """
         self.step_through_roc_creation("subrun")
-        self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        self.triplet_3_rows_DS.file_source = self.D11_21_ROC
-        self.triplet_3_rows_DS.save()
+        self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_dataset], [self.C1_in_dataset])
+        self.triplet_3_rows_dataset.file_source = self.D11_21_ROC
+        self.triplet_3_rows_dataset.save()
 
         self.assertFalse(self.D11_21_ROC.component.is_trivial())
         self.assertFalse(self.D11_21_ROC.reused)
-        self.assertNotEqual(self.triplet_3_rows_DS, self.D11_21_ROC.execrecord.execrecordouts.first().symbolicdataset)
+        self.assertNotEqual(self.triplet_3_rows_dataset,
+                            self.D11_21_ROC.execrecord.execrecordouts.first().dataset)
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('Dataset "{}" was produced by RunOutputCable "{}" but is not in an ERO of '
-                                          'ExecRecord "{}"'.format(self.triplet_3_rows_DS, self.D11_21_ROC,
+                                          'ExecRecord "{}"'.format(self.triplet_3_rows_dataset, self.D11_21_ROC,
                                                                    self.D11_21_ROC.execrecord)),
                                 self.D11_21_ROC.clean)
 
@@ -2385,7 +2380,7 @@ class RunOutputCableTests(ArchiveTestCase):
         in its output, is clean.
         """
         self.step_through_roc_creation("subrun_complete")
-        self.D11_21_ROC.outputs.add(self.C1_in_DS)
+        self.D11_21_ROC.outputs.add(self.C1_in_dataset)
         self.assertIsNone(self.D11_21_ROC.clean())
 
     def test_ROC_clean_trivial_with_data(self):
@@ -2395,8 +2390,8 @@ class RunOutputCableTests(ArchiveTestCase):
         Dataset associated, is not clean.
         """
         self.step_through_roc_creation("trivial_roc_completed")
-        self.singlet_DS.file_source = self.E31_42_ROC
-        self.singlet_DS.save()
+        self.singlet_dataset.file_source = self.E31_42_ROC
+        self.singlet_dataset.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" is trivial and should not have generated any Datasets'
                                           .format(self.E31_42_ROC)),
@@ -2419,7 +2414,7 @@ class RunOutputCableTests(ArchiveTestCase):
         data matching its ExecRecordOut, is clean.
         """
         self.step_through_roc_creation("custom_roc_completed")
-        self.E21_41_ROC.outputs.add(self.doublet_DS)
+        self.E21_41_ROC.outputs.add(self.doublet_dataset)
         self.assertTrue(self.E21_41_ROC.has_data())
         self.assertIsNone(self.E21_41_ROC.clean())
 
@@ -2430,8 +2425,8 @@ class RunOutputCableTests(ArchiveTestCase):
         have produced output data, otherwise it is not clean.
         """
         self.step_through_roc_creation("custom_roc_completed")
-        self.doublet_DS.file_source = None
-        self.doublet_DS.save()
+        self.doublet_dataset.file_source = None
+        self.doublet_dataset.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" was not reused, trivial, or deleted; it should have '
                                           'produced data'.format(self.E21_41_ROC)),
@@ -2445,8 +2440,8 @@ class RunOutputCableTests(ArchiveTestCase):
         is clean and complete.
         """
         self.step_through_roc_creation("subrun_complete")
-        self.C1_in_DS.file_source = self.D11_21_ROC
-        self.C1_in_DS.save()
+        self.C1_in_dataset.file_source = self.D11_21_ROC
+        self.C1_in_dataset.save()
 
         self.assertIsNone(self.D11_21_ROC.clean())
         self.assertIsNotNone(self.D11_21_ROC.execrecord)
@@ -2545,44 +2540,6 @@ class RunOutputCableTests(ArchiveTestCase):
         self.assertFalse(self.D11_21_ROC.keeps_output())
 
 
-class DatasetTests(TestCase):
-    # fixtures = ["initial_data", "initial_groups", "initial_user"]
-
-    def setUp(self):
-        tools.create_librarian_test_environment(self)
-
-    def tearDown(self):
-        tools.clean_up_all_files()
-
-    def test_Dataset_check_MD5(self):
-        old_md5 = "7dc85e11b5c02e434af5bd3b3da9938e"
-        new_md5 = "d41d8cd98f00b204e9800998ecf8427e"
-
-        # MD5 is now stored in symbolic dataset - even after the dataset was deleted
-        self.assertEqual(self.raw_DS.compute_md5(), old_md5)
-
-        # Initially, no change to the raw dataset has occured, so the md5 check will pass
-        self.assertEqual(self.raw_DS.clean(), None)
-
-        # The contents of the file are changed, disrupting file integrity
-        self.raw_DS.dataset_file.close()
-        self.raw_DS.dataset_file.open(mode='w')
-        self.raw_DS.dataset_file.close()
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('File integrity of "{}" lost. Current checksum "{}" does not equal expected '
-                                          'checksum "{}"'.format(self.raw_DS, new_md5, old_md5)),
-                                self.raw_DS.clean)
-
-    def test_Dataset_filename_MD5_clash(self):
-        ds1, ds2 = Dataset.objects.all()[:2]
-        ds1.name = ds2.name
-        ds1.symbolicdataset.MD5_checksum = ds2.symbolicdataset.MD5_checksum
-        ds1.symbolicdataset.save()
-        ds1.save()
-        msg = "A Dataset with that name and MD5 already exists"
-        self.assertRaisesRegexp(ValidationError, msg, ds1.validate_unique)
-
-
 class ExecLogTests(ArchiveTestCase):
     def test_delete_exec_log(self):
         """Can delete an ExecLog."""
@@ -2611,7 +2568,7 @@ class ExecLogTests(ArchiveTestCase):
 
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_run.grant_everyone_access()
-        self.make_complete_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS], other_run)
+        self.make_complete_reused(self.step_E1_RS, [self.raw_dataset], [self.doublet_dataset], other_run)
 
         # Now step_E1_RS is marked as reused, and there is a dummy record of a RunStep belonging to
         # other_run.  Let's retrieve that ExecLog and mis-wire it so that its record belongs to self.pE_run
@@ -2983,7 +2940,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         self.step_through_run_creation("first_cable_created")
         # No checks have been done yet, so the ExecLog is done but the RSIC is not.
         step_E1_RSIC = self.step_E1_RS.RSICs.first()
-        self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
+        self.make_complete_non_reused(step_E1_RSIC, [self.raw_dataset], [self.raw_dataset])
 
         self.assertTrue(step_E1_RSIC.log.is_complete())
         self.assertTrue(step_E1_RSIC.log.is_successful())
@@ -3004,7 +2961,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         """Testing on an ExecLog of a RunStep whose Method has returned with code != 0."""
         self.step_through_run_creation("first_cable")
         # Complete the RunStep...
-        self.make_complete_non_reused(self.step_E1_RS, [self.raw_symDS], [self.doublet_symDS])
+        self.make_complete_non_reused(self.step_E1_RS, [self.raw_dataset], [self.doublet_dataset])
         # ... and break it.
         el_to_break = self.step_E1_RS.log
         el_to_break.methodoutput.return_code = 1
@@ -3052,9 +3009,9 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_run.grant_everyone_access()
         other_step1 = self.step_E1.pipelinestep_instances.create(run=other_run)
-        self.make_complete_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS], other_step1)
+        self.make_complete_reused(incomplete_cable, [self.raw_dataset], [self.raw_dataset], other_step1)
         other_cable = other_step1.RSICs.first()
-        icl = self.raw_symDS.integrity_checks.create(execlog=other_cable.log, user=self.myUser)
+        icl = self.raw_dataset.integrity_checks.create(execlog=other_cable.log, user=self.myUser)
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
@@ -3067,7 +3024,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         self.step_through_run_creation("first_cable_created")
 
         incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
-        self.make_complete_non_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS])
+        self.make_complete_non_reused(incomplete_cable, [self.raw_dataset], [self.raw_dataset])
 
         self.assertFalse(incomplete_cable.is_complete())
         self.assertTrue(incomplete_cable.successful_execution())
@@ -3077,9 +3034,9 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         self.step_through_run_creation("first_cable_created")
 
         incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
-        self.make_complete_non_reused(incomplete_cable, [self.raw_symDS], [self.raw_symDS])
+        self.make_complete_non_reused(incomplete_cable, [self.raw_dataset], [self.raw_dataset])
 
-        icl = self.raw_symDS.integrity_checks.create(execlog=incomplete_cable.log, user=self.myUser)
+        icl = self.raw_dataset.integrity_checks.create(execlog=incomplete_cable.log, user=self.myUser)
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
@@ -3120,14 +3077,14 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         """Testing of a RunComponent (RunSIC) which failed at the integrity check stage."""
         self.step_through_run_creation("first_cable_created")
         step_E1_RSIC = self.step_E1_RS.RSICs.first()
-        self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
+        self.make_complete_non_reused(step_E1_RSIC, [self.raw_dataset], [self.raw_dataset])
 
         # Make a bad ICL.
         conflicting_datafile = tempfile.NamedTemporaryFile()
         conflicting_datafile.write("THIS IS A FAILURE")
 
-        # The output of this first cable is self.raw_symDS.  This creates a bad ICL.
-        self.raw_symDS.check_integrity(conflicting_datafile.name, self.pE_run.user, step_E1_RSIC.log)
+        # The output of this first cable is self.raw_dataset.  This creates a bad ICL.
+        self.raw_dataset.check_integrity(conflicting_datafile.name, self.pE_run.user, step_E1_RSIC.log)
         self.assertTrue(step_E1_RSIC.is_complete())
         self.assertFalse(step_E1_RSIC.successful_execution())
         conflicting_datafile.close()
@@ -3144,7 +3101,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
         # Set up a words dataset.
-        tools.make_words_symDS(self)
+        tools.make_words_dataset(self)
 
         self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
                                                    groups_allowed=[everyone_group()])
@@ -3214,7 +3171,7 @@ for i in range(%d):
         pipeline.save()
 
         # Set up a words dataset.
-        tools.make_words_symDS(self)
+        tools.make_words_dataset(self)
 
         active_sandbox = sandbox.execute.Sandbox(self.user_bob, pipeline, [self.symds_words],
                                                  groups_allowed=[everyone_group()])
@@ -3416,17 +3373,17 @@ year,month,day,hour,minute,second,microsecond
         self.step_through_run_creation("first_cable_created")
         step_E1_RSIC = self.step_E1_RS.RSICs.first()
 
-        # Let's tamper with self.raw_symDS.
+        # Let's tamper with self.raw_dataset.
         with tempfile.NamedTemporaryFile() as f:
             f.write("This is a tampered-with file.")
-            os.remove(self.raw_symDS.dataset.dataset_file.path)
-            self.raw_symDS.dataset.dataset_file = File(f, name="tampered")
-            self.raw_symDS.dataset.save()
+            os.remove(self.raw_dataset.dataset_file.path)
+            self.raw_dataset.dataset_file = File(f, name="tampered")
+            self.raw_dataset.save()
 
-            self.make_complete_non_reused(step_E1_RSIC, [self.raw_symDS], [self.raw_symDS])
+            self.make_complete_non_reused(step_E1_RSIC, [self.raw_dataset], [self.raw_dataset])
 
-            # Check the integrity of self.raw_symDS -- this should fail.
-            self.raw_symDS.check_integrity(f.name, self.myUser, step_E1_RSIC.log)
+            # Check the integrity of self.raw_dataset -- this should fail.
+            self.raw_dataset.check_integrity(f.name, self.myUser, step_E1_RSIC.log)
 
         self.assertTrue(self.step_E1_RS.is_complete())
         self.assertFalse(self.step_E1_RS.successful_execution())
@@ -3436,21 +3393,21 @@ year,month,day,hour,minute,second,microsecond
         self.step_through_run_creation("sub_pipeline")
         # Fail the sub-pipeline.
         self.step_D1_RS = self.step_D1.pipelinestep_instances.create(run=self.pD_run)
-        self.complete_RSICs(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS],
-                                             [self.D1_in_symDS, self.singlet_symDS])
+        self.complete_RSICs(self.step_D1_RS, [self.D1_in_dataset, self.singlet_dataset],
+                                             [self.D1_in_dataset, self.singlet_dataset])
 
         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-        icl = self.D1_in_symDS.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
+        icl = self.D1_in_dataset.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
-        icl = self.singlet_symDS.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
+        icl = self.singlet_dataset.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
 
-        self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_symDS, self.singlet_symDS], [self.C1_in_symDS])
+        self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_dataset, self.singlet_dataset], [self.C1_in_dataset])
         # Mark step_D1_RS as having failed on execution.
         step_D1_mo = self.step_D1_RS.log.methodoutput
         step_D1_mo.return_code = 1
@@ -3496,8 +3453,8 @@ year,month,day,hour,minute,second,microsecond
         """Test on a Run with one failed and one incomplete step."""
         self.step_through_run_creation("second_step")
 
-        # Make the first step a failure by making self.doublet_symDS (its output) fail its check.
-        step1_out_ccl = self.doublet_symDS.content_checks.first()
+        # Make the first step a failure by making self.doublet_dataset (its output) fail its check.
+        step1_out_ccl = self.doublet_dataset.content_checks.first()
         step1_out_ccl.add_bad_header()
         step1_out_ccl.save()
 
@@ -3516,7 +3473,7 @@ year,month,day,hour,minute,second,microsecond
 
         # Add but do not complete an output cable.
         roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
-        self.make_complete_non_reused(roc1, [self.C1_in_symDS], [self.E1_out_symDS])
+        self.make_complete_non_reused(roc1, [self.C1_in_dataset], [self.E1_out_dataset])
         # Note that this isn't actually complete -- it doesn't have data checks yet.
         self.assertFalse(self.pE_run.is_complete())
         self.assertTrue(self.pE_run.successful_execution())
@@ -3527,15 +3484,15 @@ year,month,day,hour,minute,second,microsecond
 
         # Add but do not complete an output cable.
         roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
-        self.make_complete_non_reused(roc1, [self.C1_in_symDS], [self.E1_out_symDS])
+        self.make_complete_non_reused(roc1, [self.C1_in_dataset], [self.E1_out_dataset])
 
         # Break the data.
-        E1_out_ccl = self.E1_out_symDS.content_checks.first()
+        E1_out_ccl = self.E1_out_dataset.content_checks.first()
         E1_out_ccl.execlog = roc1.log
         E1_out_ccl.add_bad_header()
         E1_out_ccl.save()
-        self.E1_out_DS.file_source = roc1
-        self.E1_out_DS.save()
+        self.E1_out_dataset.file_source = roc1
+        self.E1_out_dataset.save()
 
         self.assertTrue(self.pE_run.is_complete())
         self.assertFalse(self.pE_run.successful_execution())
@@ -3546,10 +3503,10 @@ year,month,day,hour,minute,second,microsecond
 
         # Add but do not complete an output cable.
         roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
-        self.make_complete_non_reused(roc1, [self.C1_in_symDS], [self.E1_out_symDS])
+        self.make_complete_non_reused(roc1, [self.C1_in_dataset], [self.E1_out_dataset])
 
         # Break the data.
-        E1_out_ccl = self.E1_out_symDS.content_checks.first()
+        E1_out_ccl = self.E1_out_dataset.content_checks.first()
         E1_out_ccl.execlog = roc1.log
         E1_out_ccl.add_bad_header()
         E1_out_ccl.save()
@@ -3629,7 +3586,7 @@ class RunStepReuseFailedExecRecordTests(TestCase):
 
     def setUp(self):
         tools.create_grandpa_sandbox_environment(self)
-        tools.make_words_symDS(self)
+        tools.make_words_dataset(self)
 
     def tearDown(self):
         tools.destroy_grandpa_sandbox_environment(self)
@@ -3670,186 +3627,6 @@ class RunStepReuseFailedExecRecordTests(TestCase):
 
         self.assertEquals(run_1.runsteps.get(pipelinestep__step_num=1).execrecord,
                           run_2.runsteps.get(pipelinestep__step_num=1).execrecord)
-
-
-class DatasetApiTests(BaseTestCases.ApiTestCase):
-    @classmethod
-    def setUpClass(cls):
-        # Force dataset ids to be different from symbolic dataset ids.
-        Dataset.create_empty(user=kive_user())
-
-    def setUp(self):
-        super(DatasetApiTests, self).setUp()
-        num_cols = 12
-
-        self.list_path = reverse("dataset-list")
-        # This should equal archive.ajax.DatasetViewSet.as_view({"get": "list"}).
-        self.list_view, _, _ = resolve(self.list_path)
-
-        with tempfile.TemporaryFile() as f:
-            data = ','.join(map(str, range(num_cols)))
-            f.write(data)
-            f.seek(0)
-            self.test_dataset = Dataset.create_dataset(cls=None, file_path=None, user=self.kive_user,
-                                                          users_allowed=None, groups_allowed=None, cdt=None,
-                                                          keep_file=True, name="Test dataset",
-                                                          description="Test data for a test that tests test data",
-                                                          file_source=None, check=True, file_handle=f)
-            self.test_dataset_path = "{}{}/".format(self.list_path,
-                                                    self.test_dataset.dataset.id)
-            self.n_prexisting_datasets = 1
-
-        self.detail_pk = self.test_dataset.dataset.pk
-        self.detail_path = reverse("dataset-detail",
-                                   kwargs={'pk': self.detail_pk})
-        self.redaction_path = reverse("dataset-redaction-plan",
-                                      kwargs={'pk': self.detail_pk})
-        self.removal_path = reverse("dataset-removal-plan",
-                                    kwargs={'pk': self.detail_pk})
-
-        self.detail_view, _, _ = resolve(self.detail_path)
-        self.redaction_view, _, _ = resolve(self.redaction_path)
-        self.removal_view, _, _ = resolve(self.removal_path)
-
-    def tearDown(self):
-        for d in Dataset.objects.all():
-            d.dataset_file.delete()
-
-    def test_dataset_list(self, expected_entries=0):
-        """
-        Test the API list view.
-        """
-        request = self.factory.get(self.list_path)
-
-        force_authenticate(request, user=self.kive_user)
-        resp = self.list_view(request).data
-
-        self.assertEquals(len(resp), expected_entries + self.n_prexisting_datasets)
-        self.assertEquals(resp[-1]['description'],
-                          "Test data for a test that tests test data")
-
-    def test_dataset_detail(self):
-        request = self.factory.get(self.detail_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(
-            response.data['description'],
-            "Test data for a test that tests test data")
-
-    def test_dataset_add(self):
-        """
-        Test adding a Dataset via the API.
-
-        Each dataset must have unique content.
-        """
-        num_cols = 12
-        num_files = 2
-        FROM_FILE_END = 2
-
-        with tempfile.TemporaryFile() as f:
-            data = ','.join(map(str, range(num_cols)))
-            f.write(data)
-            for i in xrange(num_files):
-                f.seek(0, FROM_FILE_END)
-                f.write('data file {}\n'.format(i))
-                f.seek(0)
-                request = self.factory.post(
-                    self.list_path,
-                    {
-                        'name': "My cool file %d" % i,
-                        'description': 'A really cool file',
-                        # No CompoundDatatype -- this is raw.
-                        'dataset_file': f
-                    }
-                )
-
-                force_authenticate(request, user=self.kive_user)
-                resp = self.list_view(request).render().data
-
-                self.assertIsNone(resp.get('errors'))
-                self.assertEquals(resp['name'], "My cool file %d" % i)
-
-        self.test_dataset_list(expected_entries=num_files)
-
-    def test_dataset_add_duplicate(self):
-        """
-        Test adding a duplicate Dataset via the API.
-
-        Each dataset must have unique content.
-        """
-        num_cols = 12
-
-        with tempfile.TemporaryFile() as f:
-            data = ','.join(map(str, range(num_cols)))
-            f.write(data)
-            f.seek(0)
-
-            # First, we add this file and it works.
-            request = self.factory.post(
-                self.list_path,
-                {
-                    'name': "Original",
-                    'description': 'Totes unique',
-                    # No CompoundDatatype -- this is raw.
-                    'dataset_file': f
-                }
-            )
-            force_authenticate(request, user=self.kive_user)
-            self.list_view(request).render()
-
-            # Now we add the same file again.
-            request = self.factory.post(
-                self.list_path,
-                {
-                    'name': "CarbonCopy",
-                    'description': "Maybe not so unique",
-                    'dataset_file': f
-                }
-            )
-            force_authenticate(request, user=self.kive_user)
-            resp = self.list_view(request).render().data
-
-        self.assertEqual({'dataset_file': [u'The submitted file is empty.']},
-                         resp)
-
-    def test_dataset_removal_plan(self):
-        request = self.factory.get(self.removal_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.removal_view(request, pk=self.detail_pk)
-
-        self.assertEquals(response.data['SymbolicDatasets'], 1)
-        self.assertEquals(response.data['CompoundDatatypes'], 0)
-
-    def test_dataset_removal(self):
-        start_count = Dataset.objects.all().count()
-
-        request = self.factory.delete(self.detail_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
-
-        end_count = Method.objects.all().count()
-        self.assertEquals(end_count, start_count - 1)
-
-    def test_dataset_redaction_plan(self):
-        request = self.factory.get(self.redaction_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.redaction_view(request, pk=self.detail_pk)
-        self.assertEquals(response.data['SymbolicDatasets'], 1)
-        self.assertEquals(response.data['OutputLogs'], 0)
-
-    def test_dataset_redaction(self):
-        symbolic_dataset_id = Dataset.objects.get(
-            pk=self.detail_pk).symbolicdataset_id
-
-        request = self.factory.patch(self.detail_path,
-                                     {'is_redacted': "true"})
-        force_authenticate(request, user=self.kive_user)
-        response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.status_code, status.HTTP_200_OK)
-
-        symbolic_dataset = Dataset.objects.get(pk=symbolic_dataset_id)
-        self.assertTrue(symbolic_dataset.is_redacted())
 
 
 class MethodOutputApiTests(BaseTestCases.ApiTestCase):
@@ -3921,216 +3698,3 @@ class MethodOutputApiTests(BaseTestCases.ApiTestCase):
 
         method_output = MethodOutput.objects.get(pk=self.detail_pk)
         self.assertTrue(method_output.is_output_redacted())
-
-
-class DatasetSerializerTests(TestCase):
-    """
-    Tests of DatasetSerializer.
-    """
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
-
-    def setUp(self):
-        self.factory = APIRequestFactory()
-        self.list_path = reverse("dataset-list")
-
-        # This defines a user named "john" which is now accessible as self.myUser.
-        tools.create_metadata_test_environment(self)
-        self.kive_user = kive_user()
-        self.duck_context = DuckContext()
-
-        num_cols = 12
-        self.raw_file_contents = ','.join(map(str, range(num_cols)))
-
-        # A CompoundDatatype that belongs to the Kive user.
-        self.kive_CDT = CompoundDatatype(user=self.kive_user)
-        self.kive_CDT.save()
-        self.kive_CDT.members.create(
-            datatype=self.string_dt,
-            column_name="col1",
-            column_idx=1
-        )
-        self.kive_CDT.full_clean()
-
-        self.kive_file_contents = """col1
-foo
-bar
-baz
-"""
-
-        self.data_to_serialize = {
-            "name": "SerializedData",
-            "description": "Dataset for testing deserialization",
-            "users_allowed": [],
-            "groups_allowed": []
-        }
-
-    def test_validate(self):
-        """
-        Test validating a new Dataset.
-        """
-        with tempfile.TemporaryFile() as f:
-            f.write(self.raw_file_contents)
-            f.seek(0)
-
-            self.data_to_serialize["dataset_file"] = File(f)
-
-            ds = DatasetSerializer(
-                data=self.data_to_serialize,
-                context=self.duck_context
-            )
-            self.assertTrue(ds.is_valid())
-
-    def test_validate_with_users_allowed(self):
-        """
-        Test validating a new Dataset with users allowed.
-        """
-        with tempfile.TemporaryFile() as f:
-            f.write(self.raw_file_contents)
-            f.seek(0)
-
-            self.data_to_serialize["dataset_file"] = File(f)
-            self.data_to_serialize["users_allowed"].append(self.myUser.username)
-
-            ds = DatasetSerializer(
-                data=self.data_to_serialize,
-                context=self.duck_context
-            )
-            self.assertTrue(ds.is_valid())
-
-    def test_validate_with_groups_allowed(self):
-        """
-        Test validating a new Dataset with groups allowed.
-        """
-        with tempfile.TemporaryFile() as f:
-            f.write(self.raw_file_contents)
-            f.seek(0)
-
-            self.data_to_serialize["dataset_file"] = File(f)
-            self.data_to_serialize["groups_allowed"].append(everyone_group().name)
-
-            ds = DatasetSerializer(
-                data=self.data_to_serialize,
-                context=self.duck_context
-            )
-            self.assertTrue(ds.is_valid())
-
-    def test_validate_with_CDT(self):
-        """
-        Test validating a Dataset with a CDT.
-        """
-        with tempfile.TemporaryFile() as f:
-            f.write(self.kive_file_contents)
-            f.seek(0)
-
-            self.data_to_serialize["dataset_file"] = File(f)
-            self.data_to_serialize["compounddatatype"] = self.kive_CDT.pk
-
-            ds = DatasetSerializer(
-                data=self.data_to_serialize,
-                context=self.duck_context
-            )
-            self.assertTrue(ds.is_valid())
-
-    def test_validate_ineligible_CDT(self):
-        """
-        Test validating a Dataset with a CDT that the user doesn't have access to.
-        """
-        with tempfile.TemporaryFile() as f:
-            f.write(self.kive_file_contents)
-            f.seek(0)
-
-            self.data_to_serialize["dataset_file"] = File(f)
-            self.data_to_serialize["compounddatatype"] = self.kive_CDT.pk
-
-            ds = DatasetSerializer(
-                data=self.data_to_serialize,
-                context=DuckContext(self.myUser)
-            )
-            self.assertFalse(ds.is_valid())
-            self.assertEquals(len(ds.errors["compounddatatype"]), 1)
-
-    def test_create(self):
-        """
-        Test creating a Dataset.
-        """
-        with tempfile.TemporaryFile() as f:
-            f.write(self.raw_file_contents)
-            f.seek(0)
-
-            self.data_to_serialize["dataset_file"] = File(f)
-
-            ds = DatasetSerializer(
-                data=self.data_to_serialize,
-                context=self.duck_context
-            )
-            ds.is_valid()
-            dataset = ds.save()
-
-            # Probe the Dataset to make sure everything looks fine.
-            self.assertEquals(dataset.name, self.data_to_serialize["name"])
-            self.assertEquals(dataset.description, self.data_to_serialize["description"])
-            self.assertIsNone(dataset.symbolicdataset.compounddatatype)
-            self.assertEquals(dataset.symbolicdataset.user, self.kive_user)
-
-    def test_create_with_CDT(self):
-        """
-        Test creating a Dataset with a CDT.
-        """
-        with tempfile.TemporaryFile() as f:
-            f.write(self.kive_file_contents)
-            f.seek(0)
-
-            self.data_to_serialize["dataset_file"] = File(f)
-            self.data_to_serialize["compounddatatype"] = self.kive_CDT.pk
-
-            ds = DatasetSerializer(
-                data=self.data_to_serialize,
-                context=self.duck_context
-            )
-            ds.is_valid()
-            dataset = ds.save()
-
-            # Probe to make sure the CDT got set correctly.
-            self.assertEquals(dataset.symbolicdataset.compounddatatype, self.kive_CDT)
-
-    def test_create_with_users_allowed(self):
-        """
-        Test validating a new Dataset with users allowed.
-        """
-        with tempfile.TemporaryFile() as f:
-            f.write(self.raw_file_contents)
-            f.seek(0)
-
-            self.data_to_serialize["dataset_file"] = File(f)
-            self.data_to_serialize["users_allowed"].append(self.myUser.username)
-
-            ds = DatasetSerializer(
-                data=self.data_to_serialize,
-                context=self.duck_context
-            )
-            ds.is_valid()
-            dataset = ds.save()
-
-            self.assertListEqual(list(dataset.symbolicdataset.users_allowed.all()),
-                                 [self.myUser])
-
-    def test_create_with_groups_allowed(self):
-        """
-        Test validating a new Dataset with groups allowed.
-        """
-        with tempfile.TemporaryFile() as f:
-            f.write(self.raw_file_contents)
-            f.seek(0)
-
-            self.data_to_serialize["dataset_file"] = File(f)
-            self.data_to_serialize["groups_allowed"].append(everyone_group().name)
-
-            ds = DatasetSerializer(
-                data=self.data_to_serialize,
-                context=self.duck_context
-            )
-            ds.is_valid()
-            dataset = ds.save()
-
-            self.assertListEqual(list(dataset.symbolicdataset.groups_allowed.all()),
-                                 [everyone_group()])

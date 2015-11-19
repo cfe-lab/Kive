@@ -33,7 +33,7 @@ from pipeline.models import Pipeline
 
 def empty_redaction_plan():
     return {
-        "SymbolicDatasets": set(),
+        "Datasets": set(),
         "ExecRecords": set(),
         "OutputLogs": set(),
         "ErrorLogs": set(),
@@ -53,12 +53,9 @@ def redact_helper(redaction_plan):
         raise archive.exceptions.RunNotFinished("Cannot redact: an affected run is still in progress")
 
     # Proceed in a fixed order.
-    if "SymbolicDatasets" in redaction_plan:
-        for sd in redaction_plan["SymbolicDatasets"]:
+    if "Datasets" in redaction_plan:
+        for sd in redaction_plan["Datasets"]:
             sd.redact_this()
-            # reloaded_sd = Dataset.objects.get(pk=sd.pk)
-            # print "After calling {}.redact_this(), {}.is_redacted() is {}".format(sd, reloaded_sd,
-            #                                                                       reloaded_sd.is_redacted())
 
     if "ExecRecords" in redaction_plan:
         for er in redaction_plan["ExecRecords"]:
@@ -299,8 +296,8 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         for _input in self.inputs.all():
             if _input.dataset.has_data():
-                input_list[_input.index] = {"dataset_id": _input.dataset.dataset.id,
-                                            "dataset_name": _input.dataset.dataset.name,
+                input_list[_input.index] = {"dataset_id": _input.dataset.id,
+                                            "dataset_name": _input.dataset.name,
                                             "md5": _input.dataset.MD5_checksum}
 
         # One of the steps is in progress?
@@ -1067,8 +1064,8 @@ class RunComponent(stopwatch.models.Stopwatch):
         removal_plan = removal_accumulator or metadata.models.empty_removal_plan()
 
         for ds in self.outputs.all():
-            if ds.dataset not in removal_plan["SymbolicDatasets"]:
-                metadata.models.update_removal_plan(removal_plan, ds.dataset.build_removal_plan(removal_plan))
+            if ds not in removal_plan["Datasets"]:
+                metadata.models.update_removal_plan(removal_plan, ds.build_removal_plan(removal_plan))
 
         if self.has_log and self.execrecord and self.execrecord.generator == self.log:
             if self.execrecord not in removal_plan["ExecRecords"]:

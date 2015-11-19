@@ -810,20 +810,20 @@ def load_eric_martin_test_environment(case):
     case.pE_run = case.pE.pipeline_instances.get(name='pE_run')
 
     case.triplet_dataset = Dataset.objects.get(
-        dataset__name="triplet",
-        dataset__dataset_file__endswith="step_0_triplet.csv")
+        name="triplet",
+        dataset_file__endswith="step_0_triplet.csv")
     case.triplet_dataset_structure = case.triplet_dataset.structure
-    case.doublet_dataset = Dataset.objects.get(dataset__name="doublet")
+    case.doublet_dataset = Dataset.objects.get(name="doublet")
     case.doublet_dataset_structure = case.doublet_dataset.structure
     case.singlet_dataset = Dataset.objects.get(
-        dataset__name="singlet",
-        dataset__dataset_file__endswith="singlet_cdt_large.csv")
+        name="singlet",
+        dataset_file__endswith="singlet_cdt_large.csv")
     case.singlet_dataset_structure = case.singlet_dataset.structure
     case.singlet_3rows_dataset = Dataset.objects.get(
-        dataset__name="singlet",
-        dataset__dataset_file__endswith="step_0_singlet.csv")
+        name="singlet",
+        dataset_file__endswith="step_0_singlet.csv")
     case.singlet_3rows_dataset_structure = case.singlet_3rows_dataset.structure
-    case.raw_dataset = Dataset.objects.get(dataset__name="raw_DS")
+    case.raw_dataset = Dataset.objects.get(name="raw_DS")
 
     # MD5 calculated on doublet_remuxed_from_triplet.csv file.
     case.D1_in_dataset = Dataset.objects.get(
@@ -831,36 +831,35 @@ def load_eric_martin_test_environment(case):
     case.D1_in_dataset_structure = case.D1_in_dataset.structure
 
     case.C1_in_dataset = Dataset.objects.get(
-        dataset__name="C1_in_triplet")
+        name="C1_in_triplet")
     case.C1_in_dataset_structure = case.C1_in_dataset.structure
 
     checksum = Dataset.objects.get(
-        dataset__dataset_file__endswith="E11_32_output.csv").MD5_checksum
-    case.C2_in_dataset = Dataset.objects.get(MD5_checksum=checksum,
-                                                   dataset__isnull=True)
+        dataset_file__endswith="E11_32_output.csv").MD5_checksum
+    case.C2_in_dataset = Dataset.objects.get(MD5_checksum=checksum)
     case.C2_in_dataset_structure = case.C2_in_dataset.structure
     case.E11_32_output_dataset = Dataset.objects.get(
-        dataset__name="E11_32 output doublet")
+        name="E11_32 output doublet")
     case.E11_32_output_dataset_structure = case.E11_32_output_dataset.structure
-    case.C1_out_dataset = Dataset.objects.get(dataset__name="raw")
+    case.C1_out_dataset = Dataset.objects.get(name="raw")
     case.C1_out_dataset_structure = case.C1_out_dataset.structure
-    case.C2_out_dataset = Dataset.objects.get(dataset__name="C2_out")
-    case.C3_out_dataset = Dataset.objects.get(dataset__name="C3_out")
+    case.C2_out_dataset = Dataset.objects.get(name="C2_out")
+    case.C3_out_dataset = Dataset.objects.get(name="C3_out")
 
     case.triplet_3_rows_dataset = Dataset.objects.get(
-        dataset__name="triplet",
-        dataset__dataset_file__endswith="step_0_triplet_3_rows.csv")
+        name="triplet",
+        dataset_file__endswith="step_0_triplet_3_rows.csv")
     case.triplet_3_rows_dataset_structure = case.triplet_3_rows_dataset.structure
-    case.E1_out_dataset = Dataset.objects.get(dataset__name="E1_out")
+    case.E1_out_dataset = Dataset.objects.get(name="E1_out")
     case.E1_out_dataset_structure = case.E1_out_dataset.structure
     case.DNA_triplet_dataset = Dataset.objects.get(
-        dataset__name="DNA_triplet")
+        name="DNA_triplet")
     case.DNA_triplet_dataset_structure = case.DNA_triplet_dataset.structure
     case.E01_21_DNA_doublet_dataset = Dataset.objects.get(
-        dataset__name="E01_21_DNA_doublet")
+        name="E01_21_DNA_doublet")
     case.E01_21_DNA_doublet_dataset_structure = case.E01_21_DNA_doublet_dataset.structure
     case.E21_41_DNA_doublet_dataset = Dataset.objects.get(
-        dataset__name="E21_41_DNA_doublet")
+        name="E21_41_DNA_doublet")
     case.E21_41_DNA_doublet_dataset_structure = case.E21_41_DNA_doublet_dataset.structure
 
 

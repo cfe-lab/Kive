@@ -621,7 +621,7 @@ class DatatypeTests(MetadataTestCase):
                                                user=self.myUser, cdt=PROTOTYPE_CDT,
                                                name="DNAPrototype", description="Prototype for the DNA Datatype")
 
-        self.DNA_dt.prototype = DNA_prototype.dataset
+        self.DNA_dt.prototype = DNA_prototype
 
         self.assertEquals(self.DNA_dt.clean(), None)
 
@@ -633,7 +633,7 @@ class DatatypeTests(MetadataTestCase):
                                                    user=self.myUser, cdt=None,
                                                    name="RawPrototype", description="Prototype that is raw")
 
-        self.DNA_dt.prototype = DNA_raw_prototype.dataset
+        self.DNA_dt.prototype = DNA_raw_prototype
         PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
         self.assertRaisesRegexp(ValidationError, 
                                 re.escape('Prototype Dataset for Datatype "{}" should have CompoundDatatype "{}", '
@@ -656,7 +656,7 @@ class DatatypeTests(MetadataTestCase):
                                                        name="BadCDTPrototype",
                                                        description="Prototype with a bad CDT")
 
-        self.DNA_dt.prototype = DNA_prototype_bad_CDT.dataset
+        self.DNA_dt.prototype = DNA_prototype_bad_CDT
 
         PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
         self.assertRaisesRegexp(ValidationError,
@@ -2336,7 +2336,6 @@ class CompoundDatatypeTests(MetadataTestCase):
         raw_dataset = Dataset.create_dataset(file_path=path, user=self.myUser, keep_file=True,
                                              name="something", description="desc")
         self.assertEqual(raw_dataset.clean(), None)
-        self.assertEqual(raw_dataset.dataset.clean(), None)
 
     def test_create_dataset_valid(self):
         """

@@ -222,8 +222,13 @@ class CustomConstraintTests(TestCase):
         self.assertRaisesRegexp(
             ValueError,
             re.escape('Verification method for Datatype "{}" produced no output'.format(dt_no_output)),
-            lambda: Dataset.create_dataset(no_output_datafile, self.user_oscar, cdt=cdt_no_output, name="no output",
-                                              name="no output", description="data with a bad verifier")
+            lambda: Dataset.create_dataset(
+                no_output_datafile,
+                self.user_oscar,
+                cdt=cdt_no_output,
+                name="no output",
+                description="data with a bad verifier"
+            )
         )
         os.remove(no_output_datafile)
 
@@ -255,11 +260,13 @@ class CustomConstraintTests(TestCase):
             ValueError,
             re.escape('Verification method for Datatype "{}" indicated an error in row {}, but '
                       'only {} rows were checked'.format(dt_big_row, 1000, 2)),
-            lambda: Dataset.create_dataset(big_row_datafile, file_path=self.user_oscar, user=self.user_oscar,
-                                              cdt=cdt_big_row,
-                                              description="data with a verifier outputting too high a row number",
-                                              name="big row",
-                                              description="data with a verifier outputting too high a row number")
+            lambda: Dataset.create_dataset(
+                big_row_datafile,
+                user=self.user_oscar,
+                cdt=cdt_big_row,
+                name="big row",
+                description="data with a verifier outputting too high a row number"
+            )
         )
         os.remove(big_row_datafile)
 
@@ -291,11 +298,13 @@ class CustomConstraintTests(TestCase):
             ValueError,
             re.escape('The entry at row {}, column {} of file "{}" did not pass the constraints of '
                       'Datatype "{}"'.format(3, 2, self.bad_datafile, self.dt_custom)),
-                      lambda: Dataset.create_dataset(self.bad_datafile, file_path=self.user_oscar,
-                                                        user=self.user_oscar, cdt=self.cdt_constraints,
-                                                        description="invalid data to test custom constraint checking",
-                                                        name="bad data",
-                                                        description="invalid data to test custom constraint checking")
+                      lambda: Dataset.create_dataset(
+                          self.bad_datafile,
+                          user=self.user_oscar,
+                          cdt=self.cdt_constraints,
+                          name="bad data",
+                          description="invalid data to test custom constraint checking"
+                      )
         )
 
     def _test_content_check_integrity(self, content_check, execlog, dataset):
@@ -316,22 +325,26 @@ class CustomConstraintTests(TestCase):
         """
         Helper function to upload good data.
         """
-        dataset_good = Dataset.create_dataset(self.good_datafile, file_path=self.user_oscar, user=self.user_oscar,
-                                               cdt=self.cdt_constraints,
-                                               description="data which conforms to all its constraints",
-                                               name="good data",
-                                               description="data which conforms to all its constraints")
+        dataset_good = Dataset.create_dataset(
+            self.good_datafile,
+            user=self.user_oscar,
+            cdt=self.cdt_constraints,
+            name="good data",
+            description="data which conforms to all its constraints"
+        )
         return dataset_good
 
     def _test_upload_data_bad(self):
         """
         Helper function to upload bad data.
         """
-        dataset_bad = Dataset.create_dataset(self.bad_datafile, file_path=self.user_oscar, user=self.user_oscar,
-                                              cdt=self.cdt_constraints,
-                                              description="data which conforms to all its constraints",
-                                              name="good data",
-                                              description="data which conforms to all its constraints")
+        dataset_bad = Dataset.create_dataset(
+            self.bad_datafile,
+            user=self.user_oscar,
+            cdt=self.cdt_constraints,
+            name="good data",
+            description="data which conforms to all its constraints"
+        )
         return dataset_bad
 
     def _test_setup_prototype_good(self):
@@ -339,14 +352,16 @@ class CustomConstraintTests(TestCase):
         prototype_file = self._setup_datafile(prototype_cdt, 
                 [["hello", "True"], ["hell", "True"], ["hel", "False"],
                  ["he", "True"], ["h", "False"]])
-        prototype_SD = Dataset.create_dataset(prototype_file, file_path=self.user_oscar, user=self.user_oscar,
-                                                 cdt=prototype_cdt, description="working prototype for constraint CDT",
-                                                 name="good prototype",
-                                                 description="working prototype for constraint CDT")
+        prototype_SD = Dataset.create_dataset(
+            prototype_file,
+            user=self.user_oscar,
+            cdt=prototype_cdt,
+            name="good prototype",
+            description="working prototype for constraint CDT")
         os.remove(prototype_file)
 
         # Add a prototype to the custom DT, and make a new CDT.
-        self.dt_custom.prototype = prototype_SD.dataset
+        self.dt_custom.prototype = prototype_SD
         self.dt_custom.save()
         cdt = self._setup_compounddatatype([self.dt_basic, self.dt_custom], ["letter strings", "words"],
                                            self.user_oscar)
@@ -357,14 +372,17 @@ class CustomConstraintTests(TestCase):
         prototype_file = self._setup_datafile(prototype_cdt, 
                 [["hello", "False"], ["hell", "True"], ["hel", "False"],
                  ["he", "True"], ["h", "False"]])
-        prototype_SD = Dataset.create_dataset(prototype_file, file_path=self.user_oscar, user=self.user_oscar,
-                                                 cdt=prototype_cdt, description="working prototype for constraint CDT",
-                                                 name="good prototype",
-                                                 description="working prototype for constraint CDT")
+        prototype_SD = Dataset.create_dataset(
+            prototype_file,
+            user=self.user_oscar,
+            cdt=prototype_cdt,
+            name="good prototype",
+            description="working prototype for constraint CDT"
+        )
         os.remove(prototype_file)
 
         # Add a prototype to the custom DT.
-        self.dt_custom.prototype = prototype_SD.dataset
+        self.dt_custom.prototype = prototype_SD
         self.dt_custom.save()
         return self.dt_custom
 
@@ -468,10 +486,13 @@ class CustomConstraintTests(TestCase):
         CustomConstraints is uploaded with a working prototype.
         """
         cdt = self._test_setup_prototype_good()
-        dataset_good = Dataset.create_dataset(self.good_datafile, file_path=self.user_oscar, user=self.user_oscar,
-                                               cdt=cdt, description="data which conforms to all its constraints",
-                                               name="good data",
-                                               description="data which conforms to all its constraints")
+        dataset_good = Dataset.create_dataset(
+            self.good_datafile,
+            user=self.user_oscar,
+            cdt=cdt,
+            name="good data",
+            description="data which conforms to all its constraints"
+        )
         self.assertEqual(dataset_good.clean(), None)
         content_check = dataset_good.content_checks.first()
         self._test_content_check_integrity(content_check, None, dataset_good)

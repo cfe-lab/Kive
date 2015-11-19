@@ -71,7 +71,7 @@ class ExecuteResultTestsRM(TestCase):
         self.revcomp_run = self.pipeline_revcomp.pipeline_instances.first()
 
         self.dataset_labdata = Dataset.objects.get(
-            dataset__name="lab data",
+            name="lab data",
             user=self.user_alice
         )
 
@@ -140,7 +140,7 @@ class ExecuteResultTestsRM(TestCase):
         outfile = os.path.join(tmpdir, "output")
         complement_popen = self.method_complement.invoke_code(
             tmpdir,
-            [self.dataset_labdata.dataset.dataset_file.file.name],
+            [self.dataset_labdata.dataset_file.file.name],
             [outfile]
         )
         complement_popen.wait()
@@ -173,7 +173,7 @@ class ExecuteResultTestsRM(TestCase):
 
         pipelinestep = self.pipeline_complement.steps.first()  # 1 step
         runstep = run.runsteps.first()
-        dataset_out = runstep.outputs.first().dataset
+        dataset_out = runstep.outputs.first()
         execlog = runstep.log
         execrecord = runstep.execrecord
         execrecordout = execrecord.execrecordouts.first()
@@ -306,7 +306,7 @@ class ExecuteDiscardedIntermediateTests(TestCase):
         self.revcomp_v2_run = self.pipeline_revcomp_v2.pipeline_instances.first()  # only one exists
 
         self.dataset_labdata = Dataset.objects.get(
-            dataset__name="lab data",
+            name="lab data",
             user=self.user_alice
         )
 
@@ -430,7 +430,7 @@ class FindDatasetTests(TestCase):
         to a cable, should return the step (and in particular, not the cable).
         """
         self.pipeline_noop = Pipeline.objects.get(family__name="simple pipeline")
-        self.dataset_words = Dataset.objects.get(dataset__name='blahblah')
+        self.dataset_words = Dataset.objects.get(name='blahblah')
         self.user_bob = User.objects.get(username='bob')
 
         sandbox = Sandbox(self.user_bob, self.pipeline_noop, [self.dataset_words])
@@ -458,7 +458,7 @@ class FindDatasetTests(TestCase):
         top-level run as the run.
         """
         self.pipeline_twostep = Pipeline.objects.get(family__name="two-step pipeline")
-        self.dataset_backwords = Dataset.objects.get(dataset__name='backwords')
+        self.dataset_backwords = Dataset.objects.get(name='backwords')
         self.user_bob = User.objects.get(username='bob')
 
         sandbox = Sandbox(self.user_bob, self.pipeline_twostep, [self.dataset_backwords])
@@ -489,7 +489,7 @@ class FindDatasetTests(TestCase):
         on a custom cable.
         """
         self.pipeline_nested = Pipeline.objects.get(family__name="nested pipeline")
-        self.dataset_backwords = Dataset.objects.get(dataset__name='backwords')
+        self.dataset_backwords = Dataset.objects.get(name='backwords')
         self.user_bob = User.objects.get(username='bob')
 
         sandbox = Sandbox(self.user_bob, self.pipeline_nested, [self.dataset_backwords])

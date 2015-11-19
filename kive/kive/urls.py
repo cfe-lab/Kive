@@ -78,20 +78,20 @@ urlpatterns = patterns(
     url(r'^datasets$', 'librarian.views.datasets', name='datasets'),
     url(r'^dataset_download/(?P<dataset_id>\d+)$', 'librarian.views.dataset_download', name='dataset_download'),
     url(r'^dataset_view/(?P<dataset_id>\d+)$', 'librarian.views.dataset_view', name='dataset_view'),
-    url(r'^stdout_download/(?P<methodoutput_id>\d+)$', 'librarian.views.stdout_download', name='stdout_download'),
-    url(r'^stdout_view/(?P<methodoutput_id>\d+)$', 'librarian.views.stdout_view', name='stdout_view'),
-    url(r'^stderr_download/(?P<methodoutput_id>\d+)$', 'librarian.views.stderr_download', name='stderr_download'),
-    url(r'^stderr_view/(?P<methodoutput_id>\d+)$', 'librarian.views.stderr_view', name='stderr_view'),
     url(r'^datasets_add$', 'librarian.views.datasets_add', name='datasets_add'),
     url(r'^datasets_add_bulk', 'librarian.views.datasets_add_bulk', name='datasets_add_bulk'),
     url(r'^datasets_bulk', 'librarian.views.datasets_bulk', name='datasets_bulk'),
-
     url(r'^datasets_add_archive$', 'librarian.views.datasets_add_archive', name='datasets_add_archive'),
 
     url(r'^datasets_lookup/$', 'librarian.views.dataset_lookup', name='dataset_lookup'),
     url(r'^datasets_lookup/(?P<md5_checksum>[0-9A-Fa-f]{32})$', 'librarian.views.dataset_lookup',
         name='dataset_lookup'),
     url(r'^lookup$', 'librarian.views.lookup', name='lookup'),
+
+    url(r'^stdout_download/(?P<methodoutput_id>\d+)$', 'archive.views.stdout_download', name='stdout_download'),
+    url(r'^stdout_view/(?P<methodoutput_id>\d+)$', 'archive.views.stdout_view', name='stdout_view'),
+    url(r'^stderr_download/(?P<methodoutput_id>\d+)$', 'archive.views.stderr_download', name='stderr_download'),
+    url(r'^stderr_view/(?P<methodoutput_id>\d+)$', 'archive.views.stderr_view', name='stderr_view'),
 
     url(r'^choose_pipeline$', 'sandbox.views.choose_pipeline', name='choose_pipeline'),
     url(r'^choose_inputs$', 'sandbox.views.choose_inputs', name='choose_inputs'),
