@@ -320,7 +320,7 @@ class KiveAPI(Session):
 
         # Construct the inputs
         params = dict(pipeline=pipeline.pipeline_id,
-                      inputs=[dict(symbolicdataset=d.symbolicdataset_id,
+                      inputs=[dict(dataset=d.dataset_id,
                                    index=i)
                               for i, d in enumerate(inputs, 1)],
                       name=name,
