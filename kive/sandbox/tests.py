@@ -68,18 +68,18 @@ def execute_tests_environment_setup(case):
     case.mA_out_cdtm_1 = case.mA_out_cdt.members.create(datatype=case.int_dt, column_name="c", column_idx=1)
     case.mA_out_cdtm_2 = case.mA_out_cdt.members.create(datatype=case.string_dt, column_name="d", column_idx=2)
 
-    case.symDS = Dataset.create_dataset(
+    case.dataset = Dataset.create_dataset(
         os.path.join(samplecode_path, "input_for_test_C_twostep_with_subpipeline.csv"),
         user=case.myUser,
         cdt=case.pX_in_cdt,
-        name="pX_in_symDS",
+        name="pX_in_dataset",
         description="input to pipeline pX"
     )
-    case.rawDS = Dataset.create_dataset(
+    case.raw_dataset = Dataset.create_dataset(
         os.path.join(samplecode_path, "input_for_test_C_twostep_with_subpipeline.csv"),
         user=case.myUser,
         cdt=None,
-        name="pX_in_symDS",
+        name="pX_in_dataset",
         description="input to pipeline pX"
     )
 
@@ -143,9 +143,9 @@ def execute_tests_environment_load(case):
     case.mA_out_cdtm_1 = case.mA_out_cdt.members.get(column_name="c")
     case.mA_out_cdtm_2 = case.mA_out_cdt.members.get(column_name="d")
 
-    case.symDS = Dataset.objects.get(
+    case.dataset = Dataset.objects.get(
         structure__compounddatatype=case.pX_in_cdt)
-    case.rawDS = Dataset.objects.get(structure__isnull=True)
+    case.raw_dataset = Dataset.objects.get(structure__isnull=True)
     case.mA = Method.objects.get(revision_name="mA")
     case.mA_in = case.mA.inputs.get()
     case.mA_out = case.mA.outputs.get()
@@ -223,7 +223,7 @@ class ExecuteTests(ExecuteTestsBase):
 
         # Execute pipeline
         pipeline = self.pX
-        inputs = [self.symDS]
+        inputs = [self.dataset]
         mySandbox = Sandbox(self.myUser, pipeline, inputs)
         mySandbox.execute_pipeline()
 
@@ -277,7 +277,7 @@ class ExecuteTests(ExecuteTestsBase):
 
         # Execute pipeline
         pipeline = self.pX
-        inputs = [self.symDS]
+        inputs = [self.dataset]
         mySandbox = Sandbox(self.myUser, pipeline, inputs)
         mySandbox.execute_pipeline()
 
@@ -362,7 +362,7 @@ class ExecuteTests(ExecuteTestsBase):
             cdt=self.pX_in_cdt,
             keep_file=True,
             name="input_dataset",
-            description="symDS description"
+            description="dataset description"
         )
 
         # Execute pipeline
@@ -463,7 +463,7 @@ class ExecuteTests(ExecuteTestsBase):
         self.mA_crr.content_file.save("NowCorrupted.dat", ContentFile("CORRUPTED"))
         self.mA_crr.save()
 
-        sandbox = Sandbox(self.myUser, self.pX, [self.symDS])
+        sandbox = Sandbox(self.myUser, self.pX, [self.dataset])
         sandbox.execute_pipeline()
 
         # This Run should have failed right away.
@@ -495,7 +495,7 @@ class SandboxTests(ExecuteTestsBase):
         p.save()
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expects 0 inputs, but 1 were supplied'.format(p)),
-                                lambda: Sandbox(self.myUser, p, [self.symDS]))
+                                lambda: Sandbox(self.myUser, p, [self.dataset]))
 
     def test_sandbox_correct_inputs(self):
         """
@@ -509,7 +509,7 @@ class SandboxTests(ExecuteTestsBase):
                        min_row=8,
                        max_row=12)
         # Assert no ValueError raised.
-        Sandbox(self.myUser, p, [self.symDS])
+        Sandbox(self.myUser, p, [self.dataset])
 
     def test_sandbox_raw_expected_nonraw_supplied(self):
         """
@@ -520,8 +520,8 @@ class SandboxTests(ExecuteTestsBase):
         p.create_input(dataset_name="in", dataset_idx=1)
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expected input {} to be raw, but got one with '
-                                          'CompoundDatatype "{}"'.format(p, 1, self.symDS.structure.compounddatatype)),
-                                lambda: Sandbox(self.myUser, p, [self.symDS]))
+                                          'CompoundDatatype "{}"'.format(p, 1, self.dataset.structure.compounddatatype)),
+                                lambda: Sandbox(self.myUser, p, [self.dataset]))
 
     def test_sandbox_nonraw_expected_raw_supplied(self):
         """
@@ -533,7 +533,7 @@ class SandboxTests(ExecuteTestsBase):
         tf = tempfile.NamedTemporaryFile(delete=False)
         tf.write("foo")
         tf.close()
-        raw_symDS = Dataset.create_dataset(
+        raw_dataset = Dataset.create_dataset(
             tf.name,
             user=self.myUser,
             name="foo",
@@ -542,7 +542,7 @@ class SandboxTests(ExecuteTestsBase):
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
                                           .format(p, 1, self.pX_in_cdt)),
-                                lambda: Sandbox(self.myUser, p, [raw_symDS]))
+                                lambda: Sandbox(self.myUser, p, [raw_dataset]))
         os.remove(tf.name)
 
     def test_sandbox_cdt_mismatch(self):
@@ -556,8 +556,8 @@ class SandboxTests(ExecuteTestsBase):
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got one '
                                           'with CompoundDatatype "{}"'
-                                          .format(p, 1, self.mA_in_cdt, self.symDS.structure.compounddatatype)),
-                                lambda: Sandbox(self.myUser, p, [self.symDS]))
+                                          .format(p, 1, self.mA_in_cdt, self.dataset.structure.compounddatatype)),
+                                lambda: Sandbox(self.myUser, p, [self.dataset]))
 
     def test_sandbox_too_many_rows(self):
         """
@@ -573,10 +573,10 @@ class SandboxTests(ExecuteTestsBase):
                        max_row=4)
         expected_message = (
             'Pipeline "{}" expected input {} to have between {} and {} rows, '
-            'but got one with {}'.format(p, 1, 2, 4, self.symDS.num_rows()))
+            'but got one with {}'.format(p, 1, 2, 4, self.dataset.num_rows()))
         self.assertRaisesRegexp(ValueError,
                                 re.escape(expected_message),
-                                lambda: Sandbox(self.myUser, p, [self.symDS]))
+                                lambda: Sandbox(self.myUser, p, [self.dataset]))
 
     def test_sandbox_too_few_rows(self):
         """
@@ -591,10 +591,10 @@ class SandboxTests(ExecuteTestsBase):
                        min_row=20)
         expected_message = (
             'Pipeline "{}" expected input {} to have between {} and {} rows, '
-            'but got one with {}'.format(p, 1, 20, sys.maxint, self.symDS.num_rows()))
+            'but got one with {}'.format(p, 1, 20, sys.maxint, self.dataset.num_rows()))
         self.assertRaisesRegexp(ValueError,
                                 re.escape(expected_message),
-                                lambda: Sandbox(self.myUser, p, [self.symDS]))
+                                lambda: Sandbox(self.myUser, p, [self.dataset]))
 
 
 class RestoreReusableDatasetTest(TestCase):

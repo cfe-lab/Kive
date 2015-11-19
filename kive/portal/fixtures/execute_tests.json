@@ -78,35 +78,9 @@
     }, 
     {
         "fields": {
-            "created_by": null, 
-            "dataset_file": "Datasets/fixtures/input_for_test_C_twostep_with_subpipeline.csv", 
-            "date_created": "2000-01-01T00:00:00Z", 
-            "date_modified": "2000-01-01T00:00:00Z", 
-            "description": "input to pipeline pX", 
-            "name": "pX_in_symDS", 
-            "symbolicdataset": 1
-        }, 
-        "model": "archive.dataset", 
-        "pk": 1
-    }, 
-    {
-        "fields": {
-            "created_by": null, 
-            "dataset_file": "Datasets/fixtures/input_for_test_C_twostep_with_subpipeline_bom1ppU.csv", 
-            "date_created": "2000-01-01T00:00:00Z", 
-            "date_modified": "2000-01-01T00:00:00Z", 
-            "description": "input to pipeline pX", 
-            "name": "pX_in_symDS", 
-            "symbolicdataset": 2
-        }, 
-        "model": "archive.dataset", 
-        "pk": 2
-    }, 
-    {
-        "fields": {
             "compounddatatype": 5, 
-            "num_rows": 10, 
-            "symbolicdataset": 1
+            "dataset": 1, 
+            "num_rows": 10
         }, 
         "model": "librarian.datasetstructure", 
         "pk": 1
@@ -432,7 +406,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$zgxuYFDl8dZI$PRGj29IDQ5ojUfC+Hj85VmvSWznzb+JXv+H1eh/JnN8=", 
+            "password": "pbkdf2_sha256$15000$3fen9FRAGuv5$PTlJV+/IyPUbGecOlFhik/QmDA1wzoFIWbtHBXPm8z4=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -470,22 +444,32 @@
         "fields": {
             "MD5_checksum": "4ce50c714420255e82dd3965ccec07ec", 
             "_redacted": false, 
+            "dataset_file": "Datasets/2015_11/input_for_test_C_twostep_with_subpipeline.csv", 
+            "date_created": "2000-01-01T00:00:00Z", 
+            "description": "input to pipeline pX", 
+            "file_source": null, 
             "groups_allowed": [], 
+            "name": "pX_in_dataset", 
             "user": 2, 
             "users_allowed": []
         }, 
-        "model": "librarian.symbolicdataset", 
+        "model": "librarian.dataset", 
         "pk": 1
     }, 
     {
         "fields": {
             "MD5_checksum": "4ce50c714420255e82dd3965ccec07ec", 
             "_redacted": false, 
+            "dataset_file": "Datasets/2015_11/input_for_test_C_twostep_with_subpipeline_SP1WL15.csv", 
+            "date_created": "2000-01-01T00:00:00Z", 
+            "description": "input to pipeline pX", 
+            "file_source": null, 
             "groups_allowed": [], 
+            "name": "pX_in_dataset", 
             "user": 2, 
             "users_allowed": []
         }, 
-        "model": "librarian.symbolicdataset", 
+        "model": "librarian.dataset", 
         "pk": 2
     }, 
     {
@@ -643,10 +627,10 @@
     }, 
     {
         "fields": {
+            "dataset": 1, 
             "end_time": "2000-01-01T00:00:00Z", 
             "execlog": null, 
             "start_time": "2000-01-01T00:00:00Z", 
-            "symbolicdataset": 1, 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 

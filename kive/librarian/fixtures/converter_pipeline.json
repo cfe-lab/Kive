@@ -5,7 +5,7 @@
         "description": "Toy FASTA file for testing pipelines",
         "groups_allowed": [],
         "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e",
-        "created_by": null,
+        "file_source": null,
         "users_allowed": [],
         "user": 1,
         "date_created": "2015-01-13T21:15:28.253Z",

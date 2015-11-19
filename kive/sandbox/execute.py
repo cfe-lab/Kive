@@ -757,11 +757,10 @@ class Sandbox:
         if dataset_to_recover.has_data():
             self.logger.debug("Dataset is in the DB - writing it to the file system")
             location = self.dataset_fs_map[dataset_to_recover]
-            saved_data = dataset_to_recover.dataset
             try:
-                shutil.copyfile(saved_data.dataset_file.path, location)
+                shutil.copyfile(dataset_to_recover.dataset_file.path, location)
             except IOError:
-                self.logger.error("could not copy file {} to file {}.".format(saved_data.dataset_file.path, location))
+                self.logger.error("could not copy file {} to file {}.".format(dataset_to_recover.dataset_file.path, location))
                 return False
             return True
 
@@ -1514,12 +1513,11 @@ def finish_cable(cable_execute_dict, worker_rank):
     # FIXME at some point in the future this will have to be updated to mean "write to the local sandbox".
     if not input_dataset_in_sdbx:
         logger.debug("[%d] Dataset is in the DB - writing it to the file system", worker_rank)
-        saved_data = input_dataset.dataset
         try:
-            shutil.copyfile(saved_data.dataset_file.path, input_dataset_path)
+            shutil.copyfile(input_dataset.dataset_file.path, input_dataset_path)
         except IOError:
             logger.error("[%d] could not copy file %s to file %s.",
-                         worker_rank, saved_data.dataset_file.path, input_dataset_path)
+                         worker_rank, input_dataset.dataset_file.path, input_dataset_path)
             curr_record.stop(save=True, clean=True)
             return curr_record
 
@@ -1574,7 +1572,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_dat
                     if execrecord is None:
                         output_dataset = librarian.models.Dataset.create_empty(
                             cdt=output_CDT,
-                            created_by=curr_record
+                            file_source=curr_record
                         )
                     else:
                         output_dataset = execrecord.execrecordouts.first().dataset
@@ -1604,7 +1602,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_dat
                             keep_file=make_dataset,
                             name=dataset_name,
                             description=dataset_desc,
-                            created_by=curr_record,
+                            file_source=curr_record,
                             check=False
                         )
 
@@ -1834,7 +1832,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                                 output_dataset = execrecord.get_execrecordout(curr_output).dataset
                             else:
                                 output_dataset = librarian.models.Dataset.create_empty(
-                                    cdt=output_CDT, created_by=runstep)
+                                    cdt=output_CDT, file_source=runstep)
                             output_dataset.mark_missing(start_time, end_time, curr_log, user)
 
                             bad_output_found = True
@@ -1864,7 +1862,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                                     keep_file=make_dataset,
                                     name=dataset_name,
                                     description=dataset_desc,
-                                    created_by=runstep,
+                                    file_source=runstep,
                                     check=False
                                 )
                                 logger.debug("[%d] First time seeing file: saved md5 %s",

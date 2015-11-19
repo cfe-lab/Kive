@@ -48,7 +48,7 @@ class DatasetForm(metadata.forms.AccessControlForm):
 
         dataset = Dataset.create_dataset(file_path=None, user=user, cdt=compound_datatype_obj,
                                          keep_file=True, name=self.cleaned_data['name'],
-                                         description=self.cleaned_data['description'], created_by=None,
+                                         description=self.cleaned_data['description'], file_source=None,
                                          check=True, file_handle=self.cleaned_data['dataset_file'])
         dataset.grant_from_json(self.cleaned_data["permissions"])
 
@@ -130,7 +130,7 @@ class BulkCSVDatasetForm (metadata.forms.AccessControlForm):
                                     users_allowed=self.cleaned_data["users_allowed"],
                                     groups_allowed=self.cleaned_data["groups_allowed"],
                                     csv_file_handle=self.cleaned_data['datasets_csv'], cdt=compound_datatype_obj,
-                                    keep_files=True, created_by=None, check=True)
+                                    keep_files=True, file_source=None, check=True)
 
 
 class MultiFileField(forms.Field):
@@ -229,7 +229,7 @@ class BulkAddDatasetForm (metadata.forms.AccessControlForm):
 
                 dataset = Dataset.create_dataset(file_path=None, user=user,
                                                  cdt=compound_datatype_obj, keep_file=True, name=auto_name,
-                                                 description=auto_description, created_by=None, check=True,
+                                                 description=auto_description, file_source=None, check=True,
                                                  file_handle=uploaded_file)
                 dataset.grant_from_json(self.cleaned_data["permissions"])
 
@@ -367,7 +367,7 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
 
                 dataset = Dataset.create_dataset(file_path=None, user=user,
                                                  cdt=compound_datatype_obj, keep_file=True, name=auto_name,
-                                                 description=auto_description, created_by=None, check=True,
+                                                 description=auto_description, file_source=None, check=True,
                                                  file_handle=uploaded_file)
                 dataset.grant_from_json(self.cleaned_data["permissions"])
 

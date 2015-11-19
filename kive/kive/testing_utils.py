@@ -2278,7 +2278,7 @@ def destroy_grandpa_sandbox_environment(case):
     os.remove(case.grandpa_datafile.name)
 
 
-def make_dataset(contents, CDT, keep_file, user, name, description, created_by, check):
+def make_dataset(contents, CDT, keep_file, user, name, description, file_source, check):
     """
     Wrapper for create_dataset that creates a Dataset from a string.
     """
@@ -2291,7 +2291,7 @@ def make_dataset(contents, CDT, keep_file, user, name, description, created_by, 
             keep_file=keep_file,
             name=name,
             description=description,
-            created_by=created_by,
+            file_source=file_source,
             check=check,
             file_handle=f
         )

@@ -114,7 +114,7 @@ class ArchiveTestCaseHelpers:
         step1_in_ccl = self.doublet_symDS.content_checks.first()
         step1_in_ccl.execlog = self.step_E1_RS.log
         step1_in_ccl.save()
-        self.doublet_DS.created_by = self.step_E1_RS
+        self.doublet_DS.file_source = self.step_E1_RS
         self.doublet_DS.save()
         if bp == "first_runstep_complete":
             return
@@ -153,7 +153,7 @@ class ArchiveTestCaseHelpers:
         C1_ccl = self.C1_in_symDS.content_checks.first()
         C1_ccl.execlog = self.step_D1_RS.log
         C1_ccl.save()
-        self.C1_in_DS.created_by = self.step_D1_RS
+        self.C1_in_DS.file_source = self.step_D1_RS
         self.C1_in_DS.save()
 
         pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
@@ -248,7 +248,7 @@ class ArchiveTestCaseHelpers:
         step1_in_ccl = self.doublet_symDS.content_checks.first()
         step1_in_ccl.execlog = self.step_E1_RS.log
         step1_in_ccl.save()
-        self.doublet_DS.created_by = self.step_E1_RS
+        self.doublet_DS.file_source = self.step_E1_RS
         self.doublet_DS.save()
         if bp == "first_step_complete":
             return
@@ -301,7 +301,7 @@ class ArchiveTestCaseHelpers:
         C1_ccl = self.C1_in_symDS.content_checks.first()
         C1_ccl.execlog = self.step_D1_RS.log
         C1_ccl.save()
-        self.C1_in_DS.created_by = self.step_D1_RS
+        self.C1_in_DS.file_source = self.step_D1_RS
         self.C1_in_DS.save()
 
         pD_ROC = self.pD.outcables.first().poc_instances.create(run=self.pD_run)
@@ -356,7 +356,7 @@ class ArchiveTestCaseHelpers:
         E1_out_ccl = self.E1_out_symDS.content_checks.first()
         E1_out_ccl.execlog = roc1.log
         E1_out_ccl.save()
-        self.E1_out_DS.created_by = roc1
+        self.E1_out_DS.file_source = roc1
         self.E1_out_DS.save()
 
         if bp == "first_outcable":
@@ -428,7 +428,7 @@ class ArchiveTestCaseHelpers:
             return
 
         self.make_complete_non_reused(self.E21_41_ROC, [self.C1_in_symDS], [self.doublet_symDS])
-        self.doublet_DS.created_by = self.E21_41_ROC
+        self.doublet_DS.file_source = self.E21_41_ROC
         self.doublet_DS.save()
         if bp == "custom_roc_completed":
             return
@@ -450,7 +450,7 @@ class ArchiveTestCaseHelpers:
             return
 
         self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        self.C1_in_DS.created_by = self.D11_21_ROC
+        self.C1_in_DS.file_source = self.D11_21_ROC
         self.C1_in_DS.save()
         self.C1_in_symDS.content_checks.create(execlog=self.D11_21_ROC.log, start_time=timezone.now(),
                                                end_time=timezone.now(), user=self.myUser)
@@ -714,7 +714,7 @@ class RunComponentTests(ArchiveTestCase):
         self.step_through_runstep_creation("first_runstep_complete")
         self.step_E1_RS.reused = True
         for curr_output in self.step_E1_RS.outputs.all():
-            curr_output.created_by = None
+            curr_output.file_source = None
             curr_output.save()
 
         self.assertRaisesRegexp(
@@ -846,7 +846,7 @@ class RunStepTests(ArchiveTestCase):
         Dataset, is not clean.
         """
         self.step_through_runstep_creation("first_runstep")
-        self.doublet_DS.created_by = self.step_E1_RS
+        self.doublet_DS.file_source = self.step_E1_RS
         self.doublet_DS.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" inputs not quenched; no data should have been generated'
@@ -994,7 +994,7 @@ class RunStepTests(ArchiveTestCase):
         """
         self.step_through_runstep_creation("first_runstep_complete")
         self.step_E1_RS.reused = True
-        self.doublet_DS.created_by = self.step_E1_RS
+        self.doublet_DS.file_source = self.step_E1_RS
         self.doublet_DS.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" reused an ExecRecord and should not have generated any Datasets'
@@ -1086,7 +1086,7 @@ class RunStepTests(ArchiveTestCase):
         """
         self.step_through_runstep_creation("first_runstep_complete")
         self.step_E1_RS.reused = False
-        self.doublet_DS.created_by = self.step_E1_RS
+        self.doublet_DS.file_source = self.step_E1_RS
         self.doublet_symDS.MD5_checksum = "foo"
         self.doublet_DS.save()
         self.doublet_symDS.save()
@@ -1211,7 +1211,7 @@ class RunStepTests(ArchiveTestCase):
         A RunStep with a Dataset not in its ExecRecord is not clean.
         """
         self.step_through_runstep_creation("first_step")
-        self.triplet_DS.created_by = self.step_E1_RS
+        self.triplet_DS.file_source = self.step_E1_RS
         self.triplet_DS.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" generated Dataset "{}" but it is not in its ExecRecord'
@@ -1243,7 +1243,7 @@ class RunStepTests(ArchiveTestCase):
         complete_clean.
         """
         self.step_through_runstep_creation("first_runstep")
-        self.doublet_DS.created_by = self.step_E1_RS
+        self.doublet_DS.file_source = self.step_E1_RS
         self.doublet_DS.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" inputs not quenched; no data should have been generated'
@@ -1642,7 +1642,7 @@ class RunSICTests(ArchiveTestCase):
         but which has associated data, is not clean.
         """
         self.step_through_runsic_creation("rsic_created")
-        self.doublet_DS.created_by = self.E11_32_RSIC
+        self.doublet_DS.file_source = self.E11_32_RSIC
         self.doublet_DS.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" has not decided whether or not to reuse an ExecRecord; '
@@ -1676,7 +1676,7 @@ class RunSICTests(ArchiveTestCase):
         """
         self.step_through_runsic_creation("rsic_completed")
         self.E11_32_RSIC.reused = True
-        self.doublet_DS.created_by = self.E11_32_RSIC
+        self.doublet_DS.file_source = self.E11_32_RSIC
         self.doublet_DS.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" reused an ExecRecord and should not have generated any Datasets'
@@ -1979,7 +1979,7 @@ class RunSICTests(ArchiveTestCase):
         self.E11_32.keep_output = True
 
         # Associate different datasets to RSIC and associated ERO.
-        self.doublet_DS.created_by = self.E11_32_RSIC
+        self.doublet_DS.file_source = self.E11_32_RSIC
         self.doublet_DS.save()
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
         self.E11_32_output_DS.symbolicdataset = ero.symbolicdataset
@@ -2002,7 +2002,7 @@ class RunSICTests(ArchiveTestCase):
         self.E11_32_RSIC.reused = False
         self.E11_32.keep_output = True
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
-        self.E11_32_output_DS.created_by = self.E11_32_RSIC
+        self.E11_32_output_DS.file_source = self.E11_32_RSIC
         self.E11_32_output_DS.symbolicdataset = ero.symbolicdataset
         ero.symbolicdataset.MD5_checksum = self.E11_32_output_DS.compute_md5()
         self.E11_32_output_DS.save()
@@ -2022,7 +2022,7 @@ class RunSICTests(ArchiveTestCase):
         # which has data.
         self.E11_32_RSIC.reused = False
         self.E11_32.keep_output = True
-        self.E11_32_output_DS.created_by = self.E11_32_RSIC
+        self.E11_32_output_DS.file_source = self.E11_32_RSIC
         self.E11_32_output_DS.save()
 
         ero_to_change = self.E11_32_RSIC.execrecord.execrecordouts.first()
@@ -2116,7 +2116,7 @@ class RunOutputCableTests(ArchiveTestCase):
         ExecRecord should not have generated any data.
         """
         self.step_through_roc_creation("roc_created")
-        self.C1_out_DS.created_by = self.E31_42_ROC
+        self.C1_out_DS.file_source = self.E31_42_ROC
         self.C1_out_DS.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" has not decided whether or not to reuse an ExecRecord; '
@@ -2151,7 +2151,7 @@ class RunOutputCableTests(ArchiveTestCase):
         """
         self.step_through_roc_creation("roc_created")
         self.E31_42_ROC.reused = True
-        self.singlet_DS.created_by = self.E31_42_ROC
+        self.singlet_DS.file_source = self.E31_42_ROC
         self.singlet_DS.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" reused an ExecRecord and should not have generated any '
@@ -2181,7 +2181,7 @@ class RunOutputCableTests(ArchiveTestCase):
                             start_time=timezone.now(), end_time=timezone.now())
         cable_log.save()
 
-        self.singlet_DS.created_by = self.E31_42_ROC
+        self.singlet_DS.file_source = self.E31_42_ROC
         self.singlet_DS.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" is trivial and should not have generated any Datasets'
@@ -2204,7 +2204,7 @@ class RunOutputCableTests(ArchiveTestCase):
         ExecRecord, should generate at most one Dataset.
         """
         self.step_through_roc_creation("custom_roc_completed")
-        self.E1_out_DS.created_by = self.E21_41_ROC
+        self.E1_out_DS.file_source = self.E21_41_ROC
         self.E1_out_DS.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" should generate at most one Dataset'
@@ -2305,7 +2305,7 @@ class RunOutputCableTests(ArchiveTestCase):
 
         # May 12, 2014: this caused the test to fail.  We just want the ERO to not have
         # data.
-        # self.triplet_3_rows_DS.created_by = self.D11_21_ROC
+        # self.triplet_3_rows_DS.file_source = self.D11_21_ROC
         # self.triplet_3_rows_DS.save()
 
         self.C1_in_DS.delete()
@@ -2365,7 +2365,7 @@ class RunOutputCableTests(ArchiveTestCase):
         """
         self.step_through_roc_creation("subrun")
         self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_symDS], [self.C1_in_symDS])
-        self.triplet_3_rows_DS.created_by = self.D11_21_ROC
+        self.triplet_3_rows_DS.file_source = self.D11_21_ROC
         self.triplet_3_rows_DS.save()
 
         self.assertFalse(self.D11_21_ROC.component.is_trivial())
@@ -2395,7 +2395,7 @@ class RunOutputCableTests(ArchiveTestCase):
         Dataset associated, is not clean.
         """
         self.step_through_roc_creation("trivial_roc_completed")
-        self.singlet_DS.created_by = self.E31_42_ROC
+        self.singlet_DS.file_source = self.E31_42_ROC
         self.singlet_DS.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" is trivial and should not have generated any Datasets'
@@ -2430,7 +2430,7 @@ class RunOutputCableTests(ArchiveTestCase):
         have produced output data, otherwise it is not clean.
         """
         self.step_through_roc_creation("custom_roc_completed")
-        self.doublet_DS.created_by = None
+        self.doublet_DS.file_source = None
         self.doublet_DS.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunOutputCable "{}" was not reused, trivial, or deleted; it should have '
@@ -2445,7 +2445,7 @@ class RunOutputCableTests(ArchiveTestCase):
         is clean and complete.
         """
         self.step_through_roc_creation("subrun_complete")
-        self.C1_in_DS.created_by = self.D11_21_ROC
+        self.C1_in_DS.file_source = self.D11_21_ROC
         self.C1_in_DS.save()
 
         self.assertIsNone(self.D11_21_ROC.clean())
@@ -3534,7 +3534,7 @@ year,month,day,hour,minute,second,microsecond
         E1_out_ccl.execlog = roc1.log
         E1_out_ccl.add_bad_header()
         E1_out_ccl.save()
-        self.E1_out_DS.created_by = roc1
+        self.E1_out_DS.file_source = roc1
         self.E1_out_DS.save()
 
         self.assertTrue(self.pE_run.is_complete())
@@ -3694,7 +3694,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
                                                           users_allowed=None, groups_allowed=None, cdt=None,
                                                           keep_file=True, name="Test dataset",
                                                           description="Test data for a test that tests test data",
-                                                          created_by=None, check=True, file_handle=f)
+                                                          file_source=None, check=True, file_handle=f)
             self.test_dataset_path = "{}{}/".format(self.list_path,
                                                     self.test_dataset.dataset.id)
             self.n_prexisting_datasets = 1

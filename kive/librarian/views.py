@@ -364,7 +364,7 @@ def dataset_lookup(request, md5_checksum=None):
             md5_checksum = checksum.hexdigest()
 
     datasets = librarian.models.Dataset.filter_by_user(request.user).filter(
-        MD5_checksum=md5_checksum).exclude(dataset__created_by=None)
+        MD5_checksum=md5_checksum).exclude(dataset__file_source=None)
 
     datasets_as_inputs = []
     runs = Run.objects.filter(inputs__dataset__MD5_checksum=md5_checksum)

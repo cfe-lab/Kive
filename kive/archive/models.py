@@ -1367,13 +1367,13 @@ class RunStep(RunComponent):
 
             if self.pipelinestep.outputs_to_delete.filter(dataset_name=to.dataset_name).exists():
                 # This output is deleted; there should be no associated Dataset.
-                if self.outputs.filter(dataset=corresp_ero.dataset).exists():
+                if self.outputs.filter(pk=corresp_ero.dataset.pk).exists():
                     raise ValidationError('Output "{}" of RunStep "{}" is deleted; no data should be associated'
                                           .format(to, self))
 
             elif corresp_ero.dataset in outputs_missing:
                 # This output is missing; there should be no associated Dataset.
-                if self.outputs.filter(dataset=corresp_ero.dataset).exists():
+                if self.outputs.filter(pk=corresp_ero.dataset.pk).exists():
                     raise ValidationError('Output "{}" of RunStep "{}" is missing; no data should be associated'
                                           .format(to, self))
 
@@ -1385,7 +1385,7 @@ class RunStep(RunComponent):
         # Check that any associated data belongs to an ERO of this ER
         # Supposed to be the datasets attached to this runstep (Produced by this runstep)
         for out_data in self.outputs.all():
-            if not self.execrecord.execrecordouts.filter(dataset=out_data.dataset).exists():
+            if not self.execrecord.execrecordouts.filter(dataset=out_data).exists():
                 raise ValidationError('RunStep "{}" generated Dataset "{}" but it is not in its ExecRecord'
                                       .format(self, out_data))
 
@@ -1912,7 +1912,7 @@ class RunCable(RunComponent):
                         raise ValidationError('{} "{}" was not reused, trivial, or deleted; it should have '
                                               'produced data'.format(self._cable_type_str(), self))
 
-                    if corresp_ero.dataset.dataset != self.outputs.first():
+                    if corresp_ero.dataset != self.outputs.first():
                         raise ValidationError('Dataset "{}" was produced by {} "{}" but is not in an ERO of '
                                               'ExecRecord "{}"'.format(self.outputs.first(),
                                                                        self._cable_type_str(),

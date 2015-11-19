@@ -87,7 +87,7 @@ class Dataset(metadata.models.AccessControl):
     # Case 2: from the transformation of a RunStep
     # Case 3: from the execution of a POC (i.e. from a ROC)
     # Case 4: from the execution of a PSIC (i.e. from a RunSIC)
-    created_by = models.ForeignKey("archive.RunComponent", related_name="outputs", null=True, blank=True)
+    file_source = models.ForeignKey("archive.RunComponent", related_name="outputs", null=True, blank=True)
 
     # Datasets are stored in the "Datasets" folder
     dataset_file = models.FileField(upload_to=get_upload_path, help_text="Physical path where datasets are stored",
@@ -251,13 +251,15 @@ class Dataset(metadata.models.AccessControl):
         if self.has_structure():
             self.structure.clean()
 
-        if self.created_by is not None:
+        if self.file_source is not None:
             # Whatever run created this Dataset must have had access to the parent Dataset.
-            self.created_by.definite.top_level_run.validate_restrict_access([self])
+            self.file_source.definite.top_level_run.validate_restrict_access([self])
 
         if self.has_data() and not self.check_md5():
-            raise ValidationError('File integrity of "{}" lost. Current checksum "{}" does not equal expected checksum '
-                                  '"{}"'.format(self, self.compute_md5(), self.MD5_checksum))
+            raise ValidationError(
+                'File integrity of "{}" lost. Current checksum "{}" does not equal expected checksum '
+                '"{}"'.format(self, self.compute_md5(), self.MD5_checksum)
+            )
 
     def validate_unique(self, *args, **kwargs):
         query = Dataset.objects.filter(MD5_checksum=self.MD5_checksum,
@@ -315,7 +317,7 @@ class Dataset(metadata.models.AccessControl):
         # Note: "is not" won't work here because self.dataset_file
         # is a FieldFile with no file, not None.  However, == and != have
         # have been appropriately overloaded to handle this.
-        return self.dataset_file != None
+        return bool(self.dataset_file)
 
     def has_structure(self):
         """True if associated DatasetStructure exists; False otherwise."""
@@ -434,7 +436,7 @@ class Dataset(metadata.models.AccessControl):
 
     @classmethod
     def create_empty(cls, user=None, cdt=None, users_allowed=None, groups_allowed=None,
-                     created_by=None):
+                     file_source=None):
         """Create an empty Dataset.
 
         INPUTS
@@ -449,14 +451,14 @@ class Dataset(metadata.models.AccessControl):
         groups_allowed = groups_allowed or []
 
         if user is None:
-            assert created_by is not None
-            user = created_by.top_level_run.user
-            users_allowed = created_by.top_level_run.users_allowed.all()
-            groups_allowed = created_by.top_level_run.groups_allowed.all()
-        elif created_by is not None:
-            assert user == created_by.top_level_run.user
-            assert set(users_allowed) == set(created_by.top_level_run.users_allowed.all())
-            assert set(groups_allowed) == set(created_by.top_level_run.groups_allowed.all())
+            assert file_source is not None
+            user = file_source.top_level_run.user
+            users_allowed = file_source.top_level_run.users_allowed.all()
+            groups_allowed = file_source.top_level_run.groups_allowed.all()
+        elif file_source is not None:
+            assert user == file_source.top_level_run.user
+            assert set(users_allowed) == set(file_source.top_level_run.users_allowed.all())
+            assert set(groups_allowed) == set(file_source.top_level_run.groups_allowed.all())
 
         empty_SD = cls(user=user, MD5_checksum="")
         empty_SD.clean()
@@ -475,13 +477,13 @@ class Dataset(metadata.models.AccessControl):
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
     def create_dataset(cls, file_path, user=None, users_allowed=None, groups_allowed=None, cdt=None, keep_file=True,
-                       name=None, description=None, created_by=None, check=True, file_handle=None):
+                       name=None, description=None, file_source=None, check=True, file_handle=None):
         """
         Helper function to make defining SDs and Datasets faster.
 
         user and name must both be set if make_dataset=True.
         make_dataset creates a Dataset from the given file path to go
-        with the SD. created_by can be a RunAtomic to register the
+        with the SD. file_source can be a RunAtomic to register the
         Dataset with, or None if it was uploaded by the user (or if
         make_dataset=False). If check is True, do a ContentCheck on the
         file.
@@ -492,14 +494,14 @@ class Dataset(metadata.models.AccessControl):
         groups_allowed = groups_allowed or []
 
         if user is None:
-            assert created_by is not None
-            user = created_by.top_level_run.user
-            users_allowed = created_by.top_level_run.users_allowed.all()
-            groups_allowed = created_by.top_level_run.groups_allowed.all()
-        elif created_by is not None:
-            assert user == created_by.top_level_run.user
-            assert set(users_allowed) == set(created_by.top_level_run.users_allowed.all())
-            assert set(groups_allowed) == set(created_by.top_level_run.groups_allowed.all())
+            assert file_source is not None
+            user = file_source.top_level_run.user
+            users_allowed = file_source.top_level_run.users_allowed.all()
+            groups_allowed = file_source.top_level_run.groups_allowed.all()
+        elif file_source is not None:
+            assert user == file_source.top_level_run.user
+            assert set(users_allowed) == set(file_source.top_level_run.users_allowed.all())
+            assert set(groups_allowed) == set(file_source.top_level_run.groups_allowed.all())
 
         if file_path:
             LOGGER.debug("Creating Dataset from file {}".format(file_path))
@@ -514,9 +516,8 @@ class Dataset(metadata.models.AccessControl):
             new_dataset = cls.create_empty(user, cdt=cdt,
                                            users_allowed=users_allowed, groups_allowed=groups_allowed)
 
-            new_dataset.name = name
-            new_dataset.description = description
-            new_dataset.created_by = created_by
+            new_dataset.name = name or ""
+            new_dataset.description = description or ""
 
             if new_dataset.is_raw():
                 new_dataset.set_MD5(file_path, file_handle)
@@ -564,6 +565,7 @@ class Dataset(metadata.models.AccessControl):
 
             if keep_file:
                 new_dataset.register_file(file_path=file_path, file_handle=file_handle)
+                new_dataset.file_source = file_source
             else:
                 if new_dataset.is_raw():
                     new_dataset.set_MD5(file_name, file_handle)
@@ -579,7 +581,7 @@ class Dataset(metadata.models.AccessControl):
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
     def create_dataset_bulk(cls, csv_file_path, user, users_allowed=None, groups_allowed=None, csv_file_handle=None,
-                            cdt=None, keep_files=True, created_by=None, check=True):
+                            cdt=None, keep_files=True, file_source=None, check=True):
         """
         Helper function to make defining multiple SDs and Datasets faster.
         Instead of specifying datasets one by one,
@@ -594,7 +596,7 @@ class Dataset(metadata.models.AccessControl):
         - File
 
         make_dataset creates a Dataset from the given file path to go
-        with the SD. created_by can be a RunAtomic to register the
+        with the SD. file_source can be a RunAtomic to register the
         Dataset with, or None if it was uploaded by the user (or if
         make_dataset=False). If check is True, do a ContentCheck on the
         file.  If this fails, then a ValueError is raised and no changes
@@ -609,7 +611,7 @@ class Dataset(metadata.models.AccessControl):
         :param cdt:
         :param keep_files:
         :param user:
-        :param created_by:
+        :param file_source:
         :param check:
         """
         new_datasets = []
@@ -645,7 +647,7 @@ class Dataset(metadata.models.AccessControl):
                             file_path=file_name, user=user, users_allowed=users_allowed,
                             groups_allowed=groups_allowed, cdt=cdt,
                             keep_file=keep_files, name=name, description=desc,
-                            created_by=created_by, check=check
+                            file_source=file_source, check=check
                         )
 
                         new_datasets.extend([new_dataset])
@@ -802,8 +804,8 @@ class Dataset(metadata.models.AccessControl):
         """
         Mark RunComponents that use this as an output as failed.
         """
-        if self.has_data() and self.dataset.created_by is not None:
-            creating_ER = self.dataset.created_by.execrecord
+        if self.has_data() and self.dataset.file_source is not None:
+            creating_ER = self.dataset.file_source.execrecord
             for rc in creating_ER.used_by_components.all():
                 rc.mark_unsuccessful()
 
@@ -958,7 +960,7 @@ class Dataset(metadata.models.AccessControl):
                         os.remove(filepath)
                         total_size -= filesize
                 else:
-                    if dataset.created_by is None:
+                    if dataset.file_source is None:
                         is_skipped = True  # it was uploaded, not created
                     else:
                         # Check to see if it's being used by an active run.

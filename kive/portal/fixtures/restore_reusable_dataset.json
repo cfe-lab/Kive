@@ -1,9 +1,9 @@
 [
     {
         "fields": {
+            "dataset": 1, 
             "index": 1, 
-            "run": 1, 
-            "symbolicdataset": 1
+            "run": 1
         }, 
         "model": "archive.runinput", 
         "pk": 1
@@ -55,7 +55,7 @@
             "_complete": true, 
             "_redacted": false, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:03Z", 
             "execrecord": 3, 
             "is_cancelled": false, 
             "reused": false, 
@@ -117,32 +117,6 @@
         }, 
         "model": "archive.runoutputcable", 
         "pk": 5
-    }, 
-    {
-        "fields": {
-            "created_by": null, 
-            "dataset_file": "Datasets/fixtures/pairs.csv", 
-            "date_created": "2000-01-01T00:00:00Z", 
-            "date_modified": "2000-01-01T00:00:00Z", 
-            "description": "", 
-            "name": "pairs", 
-            "symbolicdataset": 1
-        }, 
-        "model": "archive.dataset", 
-        "pk": 1
-    }, 
-    {
-        "fields": {
-            "created_by": 2, 
-            "dataset_file": "Datasets/fixtures/step2_total_sums.raw", 
-            "date_created": "2000-01-01T00:00:03Z", 
-            "date_modified": "2000-01-01T00:00:03Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2015-11-05 01:28:11.902181+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
-            "name": "run1_step2_outputtotal_sums", 
-            "symbolicdataset": 3
-        }, 
-        "model": "archive.dataset", 
-        "pk": 2
     }, 
     {
         "fields": {
@@ -259,90 +233,90 @@
     }, 
     {
         "fields": {
+            "dataset": 1, 
             "execrecord": 1, 
-            "generic_input": 7, 
-            "symbolicdataset": 1
+            "generic_input": 7
         }, 
         "model": "librarian.execrecordin", 
         "pk": 1
     }, 
     {
         "fields": {
+            "dataset": 1, 
             "execrecord": 2, 
-            "generic_input": 1, 
-            "symbolicdataset": 1
+            "generic_input": 1
         }, 
         "model": "librarian.execrecordin", 
         "pk": 2
     }, 
     {
         "fields": {
+            "dataset": 2, 
             "execrecord": 3, 
-            "generic_input": 2, 
-            "symbolicdataset": 2
+            "generic_input": 2
         }, 
         "model": "librarian.execrecordin", 
         "pk": 3
     }, 
     {
         "fields": {
+            "dataset": 2, 
             "execrecord": 4, 
-            "generic_input": 3, 
-            "symbolicdataset": 2
+            "generic_input": 3
         }, 
         "model": "librarian.execrecordin", 
         "pk": 4
     }, 
     {
         "fields": {
+            "dataset": 3, 
             "execrecord": 5, 
-            "generic_input": 4, 
-            "symbolicdataset": 3
+            "generic_input": 4
         }, 
         "model": "librarian.execrecordin", 
         "pk": 5
     }, 
     {
         "fields": {
+            "dataset": 1, 
             "execrecord": 1, 
-            "generic_output": 1, 
-            "symbolicdataset": 1
+            "generic_output": 1
         }, 
         "model": "librarian.execrecordout", 
         "pk": 1
     }, 
     {
         "fields": {
+            "dataset": 2, 
             "execrecord": 2, 
-            "generic_output": 2, 
-            "symbolicdataset": 2
+            "generic_output": 2
         }, 
         "model": "librarian.execrecordout", 
         "pk": 2
     }, 
     {
         "fields": {
+            "dataset": 2, 
             "execrecord": 3, 
-            "generic_output": 3, 
-            "symbolicdataset": 2
+            "generic_output": 3
         }, 
         "model": "librarian.execrecordout", 
         "pk": 3
     }, 
     {
         "fields": {
+            "dataset": 3, 
             "execrecord": 4, 
-            "generic_output": 4, 
-            "symbolicdataset": 3
+            "generic_output": 4
         }, 
         "model": "librarian.execrecordout", 
         "pk": 4
     }, 
     {
         "fields": {
+            "dataset": 3, 
             "execrecord": 5, 
-            "generic_output": 8, 
-            "symbolicdataset": 3
+            "generic_output": 8
         }, 
         "model": "librarian.execrecordout", 
         "pk": 5
@@ -723,8 +697,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 2, 
-            "dataset_name": "total_products", 
+            "dataset_idx": 1, 
+            "dataset_name": "total_sums", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -732,8 +706,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 1, 
-            "dataset_name": "total_sums", 
+            "dataset_idx": 2, 
+            "dataset_name": "total_products", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -749,10 +723,10 @@
             "paused_by": null, 
             "pipeline": 4, 
             "purged": true, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userkive_run1_nRg2M3", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userkive_run1_Q7KqI8", 
             "start_time": "2000-01-01T00:00:01Z", 
             "stopped_by": null, 
-            "time_queued": "2015-11-05T01:28:11.837Z", 
+            "time_queued": "2015-11-19T01:15:28.958Z", 
             "user": 1, 
             "users_allowed": []
         }, 
@@ -763,35 +737,50 @@
         "fields": {
             "MD5_checksum": "e093c9eac5d0cae832d4e2071ccfdc5f", 
             "_redacted": false, 
+            "dataset_file": "Datasets/2015_11/pairs.csv", 
+            "date_created": "2000-01-01T00:00:00Z", 
+            "description": "", 
+            "file_source": null, 
             "groups_allowed": [
                 1
             ], 
+            "name": "pairs", 
             "user": 1, 
             "users_allowed": []
         }, 
-        "model": "librarian.symbolicdataset", 
+        "model": "librarian.dataset", 
         "pk": 1
     }, 
     {
         "fields": {
-            "MD5_checksum": "043a30d6777212903af08eaed2ae721c", 
+            "MD5_checksum": "c368ac9dbfe10312a86be5be6dd4cd16", 
             "_redacted": false, 
+            "dataset_file": "", 
+            "date_created": "2000-01-01T00:00:01Z", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2015-11-19 01:15:29.031698+00:00 by kive\nrun: 1\nuser: kive\nstep: 1\noutput: sums_and_products", 
+            "file_source": null, 
             "groups_allowed": [], 
+            "name": "run1_step1_outputsums_and_products", 
             "user": 1, 
             "users_allowed": []
         }, 
-        "model": "librarian.symbolicdataset", 
+        "model": "librarian.dataset", 
         "pk": 2
     }, 
     {
         "fields": {
-            "MD5_checksum": "ba9d3a9e10d9f54046b7f0199a284b86", 
+            "MD5_checksum": "7ff6ac15c4dd1c669671b0095937c4f5", 
             "_redacted": false, 
+            "dataset_file": "Datasets/2015_11/step2_total_sums.raw", 
+            "date_created": "2000-01-01T00:00:03Z", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2015-11-19 01:15:29.031698+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
+            "file_source": 2, 
             "groups_allowed": [], 
+            "name": "run1_step2_outputtotal_sums", 
             "user": 1, 
             "users_allowed": []
         }, 
-        "model": "librarian.symbolicdataset", 
+        "model": "librarian.dataset", 
         "pk": 3
     }, 
     {
@@ -1096,10 +1085,10 @@
     }, 
     {
         "fields": {
+            "dataset": 2, 
             "end_time": "2000-01-01T00:00:02Z", 
             "execlog": 2, 
             "start_time": "2000-01-01T00:00:02Z", 
-            "symbolicdataset": 2, 
             "user": 1
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1107,10 +1096,10 @@
     }, 
     {
         "fields": {
+            "dataset": 3, 
             "end_time": "2000-01-01T00:00:03Z", 
             "execlog": 4, 
             "start_time": "2000-01-01T00:00:03Z", 
-            "symbolicdataset": 3, 
             "user": 1
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1118,10 +1107,10 @@
     }, 
     {
         "fields": {
+            "dataset": 1, 
             "end_time": "2000-01-01T00:00:01Z", 
             "execlog": 1, 
             "start_time": "2000-01-01T00:00:01Z", 
-            "symbolicdataset": 1, 
             "user": 1
         }, 
         "model": "datachecking.integritychecklog", 
@@ -1129,10 +1118,10 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:02Z", 
+            "dataset": 2, 
+            "end_time": "2000-01-01T00:00:03Z", 
             "execlog": 3, 
-            "start_time": "2000-01-01T00:00:02Z", 
-            "symbolicdataset": 2, 
+            "start_time": "2000-01-01T00:00:03Z", 
             "user": 1
         }, 
         "model": "datachecking.integritychecklog", 
@@ -1140,10 +1129,10 @@
     }, 
     {
         "fields": {
+            "dataset": 3, 
             "end_time": "2000-01-01T00:00:04Z", 
             "execlog": 5, 
             "start_time": "2000-01-01T00:00:04Z", 
-            "symbolicdataset": 3, 
             "user": 1
         }, 
         "model": "datachecking.integritychecklog", 

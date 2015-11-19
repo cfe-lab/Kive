@@ -159,8 +159,8 @@ class DatasetTests(LibrarianTestCase):
                          ))
 
     def test_is_raw(self):
-        self.assertEqual(self.triplet_symDS.is_raw(), False)
-        self.assertEqual(self.raw_symDS.is_raw(), True)
+        self.assertEqual(self.triplet_dataset.is_raw(), False)
+        self.assertEqual(self.raw_dataset.is_raw(), True)
 
     def test_forgot_header(self):
         """
@@ -276,7 +276,7 @@ Bob,tw3nty
         self.assertEqual(self.dataset.description, dsdesc)
         self.assertEqual(self.dataset.date_created.date(), timezone.now().date())
         self.assertEqual(self.dataset.date_created < timezone.now(), True)
-        self.assertEqual(self.dataset.created_by, None)
+        self.assertEqual(self.dataset.file_source, None)
         self.assertEqual(os.path.basename(self.dataset.dataset_file.path), os.path.basename(file_path))
         data_file.close()
 
@@ -311,15 +311,15 @@ Bob,tw3nty
             self.assertEqual(dataset.description, dsdesc+str(i))
             self.assertEqual(dataset.date_created.date(), timezone.now().date())
             self.assertEqual(dataset.date_created < timezone.now(), True)
-            self.assertEqual(dataset.created_by, None)
+            self.assertEqual(dataset.file_source, None)
             self.assertEqual(os.path.basename(dataset.dataset_file.path), os.path.basename(file_paths[i]))
 
 
 class DatasetStructureTests(LibrarianTestCase):
 
     def test_num_rows(self):
-        self.assertEqual(self.triplet_3_rows_symDS.num_rows(), 3)
-        self.assertEqual(self.triplet_3_rows_symDS.structure.num_rows, 3)
+        self.assertEqual(self.triplet_3_rows_dataset.num_rows(), 3)
+        self.assertEqual(self.triplet_3_rows_dataset.structure.num_rows, 3)
 
 
 class ExecRecordTests(LibrarianTestCase):
@@ -339,7 +339,7 @@ class ExecRecordTests(LibrarianTestCase):
         myROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
         myER = ER_from_record(myROC)
         myERI_bad = myER.execrecordins.create(
-            dataset = self.singlet_symDS,
+            dataset = self.singlet_dataset,
             generic_input = self.C1_out)
 
         self.assertRaisesRegexp(
@@ -350,7 +350,7 @@ class ExecRecordTests(LibrarianTestCase):
     def test_ER_links_PSIC_so_ERI_must_link_TX_that_PSIC_is_fed_by(self):
         # ER links PSIC: ERI must link to the TO/TI that the PSIC is fed by
         myER = ER_from_PSIC(self.pE_run, self.step_E3, self.E11_32)
-        myERI_bad = myER.execrecordins.create(dataset=self.singlet_symDS,
+        myERI_bad = myER.execrecordins.create(dataset=self.singlet_dataset,
                                               generic_input=self.C1_out)
         self.assertRaisesRegexp(
             ValidationError,
@@ -358,7 +358,7 @@ class ExecRecordTests(LibrarianTestCase):
             myERI_bad.clean)
         
         yourER = ER_from_PSIC(self.pE_run, self.step_E2, self.E02_22)
-        yourERI_bad = yourER.execrecordins.create(dataset=self.singlet_symDS,
+        yourERI_bad = yourER.execrecordins.create(dataset=self.singlet_dataset,
                                                   generic_input=self.D2_in)
         self.assertRaisesRegexp(
             ValidationError,
@@ -369,7 +369,7 @@ class ExecRecordTests(LibrarianTestCase):
         # ER's EL doesn't refer to a RSIC or ROC (So, RunStep): ERI must refer to a TI
         myRS = self.pE_run.runsteps.create(pipelinestep=self.step_E1)
         myER = ER_from_record(myRS)
-        myERI_bad = myER.execrecordins.create(dataset=self.singlet_symDS,
+        myERI_bad = myER.execrecordins.create(dataset=self.singlet_dataset,
                                               generic_input=self.C1_out)
         self.assertRaisesRegexp(
             ValidationError,
@@ -391,13 +391,13 @@ class ExecRecordTests(LibrarianTestCase):
         myRS = self.pD_run.runsteps.create(pipelinestep=self.step_D1)
         myER = ER_from_record(myRS)
         myERI_good = myER.execrecordins.create(
-            dataset=self.D1_in_symDS,
+            dataset=self.D1_in_dataset,
             generic_input=self.B1_in)
 
         self.assertEqual(myERI_good.clean(), None)
         
         myERI_bad = myER.execrecordins.create(
-            dataset=self.triplet_symDS,
+            dataset=self.triplet_dataset,
             generic_input=self.mB.outputs.all()[0])
         self.assertRaisesRegexp(
             ValidationError,
@@ -411,12 +411,12 @@ class ExecRecordTests(LibrarianTestCase):
         myER_C = ER_from_record(myRS_C)
 
         myERI_unraw_unraw = myER_C.execrecordins.create(
-            dataset=self.triplet_symDS,
+            dataset=self.triplet_dataset,
             generic_input=self.C1_in)
         self.assertEqual(myERI_unraw_unraw.clean(), None)
 
         myERI_raw_unraw_BAD = myER_C.execrecordins.create(
-            dataset=self.raw_symDS,
+            dataset=self.raw_dataset,
             generic_input=self.C2_in)
         self.assertRaisesRegexp(
             ValidationError,
@@ -427,7 +427,7 @@ class ExecRecordTests(LibrarianTestCase):
         myRS_A = self.pE_run.runsteps.create(pipelinestep=self.step_E1)
         myER_A = ER_from_record(myRS_A)
         myERI_unraw_raw_BAD = myER_A.execrecordins.create(
-            dataset=self.triplet_symDS,
+            dataset=self.triplet_dataset,
             generic_input=self.A1_rawin)
         self.assertRaisesRegexp(
             ValidationError,
@@ -436,7 +436,7 @@ class ExecRecordTests(LibrarianTestCase):
         myERI_unraw_raw_BAD.delete()
     
         myERI_raw_raw = myER_A.execrecordins.create(
-            dataset=self.raw_symDS,
+            dataset=self.raw_dataset,
             generic_input=self.A1_rawin)
         self.assertEqual(myERI_raw_raw.clean(), None)
 
@@ -447,7 +447,7 @@ class ExecRecordTests(LibrarianTestCase):
 
         # We annotate that triplet was fed from D1_out into E21_41
         myERI_wrong_CDT = myER.execrecordins.create(
-            dataset=self.singlet_symDS,
+            dataset=self.singlet_dataset,
             generic_input=self.pD.outputs.get(dataset_name="D1_out"))
         self.assertRaisesRegexp(
             ValidationError,
@@ -457,7 +457,7 @@ class ExecRecordTests(LibrarianTestCase):
 
         # Right CDT but wrong number of rows (It needs < 5, we have 10)
         myERI_too_many_rows = myER.execrecordins.create(
-            dataset=self.triplet_symDS,
+            dataset=self.triplet_dataset,
             generic_input=self.pD.outputs.get(dataset_name="D1_out"))
         self.assertRaisesRegexp(
             ValidationError,
@@ -470,7 +470,7 @@ class ExecRecordTests(LibrarianTestCase):
         myROC = self.pE_run.runsteps.create(pipelinestep=self.step_E3)
         myER = ER_from_record(myROC)
         myERI_wrong_CDT = myER.execrecordins.create(
-            dataset=self.singlet_symDS,
+            dataset=self.singlet_dataset,
             generic_input=self.C2_in)
         self.assertRaisesRegexp(
             ValidationError,
@@ -479,7 +479,7 @@ class ExecRecordTests(LibrarianTestCase):
         myERI_wrong_CDT.delete()
 
         myERI_right_CDT = myER.execrecordins.create(
-            dataset=self.doublet_symDS, generic_input=self.C2_in)
+            dataset=self.doublet_dataset, generic_input=self.C2_in)
         self.assertEqual(myERI_right_CDT.clean(), None)
 
     def test_ER_links_with_POC_ERO_TO_must_belong_to_same_pipeline_as_ER_POC(self):
@@ -491,14 +491,14 @@ class ExecRecordTests(LibrarianTestCase):
 
         # This ERO has a TO that belongs to this pipeline
         myERO_good = myER.execrecordouts.create(
-            dataset=self.singlet_symDS,
+            dataset=self.singlet_dataset,
             generic_output=self.pE.outputs.get(dataset_name="E2_out"))
         self.assertEqual(myERO_good.clean(), None)
         myERO_good.delete()
 
         # This ERO has a TO that does NOT belong to this pipeline
         myERO_bad = myER.execrecordouts.create(
-            dataset=self.triplet_3_rows_symDS,
+            dataset=self.triplet_3_rows_dataset,
             generic_output=self.pD.outputs.get(dataset_name="D1_out"))
         self.assertRaisesRegexp(
             ValidationError,
@@ -514,7 +514,7 @@ class ExecRecordTests(LibrarianTestCase):
 
         # Define ERO with a TO that is part of pipeline E but with the wrong name from the POC
         myERO_bad = myER.execrecordouts.create(
-            dataset=self.triplet_3_rows_symDS,
+            dataset=self.triplet_3_rows_dataset,
             generic_output=self.pE.outputs.get(dataset_name="E2_out"))
         self.assertRaisesRegexp(
             ValidationError,
@@ -528,12 +528,12 @@ class ExecRecordTests(LibrarianTestCase):
         myER = ER_from_record(myRS)
 
         myERO_rawDS_rawTO = myER.execrecordouts.create(
-            dataset=self.raw_symDS, generic_output=self.C3_rawout)
+            dataset=self.raw_dataset, generic_output=self.C3_rawout)
         self.assertEqual(myERO_rawDS_rawTO.clean(), None)
         myERO_rawDS_rawTO.delete()
 
         myERO_rawDS_nonrawTO = myER.execrecordouts.create(
-            dataset=self.raw_symDS, generic_output=self.C1_out)
+            dataset=self.raw_dataset, generic_output=self.C1_out)
         self.assertRaisesRegexp(
             ValidationError,
             r'Dataset ".*" \(raw\) cannot have come from output ".*" \(non-raw\)',
@@ -541,7 +541,7 @@ class ExecRecordTests(LibrarianTestCase):
         myERO_rawDS_nonrawTO.delete()
 
         myERO_DS_rawTO = myER.execrecordouts.create(
-            dataset=self.singlet_symDS, generic_output=self.C3_rawout)
+            dataset=self.singlet_dataset, generic_output=self.C3_rawout)
         self.assertRaisesRegexp(
             ValidationError,
             r'Dataset ".*" \(non-raw\) cannot have come from output ".*" \(raw\)',
@@ -549,13 +549,13 @@ class ExecRecordTests(LibrarianTestCase):
         myERO_DS_rawTO.delete()
 
         myERO_DS_TO = myER.execrecordouts.create(
-            dataset=self.singlet_symDS, generic_output=self.C1_out)
+            dataset=self.singlet_dataset, generic_output=self.C1_out)
         self.assertEqual(myERO_DS_TO.clean(), None)
         myERO_DS_TO.delete()
         
         # 2) Dataset must have the same CDT of the producing TO
         myERO_invalid_CDT = myER.execrecordouts.create(
-            dataset=self.triplet_symDS, generic_output=self.C1_out)
+            dataset=self.triplet_dataset, generic_output=self.C1_out)
         self.assertRaisesRegexp(
             ValidationError,
             'CDT of Dataset ".*" is not the CDT of the TransformationOutput ".*" of the generating Method',
@@ -567,7 +567,7 @@ class ExecRecordTests(LibrarianTestCase):
         myRS = self.pD_run.runsteps.create(pipelinestep=self.step_D1)
         myER_2 = ER_from_record(myRS)
         myERO_too_many_rows = myER_2.execrecordouts.create(
-            dataset=self.triplet_symDS, generic_output=self.B1_out)
+            dataset=self.triplet_dataset, generic_output=self.B1_out)
         self.assertRaisesRegexp(
             ValidationError,
             'Dataset ".*" was produced by TransformationOutput ".*" but has too many rows',
@@ -581,7 +581,7 @@ class ExecRecordTests(LibrarianTestCase):
         mC_ER = ER_from_record(mC_RS)
         mC_ER_in_1 = mC_ER.execrecordins.create(
             generic_input=self.C1_in,
-            dataset=self.C1_in_symDS)
+            dataset=self.C1_in_dataset)
 
         # Good case: input Dataset has the CDT of
         # generic_input.
@@ -599,7 +599,7 @@ class ExecRecordTests(LibrarianTestCase):
         other_CDT.members.create(datatype=self.string_dt,
                                  column_name="c", column_idx=3)
 
-        self.C1_in_symDS.structure.compounddatatype = other_CDT
+        self.C1_in_dataset.structure.compounddatatype = other_CDT
         self.assertEqual(mC_ER_in_1.clean(), None)
 
         # Good case: proper restriction.
@@ -608,7 +608,7 @@ class ExecRecordTests(LibrarianTestCase):
         self.assertEqual(mC_ER_in_1.clean(), None)
 
         # Bad case: a type that is not a restriction at all.
-        self.C1_in_symDS.structure.compounddatatype = self.doublet_cdt
+        self.C1_in_dataset.structure.compounddatatype = self.doublet_cdt
         self.assertRaisesRegexp(
             ValidationError,
             "CDT of Dataset .* is not a restriction of the required CDT",
@@ -621,7 +621,7 @@ class ExecRecordTests(LibrarianTestCase):
         mA_ER = ER_from_record(mA_RS)
         mA_ERO = mA_ER.execrecordouts.create(
             generic_output=self.A1_out,
-            dataset=self.doublet_symDS)
+            dataset=self.doublet_dataset)
 
         # Good case: output Dataset has the CDT of
         # generic_output.
@@ -635,8 +635,8 @@ class ExecRecordTests(LibrarianTestCase):
         other_CDT.members.create(datatype=self.string_dt,
                                  column_name="y", column_idx=2)
         
-        self.doublet_symDS.structure.compounddatatype = other_CDT
-        self.doublet_symDS.structure.save()
+        self.doublet_dataset.structure.compounddatatype = other_CDT
+        self.doublet_dataset.structure.save()
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -644,7 +644,7 @@ class ExecRecordTests(LibrarianTestCase):
             mA_ERO.clean)
 
         # Bad case: output Dataset has another CDT altogether.
-        mA_ERO.dataset=self.triplet_symDS
+        mA_ERO.dataset=self.triplet_dataset
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -658,7 +658,7 @@ class ExecRecordTests(LibrarianTestCase):
         outcable_ER = ER_from_record(outcable_ROC)
         outcable_ERO = outcable_ER.execrecordouts.create(
             generic_output=self.E1_out,
-            dataset=self.E1_out_symDS)
+            dataset=self.E1_out_dataset)
 
         # Good case: output Dataset has the CDT of generic_output.
         self.assertEqual(outcable_ERO.clean(), None)
@@ -671,8 +671,8 @@ class ExecRecordTests(LibrarianTestCase):
         other_CDT.members.create(datatype=self.string_dt,
                                  column_name="y", column_idx=2)
         
-        self.E1_out_symDS.structure.compounddatatype = other_CDT
-        self.E1_out_symDS.structure.save()
+        self.E1_out_dataset.structure.compounddatatype = other_CDT
+        self.E1_out_dataset.structure.save()
         self.assertEqual(outcable_ERO.clean(), None)
 
         # Bad case: output Dataset has a CDT that is a restriction of
@@ -685,7 +685,7 @@ class ExecRecordTests(LibrarianTestCase):
             outcable_ERO.clean)
 
         # Bad case: output Dataset has another CDT altogether.
-        outcable_ERO.dataset = self.singlet_symDS
+        outcable_ERO.dataset = self.singlet_dataset
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -698,7 +698,7 @@ class ExecRecordTests(LibrarianTestCase):
         cable_ER = ER_from_PSIC(self.pE_run, self.step_E3, self.E11_32)
         cable_ERO = cable_ER.execrecordouts.create(
             generic_output=self.C2_in,
-            dataset=self.doublet_symDS)
+            dataset=self.doublet_dataset)
 
         # Good case: output Dataset has the CDT of generic_output.
         self.assertEqual(cable_ERO.clean(), None)
@@ -711,8 +711,8 @@ class ExecRecordTests(LibrarianTestCase):
         other_CDT.members.create(datatype=self.string_dt,
                                  column_name="y", column_idx=2)
         
-        self.doublet_symDS.structure.compounddatatype = other_CDT
-        self.doublet_symDS.structure.save()
+        self.doublet_dataset.structure.compounddatatype = other_CDT
+        self.doublet_dataset.structure.save()
         self.assertEqual(cable_ERO.clean(), None)
 
         # Good case: output Dataset has a CDT that is a restriction of
@@ -722,7 +722,7 @@ class ExecRecordTests(LibrarianTestCase):
         self.assertEqual(cable_ERO.clean(), None)
 
         # Bad case: output Dataset has another CDT altogether.
-        cable_ERO.dataset = self.singlet_symDS
+        cable_ERO.dataset = self.singlet_dataset
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -734,16 +734,16 @@ class ExecRecordTests(LibrarianTestCase):
         cable_ER = ER_from_PSIC(self.pE_run, self.step_E2, self.E02_22)
         cable_ER.execrecordins.create(
             generic_input=self.E2_in,
-            dataset = self.singlet_symDS)
+            dataset = self.singlet_dataset)
         cable_ERO = cable_ER.execrecordouts.create(
             generic_output=self.D2_in,
-            dataset = self.singlet_symDS)
+            dataset = self.singlet_dataset)
 
         # Good case: datasets on either side of this trivial cable match.
         self.assertEqual(cable_ER.clean(), None)
 
         # Bad case: datasets don't match.
-        cable_ERO.dataset = self.C1_out_symDS
+        cable_ERO.dataset = self.C1_out_dataset
         cable_ERO.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('ExecRecord "{}" represents a trivial cable but its input and output do not '
@@ -757,16 +757,16 @@ class ExecRecordTests(LibrarianTestCase):
         outcable_ER = ER_from_record(outcable_ROC)
         outcable_ER.execrecordins.create(
             generic_input=self.C1_out,
-            dataset=self.C1_out_symDS)
+            dataset=self.C1_out_dataset)
         outcable_ERO = outcable_ER.execrecordouts.create(
             generic_output=self.E2_out,
-            dataset=self.C1_out_symDS)
+            dataset=self.C1_out_dataset)
 
         # Good case: datasets on either side of this trivial POC match.
         self.assertEqual(outcable_ER.clean(), None)
 
         # Bad case: datasets don't match.
-        outcable_ERO.dataset = self.singlet_symDS
+        outcable_ERO.dataset = self.singlet_dataset
         outcable_ERO.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('ExecRecord "{}" represents a trivial cable but its input and output do not '
@@ -778,8 +778,8 @@ class ExecRecordTests(LibrarianTestCase):
         """Test that the Datatypes of Datasets passing through POCs are properly preserved."""
         outcable_ROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
         outcable_ER = ER_from_record(outcable_ROC)
-        outcable_ERI = outcable_ER.execrecordins.create(generic_input=self.D1_out, dataset=self.C1_in_symDS)
-        outcable_ERO = outcable_ER.execrecordouts.create(generic_output=self.E1_out, dataset=self.E1_out_symDS)
+        outcable_ERI = outcable_ER.execrecordins.create(generic_input=self.D1_out, dataset=self.C1_in_dataset)
+        outcable_ERO = outcable_ER.execrecordouts.create(generic_output=self.E1_out, dataset=self.E1_out_dataset)
 
         # Good case: the Datatypes are exactly those needed.
         self.assertEqual(outcable_ER.clean(), None)
@@ -792,14 +792,14 @@ class ExecRecordTests(LibrarianTestCase):
         E1_out_structure.compounddatatype = self.DNA_doublet_cdt
         E1_out_structure.save()
         
-        outcable_ERI.dataset = self.DNA_triplet_symDS
+        outcable_ERI.dataset = self.DNA_triplet_dataset
         outcable_ERI.save()
-        outcable_ERO.dataset = self.E21_41_DNA_doublet_symDS
+        outcable_ERO.dataset = self.E21_41_DNA_doublet_dataset
         outcable_ERO.save()
         self.assertIsNone(outcable_ER.clean())
 
         # Bad case: cable does some casting.
-        output_col1 = (self.E21_41_DNA_doublet_symDS.structure.compounddatatype.members.get(column_idx=1))
+        output_col1 = (self.E21_41_DNA_doublet_dataset.structure.compounddatatype.members.get(column_idx=1))
         output_col1.datatype = self.string_dt
         output_col1.save()
 
@@ -816,10 +816,10 @@ class ExecRecordTests(LibrarianTestCase):
         cable_ER = ER_from_PSIC(self.pE_run, self.step_E2, self.E01_21)
         cable_ERI = cable_ER.execrecordins.create(
             generic_input=self.E1_in,
-            dataset=self.triplet_symDS)
+            dataset=self.triplet_dataset)
         cable_ERO = cable_ER.execrecordouts.create(
             generic_output=self.D1_in,
-            dataset=self.D1_in_symDS)
+            dataset=self.D1_in_dataset)
 
         # Good case: the Datatypes are exactly those needed.
         self.assertEqual(cable_ER.clean(), None)
@@ -832,14 +832,14 @@ class ExecRecordTests(LibrarianTestCase):
         out_structure.compounddatatype = self.DNA_doublet_cdt
         out_structure.save()
         
-        cable_ERI.dataset = self.DNA_triplet_symDS
+        cable_ERI.dataset = self.DNA_triplet_dataset
         cable_ERI.save()
-        cable_ERO.dataset = self.E01_21_DNA_doublet_symDS
+        cable_ERO.dataset = self.E01_21_DNA_doublet_dataset
         cable_ERO.save()
         self.assertEqual(cable_ER.clean(), None)
 
         # Bad case: cable does some casting.
-        output_col1 = (self.E01_21_DNA_doublet_symDS.structure.
+        output_col1 = (self.E01_21_DNA_doublet_dataset.structure.
                        compounddatatype.members.get(column_idx=1))
         output_col1.datatype = self.string_dt
         output_col1.save()

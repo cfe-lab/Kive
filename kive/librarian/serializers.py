@@ -80,6 +80,6 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
         dataset = Dataset.create_dataset(file_path=None, user=self.context["request"].user,
                                          users_allowed=users_allowed, groups_allowed=groups_allowed, cdt=cdt,
                                          keep_file=True, name=validated_data["name"],
-                                         description=validated_data["description"], created_by=None,
+                                         description=validated_data["description"], file_source=None,
                                          check=True, file_handle=validated_data["dataset_file"])
         return dataset

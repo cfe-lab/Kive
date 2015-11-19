@@ -193,11 +193,11 @@ class SimpleRunBuilder(FixtureBuilder):
         p_basic.save()
 
         # Set up a dataset with words in it called self.dataset_words.
-        tools.make_words_symDS(self)
+        tools.make_words_dataset(self)
 
         run_sandbox = Sandbox(self.user_bob,
                               p_basic,
-                              [self.symds_words],
+                              [self.dataset_words],
                               groups_allowed=[everyone_group()])
         run_sandbox.execute_pipeline()
 
@@ -233,9 +233,9 @@ class DeepNestedRunBuilder(FixtureBuilder):
         p_top.save()
 
         # Set up a dataset with words in it called self.dataset_words.
-        tools.make_words_symDS(self)
+        tools.make_words_dataset(self)
 
-        run_sandbox = Sandbox(self.user_bob, p_top, [self.symds_words],
+        run_sandbox = Sandbox(self.user_bob, p_top, [self.dataset_words],
                               groups_allowed=[everyone_group()])
         run_sandbox.execute_pipeline()
 
@@ -614,7 +614,7 @@ class RunApiTestsEnvironmentBuilder(FixtureBuilder):
         self.pX_2.create_outputs()
 
         # Run this pipeline.
-        sbox = Sandbox(self.myUser, self.pX_2, [self.symDS])
+        sbox = Sandbox(self.myUser, self.pX_2, [self.dataset])
         sbox.execute_pipeline()
 
 
@@ -635,7 +635,7 @@ class RunComponentTooManyChecksEnvironmentBuilder(FixtureBuilder):
         first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
         first_step.save()
 
-        self.two_step_sdbx = Sandbox(self.user_bob, self.two_step_pl, [self.symds_wordbacks],
+        self.two_step_sdbx = Sandbox(self.user_bob, self.two_step_pl, [self.dataset_wordbacks],
                                      groups_allowed=[everyone_group()])
         self.two_step_sdbx.execute_pipeline()
 
@@ -652,7 +652,7 @@ class RunComponentTooManyChecksEnvironmentBuilder(FixtureBuilder):
         first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
         first_step.save()
 
-        self.following_sdbx = Sandbox(self.user_bob, self.following_pl, [self.symds_wordbacks],
+        self.following_sdbx = Sandbox(self.user_bob, self.following_pl, [self.dataset_wordbacks],
                                       groups_allowed=[everyone_group()])
         self.following_sdbx.execute_pipeline()
         second_step = self.following_sdbx.run.runsteps.get(pipelinestep__step_num=2)
@@ -697,13 +697,13 @@ class RunPipelinesRecoveringReusedStepEnvironmentBuilder(FixtureBuilder):
         p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
         # Set up a words dataset.
-        tools.make_words_symDS(self)
+        tools.make_words_dataset(self)
 
-        sandbox_one = Sandbox(self.user_bob, p_one, [self.symds_words],
+        sandbox_one = Sandbox(self.user_bob, p_one, [self.dataset_words],
                               groups_allowed=[everyone_group()])
         sandbox_one.execute_pipeline()
 
-        sandbox_two = Sandbox(self.user_bob, p_two, [self.symds_words],
+        sandbox_two = Sandbox(self.user_bob, p_two, [self.dataset_words],
                               groups_allowed=[everyone_group()])
         sandbox_two.execute_pipeline()
 
@@ -723,11 +723,11 @@ class ExecuteResultTestsRMEnvironmentBuilder(FixtureBuilder):
         self.sandbox_complement.execute_pipeline()
 
         # An identically-specified second run that reuses the stuff from the first.
-        sandbox2 = Sandbox(self.user_alice, self.pipeline_complement, [self.symds_labdata])
+        sandbox2 = Sandbox(self.user_alice, self.pipeline_complement, [self.dataset_labdata])
         sandbox2.execute_pipeline()
 
         # A couple more runs, used by another test.
-        sandbox_reverse = Sandbox(self.user_alice, self.pipeline_reverse, [self.symds_labdata])
+        sandbox_reverse = Sandbox(self.user_alice, self.pipeline_reverse, [self.dataset_labdata])
         sandbox_reverse.execute_pipeline()
         self.sandbox_revcomp.execute_pipeline()
 
@@ -748,7 +748,7 @@ class ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder(FixtureBuilder):
         tools.create_sequence_manipulation_environment(self)
 
         # This run will discard intermediate data.
-        sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v2, [self.symds_labdata])
+        sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v2, [self.dataset_labdata])
         sandbox.execute_pipeline()
 
         # This is usually done in tools.destroy_sequence_manipulation_environment.
@@ -850,6 +850,6 @@ class Command(BaseCommand):
         ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
         RestoreReusableDatasetBuilder().run()
         ExecuteTestsBuilder().run()
-        FindSymbolicDatasetsBuilder().run()
+        FindDatasetsBuilder().run()
 
         self.stdout.write('Done.')

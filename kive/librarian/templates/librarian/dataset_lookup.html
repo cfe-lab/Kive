@@ -30,24 +30,24 @@
             </thead>
         {% for d in datasets %}
             <tr>
-                <td>{{ d.created_by.parent_run.id }}</td>
+                <td>{{ d.file_source.parent_run.id }}</td>
                 <td> <a href="/dataset_view/{{d.id}}"> {{ d.name }} </a> </td>
-                <td>{{ d.created_by.parent_run.pipeline.family }} </td>
+                <td>{{ d.file_source.parent_run.pipeline.family }} </td>
                 <td>
-                    {% if  d.created_by.parent_run.pipeline.revision_name|length <= 0 %}
-                        {{ d.created_by.parent_run.pipeline.family }}
+                    {% if  d.file_source.parent_run.pipeline.revision_name|length <= 0 %}
+                        {{ d.file_source.parent_run.pipeline.family }}
                     {% else %}
-                        {{ d.created_by.parent_run.pipeline.revision_name }}
+                        {{ d.file_source.parent_run.pipeline.revision_name }}
                     {% endif %}
                 </td>
                 <td>
-                    {{ d.created_by.parent_run.pipeline.revision_number }}
+                    {{ d.file_source.parent_run.pipeline.revision_number }}
                 </td>
                 <td>
-                    {% if d.created_by == None %}
+                    {% ifile_sourced_by == None %}
                         This was an upload
                     {% else %}
-                        <a href="/view_run/{{ d.created_by.parent_run.id }}/{{md5}}">View run</a>
+                        <a href="/view_run/file_sourceed_by.parent_run.id }}/{{md5}}">View run</a>
                     {% endif %}
                 </td>
             </tr>
