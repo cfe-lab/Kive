@@ -32,6 +32,7 @@ import file_access_utils
 import kive.testing_utils as tools
 from kive.tests import BaseTestCases, DuckContext
 
+
 def ER_from_record(record):
     """
     Helper function to create an ExecRecord from an Run, RunStep, or

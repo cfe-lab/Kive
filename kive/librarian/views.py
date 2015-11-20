@@ -3,6 +3,8 @@ librarian views
 """
 import hashlib
 import logging
+import mimetypes
+import os
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -11,17 +13,32 @@ from django.db import transaction
 from django.forms.formsets import formset_factory
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
+from django.core.servers.basehttp import FileWrapper
 
 from librarian.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm, ArchiveAddDatasetForm
 from archive.models import Run
 from librarian.models import Dataset
 from portal.views import admin_check
-from archive.views import _build_download_response
 from kive.settings import DATASET_DISPLAY_MAX
 
 import librarian.models
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _build_download_response(source_file):
+    file_chunker = FileWrapper(source_file)  # Stream file in chunks to avoid overloading memory.
+    mimetype = mimetypes.guess_type(source_file.url)[0]
+    response = HttpResponse(file_chunker, content_type=mimetype)
+    response['Content-Length'] = source_file.size
+    response['Content-Disposition'] = 'attachment; filename="{}"'.format(os.path.basename(source_file.name))
+    return response
+
+
+def _build_raw_viewer(request, file, name, download=None, return_to_url=None):
+    t = loader.get_template("librarian/raw_view.html")
+    c = RequestContext(request, {"file": file, "name": name, 'download': download, 'return': return_to_url})
+    return HttpResponse(t.render(c))
 
 
 @login_required
@@ -65,7 +82,7 @@ def dataset_view(request, dataset_id):
             'structure__compounddatatype__members',
             'structure__compounddatatype__members__datatype',
             'structure__compounddatatype__members__datatype__basic_constraints'
-        ).get(dataset__in=accessible_datasets, pk=dataset_id)
+        ).get(pk__in=accessible_datasets, pk=dataset_id)
 
     except Dataset.DoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
@@ -87,12 +104,6 @@ def dataset_view(request, dataset_id):
     t = loader.get_template("librarian/dataset_view.html")
     c = RequestContext(request, {'dataset': dataset, 'column_matching': col_matching, 'processed_rows': processed_rows,
                                  'return': return_url, "DATASET_DISPLAY_MAX": DATASET_DISPLAY_MAX})
-    return HttpResponse(t.render(c))
-
-
-def _build_raw_viewer(request, file, name, download=None, return_to_url=None):
-    t = loader.get_template("librarian/raw_view.html")
-    c = RequestContext(request, {"file": file, "name": name, 'download': download, 'return': return_to_url})
     return HttpResponse(t.render(c))
 
 
@@ -364,7 +375,7 @@ def dataset_lookup(request, md5_checksum=None):
             md5_checksum = checksum.hexdigest()
 
     datasets = librarian.models.Dataset.filter_by_user(request.user).filter(
-        MD5_checksum=md5_checksum).exclude(dataset__file_source=None)
+        MD5_checksum=md5_checksum).exclude(file_source=None)
 
     datasets_as_inputs = []
     runs = Run.objects.filter(inputs__dataset__MD5_checksum=md5_checksum)

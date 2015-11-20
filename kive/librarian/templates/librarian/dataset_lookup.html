@@ -44,7 +44,7 @@
                     {{ d.file_source.parent_run.pipeline.revision_number }}
                 </td>
                 <td>
-                    {% ifile_sourced_by == None %}
+                    {% if d.file_source == None %}
                         This was an upload
                     {% else %}
                         <a href="/view_run/file_sourceed_by.parent_run.id }}/{{md5}}">View run</a>

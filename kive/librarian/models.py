@@ -16,6 +16,8 @@ from django.conf import settings
 from django.template.defaultfilters import filesizeformat
 from django.db.models.signals import post_delete
 
+from django.core.urlresolvers import reverse
+
 import sys
 import csv
 import re

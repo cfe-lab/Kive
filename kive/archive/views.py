@@ -6,23 +6,14 @@ import mimetypes
 import os
 
 from django.contrib.auth.decorators import login_required
-from django.core.servers.basehttp import FileWrapper
 from django.core.urlresolvers import reverse
-from django.http import HttpResponse, Http404
+from django.http import Http404
 
 from archive.models import MethodOutput
 from librarian.models import Dataset
+from librarian.views import _build_download_response, _build_raw_viewer
 
 LOGGER = logging.getLogger(__name__)
-
-
-def _build_download_response(source_file):
-    file_chunker = FileWrapper(source_file)  # Stream file in chunks to avoid overloading memory.
-    mimetype = mimetypes.guess_type(source_file.url)[0]
-    response = HttpResponse(file_chunker, content_type=mimetype)
-    response['Content-Length'] = source_file.size
-    response['Content-Disposition'] = 'attachment; filename="{}"'.format(os.path.basename(source_file.name))
-    return response
 
 
 @login_required
