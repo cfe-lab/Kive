@@ -14,7 +14,7 @@ class Dataset(object):
     def __init__(self, obj, api=None):
         try:
             if type(obj) == dict:
-                self.id = obj['id']
+                self.dataset_id = obj['id']
                 self.filename = obj['filename']
                 self.name = obj['name'] if 'name' in obj else obj['output_name']
                 self.cdt = CompoundDatatype(obj['compounddatatype']) if 'compounddatatype' in obj else None
@@ -49,7 +49,7 @@ class Dataset(object):
         :return: a response object
         """
         response = self.api.get("@api_dataset_dl",
-                                context={'dataset-id': self.id},
+                                context={'dataset-id': self.dataset_id},
                                 is_json=False,
                                 stream=True)
 
