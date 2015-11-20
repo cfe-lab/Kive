@@ -623,6 +623,7 @@ def create_eric_martin_test_environment(case):
         user=case.myUser,
         groups_allowed=[everyone_group()],
         cdt=case.doublet_cdt,
+        name="D1_in_doublet",
         keep_file=False
     )
     case.D1_in_dataset_structure = case.D1_in_dataset.structure
@@ -644,7 +645,8 @@ def create_eric_martin_test_environment(case):
         case.myUser,
         groups_allowed=[everyone_group()],
         cdt=case.doublet_cdt,
-        keep_file=False
+        keep_file=False,
+        name="C2_in_doublet"
     )
     case.C2_in_dataset_structure = case.C2_in_dataset.structure
 
@@ -826,17 +828,16 @@ def load_eric_martin_test_environment(case):
     case.raw_dataset = Dataset.objects.get(name="raw_DS")
 
     # MD5 calculated on doublet_remuxed_from_triplet.csv file.
-    case.D1_in_dataset = Dataset.objects.get(
-        MD5_checksum='542676b23e121d16db8d41ccdae65fd1')
+    case.D1_in_dataset = Dataset.objects.get(name="D1_in_doublet")
     case.D1_in_dataset_structure = case.D1_in_dataset.structure
 
     case.C1_in_dataset = Dataset.objects.get(
         name="C1_in_triplet")
     case.C1_in_dataset_structure = case.C1_in_dataset.structure
 
-    checksum = Dataset.objects.get(
-        dataset_file__endswith="E11_32_output.csv").MD5_checksum
-    case.C2_in_dataset = Dataset.objects.get(MD5_checksum=checksum)
+    case.C2_in_dataset = Dataset.objects.get(
+        name="C2_in_doublet"
+    )
     case.C2_in_dataset_structure = case.C2_in_dataset.structure
     case.E11_32_output_dataset = Dataset.objects.get(
         name="E11_32 output doublet")

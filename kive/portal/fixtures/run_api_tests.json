@@ -146,7 +146,7 @@
             "execrecord": 2, 
             "is_cancelled": false, 
             "reused": true, 
-            "start_time": "2000-01-01T00:00:03Z"
+            "start_time": "2000-01-01T00:00:02Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 3
@@ -174,7 +174,7 @@
             "execrecord": 3, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:04Z"
+            "start_time": "2000-01-01T00:00:03Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 5
@@ -227,7 +227,7 @@
     }, 
     {
         "fields": {
-            "pipelineoutputcable": 7, 
+            "pipelineoutputcable": 8, 
             "run": 1
         }, 
         "model": "archive.runoutputcable", 
@@ -235,7 +235,7 @@
     }, 
     {
         "fields": {
-            "pipelineoutputcable": 8, 
+            "pipelineoutputcable": 7, 
             "run": 1
         }, 
         "model": "archive.runoutputcable", 
@@ -415,7 +415,7 @@
     }, 
     {
         "fields": {
-            "dataset": 4, 
+            "dataset": 5, 
             "execrecord": 3, 
             "generic_output": 10
         }, 
@@ -424,7 +424,7 @@
     }, 
     {
         "fields": {
-            "dataset": 5, 
+            "dataset": 4, 
             "execrecord": 4, 
             "generic_output": 11
         }, 
@@ -860,7 +860,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 7, 
+            "compounddatatype": 8, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 10
@@ -870,7 +870,7 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 8, 
+            "compounddatatype": 7, 
             "max_row": null, 
             "min_row": null, 
             "transf_xput": 11
@@ -961,8 +961,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 1, 
-            "dataset_name": "pX_out_1", 
+            "dataset_idx": 2, 
+            "dataset_name": "pX_out_2", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -970,8 +970,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 2, 
-            "dataset_name": "pX_out_2", 
+            "dataset_idx": 1, 
+            "dataset_name": "pX_out_1", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -990,7 +990,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$mvjWgpUoeKFN$V8Otb8pCTLPSnMFiViR/SgDxRHrEB8ewRqy848SBOcs=", 
+            "password": "pbkdf2_sha256$15000$upt5nRqEUdEx$51EqAZJkYnC0rp1rIDRUTLaP2oPYn3Sw1jggvDraZKc=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -1043,10 +1043,10 @@
             "paused_by": null, 
             "pipeline": 5, 
             "purged": false, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userjohn_run1_fsVRf6", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userjohn_run1_FYYaj0", 
             "start_time": "2000-01-01T00:00:00Z", 
             "stopped_by": null, 
-            "time_queued": "2015-11-19T01:13:58.693Z", 
+            "time_queued": "2015-11-20T20:31:57.678Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1073,7 +1073,7 @@
         "fields": {
             "MD5_checksum": "4ce50c714420255e82dd3965ccec07ec", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/input_for_test_C_twostep_with_subpipeline_w1nco4S.csv", 
+            "dataset_file": "Datasets/2015_11/input_for_test_C_twostep_with_subpipeline_VbUqKOS.csv", 
             "date_created": "2000-01-01T00:00:00Z", 
             "description": "input to pipeline pX", 
             "file_source": null, 
@@ -1091,7 +1091,7 @@
             "_redacted": false, 
             "dataset_file": "", 
             "date_created": "2000-01-01T00:00:00Z", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-11-19 01:13:58.722676+00:00 by john\nrun: 1\nuser: john\nstep: 1\ninput: mA_in", 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-11-20 20:31:57.708180+00:00 by john\nrun: 1\nuser: john\nstep: 1\ninput: mA_in", 
             "file_source": null, 
             "groups_allowed": [], 
             "name": "run1_step1_input1", 
@@ -1107,7 +1107,7 @@
             "_redacted": false, 
             "dataset_file": "Datasets/2015_11/step1_mA_out.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-11-19 01:13:58.722676+00:00 by john\nrun: 1\nuser: john\nstep: 1\noutput: mA_out", 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-11-20 20:31:57.708180+00:00 by john\nrun: 1\nuser: john\nstep: 1\noutput: mA_out", 
             "file_source": 1, 
             "groups_allowed": [], 
             "name": "run1_step1_outputmA_out", 
@@ -1123,8 +1123,8 @@
             "_redacted": false, 
             "dataset_file": "Datasets/2015_11/run1_pX_out_2.csv", 
             "date_created": "2000-01-01T00:00:04Z", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-11-19 01:13:58.722676+00:00 by john\nrun: 1\nuser: john\noutput: pX_out_2", 
-            "file_source": 6, 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2015-11-20 20:31:57.708180+00:00 by john\nrun: 1\nuser: john\noutput: pX_out_2", 
+            "file_source": 5, 
             "groups_allowed": [], 
             "name": "run1_output2", 
             "user": 2, 
@@ -1346,9 +1346,9 @@
     {
         "fields": {
             "dataset": 5, 
-            "end_time": "2000-01-01T00:00:05Z", 
-            "execlog": 4, 
-            "start_time": "2000-01-01T00:00:05Z", 
+            "end_time": "2000-01-01T00:00:04Z", 
+            "execlog": 3, 
+            "start_time": "2000-01-01T00:00:04Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1357,9 +1357,9 @@
     {
         "fields": {
             "dataset": 4, 
-            "end_time": "2000-01-01T00:00:04Z", 
-            "execlog": 3, 
-            "start_time": "2000-01-01T00:00:04Z", 
+            "end_time": "2000-01-01T00:00:05Z", 
+            "execlog": 4, 
+            "start_time": "2000-01-01T00:00:05Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 

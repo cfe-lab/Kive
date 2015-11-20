@@ -315,10 +315,9 @@ class Dataset(metadata.models.AccessControl):
         return self.MD5_checksum == self.compute_md5()
 
     def has_data(self):
-        """True if associated Dataset exists; False otherwise."""
-        # Note: "is not" won't work here because self.dataset_file
-        # is a FieldFile with no file, not None.  However, == and != have
-        # have been appropriately overloaded to handle this.
+        """True if an actual dataset file exists; False otherwise."""
+        # Note: "self.dataset_file is not None" won't work here because self.dataset_file
+        # is a FieldFile with no file, not None.
         return bool(self.dataset_file)
 
     def has_structure(self):
@@ -794,7 +793,7 @@ class Dataset(metadata.models.AccessControl):
                                                description="MD5 conflictor of {}".format(self),
                                                name="{}eviltwin".format(self))
 
-            note_of_usurping = datachecking.models.MD5Conflict(integritychecklog=icl, conflicting_SD=evil_twin)
+            note_of_usurping = datachecking.models.MD5Conflict(integritychecklog=icl, conflicting_dataset=evil_twin)
             note_of_usurping.save()
 
             self._notify_runcomponents_of_failure()
@@ -1698,7 +1697,7 @@ class ExecRecordOut(models.Model):
         self.logger.debug("ERO is clean")
 
     def has_data(self):
-        """True if associated Dataset exists; False otherwise."""
+        """True if associated Dataset has data; False otherwise."""
         return self.dataset.has_data()
 
     def is_OK(self):

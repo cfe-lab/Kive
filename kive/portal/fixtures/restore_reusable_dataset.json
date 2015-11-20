@@ -697,8 +697,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 1, 
-            "dataset_name": "total_sums", 
+            "dataset_idx": 2, 
+            "dataset_name": "total_products", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -706,8 +706,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 2, 
-            "dataset_name": "total_products", 
+            "dataset_idx": 1, 
+            "dataset_name": "total_sums", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -723,10 +723,10 @@
             "paused_by": null, 
             "pipeline": 4, 
             "purged": true, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userkive_run1_Q7KqI8", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userkive_run1_AnMQkV", 
             "start_time": "2000-01-01T00:00:01Z", 
             "stopped_by": null, 
-            "time_queued": "2015-11-19T01:15:28.958Z", 
+            "time_queued": "2015-11-20T20:33:26.970Z", 
             "user": 1, 
             "users_allowed": []
         }, 
@@ -753,11 +753,11 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "c368ac9dbfe10312a86be5be6dd4cd16", 
+            "MD5_checksum": "70ded17d68b1316ec1803f75fad35cec", 
             "_redacted": false, 
             "dataset_file": "", 
             "date_created": "2000-01-01T00:00:01Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2015-11-19 01:15:29.031698+00:00 by kive\nrun: 1\nuser: kive\nstep: 1\noutput: sums_and_products", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2015-11-20 20:33:27.021473+00:00 by kive\nrun: 1\nuser: kive\nstep: 1\noutput: sums_and_products", 
             "file_source": null, 
             "groups_allowed": [], 
             "name": "run1_step1_outputsums_and_products", 
@@ -769,11 +769,11 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "7ff6ac15c4dd1c669671b0095937c4f5", 
+            "MD5_checksum": "6dc476f01f77ab2aa13e3e5a6291edf1", 
             "_redacted": false, 
             "dataset_file": "Datasets/2015_11/step2_total_sums.raw", 
             "date_created": "2000-01-01T00:00:03Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2015-11-19 01:15:29.031698+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2015-11-20 20:33:27.021473+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
             "file_source": 2, 
             "groups_allowed": [], 
             "name": "run1_step2_outputtotal_sums", 

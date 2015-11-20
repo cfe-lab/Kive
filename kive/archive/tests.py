@@ -9,6 +9,7 @@ import tempfile
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
+from django.core.files.base import ContentFile
 from django.utils import timezone
 from django.test import TestCase, TransactionTestCase
 from django.core.urlresolvers import reverse, resolve
@@ -454,40 +455,6 @@ class ArchiveTestCaseHelpers:
         if bp == "subrun_complete":
             return
 
-    # def run_pipelines_recovering_reused_step(self):
-    #     """
-    #     Setting up and running two pipelines, where the second one reuses and then recovers a step from the first.
-    #     """
-    #     p_one = tools.make_first_pipeline("p_one", "two no-ops", self.myUser)
-    #     p_one.family.grant_everyone_access()
-    #     p_one.grant_everyone_access()
-    #     tools.create_linear_pipeline(p_one, [self.method_noop, self.method_noop], "p_one_in", "p_one_out")
-    #     p_one.create_outputs()
-    #     p_one.save()
-    #     # Mark the output of step 1 as not retained.
-    #     p_one.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
-    #
-    #     p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial", self.myUser)
-    #     p_two.family.grant_everyone_access()
-    #     p_two.grant_everyone_access()
-    #     tools.create_linear_pipeline(p_two, [self.method_noop, self.method_trivial], "p_two_in", "p_two_out")
-    #     p_two.create_outputs()
-    #     p_two.save()
-    #     # We also delete the output of step 1 so that it reuses the existing ER we'll have
-    #     # create for p_one.
-    #     p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
-    #
-    #     # Set up a words dataset.
-    #     tools.make_words_dataset(self)
-    #
-    #     self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.dataset_words],
-    #                                                groups_allowed=[everyone_group()])
-    #     self.sandbox_one.execute_pipeline()
-    #
-    #     self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.dataset_words],
-    #                                                groups_allowed=[everyone_group()])
-    #     self.sandbox_two.execute_pipeline()
-
     def _setup_deep_nested_run(self, user):
         """Set up a pipeline with sub-sub-pipelines to test recursion."""
         # Everything in this pipeline will be a no-op, so all can be linked together
@@ -516,7 +483,7 @@ class ArchiveTestCaseHelpers:
         # Set up a dataset with words in it called self.dataset_words.
         tools.make_words_dataset(self)
 
-        run_sandbox = sandbox.execute.Sandbox(self.user_bob, p_top, [self.symds_words],
+        run_sandbox = sandbox.execute.Sandbox(self.user_bob, p_top, [self.dataset_words],
                                               groups_allowed=[everyone_group()])
         run_sandbox.execute_pipeline()
         self.deep_nested_run = run_sandbox.run
@@ -1194,7 +1161,7 @@ class RunStepTests(ArchiveTestCase):
         """
         self.step_through_runstep_creation("first_step_complete")
         ero = self.step_E1_RS.execrecord.execrecordouts.first()
-        ero.dataset.delete()
+        ero.dataset.dataset_file.delete(save=True)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('ExecRecordOut "{}" of RunStep "{}" should reference existent data'
                                           .format(ero, self.step_E1_RS)),
@@ -1797,11 +1764,10 @@ class RunSICTests(ArchiveTestCase):
         other_run.grant_everyone_access()
         other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
 
-        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_dataset], [self.C2_in_dataset], other_runstep)
+        self.make_complete_reused(self.E11_32_RSIC, [self.doublet_dataset], [self.E11_32_output_dataset],
+                                  other_runstep)
         self.E11_32.keep_output = True
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
-        self.E11_32_output_dataset = ero.dataset
-        self.E11_32_output_dataset.save()
 
         self.assertTrue(self.E11_32_RSIC.is_complete())
         self.assertIsNone(self.E11_32_RSIC.complete_clean())
@@ -1922,26 +1888,33 @@ class RunSICTests(ArchiveTestCase):
         self.step_through_runsic_creation("rsic_completed")
         self.E11_32_RSIC.reused = False
         self.E11_32.keep_output = True
+        self.E11_32_RSIC.save()
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('RunSIC "{}" keeps its output; ExecRecordOut "{}" should reference existent '
-                                          'data'.format(self.E11_32_RSIC, ero)),
-                                self.E11_32_RSIC.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape('RunSIC "{}" keeps its output; ExecRecordOut "{}" should reference existent '
+                      'data'.format(self.E11_32_RSIC, ero)),
+            self.E11_32_RSIC.clean
+        )
 
     def test_RunSIC_clean_not_reused_psic_keeps_output_with_data(self):
         """
         A RunSIC not reusing an ExecRecord, whose PipelineStepInputCable
-        keeps its output, should have data in its ExecRecordOut.
+        keeps its output, should have data in its ExecRecordOut, and it should
+        also be among its own outputs.
         """
         self.step_through_runsic_creation("rsic_completed")
         self.E11_32_RSIC.reused = False
         self.E11_32.keep_output = True
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
-        self.E11_32_output_dataset = ero.dataset
-        ero.dataset.MD5_checksum = self.E11_32_output_dataset.compute_md5()
-        self.E11_32_output_dataset.save()
+
+        fake_data = "x,y\nHello,World"
+        ero.dataset.dataset_file.save("FakeData.csv", ContentFile(fake_data))
+        ero.dataset.MD5_checksum = ero.dataset.compute_md5()
+
+        ero.dataset.MD5_checksum = ero.dataset.compute_md5()
         ero.dataset.save()
-        self.E11_32_RSIC.outputs.add(self.E11_32_output_dataset)
+        self.E11_32_RSIC.outputs.add(ero.dataset)
         self.assertIsNone(self.E11_32_RSIC.clean())
 
     def test_RunSIC_clean_not_reused_nontrivial_no_data(self):
@@ -1954,8 +1927,8 @@ class RunSICTests(ArchiveTestCase):
         self.E11_32_RSIC.reused = False
         self.E11_32.keep_output = True
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
-        self.E11_32_output_dataset = ero.dataset
-        self.E11_32_output_dataset.save()
+        ero.dataset = self.E11_32_output_dataset
+        ero.save()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunSIC "{}" was not reused, trivial, or deleted; it should have produced '
                                           'data'.format(self.E11_32_RSIC)),
@@ -1973,9 +1946,22 @@ class RunSICTests(ArchiveTestCase):
         self.E11_32.keep_output = True
 
         # Associate different datasets to RSIC and associated ERO.
+        # First, the interloper.
         self.doublet_dataset.file_source = self.E11_32_RSIC
         self.doublet_dataset.save()
+
+        # Swap out the proper output Dataset for one that retains its data, since
+        # we've made the PSIC keep its output.
         ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
+        orig_ero_dataset = ero.dataset
+        orig_ero_dataset.file_source = None
+        orig_ero_dataset.save()
+
+        ero.dataset = self.E11_32_output_dataset
+        ero.dataset.file_source = None
+        ero.dataset.save()
+        ero.save()
+
         self.E11_32_output_dataset = ero.dataset
         self.E11_32_output_dataset.save()
 
@@ -1984,24 +1970,6 @@ class RunSICTests(ArchiveTestCase):
                                           'ExecRecord "{}"'.format(self.doublet_dataset, self.E11_32_RSIC,
                                                                    self.E11_32_RSIC.execrecord)),
                                 self.E11_32_RSIC.clean)
-
-    def test_RunSIC_clean_not_reused_nontrivial_correct_data(self):
-        """
-        A RunSIC which is nontrivial, is not reusing an ExecRecord, and
-        is for a PipelineStepInputCable which keeps its output, must
-        have produced the same Dataset as is recorded in its
-        ExecRecordOut.
-        """
-        self.step_through_runsic_creation("rsic_completed")
-        self.E11_32_RSIC.reused = False
-        self.E11_32.keep_output = True
-        ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
-        self.E11_32_output_dataset.file_source = self.E11_32_RSIC
-        self.E11_32_output_dataset.dataset = ero.dataset
-        ero.dataset.MD5_checksum = self.E11_32_output_dataset.compute_md5()
-        self.E11_32_output_dataset.save()
-        ero.dataset.save()
-        self.assertIsNone(self.E11_32_RSIC.clean())
 
     def test_RunSIC_complete_not_reused(self):
         """
@@ -2302,7 +2270,7 @@ class RunOutputCableTests(ArchiveTestCase):
         # self.triplet_3_rows_dataset.file_source = self.D11_21_ROC
         # self.triplet_3_rows_dataset.save()
 
-        self.C1_in_dataset.delete()
+        self.C1_in_dataset.dataset_file.delete()
         ero = self.D11_21_ROC.execrecord.execrecordouts.first()
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('ExecRecordOut "{}" should reference existent data'.format(ero)),
@@ -3103,7 +3071,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         # Set up a words dataset.
         tools.make_words_dataset(self)
 
-        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.symds_words],
+        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.dataset_words],
                                                    groups_allowed=[everyone_group()])
         self.sandbox_one.execute_pipeline()
 
@@ -3122,7 +3090,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         # create for p_one.
         p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
-        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.symds_words],
+        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.dataset_words],
                                                    groups_allowed=[everyone_group()])
         self.sandbox_two.execute_pipeline()
 
@@ -3173,7 +3141,7 @@ for i in range(%d):
         # Set up a words dataset.
         tools.make_words_dataset(self)
 
-        active_sandbox = sandbox.execute.Sandbox(self.user_bob, pipeline, [self.symds_words],
+        active_sandbox = sandbox.execute.Sandbox(self.user_bob, pipeline, [self.dataset_words],
                                                  groups_allowed=[everyone_group()])
         active_sandbox.execute_pipeline()
 
@@ -3282,7 +3250,7 @@ with open(sys.argv[2], "wb") as f:
         )
         tools.simple_method_io(self.time_trivial, self.curr_time_CDT, "input", "unchanged_output")
 
-        self.time_SD = tools.make_SD(
+        self.time_SD = tools.make_dataset(
             """\
 year,month,day,hour,minute,second,microsecond
 1969,1,1,0,0,0,0
@@ -3620,9 +3588,9 @@ class RunStepReuseFailedExecRecordTests(TestCase):
 
         # The first Pipeline should fail.  The second will reuse the first step's ExecRecord, and will not
         # throw an exception, even though the ExecRecord doesn't provide the necessary output.
-        run_1 = sandbox.execute.Sandbox(self.user_grandpa, failing_pipeline, [self.symds_words],
+        run_1 = sandbox.execute.Sandbox(self.user_grandpa, failing_pipeline, [self.dataset_words],
                                         groups_allowed=[everyone_group()]).execute_pipeline()
-        run_2 = sandbox.execute.Sandbox(self.user_grandpa, failing_pl_2, [self.symds_words],
+        run_2 = sandbox.execute.Sandbox(self.user_grandpa, failing_pl_2, [self.dataset_words],
                                         groups_allowed=[everyone_group()]).execute_pipeline()
 
         self.assertEquals(run_1.runsteps.get(pipelinestep__step_num=1).execrecord,
