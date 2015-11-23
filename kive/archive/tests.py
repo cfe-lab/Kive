@@ -3501,6 +3501,10 @@ year,month,day,hour,minute,second,microsecond
         step1_out_ccl.add_bad_header()
         step1_out_ccl.save()
 
+        # Start the second step.
+        step2 = self.pE_run.runsteps.get(pipelinestep__step_num=2)
+        step2.start()
+
         self.assertFalse(self.pE_run.is_complete())
         self.assertFalse(self.pE_run.successful_execution())
 
@@ -3544,7 +3548,7 @@ year,month,day,hour,minute,second,microsecond
         """Test on a Run having one failed output cable and one incomplete one."""
         self.step_through_run_creation("third_step_complete")
 
-        # Add but do not complete an output cable.
+        # Add a complete output cable.
         roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
         self.make_complete_non_reused(roc1, [self.C1_in_symDS], [self.E1_out_symDS])
 
@@ -3554,7 +3558,8 @@ year,month,day,hour,minute,second,microsecond
         E1_out_ccl.add_bad_header()
         E1_out_ccl.save()
 
-        self.pE.outcables.get(output_idx=2).poc_instances.create(run=self.pE_run)
+        roc2 = self.pE.outcables.get(output_idx=2).poc_instances.create(run=self.pE_run)
+        roc2.start()
 
         self.assertFalse(self.pE_run.is_complete())
         self.assertFalse(self.pE_run.successful_execution())
