@@ -2097,7 +2097,7 @@ class Dataset(models.Model):
     Pipeline.clean() checks that the pipeline is well-defined in theory,
     while Dataset.clean() ensures the Pipeline produces what is expected.
     """
-    UPLOAD_DIR = "Datasets"  # This is relative to kive.settings.MEDIA_ROOT
+    UPLOAD_DIR = "Datasets"  # This is relative to settings.MEDIA_ROOT
 
     # The user who created this Dataset is stored in one of
     # a) the SymbolicDataset of this Dataset (if it's uploaded)

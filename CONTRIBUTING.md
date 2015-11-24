@@ -98,10 +98,12 @@ Once you have set up your production server, this is how to deploy a new release
         ./manage.py migrate
         sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./manage.py collectstatic
         
-9. Launch the fleet.
+9. Launch the fleet.  If `kiveuser` is the user account used to run the fleet
+    (this may be `apache`, but setting up a dedicated account for this purpose
+    is recommended):
 
-        sudo -u apache ls /  # Just test that you can log in as apache
-        sudo -u apache LD_LIBRARY_PATH=$LD_LIBRARY_PATH PATH=$PATH ./manage.py runfleet --workers 191 &>/dev/null &
+        sudo -u kiveuser ls /  # Just test that you can log in as kiveuser
+        sudo -u kiveuser LD_LIBRARY_PATH=$LD_LIBRARY_PATH PATH=$PATH ./manage.py runfleet --workers 191 &>/dev/null &
         
 10. Restart apache:
 
