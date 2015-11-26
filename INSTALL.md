@@ -267,18 +267,27 @@ Restricted user for running user-submitted code
 By its nature, Kive runs user-submitted code under an account that does not
 necessarily belong to that user.  For example, on a development machine, this 
 code will typically run as the developer (i.e. you), and on a production 
-machine, code will run as the `apache` user (in the examples below, this user 
+machine, code may run as the `apache` user (in the examples below, this user 
 is named `kiveuser`).  This poses obvious security risks.  To reduce these risks, 
 Kive supports running pipelines as another user -- preferably an unprivileged one 
 that cannot access any vital system information such as the database -- via SSH 
 on localhost.
 
 Before this can be enabled, you must create a suitable user account (let's say 
-this user is named `sandboxworker`) however is typical on your system.
+this user is named `sandboxworker`) however is typical on your system.  If you're
+running on a production system, you should also create another user account under
+which to run the Kive fleet, so that `apache` isn't running the fleet; i.e. 
+`kiveuser` should not be `apache`.  We'll explain why shortly.
 
 Next, create a system group that contains both this user and the 
-`kiveuser` user, whoever that is on your system.  In our examples below, this 
-group will be called `kive`.
+`kiveuser` user, whoever that is on your system.  This group will represent all
+users that are able to access or modify the Kive sandboxes in which our pipelines
+run.  You may be tempted to simply use a group named `kive`, but be careful in 
+doing so: if such a group exists, and all Kive administrators belong to it, then
+the files your Kive application directory may belong to that group.  If files such as
+`settings.py` belong to this group, then adding `sandboxworker` to this group 
+grants the user access to potentially sensitive information -- including the
+database.  In our examples below, this group will be called `kiveprocessing`.
 
 Third, make sure that `sandboxworker` is able to access any system software 
 required by the Methods in the system.  For example, if any Methods in your
@@ -290,12 +299,14 @@ user's `.bashrc` file.
 Because the files created by `sandboxworker` will be owned by `sandboxworker`,
 but need to be cleaned up by Kive (running as `kiveuser`), ensure that 
 `sandboxworker` creates files that are writable by their group; Kive will make
-sure that these files belong to the `kive` group so that it can remove them.  
-To do this, include the command `umask 0002` in `sandboxworker`'s `.bashrc` 
-file.
+sure that these files belong to the `kiveprocessing` group so that it can 
+remove them.  To do this, include the command `umask 0002` in `sandboxworker`'s 
+`.bashrc` file.
 
 Fourth, set up passwordless SSH access to the `sandboxworker` account from the
-normal Kive account.  Typically this proceeds as follows:
+normal Kive account.  (This is why having `kiveuser` not be `apache` is a good 
+idea: granting the webserver any extra privileges beyond the defaults is risky.)
+Typically this proceeds as follows:
 
 - Produce an SSH private/public key pair with no passphrase for `kiveuser` if 
   that user doesn't already have one.
@@ -306,7 +317,7 @@ normal Kive account.  Typically this proceeds as follows:
   you are done; if not, you'll need to follow these instructions and set up another
   key pair that does not have a passphrase.)
   
-    To create this key pair, log in as `kivedev` and run the command
+    To create this key pair, log in as `kiveuser` and run the command
 
         ssh-keygen -t rsa
 
@@ -318,6 +329,14 @@ normal Kive account.  Typically this proceeds as follows:
   created to `.ssh/authorized_keys` file:
   
         cat id_rsa.pub >> ~/.ssh/authorized_keys
+        
+- As `sandboxworker`, make sure that the `.ssh` directory has `rwx` permissions 
+  for the user and none for anyone else, and that the `~/.ssh/authorized_keys` 
+  file has `rw` permissions for the user, `r` for the group, and none for
+  anyone else.  To do this:
+  
+        chmod 700 ~/.ssh
+        chmod 640 ~/.ssh/authorized_keys
     
 - As `kiveuser`, attempt to SSH into the system as `sandboxworker` with the 
   command `ssh sandboxworker@localhost`.  If this is the first time you've
@@ -381,8 +400,8 @@ Options are described in the [Open MPI FAQ][mpifaq].
 
 Assuming that you've set up an unprivileged user as in the "Restricted user 
 for running sandboxes" section, enable running code as this user by 
-setting the value of `KIVE_SANDBOX_WORKER_ACCOUNT` and `KIVE_GROUP` to the
-appropriate values (e.g. `sandboxworker` and `kive`, if you followed the
+setting the value of `KIVE_SANDBOX_WORKER_ACCOUNT` and `KIVE_PROCESSING_GROUP` to the
+appropriate values (e.g. `sandboxworker` and `kiveprocessing`, if you followed the
 above instructions exactly).
 
 Creating database tables

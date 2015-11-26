@@ -1,6 +1,7 @@
 from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 from django.contrib.auth.models import User
+from django.conf import settings
 
 import unittest
 import tempfile
@@ -10,7 +11,6 @@ import os.path
 from librarian.models import Dataset
 from sandbox.execute import Sandbox
 import kive.testing_utils as tools
-import kive.settings
 from pipeline.models import Pipeline, PipelineFamily
 from kive.tests import install_fixture_files, restore_production_files
 from method.models import Method
@@ -368,7 +368,7 @@ class BadRunTests(TestCase):
         tools.destroy_grandpa_sandbox_environment(self)
 
     @unittest.skipIf(
-        kive.settings.KIVE_SANDBOX_WORKER_ACCOUNT,
+        settings.KIVE_SANDBOX_WORKER_ACCOUNT,
         "OSError will not be thrown when using SSH to the Kive sandbox worker account"
     )
     def test_code_bad_execution(self):

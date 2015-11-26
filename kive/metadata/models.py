@@ -12,6 +12,7 @@ from django.core.validators import MinValueValidator, RegexValidator
 from django.utils.encoding import python_2_unicode_compatible
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
+from django.conf import settings
 
 import re
 import csv
@@ -23,7 +24,6 @@ import shutil
 from datetime import datetime
 import json
 
-import kive.settings
 from file_access_utils import set_up_directory, configure_sandbox_permissions
 from constants import datatypes, CDTs, maxlengths, groups, users
 
@@ -1001,7 +1001,7 @@ class Datatype(AccessControl):
         self.logger.debug('Checking constraints for Datatype "{}" on its prototype'.format(self))
         summary_path = tempfile.mkdtemp(
             prefix="Datatype{}_".format(self.pk),
-            dir=os.path.join(kive.settings.MEDIA_ROOT, kive.settings.SANDBOX_PATH)
+            dir=os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
         )
         configure_sandbox_permissions(summary_path)
 

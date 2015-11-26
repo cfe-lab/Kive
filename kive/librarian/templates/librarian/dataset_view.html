@@ -148,7 +148,7 @@ $(document).ready(function(){
         </tr>
     {% endfor %}
 
-    {% if processed_rows|length == DATASET_DISPLAY_MAX %}
+    {% if processed_rows|length == max_to_display %}
       <tr><td colspan="9999" style="text-align:center">&#8942;</td></tr>
     {% endif %}
 </tbody>

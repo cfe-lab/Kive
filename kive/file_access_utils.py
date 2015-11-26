@@ -6,8 +6,9 @@ import errno
 import grp
 import stat
 
+from django.conf import settings
+
 from constants import dirnames
-import kive.settings
 
 
 def can_create_new_file(file_to_create):
@@ -65,24 +66,24 @@ def sandbox_base_path():
     """
     Helper that produces the name of the base directory for all sandboxes.
     """
-    return os.path.join(kive.settings.MEDIA_ROOT, kive.settings.SANDBOX_PATH)
+    return os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
 
 
 def configure_sandbox_permissions(path):
     """
     Ensure that the specified path has the correct group and permissions.
 
-    PRE: KIVE_SANDBOX_WORKER_ACCOUNT is either unspecified or it and KIVE_GROUP
-    are properly specified.
+    PRE: KIVE_SANDBOX_WORKER_ACCOUNT is either unspecified or it and
+    KIVE_PROCESSING_GROUP are properly specified.
     """
     # Do nothing if we aren't using SSH and another unprivileged account
     # for execution.
-    if not kive.settings.KIVE_SANDBOX_WORKER_ACCOUNT:
+    if not settings.KIVE_SANDBOX_WORKER_ACCOUNT:
         return
 
-    # KIVE_GROUP had better be set in kive.settings, and it had better be
-    # a valid group.
-    kive_group = grp.getgrnam(kive.settings.KIVE_GROUP)
+    # KIVE_PROCESSING_GROUP had better be set in settings, and it had
+    # better be a valid group.
+    kive_group = grp.getgrnam(settings.KIVE_PROCESSING_GROUP)
     os.chown(path, -1, kive_group.gr_gid)
     os.chmod(path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH)
 

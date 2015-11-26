@@ -4,17 +4,17 @@ import re
 import os
 import shutil
 
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.test import TestCase
+from django.conf import settings
 
 from metadata.models import Datatype, CompoundDatatype, CustomConstraint, everyone_group
 from method.models import MethodFamily, CodeResource
 from librarian.models import Dataset
 from datachecking.models import ContentCheckLog
 from sandbox.execute import Sandbox
-import kive.settings
 
 import kive.testing_utils as tools
 import file_access_utils
@@ -33,7 +33,7 @@ class CustomConstraintTests(TestCase):
         self.user_oscar = User.objects.create_user('oscar', 'oscar@thegrouch.com', 'garbage')
         self.user_oscar.groups.add(everyone_group())
         self.workdir = tempfile.mkdtemp(
-            dir=os.path.join(kive.settings.MEDIA_ROOT, kive.settings.SANDBOX_PATH)
+            dir=os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
         )
         file_access_utils.configure_sandbox_permissions(self.workdir)
 

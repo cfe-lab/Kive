@@ -6,7 +6,7 @@
 # MEDIA_ROOT: set to the absolute path you wish to use on your system
 # STATIC_ROOT: set to the absolute path you wish to use on your system
 # KIVE_SANDBOX_WORKER_ACCOUNT: the user account used to run sandboxes
-# KIVE_GROUP: the system group containing the typical Kive user and the above
+# KIVE_PROCESSING_GROUP: group representing users that have access to the sandboxes
 
 
 DEBUG = True
@@ -260,7 +260,7 @@ KIVE_SANDBOX_WORKER_ACCOUNT = ""
 
 # The system group that contains both the user that launches the fleet and
 # the sandbox worker account.  This is ignored if KIVE_SANDBOX_WORKER_ACCOUNT is blank.
-KIVE_GROUP = "kive"
+KIVE_PROCESSING_GROUP = "kiveprocessing"
 
 # Number of rows to display on the View Dataset page.
 DATASET_DISPLAY_MAX = 100

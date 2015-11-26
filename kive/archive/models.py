@@ -416,8 +416,8 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         # A run is complete if all of its component RunSteps and
         # RunOutputCables are complete, or if any one fails and the
-        # rest are complete.  If anything is incomplete, immediately
-        # bail and return False.
+        # rest are complete or have not started.  If anything is in progress,
+        # immediately bail and return False.
         anything_failed = False
         all_exist = True
 
@@ -425,7 +425,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             corresp_rs = self.runsteps.filter(pipelinestep=step).first()
             if corresp_rs is None:
                 all_exist = False
-            elif not corresp_rs.is_complete():
+            elif corresp_rs.has_started() and not corresp_rs.is_complete():
                 return False
             elif not corresp_rs.is_successful():
                 anything_failed = True
@@ -433,12 +433,12 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             corresp_roc = self.runoutputcables.filter(pipelineoutputcable=outcable).first()
             if corresp_roc is None:
                 all_exist = False
-            elif not corresp_roc.is_complete():
+            elif corresp_roc.has_started() and not corresp_roc.is_complete():
                 return False
             elif not corresp_roc.is_successful():
                 anything_failed = True
 
-        # At this point, all RunSteps and ROCs that exist are complete.
+        # At this point, all RunSteps and ROCs that exist are complete or unstarted.
         if anything_failed:
             # This is the "unsuccessful complete" case.
             return True

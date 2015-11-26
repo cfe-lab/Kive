@@ -11,11 +11,11 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
 from django.utils.timezone import utc
+from django.conf import settings
 
 import archive.models
 import datachecking.models
 from file_access_utils import compute_md5
-import kive.settings
 import kive.testing_utils as tools
 from librarian.models import Dataset
 from metadata.models import CompoundDatatype, everyone_group
@@ -68,7 +68,7 @@ class FixtureBuilder(object):
                 dump_objects.append(after_object)
 
         self.replace_timestamps(dump_objects)
-        self.rename_dataset_files(os.path.join(kive.settings.MEDIA_ROOT,
+        self.rename_dataset_files(os.path.join(settings.MEDIA_ROOT,
                                                archive.models.Dataset.UPLOAD_DIR),
                                   dump_objects)
 
@@ -86,11 +86,11 @@ class FixtureBuilder(object):
             archive.models.MethodOutput.UPLOAD_DIR,
             datachecking.models.VerificationLog.UPLOAD_DIR,
             portal.models.StagedFile.UPLOAD_DIR,
-            kive.settings.SANDBOX_PATH
+            settings.SANDBOX_PATH
         ]
 
         for target in targets:
-            target_path = os.path.join(kive.settings.MEDIA_ROOT, target)
+            target_path = os.path.join(settings.MEDIA_ROOT, target)
             fixture_name, _extension = os.path.splitext(self.get_name())
             fixture_files_path = os.path.join("FixtureFiles", fixture_name, target)
 
