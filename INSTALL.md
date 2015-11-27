@@ -195,6 +195,7 @@ Download the Kive source code, and install it in a location where the apache
 user can access it.
 
 The root directory of Kive should contain the following subdirectories:
+* `/api`
 * `/doc`
 * `/samplecode`
 * `/kive`
@@ -345,12 +346,12 @@ Typically this proceeds as follows:
         The authenticity of host '12.34.56.78 (12.34.56.78)' can't be established.
         RSA key fingerprint is b1:2d:33:67:ce:35:4d:5f:f3:a8:cd:c0:c4:48:86:12.
         Are you sure you want to continue connecting (yes/no)?
-  
-  Enter `yes` to finish the setup, then log out of the SSH session.
-  
-You may wish to verify that passwordless SSH is properly set up by running
-`ssh sandboxworker@localhost` one more time.  This time, it should take you
-directly to a login shell without any prompts.
+        
+    Enter `yes` to finish the setup, then log out of the SSH session.
+      
+    You may wish to verify that passwordless SSH is properly set up by running
+    `ssh sandboxworker@localhost` one more time.  This time, it should take you
+    directly to a login shell without any prompts.
 
 Details of setting up Kive to execute code as this user may be found below.
 
@@ -403,6 +404,25 @@ for running sandboxes" section, enable running code as this user by
 setting the value of `KIVE_SANDBOX_WORKER_ACCOUNT` and `KIVE_PROCESSING_GROUP` to the
 appropriate values (e.g. `sandboxworker` and `kiveprocessing`, if you followed the
 above instructions exactly).
+
+If this is a fresh install, Kive will make sure the `Sandboxes` directory is readable
+and writable by the appropriate users and groups.  However, if not, then you must
+make these changes manually (you may need to use `sudo` for these commands)
+
+    chgrp -R kiveprocessing [MEDIA_ROOT]/Sandboxes
+    chmod -R g+w [MEDIA_ROOT]/Sandboxes
+    find [MEDIA_ROOT]/Sandboxes -type d -exec chmod g+s {} \;
+    
+Additionally, if you were previously using `apache` to launch the fleet and you've switched
+to using another account called `kiveuser`, you should also change the permissions on the other
+data directories so that `kiveuser` can access them, as previously they likely belonged solely
+to `apache`.  If all your Kive users belong to group `kive`, then:
+
+    chgrp -R kive [MEDIA_ROOT]/CodeResources
+    chmod -R g+w [MEDIA_ROOT]/CodeResources
+    find [MEDIA_ROOT]/CodeResources -type d -exec chmod g+s {} \;
+    
+and repeat this for `Datasets` and `Logs`.
 
 Creating database tables
 ------------------------
