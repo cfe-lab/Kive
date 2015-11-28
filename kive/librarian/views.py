@@ -102,8 +102,16 @@ def dataset_view(request, dataset_id):
                                       limit=DATASET_DISPLAY_MAX)
 
     t = loader.get_template("librarian/dataset_view.html")
+
+    # A DatasetForm which we can use to make submission and editing easier.
+    dataset_form = DatasetForm(
+        user=request.user,
+        initial={"name": dataset.name, "description": dataset.description}
+    )
+
     c = RequestContext(request, {'dataset': dataset, 'column_matching': col_matching, 'processed_rows': processed_rows,
-                                 'return': return_url, "DATASET_DISPLAY_MAX": DATASET_DISPLAY_MAX})
+                                 'return': return_url, "DATASET_DISPLAY_MAX": DATASET_DISPLAY_MAX,
+                                 'dataset_form': dataset_form})
     return HttpResponse(t.render(c))
 
 

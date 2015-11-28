@@ -70,6 +70,12 @@
         .value-error-tip li{
             text-size: 0.7em;
         }
+
+        .dataset_contents {
+            background-color: lightgrey;
+            padding: 10px;
+            margin-top: 10px;
+        }
     </style>
     <script type="text/javascript" src="/static/portal/jquery-2.0.3.min.js"></script>
 <script>
@@ -94,8 +100,74 @@ $(document).ready(function(){
 {% endif %}
 
 <h2>{{ dataset.name }}</h2>
-<a href="{{ dataset.get_absolute_url }}">Download</a>
 
+<form>
+
+    <table id="dataset_details">
+    <tr>
+        <td colspan="2"><a href="{{ dataset.get_absolute_url }}">Download</a></td>
+    </tr>
+
+    <tr>
+        <td>Date created:</td>
+        <td>{{ dataset.date_created }}</td>
+    </tr>
+    <tr>
+        <td>File size:</td>
+        <td>{{ dataset.get_formatted_filesize }}</td>
+    </tr>
+    <tr>
+        <td>Creator:</td>
+        <td>{{ dataset.user }}</td>
+    </tr>
+    <tr>
+        <td>Users allowed:</td>
+        <td>
+            {% if dataset.users_allowed.exists %}
+                <ul>
+                {% for user in dataset.users_allowed.all %}
+                    <li>{{ user }}</li>
+                {% endfor %}
+                </ul>
+            {% else %}
+            None
+            {% endif %}
+        </td>
+    </tr>
+    <tr>
+        <td>Groups allowed:</td>
+        <td>
+            {% if dataset.groups_allowed.exists %}
+                <ul>
+                {% for group in dataset.groups_allowed.all %}
+                    <li>{{ group }}</li>
+                {% endfor %}
+                </ul>
+            {% else %}
+            None
+            {% endif %}
+        </td>
+    </tr>
+
+    <tr>
+        <td>Name:</td>
+        <td>
+            {{ dataset_form.name }}
+        </td>
+    </tr>
+    <tr>
+        <td>Description:</td>
+        <td>
+            {{ dataset_form.description }}
+        </td>
+    </tr>
+
+    </table>
+    <input type="submit" name="reviseDatasetMetadata" value="Revise metadata"/>
+
+</form>
+
+<div class="dataset_contents">
 <table>
 <thead>
     <tr>
@@ -153,4 +225,5 @@ $(document).ready(function(){
     {% endif %}
 </tbody>
 </table>
+</div>
 {% endblock %}
