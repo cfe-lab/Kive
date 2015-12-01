@@ -14,13 +14,14 @@ from django.forms.formsets import formset_factory
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
 from django.core.servers.basehttp import FileWrapper
+from django.conf import settings
 
-from librarian.forms import DatasetForm, BulkAddDatasetForm, BulkDatasetUpdateForm, ArchiveAddDatasetForm
+from librarian.forms import DatasetForm, DatasetMetadataForm, BulkAddDatasetForm, BulkDatasetUpdateForm,\
+    ArchiveAddDatasetForm
 from archive.models import Run
 from librarian.models import Dataset
 from portal.views import admin_check
-from kive.settings import DATASET_DISPLAY_MAX
-
+from metadata.models import CompoundDatatype
 import librarian.models
 
 LOGGER = logging.getLogger(__name__)
@@ -69,7 +70,7 @@ def dataset_download(request, dataset_id):
 @login_required
 def dataset_view(request, dataset_id):
     """
-    Display the file associated with the dataset in the browser.
+    Display the file associated with the dataset in the browser, or update its name/description.
     """
     return_to_run = request.GET.get('run_id', None)
     return_url = None if return_to_run is None else reverse('view_run', kwargs={'run_id': return_to_run})
@@ -87,31 +88,56 @@ def dataset_view(request, dataset_id):
     except Dataset.DoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
-    if dataset.is_raw():
-        return _build_raw_viewer(request, dataset.dataset_file, dataset.name, dataset.get_absolute_url())
+    if request.method == "POST":
+        # We are going to try and update this Dataset.
+        dataset_form = DatasetMetadataForm(request.POST, instance=dataset)
+        try:
+            if dataset_form.is_valid():
+                dataset.name = dataset_form.cleaned_data["name"]
+                dataset.description = dataset_form.cleaned_data["description"]
+                dataset.clean()
+                dataset.save()
 
-    # If we have a mismatched output, we do an alignment
-    # over the columns
-    if dataset.content_matches_header:
-        col_matching, processed_rows = None, dataset.rows(True,
-                                                          limit=DATASET_DISPLAY_MAX)
+                return HttpResponseRedirect("/datasets")
+        except (AttributeError, ValidationError, ValueError) as e:
+            LOGGER.exception(e.message)
+            dataset_form.add_error(None, e)
+
     else:
-        col_matching, insert = dataset.column_alignment()
-        processed_rows = dataset.rows(data_check=True,
-                                      insert_at=insert,
-                                      limit=DATASET_DISPLAY_MAX)
+        # A DatasetForm which we can use to make submission and editing easier.
+        dataset_form = DatasetMetadataForm(
+            initial={"name": dataset.name, "description": dataset.description}
+        )
 
-    t = loader.get_template("librarian/dataset_view.html")
-
-    # A DatasetForm which we can use to make submission and editing easier.
-    dataset_form = DatasetForm(
-        user=request.user,
-        initial={"name": dataset.name, "description": dataset.description}
+    c = RequestContext(
+        request,
+        {
+            'dataset': dataset,
+            'return': return_url,
+            'dataset_form': dataset_form
+        }
     )
+    if dataset.is_raw():
+        t = loader.get_template("librarian/raw_dataset_view.html")
+    else:
+        # If we have a mismatched output, we do an alignment
+        # over the columns.
+        if dataset.content_matches_header:
+            col_matching, processed_rows = None, dataset.rows(True, limit=settings.DATASET_DISPLAY_MAX)
+        else:
+            col_matching, insert = dataset.column_alignment()
+            processed_rows = dataset.rows(data_check=True,
+                                          insert_at=insert,
+                                          limit=settings.DATASET_DISPLAY_MAX)
 
-    c = RequestContext(request, {'dataset': dataset, 'column_matching': col_matching, 'processed_rows': processed_rows,
-                                 'return': return_url, "DATASET_DISPLAY_MAX": DATASET_DISPLAY_MAX,
-                                 'dataset_form': dataset_form})
+        t = loader.get_template("librarian/csv_dataset_view.html")
+        c.update(
+            {
+                'column_matching': col_matching,
+                'processed_rows': processed_rows,
+                "DATASET_DISPLAY_MAX": settings.DATASET_DISPLAY_MAX
+            }
+        )
     return HttpResponse(t.render(c))
 
 
@@ -123,31 +149,56 @@ def datasets_add(request):
     t = loader.get_template('librarian/datasets_add.html')
     c = RequestContext(request)
     if request.method == 'POST':
-        single_dataset_form = DatasetForm(request.POST, request.FILES, user=request.user, prefix="single")
+        # The new Dataset; we need it here for validation purposes.
+
+        ds = Dataset(user=request.user)
+        df = DatasetForm(request.POST, request.FILES, instance=ds, user=request.user,
+                         prefix="single")
 
         success = True
         try:
-            if "singleSubmit" not in single_dataset_form.data:
-                single_dataset_form.add_error(None, "Invalid form submission")
+            if "singleSubmit" not in df.data:
+                df.add_error(None, "Invalid form submission")
                 success = False
-            elif single_dataset_form.is_valid():
-                single_dataset_form.create_dataset(request.user)
+
+            elif df.is_valid():
+
+                cdt = None
+                if df.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
+                    cdt = CompoundDatatype.objects.get(pk=df.cleaned_data['compound_datatype'])
+
+                with transaction.atomic():
+                    ds = Dataset.create_dataset(
+                        file_path=None,
+                        user=request.user,
+                        cdt=cdt,
+                        keep_file=True,
+                        name=df.cleaned_data['name'],
+                        description=df.cleaned_data['description'],
+                        file_source=None,
+                        check=True,
+                        file_handle=df.cleaned_data['dataset_file'],
+                        instance=ds
+                    )
+                    ds.grant_from_json(df.cleaned_data["permissions"])
+
+                    ds.validate_uniqueness_on_upload()
             else:
                 success = False
 
         except (AttributeError, ValidationError, ValueError) as e:
             LOGGER.exception(e.message)
             success = False
-            single_dataset_form.add_error(None, e)
+            df.add_error(None, e)
 
         if success:
             return HttpResponseRedirect("datasets")
         else:
-            c.update({'singleDataset': single_dataset_form})
+            c.update({'singleDataset': df})
 
     else:  # return an empty formset for the user to fill in
-        single_dataset_form = DatasetForm(user=request.user, prefix="single")
-        c.update({'singleDataset': single_dataset_form})
+        df = DatasetForm(user=request.user, prefix="single")
+        c.update({'singleDataset': df})
 
     return HttpResponse(t.render(c))
 

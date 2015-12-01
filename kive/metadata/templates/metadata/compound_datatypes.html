@@ -13,8 +13,11 @@
     <script type="text/javascript">
         var is_user_admin = {{ is_user_admin|lower }};
     </script>
-    <link rel="stylesheet" href="/static/portal/permissions.css">
-    <link rel="stylesheet" href="/static/portal/search.css">
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/portal/permissions.css"/>
+    <link rel="stylesheet" href="/static/portal/search.css"/>
 {% endblock %}
 
 {% block content %}

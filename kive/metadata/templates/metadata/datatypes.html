@@ -11,9 +11,6 @@
     <script src="/static/portal/permissions.js"></script>
     <script src="/static/metadata/datatypes.js"></script>
 
-    <link rel="stylesheet" href="/static/portal/search.css">
-    <link rel="stylesheet" href="/static/portal/permissions.css">
-
     <script type="text/javascript">
 
     $(function() {
@@ -32,7 +29,11 @@
     // var table = new DatatypesTable($table, is_user_admin, $active_filters, $navigation_links);
 
     </script>
+{% endblock %}
 
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/portal/search.css">
+    <link rel="stylesheet" href="/static/portal/permissions.css">
 {% endblock %}
 
 {% block content %}

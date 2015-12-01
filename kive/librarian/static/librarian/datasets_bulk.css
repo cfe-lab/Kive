@@ -1,0 +1,21 @@
+
+.status_cell {
+
+}
+
+.loading_img {
+    width:20px;
+    height:20px;
+}
+
+.display_only_input {
+    outline: none;
+}
+
+.display_only_input  input[type="text"] {
+    background-color: #F5F5F5;
+}
+
+textarea:focus, input:focus{
+    outline: none;
+}

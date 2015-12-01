@@ -13,9 +13,6 @@
     <script src="/static/portal/permissions.js"></script>
     <script src="/static/librarian/datasets.js"></script>
 
-    <link rel="stylesheet" href="/static/portal/permissions.css">
-    <link rel="stylesheet" href="/static/portal/search.css">
-
     <script type="text/javascript">
         $(function(){
             // var $preload_data = $('#preload_data');
@@ -24,6 +21,11 @@
         });
     </script>
 
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/portal/permissions.css">
+    <link rel="stylesheet" href="/static/portal/search.css">
 {% endblock %}
 
 {% block content %}

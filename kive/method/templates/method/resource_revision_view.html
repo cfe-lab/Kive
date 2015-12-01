@@ -4,9 +4,12 @@
 {% extends "portal/base.html" %}
 
 {% block javascript %}
-    <link rel="stylesheet" href="/static/method/styles/default.css">
     <script src="/static/method/highlight.pack.js"></script>
     <script>hljs.initHighlightingOnLoad();</script>
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/method/styles/default.css"/>
 {% endblock %}
 
 {% block title %} {{ revision.coderesource }}, revision {{ revision }} {% endblock %}

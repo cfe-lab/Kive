@@ -12,8 +12,6 @@
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
     <script src="/static/method/resource_revisions.js"></script>
-    <link rel="stylesheet" href="/static/portal/permissions.css">
-    <link rel="stylesheet" href="/static/portal/search.css">
 
     <script type="text/javascript">
        $(function(){
@@ -21,6 +19,11 @@
                                    $("#active_filters"), $(".navigation_links"))
        });
     </script>
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/portal/permissions.css"/>
+    <link rel="stylesheet" href="/static/portal/search.css"/>
 {% endblock %}
 
 {% block content %}

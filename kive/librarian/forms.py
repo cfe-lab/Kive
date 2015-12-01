@@ -4,6 +4,7 @@ Generate an HTML form to create a new DataSet object
 from django import forms
 from django.forms.widgets import ClearableFileInput
 from django.utils.translation import ugettext_lazy as _, ungettext_lazy
+from django.contrib.auth.models import User, Group
 
 import logging
 from datetime import datetime
@@ -22,44 +23,55 @@ from constants import maxlengths
 LOGGER = logging.getLogger(__name__)
 
 
-# FIXME convert this to a ModelForm?
-class DatasetForm(metadata.forms.AccessControlForm):
+class DatasetMetadataForm(forms.ModelForm):
+    """
+    Handles just the Dataset metadata.
+    """
+    class Meta:
+        model = Dataset
+        fields = ("name", "description")
+
+    def _post_clean(self):
+        pass
+
+
+class DatasetForm(forms.ModelForm):
     """
     User-entered single dataset.
     """
-    RAW_CDT_CHOICE = (CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)
+    permissions = metadata.forms.PermissionsField(
+        label="Users and groups allowed",
+        help_text="Which users and groups are allowed access to this Datatype?",
+        user_queryset=User.objects.all(),
+        group_queryset=Group.objects.all(),
+        required=False
+    )
 
-    name = forms.CharField(max_length=maxlengths.MAX_FILENAME_LENGTH)
-    description = forms.CharField(widget=forms.Textarea, required=False)
     dataset_file = forms.FileField(allow_empty_file="False",  max_length=maxlengths.MAX_FILENAME_LENGTH)
 
+    RAW_CDT_CHOICE = (CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)
     compound_datatype_choices = [RAW_CDT_CHOICE]
     compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
-    def create_dataset(self, user):
-        """
-        Creates and commits the Dataset and its associated Dataset to db.
-        Expects that DatasetForm.is_valid() has been called so that DatasetForm.cleaned_data dict has been populated
-        with validated data.
-        """
-        compound_datatype_obj = None
-        if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
-            compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
+    class Meta:
+        model = Dataset
+        fields = ('name', 'description', 'dataset_file', "permissions", "compound_datatype")
 
-        dataset = Dataset.create_dataset(file_path=None, user=user, cdt=compound_datatype_obj,
-                                         keep_file=True, name=self.cleaned_data['name'],
-                                         description=self.cleaned_data['description'], file_source=None,
-                                         check=True, file_handle=self.cleaned_data['dataset_file'])
-        dataset.grant_from_json(self.cleaned_data["permissions"])
-
-        return dataset
-
-    def __init__(self, data=None, files=None, user=None, *args, **kwargs):
+    def __init__(self, data=None, files=None, users_allowed=None, groups_allowed=None, user=None, *args, **kwargs):
         super(DatasetForm, self).__init__(data, files, *args, **kwargs)
+        users_allowed = users_allowed or User.objects.all()
+        groups_allowed = groups_allowed or Group.objects.all()
+        self.fields["permissions"].set_users_groups_allowed(users_allowed, groups_allowed)
 
         user_specific_choices = ([DatasetForm.RAW_CDT_CHOICE] +
                                  CompoundDatatype.choices(user))
         self.fields["compound_datatype"].choices = user_specific_choices
+
+    def _post_clean(self):
+        """
+        Special override for DatasetForm that doesn't validate the Dataset.
+        """
+        pass
 
 
 class BulkDatasetUpdateForm(forms.Form):

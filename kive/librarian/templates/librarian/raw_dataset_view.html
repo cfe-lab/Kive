@@ -1,0 +1,9 @@
+{% extends "librarian/dataset_view.html" %}
+
+{% load filters %}
+
+{% block dataset_contents %}
+<pre>
+{{ dataset.dataset_file.read }}
+</pre>
+{% endblock %}

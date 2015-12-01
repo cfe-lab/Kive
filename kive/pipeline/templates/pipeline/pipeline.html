@@ -6,9 +6,6 @@
 {% block title %}Pipelines{% endblock %}
 
 {% block javascript %}
-    <style>
-        #canvas{}
-    </style>
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/pipeline/jsBezier-0.6.js"></script>
     <script src="/static/portal/noxss.js"></script>
@@ -18,14 +15,19 @@
     <script src="/static/pipeline/pipeline_load.js"></script>
     <script src="/static/pipeline/pipeline_revise.js"></script>
 
-    <link rel="stylesheet" href="/static/pipeline/drydock.css">
-
     <script type="text/javascript">
 $(function() {
     // Security stuff to prevent cross-site scripting.
     noXSS();
 });
     </script>
+{% endblock %}
+
+{% block stylesheets %}
+    <style>
+        #canvas{}
+    </style>
+    <link rel="stylesheet" href="/static/pipeline/drydock.css"/>
 {% endblock %}
 
 {% block widget_media %}

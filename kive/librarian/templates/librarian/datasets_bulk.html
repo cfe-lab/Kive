@@ -6,32 +6,6 @@
 {% block title %}Bulk Added Dataset{% endblock %}
 
 {% block javascript %}
-<style>
-{#    TODO:  put this in CSS#}
-
-
-    .status_cell {
-
-    }
-
-    .loading_img {
-        width:20px;
-        height:20px;
-    }
-
-    .display_only_input {
-        outline: none;
-    }
-
-    .display_only_input  input[type="text"] {
-        background-color: #F5F5F5;
-    }
-
-    textarea:focus, input:focus{
-        outline: none;
-    }
-</style>
-
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script>
     $(document).ready(function() {
@@ -52,6 +26,9 @@
     </script>
 {% endblock %}
 
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/librarian/datasets_bulk.css"/>
+{% endblock %}
 
 
 {% block content %}

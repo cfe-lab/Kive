@@ -20,7 +20,10 @@
         $(function(){ setupRunView('{{run.id}}', {{run.pipeline.id}}, '{{ md5 }}'); });
     </script>
 
-    <link rel="stylesheet" href="/static/pipeline/drydock.css">
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/pipeline/drydock.css"/>
     <style>
         #canvas{}
         .status-message img{
