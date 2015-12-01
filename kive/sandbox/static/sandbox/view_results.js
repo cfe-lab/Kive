@@ -10,14 +10,14 @@ var OutputsTable = function($table, is_user_admin, run_id) {
     this.registerColumn("", function($td, output) {
         var href;
         if (output.id !== null) {
-            href = '../../' + output.type + '_view/' + output.id;
+            href = '../../' + output.type + '_view/' + output.id + "?run_id=" + run_id + "&view_results";
             $td.append($('<a>View</a>').attr('href', href));
         }
     });
     this.registerColumn("", function($td, output) {
         var href;
         if (output.id !== null) {
-            href = '../../' + output.type + '_download/' + output.id;
+            href = '../../' + output.type + '_download/' + output.id + "?run_id=" + run_id + "&view_results";
             $td.append($('<a>Download</a>').attr('href', href));
         }
     });

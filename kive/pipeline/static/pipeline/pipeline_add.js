@@ -569,26 +569,26 @@ $(function() {
                 sel = sel[0];
                 if(sel instanceof drydock_objects.OutputNode || sel instanceof drydock_objects.CdtNode ||
                    sel instanceof drydock_objects.RawNode) {
-                    window.location = '/dataset_view/' + sel.dataset_id + '?run_id=' + sel.run_id;
+                    window.location = '/dataset_view/' + sel.dataset_id + '?run_id=' + sel.run_id + "&view_run";
                 }
             }
             if (action == 'download') {
                 sel = sel[0];
                 if(sel instanceof drydock_objects.OutputNode || sel instanceof drydock_objects.CdtNode ||
                    sel instanceof drydock_objects.RawNode) {
-                    window.location = '/dataset_download/' + sel.dataset_id;
+                    window.location = '/dataset_download/' + sel.dataset_id+ "&view_run";
                 }
             }
             if (action == 'viewlog') {
                 sel = sel[0];
                 if(sel instanceof drydock_objects.MethodNode) {
-                    window.location = '/stdout_view/' + sel.log_id + '?run_id=' + sel.run_id;
+                    window.location = '/stdout_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
                 }
             }
             if (action == 'viewerrorlog') {
                 sel = sel[0];
                 if(sel instanceof drydock_objects.MethodNode) {
-                    window.location = '/stderr_view/' + sel.log_id + '?run_id=' + sel.run_id;
+                    window.location = '/stderr_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
                 }
             }
         }

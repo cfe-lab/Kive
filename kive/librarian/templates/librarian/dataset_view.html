@@ -8,10 +8,20 @@
 {% block title %}Datasets{% endblock %}
 
 {% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script>
+    var is_owner = {{ is_owner|lower }},
+        is_admin = {{ is_admin|lower }};
+    </script>
+    <script src="/static/librarian/dataset_view.js"></script>
 {% endblock %}
 
 {% block stylesheets %}
 <link rel="stylesheet" href="/static/librarian/dataset_view.css">
+{% endblock %}
+
+{% block widget_media %}
+{{ dataset_form.media }}
 {% endblock %}
 
 {% block content %}
@@ -24,7 +34,13 @@
 
 <h2>{{ dataset.name }}</h2>
 
+{% if not is_owner and is_admin %}
+    <div id="lock"><img src=""></div>
+{% endif %}
+
+{% if is_owner or is_admin %}
 <form id="datasetMetadata" name="datasetMetadata" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+{% endif %}
 
     <table id="dataset_details">
     <tr>
@@ -44,8 +60,9 @@
         <td>{{ dataset.user }}</td>
     </tr>
     <tr>
-        <td>Users allowed:</td>
+        <td>Permissions:</td>
         <td>
+            <h4>Users allowed</h4>
             {% if dataset.users_allowed.exists %}
                 <ul>
                 {% for user in dataset.users_allowed.all %}
@@ -55,11 +72,8 @@
             {% else %}
             None
             {% endif %}
-        </td>
-    </tr>
-    <tr>
-        <td>Groups allowed:</td>
-        <td>
+
+            <h4>Groups allowed</h4>
             {% if dataset.groups_allowed.exists %}
                 <ul>
                 {% for group in dataset.groups_allowed.all %}
@@ -70,27 +84,48 @@
             None
             {% endif %}
         </td>
+        {% if is_owner or is_admin %}
+        <td class="edit">{{ dataset_form.permissions }}</td>
+        {% endif %}
     </tr>
 
     <tr>
         <td>Name:</td>
         <td>
-            {{ dataset_form.name }}
+            <span class="readonly">{{ dataset.name }}</span>
+            {% if is_owner or is_admin %}
+            <span class="edit">{{ dataset_form.name }}</span>
+            {% endif %}
         </td>
-        <td class="errortext">{{ dataset_form.name.errors }}</td>
+        <td class="errortext">
+            {% if is_owner or is_admin %}
+            <span class="edit">{{ dataset_form.name.errors }}</span>
+            {% endif %}
+        </td>
     </tr>
     <tr>
         <td>Description:</td>
         <td>
-            {{ dataset_form.description }}
+            <span class="readonly">{{ dataset.description }}</span>
+            {% if is_owner or is_admin %}
+            <span class="edit">{{ dataset_form.description }}</span>
+            {% endif %}
         </td>
-        <td class="errortext">{{ dataset_form.description.errors }}</td>
+        <td class="errortext">
+            {% if is_owner or is_admin %}
+            <span class="edit">{{ dataset_form.description.errors }}</span>
+            {% endif %}
+        </td>
     </tr>
 
     </table>
-    <input type="submit" name="reviseDatasetMetadata" value="Revise metadata"/>
+    {% if is_owner or is_admin %}
+    <span class="edit"><input type="submit" name="reviseDatasetMetadata" value="Revise metadata"/></span>
+    {% endif %}
 
+{% if is_owner or is_admin %}
 </form>
+{% endif %}
 
 <div class="dataset_contents">
 {% block dataset_contents %}

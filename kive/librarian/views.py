@@ -73,30 +73,54 @@ def dataset_view(request, dataset_id):
     Display the file associated with the dataset in the browser, or update its name/description.
     """
     return_to_run = request.GET.get('run_id', None)
-    return_url = None if return_to_run is None else reverse('view_run', kwargs={'run_id': return_to_run})
+    is_view_results = "view_results" in request.GET
+    is_view_run = "view_run" in request.GET
+    return_url = None
+    if return_to_run is not None:
+        if is_view_run:
+            return_url = reverse('view_run', kwargs={'run_id': return_to_run})
+        elif is_view_results:
+            return_url = reverse('view_results', kwargs={'run_id': return_to_run})
 
     try:
-        accessible_datasets = librarian.models.Dataset.filter_by_user(request.user)
-        dataset = Dataset.objects.prefetch_related(
-            'structure',
-            'structure__compounddatatype',
-            'structure__compounddatatype__members',
-            'structure__compounddatatype__members__datatype',
-            'structure__compounddatatype__members__datatype__basic_constraints'
-        ).get(pk__in=accessible_datasets, pk=dataset_id)
+        if admin_check(request.user):
+            dataset = Dataset.objects.prefetch_related(
+                'structure',
+                'structure__compounddatatype',
+                'structure__compounddatatype__members',
+                'structure__compounddatatype__members__datatype',
+                'structure__compounddatatype__members__datatype__basic_constraints'
+            ).get(pk=dataset_id)
+
+        else:
+            accessible_datasets = librarian.models.Dataset.filter_by_user(request.user)
+            dataset = Dataset.objects.prefetch_related(
+                'structure',
+                'structure__compounddatatype',
+                'structure__compounddatatype__members',
+                'structure__compounddatatype__members__datatype',
+                'structure__compounddatatype__members__datatype__basic_constraints'
+            ).get(pk__in=accessible_datasets, pk=dataset_id)
 
     except Dataset.DoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
     if request.method == "POST":
         # We are going to try and update this Dataset.
-        dataset_form = DatasetMetadataForm(request.POST, instance=dataset)
+        dataset_form = DatasetMetadataForm(
+            request.POST,
+            owner=dataset.user,
+            users_already_allowed=dataset.users_allowed.all(),
+            groups_already_allowed=dataset.groups_allowed.all(),
+            instance=dataset
+        )
         try:
             if dataset_form.is_valid():
                 dataset.name = dataset_form.cleaned_data["name"]
                 dataset.description = dataset_form.cleaned_data["description"]
                 dataset.clean()
                 dataset.save()
+                dataset.grant_from_json(dataset_form.cleaned_data["permissions"])
 
                 return HttpResponseRedirect("/datasets")
         except (AttributeError, ValidationError, ValueError) as e:
@@ -106,15 +130,20 @@ def dataset_view(request, dataset_id):
     else:
         # A DatasetForm which we can use to make submission and editing easier.
         dataset_form = DatasetMetadataForm(
+            owner=dataset.user,
+            users_already_allowed=dataset.users_allowed.all(),
+            groups_already_allowed=dataset.groups_allowed.all(),
             initial={"name": dataset.name, "description": dataset.description}
         )
 
     c = RequestContext(
         request,
         {
-            'dataset': dataset,
-            'return': return_url,
-            'dataset_form': dataset_form
+            "is_admin": admin_check(request.user),
+            "is_owner": dataset.user == request.user,
+            "dataset": dataset,
+            "return": return_url,
+            "dataset_form": dataset_form
         }
     )
     if dataset.is_raw():
