@@ -40,6 +40,7 @@ class CompoundDatatypeSerializer(serializers.ModelSerializer):
     representation = serializers.SerializerMethodField()
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='compounddatatype-removal-plan')
+    absolute_url = serializers.SerializerMethodField()
 
     class Meta:
         model = CompoundDatatype
@@ -50,9 +51,14 @@ class CompoundDatatypeSerializer(serializers.ModelSerializer):
             'user',
             'users_allowed',
             'groups_allowed',
-            'removal_plan'
+            'removal_plan',
+            'absolute_url'
         )
 
     def get_representation(self, obj):
         if obj:
             return str(obj)
+
+    def get_absolute_url(self, obj):
+        if obj:
+            return '/compound_datatypes/{}'.format(obj.pk)

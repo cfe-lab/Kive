@@ -224,6 +224,68 @@ def compound_datatypes(request):
     return HttpResponse(t.render(c))
 
 
+@login_required
+@user_passes_test(developer_check)
+def compound_datatype_detail(request, id):
+    """
+    View or modify the CDT's details (name, description, permissions).
+    """
+    four_oh_four = False
+    try:
+        cdt = CompoundDatatype.objects.get(pk=id)
+        if not cdt.can_be_accessed(request.user) and not admin_check(request.user):
+            four_oh_four = True
+    except CompoundDatatype.DoesNotExist:
+        four_oh_four = True
+
+    if four_oh_four:
+        raise Http404("ID {} cannot be accessed".format(id))
+
+    user_pks_already_allowed = cdt.users_allowed.values_list("pk", flat=True)
+    group_pks_already_allowed = cdt.groups_allowed.values_list("pk", flat=True)
+
+    addable_users = User.objects.exclude(
+        pk__in=itertools.chain([cdt.user.pk], user_pks_already_allowed)
+    )
+    addable_groups = Group.objects.exclude(pk__in=group_pks_already_allowed)
+
+    if request.method == "POST":
+        # We are going to try and update this CompoundDatatype.
+        cdt_form = CompoundDatatypeForm(
+            request.POST,
+            users_allowed=addable_users,
+            groups_allowed=addable_groups,
+            instance=cdt
+        )
+        try:
+            if cdt_form.is_valid():
+                cdt.grant_from_json(cdt_form.cleaned_data["permissions"])
+
+                return HttpResponseRedirect("/compound_datatypes")
+        except (AttributeError, ValidationError, ValueError) as e:
+            LOGGER.exception(e.message)
+            cdt_form.add_error(None, e)
+
+    else:
+        # A blank form which we can use to make submission and editing easier.
+        cdt_form = CompoundDatatypeForm(
+            users_allowed=addable_users,
+            groups_allowed=addable_groups
+        )
+
+    t = loader.get_template('metadata/compound_datatype_detail.html')
+    c = RequestContext(
+        request,
+        {
+            "cdt": cdt,
+            "members": cdt.members.order_by("column_idx"),
+            "cdt_form": cdt_form,
+            "is_owner": request.user == cdt.user,
+            "is_admin": admin_check(request.user)
+        })
+    return HttpResponse(t.render(c))
+
+
 # FIXME make this use a formset!
 def make_cdm_forms(request, cdt):
     """

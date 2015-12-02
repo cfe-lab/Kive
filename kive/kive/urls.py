@@ -53,6 +53,8 @@ urlpatterns = patterns(
     url(r'^datatype_add$', 'metadata.views.datatype_add', name='datatype_add'),
 
     url(r'^compound_datatypes$', 'metadata.views.compound_datatypes', name='compound_datatypes'),
+    url(r'^compound_datatypes/(?P<id>\d+)/$', 'metadata.views.compound_datatype_detail',
+        name='compound_datatype_detail'),
     url(r'^compound_datatype_add$', 'metadata.views.compound_datatype_add', name='compound_datatype_add'),
 
     url(r'^resources$', 'method.views.resources', name='resources'),

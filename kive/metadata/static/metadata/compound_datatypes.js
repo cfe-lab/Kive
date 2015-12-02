@@ -1,3 +1,8 @@
+function cdt_link($td, cdt) {
+    var $a = $("<a/>").attr("href", cdt.absolute_url).text(cdt.representation);
+    $td.append($a);
+}
+
 var CompoundDatatypesTable = function($table, is_user_admin, $active_filters, $navigation_links) {
     permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
 
@@ -11,7 +16,7 @@ var CompoundDatatypesTable = function($table, is_user_admin, $active_filters, $n
     );
 
     this.list_url = "api/compounddatatypes/";
-    this.registerColumn("Scheme", "representation");
+    this.registerColumn("Scheme", cdt_link);
 
     this.registerStandardColumn("user");
     this.registerStandardColumn("users_allowed");

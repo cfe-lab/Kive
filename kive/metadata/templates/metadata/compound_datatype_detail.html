@@ -1,0 +1,99 @@
+<!-- Django template -->
+<!-- Display contents of Datatypes as a HTML table -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Compound Datatypes{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script>
+    var is_owner = {{ is_owner|lower }},
+        is_admin = {{ is_admin|lower }};
+    </script>
+    <script src="/static/portal/edit_details.js"></script>
+{% endblock %}
+
+{% block widget_media %}
+{{ cdt_form.media }}
+{% endblock %}
+
+{% block content %}
+
+<a href="/compound_datatypes" rel="prev">Return to summary view</a>
+<h2><code>{{ cdt.short_name }}</code></h2>
+
+{% if not is_owner and is_admin %}
+    <div id="lock"><img src=""/></div>
+{% endif %}
+
+<h3>Details</h3>
+
+
+{% if is_owner or is_admin %}
+<form id="cdtDetails" name="cdtDetails" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+{% endif %}
+
+<table>
+<tr>
+    <td>Creator:</td>
+    <td>{{ cdt.user }}</td>
+</tr>
+<tr>
+    <td>Permissions:</td>
+    <td>
+    <h4>Users allowed</h4>
+    {% if cdt.users_allowed.exists %}
+    <ul>
+        {% for user in cdt.users_allowed.all %}
+        <li>{{ user }}</li>
+        {% endfor %}
+    </ul>
+    {% else %}
+        <em>None</em>
+    {% endif %}
+
+    <h4>Groups allowed</h4>
+    {% if cdt.groups_allowed.exists %}
+    <ul>
+        {% for group in cdt.groups_allowed.all %}
+        <li>{{ group }}</li>
+        {% endfor %}
+    </ul>
+    {% else %}
+        <em>None</em>
+    {% endif %}
+    </td>
+
+    {% if is_owner or is_admin %}
+    <td class="edit">{{ cdt_form.permissions }}</td>
+    {% endif %}
+</tr>
+
+</table>
+
+{% if is_owner or is_admin %}
+<span class="edit"><input type="submit" name="reviseDatatypeDetails" value="Revise details"/></span>
+</form>
+{% endif %}
+
+<h3>Columns</h3>
+
+<table>
+<thead>
+    <th>Index</th>
+    <th>Datatype</th>
+    <th>Name</th>
+    <th>Optional?</th>
+</thead>
+{% for cdtm in members %}
+<tr>
+    <td>{{ cdtm.column_idx }}</td>
+    <td>{{ cdtm.datatype }}</td>
+    <td>{{ cdtm.column_name }}</td>
+    <td>{{ cdtm.blankable }}</td>
+</tr>
+{% endfor %}
+</table>
+
+{% endblock %}
