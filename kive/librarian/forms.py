@@ -7,7 +7,6 @@ from django.utils.translation import ugettext_lazy as _, ungettext_lazy
 from django.contrib.auth.models import User, Group
 
 import logging
-import itertools
 from datetime import datetime
 
 from metadata.models import CompoundDatatype
@@ -24,9 +23,9 @@ from constants import maxlengths
 LOGGER = logging.getLogger(__name__)
 
 
-class DatasetMetadataForm(forms.ModelForm):
+class DatasetDetailsForm(forms.ModelForm):
     """
-    Handles just the Dataset metadata.
+    Handles just the Dataset details.
     """
     permissions = metadata.forms.PermissionsField(
         label="Users and groups allowed",
@@ -43,17 +42,10 @@ class DatasetMetadataForm(forms.ModelForm):
     def _post_clean(self):
         pass
 
-    def __init__(self, data=None, files=None, owner=None,
-                 users_already_allowed=None, groups_already_allowed=None,
+    def __init__(self, data=None, files=None,
+                 addable_users=None, addable_groups=None,
                  *args, **kwargs):
-        super(DatasetMetadataForm, self).__init__(data, files, *args, **kwargs)
-
-        users_already_allowed = users_already_allowed or []
-        groups_already_allowed = groups_already_allowed or []
-
-        addable_users = User.objects.exclude(pk__in=[x.pk for x in itertools.chain([owner], users_already_allowed)])
-        addable_groups = Group.objects.exclude(pk__in=[x.pk for x in groups_already_allowed])
-
+        super(DatasetDetailsForm, self).__init__(data, files, *args, **kwargs)
         self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)
 
 

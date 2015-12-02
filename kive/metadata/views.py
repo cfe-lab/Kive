@@ -8,17 +8,23 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.models import User, Group
 
 import re
+import logging
+import itertools
 
 from constants import datatypes as dt_pks
 from metadata.forms import CompoundDatatypeForm, CompoundDatatypeMemberForm, \
-    DatatypeForm, IntegerConstraintForm, StringConstraintForm
+    DatatypeForm, DatatypeDetailsForm, IntegerConstraintForm, StringConstraintForm
 from metadata.models import BasicConstraint, CompoundDatatype, \
     CompoundDatatypeMember, Datatype, get_builtin_types
 from portal.views import developer_check, admin_check
 from metadata.serializers import DatatypeSerializer, CompoundDatatypeSerializer
 import json
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 @login_required
@@ -148,8 +154,8 @@ def datatype_detail(request, id):
     # retrieve the Datatype object from database by PK
     four_oh_four = False
     try:
-        this_datatype = Datatype.objects.get(pk=id)
-        if not this_datatype.can_be_accessed(request.user):
+        dt = Datatype.objects.get(pk=id)
+        if not dt.can_be_accessed(request.user):
             four_oh_four = True
     except Datatype.DoesNotExist:
         four_oh_four = True
@@ -157,12 +163,52 @@ def datatype_detail(request, id):
     if four_oh_four:
         raise Http404("ID {} cannot be accessed".format(id))
 
+    user_pks_already_allowed = dt.users_allowed.values_list("pk", flat=True)
+    group_pks_already_allowed = dt.groups_allowed.values_list("pk", flat=True)
+
+    addable_users = User.objects.exclude(
+        pk__in=itertools.chain([dt.user.pk], user_pks_already_allowed)
+    )
+    addable_groups = Group.objects.exclude(pk__in=group_pks_already_allowed)
+
+    if request.method == "POST":
+        # We are going to try and update this Datatype.
+        datatype_form = DatatypeDetailsForm(
+            request.POST,
+            addable_users=addable_users,
+            addable_groups=addable_groups,
+            instance=dt
+        )
+        try:
+            if datatype_form.is_valid():
+                dt.name = datatype_form.cleaned_data["name"]
+                dt.description = datatype_form.cleaned_data["description"]
+                dt.clean()
+                dt.save()
+                dt.grant_from_json(datatype_form.cleaned_data["permissions"])
+
+                return HttpResponseRedirect("/datasets")
+        except (AttributeError, ValidationError, ValueError) as e:
+            LOGGER.exception(e.message)
+            datatype_form.add_error(None, e)
+
+    else:
+        # A blank form which we can use to make submission and editing easier.
+        datatype_form = DatatypeDetailsForm(
+            addable_users=addable_users,
+            addable_groups=addable_groups,
+            initial={"name": dt.name, "description": dt.description}
+        )
+
     t = loader.get_template('metadata/datatype_detail.html')
     c = RequestContext(
         request,
         {
-            "datatype": this_datatype,
-            "constraints": this_datatype.basic_constraints.all()
+            "datatype": dt,
+            "constraints": dt.basic_constraints.all(),
+            "datatype_form": datatype_form,
+            "is_owner": request.user == dt.user,
+            "is_admin": admin_check(request.user)
         })
     return HttpResponse(t.render(c))
 

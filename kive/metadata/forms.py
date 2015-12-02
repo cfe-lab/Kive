@@ -220,6 +220,25 @@ class DatatypeForm (forms.ModelForm):
         self.fields["permissions"].set_users_groups_allowed(users_allowed, groups_allowed)
 
 
+class DatatypeDetailsForm (forms.ModelForm):
+
+    permissions = PermissionsField(
+        label="Users and groups allowed",
+        help_text="Which users and groups are allowed access to this Datatype?",
+        user_queryset=User.objects.all(),
+        group_queryset=Group.objects.all(),
+        required=False
+    )
+
+    class Meta:
+        model = Datatype
+        fields = ('name', 'description', "permissions")
+
+    def __init__(self, data=None, addable_users=None, addable_groups=None, *args, **kwargs):
+        super(DatatypeDetailsForm, self).__init__(data, *args, **kwargs)
+        self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)
+
+
 class BasicConstraintForm (forms.ModelForm):
     #ruletype = forms.ChoiceField(BasicConstraint.CONSTRAINT_TYPES)
     class Meta:

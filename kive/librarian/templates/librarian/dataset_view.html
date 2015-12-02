@@ -13,7 +13,10 @@
     var is_owner = {{ is_owner|lower }},
         is_admin = {{ is_admin|lower }};
     </script>
-    <script src="/static/librarian/dataset_view.js"></script>
+    <script src="/static/portal/edit_details.js"></script>
+{% endblock %}
+
+{% block data_specific_js %}
 {% endblock %}
 
 {% block stylesheets %}
@@ -35,11 +38,11 @@
 <h2>{{ dataset.name }}</h2>
 
 {% if not is_owner and is_admin %}
-    <div id="lock"><img src=""></div>
+    <div id="lock"><img src=""/></div>
 {% endif %}
 
 {% if is_owner or is_admin %}
-<form id="datasetMetadata" name="datasetMetadata" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+<form id="datasetDetails" name="datasetDetails" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
 {% endif %}
 
     <table id="dataset_details">
@@ -70,7 +73,7 @@
                 {% endfor %}
                 </ul>
             {% else %}
-            None
+            <em>None</em>
             {% endif %}
 
             <h4>Groups allowed</h4>
@@ -81,7 +84,7 @@
                 {% endfor %}
                 </ul>
             {% else %}
-            None
+            <em>None</em>
             {% endif %}
         </td>
         {% if is_owner or is_admin %}
@@ -120,7 +123,7 @@
 
     </table>
     {% if is_owner or is_admin %}
-    <span class="edit"><input type="submit" name="reviseDatasetMetadata" value="Revise metadata"/></span>
+    <span class="edit"><input type="submit" name="reviseDatasetDetails" value="Revise details"/></span>
     {% endif %}
 
 {% if is_owner or is_admin %}

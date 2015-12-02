@@ -1534,7 +1534,7 @@ class DatasetWithFileTests(TestCase):
         ds1.MD5_checksum = ds2.MD5_checksum
         ds1.save()
         msg = "A Dataset with that name and MD5 already exists"
-        self.assertRaisesRegexp(ValidationError, msg, ds1.validate_unique)
+        self.assertRaisesRegexp(ValidationError, msg, ds1.validate_uniqueness_on_upload)
 
 
 class DatasetApiTests(BaseTestCases.ApiTestCase):

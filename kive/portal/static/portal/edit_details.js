@@ -16,11 +16,8 @@ $(function() {
         }
     }
 
-    showEditReadonly();
-
     if (is_owner) {
         is_editable = true;
-        showEditReadonly();
     }
     else if (is_admin) {
         // The lock div is only there if the user is an administrator (and not the owner).
@@ -29,4 +26,6 @@ $(function() {
             showEditReadonly();
         });
     }
+
+    showEditReadonly();
 });

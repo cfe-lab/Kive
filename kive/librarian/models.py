@@ -311,16 +311,11 @@ class Dataset(metadata.models.AccessControl):
 
     def compute_md5(self):
         """Computes the MD5 checksum of the Dataset."""
-        # We only close the file at the end if it started off closed.  In some cases
-        # with Django files (especially with the InMemoryUploadedFile produced through
-        # the UI), closing it seems to render it unopenable.
-        originally_closed = self.dataset_file.file.closed
         try:
             self.dataset_file.open()
             md5 = file_access_utils.compute_md5(self.dataset_file.file)
         finally:
-            if originally_closed:
-                self.dataset_file.close()
+            self.dataset_file.close()
 
         return md5
 

@@ -6,31 +6,42 @@
 {% block title %}Datatypes{% endblock %}
 
 {% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script>
+    var is_owner = {{ is_owner|lower }},
+        is_admin = {{ is_admin|lower }};
+    </script>
+    <script src="/static/portal/edit_details.js"></script>
+{% endblock %}
+
+{% block widget_media %}
+{{ datatype_form.media }}
 {% endblock %}
 
 {% block content %}
 
 <a href="/datatypes" rel="prev">Return to summary view</a>
-<h2><tt>{{ datatype.name }}</tt></h2>
+<h2><code>{{ datatype.name }}</code></h2>
 
+{% if not is_owner and is_admin %}
+    <div id="lock"><img src=""/></div>
+{% endif %}
 
 <h3>Details</h3>
+
+
+{% if is_owner or is_admin %}
+<form id="datatypeDetails" name="datatypeDetails" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+{% endif %}
+
 <table>
 <tr>
-    <td>Name</td>
-    <td>{{ datatype.name }}</td>
-</tr>
-<tr>
-    <td>Date created</td>
+    <td>Date created:</td>
     <td>{{ datatype.date_created }}</td>
-</tr>
-<tr>
-    <td>Description</td>
-    <td>{{ datatype.description }}</td>
 </tr>
 {% if datatype.restricts.exists %}
 <tr>
-    <td>Restricts</td>
+    <td>Restricts:</td>
     <td><ul>
         {% for r in datatype.restricts.all %}
         <li>{{ r }}</li>
@@ -39,30 +50,67 @@
 </tr>
 {% endif %}
 <tr>
-    <td>Creator</td>
+    <td>Creator:</td>
     <td>{{ datatype.user }}</td>
 </tr>
-{% if datatype.users_allowed.exists %}
 <tr>
-    <td>Users allowed</td>
-    <td><ul>
+    <td>Permissions:</td>
+    <td>
+    <h4>Users allowed</h4>
+    {% if datatype.users_allowed.exists %}
+    <ul>
         {% for user in datatype.users_allowed.all %}
         <li>{{ user }}</li>
         {% endfor %}
-    </ul></td>
-</tr>
-{% endif %}
-{% if datatype.groups_allowed.exists %}
-<tr>
-    <td>Groups allowed</td>
-    <td><ul>
+    </ul>
+    {% else %}
+        <em>None</em>
+    {% endif %}
+
+    <h4>Groups allowed</h4>
+    {% if datatype.groups_allowed.exists %}
+    <ul>
         {% for group in datatype.groups_allowed.all %}
         <li>{{ group }}</li>
         {% endfor %}
-    </ul></td>
+    </ul>
+    {% else %}
+        <em>None</em>
+    {% endif %}
+    </td>
+
+    {% if is_owner or is_admin %}
+    <td class="edit">{{ datatype_form.permissions }}</td>
+    {% endif %}
 </tr>
-{% endif %}
+
+<tr>
+    <td>Name</td>
+    <td>
+        <span class="readonly">{{ datatype.name }}</span>
+        {% if is_owner or is_admin %}
+        <span class="edit">{{ datatype_form.name }}</span>
+        {% endif %}
+    </td>
+</tr>
+<tr>
+    <td>Description</td>
+    <td>
+        <span class="readonly">{{ datatype.description }}</span>
+        {% if is_owner or is_admin %}
+        <span class="edit">{{ datatype_form.description }}</span>
+        {% endif %}
+    </td>
+</tr>
 </table>
+
+{% if is_owner or is_admin %}
+<span class="edit"><input type="submit" name="reviseDatatypeDetails" value="Revise details"/></span>
+{% endif %}
+
+{% if is_owner or is_admin %}
+</form>
+{% endif %}
 
 {% if constraints %}
 <h3>Basic constraints</h3>

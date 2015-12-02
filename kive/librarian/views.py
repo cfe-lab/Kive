@@ -5,6 +5,7 @@ import hashlib
 import logging
 import mimetypes
 import os
+import itertools
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -15,8 +16,9 @@ from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
 from django.core.servers.basehttp import FileWrapper
 from django.conf import settings
+from django.contrib.auth.models import User, Group
 
-from librarian.forms import DatasetForm, DatasetMetadataForm, BulkAddDatasetForm, BulkDatasetUpdateForm,\
+from librarian.forms import DatasetForm, DatasetDetailsForm, BulkAddDatasetForm, BulkDatasetUpdateForm,\
     ArchiveAddDatasetForm
 from archive.models import Run
 from librarian.models import Dataset
@@ -105,13 +107,28 @@ def dataset_view(request, dataset_id):
     except Dataset.DoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
+    # Figure out which users and groups could be given access to this Dataset.
+    # If the Dataset is uploaded, it's anyone who doesn't already have access;
+    # if it was generated, it's anyone who had access to the generating run.
+    user_pks_already_allowed = dataset.users_allowed.values_list("pk", flat=True)
+    group_pks_already_allowed = dataset.groups_allowed.values_list("pk", flat=True)
+
+    all_potential_users = (User.objects.all() if dataset.file_source is None
+                           else dataset.file_source.top_level_run.users_allowed.all())
+    addable_users = all_potential_users.exclude(
+        pk__in=itertools.chain([dataset.user.pk], user_pks_already_allowed)
+    )
+
+    all_potential_groups = (Group.objects.all() if dataset.file_source is None
+                            else dataset.file_source.top_level_run.groups_allowed.all())
+    addable_groups = all_potential_groups.exclude(pk__in=group_pks_already_allowed)
+
     if request.method == "POST":
         # We are going to try and update this Dataset.
-        dataset_form = DatasetMetadataForm(
+        dataset_form = DatasetDetailsForm(
             request.POST,
-            owner=dataset.user,
-            users_already_allowed=dataset.users_allowed.all(),
-            groups_already_allowed=dataset.groups_allowed.all(),
+            addable_users=addable_users,
+            addable_groups=addable_groups,
             instance=dataset
         )
         try:
@@ -129,10 +146,9 @@ def dataset_view(request, dataset_id):
 
     else:
         # A DatasetForm which we can use to make submission and editing easier.
-        dataset_form = DatasetMetadataForm(
-            owner=dataset.user,
-            users_already_allowed=dataset.users_allowed.all(),
-            groups_already_allowed=dataset.groups_allowed.all(),
+        dataset_form = DatasetDetailsForm(
+            addable_users=addable_users,
+            addable_groups=addable_groups,
             initial={"name": dataset.name, "description": dataset.description}
         )
 
