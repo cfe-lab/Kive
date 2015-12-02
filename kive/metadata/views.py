@@ -155,7 +155,7 @@ def datatype_detail(request, id):
     four_oh_four = False
     try:
         dt = Datatype.objects.get(pk=id)
-        if not dt.can_be_accessed(request.user):
+        if not dt.can_be_accessed(request.user) and not admin_check(request.user):
             four_oh_four = True
     except Datatype.DoesNotExist:
         four_oh_four = True
@@ -187,7 +187,7 @@ def datatype_detail(request, id):
                 dt.save()
                 dt.grant_from_json(datatype_form.cleaned_data["permissions"])
 
-                return HttpResponseRedirect("/datasets")
+                return HttpResponseRedirect("/datatypes")
         except (AttributeError, ValidationError, ValueError) as e:
             LOGGER.exception(e.message)
             datatype_form.add_error(None, e)
