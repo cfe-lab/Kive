@@ -1074,7 +1074,7 @@ var drydock = (function() {
             sel = this.selection,
             labels = [],
             flat_exec_order = [],
-            i, l, L, textWidth, shape;
+            i, l, L, textWidth, shape, method;
         ctx.save();
         this.clear();
         ctx.scale(this.scale, this.scale);
@@ -1132,6 +1132,12 @@ var drydock = (function() {
             }
         }
         
+        for (i = 0; (method = this.methods[i]); i++) {
+            // draw all update signals above shapes and connectors
+            if (method.update_signal) {
+                method.update_signal.draw(ctx);
+            }
+        }
         if (this.enable_labels) {
             // draw all labels
             ctx.textAlign = 'center';

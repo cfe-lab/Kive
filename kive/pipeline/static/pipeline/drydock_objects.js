@@ -801,10 +801,8 @@ var drydock_objects = (function() {
         
         // update signal
         if (this.update_signal) {
-            var us = this.update_signal;
-            us.x = vertices[6].x - us.r;
-            us.y = vertices[2].y + us.r;
-            us.draw(ctx);
+            this.update_signal.x = vertices[6].x - this.update_signal.r;
+            this.update_signal.y = vertices[2].y + this.update_signal.r;
         }
     
         // Highlight the method based on status.
