@@ -26,6 +26,7 @@ var pipeline = (function(exports){
         this.build_inputs();
         this.build_steps();
         this.build_outputs();
+        this.canvasState.has_unsaved_changes = false;
     };
 
     my.Pipeline.prototype.serialize = function(form_data) {

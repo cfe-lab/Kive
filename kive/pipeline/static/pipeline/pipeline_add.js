@@ -841,7 +841,7 @@ $(function() {
     ------------------------------------------------------------------------------------
     */
     $(window)                    .on('resize',               documentResizeHandler)
-                                 .on('beforeunload',         function() { if (canvasState.can_edit) return 'Are you sure you want to leave?'; });
+                                 .on('beforeunload',         function() { if (canvasState.can_edit && canvasState.has_unsaved_changes) return 'You have unsaved changes.'; });
     $(document)                  .on('keydown',              documentKeyHandler)
                                  .on('mousedown',            documentClickHandler)
                                  .on('cancel', '.context_menu, .modal_dialog, .ctrl_menu', function() { $(this).hide(); });

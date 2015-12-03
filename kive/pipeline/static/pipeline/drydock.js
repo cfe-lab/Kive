@@ -68,6 +68,7 @@ var drydock = (function() {
         this.exec_order = [];
         this.exec_order_is_ambiguous = null;
         this.exec_order_may_have_changed = false;
+        this.has_unsaved_changes = false;
         
         this.collisions = 0;
     
@@ -723,6 +724,8 @@ var drydock = (function() {
                 if (connector.dest.connected.indexOf(connector) < 0) {
                     connector.dest.connected.push(connector);
                 }
+
+                this.has_unsaved_changes = true;
             } else {
                 // connector not yet linked to anything
             
@@ -834,6 +837,7 @@ var drydock = (function() {
             this.testExecutionOrder();
         }
         this.valid = false;
+        this.has_unsaved_changes = true;
         return shape;
     };
     
@@ -1198,6 +1202,7 @@ var drydock = (function() {
         this.testExecutionOrder();
         this.selection = [];
         this.valid = false; // re-draw canvas to make Connector disappear
+        this.has_unsaved_changes = true;
     };
     
     my.CanvasState.prototype.findMethodNode = function(method_pk) {
