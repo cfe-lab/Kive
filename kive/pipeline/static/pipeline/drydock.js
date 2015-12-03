@@ -836,6 +836,7 @@ var drydock = (function() {
             this.methods.push(shape);
             this.testExecutionOrder();
         }
+        shape.has_unsaved_changes = true;
         this.valid = false;
         this.has_unsaved_changes = true;
         return shape;
@@ -886,7 +887,6 @@ var drydock = (function() {
         var was_fully_connected = old_method.isFullyConnected();
         new_method.x = old_method.x;
         new_method.y = old_method.y;
-        new_method.has_unsaved_changes = true;
         this.addShape(new_method);
         migrateConnectors(old_method, new_method);
         this.deleteObject(old_method);
@@ -1098,19 +1098,19 @@ var drydock = (function() {
         // draw all shapes and magnets
         for (i = 0; (shape = shapes[i]); i++) {
             shape.draw(ctx);
+            L = shape.getLabel();
             
             // queue label to be drawn after
             if (this.force_show_exec_order === false ||
                     !(shape instanceof drydock_objects.MethodNode) ||
                     this.force_show_exec_order === undefined &&
                     !this.exec_order_is_ambiguous) {
-                labels.push(shape.getLabel());
+                L.label = (L.suffix? L.suffix +' ' : '')+ L.label;
             } else {
                 // add information about execution order
-                L = shape.getLabel();
                 L.label = (flat_exec_order.indexOf(shape) + 1) + L.suffix +': '+ L.label;
-                labels.push(L);
             }
+            labels.push(L);
         }
 
         // draw all connectors

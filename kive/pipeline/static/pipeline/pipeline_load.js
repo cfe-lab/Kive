@@ -26,7 +26,11 @@ var pipeline = (function(exports){
         this.build_inputs();
         this.build_steps();
         this.build_outputs();
+        
         this.canvasState.has_unsaved_changes = false;
+        for (var shape, i=0; shape = this.canvasState.shapes[i]; i++) {
+            shape.has_unsaved_changes = false;
+        }
     };
 
     my.Pipeline.prototype.serialize = function(form_data) {

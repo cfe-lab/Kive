@@ -456,7 +456,8 @@ var drydock_objects = (function() {
         return new my.NodeLabel(
                 this.label,
                 this.x + this.dx,
-                this.y + this.dy - this.h/2 - this.offset);
+                this.y + this.dy - this.h/2 - this.offset,
+                this.has_unsaved_changes && '*');
     };
 
     my.RawNode = function(x, y, label, input_index) {
@@ -625,7 +626,8 @@ var drydock_objects = (function() {
         return new my.NodeLabel(
                 this.label,
                 this.x + this.dx,
-                this.y + this.dy - this.h/2 - this.offset);
+                this.y + this.dy - this.h/2 - this.offset,
+                this.has_unsaved_changes && '*');
     };
 
     my.CdtNode.prototype.deleteFrom = my.RawNode.prototype.deleteFrom;
