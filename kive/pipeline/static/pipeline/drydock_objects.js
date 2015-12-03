@@ -923,7 +923,8 @@ var drydock_objects = (function() {
         return new my.NodeLabel(
                 this.label,
                 this.x + this.dx + this.scoop/4,
-                this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset);
+                this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset,
+                this.has_unsaved_changes && '*');
     };
     
     my.MethodNode.prototype.doDown = function(cs, e) {
@@ -1448,8 +1449,9 @@ var drydock_objects = (function() {
         if (index > -1) cs.connectors.splice(index, 1);
     };
     
-    my.NodeLabel = function(label, x, y) {
+    my.NodeLabel = function(label, x, y, suffix) {
         this.label = label || '';
+        this.suffix = suffix || '';
         this.x = x || 0;
         this.y = y || 0;
     };

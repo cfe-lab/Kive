@@ -886,6 +886,7 @@ var drydock = (function() {
         var was_fully_connected = old_method.isFullyConnected();
         new_method.x = old_method.x;
         new_method.y = old_method.y;
+        new_method.has_unsaved_changes = true;
         this.addShape(new_method);
         migrateConnectors(old_method, new_method);
         this.deleteObject(old_method);
@@ -1107,7 +1108,7 @@ var drydock = (function() {
             } else {
                 // add information about execution order
                 L = shape.getLabel();
-                L.label = (flat_exec_order.indexOf(shape) + 1) +': '+ L.label;
+                L.label = (flat_exec_order.indexOf(shape) + 1) + L.suffix +': '+ L.label;
                 labels.push(L);
             }
         }
