@@ -32,6 +32,7 @@ import fleet.exceptions
 from librarian.models import ExecRecord
 import metadata.models
 import stopwatch.models
+from method.models import Method
 
 
 def empty_redaction_plan():
@@ -1372,9 +1373,35 @@ class RunStep(RunComponent):
         # Tack on the coordinate within that run.
         return run_coords + (self.pipelinestep.step_num,)
 
-    def find_compatible_ERs(self, inputs_after_cable):
-        assert self.transformation.is_method
-        return self.pipelinestep.transformation.definite.find_compatible_ERs(inputs_after_cable, self)
+    def find_compatible_ERs(self, input_symbolicdatasets):
+        """ Find all ExecRecords that are compatible with this RunStep.
+
+        Exclude redacted ones. Permissions of old run must include all
+        permissions of new run.
+        @param input_symbolicdatasets: a list of symbolic datasets that have
+            already been processed by the input cables. To be compatible, an
+            ExecRecord must have the same inputs in the same order.
+        @return: generator of ExecRecords
+        """
+        transformation = self.transformation
+        assert transformation.is_method
+        if transformation.definite.reusable == Method.NON_REUSABLE:
+            return
+
+        query = ExecRecord.objects.filter(
+            used_by_components__runstep__pipelinestep__transformation=transformation)
+        for dataset_idx, symbolicdataset in enumerate(input_symbolicdatasets, 1):
+            query = query.filter(
+                execrecordins__generic_input__transformationinput__dataset_idx=dataset_idx,
+                execrecordins__symbolicdataset=symbolicdataset)
+
+        new_run = self.top_level_run
+        for execrecord in query.all():
+            if not execrecord.is_redacted():
+                extra_users, extra_groups = new_run.extra_users_groups(
+                    [execrecord.generating_run])
+                if not(extra_users or extra_groups):
+                    yield execrecord
 
     @transaction.atomic
     def check_ER_usable(self, execrecord):

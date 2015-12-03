@@ -26,7 +26,6 @@ import archive.models
 import method.models
 import pipeline.models
 import transformation.models
-import librarian.models
 import datachecking.models
 import metadata.models
 import fleet.exceptions
@@ -1334,7 +1333,7 @@ class ExecRecordOut(models.Model):
 
         # If SD is raw, the ERO output TO must also be raw
         # Refresh symbolicdataset and generic_output to make sure we get the right information.
-        self.symbolicdataset = librarian.models.SymbolicDataset.objects.get(pk=self.symbolicdataset.pk)
+        self.symbolicdataset = SymbolicDataset.objects.get(pk=self.symbolicdataset.pk)
         self.generic_output = transformation.models.TransformationXput.objects.get(pk=self.generic_output.pk)
         if self.symbolicdataset.is_raw() != self.generic_output.is_raw():
             sd_raw_str = "raw" if self.symbolicdataset.is_raw() else "non-raw"

@@ -2405,7 +2405,8 @@ with open(outfile, "wb") as f:
         sdbx.execute_pipeline()
 
         rng_step = self.test_nonreusable.steps.get(step_num=1)
-        self.assertListEqual(self.rng_method.find_compatible_ERs([], rng_step), [])
+        runstep = rng_step.pipelinestep_instances.first()
+        self.assertListEqual(list(runstep.find_compatible_ERs([])), [])
 
     def test_execute_does_not_reuse(self):
         """
