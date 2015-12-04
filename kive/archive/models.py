@@ -578,6 +578,27 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         return removal_plan
 
+    def increase_permissions_from_json(self, permissions_json):
+        """
+        Grant permission to all users and groups specified in the parameter.
+
+        The permissions_json parameter should be a JSON string formatted as it would
+        be by the permissions widget used in the UI.
+        """
+        self.grant_from_json(permissions_json)
+
+        for runstep in self.runsteps.all():
+            for rsic in runstep.RSICs.all():
+                for ds in rsic.outputs.all():
+                    ds.increase_permissions_from_json(permissions_json)
+
+            for ds in runstep.outputs.all():
+                ds.increase_permissions_from_json(permissions_json)
+
+        for roc in self.runoutputcables.all():
+            for ds in roc.outputs.all():
+                ds.increase_permissions_from_json(permissions_json)
+
 
 class RunInput(models.Model):
     """

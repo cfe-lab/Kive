@@ -23,6 +23,7 @@ import tempfile
 import shutil
 from datetime import datetime
 import json
+import itertools
 
 from file_access_utils import set_up_directory, configure_sandbox_permissions
 from constants import datatypes, CDTs, maxlengths, groups, users
@@ -518,13 +519,13 @@ class AccessControl(models.Model):
         Given a JSON string as produced by a PermissionsField, add permissions to this object.
         """
         permissions = json.loads(permissions_json)
-        users_to_grant = [User.objects.get(pk=x) for x in permissions[0]]
-        groups_to_grant = [Group.objects.get(pk=x) for x in permissions[1]]
+        users_to_grant = User.objects.filter(pk__in=permissions[0])
+        groups_to_grant = Group.objects.filter(pk__in=permissions[1])
         self.grant_from_permissions_list([users_to_grant, groups_to_grant])
 
     def grant_from_permissions_list(self, permissions_list):
         """
-        Given a list with two entries (one list of users and one of groups), add permissions.
+        Given a list with two entries (one iterable of users and one of groups), add permissions.
         """
         for user in permissions_list[0]:
             self.users_allowed.add(user)
@@ -538,6 +539,24 @@ class AccessControl(models.Model):
         """
         self.grant_from_permissions_list((source.users_allowed.all(),
                                           source.groups_allowed.all()))
+
+    def intersect_permissions(self, users_qs=None, groups_qs=None):
+        """
+        Intersects the parameter QuerySets with this object's permissions.
+        """
+        eligible_user_pks = itertools.chain([self.user.pk],
+                                            self.users_allowed.values_list("pk", flat=True))
+
+        users_qs = users_qs if users_qs is not None else User.objects.all()
+        groups_qs = groups_qs if groups_qs is not None else Group.objects.all()
+
+        users_qs = users_qs.filter(pk__in=eligible_user_pks)
+        groups_qs = groups_qs.filter(
+            pk__in=self.groups_allowed.values_list("pk", flat=True)
+        )
+
+        return users_qs, groups_qs
+
 
 
 @python_2_unicode_compatible

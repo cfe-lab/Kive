@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta
+import itertools
 
 from django.db import transaction
 from django.db.models import Q
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
+from django.contrib.auth.models import User, Group
 
 from rest_framework import permissions, status
 from rest_framework.decorators import detail_route, list_route
@@ -16,9 +18,10 @@ from archive.serializers import MethodOutputSerializer, RunSerializer,\
 from archive.models import Run, RunInput, ExceedsSystemCapabilities, MethodOutput,\
     summarize_redaction_plan
 from portal.views import admin_check
-
+from kive.serializers import PermissionsSerializer
 from kive.ajax import RemovableModelViewSet, IsGrantedReadOnly,\
     StandardPagination, CleanCreateModelMixin, SearchableModelMixin
+from constants import groups
 
 JSON_CONTENT_TYPE = 'application/json'
 
@@ -254,3 +257,61 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
             if key == 'endbefore':
                 return queryset.filter(end_time__lte=t)
         raise APIException('Unknown filter key: {}'.format(key))
+
+    @detail_route(methods=['get'], suffix='Eligible Permissions')
+    def eligible_permissions(self, request, pk=None):
+        run = self.get_object()
+
+        if not run.is_complete():
+            return Response(
+                {
+                    "detail": "Eligible permissions cannot be found until the run is complete."
+                },
+                status=500
+            )
+
+        # If we are going to increase the permissions on this Run, it can only
+        # be increased to those users and groups that have access to
+        # a) the Pipeline
+        # b) the input Datasets
+        # c) the top-level Runs of the ExecRecords it reuses
+        addable_users, addable_groups = run.pipeline.intersect_permissions(users_qs=None, groups_qs=None)
+
+        for run_input in run.inputs.all():
+            addable_users, addable_groups = run_input.dataset.intersect_permissions(
+                addable_users,
+                addable_groups
+            )
+
+        # Look for permissions on reused RunComponents.
+        all_rcs = [run.runsteps.all()]
+        [all_rcs.append(rs.RSICs.all()) for rs in run.runsteps.all()]
+        all_rcs.append(run.runoutputcables.all())
+
+        for rc in itertools.chain(*all_rcs):
+            if rc.reused:
+                orig_run = rc.execrecord.generating_run
+                addable_users, addable_groups = orig_run.intersect_permissions(
+                    addable_users,
+                    addable_groups
+                )
+
+        if addable_groups.filter(pk=groups.EVERYONE_PK).exists():
+            addable_users = User.objects.all()
+            addable_groups = Group.objects.all()
+
+        addable_users = addable_users.exclude(
+            pk__in=itertools.chain([run.user.pk], run.users_allowed.values_list("pk", flat=True))
+        )
+        addable_groups = addable_groups.exclude(
+            pk__in=run.groups_allowed.values_list("pk", flat=True)
+        )
+
+        return Response(
+            PermissionsSerializer(
+                {
+                    "users": addable_users,
+                    "groups": addable_groups
+                }
+            ).data
+        )

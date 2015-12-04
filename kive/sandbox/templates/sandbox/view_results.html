@@ -6,11 +6,14 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-    <script src="/static/sandbox/view_results.js"></script>
     <script type="text/javascript">
         var is_user_admin = {{ is_user_admin|lower }},
-            run_id = {{ run.id }};
+            run_id = {{ run.id }},
+            is_owner = {{ is_owner|lower }};
+        var is_admin = is_user_admin;
     </script>
+    <script src="/static/sandbox/view_results.js"></script>
+    <script src="/static/portal/edit_details.js"></script>
 {% endblock %}
 
 {% block stylesheets %}
@@ -23,6 +26,10 @@
     </style>
 {% endblock %}
 
+{% block widget_media %}
+{{ run_form.media }}
+{% endblock %}
+
 {% block content %}
 {% if back_to_view %}
     <a href="/view_run/{{ run.id }}" rel="prev">Back to run</a>
@@ -32,12 +39,79 @@
 
 <h2> {{ run.display_name }} </h2>
 
+{% if not is_owner and is_admin and is_complete %}
+    <div id="lock"><img src=""/></div>
+{% endif %}
+
+<h3>Details</h3>
+
+{% if is_complete %}
+{% if is_owner or is_admin %}
+<form id="runDetails" name="runDetails" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+{% endif %}
+{% endif %}
+
     <table id="run_details">
-    {% if run.description != "" %}
     <tr>
-        <td class="run_description">{{ run.description }}</td>
+        <td>Name:</td>
+        <td>
+            <span class="readonly">{{ run.name }}</span>
+
+            {% if is_complete %}
+            {% if is_owner or is_admin %}
+            <span class="edit">{{ run_form.name }}</span>
+            {% endif %}
+            {% endif %}
+        </td>
     </tr>
-    {% endif %}
+
+    <tr>
+        <td>Description:</td>
+        <td class="run_description">
+            <span class="readonly">{{ run.description }}</span>
+            {% if is_complete %}
+            {% if is_owner or is_admin %}
+            <span class="edit">{{ run_form.description }}</span>
+            {% endif %}
+            {% endif %}
+        </td>
+    </tr>
+
+    <tr>
+        <td>Permissions:</td>
+        <td>
+            <h4>Users allowed</h4>
+            {% if run.users_allowed.exists %}
+                <ul>
+                {% for user in run.users_allowed.all %}
+                    <li>{{ user }}</li>
+                {% endfor %}
+                </ul>
+            {% else %}
+            <em>None</em>
+            {% endif %}
+
+            <h4>Groups allowed</h4>
+            {% if run.groups_allowed.exists %}
+                <ul>
+                {% for group in run.groups_allowed.all %}
+                    <li>{{ group }}</li>
+                {% endfor %}
+                </ul>
+            {% else %}
+            <em>None</em>
+            {% endif %}
+        </td>
+        {% if is_complete %}
+        {% if is_owner or is_admin %}
+        <td class="edit">
+        <div id="edit_permissions"><a href="/api/runs/{{ run.pk }}/eligible_permissions">Edit permissions</a></div>
+        <div id="loading_message">Computing eligible users and groups....</div>
+        <div id="permissions_widget">{{ run_form.permissions }}</div>
+        </td>
+        {% endif %}
+        {% endif %}
+    </tr>
 
     <tr>
         <td>Pipeline Family:</td>
@@ -49,6 +123,14 @@
     </tr>
     </table>
 
+{% if is_complete %}
+{% if is_owner or is_admin %}
+<span class="edit"><input type="submit" name="reviseRunDetails" value="Revise details"/></span>
+</form>
+{% endif %}
+{% endif %}
+
+{{ run_form.errors }}
 
 <div id="outputs_json" style="display:none">{{ outputs|escape }}</div>
 

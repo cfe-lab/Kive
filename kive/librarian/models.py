@@ -1026,6 +1026,19 @@ class Dataset(metadata.models.AccessControl):
             if log_method == cls.logger.error:
                 raise RuntimeError(message)
 
+    def increase_permissions_from_json(self, permissions_json):
+        """
+        Grant permission to all users and groups specified in the parameter.
+
+        The permissions_json parameter should be a JSON string formatted as it would
+        be by the permissions widget used in the UI.
+        """
+        self.grant_from_json(permissions_json)
+
+        for ic in self.integrity_checks.all():
+            if ic.is_fail():
+                ic.usurper.increase_permissions_from_json(permissions_json)
+
 
 class DatasetStructure(models.Model):
     """

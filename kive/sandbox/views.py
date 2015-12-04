@@ -1,4 +1,6 @@
 import json
+import itertools
+import logging
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -6,12 +8,17 @@ from django.db import transaction
 from django.http import HttpResponse, Http404, HttpResponseRedirect
 from django.template import loader, RequestContext
 from django.views.decorators.http import require_GET, require_POST
+from django.contrib.auth.models import User, Group
 
 from archive.models import Dataset, Run
 from archive.serializers import RunOutputsSerializer
 from pipeline.models import Pipeline
 from portal.views import admin_check
-from sandbox.forms import InputSubmissionForm, RunSubmissionForm
+from sandbox.forms import InputSubmissionForm, RunSubmissionForm, RunDetailsForm
+from constants import groups
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 @login_required
@@ -149,26 +156,93 @@ def runs(request):
 @login_required
 def view_results(request, run_id):
     """View outputs from a pipeline run."""
-    template = loader.get_template("sandbox/view_results.html")
-    context = RequestContext(request)
-
-    context['is_user_admin'] = admin_check(request.user)
-    context['back_to_view'] = request.GET.get('back_to_view', None) == 'true'
+    go_back_to_view = request.GET.get('back_to_view', None) == 'true'
     
     four_oh_four = False
     try:
-        run = Run.objects.get(pk=run_id)
-        context["run"] = run
-        if not run.can_be_accessed(request.user):
+        # If we're going to change the permissions, this will make it faster.
+        # FIXME punch this up so it gets the top-level runs of the ExecRecords it reuses
+        run = Run.objects.prefetch_related(
+            "runsteps__RSICs__outputs__integrity_checks__usurper",
+            "runsteps__outputs__integrity_checks__usurper",
+            "runoutputcables__outputs__integrity_checks__usurper",
+            "runsteps__execrecord__generator__record__runstep__run",
+            "runsteps__RSICs__execrecord__generator__record__runsic__runstep__run",
+            "runoutputcables__execrecord__generator__record__runoutputcable__run"
+        ).get(pk=run_id)
+
+        if run.is_subrun():
+            four_oh_four = True
+
+        if not run.can_be_accessed(request.user) and not admin_check(request.user):
             four_oh_four = True
     except Run.DoesNotExist:
         four_oh_four = True
     if four_oh_four:
         raise Http404("ID {} does not exist or is not accessible".format(run_id))
 
-    context["outputs"] = json.dumps(RunOutputsSerializer(
-        run,
-        context={'request': request}).data)
+    with transaction.atomic():
+        run_complete = run.is_complete()
+
+    if request.method == "POST":
+        # We don't allow changing anything until after the Run is finished.
+        if not run_complete:
+            # A RunSubmissionForm which we can use to make submission and editing easier.
+            run_form = RunDetailsForm(
+                users_allowed=User.objects.none(),
+                groups_allowed=Group.objects.none(),
+                initial={"name": run.name, "description": run.description}
+            )
+            run_form.add_error(None, "This run cannot be modified until it is complete.")
+
+        else:
+            # We are going to try and update this Run.  We don't bother restricting the
+            # PermissionsField here; instead we will catch errors at the model validation
+            # step.
+            run_form = RunDetailsForm(
+                request.POST,
+                instance=run
+            )
+            try:
+                if run_form.is_valid():
+                    with transaction.atomic():
+                        run.name = run_form.cleaned_data["name"]
+                        run.description = run_form.cleaned_data["description"]
+                        run.save()
+                        run.increase_permissions_from_json(run_form.cleaned_data["permissions"])
+                        run.clean()
+
+                    if go_back_to_view:
+                        return HttpResponseRedirect("/view_run/{}".format(run_id))
+                    else:
+                        return HttpResponseRedirect("/runs")
+
+            except (AttributeError, ValidationError, ValueError) as e:
+                LOGGER.exception(e.message)
+                run_form.add_error(None, e)
+
+    else:
+        # A RunSubmissionForm which we can use to make submission and editing easier.
+        run_form = RunSubmissionForm(
+            users_allowed=User.objects.none(),
+            groups_allowed=Group.objects.none(),
+            initial={"name": run.name, "description": run.description}
+        )
+
+    template = loader.get_template("sandbox/view_results.html")
+    context = RequestContext(
+        request,
+        {
+            "run": run,
+            "outputs": json.dumps(RunOutputsSerializer(run, context={'request': request}).data),
+            "run_form": run_form,
+            "is_complete": run_complete,
+            "is_owner": run.user == request.user,
+            "is_user_admin": admin_check(request.user),
+            "back_to_view": go_back_to_view
+        }
+    )
+
     return HttpResponse(template.render(context))
 
 

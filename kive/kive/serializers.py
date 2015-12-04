@@ -27,6 +27,16 @@ class UserSerializer(serializers.ModelSerializer):
         return [GroupSerializer(x).data for x in obj.groups.all()]
 
 
+class PermissionsSerializer(serializers.Serializer):
+    """
+    Serializer that encapsulates users and groups.
+
+    This is useful when populating a PermissionsField.
+    """
+    users = TinyUserSerializer(many=True)
+    groups = GroupSerializer(many=True)
+
+
 class AccessControlSerializer(serializers.Serializer):
     """
     Mixin that adds SlugRelatedFields to AccessControl-based ModelSerializers.

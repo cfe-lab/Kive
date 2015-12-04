@@ -296,7 +296,11 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
 
     def is_fail(self):
         """True if this integrity check is a failure."""
-        return hasattr(self, "usurper")
+        try:
+            self.usurper
+        except ObjectDoesNotExist:
+            return False
+        return self.usurper.pk is not None
 
 
 class VerificationLog(stopwatch.models.Stopwatch):
