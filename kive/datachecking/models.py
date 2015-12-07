@@ -7,7 +7,7 @@ from __future__ import unicode_literals
 
 from django.db import models
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.contenttypes import generic
+from django.contrib.contenttypes import fields
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.utils.encoding import python_2_unicode_compatible
 from django.contrib.auth.models import User
@@ -165,7 +165,7 @@ class CellError(models.Model):
     object_id = models.PositiveIntegerField(null=True)
     # This shows which constraint failed; if it's null that means that
     # the parent BadData object failed the basic type-based check.
-    constraint_failed = generic.GenericForeignKey("content_type", "object_id")
+    constraint_failed = fields.GenericForeignKey("content_type", "object_id")
 
     def clean(self):
         """
