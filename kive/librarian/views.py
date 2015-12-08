@@ -14,7 +14,7 @@ from django.db import transaction
 from django.forms.formsets import formset_factory
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
-from django.core.servers.basehttp import FileWrapper
+from wsgiref.util import FileWrapper
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 
