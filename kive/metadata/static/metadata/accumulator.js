@@ -2,6 +2,7 @@ $(function() {
   var widget = $('.permissions-widget');
   var css_first = 'pw-selected pw-first-selected';
   initializeWidgetDisplay.call(widget);
+  widget.on('sync', syncWidgetDisplay);
   
   $('.pw-users_groups', widget)
     .on('click',    '.pw-option', selectionHandler)
@@ -154,6 +155,26 @@ $(function() {
       selector = '.pw-users_groups_allowed';
     }
     return $(selector, getWidget(this));
+  }
+  function syncWidgetDisplay() {
+    var widget = getWidget(this);
+    $('.pw-option', widget).remove();// clear/reset display
+    syncFor('user');// add .pw-options in step with <option>s
+    syncFor('group');
+    initializeWidgetDisplay.call(this);//add selected and locked attributes
+
+    function syncFor(label) {
+      var div_template = $('<div>').addClass('pw-option pw-' + label),
+        div_ar = [];
+      $('.pw-hidden-' + label + 's option', widget)
+        .each(function() {
+          div_ar.push(div_template.clone()
+            .data('value', this.value)
+            .text($(this).text())
+          );
+        });
+      $('.pw-' + label + 's_options', widget).append(div_ar);
+    }
   }
   function syncHiddenInput() {
     var widget = getWidget(this);

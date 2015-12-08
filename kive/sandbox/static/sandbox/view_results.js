@@ -53,12 +53,12 @@ OutputsTable.prototype.getRedactionField = function(plan_url) {
             : "is_redacted");
 };
 
-function clickRemove(event) {
+function clickRemove(e) {
     var $a = $(this),
         permissions_table = event.data,
         run_url = '/api/runs/' + run_id,
         plan_url = run_url + '/removal_plan/';
-    event.preventDefault();
+    e.preventDefault();
     $.getJSON(
             plan_url,
             {},
@@ -71,7 +71,7 @@ function clickRemove(event) {
                         url: run_url,
                         method: 'DELETE',
                         success: function() {
-                            location = '../../runs';
+                            window.location = '../../runs';
                         }
                     });
                 }
@@ -82,67 +82,64 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     // Security stuff to prevent cross-site scripting.
     noXSS();
     
-    var table = new OutputsTable($('#outputs'), is_user_admin, run_id);
+    var table = new OutputsTable($('#outputs'), is_user_admin, run_id),
+        $permissions_widget = $("#permissions_widget"),
+        $users_widget = $permissions_widget.find("#id_permissions_0"),
+        $groups_widget = $permissions_widget.find("#id_permissions_1"),
+        $edit_link_div = $("#edit_permissions"),
+        $loading_msg = $("#loading_message");
+
     table.buildTable(table.extractRows($.parseJSON($('#outputs_json').text())));
 
     if (is_owner || is_admin) {
-        var $edit_link_div = $("#edit_permissions"),
-            $loading_msg = $("#loading_message"),
-            $permissions_widget = $("#permissions_widget");
-
         $loading_msg.hide();
         $permissions_widget.hide();
 
-        $edit_link_div.find("a").on("click", function () {
-            event.preventDefault();
+        $("a", $edit_link_div)
+            .on("click", fillPermissionsForm);
 
-            $edit_link_div.hide();
-            $loading_msg.show();
+        fillPermissionsForm.call($("a", $edit_link_div));
+    }
 
-            var $users_widget = $permissions_widget.find("#id_permissions_0"),
-                $groups_widget = $permissions_widget.find("#id_permissions_1");
+    function fillPermissionsForm(e) {
+        if (e) e.preventDefault();
 
-            // Retrieve the list of eligible users and groups that we can add permissions to.
-            $.getJSON($(this).attr("href")).done(
-                function (response) {
-                    // The response should be a list of two lists, where the first list is
-                    // eligible users and the second list is eligible groups.
-                    // Both lists should be of 2-tuples (pk, username|groupname).
-                    $.each(
-                        response.users,
-                        function () {
-                            $users_widget
-                                .append($("<option></option>")
-                                    .attr("value", this.id)
-                                    .text(this.username)
-                            );
-                        }
-                    );
+        $edit_link_div.hide();
+        $loading_msg.show();
 
-                    $.each(
-                        response.groups,
-                        function () {
-                            $groups_widget
-                                .append($("<option></option>")
-                                    .attr("value", this.id)
-                                    .text(this.name)
-                            );
-                        }
-                    );
+        // Retrieve the list of eligible users and groups that we can add permissions to.
+        $.getJSON($(this).attr("href")).done(
+            function (response) {
+                // The response should be a list of two lists, where the first list is
+                // eligible users and the second list is eligible groups.
+                // Both lists should be of 2-tuples (pk, username|groupname).
+                $.each(response.users, function () {
+                    $("<option>")
+                        .attr("value", this.id)
+                        .text(this.username)
+                        .appendTo($users_widget);
+                });
 
-                    $loading_msg.hide();
-                    $permissions_widget.show();
-                }
-            ).fail(
-                function (request) {
-                    var response = request.responseJSON,
-                        detail = (
-                                response ?
-                                response.detail :
-                                "Error while finding eligible users and groups");
-                    $loading_msg.text(detail);
-                }
-            );
-        });
+                $.each(response.groups, function () {
+                    $("<option>")
+                        .attr("value", this.id)
+                        .text(this.name)
+                        .appendTo($groups_widget);
+                });
+
+                $loading_msg.hide();
+                $permissions_widget.show()
+                    .find('.permissions-widget').trigger('sync');
+            }
+        ).fail(
+            function (request) {
+                var response = request.responseJSON,
+                    detail = (
+                            response ?
+                            response.detail :
+                            "Error while finding eligible users and groups");
+                $loading_msg.text(detail);
+            }
+        );
     }
 });
