@@ -77,7 +77,7 @@ def dataset_view(request, dataset_id):
     return_to_run = request.GET.get('run_id', None)
     is_view_results = "view_results" in request.GET
     is_view_run = "view_run" in request.GET
-    return_url = None
+    return_url = reverse("datasets")
     if return_to_run is not None:
         if is_view_run:
             return_url = reverse('view_run', kwargs={'run_id': return_to_run})
@@ -139,7 +139,7 @@ def dataset_view(request, dataset_id):
                 dataset.save()
                 dataset.grant_from_json(dataset_form.cleaned_data["permissions"])
 
-                return HttpResponseRedirect("/datasets")
+                return HttpResponseRedirect(return_url)
         except (AttributeError, ValidationError, ValueError) as e:
             LOGGER.exception(e.message)
             dataset_form.add_error(None, e)

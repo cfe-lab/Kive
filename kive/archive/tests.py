@@ -5,6 +5,7 @@ Kive archive application unit tests.
 import os
 import re
 import tempfile
+import json
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -20,18 +21,20 @@ from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
     RunOutputCable, RunStep, RunSIC
 from datachecking.models import BadData
 from file_access_utils import compute_md5
-from librarian.models import ExecRecord, Dataset
+from librarian.models import ExecRecord, Dataset, DatasetStructure
 
 from kive.tests import BaseTestCases, install_fixture_files, restore_production_files
-from method.models import Method
-from pipeline.models import Pipeline, PipelineStep
+from method.models import Method, MethodFamily, CodeResource
+from pipeline.models import Pipeline, PipelineStep, PipelineFamily
 
 import sandbox.execute
 import kive.testing_utils as tools
 
 # Rather than define everyone_group here, we import this function to prevent compile-time
 # database access.
-from metadata.models import everyone_group, CompoundDatatype
+from metadata.models import kive_user, everyone_group, CompoundDatatype
+
+from constants import groups
 
 
 class ArchiveTestCaseHelpers:
@@ -3671,3 +3674,180 @@ class MethodOutputApiTests(BaseTestCases.ApiTestCase):
 
         method_output = MethodOutput.objects.get(pk=self.detail_pk)
         self.assertTrue(method_output.is_output_redacted())
+
+
+class RunIncreasePermissionsNestedRunTests(TestCase):
+    """
+    Tests of Run.increase_permissions_from_json with nested Runs.
+    """
+    fixtures = ["deep_nested_run"]
+
+    def setUp(self):
+        self.john = User.objects.get(username="john")
+        self.ringo = User.objects.get(username="ringo")
+        self.bob = User.objects.get(username="bob")
+
+        # This Run has nesting two layers deep, and
+        # belongs to self.bob, with permissions granted to Everyone.
+        self.run = Run.objects.get(pipeline__family__name="p_top")
+
+        # Let's sweep through and remove all extra permissions on anything self.bob ever produced.
+        for ds in Dataset.objects.filter(user=self.bob):
+            ds.groups_allowed.remove(everyone_group())
+
+        for run in Run.objects.filter(user=self.bob):
+            run.groups_allowed.remove(everyone_group())
+
+    def test_increase_permissions(self):
+        """
+        Test granting permissions from a JSON input.
+        """
+        perms_to_add = [[self.john.pk, self.ringo.pk], [groups.DEVELOPERS_PK]]
+
+        self.run.increase_permissions_from_json(json.dumps(perms_to_add))
+
+        # Sweep through and make sure all outputs and Runs have had the appropriate
+        # permissions added.
+        for run in Run.objects.filter(user=self.bob):
+            if run.top_level_run == self.run:
+                self.assertTrue(run.users_allowed.filter(pk=self.john.pk).exists())
+                self.assertTrue(run.users_allowed.filter(pk=self.ringo.pk).exists())
+                self.assertTrue(run.groups_allowed.filter(pk=groups.DEVELOPERS_PK))
+
+        for ds in Dataset.objects.filter(user=self.bob, file_source__isnull=False):
+            if ds.file_source.top_level_run == self.run:
+                self.assertTrue(ds.users_allowed.filter(pk=self.john.pk).exists())
+                self.assertTrue(ds.users_allowed.filter(pk=self.ringo.pk).exists())
+                self.assertTrue(ds.groups_allowed.filter(pk=groups.DEVELOPERS_PK))
+
+
+class RunIncreasePermissionsCustomCableTests(TestCase):
+    """
+    Tests of Run.increase_permissions_from_json with custom cables.
+    """
+    fixtures = ["run_api_tests"]
+
+    def setUp(self):
+        self.john = User.objects.get(username="john")
+
+        # We want the inputs and the Pipeline to have appropriate permissions
+        # for us to be able to freely grant permissions on the Run.
+        for cdt in CompoundDatatype.objects.all():
+            cdt.grant_everyone_access()
+
+        for cr in CodeResource.objects.all():
+            cr.grant_everyone_access()
+            for crr in cr.revisions.all():
+                crr.grant_everyone_access()
+
+        for mf in MethodFamily.objects.all():
+            mf.grant_everyone_access()
+            for method in mf.members.all():
+                method.grant_everyone_access()
+
+        for pf in PipelineFamily.objects.all():
+            pf.grant_everyone_access()
+            for pl in pf.members.all():
+                pl.grant_everyone_access()
+
+        self.pf = PipelineFamily.objects.get(name="self.pf")
+        self.pl = self.pf.members.get(revision_name="pX_revision_2")
+
+        # This is the input to the run.
+        ds_structure = DatasetStructure.objects.get(dataset__name="pX_in_dataset", dataset__user=self.john)
+        input_ds = ds_structure.dataset
+        input_ds.grant_everyone_access()
+
+        # This Run has nesting two layers deep, and
+        # belongs to self.bob, with permissions granted to Everyone.
+        self.run = Run.objects.get(pipeline__pk=self.pl.pk)
+
+    def test_increase_permissions(self):
+        """
+        Test granting permissions from a JSON input.
+        """
+        perms_to_add = [[kive_user().pk], [groups.DEVELOPERS_PK]]
+
+        self.run.increase_permissions_from_json(json.dumps(perms_to_add))
+
+        # Sweep through and make sure all outputs and Runs have had the appropriate
+        # permissions added.
+        for run in Run.objects.filter(user=self.john):
+            if run.top_level_run == self.run:
+                self.assertTrue(run.users_allowed.filter(pk=kive_user().pk).exists())
+                self.assertTrue(run.groups_allowed.filter(pk=groups.DEVELOPERS_PK))
+
+        for ds in Dataset.objects.filter(user=self.john, file_source__isnull=False):
+            if ds.file_source.top_level_run == self.run:
+                self.assertTrue(ds.users_allowed.filter(pk=kive_user().pk).exists())
+                self.assertTrue(ds.groups_allowed.filter(pk=groups.DEVELOPERS_PK))
+
+
+class GetAllAtomicRunComponentsTests(TestCase):
+    """
+    Tests of Run.get_all_atomic_runcomponents.
+    """
+    fixtures = ["deep_nested_run"]
+
+    def setUp(self):
+        self.bob = User.objects.get(username="bob")
+        self.method_noop = Method.objects.get(family__name="string noop", revision_name="v1")
+
+        # This Run has nesting two layers deep, and
+        # belongs to self.bob, with permissions granted to Everyone.
+        # It looks like:
+        # p_top
+        # - p_sub
+        #   - p_basic
+        #     - method_noop
+        #     - method_noop
+        #   - p_basic
+        # - p_sub
+        # - p_sub
+        # with single trivial cables connecting everything.
+        self.run = Run.objects.get(pipeline__family__name="p_top")
+
+        # Let's sweep through and remove all extra permissions on anything self.bob ever produced.
+        for ds in Dataset.objects.filter(user=self.bob):
+            ds.groups_allowed.remove(everyone_group())
+
+        for run in Run.objects.filter(user=self.bob):
+            run.groups_allowed.remove(everyone_group())
+
+    def test_get_all_atomic_run_components(self):
+        """
+        Test on a run with a fair amount of nesting.
+        """
+        all_rcs = self.run.get_all_atomic_runcomponents()
+
+        # The stuff that should be in all_rcs:
+        atomics = []
+        # Look at each step of p_top.
+        for top_step_num in (1,2,3):
+            curr_top_step = self.run.runsteps.get(pipelinestep__step_num=top_step_num)
+            atomics += list(curr_top_step.RSICs.all())
+
+            # Descend into p_sub.
+            curr_p_sub_run = curr_top_step.child_run
+            for sub_step_num in (1,2):
+                curr_sub_step = curr_p_sub_run.runsteps.get(pipelinestep__step_num=sub_step_num)
+                atomics += list(curr_sub_step.RSICs.all())
+
+                # Descend into p_basic.
+                curr_p_basic_run = curr_sub_step.child_run
+                for third_lvl_step_num in (1,2):
+                    curr_basic_step = curr_p_basic_run.runsteps.get(pipelinestep__step_num=third_lvl_step_num)
+                    atomics += list(curr_basic_step.RSICs.all())
+                    atomics.append(curr_basic_step)
+                atomics += list(curr_p_basic_run.runoutputcables.all())
+
+            atomics += list(curr_p_sub_run.runoutputcables.all())
+
+        atomics += list(self.run.runoutputcables.all())
+
+        self.assertSetEqual(set(atomics), set(all_rcs))
+
+
+
+
+

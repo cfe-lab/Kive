@@ -8,6 +8,7 @@ import re
 import tempfile
 import time
 import logging
+import json
 
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -15,18 +16,20 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.core.urlresolvers import reverse, resolve
 from django.core.files import File
+from django.core.files.base import ContentFile
 
 from rest_framework.test import force_authenticate, APIRequestFactory
 from rest_framework import status
 
 from archive.models import ExecLog, MethodOutput, Run, RunStep
-from constants import datatypes
+from constants import datatypes, groups
 from librarian.models import Dataset, ExecRecord
 from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, \
     MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
 from librarian.serializers import DatasetSerializer
+from datachecking.models import MD5Conflict
 
 import file_access_utils
 import kive.testing_utils as tools
@@ -321,6 +324,50 @@ Bob,tw3nty
             self.assertEqual(dataset.date_created < timezone.now(), True)
             self.assertEqual(dataset.file_source, None)
             self.assertEqual(os.path.basename(dataset.dataset_file.path), os.path.basename(file_paths[i]))
+
+    def test_dataset_increase_permissions_from_json(self):
+        """
+        Test increase_permissions_from_json reaches any usurping Datasets.
+        """
+        # First, we revoke Everyone permissions on a Dataset.
+        self.singlet_dataset.groups_allowed.remove(everyone_group())
+
+        # We store the original contents of a Dataset...
+        self.singlet_dataset.dataset_file.open()
+        orig_contents = self.singlet_dataset.dataset_file.read()
+        self.singlet_dataset.dataset_file.close()
+        orig_MD5 = self.singlet_dataset.MD5_checksum
+
+        # ... and then we corrupt it.
+        self.singlet_dataset.MD5_checksum = "corruptedmd5"
+        self.singlet_dataset.save()
+
+        usurping_ds = Dataset(
+            name="Usurping DS",
+            description="Usurps self.singlet_dataset",
+            user=self.myUser,
+            dataset_file=ContentFile(orig_contents),
+            MD5_checksum=orig_MD5
+        )
+        usurping_ds.save()
+
+        ic = self.singlet_dataset.integrity_checks.create(user=self.myUser)
+        ic.start()
+
+        new_conflict = MD5Conflict(integritychecklog=ic, conflicting_dataset=usurping_ds)
+        new_conflict.save()
+
+        ic.stop()
+
+        # Now, let's try to grant some permissions on self.singlet_dataset.
+        new_perms_json = json.dumps([[self.ringoUser.pk], [groups.DEVELOPERS_PK]])
+        self.singlet_dataset.increase_permissions_from_json(new_perms_json)
+
+        self.assertTrue(self.singlet_dataset.users_allowed.filter(pk=self.ringoUser.pk).exists())
+        self.assertTrue(usurping_ds.users_allowed.filter(pk=self.ringoUser.pk).exists())
+
+        self.assertTrue(self.singlet_dataset.groups_allowed.filter(pk=groups.DEVELOPERS_PK).exists())
+        self.assertTrue(usurping_ds.groups_allowed.filter(pk=groups.DEVELOPERS_PK).exists())
 
 
 class DatasetStructureTests(LibrarianTestCase):

@@ -284,9 +284,7 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
             )
 
         # Look for permissions on reused RunComponents.
-        all_rcs = [run.runsteps.all()]
-        [all_rcs.append(rs.RSICs.all()) for rs in run.runsteps.all()]
-        all_rcs.append(run.runoutputcables.all())
+        all_rcs = run.get_all_atomic_runcomponents()
 
         for rc in itertools.chain(*all_rcs):
             if rc.reused:

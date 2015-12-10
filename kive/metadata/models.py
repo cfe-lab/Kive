@@ -550,13 +550,14 @@ class AccessControl(models.Model):
         users_qs = users_qs if users_qs is not None else User.objects.all()
         groups_qs = groups_qs if groups_qs is not None else Group.objects.all()
 
-        users_qs = users_qs.filter(pk__in=eligible_user_pks)
-        groups_qs = groups_qs.filter(
-            pk__in=self.groups_allowed.values_list("pk", flat=True)
-        )
+        # If the Everyone group has access to this object, then we don't filter.
+        if not self.groups_allowed.filter(pk=groups.EVERYONE_PK).exists():
+            users_qs = users_qs.filter(pk__in=eligible_user_pks)
+            groups_qs = groups_qs.filter(
+                pk__in=self.groups_allowed.values_list("pk", flat=True)
+            )
 
         return users_qs, groups_qs
-
 
 
 @python_2_unicode_compatible

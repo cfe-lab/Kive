@@ -1037,7 +1037,7 @@ class Dataset(metadata.models.AccessControl):
 
         for ic in self.integrity_checks.all():
             if ic.is_fail():
-                ic.usurper.increase_permissions_from_json(permissions_json)
+                ic.usurper.conflicting_dataset.increase_permissions_from_json(permissions_json)
 
 
 class DatasetStructure(models.Model):

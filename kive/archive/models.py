@@ -592,12 +592,37 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                 for ds in rsic.outputs.all():
                     ds.increase_permissions_from_json(permissions_json)
 
+            if runstep.has_subrun():
+                runstep.child_run.increase_permissions_from_json(permissions_json)
+
             for ds in runstep.outputs.all():
                 ds.increase_permissions_from_json(permissions_json)
 
         for roc in self.runoutputcables.all():
             for ds in roc.outputs.all():
                 ds.increase_permissions_from_json(permissions_json)
+
+    def get_all_atomic_runcomponents(self):
+        """
+        Returns an iterable of all atomic RunComponents that belong to this Run.
+
+        This includes RunComponents that belong to sub-Runs.
+        """
+        # This will be a list of querysets that we will use itertools.chain to join.
+        rc_querysets = []
+
+        atomic_step_pks = []
+        for rs in self.runsteps.all():
+            rc_querysets.append(rs.RSICs.all())
+            if rs.has_subrun():
+                sub_rcs = rs.child_run.get_all_atomic_runcomponents()
+                rc_querysets.append(sub_rcs)
+            else:
+                atomic_step_pks.append(rs.pk)
+        rc_querysets.append(RunStep.objects.filter(pk__in=atomic_step_pks))
+        rc_querysets.append(self.runoutputcables.all())
+
+        return itertools.chain(*rc_querysets)
 
 
 class RunInput(models.Model):
