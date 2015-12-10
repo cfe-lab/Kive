@@ -7,7 +7,7 @@ import re
 import tempfile
 import json
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.core.files.base import ContentFile
@@ -3848,6 +3848,163 @@ class GetAllAtomicRunComponentsTests(TestCase):
         self.assertSetEqual(set(atomics), set(all_rcs))
 
 
+class EligiblePermissionsTests(TestCase):
+    fixtures = ["run_pipelines_recovering_reused_step"]
 
+    def setUp(self):
+        self.john = User.objects.get(username="john")
+        self.ringo = User.objects.get(username="ringo")
+        self.bob = User.objects.get(username="bob")
 
+        self.developers_group = Group.objects.get(pk=groups.DEVELOPERS_PK)
 
+        self.p_one = Pipeline.objects.get(family__name="p_one", revision_name="v1")
+        self.p_two = Pipeline.objects.get(family__name="p_two", revision_name="v1")
+
+        self.words_ds = Dataset.objects.get(name="blahblah")
+
+        self.run_one = self.p_one.pipeline_instances.get(user=self.bob)
+        self.run_two = self.p_two.pipeline_instances.get(user=self.bob)
+
+        self.run_two.groups_allowed.remove(everyone_group())
+        self.run_one.groups_allowed.remove(everyone_group())
+        self.words_ds.groups_allowed.remove(everyone_group())
+
+        self.p_two.groups_allowed.remove(everyone_group())
+        self.p_one.groups_allowed.remove(everyone_group())
+
+        self.p_one.users_allowed.add(self.bob)
+        self.p_two.users_allowed.add(self.bob)
+
+    def test_eligible_permissions_pipeline_inputs_restricted(self):
+        """
+        Test retrieving eligible permissions on a Run whose Pipeline and inputs won't allow more permissions.
+        """
+        addable_users, addable_groups = self.run_one.eligible_permissions()
+
+        self.assertFalse(addable_users.exists())
+        self.assertFalse(addable_groups.exists())
+
+    def test_eligible_permissions_pipeline_allows_more_but_inputs_restricted(self):
+        """
+        Test retrieving eligible permissions when the Pipeline allows more but the input doesn't.
+        """
+        self.p_one.groups_allowed.add(self.developers_group)
+        self.p_one.users_allowed.add(self.ringo)
+
+        addable_users, addable_groups = self.run_one.eligible_permissions()
+        self.assertFalse(addable_users.exists())
+        self.assertFalse(addable_groups.exists())
+
+    def test_eligible_permissions_pipeline_restricted_but_inputs_allow_more(self):
+        """
+        Test retrieving eligible permissions when the input allows more but the Pipeline doesn't.
+        """
+        self.words_ds.groups_allowed.add(self.developers_group)
+        self.words_ds.users_allowed.add(self.ringo)
+
+        addable_users, addable_groups = self.run_one.eligible_permissions()
+        self.assertFalse(addable_users.exists())
+        self.assertFalse(addable_groups.exists())
+
+    def test_eligible_permissions_pipeline_inputs_no_overlap(self):
+        """
+        Test retrieving eligible permissions when the input and Pipeline have non-overlapping permissions.
+        """
+        self.words_ds.groups_allowed.add(self.developers_group)
+        self.p_one.users_allowed.add(self.ringo)
+
+        addable_users, addable_groups = self.run_one.eligible_permissions()
+        self.assertFalse(addable_users.exists())
+        self.assertFalse(addable_groups.exists())
+
+    def test_eligible_permissions_with_eligible_users(self):
+        """
+        Test retrieving eligible permissions when the input and Pipeline allow other users.
+        """
+        self.words_ds.users_allowed.add(self.ringo)
+        self.p_one.users_allowed.add(self.ringo)
+
+        addable_users, addable_groups = self.run_one.eligible_permissions()
+        self.assertSetEqual({self.ringo}, set(addable_users))
+        self.assertFalse(addable_groups.exists())
+
+    def test_eligible_permissions_with_eligible_groups(self):
+        """
+        Test retrieving eligible permissions when the input and Pipeline allow other groups.
+        """
+        self.words_ds.groups_allowed.add(self.developers_group)
+        self.p_one.groups_allowed.add(everyone_group())
+
+        addable_users, addable_groups = self.run_one.eligible_permissions()
+        self.assertFalse(addable_users.exists())
+        self.assertSetEqual({self.developers_group}, set(addable_groups))
+
+    def test_eligible_permissions_already_granted(self):
+        """
+        Case where the input and Pipeline allow other users and groups that the Run already has.
+        """
+        self.words_ds.users_allowed.add(self.ringo)
+        self.words_ds.groups_allowed.add(self.developers_group)
+        self.p_one.users_allowed.add(self.ringo)
+        self.p_one.groups_allowed.add(everyone_group())
+
+        self.run_one.users_allowed.add(self.ringo)
+        self.run_one.groups_allowed.add(self.developers_group)
+
+        addable_users, addable_groups = self.run_one.eligible_permissions()
+        self.assertFalse(addable_users.exists())
+        self.assertFalse(addable_groups.exists())
+
+    def test_eligible_permissions_reused_run_restricted(self):
+        """
+        Case where the Run reuses steps from previous Runs and the original Run is restricted.
+        """
+        self.words_ds.users_allowed.add(self.ringo)
+        self.words_ds.groups_allowed.add(self.developers_group)
+        self.p_one.users_allowed.add(self.ringo)
+        self.p_one.groups_allowed.add(everyone_group())
+        self.p_two.users_allowed.add(self.ringo)
+        self.p_two.groups_allowed.add(everyone_group())
+
+        # This should still give no addable users or groups because self.run_one
+        # doesn't have added permissions.
+        addable_users, addable_groups = self.run_two.eligible_permissions()
+        self.assertFalse(addable_users.exists())
+        self.assertFalse(addable_groups.exists())
+
+    def test_eligible_permissions_reused_run_restricted(self):
+        """
+        Case where the Run reuses steps from previous Runs and the original Run had some permissions.
+        """
+        self.words_ds.users_allowed.add(self.ringo, self.john)
+        self.words_ds.groups_allowed.add(self.developers_group)
+        self.p_one.users_allowed.add(self.ringo, self.john)
+        self.p_one.groups_allowed.add(everyone_group())
+        self.p_two.users_allowed.add(self.ringo, self.john)
+        self.p_two.groups_allowed.add(everyone_group())
+
+        self.run_one.users_allowed.add(self.ringo)
+        self.run_one.groups_allowed.add(self.developers_group)
+
+        # This should still give no addable users or groups because self.run_one
+        # doesn't have added permissions.
+        addable_users, addable_groups = self.run_two.eligible_permissions()
+        self.assertSetEqual({self.ringo}, set(addable_users))
+        self.assertSetEqual({self.developers_group}, set(addable_groups))
+
+    def test_eligible_permissions_incomplete_run(self):
+        """
+        Exception should be thrown when the run is incomplete.
+        """
+        incomplete_run = Run(
+            user=self.bob,
+            name="IncompleteRun",
+            description="eligible_permissions should throw an exception",
+            pipeline=self.p_one
+        )
+        self.assertRaisesRegexp(
+            RuntimeError,
+            "Eligible permissions cannot be found until the run is complete",
+            incomplete_run.eligible_permissions
+        )

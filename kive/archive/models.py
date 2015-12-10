@@ -19,11 +19,11 @@ from django.core.urlresolvers import reverse
 from django.core.validators import MinValueValidator
 from django.utils.encoding import python_2_unicode_compatible
 from django.utils import timezone
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 
 import archive.signals
 import archive.exceptions
-from constants import maxlengths
+from constants import maxlengths, groups
 from datachecking.models import ContentCheckLog, IntegrityCheckLog
 from librarian.models import Dataset
 import metadata.models
@@ -623,6 +623,49 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         rc_querysets.append(self.runoutputcables.all())
 
         return itertools.chain(*rc_querysets)
+
+    def eligible_permissions(self):
+        """
+        Determine which users and groups may be granted access to this Run.
+
+        The run's permissions can only be extended to those users and groups
+        that have access to
+        a) the Pipeline
+        b) the input Datasets
+        c) the top-level Runs of the ExecRecords it reuses
+        """
+        if not self.is_complete():
+            raise RuntimeError("Eligible permissions cannot be found until the run is complete")
+        addable_users, addable_groups = self.pipeline.intersect_permissions(users_qs=None, groups_qs=None)
+
+        for run_input in self.inputs.all():
+            addable_users, addable_groups = run_input.dataset.intersect_permissions(
+                addable_users,
+                addable_groups
+            )
+
+        # Look for permissions on reused RunComponents.
+        for rc in self.get_all_atomic_runcomponents():
+            if rc.reused:
+                orig_run = rc.execrecord.generating_run
+                if orig_run != self:
+                    addable_users, addable_groups = orig_run.intersect_permissions(
+                        addable_users,
+                        addable_groups
+                    )
+
+        if addable_groups.filter(pk=groups.EVERYONE_PK).exists():
+            addable_users = User.objects.all()
+            addable_groups = Group.objects.all()
+
+        addable_users = addable_users.exclude(
+            pk__in=itertools.chain([self.user.pk], self.users_allowed.values_list("pk", flat=True))
+        )
+        addable_groups = addable_groups.exclude(
+            pk__in=self.groups_allowed.values_list("pk", flat=True)
+        )
+
+        return addable_users, addable_groups
 
 
 class RunInput(models.Model):

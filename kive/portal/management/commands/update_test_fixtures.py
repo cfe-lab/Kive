@@ -699,12 +699,28 @@ class RunPipelinesRecoveringReusedStepEnvironmentBuilder(FixtureBuilder):
         # Set up a words dataset.
         tools.make_words_dataset(self)
 
-        sandbox_one = Sandbox(self.user_bob, p_one, [self.dataset_words],
-                              groups_allowed=[everyone_group()])
+        run_one = Run(
+            user=self.user_bob,
+            name="RunOne",
+            description="Bob runs p_one",
+            pipeline=p_one
+        )
+        run_one.save()
+        run_one.inputs.create(dataset=self.dataset_words, index=1)
+        run_one.groups_allowed.add(everyone_group())
+        sandbox_one = Sandbox(run=run_one)
         sandbox_one.execute_pipeline()
 
-        sandbox_two = Sandbox(self.user_bob, p_two, [self.dataset_words],
-                              groups_allowed=[everyone_group()])
+        run_two = Run(
+            user=self.user_bob,
+            name="RunOne",
+            description="Bob runs p_two, which tries to reuse part of run_one but ultimately needs to recover",
+            pipeline=p_two
+        )
+        run_two.save()
+        run_two.inputs.create(dataset=self.dataset_words, index=1)
+        run_two.groups_allowed.add(everyone_group())
+        sandbox_two = Sandbox(run=run_two)
         sandbox_two.execute_pipeline()
 
 
