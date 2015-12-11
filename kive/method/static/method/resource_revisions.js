@@ -4,9 +4,6 @@
 (function(window){
 
     function coderevision_link($td, revision) {
-        if (revision.content_file.length !== 0) {
-
-        }
         var $a = $("<a/>").attr("href", revision.absolute_url).text("Revise");
         $td.append($a);
     }

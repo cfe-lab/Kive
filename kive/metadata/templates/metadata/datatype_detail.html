@@ -85,7 +85,7 @@
 </tr>
 
 <tr>
-    <td>Name</td>
+    <td>Name:</td>
     <td>
         <span class="readonly">{{ datatype.name }}</span>
         {% if is_owner or is_admin %}
@@ -94,7 +94,7 @@
     </td>
 </tr>
 <tr>
-    <td>Description</td>
+    <td>Description:</td>
     <td>
         <span class="readonly">{{ datatype.description }}</span>
         {% if is_owner or is_admin %}
@@ -108,6 +108,8 @@
 <span class="edit"><input type="submit" name="reviseDatatypeDetails" value="Revise details"/></span>
 </form>
 {% endif %}
+
+{{ datatype_form.errors }}
 
 {% if constraints %}
 <h3>Basic constraints</h3>

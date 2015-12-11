@@ -42,8 +42,8 @@
 {% endif %}
 
 <table>
-<tr><td>Date created</td><td>{{ revision.revision_DateTime }}</td></tr>
-<tr><td>Creator</td><td>{{ revision.user }}</td></tr>
+<tr><td>Date created:</td><td>{{ revision.revision_DateTime }}</td></tr>
+<tr><td>Creator:</td><td>{{ revision.user }}</td></tr>
 
 <tr>
     <td>Permissions:</td>
@@ -77,7 +77,7 @@
 </tr>
 
 <tr>
-    <td>Revision name</td>
+    <td>Revision name:</td>
     <td>
         <span class="readonly">{{ revision.revision_name }}</span>
         {% if is_owner or is_admin %}
@@ -86,7 +86,7 @@
     </td>
 </tr>
 <tr>
-    <td>Revision description</td>
+    <td>Revision description:</td>
     <td>
         <span class="readonly">{{ revision.revision_desc }}</span>
         {% if is_owner or is_admin %}
@@ -101,6 +101,8 @@
 <span class="edit"><input type="submit" name="reviseCodeResourceRevisionDetails" value="Revise details"/></span>
 </form>
 {% endif %}
+
+{{ revision_form.errors }}
 
 <pre><code>
 {{ revision.content_file.read }}

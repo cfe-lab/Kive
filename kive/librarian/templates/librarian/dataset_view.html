@@ -122,13 +122,13 @@
     </tr>
 
     </table>
-    {% if is_owner or is_admin %}
-    <span class="edit"><input type="submit" name="reviseDatasetDetails" value="Revise details"/></span>
-    {% endif %}
 
 {% if is_owner or is_admin %}
+<span class="edit"><input type="submit" name="reviseDatasetDetails" value="Revise details"/></span>
 </form>
 {% endif %}
+
+{{ dataset_form.non_field_errors }}
 
 <div class="dataset_contents">
 {% block dataset_contents %}

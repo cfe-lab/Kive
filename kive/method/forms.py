@@ -6,7 +6,7 @@ from django.http import Http404
 from django import forms
 from django.contrib.auth.models import User, Group
 
-from method.models import CodeResource, CodeResourceRevision, Method
+from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from metadata.models import CompoundDatatype
 from metadata.forms import AccessControlForm, PermissionsField
 
@@ -256,6 +256,26 @@ class MethodForm(MethodReviseForm):
             )
 
 
+class MethodDetailsForm(forms.ModelForm):
+    permissions = PermissionsField(
+        label="Users and groups allowed",
+        help_text="Which users and groups are allowed access to this Method?",
+        user_queryset=User.objects.all(),
+        group_queryset=Group.objects.all(),
+        required=False
+    )
+
+    class Meta:
+        model = Method
+        fields = ("revision_name", "revision_desc", "permissions")
+
+    def __init__(self, data=None, addable_users=None, addable_groups=None, *args, **kwargs):
+        addable_users = addable_users if addable_users is not None else User.objects.all()
+        addable_groups = addable_groups if addable_groups is not None else Group.objects.all()
+        super(MethodDetailsForm, self).__init__(data, *args, **kwargs)
+        self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)
+
+
 class TransformationXputForm (forms.Form):
 
     dataset_name = forms.CharField()
@@ -287,8 +307,16 @@ class XputStructureForm (forms.Form):
         self.fields['compounddatatype'].choices = [('', '--------'), ('__raw__', 'Unstructured')] + more_choices
 
 
-class MethodFamilyForm (forms.Form):
+class MethodFamilyForm (forms.ModelForm):
     """Form used in creating a new MethodFamily."""
+    permissions = PermissionsField(
+        label="Users and groups allowed",
+        help_text="Which users and groups are allowed access to this MethodFamily?",
+        user_queryset=User.objects.all(),
+        group_queryset=Group.objects.all(),
+        required=False
+    )
+
     name = forms.CharField(label="Family name")
 
     description = forms.CharField(
@@ -296,3 +324,13 @@ class MethodFamilyForm (forms.Form):
         widget=forms.Textarea(attrs={'rows': 5, 'cols': 30, 'style': 'height: 5em;'}),
         required=False
     )
+
+    class Meta:
+        model = MethodFamily
+        fields = ("name", "description", "permissions")
+
+    def __init__(self, data=None, addable_users=None, addable_groups=None, *args, **kwargs):
+        addable_users = addable_users if addable_users is not None else User.objects.all()
+        addable_groups = addable_groups if addable_groups is not None else Group.objects.all()
+        super(MethodFamilyForm, self).__init__(data, *args, **kwargs)
+        self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)

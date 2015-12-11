@@ -29,7 +29,6 @@
 
 <h3>Details</h3>
 
-
 {% if is_owner or is_admin %}
 <form id="cdtDetails" name="cdtDetails" action="" method="post">{% csrf_token %}
 {% endif %}
@@ -76,6 +75,8 @@
 <span class="edit"><input type="submit" name="reviseDatatypeDetails" value="Revise details"/></span>
 </form>
 {% endif %}
+
+{{ cdt_form.errors }}
 
 <h3>Columns</h3>
 

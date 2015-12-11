@@ -121,6 +121,20 @@ class Transformation(metadata.models.AccessControl):
     def display_name(self):
         return self.definite.display_name
 
+    @property
+    def sorted_inputs(self):
+        """
+        Return a sorted QuerySet of inputs to this Transformation.
+        """
+        return self.inputs.order_by("dataset_idx")
+
+    @property
+    def sorted_outputs(self):
+        """
+        Return a sorted QuerySet of outputs produced by this Transformation.
+        """
+        return self.outputs.order_by("dataset_idx")
+
     def __str__(self):
         if self.revision_name:
             return "{}: {}".format(self.definite.revision_number, self.revision_name)

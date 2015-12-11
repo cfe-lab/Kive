@@ -627,9 +627,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
         super(Method, self).save(*args, **kwargs)
 
-    def get_absolute_url(self):
-        return "/method_revise/{}".format(self.id)
-
     @property
     def is_method(self):
         return True
@@ -1039,10 +1036,6 @@ class MethodFamily(transformation.models.TransformationFamily):
     """
     # Implicitly defined:
     #   members (Method/ForeignKey)
-
-    def get_absolute_url(self):
-        """ go to a page listing all Methods under this family"""
-        return "/methods/{}".format(self.id)
 
     @property
     def num_revisions(self):

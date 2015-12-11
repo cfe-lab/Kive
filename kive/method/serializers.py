@@ -210,9 +210,12 @@ class MethodFamilySerializer(AccessControlSerializer,
         return obj.num_revisions
 
     def get_absolute_url(self, obj):
+        """
+        Gives the URL that lists all Methods under this family.
+        """
         if not obj:
             return None
-        return obj.get_absolute_url()
+        return "/methods/{}".format(obj.pk)
 
 
 # This is analogous to CRRevisionNumberGetter.
@@ -242,6 +245,7 @@ class MethodSerializer(AccessControlSerializer,
     outputs = TransformationOutputSerializer(many=True, allow_null=True, required=False)
 
     absolute_url = serializers.SerializerMethodField()
+    view_url = serializers.SerializerMethodField()
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='method-removal-plan')
 
@@ -266,6 +270,7 @@ class MethodSerializer(AccessControlSerializer,
             "id",
             "url",
             "absolute_url",
+            "view_url",
             "removal_plan",
             "family_id",
             "family",
@@ -295,7 +300,12 @@ class MethodSerializer(AccessControlSerializer,
     def get_absolute_url(self, obj):
         if not obj:
             return None
-        return obj.get_absolute_url()
+        return "/method_revise/{}".format(obj.pk)
+
+    def get_view_url(self, obj):
+        if not obj:
+            return None
+        return "/method_view/{}".format(obj.pk)
 
     # Due to nesting of inputs and outputs, we need to customize the create method.
     def create(self, validated_data):

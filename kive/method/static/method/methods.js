@@ -1,5 +1,10 @@
 function method_link($td, method) {
-    var $a = $("<a/>").attr("href", method.absolute_url).text(method.display_name);
+    var $a = $("<a/>").attr("href", method.absolute_url).text("Revise");
+    $td.append($a);
+}
+
+function method_view_link($td, method) {
+    var $a = $("<a/>").attr("href", method.view_url).text(method.display_name);
     $td.append($a);
 }
 
@@ -21,7 +26,8 @@ var MethodTable = function($table, is_user_admin, family_pk, $active_filters, $n
     var $mf_filter = this.filterSet.add("methodfamily_id", family_pk, true);
     $mf_filter.hide();
 
-    this.registerColumn("Name", method_link);
+    this.registerColumn("Name", method_view_link);
+    this.registerColumn("", method_link)
     this.registerColumn("Description", "revision_desc");
 
     this.registerStandardColumn("user");

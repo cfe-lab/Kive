@@ -10,6 +10,7 @@ from django.template import loader, RequestContext
 
 from datetime import datetime
 import logging
+import itertools
 
 import metadata.models
 from metadata.models import CompoundDatatype
@@ -18,7 +19,7 @@ from method.models import CodeResource, CodeResourceDependency, Method, \
 from method.forms import CodeResourceDependencyForm, \
     CodeResourcePrototypeForm, CodeResourceRevisionForm, MethodFamilyForm, \
     MethodForm, MethodReviseForm, TransformationXputForm, XputStructureForm, \
-    CodeResourceDetailsForm, CodeResourceRevisionDetailsForm
+    CodeResourceDetailsForm, CodeResourceRevisionDetailsForm, MethodDetailsForm
 from portal.views import developer_check, admin_check
 
 
@@ -510,21 +511,46 @@ def methods(request, id):
         # Redirect back to the resources page.
         raise Http404("ID {} cannot be accessed".format(id))
 
-    # member_methods = AccessControl.filter_by_user(
-    #     request.user,
-    #     is_admin=False,
-    #     queryset=family.members.all())
+    addable_users, addable_groups = family.other_users_groups()
 
-    # methods_json = JSONRenderer().render(
-    #     MethodSerializer(member_methods, many=True, context={"request": request}).data
-    # )
+    if request.method == 'POST':
+        # We are attempting to update the CodeResource's metadata/permissions.
+        mf_form = MethodFamilyForm(
+            request.POST,
+            addable_users=addable_users,
+            addable_groups=addable_groups,
+            instance=family
+        )
+
+        if mf_form.is_valid():
+            try:
+                family.name = mf_form.cleaned_data["name"]
+                family.description = mf_form.cleaned_data["description"]
+                family.save()
+                family.grant_from_json(mf_form.cleaned_data["permissions"])
+                family.clean()
+
+                # Success -- go back to the resources page.
+                return HttpResponseRedirect('/method_families')
+            except (AttributeError, ValidationError, ValueError) as e:
+                LOGGER.exception(e.message)
+                mf_form.add_error(None, e)
+
+    else:
+        mf_form = MethodFamilyForm(
+            addable_users=addable_users,
+            addable_groups=addable_groups,
+            initial={"name": family.name, "description": family.description}
+        )
 
     t = loader.get_template('method/methods.html')
     c = RequestContext(request,
                        {
-                           'family': family,
-                           # "methods": methods_json,
-                           "is_user_admin": admin_check(request.user)
+                           "family": family,
+                           "family_form": mf_form,
+                           "is_admin": admin_check(request.user),
+                           "is_owner": request.user == family.user
+
                        })
     return HttpResponse(t.render(c))
 
@@ -539,7 +565,12 @@ def create_method_forms(request_post, user, family=None):
         family_form = MethodFamilyForm(request_post)
     else:
         assert family is not None
-        family_form = MethodFamilyForm({"name": family.name, "description": family.description})
+        family_form = MethodFamilyForm(
+            {
+                "name": family.name,
+                "description": family.description,
+                "user": family.user
+            })
     family_form.is_valid()
 
     # Populate main form with submitted values.
@@ -602,12 +633,13 @@ def create_method_from_forms(family_form, method_form, input_forms, output_forms
         with transaction.atomic():
             if family is None:
                 try:
-                    family = MethodFamily.create(
-                        name=family_form.cleaned_data["name"],
-                        description=family_form.cleaned_data['description'],
-                        user=creating_user)
-
+                    # family = MethodFamily.create(
+                    #     name=family_form.cleaned_data["name"],
+                    #     description=family_form.cleaned_data['description'],
+                    #     user=creating_user)
+                    family = family_form.save()
                     family.grant_from_json(method_form.cleaned_data["permissions"])
+                    family.full_clean()
 
                 except ValidationError as e:
                     family_form.add_error(None, e)
@@ -702,6 +734,79 @@ def _method_forms_check_valid(family_form, method_form, input_form_tuples, outpu
     all_forms = ([family_form] + [method_form] + list(in_xput_forms) + list(in_struct_forms) +
                  list(out_xput_forms) + list(out_struct_forms))
     return all(x.is_valid() for x in all_forms)
+
+
+@login_required
+@user_passes_test(developer_check)
+def method_view(request, id):
+    """
+    View a Method or edit its metadata/permissions.
+    """
+    four_oh_four = False
+    try:
+        method = Method.objects.get(pk=id)
+        if not method.can_be_accessed(request.user):
+            four_oh_four = True
+    except Method.DoesNotExist:
+        four_oh_four = True
+
+    if four_oh_four:
+        raise Http404("ID {} is not accessible".format(id))
+
+    addable_users, addable_groups = method.other_users_groups()
+    addable_users, addable_groups = method.family.intersect_permissions(addable_users, addable_groups)
+    if method.revision_parent is not None:
+        addable_users, addable_groups = method.revision_parent.intersect_permissions(addable_users, addable_groups)
+    addable_users, addable_groups = method.driver.intersect_permissions(addable_users, addable_groups)
+    for xput in itertools.chain(method.inputs.all(), method.outputs.all()):
+        xput_cdt = xput.get_cdt()
+        if xput_cdt is not None:
+            addable_users, addable_groups = xput_cdt.intersect_permissions(addable_users, addable_groups)
+
+    if request.method == 'POST':
+        # We are attempting to update the Method's metadata/permissions.
+        method_form = MethodDetailsForm(
+            request.POST,
+            addable_users=addable_users,
+            addable_groups=addable_groups,
+            instance=method
+        )
+
+        if method_form.is_valid():
+            try:
+                method.revision_name = method_form.cleaned_data["revision_name"]
+                method.revision_desc = method_form.cleaned_data["revision_desc"]
+                method.save()
+                method.grant_from_json(method_form.cleaned_data["permissions"])
+                method.clean()
+
+                # Success -- go back to the CodeResource page.
+                return HttpResponseRedirect('/methods/{}'.format(method.family.pk))
+            except (AttributeError, ValidationError, ValueError) as e:
+                LOGGER.exception(e.message)
+                method_form.add_error(None, e)
+
+    else:
+        method_form = MethodDetailsForm(
+            addable_users=addable_users,
+            addable_groups=addable_groups,
+            initial={
+                "revision_name": method.revision_name,
+                "revision_desc": method.revision_desc
+            }
+        )
+
+    t = loader.get_template("method/method_view.html")
+    c = RequestContext(
+        request,
+        {
+            "method": method,
+            "method_form": method_form,
+            "is_owner": method.user == request.user,
+            "is_admin": admin_check(request.user)
+        }
+    )
+    return HttpResponse(t.render(c))
 
 
 @login_required
