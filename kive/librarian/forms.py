@@ -29,7 +29,7 @@ class DatasetDetailsForm(forms.ModelForm):
     """
     permissions = metadata.forms.PermissionsField(
         label="Users and groups allowed",
-        help_text="Which users and groups are allowed access to this Datatype?",
+        help_text="Which users and groups are allowed access to this Dataset?",
         user_queryset=User.objects.all(),
         group_queryset=Group.objects.all(),
         required=False
@@ -55,7 +55,7 @@ class DatasetForm(forms.ModelForm):
     """
     permissions = metadata.forms.PermissionsField(
         label="Users and groups allowed",
-        help_text="Which users and groups are allowed access to this Datatype?",
+        help_text="Which users and groups are allowed access to this Dataset?",
         user_queryset=User.objects.all(),
         group_queryset=Group.objects.all(),
         required=False

@@ -297,7 +297,7 @@ class CompoundDatatypeForm(forms.ModelForm):
 
     def __init__(self, data=None, users_allowed=None, groups_allowed=None, *args, **kwargs):
         super(CompoundDatatypeForm, self).__init__(data, *args, **kwargs)
-        users_allowed = users_allowed or User.objects.all()
-        groups_allowed = groups_allowed or Group.objects.all()
+        users_allowed = users_allowed if users_allowed is not None else User.objects.all()
+        groups_allowed = groups_allowed if groups_allowed is not None else Group.objects.all()
         self.fields["permissions"].set_users_groups_allowed(users_allowed, groups_allowed)
 

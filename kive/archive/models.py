@@ -636,7 +636,12 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         if not self.is_complete():
             raise RuntimeError("Eligible permissions cannot be found until the run is complete")
-        addable_users, addable_groups = self.pipeline.intersect_permissions(users_qs=None, groups_qs=None)
+
+        # Start with the users/groups who don't have access to this Run...
+        addable_users, addable_groups = self.other_users_groups()
+
+        # ... and then refine it.
+        addable_users, addable_groups = self.pipeline.intersect_permissions(addable_users, addable_groups)
 
         for run_input in self.inputs.all():
             addable_users, addable_groups = run_input.dataset.intersect_permissions(
@@ -657,13 +662,6 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         if addable_groups.filter(pk=groups.EVERYONE_PK).exists():
             addable_users = User.objects.all()
             addable_groups = Group.objects.all()
-
-        addable_users = addable_users.exclude(
-            pk__in=itertools.chain([self.user.pk], self.users_allowed.values_list("pk", flat=True))
-        )
-        addable_groups = addable_groups.exclude(
-            pk__in=self.groups_allowed.values_list("pk", flat=True)
-        )
 
         return addable_users, addable_groups
 

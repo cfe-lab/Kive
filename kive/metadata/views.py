@@ -163,13 +163,7 @@ def datatype_detail(request, id):
     if four_oh_four:
         raise Http404("ID {} cannot be accessed".format(id))
 
-    user_pks_already_allowed = dt.users_allowed.values_list("pk", flat=True)
-    group_pks_already_allowed = dt.groups_allowed.values_list("pk", flat=True)
-
-    addable_users = User.objects.exclude(
-        pk__in=itertools.chain([dt.user.pk], user_pks_already_allowed)
-    )
-    addable_groups = Group.objects.exclude(pk__in=group_pks_already_allowed)
+    addable_users, addable_groups = dt.other_users_groups()
 
     if request.method == "POST":
         # We are going to try and update this Datatype.
@@ -241,13 +235,12 @@ def compound_datatype_detail(request, id):
     if four_oh_four:
         raise Http404("ID {} cannot be accessed".format(id))
 
-    user_pks_already_allowed = cdt.users_allowed.values_list("pk", flat=True)
-    group_pks_already_allowed = cdt.groups_allowed.values_list("pk", flat=True)
-
-    addable_users = User.objects.exclude(
-        pk__in=itertools.chain([cdt.user.pk], user_pks_already_allowed)
-    )
-    addable_groups = Group.objects.exclude(pk__in=group_pks_already_allowed)
+    addable_users, addable_groups = cdt.other_users_groups()
+    for cdtm in cdt.members.all():
+        addable_users, addable_groups = cdtm.datatype.intersect_permissions(
+            users_qs=addable_users,
+            groups_qs=addable_groups
+        )
 
     if request.method == "POST":
         # We are going to try and update this CompoundDatatype.

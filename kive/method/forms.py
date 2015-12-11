@@ -4,9 +4,11 @@ Generate an HTML form to create a new Datatype object
 
 from django.http import Http404
 from django import forms
+from django.contrib.auth.models import User, Group
+
 from method.models import CodeResource, CodeResourceRevision, Method
 from metadata.models import CompoundDatatype
-from metadata.forms import AccessControlForm
+from metadata.forms import AccessControlForm, PermissionsField
 
 import logging
 
@@ -14,12 +16,27 @@ logger = logging.getLogger(__name__)
 
 
 # CodeResource forms.
-class CodeResourceMinimalForm(AccessControlForm):
+class CodeResourceDetailsForm(forms.ModelForm):
     """
-    use for validating only two entries
+    Form used for updating a CodeResource (not a CodeResourceRevision).
     """
-    revision_name = forms.CharField(max_length=255)
-    revision_desc = forms.CharField(max_length=255)
+    permissions = PermissionsField(
+        label="Users and groups allowed",
+        help_text="Which users and groups are allowed access to this CodeResource?",
+        user_queryset=User.objects.all(),
+        group_queryset=Group.objects.all(),
+        required=False
+    )
+
+    class Meta:
+        model = CodeResource
+        fields = ("name", "description", "permissions")
+
+    def __init__(self, data=None, addable_users=None, addable_groups=None, *args, **kwargs):
+        addable_users = addable_users if addable_users is not None else User.objects.all()
+        addable_groups = addable_groups if addable_groups is not None else Group.objects.all()
+        super(CodeResourceDetailsForm, self).__init__(data, *args, **kwargs)
+        self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)
 
 
 class CodeResourcePrototypeForm(AccessControlForm):
@@ -54,6 +71,29 @@ class CodeResourcePrototypeForm(AccessControlForm):
         required=False,
         allow_empty_file=True
     )
+
+
+class CodeResourceRevisionDetailsForm(forms.ModelForm):
+    """
+    Form used for updating a CodeResourceRevision.
+    """
+    permissions = PermissionsField(
+        label="Users and groups allowed",
+        help_text="Which users and groups are allowed access to this CodeResourceRevision?",
+        user_queryset=User.objects.all(),
+        group_queryset=Group.objects.all(),
+        required=False
+    )
+
+    class Meta:
+        model = CodeResourceRevision
+        fields = ("revision_name", "revision_desc", "permissions")
+
+    def __init__(self, data=None, addable_users=None, addable_groups=None, *args, **kwargs):
+        addable_users = addable_users if addable_users is not None else User.objects.all()
+        addable_groups = addable_groups if addable_groups is not None else Group.objects.all()
+        super(CodeResourceRevisionDetailsForm, self).__init__(data, *args, **kwargs)
+        self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)
 
 
 class CodeResourceRevisionForm(AccessControlForm):

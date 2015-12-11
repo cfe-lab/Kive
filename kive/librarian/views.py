@@ -110,18 +110,13 @@ def dataset_view(request, dataset_id):
     # Figure out which users and groups could be given access to this Dataset.
     # If the Dataset is uploaded, it's anyone who doesn't already have access;
     # if it was generated, it's anyone who had access to the generating run.
-    user_pks_already_allowed = dataset.users_allowed.values_list("pk", flat=True)
-    group_pks_already_allowed = dataset.groups_allowed.values_list("pk", flat=True)
+    addable_users, addable_groups = dataset.other_users_groups()
 
-    all_potential_users = (User.objects.all() if dataset.file_source is None
-                           else dataset.file_source.top_level_run.users_allowed.all())
-    addable_users = all_potential_users.exclude(
-        pk__in=itertools.chain([dataset.user.pk], user_pks_already_allowed)
-    )
-
-    all_potential_groups = (Group.objects.all() if dataset.file_source is None
-                            else dataset.file_source.top_level_run.groups_allowed.all())
-    addable_groups = all_potential_groups.exclude(pk__in=group_pks_already_allowed)
+    if dataset.file_source is not None:
+        generating_run = dataset.file_source.top_level_run
+        addable_users.exclude(pk=generating_run.user)
+        addable_users.exclude(pk__in=generating_run.users_allowed.values_list("pk", flat=True))
+        addable_groups.exclude(pk__in=generating_run.groups_allowed.values_list("pk", flat=True))
 
     if request.method == "POST":
         # We are going to try and update this Dataset.

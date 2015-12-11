@@ -7,23 +7,22 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
-from django.contrib.auth.models import User, Group
-
-from rest_framework.renderers import JSONRenderer
 
 from datetime import datetime
-import json
+import logging
 
 import metadata.models
-from metadata.models import CompoundDatatype, AccessControl
+from metadata.models import CompoundDatatype
 from method.models import CodeResource, CodeResourceDependency, Method, \
     MethodFamily, CodeResourceRevision
 from method.forms import CodeResourceDependencyForm, \
     CodeResourcePrototypeForm, CodeResourceRevisionForm, MethodFamilyForm, \
-    MethodForm, MethodReviseForm, TransformationXputForm, XputStructureForm
+    MethodForm, MethodReviseForm, TransformationXputForm, XputStructureForm, \
+    CodeResourceDetailsForm, CodeResourceRevisionDetailsForm
 from portal.views import developer_check, admin_check
-from method.serializers import MethodFamilySerializer, MethodSerializer, \
-    CodeResourceSerializer, CodeResourceRevisionSerializer
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 @login_required
@@ -60,55 +59,47 @@ def resource_revisions(request, id):
         # Redirect back to the resources page.
         raise Http404("ID {} cannot be accessed".format(id))
 
+    addable_users, addable_groups = coderesource.other_users_groups()
+
     if request.method == 'POST':
-        # Use forms here, just as in resource_add.  Again note that entries of dep_forms may be None.
-        revision_form = CodeResourceRevisionForm(request.POST, request.FILES)
-        dep_forms = _make_dep_forms(request.POST.dict(), request.user)
-        t = loader.get_template('method/resource_revision_add.html')
+        # We are attempting to update the CodeResource's metadata/permissions.
+        resource_form = CodeResourceDetailsForm(
+            request.POST,
+            addable_users=addable_users,
+            addable_groups=addable_groups,
+            instance=coderesource
+        )
 
-        all_good = True
-        if not revision_form.is_valid():
-            all_good = False
-        for dep_form in [x for x in dep_forms if x is not None]:
-            if not dep_form.is_valid():
-                all_good = False
+        if resource_form.is_valid():
+            try:
+                coderesource.name = resource_form.cleaned_data["name"]
+                coderesource.description = resource_form.cleaned_data["description"]
+                coderesource.clean()
+                coderesource.save()
+                coderesource.grant_from_json(resource_form.cleaned_data["permissions"])
 
-        if not all_good:
-            c = RequestContext(request,
-                               {'revision_form': revision_form,
-                                'parent_revision': None,
-                                'coderesource': coderesource,
-                                'dep_forms': dep_forms})
-            return HttpResponse(t.render(c))
+                # Success -- go back to the resources page.
+                return HttpResponseRedirect('/resources')
+            except (AttributeError, ValidationError, ValueError) as e:
+                LOGGER.exception(e.message)
+                resource_form.add_error(None, e)
 
-
-        try:
-            _make_crv(request.FILES('content_file', None),
-                      request.user,
-                      revision_form,
-                      dep_forms,
-                      code_resource=coderesource)
-        except ValidationError:
-            # The forms have all been updated with the appropriate errors.
-            c = RequestContext(request,
-                               {'revision_form': revision_form,
-                                'parent_revision': None,
-                                'coderesource': coderesource,
-                                'dep_forms': dep_forms})
-            return HttpResponse(t.render(c)) # CodeResourceRevision object required for next steps
-
-        # Success; return to the resources page.
-        return HttpResponseRedirect('/resources')
+    else:
+        resource_form = CodeResourceDetailsForm(
+            addable_users=addable_users,
+            addable_groups=addable_groups,
+            initial={"name": coderesource.name, "description": coderesource.description}
+        )
 
     # Cast request.user to class KiveUser & grab data
     curr_user = metadata.models.KiveUser.kiveify(request.user)
     revisions = coderesource.revisions.filter(curr_user.access_query()).\
         distinct().order_by('-revision_number')
     if len(revisions) == 0:
+        # Go to the resource_revision_add page to create a first revision.
         t = loader.get_template('method/resource_revision_add.html')
-        creating_user = request.user
         crv_form = CodeResourceRevisionForm()
-        dep_forms = [CodeResourceDependencyForm(user=creating_user, auto_id='id_%s_0')]
+        dep_forms = [CodeResourceDependencyForm(user=request.user, auto_id='id_%s_0')]
 
         c = RequestContext(request,
                            {'revision_form': crv_form,
@@ -123,8 +114,10 @@ def resource_revisions(request, id):
         request,
         {
             'coderesource': coderesource,
+            "resource_form": resource_form,
             'revisions': revisions,
-            'is_user_admin': admin_check(request.user)
+            'is_admin': admin_check(request.user),
+            "is_owner": request.user == coderesource.user
         }
     )
     return HttpResponse(t.render(c))
@@ -434,8 +427,53 @@ def resource_revision_view(request, id):
     if four_oh_four:
         raise Http404("ID {} is not accessible".format(id))
 
+    addable_users, addable_groups = revision.other_users_groups()
+    for dep in revision.dependencies.all():
+        addable_users, addable_groups = dep.requirement.intersect_permissions(addable_users, addable_groups)
+
+    if request.method == 'POST':
+        # We are attempting to update the CodeResourceRevision's metadata/permissions.
+        revision_form = CodeResourceRevisionDetailsForm(
+            request.POST,
+            addable_users=addable_users,
+            addable_groups=addable_groups,
+            instance=revision
+        )
+
+        if revision_form.is_valid():
+            try:
+                revision.revision_name = revision_form.cleaned_data["revision_name"]
+                revision.revision_desc = revision_form.cleaned_data["revision_desc"]
+                revision.save()
+                revision.grant_from_json(revision_form.cleaned_data["permissions"])
+                revision.clean()
+
+                # Success -- go back to the CodeResource page.
+                return HttpResponseRedirect('/resource_revisions/{}'.format(revision.coderesource.pk))
+            except (AttributeError, ValidationError, ValueError) as e:
+                LOGGER.exception(e.message)
+                revision_form.add_error(None, e)
+
+    else:
+        revision_form = CodeResourceRevisionDetailsForm(
+            addable_users=addable_users,
+            addable_groups=addable_groups,
+            initial={
+                "revision_name": revision.revision_name,
+                "revision_desc": revision.revision_desc
+            }
+        )
+
     t = loader.get_template("method/resource_revision_view.html")
-    c = RequestContext(request, {"revision": revision})
+    c = RequestContext(
+        request,
+        {
+            "revision": revision,
+            "revision_form": revision_form,
+            "is_owner": revision.user == request.user,
+            "is_admin": admin_check(request.user)
+        }
+    )
     return HttpResponse(t.render(c))
 
 

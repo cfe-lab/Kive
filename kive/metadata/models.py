@@ -559,6 +559,20 @@ class AccessControl(models.Model):
 
         return users_qs, groups_qs
 
+    def other_users_groups(self):
+        """
+        Returns users and groups that don't already have access.
+        """
+        user_pks_already_allowed = self.users_allowed.values_list("pk", flat=True)
+        group_pks_already_allowed = self.groups_allowed.values_list("pk", flat=True)
+
+        addable_users = User.objects.exclude(
+            pk__in=itertools.chain([self.user.pk], user_pks_already_allowed)
+        )
+        addable_groups = Group.objects.exclude(pk__in=group_pks_already_allowed)
+
+        return addable_users, addable_groups
+
 
 @python_2_unicode_compatible
 class Datatype(AccessControl):

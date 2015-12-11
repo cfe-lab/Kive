@@ -4,12 +4,23 @@
 {% extends "portal/base.html" %}
 
 {% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/method/highlight.pack.js"></script>
-    <script>hljs.initHighlightingOnLoad();</script>
+    <script>
+        hljs.initHighlightingOnLoad();
+
+        var is_owner = {{ is_owner|lower }},
+            is_admin = {{ is_admin|lower }};
+    </script>
+    <script src="/static/portal/edit_details.js"></script>
 {% endblock %}
 
 {% block stylesheets %}
     <link rel="stylesheet" href="/static/method/styles/default.css"/>
+{% endblock %}
+
+{% block widget_media %}
+{{ revision_form.media }}
 {% endblock %}
 
 {% block title %} {{ revision.coderesource }}, revision {{ revision }} {% endblock %}
@@ -19,6 +30,77 @@
 <a href="/resource_revisions/{{ revision.coderesource.id }}" rel="prev">Back to Code Resource</a>
 
 <h2>{{ revision.coderesource }}, revision {{ revision }}</h2>
+
+{% if not is_owner and is_admin %}
+    <div id="lock"><img src=""/></div>
+{% endif %}
+
+<h3>Details</h3>
+
+{% if is_owner or is_admin %}
+<form id="codeResourceRevisionDetails" name="codeResourceRevisionDetails" action="" method="post">{% csrf_token %}
+{% endif %}
+
+<table>
+<tr><td>Date created</td><td>{{ revision.revision_DateTime }}</td></tr>
+<tr><td>Creator</td><td>{{ revision.user }}</td></tr>
+
+<tr>
+    <td>Permissions:</td>
+    <td>
+    <h4>Users allowed</h4>
+    {% if revision.users_allowed.exists %}
+    <ul>
+        {% for user in revision.users_allowed.all %}
+        <li>{{ user }}</li>
+        {% endfor %}
+    </ul>
+    {% else %}
+        <em>None</em>
+    {% endif %}
+
+    <h4>Groups allowed</h4>
+    {% if revision.groups_allowed.exists %}
+    <ul>
+        {% for group in revision.groups_allowed.all %}
+        <li>{{ group }}</li>
+        {% endfor %}
+    </ul>
+    {% else %}
+        <em>None</em>
+    {% endif %}
+    </td>
+
+    {% if is_owner or is_admin %}
+    <td class="edit">{{ revision_form.permissions }}</td>
+    {% endif %}
+</tr>
+
+<tr>
+    <td>Revision name</td>
+    <td>
+        <span class="readonly">{{ revision.revision_name }}</span>
+        {% if is_owner or is_admin %}
+        <span class="edit">{{ revision_form.revision_name }}</span>
+        {% endif %}
+    </td>
+</tr>
+<tr>
+    <td>Revision description</td>
+    <td>
+        <span class="readonly">{{ revision.revision_desc }}</span>
+        {% if is_owner or is_admin %}
+        <span class="edit">{{ revision_form.revision_desc }}</span>
+        {% endif %}
+    </td>
+</tr>
+
+</table>
+
+{% if is_owner or is_admin %}
+<span class="edit"><input type="submit" name="reviseCodeResourceRevisionDetails" value="Revise details"/></span>
+</form>
+{% endif %}
 
 <pre><code>
 {{ revision.content_file.read }}
