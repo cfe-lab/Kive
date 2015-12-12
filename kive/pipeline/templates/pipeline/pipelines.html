@@ -12,16 +12,24 @@
     <script src="/static/pipeline/pipelines.js"></script>
 
     <script type="text/javascript">
-        $(function(){
-            pipelines.main({{ is_user_admin|lower }}, $("#pipelines"), {{ family.pk }},
-                           $("#active_filters"), $(".navigation_links"));
-        });
+    var is_owner = {{ is_owner|lower }},
+        is_admin = {{ is_admin|lower }};
+
+    $(function(){
+        pipelines.main(is_admin, $("#pipelines"), {{ family.pk }},
+                       $("#active_filters"), $(".navigation_links"));
+    });
     </script>
+    <script src="/static/portal/edit_details.js"></script>
 {% endblock %}
 
 {% block stylesheets %}
     <link rel="stylesheet" href="/static/portal/permissions.css"/>
     <link rel="stylesheet" href="/static/portal/search.css"/>
+{% endblock %}
+
+{% block widget_media %}
+{{ family_form.media }}
 {% endblock %}
 
 {% block content %}
@@ -30,9 +38,80 @@
 
 <h2>Pipeline Family: {{ family.name }}</h2>
 
-{% if family.description %}
-<p>{{ family.description }}</p>
+{% if not is_owner and is_admin %}
+    <div id="lock"><img src=""/></div>
 {% endif %}
+
+<h3>Details</h3>
+
+{% if is_owner or is_admin %}
+<form id="pipelineFamilyDetails" name="pipelineFamilyDetails" action="" method="post">{% csrf_token %}
+{% endif %}
+
+<table>
+<tr>
+    <td>Creator:</td>
+    <td>{{ family.user }}</td>
+</tr>
+
+<tr>
+    <td>Permissions:</td>
+    <td>
+    <h4>Users allowed</h4>
+    {% if family.users_allowed.exists %}
+    <ul>
+        {% for user in family.users_allowed.all %}
+        <li>{{ user }}</li>
+        {% endfor %}
+    </ul>
+    {% else %}
+        <em>None</em>
+    {% endif %}
+
+    <h4>Groups allowed</h4>
+    {% if family.groups_allowed.exists %}
+    <ul>
+        {% for group in family.groups_allowed.all %}
+        <li>{{ group }}</li>
+        {% endfor %}
+    </ul>
+    {% else %}
+        <em>None</em>
+    {% endif %}
+    </td>
+
+    {% if is_owner or is_admin %}
+    <td class="edit">{{ family_form.permissions }}</td>
+    {% endif %}
+</tr>
+
+<tr>
+    <td>Name:</td>
+    <td>
+        <span class="readonly">{{ family.name }}</span>
+        {% if is_owner or is_admin %}
+        <span class="edit">{{ family_form.name }}</span>
+        {% endif %}
+    </td>
+</tr>
+<tr>
+    <td>Description:</td>
+    <td>
+        <span class="readonly">{{ family.description }}</span>
+        {% if is_owner or is_admin %}
+        <span class="edit">{{ family_form.description }}</span>
+        {% endif %}
+    </td>
+</tr>
+
+</table>
+
+{% if is_owner or is_admin %}
+<span class="edit"><input type="submit" name="revisePipelineFamilyDetails" value="Revise details"/></span>
+</form>
+{% endif %}
+
+{{ family_form.errors }}
 
 <p style="font-style: italic; color: gray">
 Click on 'Revise' link to revise the corresponding pipeline, or click 'Add new pipeline' to add a pipeline without specifying a parent revision.

@@ -34,9 +34,12 @@ class CodeResourceSerializer(AccessControlSerializer,
         )
 
     def get_absolute_url(self, obj):
+        """
+        The URL for the page that displays all revisions of this CodeResource.
+        """
         if not obj:
             return None
-        return obj.get_absolute_url()
+        return '/resource_revisions/{}'.format(obj.pk)
 
 
 class CodeResourceDependencySerializer(serializers.ModelSerializer):
@@ -140,14 +143,21 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
                 user=request.user)
 
     def get_absolute_url(self, obj):
+        """
+        A page that allows user to add a revision of the CodeResource
+        with this CodeResourceRevision as its parent.
+        """
         if not obj:
             return None
-        return obj.get_absolute_url()
+        return '/resource_revision_add/{}'.format(obj.pk)
 
     def get_view_url(self, obj):
+        """
+        A page that displays this CodeResourceRevision.
+        """
         if not obj:
             return None
-        return obj.get_view_url()
+        return '/resource_revision_view/{}'.format(obj.pk)
 
     # This is a nested serializer so we need to customize the create method.
     def create(self, validated_data):

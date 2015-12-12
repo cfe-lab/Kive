@@ -2,23 +2,23 @@
 pipeline views
 """
 
-from django.http import HttpResponse, Http404
+from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
 from django.contrib.auth.decorators import login_required, user_passes_test
-
-from rest_framework.renderers import JSONRenderer
+from django.core.exceptions import ValidationError
 
 import json
 import logging
 
 from method.models import MethodFamily
-from metadata.models import CompoundDatatype, AccessControl
+from metadata.models import CompoundDatatype
 from pipeline.models import Pipeline, PipelineFamily
 import metadata.forms
 from portal.views import developer_check, admin_check
-from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer
+from pipeline.serializers import PipelineSerializer
+from pipeline.forms import PipelineFamilyDetailsForm
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
 @login_required
@@ -55,21 +55,45 @@ def pipelines(request, id):
         # Redirect back to the resources page.
         raise Http404("ID {} cannot be accessed".format(id))
 
-    member_pipelines = AccessControl.filter_by_user(
-        request.user,
-        is_admin=False,
-        queryset=family.members.all())
+    addable_users, addable_groups = family.other_users_groups()
 
-    # pipelines_json = JSONRenderer().render(
-    #     PipelineSerializer(member_pipelines, many=True, context={"request": request}).data
-    # )
+    if request.method == 'POST':
+        # We are attempting to update the CodeResource's metadata/permissions.
+        pf_form = PipelineFamilyDetailsForm(
+            request.POST,
+            addable_users=addable_users,
+            addable_groups=addable_groups,
+            instance=family
+        )
+
+        if pf_form.is_valid():
+            try:
+                family.name = pf_form.cleaned_data["name"]
+                family.description = pf_form.cleaned_data["description"]
+                family.save()
+                family.grant_from_json(pf_form.cleaned_data["permissions"])
+                family.clean()
+
+                # Success -- go back to the resources page.
+                return HttpResponseRedirect('/pipeline_families')
+            except (AttributeError, ValidationError, ValueError) as e:
+                LOGGER.exception(e.message)
+                pf_form.add_error(None, e)
+
+    else:
+        pf_form = PipelineFamilyDetailsForm(
+            addable_users=addable_users,
+            addable_groups=addable_groups,
+            initial={"name": family.name, "description": family.description}
+        )
 
     t = loader.get_template('pipeline/pipelines.html')
     c = RequestContext(request,
                        {
-                           'family': family,
-                           # "pipelines": pipelines_json,
-                           "is_user_admin": admin_check(request.user)
+                           "family": family,
+                           "family_form": pf_form,
+                           "is_admin": admin_check(request.user),
+                           "is_owner": request.user == family.user
                        })
     return HttpResponse(t.render(c))
 

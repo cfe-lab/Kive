@@ -88,12 +88,6 @@ class CodeResource(metadata.models.AccessControl):
             return None
         return max([revision.revision_DateTime for revision in self.revisions.all()])
 
-    def get_absolute_url(self):
-        """
-        A page that displays all revisions of this CodeResource
-        """
-        return '/resource_revisions/{}'.format(self.id)
-
     def __str__(self):
         return self.name
 
@@ -417,19 +411,6 @@ class CodeResourceRevision(metadata.models.AccessControl):
                 dep_fn = dep.requirement.coderesource.filename
 
             dep.requirement.install_h(path_for_deps, dep_fn)
-
-    def get_absolute_url(self):
-        """
-        A page that allows user to add a revision of the CodeResource
-        with this CRRevision as its parent.
-        """
-        return '/resource_revision_add/%i' % self.id
-
-    def get_view_url(self):
-        """
-        A page that displays the source of this CodeResourceRevision
-        """
-        return '/resource_revision_view/%i' % self.id
 
     @transaction.atomic
     def remove(self):

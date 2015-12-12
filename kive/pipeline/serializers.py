@@ -467,7 +467,6 @@ class PipelineSerializer(AccessControlSerializer,
 class PipelineFamilySerializer(AccessControlSerializer,
                                serializers.ModelSerializer):
     removal_plan = serializers.HyperlinkedIdentityField(view_name='pipelinefamily-removal-plan')
-    absolute_url = serializers.SerializerMethodField()
 
     # We use a SerializerMethodField here so we can pass in the necessary context to filter
     # by the requesting user.

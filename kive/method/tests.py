@@ -2530,7 +2530,7 @@ class CodeResourceApiTests(BaseTestCases.ApiTestCase):
 
         self.assertEquals(detail["id"], self.noop_cr.pk)
         self.assertEquals(detail["num_revisions"], self.noop_cr.num_revisions)
-        self.assertEquals(detail["absolute_url"], self.noop_cr.get_absolute_url())
+        self.assertEquals(detail["absolute_url"], "/resource_revisions/{}".format(self.noop_cr.pk))
 
     def test_removal_plan(self):
         cr_removal_path = reverse("coderesource-removal-plan", kwargs={'pk': self.noop_cr.pk})
@@ -2781,7 +2781,7 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         detail = response.data
 
         self.assertEquals(detail["id"], self.noop_crr.pk)
-        self.assertEquals(detail["absolute_url"], self.noop_crr.get_absolute_url())
+        self.assertEquals(detail["absolute_url"], "/resource_revision_add/{}".format(self.noop_crr.pk))
         self.assertEquals(detail["revision_name"], self.noop_crr.revision_name)
 
     def test_removal_plan(self):

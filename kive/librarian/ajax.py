@@ -10,7 +10,7 @@ from rest_framework.decorators import detail_route
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
-from archive.views import _build_download_response
+from librarian.views import _build_download_response
 from librarian.serializers import DatasetSerializer
 from librarian.models import Dataset
 
