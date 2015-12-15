@@ -10,6 +10,7 @@ from archive.models import Run, MethodOutput, RunInput
 from transformation.models import TransformationInput
 from pipeline.models import Pipeline
 from metadata.models import who_cannot_access
+from datachecking.models import BadData
 
 from kive.serializers import AccessControlSerializer
 
@@ -81,6 +82,9 @@ class _RunDataset(object):
 
     def set_redacted(self):
         self.size = self.date = 'redacted'
+
+    def set_missing_output(self):
+        self.size = self.date = 'not created'
 
 
 class RunOutputsSerializer(serializers.ModelSerializer):
@@ -205,6 +209,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     outputs.append(output)
                 except ValueError:
                     pass
+
             if runstep.execrecord is not None:
                 for execrecordout in runstep.execrecord.execrecordouts_in_order:
                     transform_output = execrecordout.generic_output.definite
@@ -214,10 +219,19 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                         display=execrecordout.generic_output,
                         is_ok=execrecordout.is_OK(),
                         type='dataset')
+
+                    # Look for any bad ContentCheckLogs that indicate missing output.
+                    missing_data = BadData.objects.filter(
+                        contentchecklog__in=execrecordout.dataset.content_checks.values_list("pk", flat=True),
+                        missing_output=True
+                    )
+
                     if execrecordout.dataset.has_data():
                         output.set_dataset(execrecordout.dataset, request)
                     elif execrecordout.dataset.is_redacted():
                         output.set_redacted()
+                    elif missing_data.exists():
+                        output.set_missing_output()
 
                     outputs.append(output)
         for output in outputs:

@@ -562,15 +562,17 @@ def create_method_forms(request_post, user, family=None):
     query_dict = request_post.dict()
     if 'name' in query_dict:
         assert family is None
-        family_form = MethodFamilyForm(request_post)
+        family = MethodFamily(user=user)
+        family_form = MethodFamilyForm(request_post, instance=family)
     else:
         assert family is not None
         family_form = MethodFamilyForm(
             {
                 "name": family.name,
-                "description": family.description,
-                "user": family.user
-            })
+                "description": family.description
+            },
+            instance=family
+        )
     family_form.is_valid()
 
     # Populate main form with submitted values.

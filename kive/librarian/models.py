@@ -1001,7 +1001,7 @@ class Dataset(metadata.models.AccessControl):
                     if is_skipped:
                         skipped_count += 1
                     else:
-                        dataset.delete()
+                        dataset.dataset_file.delete(save=True)
                         total_size -= filesize
 
             remaining = 'Leaving {} over {} files.'.format(
