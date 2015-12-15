@@ -141,7 +141,7 @@ Typically Postgres caps the number of simultaneous database connections
     max_connections = 200
   
   to this file (this affords you some breathing room to access the database
-  outside of Kive as well).
+  outside of Kive as well).  Then restart the Postgres server.
 
 
 Installing psycopg2

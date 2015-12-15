@@ -983,9 +983,10 @@ def method_revise(request, id):
         parent_groups_allowed = [x.pk for x in parent_revision.groups_allowed.all()]
         method_revise_form = MethodReviseForm(
             initial={
-                'revision_desc': parent_method.revision_desc,
-                'revisions': parent_revision.pk,
-                'reusable': parent_method.reusable,
+                "revision_desc": parent_method.revision_desc,
+                "revisions": parent_revision.pk,
+                "reusable": parent_method.reusable,
+                "threads": parent_method.threads,
                 "permissions": [parent_users_allowed, parent_groups_allowed]
             })
         xput_forms = []
