@@ -130,6 +130,20 @@ likely `/var/lib/postgresql/9.3/main`. You can figure out where the data
 directory is by typing `show data_directory;` into the postgres prompt.
 Don't worry about creating a database yet, that will get done later on.
 
+Typically Postgres caps the number of simultaneous database connections
+  at 100.  This can be a problem if you intend to run more than 100 worker
+  processes (i.e. processes that will handle running your pipelines).  To
+  change the cap, you should change the `max_connections` setting in the
+  Postgres config file (usually `postgresql.conf` in Postgres' data 
+  directory).  For example, if you are running 191 workers, then you might
+  add the line
+  
+    max_connections = 200
+  
+  to this file (this affords you some breathing room to access the database
+  outside of Kive as well).
+
+
 Installing psycopg2
 ------------------
 Psycopg is a PostgreSQL adaptor for Python.  It is mandatory in order for Django to use a PostgreSQL database.  Instructions for downloading and installing it may be found at [initd.org](http://initd.org/psycopg/).
