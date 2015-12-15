@@ -68,14 +68,6 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
         if "structure" in validated_data:
             cdt = validated_data["structure"].get("compounddatatype", None)
 
-        # users_allowed = None
-        # groups_allowed = None
-        # if "users_allowed" in validated_data:
-        #     users_allowed = validated_data["users_allowed"]
-        #
-        # if "groups_allowed" in validated_data:
-        #     groups_allowed = validated_data["groups_allowed"]
-
         dataset = Dataset.create_dataset(
             file_path=None,
             user=self.context["request"].user,

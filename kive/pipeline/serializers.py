@@ -245,9 +245,6 @@ class PipelineSerializer(AccessControlSerializer,
     removal_plan = serializers.HyperlinkedIdentityField(view_name='pipeline-removal-plan')
     step_updates = serializers.HyperlinkedIdentityField(view_name='pipeline-step-updates')
 
-    absolute_url = serializers.SerializerMethodField()
-    view_url = serializers.SerializerMethodField()
-
     # This is as per CodeResourceRevisionSerializer.
     revision_number = serializers.IntegerField(
         read_only=True,
@@ -462,16 +459,6 @@ class PipelineSerializer(AccessControlSerializer,
 
         return pipeline
 
-    def get_absolute_url(self, obj):
-        if not obj:
-            return None
-        return reverse("pipeline_revise", kwargs={"id": obj.pk})
-
-    def get_view_url(self, obj):
-        if not obj:
-            return None
-        return reverse("pipeline_view", kwargs={"id": obj.pk})
-
 
 class PipelineFamilySerializer(AccessControlSerializer,
                                serializers.ModelSerializer):
@@ -481,8 +468,6 @@ class PipelineFamilySerializer(AccessControlSerializer,
     # by the requesting user.
     members = serializers.SerializerMethodField()
     members_url = serializers.HyperlinkedIdentityField(view_name='pipelinefamily-pipelines')
-
-    absolute_url = serializers.SerializerMethodField()
 
     class Meta:
         model = PipelineFamily
@@ -502,11 +487,6 @@ class PipelineFamilySerializer(AccessControlSerializer,
         read_only_fields = (
             "members"
         )
-
-    def get_absolute_url(self, obj):
-        if not obj:
-            return None
-        return '/pipelines/{}'.format(obj.pk)
 
     def get_members(self, obj):
         """

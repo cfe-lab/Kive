@@ -13,7 +13,6 @@ class CodeResourceSerializer(AccessControlSerializer,
                              serializers.ModelSerializer):
     removal_plan = serializers.HyperlinkedIdentityField(view_name='coderesource-removal-plan')
     revisions = serializers.HyperlinkedIdentityField(view_name="coderesource-revisions")
-    absolute_url = serializers.SerializerMethodField()
 
     class Meta:
         model = CodeResource
@@ -32,14 +31,6 @@ class CodeResourceSerializer(AccessControlSerializer,
             'num_revisions',
             'absolute_url'
         )
-
-    def get_absolute_url(self, obj):
-        """
-        The URL for the page that displays all revisions of this CodeResource.
-        """
-        if not obj:
-            return None
-        return '/resource_revisions/{}'.format(obj.pk)
 
 
 class CodeResourceDependencySerializer(serializers.ModelSerializer):
@@ -84,8 +75,6 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
 
     download_url = serializers.HyperlinkedIdentityField(view_name='coderesourcerevision-download')
     removal_plan = serializers.HyperlinkedIdentityField(view_name='coderesourcerevision-removal-plan')
-    absolute_url = serializers.SerializerMethodField()
-    view_url = serializers.SerializerMethodField()
 
     # As per
     # http://www.django-rest-framework.org/api-guide/serializers/#specifying-read-only-fields
@@ -142,23 +131,6 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
             staged_file_field.queryset = portal.models.StagedFile.objects.filter(
                 user=request.user)
 
-    def get_absolute_url(self, obj):
-        """
-        A page that allows user to add a revision of the CodeResource
-        with this CodeResourceRevision as its parent.
-        """
-        if not obj:
-            return None
-        return '/resource_revision_add/{}'.format(obj.pk)
-
-    def get_view_url(self, obj):
-        """
-        A page that displays this CodeResourceRevision.
-        """
-        if not obj:
-            return None
-        return '/resource_revision_view/{}'.format(obj.pk)
-
     # This is a nested serializer so we need to customize the create method.
     def create(self, validated_data):
         """
@@ -193,8 +165,6 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
 
 class MethodFamilySerializer(AccessControlSerializer,
                              serializers.ModelSerializer):
-    num_revisions = serializers.SerializerMethodField()
-    absolute_url = serializers.SerializerMethodField()
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='methodfamily-removal-plan')
     methods = serializers.HyperlinkedIdentityField(view_name="methodfamily-methods")
@@ -213,19 +183,6 @@ class MethodFamilySerializer(AccessControlSerializer,
             "removal_plan",
             "methods"
         )
-
-    def get_num_revisions(self, obj):
-        if not obj:
-            return None
-        return obj.num_revisions
-
-    def get_absolute_url(self, obj):
-        """
-        Gives the URL that lists all Methods under this family.
-        """
-        if not obj:
-            return None
-        return "/methods/{}".format(obj.pk)
 
 
 # This is analogous to CRRevisionNumberGetter.
@@ -254,8 +211,6 @@ class MethodSerializer(AccessControlSerializer,
     inputs = TransformationInputSerializer(many=True, allow_null=True, required=False)
     outputs = TransformationOutputSerializer(many=True, allow_null=True, required=False)
 
-    absolute_url = serializers.SerializerMethodField()
-    view_url = serializers.SerializerMethodField()
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='method-removal-plan')
 
@@ -306,16 +261,6 @@ class MethodSerializer(AccessControlSerializer,
     
             driver_field = self.fields["driver"]
             driver_field.queryset = CodeResourceRevision.filter_by_user(curr_user)
-
-    def get_absolute_url(self, obj):
-        if not obj:
-            return None
-        return "/method_revise/{}".format(obj.pk)
-
-    def get_view_url(self, obj):
-        if not obj:
-            return None
-        return "/method_view/{}".format(obj.pk)
 
     # Due to nesting of inputs and outputs, we need to customize the create method.
     def create(self, validated_data):

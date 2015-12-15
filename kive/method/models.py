@@ -15,6 +15,7 @@ from django.core.validators import RegexValidator, MinValueValidator
 from django.core.files import File
 from django.utils.encoding import python_2_unicode_compatible
 from django.conf import settings
+from django.core.urlresolvers import reverse
 
 import metadata.models
 import transformation.models
@@ -58,6 +59,13 @@ class CodeResource(metadata.models.AccessControl):
 
     class Meta:
         ordering = ('name',)
+
+    @property
+    def absolute_url(self):
+        """
+        The URL for the page that displays all revisions of this CodeResource.
+        """
+        return reverse("resource_revisions", kwargs={"id": self.pk})
 
     @property
     def num_revisions(self):
@@ -175,6 +183,21 @@ class CodeResourceRevision(metadata.models.AccessControl):
     @property
     def display_name(self):
         return self.revision_name or self.coderesource.name
+
+    @property
+    def absolute_url(self):
+        """
+        A page that allows user to add a revision of the CodeResource
+        with this CodeResourceRevision as its parent.
+        """
+        return reverse("resource_revision_add", kwargs={"id": self.pk})
+
+    @property
+    def view_url(self):
+        """
+        A page that displays this CodeResourceRevision.
+        """
+        return reverse("resource_revision_view", kwargs={"id": self.pk})
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -579,10 +602,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
     # Implicitly defined:
     # - execrecords: from ExecRecord
 
-    @property
-    def display_name(self):
-        return '{}: {}'.format(self.revision_number, self.revision_name)
-
     class Meta:
         unique_together = (("family", "revision_number"))
         ordering = ["family__name", "-revision_number"]
@@ -607,6 +626,18 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             self.revision_number = self.family.next_revision()
 
         super(Method, self).save(*args, **kwargs)
+
+    @property
+    def display_name(self):
+        return '{}: {}'.format(self.revision_number, self.revision_name)
+
+    @property
+    def absolute_url(self):
+        return reverse("method_revise", kwargs={"id": self.pk})
+
+    @property
+    def view_url(self):
+        return reverse("method_view", kwargs={"id": self.pk})
 
     @property
     def is_method(self):
@@ -1022,6 +1053,13 @@ class MethodFamily(transformation.models.TransformationFamily):
     def num_revisions(self):
         """Number of revisions within this family."""
         return self.members.count()
+
+    @property
+    def absolute_url(self):
+        """
+        Gives the URL that lists all Methods under this family.
+        """
+        return reverse("methods", kwargs={"id": self.pk})
 
     def max_revision(self):
         """

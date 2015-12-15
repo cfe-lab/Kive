@@ -285,7 +285,8 @@ class Dataset(metadata.models.AccessControl):
                 }
             )
 
-    def get_absolute_url(self):
+    @property
+    def absolute_url(self):
         """
         :return str: URL to access the dataset_file
         """

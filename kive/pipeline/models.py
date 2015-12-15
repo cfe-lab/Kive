@@ -12,6 +12,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator, validate_slug
 from django.db import transaction
 from django.utils.encoding import python_2_unicode_compatible
+from django.core.urlresolvers import reverse
 
 import csv
 import exceptions
@@ -43,6 +44,10 @@ class PipelineFamily(transformation.models.TransformationFamily):
     def size(self):
         """Returns size of this Pipeline's family"""
         return self.members.count()
+
+    @property
+    def absolute_url(self):
+        return reverse("pipelines", kwargs={"id": self.pk})
 
     @property
     def num_revisions(self):
@@ -169,6 +174,14 @@ class Pipeline(transformation.models.Transformation):
     @property
     def display_name(self):
         return '{}: {}'.format(self.revision_number, self.revision_name)
+
+    @property
+    def absolute_url(self):
+        return reverse("pipeline_revise", kwargs={"id": self.pk})
+
+    @property
+    def view_url(self):
+        return reverse("pipeline_view", kwargs={"id": self.pk})
 
     def save(self, *args, **kwargs):
         if not self.revision_number:

@@ -13,6 +13,7 @@ from django.utils.encoding import python_2_unicode_compatible
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
 from django.conf import settings
+from django.core.urlresolvers import reverse
 
 import re
 import csv
@@ -618,8 +619,9 @@ class Datatype(AccessControl):
     def __str__(self):
         return self.name
 
-    def get_absolute_url(self):
-        return '/datatypes/{}'.format(self.id)
+    @property
+    def absolute_url(self):
+        return reverse("datatype_detail", kwargs={"id": self.pk})
 
     @staticmethod
     def parse_boolean(string):
@@ -1676,6 +1678,10 @@ class CompoundDatatype(AccessControl):
     @property
     def short_name(self):
         return self._format(limit=4)
+
+    @property
+    def absolute_url(self):
+        return reverse("compound_datatype_detail", kwargs={"id": self.pk})
 
     @classmethod
     def choices(cls, user):
