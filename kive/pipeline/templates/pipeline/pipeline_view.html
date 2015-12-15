@@ -5,11 +5,29 @@
 
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/pipeline/jsBezier-0.6.js"></script>
+
+    <script src="/static/pipeline/drydock_objects.js"></script>
+    <script src="/static/pipeline/drydock.js"></script>
+
+    <script src="/static/pipeline/pipeline_add.js"></script>
+    <script src="/static/pipeline/pipeline_load.js"></script>
+
+    <script src="/static/pipeline/pipeline_view.js"></script>
     <script>
         var is_owner = {{ is_owner|lower }},
             is_admin = {{ is_admin|lower }};
+        $(function(){
+            setupPipelineView(
+                {% autoescape off %}
+                {{ pipeline_dict }}
+                {% endautoescape %}
+            );
+        });
     </script>
     <script src="/static/portal/edit_details.js"></script>
+
 {% endblock %}
 
 {% block stylesheets %}
@@ -100,6 +118,10 @@
 
 {{ pipeline_form.errors }}
 
-FIXME put a canvas here
+    <h3>Diagram</h3>
+
+    <div>
+        <canvas id="pipeline_canvas" data-editable="false">HTML5 Canvas not supported by this browser.</canvas>
+    </div>
 
 {% endblock %}

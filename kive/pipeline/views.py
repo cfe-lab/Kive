@@ -308,6 +308,10 @@ def pipeline_view(request, id):
         {
             "pipeline": pipeline,
             "pipeline_form": pipeline_form,
+            "pipeline_dict": json.dumps(PipelineSerializer(
+                pipeline,
+                context={"request": request}
+            ).data),
             "is_owner": pipeline.user == request.user,
             "is_admin": admin_check(request.user)
         }
