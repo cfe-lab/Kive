@@ -5,7 +5,7 @@ Forms for creating Pipeline objects.
 from django import forms
 from django.contrib.auth.models import User, Group
 
-from pipeline.models import PipelineStep, PipelineFamily
+from pipeline.models import PipelineStep, PipelineFamily, Pipeline
 from metadata.forms import PermissionsField
 
 
@@ -29,7 +29,7 @@ class PipelineStepInputCableForm (forms.ModelForm):
 class PipelineFamilyDetailsForm(forms.ModelForm):
     permissions = PermissionsField(
         label="Users and groups allowed",
-        help_text="Which users and groups are allowed access to this CodeResource?",
+        help_text="Which users and groups are allowed access to this PipelineFamily?",
         user_queryset=User.objects.all(),
         group_queryset=Group.objects.all(),
         required=False
@@ -43,4 +43,24 @@ class PipelineFamilyDetailsForm(forms.ModelForm):
         addable_users = addable_users if addable_users is not None else User.objects.all()
         addable_groups = addable_groups if addable_groups is not None else Group.objects.all()
         super(PipelineFamilyDetailsForm, self).__init__(data, *args, **kwargs)
+        self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)
+
+
+class PipelineDetailsForm(forms.ModelForm):
+    permissions = PermissionsField(
+        label="Users and groups allowed",
+        help_text="Which users and groups are allowed access to this Pipeline?",
+        user_queryset=User.objects.all(),
+        group_queryset=Group.objects.all(),
+        required=False
+    )
+
+    class Meta:
+        model = Pipeline
+        fields = ("revision_name", "revision_desc", "permissions")
+
+    def __init__(self, data=None, addable_users=None, addable_groups=None, *args, **kwargs):
+        addable_users = addable_users if addable_users is not None else User.objects.all()
+        addable_groups = addable_groups if addable_groups is not None else Group.objects.all()
+        super(PipelineDetailsForm, self).__init__(data, *args, **kwargs)
         self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)

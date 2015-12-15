@@ -74,6 +74,7 @@ urlpatterns = patterns(
     url(r'^pipeline_new$', 'pipeline.views.pipeline_new', name='pipeline_new'),
     url(r'^pipelines/(?P<id>\d+)/$', 'pipeline.views.pipelines', name='pipelines'),
     url(r'^pipeline_add/(?P<id>\d+)/$', 'pipeline.views.pipeline_add', name='pipeline_add'),
+    url(r'^pipeline_view/(?P<id>\d+)/$', 'pipeline.views.pipeline_view', name='pipeline_view'),
     url(r'^pipeline_revise/(?P<id>\d+)$', 'pipeline.views.pipeline_revise', name='pipeline_revise'),
 
     url(r'^usr.html$', 'portal.views.usr', name='usr'),

@@ -18,8 +18,9 @@ import exceptions
 import os
 import logging
 import sys
-import transformation.models
+import itertools
 
+import transformation.models
 import metadata.models
 import librarian.models
 from constants import maxlengths
@@ -428,6 +429,31 @@ class Pipeline(transformation.models.Transformation):
                                 updates.append(update)
                             update.dependencies.append(next_dependency)
         return updates
+
+    def get_all_atomic_steps_cables(self):
+        """
+        Returns an iterable of all atomic PipelineSteps, PSICs, and POCs that belong to this Pipeline.
+        """
+        # These will be lists of querysets/iterables that we will use itertools.chain to join.
+        atomic_step_iterables = []
+        psic_iterables = []
+        poc_iterables = []
+
+        atomic_step_pks = []
+        for ps in self.steps.all():
+            psic_iterables.append(ps.cables_in.all())
+            if ps.is_subpipeline:
+                sub_steps, sub_psics, sub_pocs = ps.child_run.get_all_atomic_steps_cables()
+                atomic_step_iterables.append(sub_steps)
+                psic_iterables.append(sub_psics)
+                poc_iterables.append(sub_pocs)
+            else:
+                atomic_step_pks.append(ps.pk)
+        atomic_step_iterables.append(PipelineStep.objects.filter(pk__in=atomic_step_pks))
+        poc_iterables.append(self.outcables.all())
+
+        return (itertools.chain(*atomic_step_iterables), itertools.chain(*psic_iterables),
+                itertools.chain(*poc_iterables))
 
 
 @python_2_unicode_compatible

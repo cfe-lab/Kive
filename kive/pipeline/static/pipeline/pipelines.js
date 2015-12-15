@@ -3,7 +3,7 @@ var pipelines = (function() {
     var my = {};
 
     function pipeline_link($td, pipeline) {
-        var $a = $("<a/>").attr("href", pipeline.absolute_url);
+        var $a = $("<a/>").attr("href", pipeline.view_url);
         if (pipeline.revision_name === '') {
             $a.text(pipeline.revision_number + ': ').append('<span class="placeholder">anonymous</span>');
         }
@@ -11,6 +11,11 @@ var pipelines = (function() {
             $a.text(pipeline.display_name);
         }
         // revision_number revision_name
+        $td.append($a);
+    }
+
+    function pipeline_revise_link($td, pipeline) {
+        var $a = $("<a/>").attr("href", pipeline.absolute_url).text("Revise");
         $td.append($a);
     }
     
@@ -91,6 +96,7 @@ var pipelines = (function() {
         $pf_filter.hide();
 
         this.registerColumn("Name", pipeline_link);
+        this.registerColumn("", pipeline_revise_link);
         this.registerColumn("Description", revision_desc);
         this.registerColumn(
             "Published version",

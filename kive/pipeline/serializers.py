@@ -1,3 +1,5 @@
+from django.core.urlresolvers import reverse
+
 from rest_framework import serializers
 
 from kive.serializers import AccessControlSerializer
@@ -244,6 +246,7 @@ class PipelineSerializer(AccessControlSerializer,
     step_updates = serializers.HyperlinkedIdentityField(view_name='pipeline-step-updates')
 
     absolute_url = serializers.SerializerMethodField()
+    view_url = serializers.SerializerMethodField()
 
     # This is as per CodeResourceRevisionSerializer.
     revision_number = serializers.IntegerField(
@@ -274,6 +277,7 @@ class PipelineSerializer(AccessControlSerializer,
             'removal_plan',
             'step_updates',
             "absolute_url",
+            "view_url",
         )
 
     def __init__(self, *args, **kwargs):
@@ -461,7 +465,12 @@ class PipelineSerializer(AccessControlSerializer,
     def get_absolute_url(self, obj):
         if not obj:
             return None
-        return "/pipeline_revise/{}".format(obj.pk)
+        return reverse("pipeline_revise", kwargs={"id": obj.pk})
+
+    def get_view_url(self, obj):
+        if not obj:
+            return None
+        return reverse("pipeline_view", kwargs={"id": obj.pk})
 
 
 class PipelineFamilySerializer(AccessControlSerializer,
@@ -477,18 +486,18 @@ class PipelineFamilySerializer(AccessControlSerializer,
 
     class Meta:
         model = PipelineFamily
-        fields = ('id',
-                  'url',
-                  'name',
+        fields = ("id",
+                  "url",
+                  "name",
                   "description",
                   "user",
                   "users_allowed",
                   "groups_allowed",
                   "absolute_url",
-                  'removal_plan',
+                  "removal_plan",
                   "num_revisions",
-                  'members',
-                  'members_url'
+                  "members",
+                  "members_url"
         )
         read_only_fields = (
             "members"

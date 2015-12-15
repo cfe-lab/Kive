@@ -16,7 +16,7 @@ from pipeline.models import Pipeline, PipelineFamily
 import metadata.forms
 from portal.views import developer_check, admin_check
 from pipeline.serializers import PipelineSerializer
-from pipeline.forms import PipelineFamilyDetailsForm
+from pipeline.forms import PipelineFamilyDetailsForm, PipelineDetailsForm
 
 LOGGER = logging.getLogger(__name__)
 
@@ -229,4 +229,87 @@ def pipeline_revise(request, id):
     return HttpResponse(t.render(c))
 
 
+@login_required
+@user_passes_test(developer_check)
+def pipeline_view(request, id):
+    """
+    View a Pipeline or edit its metadata/permissions.
+    """
+    four_oh_four = False
+    try:
+        pipeline = Pipeline.objects.get(pk=id)
+        if not pipeline.can_be_accessed(request.user):
+            four_oh_four = True
+    except Pipeline.DoesNotExist:
+        four_oh_four = True
 
+    if four_oh_four:
+        raise Http404("ID {} is not accessible".format(id))
+
+    addable_users, addable_groups = pipeline.other_users_groups()
+    addable_users, addable_groups = pipeline.family.intersect_permissions(addable_users, addable_groups)
+
+    if pipeline.revision_parent is not None:
+        addable_users, addable_groups = pipeline.revision_parent.intersect_permissions(addable_users, addable_groups)
+
+    atomic_steps, psics, pocs = pipeline.get_all_atomic_steps_cables()
+
+    for step in atomic_steps:
+        for step_input in step.transformation.inputs.all():
+            step_input_cdt = step_input.get_cdt()
+            if step_input_cdt is not None:
+                addable_users, addable_groups = step_input_cdt.intersect_permissions(addable_users, addable_groups)
+
+    for psic in psics:
+        cable_in_cdt = psic.source.get_cdt()
+        if cable_in_cdt is not None:
+            addable_users, addable_groups = cable_in_cdt.intersect_permissions(addable_users, addable_groups)
+
+    for poc in pocs:
+        if poc.output_cdt is not None:
+            addable_users, addable_groups = poc.output_cdt.intersect_permissions(addable_users, addable_groups)
+
+    if request.method == 'POST':
+        # We are attempting to update the Pipeline's metadata/permissions.
+        pipeline_form = PipelineDetailsForm(
+            request.POST,
+            addable_users=addable_users,
+            addable_groups=addable_groups,
+            instance=pipeline
+        )
+
+        if pipeline_form.is_valid():
+            try:
+                pipeline.revision_name = pipeline_form.cleaned_data["revision_name"]
+                pipeline.revision_desc = pipeline_form.cleaned_data["revision_desc"]
+                pipeline.save()
+                pipeline.grant_from_json(pipeline_form.cleaned_data["permissions"])
+                pipeline.clean()
+
+                # Success -- go back to the CodeResource page.
+                return HttpResponseRedirect('/pipelines/{}'.format(pipeline.family.pk))
+            except (AttributeError, ValidationError, ValueError) as e:
+                LOGGER.exception(e.message)
+                pipeline_form.add_error(None, e)
+
+    else:
+        pipeline_form = PipelineDetailsForm(
+            addable_users=addable_users,
+            addable_groups=addable_groups,
+            initial={
+                "revision_name": pipeline.revision_name,
+                "revision_desc": pipeline.revision_desc
+            }
+        )
+
+    t = loader.get_template("pipeline/pipeline_view.html")
+    c = RequestContext(
+        request,
+        {
+            "pipeline": pipeline,
+            "pipeline_form": pipeline_form,
+            "is_owner": pipeline.user == request.user,
+            "is_admin": admin_check(request.user)
+        }
+    )
+    return HttpResponse(t.render(c))
