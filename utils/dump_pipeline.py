@@ -1,4 +1,3 @@
-from argparse import ArgumentParser
 from collections import Counter
 import errno
 import json
@@ -8,6 +7,7 @@ import os
 from requests.adapters import HTTPAdapter
 
 from kiveapi import KiveAPI
+from urlparse import urlparse
 
 
 def main():
@@ -15,11 +15,6 @@ def main():
     logging.getLogger('urllib3.connectionpool').setLevel(logging.WARN)
     CONFIG_FILE = os.path.expanduser("~/.dump_pipeline.config")
     UNSET = '***'
-
-    parser = ArgumentParser(description='Dump a Kive pipeline')
-    parser.add_argument('pipeline_id', type=int)
-    parser.add_argument('--folder', '-f', default='dump')
-    args = parser.parse_args()
 
     try:
         with open(CONFIG_FILE, 'rU') as f:
@@ -38,8 +33,17 @@ def main():
     kive = KiveAPI(config['server'])
     kive.mount('https://', HTTPAdapter(max_retries=20))
     kive.login(config['username'], config['password'])
-    if not os.path.isdir(args.folder):
-        os.mkdir(args.folder)
+
+    pipelines = kive.get_pipelines()
+    hostname = urlparse(kive.server_url).hostname
+    print 'Recent pipelines from {}:'.format(hostname)
+    for pipeline in pipelines[:5]:
+        print '{}, id {}'.format(pipeline, pipeline.pipeline_id)
+    pipeline_id = int(raw_input('Enter pipeline id to dump: '))
+    dump_folder = 'utils/dump/{}_pipeline{}'.format(hostname, pipeline_id)
+
+    if not os.path.isdir(dump_folder):
+        os.mkdir(dump_folder)
 
     compound_datatypes = {}  # {id: columns}
     for compound_datatype in kive.get_cdts():
@@ -60,6 +64,10 @@ def main():
         for dependency in revision['dependencies']:
             requirement = code_resource_revisions[dependency['requirement']]
             dependency['requirement'] = requirement
+        revision['dependencies'].sort(
+            key=lambda dep: (dep['depPath'],
+                             dep['depFileName'],
+                             dep['requirement']['coderesource']['filename']))
     methods = {}  # {id: method}
     for method in kive.get('/api/methods/').json():
         dump = {'driver': code_resource_revisions[method['driver']]}
@@ -71,7 +79,9 @@ def main():
         methods[method['id']] = dump
 
     used_revisions = set()
-    pipeline = kive.get_pipeline(args.pipeline_id).details
+    pipeline_wrapper = kive.get_pipeline(pipeline_id)
+    pipeline = pipeline_wrapper.details
+    print 'Dumping {}.'.format(pipeline_wrapper)
     dump = {}
     for input_item in pipeline['inputs']:
         del input_item['x']
@@ -101,7 +111,7 @@ def main():
     dump['steps'] = pipeline['steps']
 
     pipeline_filename = 'pipeline.json'
-    with open(os.path.join(args.folder, pipeline_filename), 'w') as f:
+    with open(os.path.join(dump_folder, pipeline_filename), 'w') as f:
         json.dump(dump, f, indent=4, sort_keys=True)
 
     filename_counts = Counter()
@@ -109,7 +119,7 @@ def main():
         filename = revision['coderesource']['filename']
         filename_counts[filename] += 1
         response = kive.get(revision.url, is_json=False, stream=True)
-        with open(os.path.join(args.folder, filename), 'w') as f:
+        with open(os.path.join(dump_folder, filename), 'w') as f:
             for block in response.iter_content():
                 f.write(block)
     duplicate_filenames = [filename
@@ -119,7 +129,7 @@ def main():
         raise RuntimeError('Multiple versions found: ' +
                            ', '.join(duplicate_filenames))
 
-    print 'Done.'
+    print 'Dumped {}.'.format(pipeline_wrapper)
 
 
 class CodeResourceRevision(dict):

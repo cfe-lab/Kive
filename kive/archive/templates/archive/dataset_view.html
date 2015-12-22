@@ -132,7 +132,7 @@ $(document).ready(function(){
 
         {% for value,errors in row %}
             <td {% if errors|length > 0 %} class="data-error" {% endif %}>
-                {{ value|truncatechars:10 }}
+                {{ value|truncatechars:30 }}
                 {% if errors|length > 0 %}
                     <div class="value-error-tip">
                         The following data checks failed:

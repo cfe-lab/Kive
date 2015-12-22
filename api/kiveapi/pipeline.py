@@ -64,7 +64,7 @@ class Pipeline(object):
             )
 
     def __str__(self):
-        return '%s - rev %d' % (self.revision_name, self.revision_number) if self.revision_name is not None else 'N/A'
+        return self.revision_name or 'N/A'
 
     def __unicode__(self):
         return str(self)

@@ -447,8 +447,15 @@ class Manager:
             )
 
         for rtp in ready_to_purge:
-            mgr_logger.debug("Removing sandbox at {}".format(rtp.sandbox_path))
-            rtp.collect_garbage()
+            mgr_logger.debug("Removing sandbox at %r.", rtp.sandbox_path)
+            try:
+                rtp.collect_garbage()
+            except:
+                mgr_logger.error('Failed to purge sandbox at %r.',
+                                 rtp.sandbox_path,
+                                 exc_info=True)
+                rtp.purged = True  # Don't try to purge it again.
+                rtp.save()
 
         # Next, look through the sandbox directory and see if there are any orphaned sandboxes
         # to remove.

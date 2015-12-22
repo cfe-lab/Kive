@@ -21,7 +21,31 @@ Before installing Kive, you need to install some other software.
 Installing Python
 -----------------
 
-Source code or binaries for Python can be obtained from the official website, [python.org](www.python.org).  Most *nix distributions (including OS X) come with some version of Python.  
+Source code or binaries for Python can be obtained from the official website,
+[python.org](www.python.org).  Most *nix distributions (including OS X) come
+with some version of Python.
+
+The fleet workers launch very slowly on compute nodes with a network file
+system. They will launch much faster if you run the fleet within a Python
+[virtualenv][]. Check to see the latest version of virtualenv in the
+[Python package index][pypi]. This is optional, but you can create the
+virtualenv as follows:
+
+    # Create a bootstrap environment in the kive user's home folder
+    sudo su kiveuser
+    curl -O https://pypi.python.org/packages/source/v/virtualenv/virtualenv-X.Y.Z.tar.gz
+    tar xzf virtualenv-X.Y.Z.tar.gz
+    python virtualenv-X.Y.Z/virtualenv.py bootstrap
+    rm -rf virtualenv-X.Y.Z
+    # Install virtualenv into the bootstrap
+    bootstrap/bin/pip install virtualenv-X.Y.Z.tar.gz
+    # Now create a virtualenv just for Kive fleet workers.
+    sudo bootstrap/bin/virtualenv vkive
+    # Start using the virtualenv
+    source vkive/bin/activate
+
+[virtualenv]: http://docs.python-guide.org/en/latest/dev/virtualenvs/ 
+[pypi]: https://pypi.python.org/pypi/virtualenv
 
 Installing Django
 -----------------
@@ -35,7 +59,7 @@ If you are already running Django 1.6, installing should be as painless as runni
 system-wide.  Also, many systems have multiple Python installations, so make sure that
 `pip` is using the correct one. Django REST Framework can also be installed via
 
-    pip install djangorestframework==3.1.0
+    pip install djangorestframework==3.1.2
 
 Instructions for downloading and installing `django-extensions` may be found
 [here](http://django-extensions.readthedocs.org/en/latest/installation_instructions.html).
@@ -176,7 +200,11 @@ so that it reads
 
 Then you can compile and install this module by running `sudo python setup.py install`.
 
-To confirm that the module is installed, start an interaction session by calling `python` on the command line and then enter `import psycopg2`.  If this raises an `ImportError` then something has gone wrong - for example, the version of Python used to install the module is different from the version running the interactive session.
+To confirm that the module is installed, start an interactive session by calling
+`python` on the command line and then enter `import psycopg2`.  If this raises
+an `ImportError` then something has gone wrong - for example, the version of
+Python used to install the module is different from the version running the
+interactive session.
 
 Installing OpenMPI and mpi4py
 -----------------------------
