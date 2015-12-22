@@ -28,7 +28,8 @@ var pipeline = (function(exports){
         this.build_outputs();
         
         this.canvasState.has_unsaved_changes = false;
-        for (var shape, i=0; shape = this.canvasState.shapes[i]; i++) {
+        for (var i=0; i < this.canvasState.shapes.length; i++) {
+            var shape = this.canvasState.shapes[i];
             shape.has_unsaved_changes = false;
         }
     };
