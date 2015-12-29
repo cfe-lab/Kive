@@ -212,6 +212,7 @@ LOGGING = {
 
 # The polling interval that the manager of the fleet uses between queries to the database.
 FLEET_POLLING_INTERVAL = 30  # in seconds
+FLEET_PURGING_INTERVAL = 3600  # in seconds
 
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 

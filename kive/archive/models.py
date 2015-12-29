@@ -224,8 +224,14 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         anything_failed = False
         all_exist = True
 
+        run_steps = self.runsteps.prefetch_related('invoked_logs',
+                                                   'invoked_logs__integrity_checks',
+                                                   'invoked_logs__content_checks')
         for step in self.pipeline.steps.all():
-            corresp_rs = self.runsteps.filter(pipelinestep=step).first()
+            corresp_rs = None
+            for run_step in run_steps:
+                if run_step.pipelinestep == step:
+                    corresp_rs = run_step
             if corresp_rs is None:
                 all_exist = False
             elif corresp_rs.has_started() and not corresp_rs.is_complete():
@@ -828,10 +834,10 @@ class RunComponent(stopwatch.models.Stopwatch):
             if not invoked_log.is_successful():
                 return False
             icls = invoked_log.integrity_checks.all()
-            if icls.exists() and any([x.is_fail() for x in icls]):
+            if any([x.is_fail() for x in icls]):
                 return False
             ccls = invoked_log.content_checks.all()
-            if ccls.exists() and any([x.is_fail() for x in ccls]):
+            if any([x.is_fail() for x in ccls]):
                 return False
         return True
 
@@ -1412,12 +1418,12 @@ class RunStep(RunComponent):
         # Case 1: ER was a failure.  In this case, we don't want to proceed,
         # so we return the failure for appropriate handling.
         if execrecord.outputs_failed_any_checks() or execrecord.has_ever_failed():
-            self.logger.debug("ExecRecord found ({}) was a failure".format(execrecord))
+            self.logger.debug("ExecRecord found (%s) was a failure", execrecord)
             result["successful"] = False
 
         # Case 2: ER has fully checked outputs and provides the outputs needed.
         elif execrecord.outputs_OK() and execrecord.provides_outputs(self.pipelinestep.outputs_to_retain()):
-            self.logger.debug("Completely reusing ExecRecord {}".format(execrecord))
+            self.logger.debug("Completely reusing ExecRecord %s", execrecord)
             result["fully reusable"] = True
 
         return result

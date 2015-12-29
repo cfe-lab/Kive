@@ -327,6 +327,7 @@ class Manager:
         """
         Poll the database for new jobs, and handle running of sandboxes.
         """
+        time_to_purge = None
         while True:
             time_to_poll = time.time() + settings.FLEET_POLLING_INTERVAL
             if not self.assign_tasks(time_to_poll):
@@ -338,8 +339,10 @@ class Manager:
                 return
 
             self.find_new_runs()
-            self.purge_sandboxes()
-            Dataset.purge()
+            if time_to_purge is None or time_to_poll > time_to_purge:
+                self.purge_sandboxes()
+                Dataset.purge()
+                time_to_purge = time_to_poll + settings.FLEET_PURGING_INTERVAL
 
     def assign_tasks(self, time_to_poll):
         # We can't use a for loop over the task queue because assign_task
