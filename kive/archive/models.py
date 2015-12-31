@@ -224,22 +224,47 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         anything_failed = False
         all_exist = True
 
-        run_steps = self.runsteps.prefetch_related('invoked_logs',
-                                                   'invoked_logs__integrity_checks',
-                                                   'invoked_logs__content_checks')
+        run_steps = self.runsteps.prefetch_related(
+            'execrecord__execrecordouts__symbolicdataset__structure',
+            'invoked_logs__content_checks__baddata',
+            'invoked_logs__integrity_checks__usurper',
+            'invoked_logs__methodoutput',
+            'log__content_checks__baddata',
+            'log__integrity_checks__usurper',
+            'log__record__execrecord__generator',
+            'pipelinestep__cables_in',
+            'RSICs__invoked_logs__content_checks__baddata',
+            'RSICs__invoked_logs__integrity_checks__usurper',
+            'RSICs__invoked_logs__methodoutput',
+            'RSICs__log__content_checks__baddata',
+            'RSICs__log__integrity_checks__usurper',
+            'RSICs__log__record__component__dest__structure',
+            'RSICs__log__record__execrecord__execrecordouts',
+            'RSICs__log__record__execrecord__generator',
+            'RSICs__PSIC')
+        run_step_map = {run_step.pipelinestep: run_step
+                        for run_step in run_steps}
         for step in self.pipeline.steps.all():
-            corresp_rs = None
-            for run_step in run_steps:
-                if run_step.pipelinestep == step:
-                    corresp_rs = run_step
+            corresp_rs = run_step_map.get(step)
             if corresp_rs is None:
                 all_exist = False
             elif corresp_rs.has_started() and not corresp_rs.is_complete():
                 return False
             elif not corresp_rs.is_successful():
                 anything_failed = True
+
+        cables = self.runoutputcables.prefetch_related(
+            'invoked_logs__content_checks__baddata',
+            'invoked_logs__integrity_checks__usurper',
+            'invoked_logs__methodoutput',
+            'log__content_checks__baddata',
+            'log__integrity_checks__usurper',
+            'log__record__execrecord__execrecordouts',
+            'log__record__execrecord__generator')
+        run_output_cable_map = {cable.pipelineoutputcable: cable
+                                for cable in cables}
         for outcable in self.pipeline.outcables.all():
-            corresp_roc = self.runoutputcables.filter(pipelineoutputcable=outcable).first()
+            corresp_roc = run_output_cable_map.get(outcable)
             if corresp_roc is None:
                 all_exist = False
             elif corresp_roc.has_started() and not corresp_roc.is_complete():
@@ -1311,8 +1336,10 @@ class RunStep(RunComponent):
         # return.  Any incomplete RSIC causes us to return False.
         all_cables_exist = True
         any_cables_failed = False
+        run_step_input_cables = {cable.PSIC: cable
+                                 for cable in self.RSICs.all()}
         for curr_cable in self.pipelinestep.cables_in.all():
-            corresp_RSIC = self.RSICs.filter(PSIC=curr_cable).first()
+            corresp_RSIC = run_step_input_cables.get(curr_cable)
             if corresp_RSIC is None:
                 all_cables_exist = False
             elif not corresp_RSIC.is_complete():
@@ -2597,98 +2624,35 @@ class ExecLog(stopwatch.models.Stopwatch):
         # note that it may still be in progress!
         return True
 
-    # FIXME: this isn't broken but it seems redundant and could just be folded directly
-    # into all_checks_passed.  Do we ever find a use for this?
-    def all_checks_performed(self):
-        """
-        True if every output of this ExecLog has been checked.
-
-        If the parent record does not have an ExecRecord yet, return
-        False; otherwise, use the ExecRecord to look up all of the SDs
-        output by this execution, and check that all of the outputs
-        have been tested appropriately.  That is, if the SD is
-        originally created by this ExecLog (i.e. by its corresponding
-        Run*) and is not raw, look for the CCL to appear in the list
-        of the ExecLog's CCLs; if the SD was originally created
-        before, check for this ExecLog to have a corresponding ICL.
-        """
-        if self.record.execrecord is None:
-            return False
-
-        # From here on, we know that this ExecLog corresponds to the
-        # creation or filling-in of an ExecRecord.  Go through the
-        # EROs and check that all of the corresponding ICL/CCLs are
-        # present and passed.
-
-        # FIXME REMOVE REDUNDANT??
-        # # Get the SDs that were actually created during this EL's Run*.
-        # record_outs = None
-        # if type(self.record) == RunStep:
-        #     record_outs = self.record.outputs.all()
-        # else:
-        #     record_outs = self.record.output.all()
-
-        # Is this log the generator of the execrecord?  That is, is this
-        # the very first time this execution was ever performed, and this
-        # isn't either a "filling-in" or a recovery?
-        if self.record.execrecord.generator == self:
-
-            for ero in self.record.execrecord.execrecordouts.all():
-
-                # If this was a trivial cable, then this didn't create the SD,
-                # so just look for an ICL.  Otherwise, if the SD isn't raw, look
-                # for a CCL.
-                record_is_trivial_cable = False
-                if self.record.is_cable and self.record.component.is_trivial():
-                    record_is_trivial_cable = True
-
-                if record_is_trivial_cable:
-                    corresp_icls = self.integrity_checks.filter(symbolicdataset=ero.symbolicdataset)
-                    if not corresp_icls.exists():
-                        return False
-
-                elif not ero.symbolicdataset.is_raw():
-                    corresp_ccls = self.content_checks.filter(symbolicdataset=ero.symbolicdataset)
-                    if not corresp_ccls.exists():
-                        return False
-
-        else:
-            # This is either a filling-in or a recovery, so just look for ICLs.
-            for ero in self.record.execrecord.execrecordouts.all():
-                corresp_icls = self.integrity_checks.filter(symbolicdataset=ero.symbolicdataset)
-                if not corresp_icls.exists():
-                    return False
-
-        # Now we've checked all of the outputs and they've all been
-        # as expected, so....
-        return True
-
     def all_checks_passed(self):
         """
         True if every output of this ExecLog has passed its check.
 
-        First check that all checks have been performed; then check
-        that all of the tests have passed.
+        First check that all of the tests have passed. Then check that all
+        checks have been performed.
         """
-        if not self.all_checks_performed():
+        if self.record.execrecord is None:
             return False
-
-        # From here on, we know that this ExecLog corresponds to the
-        # creation or filling-in of an ExecRecord.  Go through the
-        # EROs and check that all of the corresponding ICL/CCLs are
-        # present and passed.
+        is_trivial_cable = self.record.is_cable and self.record.component.is_trivial()
+        is_original_run = self.record.execrecord.generator == self
+        missing_content_checks = set()
+        missing_integrity_checks = set()
         for ero in self.record.execrecord.execrecordouts.all():
-            corresp_icls = self.integrity_checks.filter(symbolicdataset=ero.symbolicdataset)
-            if corresp_icls.exists():
-                if corresp_icls.first().is_fail():
-                    return False
+            if is_trivial_cable or not is_original_run:
+                missing_integrity_checks.add(ero.symbolicdataset_id)
+            elif not ero.symbolicdataset.is_raw():
+                missing_content_checks.add(ero.symbolicdataset_id)
 
-            corresp_ccls = self.content_checks.filter(symbolicdataset=ero.symbolicdataset)
-            if corresp_ccls.exists():
-                if corresp_ccls.first().is_fail():
-                    return False
+        for content_check in self.content_checks.all():
+            if content_check.is_fail():
+                return False
+            missing_content_checks.discard(content_check.symbolicdataset_id)
+        for integrity_check in self.integrity_checks.all():
+            if integrity_check.is_fail():
+                return False
+            missing_integrity_checks.discard(integrity_check.symbolicdataset_id)
 
-        return True
+        return not (missing_integrity_checks or missing_content_checks)
 
     def is_redacted(self):
         try:

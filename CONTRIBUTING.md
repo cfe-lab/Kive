@@ -19,6 +19,19 @@ If you want to see what's currently being worked on, check out the [waffle board
 
 [waffle]: https://waffle.io/cfe-lab/kive
 
+## Performance Testing ##
+It can be useful to track where time is spent when running a pipeline or a set
+of tests. Python comes with a profiler module:
+
+    python -m cProfile -s cumtime manage.py test --settings=kive.test_settings >timing.txt
+
+Another option is to install the gprof2dot package with pip. Then you can
+generate a call graph with timing information:
+
+    python -m cProfile -o timing.dat manage.py test --settings=kive.test_settings \
+    && python -m pstats timing.dat <timing_commands.txt >timing.txt \
+    && gprof2dot -f pstats timing.dat -o timing.dot
+
 ## Deploying a Release ##
 
 See the project wiki for instructions on how to [start a production server][wiki].
