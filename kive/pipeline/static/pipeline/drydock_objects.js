@@ -456,7 +456,8 @@ var drydock_objects = (function() {
         return new my.NodeLabel(
                 this.label,
                 this.x + this.dx,
-                this.y + this.dy - this.h/2 - this.offset);
+                this.y + this.dy - this.h/2 - this.offset,
+                this.has_unsaved_changes && '*');
     };
 
     my.RawNode = function(x, y, label, input_index) {
@@ -625,7 +626,8 @@ var drydock_objects = (function() {
         return new my.NodeLabel(
                 this.label,
                 this.x + this.dx,
-                this.y + this.dy - this.h/2 - this.offset);
+                this.y + this.dy - this.h/2 - this.offset,
+                this.has_unsaved_changes && '*');
     };
 
     my.CdtNode.prototype.deleteFrom = my.RawNode.prototype.deleteFrom;
@@ -799,10 +801,8 @@ var drydock_objects = (function() {
         
         // update signal
         if (this.update_signal) {
-            var us = this.update_signal;
-            us.x = vertices[6].x - us.r;
-            us.y = vertices[2].y + us.r;
-            us.draw(ctx);
+            this.update_signal.x = vertices[6].x - this.update_signal.r;
+            this.update_signal.y = vertices[2].y + this.update_signal.r;
         }
     
         // Highlight the method based on status.
@@ -923,7 +923,8 @@ var drydock_objects = (function() {
         return new my.NodeLabel(
                 this.label,
                 this.x + this.dx + this.scoop/4,
-                this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset);
+                this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset,
+                this.has_unsaved_changes && '*');
     };
     
     my.MethodNode.prototype.doDown = function(cs, e) {
@@ -1448,8 +1449,9 @@ var drydock_objects = (function() {
         if (index > -1) cs.connectors.splice(index, 1);
     };
     
-    my.NodeLabel = function(label, x, y) {
+    my.NodeLabel = function(label, x, y, suffix) {
         this.label = label || '';
+        this.suffix = suffix || '';
         this.x = x || 0;
         this.y = y || 0;
     };

@@ -2018,8 +2018,10 @@ class RunPlan(object):
                     continue
                 step_plan.execrecord = execrecord
                 execrecordouts = execrecord.execrecordouts.all()
-                for i, execrecordout in enumerate(execrecordouts):
-                    output = step_plan.outputs[i]
+                for execrecordout in execrecordouts:
+                    generic_output = execrecordout.generic_output
+                    dataset_idx = generic_output.transformationoutput.dataset_idx
+                    output = step_plan.outputs[dataset_idx-1]
                     output.dataset = execrecordout.dataset
 
         is_changed = True

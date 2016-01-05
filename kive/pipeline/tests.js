@@ -1179,7 +1179,7 @@
                 
                 this.expectedInput = new drydock_objects.RawNode(30, 50, "in");
                 this.actualInput = new drydock_objects.RawNode(30, 50, "in");
-                this.state.addShape(this.actualInput);
+                this.state.addShape(this.actualInput).has_unsaved_changes = false;
             });
             
             it('should draw', function() {
@@ -1262,7 +1262,7 @@
                             76,
                             "out");
                     this.state.$dialog = $('<p>Dialog</p>');
-                    this.state.addShape(this.actualMethod);
+                    this.state.addShape(this.actualMethod).has_unsaved_changes = false;
                 });
                 
                 function drawStartingPipeline(testCase) {
@@ -1541,7 +1541,7 @@
                     this.expectedCanvas.drawText({
                         x: this.expectedOutput.x,
                         y: this.expectedOutput.y - 30.5,
-                        text: "out",
+                        text: "* out",
                         style: "node",
                         dir: 0
                     });
@@ -1601,7 +1601,7 @@
                     this.expectedCanvas.drawText({
                         x: 221.56696744775581,
                         y: 66.94283749469356,
-                        text: "out",
+                        text: "* out",
                         style: "node",
                         dir: 0
                     });

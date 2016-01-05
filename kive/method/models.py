@@ -725,50 +725,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                         min_row=parent_output.get_min_row(),
                         max_row=parent_output.get_max_row()).save()
 
-    def find_compatible_ERs(self, input_datasets, runstep):
-        """
-        Given a set of input datasets, find any ExecRecords that use these inputs that
-        are accessible by the calling RunStep.
-
-        Note that this ExecRecord may be a failure, which the calling function
-        would then handle appropriately.
-        """
-        if self.reusable == Method.NON_REUSABLE:
-            return []
-
-        # For pipelinesteps featuring this method....
-        candidates = []
-        for possible_PS in self.pipelinesteps.all():
-
-            # For linked runsteps which did not *completely* reuse an ER....
-            for possible_RS in possible_PS.pipelinestep_instances.filter(
-                    reused=False,
-                    execrecord_id__isnull=False):
-                candidate_ER = getattr(possible_RS, 'execrecord', None)
-                if not candidate_ER or candidate_ER.is_redacted():
-                    continue
-
-                # Check that this ER is accessible by runstep.
-                extra_users, extra_groups = runstep.top_level_run.extra_users_groups(
-                    [candidate_ER.generating_run])
-                if len(extra_users) > 0 or len(extra_groups) > 0:
-                    continue
-
-                # Check if inputs match.
-                ER_matches = True
-
-                for ERI in candidate_ER.execrecordins.all():
-                    input_idx = ERI.generic_input.definite.dataset_idx
-                    if ERI.dataset != input_datasets[input_idx-1]:
-                        ER_matches = False
-                        break
-
-                if ER_matches:
-                    # All ERIs match input datasets, so commit to candidate ER.
-                    candidates.append(candidate_ER)
-
-        return candidates
-
     def _poll_stream(self, source_stream, source_name, dest_streams):
         """ Redirect all input from source_stream to all the dest_streams
 

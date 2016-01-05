@@ -1,0 +1,4 @@
+strip
+sort cumtime
+stats 500
+

@@ -68,6 +68,7 @@ var drydock = (function() {
         this.exec_order = [];
         this.exec_order_is_ambiguous = null;
         this.exec_order_may_have_changed = false;
+        this.has_unsaved_changes = false;
         
         this.collisions = 0;
     
@@ -723,6 +724,8 @@ var drydock = (function() {
                 if (connector.dest.connected.indexOf(connector) < 0) {
                     connector.dest.connected.push(connector);
                 }
+
+                this.has_unsaved_changes = true;
             } else {
                 // connector not yet linked to anything
             
@@ -833,7 +836,9 @@ var drydock = (function() {
             this.methods.push(shape);
             this.testExecutionOrder();
         }
+        shape.has_unsaved_changes = true;
         this.valid = false;
+        this.has_unsaved_changes = true;
         return shape;
     };
     
@@ -1069,7 +1074,7 @@ var drydock = (function() {
             sel = this.selection,
             labels = [],
             flat_exec_order = [],
-            i, l, L, textWidth, shape;
+            i, l, L, textWidth, shape, method;
         ctx.save();
         this.clear();
         ctx.scale(this.scale, this.scale);
@@ -1093,19 +1098,19 @@ var drydock = (function() {
         // draw all shapes and magnets
         for (i = 0; (shape = shapes[i]); i++) {
             shape.draw(ctx);
+            L = shape.getLabel();
             
             // queue label to be drawn after
             if (this.force_show_exec_order === false ||
                     !(shape instanceof drydock_objects.MethodNode) ||
                     this.force_show_exec_order === undefined &&
                     !this.exec_order_is_ambiguous) {
-                labels.push(shape.getLabel());
+                L.label = (L.suffix? L.suffix +' ' : '')+ L.label;
             } else {
                 // add information about execution order
-                L = shape.getLabel();
-                L.label = (flat_exec_order.indexOf(shape) + 1) +': '+ L.label;
-                labels.push(L);
+                L.label = (flat_exec_order.indexOf(shape) + 1) + L.suffix +': '+ L.label;
             }
+            labels.push(L);
         }
 
         // draw all connectors
@@ -1127,6 +1132,12 @@ var drydock = (function() {
             }
         }
         
+        for (i = 0; (method = this.methods[i]); i++) {
+            // draw all update signals above shapes and connectors
+            if (method.update_signal) {
+                method.update_signal.draw(ctx);
+            }
+        }
         if (this.enable_labels) {
             // draw all labels
             ctx.textAlign = 'center';
@@ -1198,6 +1209,7 @@ var drydock = (function() {
         this.testExecutionOrder();
         this.selection = [];
         this.valid = false; // re-draw canvas to make Connector disappear
+        this.has_unsaved_changes = true;
     };
     
     my.CanvasState.prototype.findMethodNode = function(method_pk) {

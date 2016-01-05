@@ -22,7 +22,7 @@ from rest_framework.test import force_authenticate, APIRequestFactory
 from rest_framework import status
 
 from archive.models import ExecLog, MethodOutput, Run, RunStep
-from constants import datatypes, groups
+from constants import datatypes
 from librarian.models import Dataset, ExecRecord
 from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, \
@@ -990,79 +990,103 @@ class ExecRecordTests(LibrarianTestCase):
         self.assertTrue(execrecord.has_ever_failed())
 
 
-class FindCompatibleERTests(LibrarianTestCase):
+class FindCompatibleERTests(TestCase):
+    fixtures = ['simple_run']
+
+    def find_run_step(self):
+        for e in ExecRecord.objects.all():
+            if e.has_ever_failed():
+                continue
+            is_running = False
+            runstep = None
+            for runcomponent in e.used_by_components.all():
+                if type(runcomponent.definite) is RunStep:
+                    runstep = runcomponent.definite
+                if not runcomponent.top_level_run.is_complete():
+                    is_running = True
+                    break
+            if not is_running and runstep:
+                return runstep
 
     def test_find_compatible_ER_never_failed(self):
         """Should be able to find a compatible ExecRecord which never failed."""
-        execrecord = None
-        for e in ExecRecord.objects.all():
-            if not e.has_ever_failed():
-                execrecord = e
-                break
+        runstep = self.find_run_step()
+        execrecord = runstep.execrecord
         self.assertIsNotNone(execrecord)
         input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.dataset)
                                for eri in execrecord.execrecordins.all()]
         input_datasets_decorated.sort()
         input_datasets = [entry[1] for entry in input_datasets_decorated]
-        runstep = execrecord.used_by_components.first().definite
         runstep.reused = False
         runstep.save()
-        method = runstep.pipelinestep.transformation.method
         self.assertFalse(execrecord.has_ever_failed())
-        self.assertIn(execrecord, method.find_compatible_ERs(input_datasets, runstep))
+        self.assertIn(execrecord, runstep.find_compatible_ERs(input_datasets))
+
+    def test_find_compatible_ER_redacted(self):
+        """Should not be able to find a redacted ExecRecord."""
+        runstep = self.find_run_step()
+        execrecord = runstep.execrecord
+        self.assertIsNotNone(execrecord)
+        execrecord.execrecordins.first().symbolicdataset.redact()
+        input_SDs_decorated = [(eri.generic_input.definite.dataset_idx, eri.symbolicdataset)
+                               for eri in execrecord.execrecordins.all()]
+        input_SDs_decorated.sort()
+        input_SDs = [entry[1] for entry in input_SDs_decorated]
+        runstep.reused = False
+        runstep.save()
+        self.assertTrue(execrecord.is_redacted())
+        self.assertNotIn(execrecord, runstep.find_compatible_ERs(input_SDs))
 
     def test_find_compatible_ER_failed(self):
         """Should also find a compatible ExecRecord which failed."""
-        execrecord = None
-        for e in ExecRecord.objects.all():
-            if e.has_ever_failed():
-                execrecord = e
-                break
+        runstep = self.find_run_step()
+        execrecord = runstep.execrecord
         self.assertIsNotNone(execrecord)
-        input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.dataset)
-                               for eri in execrecord.execrecordins.all()]
+        methodoutput = runstep.log.methodoutput
+        methodoutput.return_code = 1  # make this a failure
+        methodoutput.save()
+
+        input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.symbolicdataset)
+                                    for eri in execrecord.execrecordins.all()]
         input_datasets_decorated.sort()
         input_datasets = [entry[1] for entry in input_datasets_decorated]
         runstep = execrecord.used_by_components.first().definite
         runstep.reused = False
         runstep.save()
-        method = runstep.pipelinestep.transformation.method
         self.assertTrue(execrecord.has_ever_failed())
-        self.assertIn(execrecord, method.find_compatible_ERs(input_datasets, runstep))
+        self.assertIn(execrecord, runstep.find_compatible_ERs(input_datasets))
 
     def test_find_compatible_ER_skips_nulls(self):
         """
         Incomplete run steps don't break search for compatible ExecRecords.
         """
         # Find an ExecRecord that has never failed
-        execrecord = None
-        for execrecord in ExecRecord.objects.all():
-            if not execrecord.has_ever_failed():
-                break
-        input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.dataset)
+        runstep = self.find_run_step()
+        execrecord = runstep.execrecord
+        input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.symbolicdataset)
                                for eri in execrecord.execrecordins.all()]
         input_datasets_decorated.sort()
         input_datasets = [entry[1] for entry in input_datasets_decorated]
 
         method = execrecord.general_transf()
         pipeline = execrecord.generating_run.pipeline
-        ps = pipeline.steps.get(transformation=method)
+        ps = pipeline.steps.filter(transformation=method).first()
 
         # Create two RunSteps using this method.  First, an incomplete one.
-        run1 = Run(user=self.myUser, pipeline=pipeline, name="First incomplete run",
+        run1 = Run(user=pipeline.user, pipeline=pipeline, name="First incomplete run",
                    description="Be patient!")
         run1.save()
         run1.start()
         run1.runsteps.create(pipelinestep=ps)
 
         # Second, one that is looking for an ExecRecord.
-        run2 = Run(user=self.myUser, pipeline=pipeline, name="Second run in progress",
+        run2 = Run(user=pipeline.user, pipeline=pipeline, name="Second run in progress",
                    description="Impatient!")
         run2.save()
         run2.start()
         rs2 = run2.runsteps.create(pipelinestep=ps)
 
-        self.assertIn(execrecord, method.find_compatible_ERs(input_datasets, rs2))
+        self.assertIn(execrecord, rs2.find_compatible_ERs(input_datasets))
 
 
 class RemovalTests(TestCase):
@@ -1302,7 +1326,7 @@ class RemovalTests(TestCase):
         """
         self.remove_tester(self.noop_pl)
 
-    def test_nested_pipeline_build_removal_plan(self):
+    def test_nested_pipeline_remove(self):
         """Removing a nested Pipeline."""
         self.remove_tester(self.p_nested)
 

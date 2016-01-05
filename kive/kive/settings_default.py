@@ -212,6 +212,7 @@ LOGGING = {
 
 # The polling interval that the manager of the fleet uses between queries to the database.
 FLEET_POLLING_INTERVAL = 30  # in seconds
+FLEET_PURGING_INTERVAL = 3600  # in seconds
 
 # The time interval the worker uses between polling for progress, in seconds.
 # Shorter sleep makes worker more responsive, generates more load when idle.

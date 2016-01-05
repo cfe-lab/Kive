@@ -317,6 +317,7 @@ class Manager:
         """
         Poll the database for new jobs, and handle running of sandboxes.
         """
+        time_to_purge = None
         while True:
             self.find_stopped_runs()
 
@@ -330,8 +331,10 @@ class Manager:
                 return
 
             self.find_new_runs()
-            self.purge_sandboxes()
-            Dataset.purge()
+            if time_to_purge is None or time_to_poll > time_to_purge:
+                self.purge_sandboxes()
+                Dataset.purge()
+                time_to_purge = time_to_poll + settings.FLEET_PURGING_INTERVAL
 
     def assign_tasks(self, time_to_poll):
         # We can't use a for loop over the task queue because assign_task
@@ -479,8 +482,15 @@ class Manager:
             )
 
         for rtp in ready_to_purge:
-            mgr_logger.debug("Removing sandbox at {}".format(rtp.sandbox_path))
-            rtp.collect_garbage()
+            mgr_logger.debug("Removing sandbox at %r.", rtp.sandbox_path)
+            try:
+                rtp.collect_garbage()
+            except:
+                mgr_logger.error('Failed to purge sandbox at %r.',
+                                 rtp.sandbox_path,
+                                 exc_info=True)
+                rtp.purged = True  # Don't try to purge it again.
+                rtp.save()
 
         # Next, look through the sandbox directory and see if there are any orphaned sandboxes
         # to remove.
