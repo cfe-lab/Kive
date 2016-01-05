@@ -25,7 +25,7 @@ import archive.signals
 import archive.exceptions
 from constants import maxlengths, groups
 from datachecking.models import ContentCheckLog, IntegrityCheckLog
-from librarian.models import Dataset
+from librarian.models import Dataset, ExecRecord
 import metadata.models
 import stopwatch.models
 from pipeline.models import Pipeline
@@ -423,7 +423,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         all_exist = True
 
         run_steps = self.runsteps.prefetch_related(
-            'execrecord__execrecordouts__symbolicdataset__structure',
+            'execrecord__execrecordouts__dataset__structure',
             'invoked_logs__content_checks__baddata',
             'invoked_logs__integrity_checks__usurper',
             'invoked_logs__methodoutput',
@@ -1716,12 +1716,12 @@ class RunStep(RunComponent):
         # Tack on the coordinate within that run.
         return run_coords + (self.pipelinestep.step_num,)
 
-    def find_compatible_ERs(self, input_symbolicdatasets):
+    def find_compatible_ERs(self, input_datasets):
         """ Find all ExecRecords that are compatible with this RunStep.
 
         Exclude redacted ones. Permissions of old run must include all
         permissions of new run.
-        @param input_symbolicdatasets: a list of symbolic datasets that have
+        @param input_datasets: a list of datasets that have
             already been processed by the input cables. To be compatible, an
             ExecRecord must have the same inputs in the same order.
         @return: generator of ExecRecords
@@ -1733,10 +1733,10 @@ class RunStep(RunComponent):
 
         query = ExecRecord.objects.filter(
             used_by_components__runstep__pipelinestep__transformation=transformation)
-        for dataset_idx, symbolicdataset in enumerate(input_symbolicdatasets, 1):
+        for dataset_idx, dataset in enumerate(input_datasets, 1):
             query = query.filter(
                 execrecordins__generic_input__transformationinput__dataset_idx=dataset_idx,
-                execrecordins__symbolicdataset=symbolicdataset)
+                execrecordins__dataset=dataset)
 
         new_run = self.top_level_run
         for execrecord in query.all():
@@ -2605,18 +2605,18 @@ class ExecLog(stopwatch.models.Stopwatch):
         missing_integrity_checks = set()
         for ero in self.record.execrecord.execrecordouts.all():
             if is_trivial_cable or not is_original_run:
-                missing_integrity_checks.add(ero.symbolicdataset_id)
-            elif not ero.symbolicdataset.is_raw():
-                missing_content_checks.add(ero.symbolicdataset_id)
+                missing_integrity_checks.add(ero.dataset_id)
+            elif not ero.dataset.is_raw():
+                missing_content_checks.add(ero.dataset_id)
 
         for content_check in self.content_checks.all():
             if content_check.is_fail():
                 return False
-            missing_content_checks.discard(content_check.symbolicdataset_id)
+            missing_content_checks.discard(content_check.dataset_id)
         for integrity_check in self.integrity_checks.all():
             if integrity_check.is_fail():
                 return False
-            missing_integrity_checks.discard(integrity_check.symbolicdataset_id)
+            missing_integrity_checks.discard(integrity_check.dataset_id)
 
         return not (missing_integrity_checks or missing_content_checks)
 

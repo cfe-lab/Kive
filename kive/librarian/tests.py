@@ -22,7 +22,7 @@ from rest_framework.test import force_authenticate, APIRequestFactory
 from rest_framework import status
 
 from archive.models import ExecLog, MethodOutput, Run, RunStep
-from constants import datatypes
+from constants import datatypes, groups
 from librarian.models import Dataset, ExecRecord
 from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, \
@@ -1027,15 +1027,15 @@ class FindCompatibleERTests(TestCase):
         runstep = self.find_run_step()
         execrecord = runstep.execrecord
         self.assertIsNotNone(execrecord)
-        execrecord.execrecordins.first().symbolicdataset.redact()
-        input_SDs_decorated = [(eri.generic_input.definite.dataset_idx, eri.symbolicdataset)
-                               for eri in execrecord.execrecordins.all()]
-        input_SDs_decorated.sort()
-        input_SDs = [entry[1] for entry in input_SDs_decorated]
+        execrecord.execrecordins.first().dataset.redact()
+        input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.dataset)
+                                    for eri in execrecord.execrecordins.all()]
+        input_datasets_decorated.sort()
+        input_datasets = [entry[1] for entry in input_datasets_decorated]
         runstep.reused = False
         runstep.save()
         self.assertTrue(execrecord.is_redacted())
-        self.assertNotIn(execrecord, runstep.find_compatible_ERs(input_SDs))
+        self.assertNotIn(execrecord, runstep.find_compatible_ERs(input_datasets))
 
     def test_find_compatible_ER_failed(self):
         """Should also find a compatible ExecRecord which failed."""
@@ -1046,7 +1046,7 @@ class FindCompatibleERTests(TestCase):
         methodoutput.return_code = 1  # make this a failure
         methodoutput.save()
 
-        input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.symbolicdataset)
+        input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.dataset)
                                     for eri in execrecord.execrecordins.all()]
         input_datasets_decorated.sort()
         input_datasets = [entry[1] for entry in input_datasets_decorated]
@@ -1063,8 +1063,8 @@ class FindCompatibleERTests(TestCase):
         # Find an ExecRecord that has never failed
         runstep = self.find_run_step()
         execrecord = runstep.execrecord
-        input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.symbolicdataset)
-                               for eri in execrecord.execrecordins.all()]
+        input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.dataset)
+                                    for eri in execrecord.execrecordins.all()]
         input_datasets_decorated.sort()
         input_datasets = [entry[1] for entry in input_datasets_decorated]
 
