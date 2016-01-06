@@ -298,7 +298,12 @@ class Sandbox:
             # We bail out if the input has somehow been corrupted.
             if not input_dataset.is_OK():
                 self.logger.debug("Input %s has corrupted.  Cancelling.", input_dataset)
+
+                # Update some state variables.
                 curr_record.is_cancelled = True
+                curr_record._complete = True
+                curr_record._successful = False
+
                 curr_record.stop(save=True, clean=False)
                 curr_record.complete_clean()
 
@@ -321,6 +326,11 @@ class Sandbox:
                                 )
                                 curr_record.reused = True
                                 curr_record.execrecord = curr_ER
+
+                                # Update state variables:
+                                curr_record._complete = True
+                                curr_record._successful = can_reuse["successful"]
+
                                 curr_record.stop(save=False, clean=False)
                                 curr_record.complete_clean()
                                 curr_record.save()
@@ -1039,7 +1049,12 @@ class Sandbox:
         # We bail out if the input has somehow been corrupted.
         if not input_dataset.is_OK():
             self.logger.debug("Input %s has corrupted.  Cancelling.", input_dataset)
+
+            # Update state variables.
             curr_record.is_cancelled = True
+            curr_record._complete = True
+            curr_record._successful = False
+
             curr_record.stop(save=True, clean=False)
             curr_record.complete_clean()
 
@@ -1579,6 +1594,9 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_dat
                     output_dataset.mark_missing(start_time, end_time, curr_log, user)
                     missing_output = True
 
+                    # Update state variables.
+                    curr_record._successful = False
+
                 elif cable.is_trivial():
                     output_dataset = input_dataset
 
@@ -1635,15 +1653,17 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_dat
         if (preexisting_ER and (output_dataset.is_OK() or output_dataset.any_failed_checks())) or cable.is_trivial() or recover:
             logger.debug("[%d] Performing integrity check of trivial or previously generated output", worker_rank)
             # Perform integrity check.
-            output_dataset.check_integrity(output_path, user, curr_log, output_dataset.MD5_checksum)
+            icl = output_dataset.check_integrity(output_path, user, curr_log, output_dataset.MD5_checksum)
+            curr_record._successful = not icl.is_fail()
 
         # Did ER already exist, or is cable trivial, or recovering? No.
         else:
             logger.debug("[%d] Performing content check for output generated for the first time", worker_rank)
             summary_path = "{}_summary".format(output_path)
             # Perform content check.
-            output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
-                                          cable.max_rows_out, curr_log, user)
+            ccl = output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
+                                                     cable.max_rows_out, curr_log, user)
+            curr_record._successful = not ccl.is_fail()
 
         # If a sandbox was specified and we were successful, update the sandbox.
         if sandbox_to_update is not None and output_dataset.is_OK() and not recover:
@@ -1654,6 +1674,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_dat
 
     # End. Return curr_record.  Stop the clock if this was not a recovery.
     if not recover:
+        curr_record._complete = True
         curr_record.stop(save=True, clean=False)
     curr_record.complete_clean()
     return curr_record
@@ -1779,7 +1800,11 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
         curr_log.methodoutput.save()
         curr_log.stop(save=True, clean=False)
 
+        # Update state variables:
+        runstep._successful = False
+
         if not recover:
+            runstep._complete = True
             runstep.stop(save=True, clean=False)
         runstep.complete_clean()
         return runstep
@@ -1796,7 +1821,12 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
     except StopExecution as e:
         # Immediately end, marking the RunStep as cancelled, and re-raise e.
         logger.debug("[%d] Method execution stopped.", worker_rank)
+
+        # Update state variables.
         runstep.is_cancelled = True
+        runstep._complete = True
+        runstep._successful = False
+
         runstep.save()
         raise e
 
@@ -1836,6 +1866,9 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                             output_dataset.mark_missing(start_time, end_time, curr_log, user)
 
                             bad_output_found = True
+
+                            # Update state variables.
+                            runstep._successful = False
 
                         else:
                             # If necessary, create new Dataset for output, and create the Dataset
@@ -1907,11 +1940,17 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                     logger.debug("[%d] During recovery, output (%s) is missing", worker_rank, output_path)
                     file_is_present = False
 
+                    # Update state variables.
+                    runstep._successful = False
+
             if file_is_present:
                 # Perform integrity check.
                 logger.debug("[%d] Dataset has been computed before, checking integrity of %s",
                              worker_rank, output_dataset)
                 check = output_dataset.check_integrity(output_path, user, curr_log)
+
+                # Update state variables.
+                runstep._successful = not check.is_fail()
 
                 if check.is_fail():
                     logger.warn("[%d] IntegrityCheckLog failed for %s", worker_rank, output_path)
@@ -1923,9 +1962,11 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                         output_path, summary_path, curr_output.get_min_row(),
                         curr_output.get_max_row(), curr_log, user)
 
-                if check.is_fail():
-                    logger.warn("[%d] ContentCheckLog failed for %s", worker_rank, output_path)
-                    bad_output_found = True
+                    runstep._successful = not check.is_fail()
+
+                    if check.is_fail():
+                        logger.warn("[%d] ContentCheckLog failed for %s", worker_rank, output_path)
+                        bad_output_found = True
 
         # Recovering or filling in old ER? No.
         else:
@@ -1948,6 +1989,8 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
 
     # End. Return runstep.  Stop the clock if this was a recovery.
     if not recover:
+        # Update state variables.
+        runstep._complete = True
         if sandbox_to_update is not None:
             # Since reused=False, step_run_dir represents where the step *actually is*.
             sandbox_to_update.update_step_maps(runstep, step_run_dir, output_paths)
