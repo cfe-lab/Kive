@@ -382,7 +382,12 @@ class Sandbox:
 
                 # End. Return incomplete curr_record.
                 self.logger.warn("Recovery failed - returning RSIC/ROC without ExecLog")
+
+                # Update state variables: this cable is cancelled as it can no longer proceed.
+                curr_record.is_cancelled = True
+
                 if not recover:
+                    curr_record._complete = True
                     curr_record.stop(save=True, clean=False)
                 curr_record.clean()
                 return curr_record
@@ -458,6 +463,11 @@ class Sandbox:
                         self.logger.error("PipelineStepInputCable {} failed on reuse.".format(curr_RSIC))
                     else:
                         self.logger.error("PipelineStepInputCable {} failed.".format(curr_RSIC))
+
+                    # Update state variables.
+                    curr_RS._successful = False
+                    curr_RS._complete = True
+
                     curr_RS.stop(save=True, clean=True)
                     return curr_RS
 
@@ -491,6 +501,11 @@ class Sandbox:
                                     )
                                     curr_RS.reused = True
                                     curr_RS.execrecord = curr_ER
+
+                                    # Update state variables.
+                                    curr_RS._complete = True
+                                    curr_RS._successful = can_reuse["successful"]
+
                                     curr_RS.stop(save=False, clean=False)
                                     curr_RS.complete_clean()
                                     curr_RS.save()
@@ -525,14 +540,26 @@ class Sandbox:
 
                     # Failed recovery. Return RunStep with failed ExecLogs.
                     self.logger.warn("Recovery of Dataset {} failed".format(curr_in_dataset))
+
+                    curr_RS._complete = True
+                    curr_RS._is_cancelled = True
+
                     curr_RS.stop(save=True, clean=True)
                     return curr_RS
 
         # Run code.
         # If the step is a sub-Pipeline, execute it and return the RunStep.
         if pipelinestep.is_subpipeline:
-            self.execute_pipeline(pipeline=pipelinestep.transformation.pipeline, input_datasets=inputs_after_cable,
-                                  sandbox_path=step_run_dir, parent_runstep=curr_RS)
+            subrun = self.execute_pipeline(
+                pipeline=pipelinestep.transformation.pipeline,
+                input_datasets=inputs_after_cable,
+                sandbox_path=step_run_dir,
+                parent_runstep=curr_RS
+            )
+
+            curr_RS._complete = True
+            curr_RS._successful = subrun.is_marked_successful()
+
             curr_RS.stop(save=True, clean=True)
             return curr_RS
 
@@ -633,6 +660,11 @@ class Sandbox:
                     stop_now = True
 
             if stop_now:
+
+                # Update the state fields.
+                curr_run._complete = True
+                curr_run._successful = False
+
                 curr_run.stop(save=True, clean=True)
                 return curr_run
 
@@ -670,10 +702,20 @@ class Sandbox:
                     self.logger.debug("Reuse of cable %s failed", curr_ROC)
                 else:
                     self.logger.debug("Execution of cable %s failed", curr_ROC)
+
+                # Update state.
+                curr_run._complete = True
+                curr_run._successful = False
+
                 curr_run.stop(save=True, clean=True)
                 return curr_run
 
         self.logger.debug("Finished executing output cables")
+
+        # Update state.
+        curr_run._complete = True
+        curr_run._successful = True
+
         curr_run.stop(save=True, clean=False)
         curr_run.complete_clean()
         self.logger.debug("DONE EXECUTING PIPELINE - Run is complete, clean, and saved")
@@ -886,6 +928,9 @@ class Sandbox:
         else:
             cables_completed = [task_completed]
 
+        # A tracker for whether everything is complete or not.
+        all_complete = True
+
         # Go through steps in order, looking for input cables pointing at the task(s) that have completed.
         # If task_completed is None, then we are starting the pipeline and we look at the pipeline inputs.
         for step in pipeline_to_resume.steps.order_by("step_num"):
@@ -895,7 +940,13 @@ class Sandbox:
             if corresp_runstep.exists():
                 # We don't advance sub-pipelines -- if those are waiting on tasks in their parent run,
                 # then that would be a case for enqueue_runnable_tasks.
+
+                if not corresp_runstep.is_marked_complete():
+                    all_complete = False
                 continue
+
+            # At this point we know this step hasn't been *really* started yet (the RunStep may exist
+            # but is not started).  FIXME should this just look at start_time?
 
             # If this step is not fed at all by any of the tasks that just completed,
             # we skip it -- it can't have just become ready to go.
@@ -908,7 +959,6 @@ class Sandbox:
                 for cable in cables_completed:
                     if type(cable) is not archive.models.RunOutputCable:
                         continue
-
                     parent_runstep = cable.parent_run.parent_runstep
                     if parent_runstep is None:
                         continue
@@ -918,6 +968,8 @@ class Sandbox:
                         break
 
             if not fed_by_newly_completed:
+                # This one certainly isn't getting completed now.
+                all_complete = False
                 continue
 
             # Examine this step and see if all of the inputs are (at least symbolically) available.
@@ -956,6 +1008,7 @@ class Sandbox:
 
             if not all_inputs_fed:
                 # This step cannot be run yet, so we move on.
+                all_complete = False
                 continue
 
             # Start execution of this step.
@@ -963,16 +1016,21 @@ class Sandbox:
             run_dir = os.path.join(sandbox_path, "step{}".format(step.step_num))
             curr_RS = self.reuse_or_prepare_step(step, run_to_resume, step_inputs, run_dir)
 
+            if not curr_RS.is_marked_complete():
+                all_complete = False
+
             # If the step we just started is for a Method, and it was successfully reused, then we add its step
             # number to the list of those just completed.  This may then allow subsequent steps to also be started.
             if not curr_RS.pipelinestep.is_subpipeline:
                 if curr_RS.is_cancelled:
                     self.logger.debug("Step %d (%s) cancelled", step.step_num, step)
+                    run_to_resume.mark_unsuccessful()
                     return
-                elif curr_RS.reused and not curr_RS.successful_reuse():
+                elif curr_RS.reused and not curr_RS.is_marked_successful():
                     self.logger.debug("Step %d (%s) failed on reuse", step.step_num, step)
+                    run_to_resume.mark_unsuccessful()
                     return
-                elif curr_RS.is_complete():
+                elif curr_RS.is_marked_complete():
                     step_nums_completed.append(step.step_num)
             # Otherwise, we look and see if any of its outcables are complete.  If so, then add them to the
             # list -- they may allow stuff to run.
@@ -980,9 +1038,11 @@ class Sandbox:
                 for roc in curr_RS.child_run.runoutputcables.all():
                     if roc.is_cancelled:
                         self.logger.debug("Cable %s cancelled", roc.pipelineoutputcable)
+                        run_to_resume.mark_unsuccessful()
                         return
                     elif roc.reused and not roc.successful_reuse():
                         self.logger.debug("Cable %s failed on reuse", roc.pipelineoutputcable)
+                        run_to_resume.mark_unsuccessful()
                         return
                     elif roc.is_complete():
                         cables_completed.append(roc)
@@ -991,6 +1051,10 @@ class Sandbox:
         for outcable in pipeline_to_resume.outcables.order_by("output_idx"):
             # First, if this is already running, we skip it.
             if run_to_resume.runoutputcables.filter(pipelineoutputcable=outcable).exists():
+
+                curr_cable = run_to_resume.runoutputcables.get(pipelineoutputcable=outcable)
+                if not curr_cable.is_marked_complete():
+                    all_complete = False
                 continue
 
             # Check if this cable has just had its input made available.
@@ -999,7 +1063,7 @@ class Sandbox:
             for idx in step_nums_completed:
                 if outcable.source_step == idx:
                     source_dataset = self.socket_map[(run_to_resume, pipeline_to_resume.steps.get(step_num=idx),
-                                                 outcable.source)]
+                                                      outcable.source)]
                     fed_by_newly_completed = True
                     break
             if not fed_by_newly_completed:
@@ -1022,12 +1086,22 @@ class Sandbox:
                 output_path = os.path.join(self.out_dir, out_file_name)
                 cable_exec_info = self.reuse_or_prepare_cable(outcable, run_to_resume, source_dataset, output_path)
                 cr = cable_exec_info.cable_record
+
+                if not cr.is_marked_complete():
+                    all_complete = False
+
                 if cr.is_cancelled:
                     self.logger.debug("Cable %s cancelled", roc.pipelineoutputcable)
+                    run_to_resume.mark_unsuccessful()
                     return
                 elif cr.reused and not cr.successful_reuse():
                     self.logger.debug("Cable %s failed on reuse", roc.pipelineoutputcable)
+                    run_to_resume.mark_unsuccessful()
                     return
+
+        if all_complete:
+            run_to_resume._complete = True
+            run_to_resume.save()
 
     # Modified from execute_cable.
     def reuse_or_prepare_cable(self, cable, parent_record, input_dataset, output_path):
@@ -1053,7 +1127,7 @@ class Sandbox:
             # Update state variables.
             curr_record.is_cancelled = True
             curr_record._complete = True
-            curr_record._successful = False
+            curr_record.mark_unsuccessful()
 
             curr_record.stop(save=True, clean=False)
             curr_record.complete_clean()
@@ -1084,6 +1158,11 @@ class Sandbox:
                             )
                             curr_record.reused = True
                             curr_record.execrecord = curr_ER
+
+                            curr_record._complete = True
+                            if not can_reuse["successful"]:
+                                curr_record.mark_unsuccessful()
+
                             curr_record.stop(save=False, clean=False)
                             curr_record.complete_clean()
                             curr_record.save()
@@ -1196,6 +1275,11 @@ class Sandbox:
             if cable_exec_info.cancelled:
                 self.logger.debug("Input cable %s to step %s was cancelled", cable_exec_info.cable_record,
                                   curr_RS)
+
+                curr_RS._complete = True
+                # We don't need to mark this unsuccessful as the cable already did it.
+                # curr_RS.mark_unsuccessful()
+
                 curr_RS.stop(save=True, clean=False)
                 curr_RS.complete_clean()
             # If the cable is not complete and not ready to go, we need to recover its input.
@@ -1248,6 +1332,12 @@ class Sandbox:
                 curr_run.users_allowed.add(self.run.users_allowed.all())
                 curr_run.groups_allowed.add(self.run.groups_allowed.all())
                 self.advance_pipeline(run_to_start=curr_run)
+
+                # Update state.
+                if curr_run.is_marked_complete():
+                    curr_RS._complete = True
+                curr_RS._successful = curr_run.is_marked_successful()
+
                 return curr_RS
 
             # Look for a reusable ExecRecord.  If we find it, then complete the RunStep.
@@ -1267,6 +1357,11 @@ class Sandbox:
                                 )
                                 curr_RS.reused = True
                                 curr_RS.execrecord = curr_ER
+
+                                curr_RS._complete = True
+                                if not can_reuse["successful"]:
+                                    curr_RS.mark_unsuccessful()
+
                                 curr_RS.stop(save=True, clean=False)
                                 curr_RS.complete_clean()
                                 self.update_step_maps(curr_RS, step_run_dir, output_paths)
@@ -1501,6 +1596,10 @@ def finish_cable(cable_execute_dict, worker_rank):
                                      worker_rank, curr_ER, can_reuse["successful"])
                         curr_record.reused = True
                         curr_record.execrecord = curr_ER
+
+                        curr_record._complete = True
+                        curr_record._successful = can_reuse["successful"]
+
                         curr_record.stop(save=True, clean=False)
                         curr_record.complete_clean()
                         return curr_record
@@ -1533,6 +1632,10 @@ def finish_cable(cable_execute_dict, worker_rank):
         except IOError:
             logger.error("[%d] could not copy file %s to file %s.",
                          worker_rank, input_dataset.dataset_file.path, input_dataset_path)
+
+            curr_record._successful = False
+            curr_record._complete = True
+
             curr_record.stop(save=True, clean=True)
             return curr_record
 
@@ -1725,6 +1828,11 @@ def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
         # Cable failed, return incomplete RunStep.
         if not curr_RSIC.is_successful():
             logger.error("[%d] PipelineStepInputCable %s failed.", worker_rank, curr_RSIC)
+
+            # Update state variables.
+            curr_RS._successful = False
+            curr_RS._complete = True
+
             curr_RS.stop(save=True, clean=False)
             curr_RS.complete_clean()
             return curr_RS
@@ -1750,6 +1858,10 @@ def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
                                          worker_rank, curr_ER, can_reuse["successful"])
                             curr_RS.reused = True
                             curr_RS.execrecord = curr_ER
+
+                            curr_RS._complete = True
+                            curr_RS._successful = can_reuse["successful"]
+
                             curr_RS.stop(save=True, clean=False)
                             curr_RS.complete_clean()
                             return curr_RS

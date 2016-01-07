@@ -140,6 +140,15 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                                           blank=True,
                                           help_text="Step of parent run initiating this one as a sub-run")
 
+    # State fields to avoid the use of is_complete() and is_successful(), which can be slow.
+    _complete = models.BooleanField(
+        help_text="Denotes whether this run component has been completed. Private use only",
+        default=False)
+    _successful = models.BooleanField(
+        help_text="Denotes whether this has been successful. Private use only!",
+        default=False)
+
+
     # Implicitly, this also has start_time and end_time through inheritance.
 
     def is_stopped(self):
@@ -481,12 +490,15 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         # Nothing failed and all exist; we are complete and successful.
         return True
 
-    def complete_clean(self):
+    def complete_clean(self, thorough=False):
         """
         Checks completeness and coherence of a run.
         """
         self.clean()
-        if not self.is_complete():
+        complete = self.is_marked_complete()
+        if thorough:
+            complete = self.is_complete()
+        if not complete:
             raise ValidationError('Run "{}" is not complete'.format(self))
 
     def __str__(self):
@@ -697,6 +709,23 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         return addable_users, addable_groups
 
+    def is_marked_complete(self):
+        """
+        Returns whether or not this run has been marked as complete.
+        """
+        return self._complete
+
+    def is_marked_successful(self):
+        """
+        Returns whether or not this run has been marked as successful.
+        """
+        return self._successful
+
+    def mark_unsuccessful(self):
+        self._successful = False
+        if self.parent_runstep is not None:
+            self.parent_runstep.run.mark_unsuccessful()
+
 
 class RunInput(models.Model):
     """
@@ -764,12 +793,12 @@ class RunComponent(stopwatch.models.Stopwatch):
     def __str__(self):
         return 'RunComponent id {}'.format(self.id)
 
-    def save(self, *args, **kwargs):
-        if 'update_fields' not in kwargs:
-            self._complete = self.is_complete()
-            self._successful = self.is_successful()
-            self._redacted = self.is_redacted()
-        super(RunComponent, self).save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #     if 'update_fields' not in kwargs:
+    #         self._complete = self.is_complete()
+    #         self._successful = self.is_successful()
+    #         self._redacted = self.is_redacted()
+    #     super(RunComponent, self).save(*args, **kwargs)
 
     def has_data(self):
         """
@@ -1125,6 +1154,12 @@ class RunComponent(stopwatch.models.Stopwatch):
 
     def mark_unsuccessful(self):
         self._successful = False
+
+        if self.is_incable:
+            self.definite.runstep.run.mark_unsuccessful()
+        else:
+            self.definite.run.mark_unsuccessful()
+
         self.save(update_fields=["_successful"])
 
     def is_marked_successful(self):
