@@ -1154,13 +1154,6 @@ class RunComponent(stopwatch.models.Stopwatch):
         if not self.is_complete():
             raise ValidationError('{} "{}" is not complete'.format(self.__class__.__name__, self))
 
-    def mark_success_or_failure(self, status):
-        if status:
-            self._successful = True
-            self.save(update_fields=["_successful"])
-        else:
-            self.mark_unsuccessful()
-
     def mark_unsuccessful(self):
         self._successful = False
 

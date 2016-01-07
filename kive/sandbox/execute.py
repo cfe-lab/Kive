@@ -248,7 +248,7 @@ class Sandbox:
         """
         self.logger.error("File doesn't exist - creating CCL with BadData")
         ccl = output_dataset.content_checks.create(start_time=start_time, end_time=end_time, execlog=execlog,
-                                              user=self.user)
+                                                   user=self.user)
         ccl.add_missing_output()
 
     def execute_cable(self, cable, parent_record, recovering_record=None, input_dataset=None, output_path=None):
@@ -302,7 +302,7 @@ class Sandbox:
                 # Update some state variables.
                 curr_record.is_cancelled = True
                 curr_record.mark_complete()
-                curr_record.mark_success_or_failure(False)
+                curr_record.mark_unsuccessful()
 
                 curr_record.stop(save=True, clean=False)
                 curr_record.complete_clean()
@@ -329,7 +329,8 @@ class Sandbox:
 
                                 # Update state variables:
                                 curr_record.mark_complete()
-                                curr_record.mark_success_or_failure(can_reuse["successful"])
+                                if not can_reuse["successful"]:
+                                    curr_record.mark_unsuccessful()
 
                                 curr_record.stop(save=False, clean=False)
                                 curr_record.complete_clean()
@@ -465,7 +466,7 @@ class Sandbox:
                         self.logger.error("PipelineStepInputCable {} failed.".format(curr_RSIC))
 
                     # Update state variables.
-                    curr_RS.mark_success_or_failure(False)
+                    curr_RS.mark_unsuccessful()
                     curr_RS.mark_complete()
 
                     curr_RS.stop(save=True, clean=True)
@@ -504,7 +505,8 @@ class Sandbox:
 
                                     # Update state variables.
                                     curr_RS.mark_complete()
-                                    curr_RS.mark_success_or_failure(can_reuse["successful"])
+                                    if not can_reuse["successful"]:
+                                        curr_RS.mark_unsuccessful()
 
                                     curr_RS.stop(save=False, clean=False)
                                     curr_RS.complete_clean()
@@ -558,7 +560,8 @@ class Sandbox:
             )
 
             curr_RS._complete = True
-            curr_RS.mark_success_or_failure(subrun.is_marked_successful())
+            if not subrun.is_marked_successful():
+                curr_RS.mark_unsuccessful()
 
             curr_RS.stop(save=True, clean=True)
             return curr_RS
@@ -663,7 +666,7 @@ class Sandbox:
 
                 # Update the state fields.
                 curr_run.mark_complete()
-                curr_run.mark_success_or_failure(False)
+                curr_run.mark_unsuccessful()
 
                 curr_run.stop(save=True, clean=True)
                 return curr_run
@@ -705,7 +708,7 @@ class Sandbox:
 
                 # Update state.
                 curr_run.mark_complete()
-                curr_run.mark_success_or_failure(False)
+                curr_run.mark_unsuccessful()
 
                 curr_run.stop(save=True, clean=True)
                 return curr_run
@@ -714,7 +717,6 @@ class Sandbox:
 
         # Update state.
         curr_run.mark_complete()
-        curr_run.mark_success_or_failure(True)
 
         curr_run.stop(save=True, clean=False)
         curr_run.complete_clean(thorough=False)
@@ -1336,7 +1338,8 @@ class Sandbox:
                 # Update state.
                 if curr_run.is_marked_complete():
                     curr_RS.mark_complete()
-                curr_RS.mark_success_or_failure(curr_run.is_marked_successful())
+                if not curr_run.is_marked_successful():
+                    curr_RS.mark_unsuccessful()
 
                 return curr_RS
 
@@ -1598,7 +1601,8 @@ def finish_cable(cable_execute_dict, worker_rank):
                         curr_record.execrecord = curr_ER
 
                         curr_record.mark_complete()
-                        curr_record.mark_success_or_failure(can_reuse["successful"])
+                        if not can_reuse["successful"]:
+                            curr_record.mark_unsuccessful()
 
                         curr_record.stop(save=True, clean=False)
                         curr_record.complete_clean()
@@ -1633,7 +1637,7 @@ def finish_cable(cable_execute_dict, worker_rank):
             logger.error("[%d] could not copy file %s to file %s.",
                          worker_rank, input_dataset.dataset_file.path, input_dataset_path)
 
-            curr_record.mark_success_or_failure(False)
+            curr_record.mark_unsuccessful()
             curr_record.mark_complete()
 
             curr_record.stop(save=True, clean=True)
@@ -1698,7 +1702,7 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_dat
                     missing_output = True
 
                     # Update state variables.
-                    curr_record.mark_success_or_failure(False)
+                    curr_record.mark_unsuccessful()
 
                 elif cable.is_trivial():
                     output_dataset = input_dataset
@@ -1756,17 +1760,18 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_dat
         if (preexisting_ER and (output_dataset.is_OK() or output_dataset.any_failed_checks())) or cable.is_trivial() or recover:
             logger.debug("[%d] Performing integrity check of trivial or previously generated output", worker_rank)
             # Perform integrity check.
-            icl = output_dataset.check_integrity(output_path, user, curr_log, output_dataset.MD5_checksum)
-            curr_record.mark_success_or_failure(not icl.is_fail())
+            check = output_dataset.check_integrity(output_path, user, curr_log, output_dataset.MD5_checksum)
 
         # Did ER already exist, or is cable trivial, or recovering? No.
         else:
             logger.debug("[%d] Performing content check for output generated for the first time", worker_rank)
             summary_path = "{}_summary".format(output_path)
             # Perform content check.
-            ccl = output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
-                                                     cable.max_rows_out, curr_log, user)
-            curr_record.mark_success_or_failure(not ccl.is_fail())
+            check = output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
+                                                       cable.max_rows_out, curr_log, user)
+
+        if check.is_fail():
+            curr_record.mark_unsuccessful()
 
         # If a sandbox was specified and we were successful, update the sandbox.
         if sandbox_to_update is not None and output_dataset.is_OK() and not recover:
@@ -1830,7 +1835,7 @@ def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
             logger.error("[%d] PipelineStepInputCable %s failed.", worker_rank, curr_RSIC)
 
             # Update state variables.
-            curr_RS.mark_success_or_failure(False)
+            curr_RS.mark_unsuccessful()
             curr_RS.mark_complete()
 
             curr_RS.stop(save=True, clean=False)
@@ -1860,7 +1865,8 @@ def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
                             curr_RS.execrecord = curr_ER
 
                             curr_RS.mark_complete()
-                            curr_RS.mark_success_or_failure(can_reuse["successful"])
+                            if not can_reuse["successful"]:
+                                curr_RS.mark_unsuccessful()
 
                             curr_RS.stop(save=True, clean=False)
                             curr_RS.complete_clean()
@@ -1913,7 +1919,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
         curr_log.stop(save=True, clean=False)
 
         # Update state variables:
-        runstep.mark_success_or_failure(False)
+        runstep.mark_unsuccessful()
 
         if not recover:
             runstep.mark_complete()
@@ -1937,7 +1943,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
         # Update state variables.
         runstep.is_cancelled = True
         runstep.mark_complete()
-        runstep.mark_success_or_failure(False)
+        runstep.mark_unsuccessful()
 
         runstep.save()
         raise e
@@ -1980,7 +1986,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                             bad_output_found = True
 
                             # Update state variables.
-                            runstep.mark_success_or_failure(False)
+                            runstep.mark_unsuccessful()
 
                         else:
                             # If necessary, create new Dataset for output, and create the Dataset
@@ -2053,7 +2059,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                     file_is_present = False
 
                     # Update state variables.
-                    runstep.mark_success_or_failure(False)
+                    runstep.mark_unsuccessful()
 
             if file_is_present:
                 # Perform integrity check.
@@ -2062,7 +2068,8 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                 check = output_dataset.check_integrity(output_path, user, curr_log)
 
                 # Update state variables.
-                runstep.mark_success_or_failure(not check.is_fail())
+                if check.is_fail():
+                    runstep.mark_unsuccessful()
 
                 if check.is_fail():
                     logger.warn("[%d] IntegrityCheckLog failed for %s", worker_rank, output_path)
@@ -2074,7 +2081,8 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                         output_path, summary_path, curr_output.get_min_row(),
                         curr_output.get_max_row(), curr_log, user)
 
-                    runstep.mark_success_or_failure(not check.is_fail())
+                    if check.is_fail():
+                        runstep.mark_unsuccessful()
 
                     if check.is_fail():
                         logger.warn("[%d] ContentCheckLog failed for %s", worker_rank, output_path)
