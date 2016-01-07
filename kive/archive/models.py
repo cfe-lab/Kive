@@ -146,8 +146,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         default=False)
     _successful = models.BooleanField(
         help_text="Denotes whether this has been successful. Private use only!",
-        default=False)
-
+        default=True)
 
     # Implicitly, this also has start_time and end_time through inheritance.
 
@@ -239,7 +238,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     @property
     @transaction.atomic
     def running(self):
-        return self.started and not self.is_complete()
+        return self.started and not self.is_marked_complete()
 
     # FIXME this will need to be changed when we introduce flags for a cancelled or paused run.
     @property
@@ -490,7 +489,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         # Nothing failed and all exist; we are complete and successful.
         return True
 
-    def complete_clean(self, thorough=False):
+    def complete_clean(self, thorough=True):
         """
         Checks completeness and coherence of a run.
         """
@@ -773,7 +772,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         default=False)
     _successful = models.BooleanField(
         help_text="Denotes whether this has been successful. Private use only!",
-        default=False)
+        default=True)
     _redacted = models.BooleanField(
         help_text="Denotes whether this has been redacted. Private use only!",
         default=False)
@@ -1045,6 +1044,9 @@ class RunComponent(stopwatch.models.Stopwatch):
                     self.__class__.__name__, self)
             )
 
+    def mark_complete(self):
+        self._complete = True
+
     def is_marked_complete(self):
         """
         Returns whether or not this run component has been marked
@@ -1151,6 +1153,13 @@ class RunComponent(stopwatch.models.Stopwatch):
         self.clean()
         if not self.is_complete():
             raise ValidationError('{} "{}" is not complete'.format(self.__class__.__name__, self))
+
+    def mark_success_or_failure(self, status):
+        if status:
+            self._successful = True
+            self.save(update_fields=["_successful"])
+        else:
+            self.mark_unsuccessful()
 
     def mark_unsuccessful(self):
         self._successful = False

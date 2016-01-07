@@ -116,11 +116,11 @@ class Manager:
 
         # If we were able to reuse throughout, then we're totally done.  Otherwise we
         # need to do some bookkeeping.
-        if run_to_start.is_complete():
+        if run_to_start.is_marked_complete():
             mgr_logger.info('Run "%s" completely reused (Pipeline: %s, User: %s)',
                             run_to_start, run_to_start.pipeline, run_to_start.user)
             run_to_start.stop(save=True)
-            run_to_start.complete_clean()
+            run_to_start.complete_clean(thorough=False)
         else:
             self.active_sandboxes[run_to_start] = new_sdbx
             for task in new_sdbx.hand_tasks_to_fleet():
@@ -272,7 +272,7 @@ class Manager:
 
             curr_sdbx.run._complete = True
             curr_sdbx.run.stop(save=True)
-            curr_sdbx.run.complete_clean()
+            curr_sdbx.run.complete_clean(thorough=False)
 
             if curr_sdbx.run.is_marked_successful():
                 mgr_logger.info('Finished successful run "%s" (pk=%d) (Pipeline: %s, User: %s)',
