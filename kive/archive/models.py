@@ -141,12 +141,10 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                                           help_text="Step of parent run initiating this one as a sub-run")
 
     # State fields to avoid the use of is_complete() and is_successful(), which can be slow.
-    _complete = models.BooleanField(
-        help_text="Denotes whether this run component has been completed. Private use only",
-        default=False)
-    _successful = models.BooleanField(
-        help_text="Denotes whether this has been successful. Private use only!",
-        default=True)
+    _complete = models.NullBooleanField(
+        help_text="Denotes whether this run component has been completed. Private use only")
+    _successful = models.NullBooleanField(
+        help_text="Denotes whether this has been successful. Private use only!")
 
     # Implicitly, this also has start_time and end_time through inheritance.
 
@@ -419,10 +417,14 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         self.purged = True
         self.save()
 
-    def is_complete(self):
+    @update_field("_complete")
+    def is_complete(self, use_cache=False):
         """
         True if this run is complete; false otherwise.
         """
+        if use_cache and self._complete is not None:
+            return self._complete
+
         # A run is complete if all of its component RunSteps and
         # RunOutputCables are complete, or if any one fails and the
         # rest are complete or have not started.  If anything is in progress,
@@ -489,15 +491,12 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         # Nothing failed and all exist; we are complete and successful.
         return True
 
-    def complete_clean(self, thorough=True):
+    def complete_clean(self, use_cache=False):
         """
         Checks completeness and coherence of a run.
         """
         self.clean()
-        complete = self.is_marked_complete()
-        if thorough:
-            complete = self.is_complete()
-        if not complete:
+        if not self.is_complete(use_cache=use_cache):
             raise ValidationError('Run "{}" is not complete'.format(self))
 
     def __str__(self):
@@ -510,7 +509,8 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     def is_subrun(self):
         return self.parent_runstep is not None
 
-    def successful_execution(self):
+    @update_field("_successful")
+    def is_successful(self):
         """
         Checks if this Run is successful (so far).
         """
@@ -526,6 +526,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         # So far so good.
         return True
+
+    # def successful_execution(self):
+    #     return self.is_successful()
 
     def get_coordinates(self):
         """
@@ -708,22 +711,28 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         return addable_users, addable_groups
 
-    def is_marked_complete(self):
-        """
-        Returns whether or not this run has been marked as complete.
-        """
-        return self._complete
-
-    def is_marked_successful(self):
-        """
-        Returns whether or not this run has been marked as successful.
-        """
-        return self._successful
+    # def is_marked_complete(self):
+    #     """
+    #     Returns whether or not this run has been marked as complete.
+    #     """
+    #     return self._complete
+    #
+    # def is_marked_successful(self):
+    #     """
+    #     Returns whether or not this run has been marked as successful.
+    #     """
+    #     return self._successful
 
     def mark_unsuccessful(self):
         self._successful = False
+        self.save()
         if self.parent_runstep is not None:
             self.parent_runstep.run.mark_unsuccessful()
+
+    def mark_complete(self, save=False):
+        self._complete = True
+        if save:
+            self.save()
 
 
 class RunInput(models.Model):
@@ -767,15 +776,12 @@ class RunComponent(stopwatch.models.Stopwatch):
     is_cancelled = models.BooleanField(help_text="Denotes whether this has been cancelled",
                                        default=False)
 
-    _complete = models.BooleanField(
-        help_text="Denotes whether this run component has been completed. Private use only",
-        default=False)
-    _successful = models.BooleanField(
-        help_text="Denotes whether this has been successful. Private use only!",
-        default=True)
-    _redacted = models.BooleanField(
-        help_text="Denotes whether this has been redacted. Private use only!",
-        default=False)
+    _complete = models.NullBooleanField(
+        help_text="Denotes whether this run component has been completed. Private use only")
+    _successful = models.NullBooleanField(
+        help_text="Denotes whether this has been successful. Private use only!")
+    _redacted = models.NullBooleanField(
+        help_text="Denotes whether this has been redacted. Private use only!")
 
     # Implicit:
     # - log: via OneToOneField from ExecLog
@@ -1047,14 +1053,15 @@ class RunComponent(stopwatch.models.Stopwatch):
     def mark_complete(self):
         self._complete = True
 
-    def is_marked_complete(self):
-        """
-        Returns whether or not this run component has been marked
-        as complete when it was last saved.
-        """
-        return self._complete
+    # def is_marked_complete(self):
+    #     """
+    #     Returns whether or not this run component has been marked
+    #     as complete when it was last saved.
+    #     """
+    #     return self.is_complete(use_cache=True)
 
-    def is_complete(self, **kwargs):
+    @update_field("_complete")
+    def is_complete(self, use_cache=False, **kwargs):
         """
         True if this RunComponent is complete; false otherwise.
 
@@ -1067,8 +1074,14 @@ class RunComponent(stopwatch.models.Stopwatch):
         EL/ICL/CCL failed and the rest are complete (not all outputs
         have to have been checked).
 
+        If use_cache is True, then we return the value of self._complete
+        if that value is set.
+
         PRE: this RunComponent is clean.
         """
+        if use_cache and self._complete is not None:
+            return self._complete
+
         # Has this been cancelled before even being attempted?
         if self.is_cancelled:
             return True
@@ -1126,15 +1139,18 @@ class RunComponent(stopwatch.models.Stopwatch):
         return False
 
     @update_field("_redacted")
-    def is_redacted(self, *kwargs):
+    def is_redacted(self, use_cache=False):
+        if use_cache and self._redacted is not None:
+            return self._redacted
+
         if self.has_log and self.log.is_redacted():
             return True
         if self.execrecord is not None and self.execrecord.is_redacted():
             return True
         return False
 
-    def is_marked_redacted(self):
-        return self._redacted
+    # def is_marked_redacted(self):
+    #     return self._redacted
 
     def clean(self):
         """Confirm that this is one of RunStep or RunCable."""
@@ -1164,14 +1180,18 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         self.save(update_fields=["_successful"])
 
-    def is_marked_successful(self):
-        """
-        Returns whether or not this run component has been marked
-        as successful when it was last saved.
-        """
-        return self._successful
+    # def is_marked_successful(self):
+    #     """
+    #     Returns whether or not this run component has been marked
+    #     as successful when it was last saved.
+    #     """
+    #     return self._successful
 
-    def is_successful(self, **kwargs):
+    @update_field("_successful")
+    def is_successful(self, use_cache=False):
+        if use_cache and self._successful is not None:
+            return self._successful
+
         if self.is_cancelled:
             return False
         if self.reused:
@@ -1704,9 +1724,9 @@ class RunStep(RunComponent):
         # and successful.  Proceed to check the RunComponent stuff.
         return RunComponent.is_complete(self)
 
-    @update_field("_successful")
-    def is_successful(self, **kwargs):
-        return super(RunStep, self).is_successful()
+    # @update_field("_successful")
+    # def is_successful(self, **kwargs):
+    #     return super(RunStep, self).is_successful()
 
     def successful_execution(self):
         """
@@ -1923,13 +1943,13 @@ class RunCable(RunComponent):
     def is_trivial(self):
         return self.component.is_trivial()
 
-    @update_field("_complete")
-    def is_complete(self, **kwargs):
-        return super(RunCable, self).is_complete()
+    # @update_field("_complete")
+    # def is_complete(self, **kwargs):
+    #     return super(RunCable, self).is_complete()
 
-    @update_field("_successful")
-    def is_successful(self, **kwargs):
-        return super(RunCable, self).is_successful()
+    # @update_field("_successful")
+    # def is_successful(self, **kwargs):
+    #     return super(RunCable, self).is_successful()
 
     def _clean_not_reused(self):
         """
