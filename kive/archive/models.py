@@ -236,7 +236,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     @property
     @transaction.atomic
     def running(self):
-        return self.started and not self.is_marked_complete()
+        return self.started and not self.is_complete(use_cache=True)
 
     # FIXME this will need to be changed when we introduce flags for a cancelled or paused run.
     @property
@@ -315,7 +315,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             step_status = ""
             log_char = ""
 
-            if not step.is_marked_complete():
+            if not step.is_complete(use_cache=True):
                 try:
                     step.log.id
                     log_char = "+"
@@ -328,7 +328,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                         log_char = "."
                         step_status = "WAITING"
 
-            elif not step.is_marked_successful():
+            elif not step.is_successful(use_cache=True):
                 log_char = "!"
                 step_status = "FAILURE"
             else:
@@ -357,7 +357,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             if len(run_cables) <= 0:
                 log_char = "."
                 step_status = "WAITING"
-            elif run_cables[0].is_marked_complete():
+            elif run_cables[0].is_complete(use_cache=True):
                 log_char = "*"
                 step_status = "CLEAR"
             else:
@@ -510,10 +510,13 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         return self.parent_runstep is not None
 
     @update_field("_successful")
-    def is_successful(self):
+    def is_successful(self, use_cache=False):
         """
         Checks if this Run is successful (so far).
         """
+        if use_cache and self._successful is not None:
+            return self._successful
+
         # Check steps for success.
         for step in self.runsteps.all():
             if not step.is_successful():
@@ -710,18 +713,6 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             addable_groups = Group.objects.all()
 
         return addable_users, addable_groups
-
-    # def is_marked_complete(self):
-    #     """
-    #     Returns whether or not this run has been marked as complete.
-    #     """
-    #     return self._complete
-    #
-    # def is_marked_successful(self):
-    #     """
-    #     Returns whether or not this run has been marked as successful.
-    #     """
-    #     return self._successful
 
     def mark_unsuccessful(self):
         self._successful = False
@@ -1053,13 +1044,6 @@ class RunComponent(stopwatch.models.Stopwatch):
     def mark_complete(self):
         self._complete = True
 
-    # def is_marked_complete(self):
-    #     """
-    #     Returns whether or not this run component has been marked
-    #     as complete when it was last saved.
-    #     """
-    #     return self.is_complete(use_cache=True)
-
     @update_field("_complete")
     def is_complete(self, use_cache=False, **kwargs):
         """
@@ -1149,9 +1133,6 @@ class RunComponent(stopwatch.models.Stopwatch):
             return True
         return False
 
-    # def is_marked_redacted(self):
-    #     return self._redacted
-
     def clean(self):
         """Confirm that this is one of RunStep or RunCable."""
         # If the ExecRecord is set, check that access on the top level Run does not exceed
@@ -1179,13 +1160,6 @@ class RunComponent(stopwatch.models.Stopwatch):
             self.definite.run.mark_unsuccessful()
 
         self.save(update_fields=["_successful"])
-
-    # def is_marked_successful(self):
-    #     """
-    #     Returns whether or not this run component has been marked
-    #     as successful when it was last saved.
-    #     """
-    #     return self._successful
 
     @update_field("_successful")
     def is_successful(self, use_cache=False):
@@ -1754,7 +1728,7 @@ class RunStep(RunComponent):
         # is successful.
         try:
             self.child_run
-            return self.child_run.successful_execution()
+            return self.child_run.is_successful()
         except ObjectDoesNotExist:
             pass
 

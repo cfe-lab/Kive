@@ -719,7 +719,7 @@ class Sandbox:
         curr_run.mark_complete()
 
         curr_run.stop(save=True, clean=False)
-        curr_run.complete_clean(thorough=False)
+        curr_run.complete_clean(use_cache=True)
         self.logger.debug("DONE EXECUTING PIPELINE - Run is complete, clean, and saved")
 
         return curr_run
@@ -943,7 +943,7 @@ class Sandbox:
                 # We don't advance sub-pipelines -- if those are waiting on tasks in their parent run,
                 # then that would be a case for enqueue_runnable_tasks.
 
-                if not corresp_runstep.is_complete(use_cache=True):
+                if not corresp_runstep.first().is_complete(use_cache=True):
                     all_complete = False
                 continue
 

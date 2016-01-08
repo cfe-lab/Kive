@@ -502,7 +502,7 @@ class RestoreReusableDatasetTest(TestCase):
 
         run_to_process = self.execute_pipeline(pipeline)
 
-        self.assertTrue(run_to_process.successful_execution())
+        self.assertTrue(run_to_process.is_successful())
 
     def test_rerun_old_pipeline(self):
         pipeline = Pipeline.objects.get(revision_name='sums only')
@@ -510,7 +510,7 @@ class RestoreReusableDatasetTest(TestCase):
 
         run_to_process = self.execute_pipeline(pipeline)
 
-        self.assertTrue(run_to_process.successful_execution())
+        self.assertTrue(run_to_process.is_successful())
         self.assertEqual(expected_execrecord_count, ExecRecord.objects.count())
 
 

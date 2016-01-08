@@ -392,7 +392,7 @@ class BadRunTests(TestCase):
         sandbox = Sandbox(self.user_grandpa, self.pipeline_fubar, [self.dataset_grandpa])
         sandbox.execute_pipeline()
         self.assertIsNone(sandbox.run.complete_clean())
-        self.assertFalse(sandbox.run.successful_execution())
+        self.assertFalse(sandbox.run.is_successful())
 
         runstep1 = sandbox.run.runsteps.get(pipelinestep__step_num=1)
         self.assertIsNone(runstep1.complete_clean())
@@ -436,7 +436,7 @@ class FindDatasetTests(TestCase):
         sandbox = Sandbox(self.user_bob, self.pipeline_noop, [self.dataset_words])
         sandbox.execute_pipeline()
         self.assertIsNone(sandbox.run.complete_clean())
-        self.assertTrue(sandbox.run.successful_execution())
+        self.assertTrue(sandbox.run.is_successful())
 
         run, gen = sandbox.first_generator_of_dataset(self.dataset_words)
         self.assertEqual(run, sandbox.run)
@@ -464,7 +464,7 @@ class FindDatasetTests(TestCase):
         sandbox = Sandbox(self.user_bob, self.pipeline_twostep, [self.dataset_backwords])
         sandbox.execute_pipeline()
         self.assertIsNone(sandbox.run.complete_clean())
-        self.assertTrue(sandbox.run.successful_execution())
+        self.assertTrue(sandbox.run.is_successful())
 
         runcable = sandbox.run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
         dataset_to_find = runcable.execrecord.execrecordouts.first().dataset
@@ -495,7 +495,7 @@ class FindDatasetTests(TestCase):
         sandbox = Sandbox(self.user_bob, self.pipeline_nested, [self.dataset_backwords])
         sandbox.execute_pipeline()
         self.assertIsNone(sandbox.run.complete_clean())
-        self.assertTrue(sandbox.run.successful_execution())
+        self.assertTrue(sandbox.run.is_successful())
 
         subpipeline_step = sandbox.run.runsteps.get(pipelinestep__step_num=2)
         subrun = subpipeline_step.child_run

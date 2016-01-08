@@ -380,7 +380,7 @@ class ExecuteTests(ExecuteTestsBase):
         run = Sandbox(self.myUser, pipeline, inputs).execute_pipeline()
         self.assertTrue(run.is_complete())
 
-        self.assertTrue(run.successful_execution())
+        self.assertTrue(run.is_successful())
         self.assertIsNone(run.clean())
         self.assertIsNone(run.complete_clean())
 
@@ -394,7 +394,7 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertTrue(any(i.is_raw() for i in inputs))
         run = Sandbox(self.myUser, pipeline, inputs).execute_pipeline()
         self.assertTrue(run.is_complete())
-        self.assertTrue(run.successful_execution())
+        self.assertTrue(run.is_successful())
         self.assertIsNone(run.clean())
         self.assertIsNone(run.complete_clean())
 
@@ -471,7 +471,7 @@ class ExecuteTests(ExecuteTestsBase):
         rs = sandbox.run.runsteps.first()
 
         self.assertFalse(rs.log.methodoutput.are_checksums_OK)
-        self.assertFalse(sandbox.run.successful_execution())
+        self.assertFalse(sandbox.run.is_successful())
 
 
 class SandboxTests(ExecuteTestsBase):

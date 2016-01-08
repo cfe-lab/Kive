@@ -3394,13 +3394,13 @@ year,month,day,hour,minute,second,microsecond
         """Test on a Run with nothing started yet."""
         self.step_through_run_creation("empty_runs")
         self.assertFalse(self.pE_run.is_complete())
-        self.assertTrue(self.pE_run.successful_execution())
+        self.assertTrue(self.pE_run.is_successful())
 
     def test_run_incomplete_step(self):
         """Test on a Run with nothing started yet."""
         self.step_through_run_creation("third_step_cables_done")
         self.assertFalse(self.pE_run.is_complete())
-        self.assertTrue(self.pE_run.successful_execution())
+        self.assertTrue(self.pE_run.is_successful())
 
     def test_run_step_failed(self):
         """Test on a Run with a failed and complete step."""
@@ -3418,7 +3418,7 @@ year,month,day,hour,minute,second,microsecond
         mo_to_change.save()
 
         self.assertTrue(self.pE_run.is_complete())
-        self.assertFalse(self.pE_run.successful_execution())
+        self.assertFalse(self.pE_run.is_successful())
 
     def test_run_one_failed_step_one_incomplete_step(self):
         """Test on a Run with one failed and one incomplete step."""
@@ -3434,13 +3434,13 @@ year,month,day,hour,minute,second,microsecond
         step2.start()
 
         self.assertFalse(self.pE_run.is_complete())
-        self.assertFalse(self.pE_run.successful_execution())
+        self.assertFalse(self.pE_run.is_successful())
 
     def test_run_no_output_cables(self):
         """Test on a Run with no output cables yet."""
         self.step_through_run_creation("third_step_complete")
         self.assertFalse(self.pE_run.is_complete())
-        self.assertTrue(self.pE_run.successful_execution())
+        self.assertTrue(self.pE_run.is_successful())
 
     def test_run_incomplete_output_cable(self):
         """Test on a Run having an incomplete output cable."""
@@ -3451,7 +3451,7 @@ year,month,day,hour,minute,second,microsecond
         self.make_complete_non_reused(roc1, [self.C1_in_dataset], [self.E1_out_dataset])
         # Note that this isn't actually complete -- it doesn't have data checks yet.
         self.assertFalse(self.pE_run.is_complete())
-        self.assertTrue(self.pE_run.successful_execution())
+        self.assertTrue(self.pE_run.is_successful())
 
     def test_run_failed_output_cable(self):
         """Test on a Run having a failed output cable."""
@@ -3470,7 +3470,7 @@ year,month,day,hour,minute,second,microsecond
         self.E1_out_dataset.save()
 
         self.assertTrue(self.pE_run.is_complete())
-        self.assertFalse(self.pE_run.successful_execution())
+        self.assertFalse(self.pE_run.is_successful())
 
     def test_run_one_failed_output_cable_one_incomplete_output_cable(self):
         """Test on a Run having one failed output cable and one incomplete one."""
@@ -3490,19 +3490,19 @@ year,month,day,hour,minute,second,microsecond
         roc2.start()
 
         self.assertFalse(self.pE_run.is_complete())
-        self.assertFalse(self.pE_run.successful_execution())
+        self.assertFalse(self.pE_run.is_successful())
 
     def test_run_missing_output_cables(self):
         """Test on a Run having missing output cables."""
         self.step_through_run_creation("first_outcable")
         self.assertFalse(self.pE_run.is_complete())
-        self.assertTrue(self.pE_run.successful_execution())
+        self.assertTrue(self.pE_run.is_successful())
 
     def test_run_all_steps_and_cables_done(self):
         """Test on a Run that's completely done."""
         self.step_through_run_creation("outcables_done")
         self.assertTrue(self.pE_run.is_complete())
-        self.assertTrue(self.pE_run.successful_execution())
+        self.assertTrue(self.pE_run.is_successful())
 
 
 class TopLevelRunTests(TestCase, ArchiveTestCaseHelpers):

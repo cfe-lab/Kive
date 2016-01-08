@@ -13,7 +13,7 @@
     {
         "fields": {
             "_complete": true, 
-            "_redacted": false, 
+            "_redacted": null, 
             "_successful": true, 
             "end_time": "2000-01-01T00:00:02Z", 
             "execrecord": 2, 
@@ -27,7 +27,7 @@
     {
         "fields": {
             "_complete": true, 
-            "_redacted": false, 
+            "_redacted": null, 
             "_successful": true, 
             "end_time": "2000-01-01T00:00:01Z", 
             "execrecord": 1, 
@@ -41,13 +41,13 @@
     {
         "fields": {
             "_complete": true, 
-            "_redacted": false, 
+            "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "execrecord": 3, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:03Z"
+            "start_time": "2000-01-01T00:00:02Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 3
@@ -55,13 +55,13 @@
     {
         "fields": {
             "_complete": true, 
-            "_redacted": false, 
-            "_successful": true, 
-            "end_time": "2000-01-01T00:00:04Z", 
+            "_redacted": null, 
+            "_successful": null, 
+            "end_time": "2000-01-01T00:00:03Z", 
             "execrecord": 2, 
             "is_cancelled": false, 
             "reused": true, 
-            "start_time": "2000-01-01T00:00:04Z"
+            "start_time": "2000-01-01T00:00:03Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 4
@@ -69,13 +69,13 @@
     {
         "fields": {
             "_complete": true, 
-            "_redacted": false, 
+            "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:04Z", 
+            "end_time": "2000-01-01T00:00:03Z", 
             "execrecord": 1, 
             "is_cancelled": false, 
             "reused": true, 
-            "start_time": "2000-01-01T00:00:04Z"
+            "start_time": "2000-01-01T00:00:03Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 5
@@ -83,13 +83,13 @@
     {
         "fields": {
             "_complete": true, 
-            "_redacted": false, 
+            "_redacted": null, 
             "_successful": true, 
             "end_time": "2000-01-01T00:00:04Z", 
             "execrecord": 3, 
             "is_cancelled": false, 
             "reused": true, 
-            "start_time": "2000-01-01T00:00:04Z"
+            "start_time": "2000-01-01T00:00:03Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 6
@@ -97,13 +97,13 @@
     {
         "fields": {
             "_complete": true, 
-            "_redacted": false, 
+            "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:07Z", 
+            "end_time": "2000-01-01T00:00:06Z", 
             "execrecord": 5, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:06Z"
+            "start_time": "2000-01-01T00:00:05Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 7
@@ -111,13 +111,13 @@
     {
         "fields": {
             "_complete": true, 
-            "_redacted": false, 
+            "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:05Z", 
             "execrecord": 4, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:06Z"
+            "start_time": "2000-01-01T00:00:05Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 8
@@ -125,13 +125,13 @@
     {
         "fields": {
             "_complete": true, 
-            "_redacted": false, 
+            "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:09Z", 
+            "end_time": "2000-01-01T00:00:07Z", 
             "execrecord": 7, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:07Z"
+            "start_time": "2000-01-01T00:00:06Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 9
@@ -139,13 +139,13 @@
     {
         "fields": {
             "_complete": true, 
-            "_redacted": false, 
+            "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:08Z", 
+            "end_time": "2000-01-01T00:00:06Z", 
             "execrecord": 6, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:08Z"
+            "start_time": "2000-01-01T00:00:06Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 10
@@ -153,13 +153,13 @@
     {
         "fields": {
             "_complete": true, 
-            "_redacted": false, 
+            "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:09Z", 
+            "end_time": "2000-01-01T00:00:07Z", 
             "execrecord": 8, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:09Z"
+            "start_time": "2000-01-01T00:00:07Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 11
@@ -274,60 +274,60 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "invoking_record": 3, 
             "record": 3, 
-            "start_time": "2000-01-01T00:00:03Z"
+            "start_time": "2000-01-01T00:00:02Z"
         }, 
         "model": "archive.execlog", 
         "pk": 3
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:05Z", 
             "invoking_record": 8, 
             "record": 8, 
-            "start_time": "2000-01-01T00:00:06Z"
+            "start_time": "2000-01-01T00:00:05Z"
         }, 
         "model": "archive.execlog", 
         "pk": 4
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:05Z", 
             "invoking_record": 7, 
             "record": 7, 
-            "start_time": "2000-01-01T00:00:06Z"
+            "start_time": "2000-01-01T00:00:05Z"
         }, 
         "model": "archive.execlog", 
         "pk": 5
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:08Z", 
+            "end_time": "2000-01-01T00:00:06Z", 
             "invoking_record": 10, 
             "record": 10, 
-            "start_time": "2000-01-01T00:00:08Z"
+            "start_time": "2000-01-01T00:00:06Z"
         }, 
         "model": "archive.execlog", 
         "pk": 6
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:08Z", 
+            "end_time": "2000-01-01T00:00:06Z", 
             "invoking_record": 9, 
             "record": 9, 
-            "start_time": "2000-01-01T00:00:08Z"
+            "start_time": "2000-01-01T00:00:06Z"
         }, 
         "model": "archive.execlog", 
         "pk": 7
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:09Z", 
+            "end_time": "2000-01-01T00:00:07Z", 
             "invoking_record": 11, 
             "record": 11, 
-            "start_time": "2000-01-01T00:00:09Z"
+            "start_time": "2000-01-01T00:00:07Z"
         }, 
         "model": "archive.execlog", 
         "pk": 8
@@ -350,10 +350,10 @@
         "fields": {
             "are_checksums_OK": true, 
             "code_redacted": false, 
-            "error_log": "Logs/step1_stderr_SGmqMOp.txt", 
+            "error_log": "Logs/step1_stderr_fLrIOJ7.txt", 
             "error_redacted": false, 
             "execlog": 5, 
-            "output_log": "Logs/step1_stdout_IsJhXLd.txt", 
+            "output_log": "Logs/step1_stdout_apuw5Gz.txt", 
             "output_redacted": false, 
             "return_code": 0
         }, 
@@ -1059,7 +1059,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$BuzXBZOU7VUF$Amuxdq1BW1Pmb40JyhN2s2PKA63AtZhnGxIk1sv6b4o=", 
+            "password": "pbkdf2_sha256$15000$1WEHZKGSYAeR$U6E6T8m4+I9AItedp2bPnZXSKhNdL3K9A0bKMf4xhOk=", 
             "user_permissions": [], 
             "username": "Rem Over"
         }, 
@@ -1093,18 +1093,20 @@
     }, 
     {
         "fields": {
+            "_complete": true, 
+            "_successful": null, 
             "description": "", 
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "groups_allowed": [], 
             "name": "", 
             "parent_runstep": null, 
             "paused_by": null, 
             "pipeline": 2, 
             "purged": false, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userRem Over_run1_RIYXfB", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userRem Over_run1_wXKEV5", 
             "start_time": "2000-01-01T00:00:01Z", 
             "stopped_by": null, 
-            "time_queued": "2015-11-20T20:31:40.258Z", 
+            "time_queued": "2016-01-08T18:53:06.736Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1113,18 +1115,20 @@
     }, 
     {
         "fields": {
+            "_complete": true, 
+            "_successful": null, 
             "description": "", 
-            "end_time": "2000-01-01T00:00:05Z", 
+            "end_time": "2000-01-01T00:00:04Z", 
             "groups_allowed": [], 
             "name": "", 
             "parent_runstep": null, 
             "paused_by": null, 
             "pipeline": 2, 
             "purged": false, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userRem Over_run2_Pc0qQ3", 
-            "start_time": "2000-01-01T00:00:04Z", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userRem Over_run2_3Ho4jy", 
+            "start_time": "2000-01-01T00:00:03Z", 
             "stopped_by": null, 
-            "time_queued": "2015-11-20T20:31:43.042Z", 
+            "time_queued": "2016-01-08T18:53:08.890Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1133,18 +1137,20 @@
     }, 
     {
         "fields": {
+            "_complete": true, 
+            "_successful": null, 
             "description": "", 
-            "end_time": "2000-01-01T00:00:10Z", 
+            "end_time": "2000-01-01T00:00:08Z", 
             "groups_allowed": [], 
             "name": "", 
             "parent_runstep": null, 
             "paused_by": null, 
             "pipeline": 4, 
             "purged": false, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userRem Over_run3_VJIKff", 
-            "start_time": "2000-01-01T00:00:06Z", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userRem Over_run3_yK8ho_", 
+            "start_time": "2000-01-01T00:00:05Z", 
             "stopped_by": null, 
-            "time_queued": "2015-11-20T20:31:45.166Z", 
+            "time_queued": "2016-01-08T18:53:10.592Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1155,7 +1161,7 @@
         "fields": {
             "MD5_checksum": "97aac6a9fbc85d01b9b56d54cd2a5a1a", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/tmpmfN6Fy", 
+            "dataset_file": "Datasets/2016_01/tmpbuwgHm", 
             "date_created": "2000-01-01T00:00:00Z", 
             "description": "A dataset for use in the removal test case.", 
             "file_source": null, 
@@ -1171,9 +1177,9 @@
         "fields": {
             "MD5_checksum": "97aac6a9fbc85d01b9b56d54cd2a5a1a", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/step1_nuc_seq_out.csv", 
+            "dataset_file": "Datasets/2016_01/step1_nuc_seq_out.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
-            "description": "Generated data from a run of pipeline \"Nucleotide Sequence Noop:1 (v1)\" started at 2015-11-20 20:31:40.282679+00:00 by Rem Over\nrun: 1\nuser: Rem Over\nstep: 1\noutput: nuc_seq_out", 
+            "description": "Generated data from a run of pipeline \"Nucleotide Sequence Noop:1 (v1)\" started at 2016-01-08 18:53:06.760797+00:00 by Rem Over\nrun: 1\nuser: Rem Over\nstep: 1\noutput: nuc_seq_out", 
             "file_source": 1, 
             "groups_allowed": [], 
             "name": "run1_step1_outputnuc_seq_out", 
@@ -1187,8 +1193,8 @@
         "fields": {
             "MD5_checksum": "acf721d5ab57259504ea42bff552a8ab", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/tmpy8LaZF", 
-            "date_created": "2000-01-01T00:00:06Z", 
+            "dataset_file": "Datasets/2016_01/tmpH7vtpJ", 
+            "date_created": "2000-01-01T00:00:04Z", 
             "description": "A dataset for use in the removal test case with the two-step Pipeline.", 
             "file_source": null, 
             "groups_allowed": [], 
@@ -1203,9 +1209,9 @@
         "fields": {
             "MD5_checksum": "acf721d5ab57259504ea42bff552a8ab", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/step1_nuc_seq_out_viaHBvm.csv", 
-            "date_created": "2000-01-01T00:00:06Z", 
-            "description": "Generated data from a run of pipeline \"Nucleotide Sequence two-step Noop:1 (v1)\" started at 2015-11-20 20:31:45.209651+00:00 by Rem Over\nrun: 3\nuser: Rem Over\nstep: 1\noutput: nuc_seq_out", 
+            "dataset_file": "Datasets/2016_01/step1_nuc_seq_out_rKF2INg.csv", 
+            "date_created": "2000-01-01T00:00:05Z", 
+            "description": "Generated data from a run of pipeline \"Nucleotide Sequence two-step Noop:1 (v1)\" started at 2016-01-08 18:53:10.629055+00:00 by Rem Over\nrun: 3\nuser: Rem Over\nstep: 1\noutput: nuc_seq_out", 
             "file_source": 7, 
             "groups_allowed": [], 
             "name": "run3_step1_outputnuc_seq_out", 
@@ -1219,9 +1225,9 @@
         "fields": {
             "MD5_checksum": "acf721d5ab57259504ea42bff552a8ab", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/step2_nuc_seq_out.csv", 
-            "date_created": "2000-01-01T00:00:08Z", 
-            "description": "Generated data from a run of pipeline \"Nucleotide Sequence two-step Noop:1 (v1)\" started at 2015-11-20 20:31:45.209651+00:00 by Rem Over\nrun: 3\nuser: Rem Over\nstep: 2\noutput: nuc_seq_out", 
+            "dataset_file": "Datasets/2016_01/step2_nuc_seq_out.csv", 
+            "date_created": "2000-01-01T00:00:06Z", 
+            "description": "Generated data from a run of pipeline \"Nucleotide Sequence two-step Noop:1 (v1)\" started at 2016-01-08 18:53:10.629055+00:00 by Rem Over\nrun: 3\nuser: Rem Over\nstep: 2\noutput: nuc_seq_out", 
             "file_source": 9, 
             "groups_allowed": [], 
             "name": "run3_step2_outputnuc_seq_out", 
@@ -1276,7 +1282,7 @@
         "fields": {
             "MD5_checksum": "83626e348ac566a61cab9d94683446c7", 
             "coderesource": 2, 
-            "content_file": "CodeResources/fdopen_33mSDHU", 
+            "content_file": "CodeResources/fdopen_YkFOv6S", 
             "groups_allowed": [], 
             "revision_DateTime": "2000-01-01T00:00:00Z", 
             "revision_desc": "first version", 
@@ -1423,7 +1429,7 @@
     {
         "fields": {
             "groups_allowed": [], 
-            "revision_DateTime": "2000-01-01T00:00:05Z", 
+            "revision_DateTime": "2000-01-01T00:00:04Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
             "user": 2, 
@@ -1457,9 +1463,9 @@
     {
         "fields": {
             "dataset": 3, 
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:04Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:06Z", 
+            "start_time": "2000-01-01T00:00:04Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1468,9 +1474,9 @@
     {
         "fields": {
             "dataset": 4, 
-            "end_time": "2000-01-01T00:00:07Z", 
+            "end_time": "2000-01-01T00:00:05Z", 
             "execlog": 5, 
-            "start_time": "2000-01-01T00:00:07Z", 
+            "start_time": "2000-01-01T00:00:05Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1479,9 +1485,9 @@
     {
         "fields": {
             "dataset": 5, 
-            "end_time": "2000-01-01T00:00:09Z", 
+            "end_time": "2000-01-01T00:00:07Z", 
             "execlog": 7, 
-            "start_time": "2000-01-01T00:00:09Z", 
+            "start_time": "2000-01-01T00:00:07Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1501,9 +1507,9 @@
     {
         "fields": {
             "dataset": 2, 
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "execlog": 3, 
-            "start_time": "2000-01-01T00:00:03Z", 
+            "start_time": "2000-01-01T00:00:02Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
@@ -1512,9 +1518,9 @@
     {
         "fields": {
             "dataset": 3, 
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:05Z", 
             "execlog": 4, 
-            "start_time": "2000-01-01T00:00:06Z", 
+            "start_time": "2000-01-01T00:00:05Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
@@ -1523,9 +1529,9 @@
     {
         "fields": {
             "dataset": 4, 
-            "end_time": "2000-01-01T00:00:08Z", 
+            "end_time": "2000-01-01T00:00:06Z", 
             "execlog": 6, 
-            "start_time": "2000-01-01T00:00:08Z", 
+            "start_time": "2000-01-01T00:00:06Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
@@ -1534,9 +1540,9 @@
     {
         "fields": {
             "dataset": 5, 
-            "end_time": "2000-01-01T00:00:09Z", 
+            "end_time": "2000-01-01T00:00:07Z", 
             "execlog": 8, 
-            "start_time": "2000-01-01T00:00:09Z", 
+            "start_time": "2000-01-01T00:00:07Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 

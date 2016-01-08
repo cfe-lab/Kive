@@ -120,7 +120,7 @@ class Manager:
             mgr_logger.info('Run "%s" completely reused (Pipeline: %s, User: %s)',
                             run_to_start, run_to_start.pipeline, run_to_start.user)
             run_to_start.stop(save=True)
-            run_to_start.complete_clean(thorough=False)
+            run_to_start.complete_clean(use_cache=True)
         else:
             self.active_sandboxes[run_to_start] = new_sdbx
             for task in new_sdbx.hand_tasks_to_fleet():
@@ -272,7 +272,7 @@ class Manager:
 
             curr_sdbx.run.mark_complete()
             curr_sdbx.run.stop(save=True)
-            curr_sdbx.run.complete_clean(thorough=False)
+            curr_sdbx.run.complete_clean(use_cache=True)
 
             if curr_sdbx.run.is_successful(use_cache=True):
                 mgr_logger.info('Finished successful run "%s" (pk=%d) (Pipeline: %s, User: %s)',

@@ -1392,7 +1392,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$hZUsXBYQHaAh$/GG0lsVMsGVGb6tBFsT2q+L53YditYs7qakhJlBluw0=", 
+            "password": "pbkdf2_sha256$15000$b3D0t55mUr8e$OMEy6kP3w3udfEk/amZy30qeotZLaULX+exHvzfX4aY=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -1410,7 +1410,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:00Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$TKcpUsGS1zp8$FQE7NaHn0kKgWXAmFPdLhJhgkqZO+q+WL0aUilxEIDY=", 
+            "password": "pbkdf2_sha256$15000$kOYp0o8sZLL3$ApAwenlYwVQo5m/6DQWczdMM/JpgE1Uyl9kvNMh17eI=", 
             "user_permissions": [], 
             "username": "ringo"
         }, 
@@ -1430,7 +1430,7 @@
             "is_superuser": false, 
             "last_login": "2000-01-01T00:00:02Z", 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$Bb8F3PA04exj$KGsiWlc8E2nMkjuhkZ/Mv/sC8FxPMAWLfJQVu/RTHrg=", 
+            "password": "pbkdf2_sha256$15000$dmM8R0FLG9Dr$tHeqzVLm8lqElZ3b32GqD1S347S/EsowxlOwkJHHdkY=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -1658,6 +1658,8 @@
     }, 
     {
         "fields": {
+            "_complete": null, 
+            "_successful": null, 
             "description": "", 
             "end_time": null, 
             "groups_allowed": [
@@ -1671,7 +1673,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2015-11-20T20:29:34.249Z", 
+            "time_queued": "2016-01-08T18:51:23.324Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1680,6 +1682,8 @@
     }, 
     {
         "fields": {
+            "_complete": null, 
+            "_successful": null, 
             "description": "", 
             "end_time": null, 
             "groups_allowed": [
@@ -1693,7 +1697,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2015-11-20T20:29:34.260Z", 
+            "time_queued": "2016-01-08T18:51:23.335Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1702,6 +1706,8 @@
     }, 
     {
         "fields": {
+            "_complete": null, 
+            "_successful": null, 
             "description": "", 
             "end_time": null, 
             "groups_allowed": [
@@ -1715,7 +1721,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2015-11-20T20:29:36.171Z", 
+            "time_queued": "2016-01-08T18:51:25.082Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1726,7 +1732,7 @@
         "fields": {
             "MD5_checksum": "ab7afe2f453d27fd168641a1f9271f26", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/step_0_triplet.csv", 
+            "dataset_file": "Datasets/2016_01/step_0_triplet.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
             "description": "lol", 
             "file_source": null, 
@@ -1744,7 +1750,7 @@
         "fields": {
             "MD5_checksum": "02d5b66858d003b81ae3dc712b74e85c", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/doublet_cdt.csv", 
+            "dataset_file": "Datasets/2016_01/doublet_cdt.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
             "description": "lol", 
             "file_source": null, 
@@ -1762,7 +1768,7 @@
         "fields": {
             "MD5_checksum": "29feb269edcac613d6eea432c14640bd", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/singlet_cdt_large.csv", 
+            "dataset_file": "Datasets/2016_01/singlet_cdt_large.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
             "description": "lol", 
             "file_source": null, 
@@ -1780,7 +1786,7 @@
         "fields": {
             "MD5_checksum": "00fd50bfe7ac63e2165a442f4101e05c", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/step_0_singlet.csv", 
+            "dataset_file": "Datasets/2016_01/step_0_singlet.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
             "description": "lol", 
             "file_source": null, 
@@ -1798,7 +1804,7 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/step_0_raw.fasta", 
+            "dataset_file": "Datasets/2016_01/step_0_raw.fasta", 
             "date_created": "2000-01-01T00:00:01Z", 
             "description": "lol", 
             "file_source": null, 
@@ -1834,7 +1840,7 @@
         "fields": {
             "MD5_checksum": "56f9e5585b9d699829e2fda931d944f8", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/C1_in_triplet.csv", 
+            "dataset_file": "Datasets/2016_01/C1_in_triplet.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
             "description": "triplet 3 rows", 
             "file_source": null, 
@@ -1870,7 +1876,7 @@
         "fields": {
             "MD5_checksum": "10a4bd15d1300fcaf5a3bdad54ef1d28", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/E11_32_output.csv", 
+            "dataset_file": "Datasets/2016_01/E11_32_output.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
             "description": "result of E11_32 fed by doublet_cdt.csv", 
             "file_source": null, 
@@ -1888,8 +1894,8 @@
         "fields": {
             "MD5_checksum": "00fd50bfe7ac63e2165a442f4101e05c", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/step_0_singlet_Vj9DDaH.csv", 
-            "date_created": "2000-01-01T00:00:02Z", 
+            "dataset_file": "Datasets/2016_01/step_0_singlet_a7DI16k.csv", 
+            "date_created": "2000-01-01T00:00:01Z", 
             "description": "lol", 
             "file_source": null, 
             "groups_allowed": [
@@ -1906,8 +1912,8 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/step_0_raw_9kHdQ6r.fasta", 
-            "date_created": "2000-01-01T00:00:02Z", 
+            "dataset_file": "Datasets/2016_01/step_0_raw_sOAuGNq.fasta", 
+            "date_created": "2000-01-01T00:00:01Z", 
             "description": "lol", 
             "file_source": null, 
             "groups_allowed": [
@@ -1924,8 +1930,8 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/step_0_raw_NvFg4vM.fasta", 
-            "date_created": "2000-01-01T00:00:02Z", 
+            "dataset_file": "Datasets/2016_01/step_0_raw_4NKt88J.fasta", 
+            "date_created": "2000-01-01T00:00:01Z", 
             "description": "lol", 
             "file_source": null, 
             "groups_allowed": [
@@ -1942,8 +1948,8 @@
         "fields": {
             "MD5_checksum": "56f9e5585b9d699829e2fda931d944f8", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/step_0_triplet_3_rows.csv", 
-            "date_created": "2000-01-01T00:00:02Z", 
+            "dataset_file": "Datasets/2016_01/step_0_triplet_3_rows.csv", 
+            "date_created": "2000-01-01T00:00:01Z", 
             "description": "lol", 
             "file_source": null, 
             "groups_allowed": [
@@ -1960,7 +1966,7 @@
         "fields": {
             "MD5_checksum": "83957f8aea1c75da9f7fbf9bc90da979", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/doublet_remuxed_from_t3r.csv", 
+            "dataset_file": "Datasets/2016_01/doublet_remuxed_from_t3r.csv", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "doublet remuxed from triplet", 
             "file_source": null, 
@@ -1978,7 +1984,7 @@
         "fields": {
             "MD5_checksum": "d83866e4c23cd9503aa2f9fc565502b5", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/DNA_triplet.csv", 
+            "dataset_file": "Datasets/2016_01/DNA_triplet.csv", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "DNA triplet data", 
             "file_source": null, 
@@ -1996,7 +2002,7 @@
         "fields": {
             "MD5_checksum": "9eab0dfed5fcc89bd581f61995816ef0", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/E01_21_DNA_doublet.csv", 
+            "dataset_file": "Datasets/2016_01/E01_21_DNA_doublet.csv", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21", 
             "file_source": null, 
@@ -2014,7 +2020,7 @@
         "fields": {
             "MD5_checksum": "9b55b9431da6dba74ea61edf8e2ac044", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2015_11/E21_41_DNA_doublet.csv", 
+            "dataset_file": "Datasets/2016_01/E21_41_DNA_doublet.csv", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41", 
             "file_source": null, 
@@ -2378,7 +2384,7 @@
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:03Z", 
+            "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
             "user": 4, 
@@ -2392,7 +2398,7 @@
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:03Z", 
+            "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
             "user": 4, 
@@ -2481,7 +2487,7 @@
     {
         "fields": {
             "dataset": 9, 
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
             "start_time": "2000-01-01T00:00:01Z", 
             "user": 2
@@ -2492,9 +2498,9 @@
     {
         "fields": {
             "dataset": 10, 
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:02Z", 
+            "start_time": "2000-01-01T00:00:01Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2505,7 +2511,7 @@
             "dataset": 13, 
             "end_time": "2000-01-01T00:00:02Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:02Z", 
+            "start_time": "2000-01-01T00:00:01Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
