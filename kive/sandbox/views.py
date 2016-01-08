@@ -182,7 +182,7 @@ def view_results(request, run_id):
         raise Http404("ID {} does not exist or is not accessible".format(run_id))
 
     with transaction.atomic():
-        run_complete = run.is_complete()
+        run_complete = run.is_complete(use_cache=True)
 
     if request.method == "POST":
         # We don't allow changing anything until after the Run is finished.

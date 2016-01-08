@@ -1363,11 +1363,12 @@ class Sandbox:
                                 curr_RS.execrecord = curr_ER
 
                                 curr_RS.mark_complete()
+
                                 if not can_reuse["successful"]:
                                     curr_RS.mark_unsuccessful()
 
                                 curr_RS.stop(save=True, clean=False)
-                                curr_RS.complete_clean()
+                                curr_RS.complete_clean(use_cache=True)
                                 self.update_step_maps(curr_RS, step_run_dir, output_paths)
                                 execute_info.execrecord = curr_ER
                                 return curr_RS

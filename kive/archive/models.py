@@ -309,13 +309,13 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         # One of the steps is in progress?
         total_steps = self.pipeline.steps.count()
-        runsteps = sorted(self.runsteps.all(), key=lambda x: x.pipelinestep.step_num)
+        runsteps = self.runsteps.order_by("pipelinestep__step_num")
 
         for step in runsteps:
             step_status = ""
             log_char = ""
 
-            if not step.is_complete(use_cache=True):
+            if not step.is_complete(use_cache=True, dont_save=True):
                 try:
                     step.log.id
                     log_char = "+"
@@ -328,7 +328,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                         log_char = "."
                         step_status = "WAITING"
 
-            elif not step.is_successful(use_cache=True):
+            elif not step.is_successful(use_cache=True, dont_save=True):
                 log_char = "!"
                 step_status = "FAILURE"
             else:
@@ -349,7 +349,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         status += "-"
 
         # Which outcables are in progress?
-        cables = sorted(self.pipeline.outcables.all(), key=lambda x: x.output_idx)
+        cables = self.pipeline.outcables.order_by("output_idx")
         for pipeline_cable in cables:
             run_cables = filter(lambda x: x.run == self, pipeline_cable.poc_instances.all())
             log_char = ""
@@ -357,7 +357,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             if len(run_cables) <= 0:
                 log_char = "."
                 step_status = "WAITING"
-            elif run_cables[0].is_complete(use_cache=True):
+            elif run_cables[0].is_complete(use_cache=True, dont_save=True):
                 log_char = "*"
                 step_status = "CLEAR"
             else:
@@ -1143,12 +1143,12 @@ class RunComponent(stopwatch.models.Stopwatch):
         if not self.is_step and not self.is_cable:
             raise ValidationError("RunComponent with pk={} is neither a step nor a cable".format(self.pk))
 
-    def complete_clean(self):
+    def complete_clean(self, use_cache=False):
         """
         Checks coherence and completeness of this RunComponent.
         """
         self.clean()
-        if not self.is_complete():
+        if not self.is_complete(use_cache=use_cache):
             raise ValidationError('{} "{}" is not complete'.format(self.__class__.__name__, self))
 
     def mark_unsuccessful(self):
@@ -1162,7 +1162,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         self.save(update_fields=["_successful"])
 
     @update_field("_successful")
-    def is_successful(self, use_cache=False):
+    def is_successful(self, use_cache=False, **kwargs):
         if use_cache and self._successful is not None:
             return self._successful
 
@@ -1306,7 +1306,7 @@ class RunStep(RunComponent):
     @transaction.atomic
     def create(cls, pipelinestep, run, start=True):
         """Create a new RunStep from a PipelineStep."""
-        runstep = cls(pipelinestep=pipelinestep, run=run)
+        runstep = cls(pipelinestep=pipelinestep, run=run, _complete=False)
         if start:
             runstep.start()
         runstep.clean()
@@ -1683,9 +1683,9 @@ class RunStep(RunComponent):
             corresp_RSIC = run_step_input_cables.get(curr_cable)
             if corresp_RSIC is None:
                 all_cables_exist = False
-            elif not corresp_RSIC.is_complete():
+            elif not corresp_RSIC.is_complete(dont_save=True):
                 return False
-            elif not corresp_RSIC.is_successful():
+            elif not corresp_RSIC.is_successful(dont_save=True):
                 any_cables_failed = True
 
         # At this point we know that all RSICs that exist are complete.
@@ -1696,11 +1696,11 @@ class RunStep(RunComponent):
 
         # At this point we know that all RSICs exist, and are complete
         # and successful.  Proceed to check the RunComponent stuff.
-        return RunComponent.is_complete(self)
+        return RunComponent.is_complete(self, **kwargs)
 
     # @update_field("_successful")
     # def is_successful(self, **kwargs):
-    #     return super(RunStep, self).is_successful()
+    #     return super(RunStep, self).is_successful(**kwargs)
 
     def successful_execution(self):
         """
