@@ -15,4 +15,4 @@ function setupPipelineView(pipeline_dict) {
     self.pipeline = new Pipeline(canvasState);
     self.pipeline.load(pipeline_dict);
     self.pipeline.draw();
-};
+}

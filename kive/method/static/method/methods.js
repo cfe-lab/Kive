@@ -27,7 +27,7 @@ var MethodTable = function($table, is_user_admin, family_pk, $active_filters, $n
     $mf_filter.hide();
 
     this.registerColumn("Name", method_view_link);
-    this.registerColumn("", method_link)
+    this.registerColumn("", method_link);
     this.registerColumn("Description", "revision_desc");
 
     this.registerStandardColumn("user");
