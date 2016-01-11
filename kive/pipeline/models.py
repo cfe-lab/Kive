@@ -68,7 +68,7 @@ class PipelineFamily(transformation.models.TransformationFamily):
         """
         max_rev = self.max_revision()
         return (max_rev if max_rev is not None else 0) + 1
-     
+
     # @property
     # def published_version_display_name(self):
     #     if self.published_version is None:
@@ -170,7 +170,7 @@ class Pipeline(transformation.models.Transformation):
         if self.revision_name:
             string_rep += " ({})".format(self.revision_name)
         return string_rep
-    
+
     @property
     def display_name(self):
         return '{}: {}'.format(self.revision_number, self.revision_name)
@@ -304,7 +304,6 @@ class Pipeline(transformation.models.Transformation):
 
         return new_outcable
 
-
     def is_identical(self, other):
         """Is this Pipeline identical to another one?
 
@@ -345,7 +344,8 @@ class Pipeline(transformation.models.Transformation):
                                  .format(self, i, pipeline_input.get_cdt()))
 
             # Both are raw.
-            elif pipeline_raw: continue
+            elif pipeline_raw:
+                continue
 
             # Neither is raw.
             supplied_cdt = supplied_input.get_cdt()
@@ -415,13 +415,13 @@ class Pipeline(transformation.models.Transformation):
             pipelines_to_remove.add(ps.pipeline)
 
         return datasets_to_remove, ERs_to_remove, runs_to_remove, pipelines_to_remove
-    
+
     def find_step_updates(self):
         updates = []
         for step in self.steps.all():
             update = None
             transformation = step.transformation.find_update()
-            #TODO: handle nested pipelines
+            # TODO: handle nested pipelines
             if transformation is not None and transformation.is_method:
                 update = PipelineStepUpdate(step.step_num)
                 update.method = transformation.definite
@@ -559,7 +559,7 @@ class PipelineStep(models.Model):
 
         - Does the transformation at this step contain the parent pipeline?
         - Are any inputs multiply-cabled?
-        
+
         Also, validate each input cable, and each specified output deletion.
 
         A PipelineStep must be save()d before cables can be connected to
@@ -708,7 +708,7 @@ class PipelineCable(models.Model):
         """
         Cables are compatible if both are trivial, or the wiring
         matches.
-        
+
         For two cables' wires to match, any wire connecting column
         indices (source_idx, dest_idx) must appear in both cables.
 
@@ -783,7 +783,7 @@ class PipelineCable(models.Model):
         wires = self.custom_wires.all()
 
         # Use wires to determine the CDT of the output of this cable
-        all_members = metadata.models.CompoundDatatypeMember.objects # shorthand
+        all_members = metadata.models.CompoundDatatypeMember.objects  # shorthand
         compatible_CDTs = None
         for wire in wires:
             # Find all CompoundDatatypes with correct members.
@@ -794,7 +794,7 @@ class PipelineCable(models.Model):
             if compatible_CDTs is None:
                 compatible_CDTs = candidate_CDTs
             else:
-                compatible_CDTs &= candidate_CDTs # intersection
+                compatible_CDTs &= candidate_CDTs  # intersection
             if not compatible_CDTs:
                 return None
 
@@ -822,7 +822,7 @@ class PipelineCable(models.Model):
             self.logger.debug("Adding CDTM: {} {}".format(wire.dest_pin.column_name, wire.dest_pin.column_idx))
             output_CDT.members.create(datatype=wire.source_pin.datatype,
                                       column_name=wire.dest_pin.column_name,
-                                       column_idx=wire.dest_pin.column_idx)
+                                      column_idx=wire.dest_pin.column_idx)
 
         output_CDT.clean()
         output_CDT.save()
@@ -878,7 +878,7 @@ class PipelineCable(models.Model):
             input_csv = csv.DictReader(infile)
 
             with open(output_path, "wb") as outfile:
-                output_csv = csv.DictWriter(outfile,fieldnames=output_fields)
+                output_csv = csv.DictWriter(outfile, fieldnames=output_fields)
                 output_csv.writeheader()
 
                 for source_row in input_csv:
@@ -992,7 +992,7 @@ class PipelineStepInputCable(PipelineCable):
     Related to :model:`pipeline.models.PipelineStep`
     """
     # The step (Which has a transformation) where we define incoming cabling
-    pipelinestep = models.ForeignKey(PipelineStep, related_name = "cables_in")
+    pipelinestep = models.ForeignKey(PipelineStep, related_name="cables_in")
 
     # Input hole (TransformationInput) of the transformation
     # at this step to which the cable leads
@@ -1037,7 +1037,7 @@ class PipelineStepInputCable(PipelineCable):
         """
         step_str = "[no pipeline step set]"
         is_raw_str = ""
-        if self.pipelinestep != None:
+        if self.pipelinestep is not None:
             step_str = unicode(self.pipelinestep)
         if self.is_raw():
             is_raw_str = "(raw)"
@@ -1299,7 +1299,7 @@ class CustomCableWire(models.Model):
                 format(self.cable))
 
         # Wires connect either PSIC or POCs, so these cases are separate
-        source_CDT_members = self.cable.source.get_cdt().members.all() # Duck-typing
+        source_CDT_members = self.cable.source.get_cdt().members.all()  # Duck typing
         dest_CDT = None
         dest_CDT_members = None
         if self.cable.is_incable:
@@ -1392,7 +1392,7 @@ class PipelineOutputCable(PipelineCable):
         """ Represent with the pipeline name, and TO output index + name """
 
         pipeline_name = "[no pipeline set]"
-        if self.pipeline != None:
+        if self.pipeline is not None:
             pipeline_name = unicode(self.pipeline)
 
         return "POC feeding Output_idx [{}], Output_name [{}] for pipeline [{}]".format(
@@ -1428,7 +1428,7 @@ class PipelineOutputCable(PipelineCable):
     def clean(self):
         """
         Checks coherence of this output cable.
-        
+
         PipelineOutputCable must reference an existant, undeleted
         transformation output hole.  Also, if the cable is raw, there
         should be no custom wiring.  If the cable is not raw and there
@@ -1450,11 +1450,11 @@ class PipelineOutputCable(PipelineCable):
         outwires = self.custom_wires.all()
 
         # The cable and destination must both be raw (or non-raw)
-        if self.output_cdt == None and not self.is_raw():
+        if self.output_cdt is None and not self.is_raw():
             raise ValidationError(
                 "Cable \"{}\" has a null output_cdt but its source is non-raw" .
                 format(self))
-        elif self.output_cdt != None and self.is_raw():
+        elif self.output_cdt is not None and self.is_raw():
             raise ValidationError(
                 "Cable \"{}\" has a non-null output_cdt but its source is raw" .
                 format(self))
@@ -1484,7 +1484,7 @@ class PipelineOutputCable(PipelineCable):
 
     def complete_clean(self):
         """Checks completeness and coherence of this POC.
-        
+
         Calls clean, and then checks that if this POC is not raw and there
         are any custom wires defined, then they must quench the output CDT.
         """
