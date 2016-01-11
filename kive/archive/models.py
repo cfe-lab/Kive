@@ -280,6 +280,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         @return {'id': run_id, 'status': s, 'name': n, 'start': t, 'end': t,
             'user': u}
         """
+
         result = {'name': self.display_name}
         if hasattr(self, "not_enough_CPUs"):
             esc = self.not_enough_CPUs
@@ -351,23 +352,26 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         # Which outcables are in progress?
         cables = self.pipeline.outcables.order_by("output_idx")
         for pipeline_cable in cables:
-            run_cables = filter(lambda x: x.run == self, pipeline_cable.poc_instances.all())
+
+            curr_roc_qs = self.runoutputcables.filter(pipelineoutputcable=pipeline_cable)
             log_char = ""
             step_status = ""
-            if len(run_cables) <= 0:
+            if not curr_roc_qs.exists():
                 log_char = "."
                 step_status = "WAITING"
-            elif run_cables[0].is_complete(use_cache=True, dont_save=True):
-                log_char = "*"
-                step_status = "CLEAR"
             else:
-                try:
-                    run_cables[0].log.id
-                    log_char = "+"
-                    step_status = "RUNNING"
-                except ExecLog.DoesNotExist:
-                    log_char = ":"
-                    step_status = "READY"
+                curr_roc = curr_roc_qs.first()
+                if curr_roc.is_complete(use_cache=True, dont_save=True):
+                    log_char = "*"
+                    step_status = "CLEAR"
+                else:
+                    try:
+                        curr_roc.log.id
+                        log_char = "+"
+                        step_status = "RUNNING"
+                    except ExecLog.DoesNotExist:
+                        log_char = ":"
+                        step_status = "READY"
 
             # Log the status
             status += log_char
@@ -456,9 +460,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             corresp_rs = run_step_map.get(step)
             if corresp_rs is None:
                 all_exist = False
-            elif corresp_rs.has_started() and not corresp_rs.is_complete():
+            elif corresp_rs.has_started() and not corresp_rs.is_complete(use_cache=use_cache):
                 return False
-            elif not corresp_rs.is_successful():
+            elif not corresp_rs.is_successful(use_cache=use_cache):
                 anything_failed = True
 
         cables = self.runoutputcables.prefetch_related(
@@ -475,9 +479,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             corresp_roc = run_output_cable_map.get(outcable)
             if corresp_roc is None:
                 all_exist = False
-            elif corresp_roc.has_started() and not corresp_roc.is_complete():
+            elif corresp_roc.has_started() and not corresp_roc.is_complete(use_cache=use_cache):
                 return False
-            elif not corresp_roc.is_successful():
+            elif not corresp_roc.is_successful(use_cache=use_cache):
                 anything_failed = True
 
         # At this point, all RunSteps and ROCs that exist are complete or unstarted.
@@ -519,12 +523,12 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         # Check steps for success.
         for step in self.runsteps.all():
-            if not step.is_successful():
+            if not step.is_successful(use_cache=use_cache):
                 return False
 
         # All steps checked out.  Check outcables.
         for outcable in self.runoutputcables.all():
-            if not outcable.is_successful():
+            if not outcable.is_successful(use_cache=use_cache):
                 return False
 
         # So far so good.
@@ -1649,7 +1653,7 @@ class RunStep(RunComponent):
             self._clean_outputs()
 
     @update_field("_complete")
-    def is_complete(self, **kwargs):
+    def is_complete(self, use_cache=False, **kwargs):
         """
         True if RunStep is complete; False otherwise.
 
@@ -1662,10 +1666,14 @@ class RunStep(RunComponent):
 
         PRE: this RunStep must be clean.
         """
+
+        if use_cache and self._complete is not None:
+            return self._complete
+
         # Sub-Pipeline case:
         if self.pipelinestep.transformation.is_pipeline:
             if self.has_subrun():
-                return self.child_run.is_complete()
+                return self.child_run.is_complete(use_cache=use_cache)
             # At this point, child_run hasn't been set yet, so we can
             # say that it isn't complete.
             return False
@@ -1683,9 +1691,9 @@ class RunStep(RunComponent):
             corresp_RSIC = run_step_input_cables.get(curr_cable)
             if corresp_RSIC is None:
                 all_cables_exist = False
-            elif not corresp_RSIC.is_complete(dont_save=True):
+            elif not corresp_RSIC.is_complete(use_cache=use_cache, dont_save=True):
                 return False
-            elif not corresp_RSIC.is_successful(dont_save=True):
+            elif not corresp_RSIC.is_successful(use_cache=use_cache, dont_save=True):
                 any_cables_failed = True
 
         # At this point we know that all RSICs that exist are complete.
@@ -1696,7 +1704,7 @@ class RunStep(RunComponent):
 
         # At this point we know that all RSICs exist, and are complete
         # and successful.  Proceed to check the RunComponent stuff.
-        return RunComponent.is_complete(self, **kwargs)
+        return RunComponent.is_complete(self, use_cache=use_cache, **kwargs)
 
     # @update_field("_successful")
     # def is_successful(self, **kwargs):

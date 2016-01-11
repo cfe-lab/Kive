@@ -38,11 +38,11 @@ class Pipeline(object):
     A wrapper class for Kive's Pipeline object
     """
 
-    def __init__(self, obj):
+    def __init__(self, obj, pipeline_family_pk=None):
         try:
             if type(obj) == dict:
                 self.pipeline_id = obj['id']
-                self.family = obj['family']
+                self.family = pipeline_family_pk or obj['family']
                 self.revision_name = obj['display_name']
                 self.revision_number = obj['revision_number']
                 self.published = obj["published"] if "published" in obj else False
@@ -82,7 +82,7 @@ class PipelineFamily(object):
         try:
             self.family_id = obj['id']
             self.name = obj['name']
-            self.pipelines = [Pipeline(p) for p in obj['members']]
+            self.pipelines = [Pipeline(p, self.family_id) for p in obj['members']]
             try:
                 self.published_version = [p for p in self.pipelines if p.published][0]
             except IndexError:
