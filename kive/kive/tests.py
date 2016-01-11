@@ -78,9 +78,7 @@ def install_fixture_files(fixture_name):
     fixture_files_path = os.path.join("FixtureFiles", fixture_name)
     assert os.path.isdir(fixture_files_path)
 
-    if os.path.isdir(stash_dir):
-        shutil.rmtree(stash_dir)
-    os.makedirs(stash_dir)
+    os.makedirs(stash_dir)  # We want this to fail if it already exists.
 
     for target in targets:
         target_path = os.path.join(settings.MEDIA_ROOT, target)

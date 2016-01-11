@@ -13,7 +13,7 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 from rest_framework import status
 
 from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable,\
-    Dataset, RunInput
+    RunInput
 from archive.serializers import RunSerializer
 from archive.exceptions import SandboxActiveException, RunNotFinished
 from librarian.models import ExecRecord, Dataset
@@ -897,6 +897,9 @@ class RunSerializerTests(TestCase):
             description="lol",
             user=self.myUser
         )
+
+    def tearDown(self):
+        restore_production_files()
 
     def test_validate(self):
         """
