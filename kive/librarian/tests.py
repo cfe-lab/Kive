@@ -47,7 +47,7 @@ def ER_from_record(record):
     myEL.end_time = timezone.now()
     myEL.save()
     if record.__class__.__name__ == "RunStep":
-        output = MethodOutput(execlog=myEL, return_code = 0)
+        output = MethodOutput(execlog=myEL, return_code=0)
         output.save()
         myEL.methodoutput = output
         myEL.save()
@@ -91,7 +91,7 @@ class DatasetTests(LibrarianTestCase):
         # Turn off logging, so the test output isn't polluted.
         logging.getLogger('Dataset').setLevel(logging.CRITICAL)
         logging.getLogger('CompoundDatatype').setLevel(logging.CRITICAL)
-        
+
         rows = 10
         seqlen = 10
 
@@ -110,10 +110,12 @@ class DatasetTests(LibrarianTestCase):
         self.datatype_dna.complete_clean()
         self.cdt_record = CompoundDatatype(user=self.myUser)
         self.cdt_record.save()
-        self.cdt_record.members.create(datatype=self.datatype_str, 
-            column_name="header", column_idx=1)
+        self.cdt_record.members.create(datatype=self.datatype_str,
+                                       column_name="header",
+                                       column_idx=1)
         self.cdt_record.members.create(datatype=self.datatype_dna,
-            column_name="sequence", column_idx=2)
+                                       column_name="sequence",
+                                       column_idx=2)
         self.cdt_record.clean()
 
         self.data_file = tempfile.NamedTemporaryFile(delete=False)
@@ -251,7 +253,7 @@ foo,bar
         """
         compound_datatype = CompoundDatatype(user=self.myUser)
         compound_datatype.save()
-        compound_datatype.members.create(datatype=self.STR, 
+        compound_datatype.members.create(datatype=self.STR,
                                          column_name="name",
                                          column_idx=1)
         compound_datatype.members.create(datatype=self.INT,
@@ -394,8 +396,8 @@ class ExecRecordTests(LibrarianTestCase):
         myROC = self.pE_run.runoutputcables.create(pipelineoutputcable=self.E21_41)
         myER = ER_from_record(myROC)
         myERI_bad = myER.execrecordins.create(
-            dataset = self.singlet_dataset,
-            generic_input = self.C1_out)
+            dataset=self.singlet_dataset,
+            generic_input=self.C1_out)
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -411,7 +413,7 @@ class ExecRecordTests(LibrarianTestCase):
             ValidationError,
             "ExecRecordIn \".*\" does not denote the TO/TI that feeds the parent ExecRecord PSIC",
             myERI_bad.clean)
-        
+
         yourER = ER_from_PSIC(self.pE_run, self.step_E2, self.E02_22)
         yourERI_bad = yourER.execrecordins.create(dataset=self.singlet_dataset,
                                                   generic_input=self.D2_in)
@@ -450,7 +452,7 @@ class ExecRecordTests(LibrarianTestCase):
             generic_input=self.B1_in)
 
         self.assertEqual(myERI_good.clean(), None)
-        
+
         myERI_bad = myER.execrecordins.create(
             dataset=self.triplet_dataset,
             generic_input=self.mB.outputs.all()[0])
@@ -489,7 +491,7 @@ class ExecRecordTests(LibrarianTestCase):
             r'Dataset ".*" \(non-raw\) cannot feed source ".*" \(raw\)',
             myERI_unraw_raw_BAD.clean)
         myERI_unraw_raw_BAD.delete()
-    
+
         myERI_raw_raw = myER_A.execrecordins.create(
             dataset=self.raw_dataset,
             generic_input=self.A1_rawin)
@@ -607,7 +609,7 @@ class ExecRecordTests(LibrarianTestCase):
             dataset=self.singlet_dataset, generic_output=self.C1_out)
         self.assertEqual(myERO_DS_TO.clean(), None)
         myERO_DS_TO.delete()
-        
+
         # 2) Dataset must have the same CDT of the producing TO
         myERO_invalid_CDT = myER.execrecordouts.create(
             dataset=self.triplet_dataset, generic_output=self.C1_out)
@@ -630,7 +632,9 @@ class ExecRecordTests(LibrarianTestCase):
         myERO_too_many_rows.delete()
 
     def test_ERI_associated_Dataset_must_be_restriction_of_input_CDT(self):
-        """If the ERI has a real non-raw Dataset associated to it, the Dataset must have a CDT that is a restriction of the input it feeds."""
+        """ If the ERI has a real non-raw Dataset associated to it,
+        the Dataset must have a CDT that is a restriction of the input it feeds.
+        """
         # Method mC is step step_E3 of pipeline pE.
         mC_RS = self.pE_run.runsteps.create(pipelinestep=self.step_E3)
         mC_ER = ER_from_record(mC_RS)
@@ -668,7 +672,7 @@ class ExecRecordTests(LibrarianTestCase):
             ValidationError,
             "CDT of Dataset .* is not a restriction of the required CDT",
             mC_ER_in_1.clean)
-        
+
     def test_ERO_CDT_restrictions_Method(self):
         """ERO CDT restriction tests for the ER of a Method."""
         # Method mA is step step_E1 of pipeline pE.
@@ -689,7 +693,7 @@ class ExecRecordTests(LibrarianTestCase):
                                  column_name="x", column_idx=1)
         other_CDT.members.create(datatype=self.string_dt,
                                  column_name="y", column_idx=2)
-        
+
         self.doublet_dataset.structure.compounddatatype = other_CDT
         self.doublet_dataset.structure.save()
 
@@ -699,7 +703,7 @@ class ExecRecordTests(LibrarianTestCase):
             mA_ERO.clean)
 
         # Bad case: output Dataset has another CDT altogether.
-        mA_ERO.dataset=self.triplet_dataset
+        mA_ERO.dataset = self.triplet_dataset
 
         self.assertRaisesRegexp(
             ValidationError,
@@ -725,7 +729,7 @@ class ExecRecordTests(LibrarianTestCase):
                                         column_name="x", column_idx=1)
         other_CDT.members.create(datatype=self.string_dt,
                                  column_name="y", column_idx=2)
-        
+
         self.E1_out_dataset.structure.compounddatatype = other_CDT
         self.E1_out_dataset.structure.save()
         self.assertEqual(outcable_ERO.clean(), None)
@@ -765,7 +769,7 @@ class ExecRecordTests(LibrarianTestCase):
                                         column_name="x", column_idx=1)
         other_CDT.members.create(datatype=self.string_dt,
                                  column_name="y", column_idx=2)
-        
+
         self.doublet_dataset.structure.compounddatatype = other_CDT
         self.doublet_dataset.structure.save()
         self.assertEqual(cable_ERO.clean(), None)
@@ -789,10 +793,10 @@ class ExecRecordTests(LibrarianTestCase):
         cable_ER = ER_from_PSIC(self.pE_run, self.step_E2, self.E02_22)
         cable_ER.execrecordins.create(
             generic_input=self.E2_in,
-            dataset = self.singlet_dataset)
+            dataset=self.singlet_dataset)
         cable_ERO = cable_ER.execrecordouts.create(
             generic_output=self.D2_in,
-            dataset = self.singlet_dataset)
+            dataset=self.singlet_dataset)
 
         # Good case: datasets on either side of this trivial cable match.
         self.assertEqual(cable_ER.clean(), None)
@@ -827,7 +831,6 @@ class ExecRecordTests(LibrarianTestCase):
                                 re.escape('ExecRecord "{}" represents a trivial cable but its input and output do not '
                                           'match'.format(outcable_ER)),
                                 outcable_ER.clean)
-        
 
     def test_ER_Datasets_passing_through_non_trivial_POCs(self):
         """Test that the Datatypes of Datasets passing through POCs are properly preserved."""
@@ -846,7 +849,7 @@ class ExecRecordTests(LibrarianTestCase):
         D1_out_structure.save()
         E1_out_structure.compounddatatype = self.DNA_doublet_cdt
         E1_out_structure.save()
-        
+
         outcable_ERI.dataset = self.DNA_triplet_dataset
         outcable_ERI.save()
         outcable_ERO.dataset = self.E21_41_DNA_doublet_dataset
@@ -865,7 +868,7 @@ class ExecRecordTests(LibrarianTestCase):
                                           'column, "{}", does not match the Datatype of its source column, "{}"'
                                           .format(outcable_ER, dest_datatype, source_datatype)),
                                 outcable_ER.clean)
-        
+
     def test_ER_Datasets_passing_through_non_trivial_PSICs(self):
         """Test that the Datatypes of Datasets passing through PSICs are properly preserved."""
         cable_ER = ER_from_PSIC(self.pE_run, self.step_E2, self.E01_21)
@@ -886,7 +889,7 @@ class ExecRecordTests(LibrarianTestCase):
         in_structure.save()
         out_structure.compounddatatype = self.DNA_doublet_cdt
         out_structure.save()
-        
+
         cable_ERI.dataset = self.DNA_triplet_dataset
         cable_ERI.save()
         cable_ERO.dataset = self.E01_21_DNA_doublet_dataset
@@ -905,7 +908,7 @@ class ExecRecordTests(LibrarianTestCase):
                                 re.escape('ExecRecord "{}" represents a cable, but the Datatype of its destination '
                                           'column, "{}", does not match the Datatype of its source column, "{}"'
                                           .format(cable_ER, dest_datatype, source_datatype)),
-            cable_ER.clean)
+                                cable_ER.clean)
 
     def test_execrecord_new_never_failed(self):
         """An ExecRecord with one good RunStep has never failed."""
@@ -914,10 +917,13 @@ class ExecRecordTests(LibrarianTestCase):
         self.assertIsNotNone(pipeline)
         for run in pipeline.pipeline_instances.all():
             run.delete()
-        run = Run(pipeline=pipeline, user=user); run.save()
+        run = Run(pipeline=pipeline, user=user)
+        run.save()
         runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
-        execlog = ExecLog(record=runstep, invoking_record=runstep); execlog.save()
-        execrecord = ExecRecord(generator=execlog); execrecord.save()
+        execlog = ExecLog(record=runstep, invoking_record=runstep)
+        execlog.save()
+        execrecord = ExecRecord(generator=execlog)
+        execrecord.save()
         runstep.execrecord = execrecord
         runstep.save()
 
@@ -935,11 +941,14 @@ class ExecRecordTests(LibrarianTestCase):
             run.delete()
 
         for i in range(2):
-            run = Run(pipeline=pipeline, user=user); run.save()
+            run = Run(pipeline=pipeline, user=user)
+            run.save()
             runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
-            execlog = ExecLog(record=runstep, invoking_record=runstep); execlog.save()
+            execlog = ExecLog(record=runstep, invoking_record=runstep)
+            execlog.save()
             if i == 0:
-                execrecord = ExecRecord(generator=execlog); execrecord.save()
+                execrecord = ExecRecord(generator=execlog)
+                execrecord.save()
             runstep.execrecord = execrecord
             runstep.save()
 
@@ -953,11 +962,14 @@ class ExecRecordTests(LibrarianTestCase):
         self.assertIsNotNone(pipeline)
         for run in pipeline.pipeline_instances.all():
             run.delete()
-        run = Run(pipeline=pipeline, user=user); run.save()
+        run = Run(pipeline=pipeline, user=user)
+        run.save()
         runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
-        execlog = ExecLog(record=runstep, invoking_record=runstep); execlog.save()
+        execlog = ExecLog(record=runstep, invoking_record=runstep)
+        execlog.save()
         MethodOutput(execlog=execlog, return_code=1).save()
-        execrecord = ExecRecord(generator=execlog); execrecord.save()
+        execrecord = ExecRecord(generator=execlog)
+        execrecord.save()
         runstep.execrecord = execrecord
         runstep.save()
 
@@ -974,13 +986,16 @@ class ExecRecordTests(LibrarianTestCase):
             run.delete()
 
         for i in range(2):
-            run = Run(pipeline=pipeline, user=user); run.save()
+            run = Run(pipeline=pipeline, user=user)
+            run.save()
             runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
-            execlog = ExecLog(record=runstep, invoking_record=runstep); execlog.save()
+            execlog = ExecLog(record=runstep, invoking_record=runstep)
+            execlog.save()
             if i == 1:
                 MethodOutput(execlog=execlog, return_code=1).save()
             else:
-                execrecord = ExecRecord(generator=execlog); execrecord.save()
+                execrecord = ExecRecord(generator=execlog)
+                execrecord.save()
             runstep.execrecord = execrecord
             runstep.save()
 
@@ -1014,7 +1029,7 @@ class FindCompatibleERTests(TestCase):
         execrecord = runstep.execrecord
         self.assertIsNotNone(execrecord)
         input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.dataset)
-                               for eri in execrecord.execrecordins.all()]
+                                    for eri in execrecord.execrecordins.all()]
         input_datasets_decorated.sort()
         input_datasets = [entry[1] for entry in input_datasets_decorated]
         runstep.reused = False
