@@ -338,6 +338,10 @@ class Manager:
                 Dataset.purge()
                 time_to_purge = time_to_poll + settings.FLEET_PURGING_INTERVAL
 
+            # PERFORMANCE TESTING:
+            # if not self.active_sandboxes:
+            #     return
+
     def assign_tasks(self, time_to_poll):
         # We can't use a for loop over the task queue because assign_task
         # may add to the queue.

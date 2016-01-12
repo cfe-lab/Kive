@@ -1059,7 +1059,10 @@ class Sandbox:
                     all_complete = False
                 continue
 
-            # Check if this cable has just had its input made available.
+            # At this point we know this cable has not already been run.
+
+            # Check if this cable has just had its input made available.  First, check steps that
+            # just finished.
             source_dataset = None
             fed_by_newly_completed = False
             for idx in step_nums_completed:
@@ -1068,6 +1071,8 @@ class Sandbox:
                                                       outcable.source)]
                     fed_by_newly_completed = True
                     break
+
+            # Next, check outcables of sub-pipelines to see if they provide what we need.
             if not fed_by_newly_completed:
                 for cable in cables_completed:
                     if type(cable) is not archive.models.RunOutputCable:
@@ -1083,6 +1088,7 @@ class Sandbox:
                         break
 
             if fed_by_newly_completed:
+                # We can now start this cable.
                 file_suffix = "raw" if outcable.is_raw() else "csv"
                 out_file_name = "run{}_{}.{}".format(run_to_resume.pk, outcable.output_name, file_suffix)
                 output_path = os.path.join(self.out_dir, out_file_name)
@@ -1100,6 +1106,10 @@ class Sandbox:
                     self.logger.debug("Cable %s failed on reuse", roc.pipelineoutputcable)
                     run_to_resume.mark_unsuccessful(save=True)
                     return
+
+            else:
+                # This outcable cannot be run yet.
+                all_complete = False
 
         if all_complete:
             run_to_resume.mark_complete()
