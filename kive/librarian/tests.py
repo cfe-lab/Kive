@@ -1804,6 +1804,17 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         dataset = Dataset.objects.get(pk=self.detail_pk)
         self.assertTrue(dataset.is_redacted())
 
+    def test_dataset_purge(self):
+        dataset = Dataset.objects.get(id=self.detail_pk)
+        dataset.dataset_file.delete(save=True)
+
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(
+            response.data['description'],
+            "Test data for a test that tests test data")
+
 
 class DatasetSerializerTests(TestCase):
     """

@@ -92,8 +92,11 @@ class Dataset(metadata.models.AccessControl):
     file_source = models.ForeignKey("archive.RunComponent", related_name="outputs", null=True, blank=True)
 
     # Datasets are stored in the "Datasets" folder
-    dataset_file = models.FileField(upload_to=get_upload_path, help_text="Physical path where datasets are stored",
-                                    null=True, max_length=maxlengths.MAX_FILENAME_LENGTH)
+    dataset_file = models.FileField(upload_to=get_upload_path,
+                                    help_text="Physical path where datasets are stored",
+                                    blank=True,
+                                    default='',
+                                    max_length=maxlengths.MAX_FILENAME_LENGTH)
 
     logger = logging.getLogger('librarian.Dataset')
 
@@ -296,7 +299,7 @@ class Dataset(metadata.models.AccessControl):
         """
         :return int: size of dataset_file in bytes
         """
-        return self.dataset_file.size
+        return self.dataset_file and self.dataset_file.size or 0
 
     def get_formatted_filesize(self):
         if self.dataset_file.size >= 1099511627776:
