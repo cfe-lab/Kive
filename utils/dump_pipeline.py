@@ -12,7 +12,8 @@ from urlparse import urlparse
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    logging.getLogger('urllib3.connectionpool').setLevel(logging.WARN)
+    logging.getLogger('requests.packages.urllib3.connectionpool').setLevel(
+        logging.WARN)
     CONFIG_FILE = os.path.expanduser("~/.dump_pipeline.config")
     UNSET = '***'
 
