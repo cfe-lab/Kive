@@ -2,7 +2,7 @@
 Defines the manager and the "workers" that manage and carry out the execution of Pipelines.
 """
 
-from collections import defaultdict
+from collections import defaultdict, Counter
 import logging
 from mpi4py import MPI
 import sys
@@ -12,9 +12,11 @@ import itertools
 import os
 import glob
 import shutil
+import re
 
 from django.conf import settings
 from django.utils import timezone
+from django.db import connection
 
 import archive.models
 from archive.models import Dataset, Run, ExceedsSystemCapabilities
@@ -319,6 +321,7 @@ class Manager:
         """
         Poll the database for new jobs, and handle running of sandboxes.
         """
+        start_count = len(connection.queries)
         time_to_purge = None
         while True:
             self.find_stopped_runs()
@@ -339,8 +342,19 @@ class Manager:
                 time_to_purge = time_to_poll + settings.FLEET_PURGING_INTERVAL
 
             # PERFORMANCE TESTING:
-            # if not self.active_sandboxes:
-            #     return
+            if not self.active_sandboxes:
+
+                end_count = len(connection.queries)
+                print("Completed stress test after {} queries".format(end_count - start_count))
+                table_counts = Counter()
+                for query in connection.queries[start_count:]:
+                    m = re.match('SELECT +"([^"]*)"', query['sql'])
+                    if m:
+                        table_counts[m.group(1)] += 1
+                for table, count in table_counts.most_common(20):
+                    print('{}: {}'.format(table, count))
+
+                return
 
     def assign_tasks(self, time_to_poll):
         # We can't use a for loop over the task queue because assign_task

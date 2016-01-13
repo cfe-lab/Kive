@@ -2181,26 +2181,35 @@ class RunPlan(object):
             if run_step is None:
                 run_step = RunStep.create(step_plan.pipeline_step, self.run, start=False)
             step_plan.run_step = run_step
-            input_datasets = [plan.dataset for plan in step_plan.inputs]
-            if all(input_datasets):
-                method = step_plan.pipeline_step.transformation.definite
-                if method.reusable == Method.NON_REUSABLE:
-                    continue
-                execrecord, summary = run_step.get_suitable_ER(input_datasets)
-                if not summary:
-                    # no exec record, have to run
-                    continue
-                if (not summary['fully reusable'] and
-                        method.reusable != Method.DETERMINISTIC):
 
+            if run_step.execrecord is not None:
+                step_plan.execrecord = run_step.execrecord
+            else:
+                input_datasets = [plan.dataset for plan in step_plan.inputs]
+                if all(input_datasets):
+                    method = step_plan.pipeline_step.transformation.definite
+                    if method.reusable == Method.NON_REUSABLE:
+                        continue
+                    execrecord, summary = run_step.get_suitable_ER(input_datasets)
+                    if not summary:
+                        # no exec record, have to run
+                        continue
+                    if (not summary['fully reusable'] and
+                            method.reusable != Method.DETERMINISTIC):
+
+                        continue
+                    step_plan.execrecord = execrecord
+
+                if step_plan.execrecord is None:
+                    # We couldn't find a suitable ExecRecord.
                     continue
-                step_plan.execrecord = execrecord
-                execrecordouts = execrecord.execrecordouts.all()
-                for execrecordout in execrecordouts:
-                    generic_output = execrecordout.generic_output
-                    dataset_idx = generic_output.transformationoutput.dataset_idx
-                    output = step_plan.outputs[dataset_idx-1]
-                    output.dataset = execrecordout.dataset
+
+            execrecordouts = step_plan.execrecord.execrecordouts.all()
+            for execrecordout in execrecordouts:
+                generic_output = execrecordout.generic_output
+                dataset_idx = generic_output.transformationoutput.dataset_idx
+                output = step_plan.outputs[dataset_idx-1]
+                output.dataset = execrecordout.dataset
 
         is_changed = True
         while is_changed:
