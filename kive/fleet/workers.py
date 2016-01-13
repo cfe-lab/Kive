@@ -2,7 +2,7 @@
 Defines the manager and the "workers" that manage and carry out the execution of Pipelines.
 """
 
-from collections import defaultdict, Counter
+from collections import defaultdict
 import logging
 from mpi4py import MPI
 import sys
@@ -12,11 +12,9 @@ import itertools
 import os
 import glob
 import shutil
-import re
 
 from django.conf import settings
 from django.utils import timezone
-from django.db import connection
 
 import archive.models
 from archive.models import Dataset, Run, ExceedsSystemCapabilities
@@ -52,8 +50,9 @@ class Manager:
     assigning the resulting tasks to workers.
     """
 
-    def __init__(self, worker_count, manage_script):
+    def __init__(self, worker_count, quit_idle, manage_script):
         self.worker_count = worker_count
+        self.quit_idle = quit_idle
         self.manage_script = manage_script
 
         # tasks_in_progress tracks what jobs are assigned to what workers:
@@ -321,7 +320,6 @@ class Manager:
         """
         Poll the database for new jobs, and handle running of sandboxes.
         """
-        start_count = len(connection.queries)
         time_to_purge = None
         while True:
             self.find_stopped_runs()
@@ -341,19 +339,8 @@ class Manager:
                 Dataset.purge()
                 time_to_purge = time_to_poll + settings.FLEET_PURGING_INTERVAL
 
-            # PERFORMANCE TESTING:
-            if not self.active_sandboxes:
-
-                end_count = len(connection.queries)
-                print("Completed stress test after {} queries".format(end_count - start_count))
-                table_counts = Counter()
-                for query in connection.queries[start_count:]:
-                    m = re.match('SELECT +"([^"]*)"', query['sql'])
-                    if m:
-                        table_counts[m.group(1)] += 1
-                for table, count in table_counts.most_common(20):
-                    print('{}: {}'.format(table, count))
-
+            if self.quit_idle and not self.active_sandboxes:
+                mgr_logger.info('Fleet is idle, quitting.')
                 return
 
     def assign_tasks(self, time_to_poll):
@@ -598,7 +585,10 @@ class Worker:
 
                 else:
                     sandbox_result = sandbox.execute.finish_cable(task_info_dict, self.rank)
-                worker_logger.debug("{} {} completed.  Returning results to Manager.".format(task.__class__.__name__, task))
+                worker_logger.debug(
+                    "%s %s completed.  Returning results to Manager.",
+                    task.__class__.__name__,
+                    task)
                 result = sandbox_result.pk
             except StopExecution as e:
                 worker_logger.debug(
