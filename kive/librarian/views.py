@@ -5,7 +5,6 @@ import hashlib
 import logging
 import mimetypes
 import os
-import itertools
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -16,7 +15,6 @@ from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader, RequestContext
 from wsgiref.util import FileWrapper
 from django.conf import settings
-from django.contrib.auth.models import User, Group
 
 from librarian.forms import DatasetForm, DatasetDetailsForm, BulkAddDatasetForm, BulkDatasetUpdateForm,\
     ArchiveAddDatasetForm

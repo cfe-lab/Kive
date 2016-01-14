@@ -1,11 +1,9 @@
 from datetime import datetime, timedelta
-import itertools
 
 from django.db import transaction
 from django.db.models import Q
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone
-from django.contrib.auth.models import User, Group
 
 from rest_framework import permissions, status
 from rest_framework.decorators import detail_route, list_route
@@ -21,14 +19,13 @@ from portal.views import admin_check
 from kive.serializers import PermissionsSerializer
 from kive.ajax import RemovableModelViewSet, IsGrantedReadOnly,\
     StandardPagination, CleanCreateModelMixin, SearchableModelMixin
-from constants import groups
 
 JSON_CONTENT_TYPE = 'application/json'
 
 
 class MethodOutputViewSet(ReadOnlyModelViewSet):
     """ List and redact method output records.
-    
+
     PATCH output_redacted=true, error_redacted=true, or code_redacted=true on an
     instance to blank its output log, error log, or return code.
     """
@@ -46,7 +43,7 @@ class MethodOutputViewSet(ReadOnlyModelViewSet):
         redactions = {'output_redacted': method_output.redact_output_log,
                       'error_redacted': method_output.redact_error_log,
                       'code_redacted': method_output.redact_return_code}
-        
+
         unexpected_keys = set(request.DATA.keys()) - set(redactions.keys())
         if unexpected_keys:
             return Response(
@@ -230,7 +227,7 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
             old_aborted_runs = ExceedsSystemCapabilities.objects.values(
                 'run_id').filter(run__time_queued__lt=recent_time)
             return queryset.filter(
-                Q(end_time__isnull=True)|
+                Q(end_time__isnull=True) |
                 Q(end_time__gte=recent_time)
             ).distinct().exclude(
                 pk__in=old_aborted_runs
@@ -240,8 +237,8 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
                 symbolicdataset__dataset__name__icontains=value).values(
                     'run_id')
             return queryset.filter(
-                Q(name__icontains=value)|
-                (Q(name="") & (Q(pipeline__family__name__icontains=value)|
+                Q(name__icontains=value) |
+                (Q(name="") & (Q(pipeline__family__name__icontains=value) |
                                Q(id__in=runs_with_matching_inputs))))
         if key == "user":
             return queryset.filter(user__username__icontains=value)
