@@ -234,7 +234,7 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
             )
         if key == 'name':
             runs_with_matching_inputs = RunInput.objects.filter(
-                symbolicdataset__dataset__name__icontains=value).values(
+                dataset__name__icontains=value).values(
                     'run_id')
             return queryset.filter(
                 Q(name__icontains=value) |
