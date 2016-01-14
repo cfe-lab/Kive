@@ -1159,7 +1159,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         self._successful = False
 
         if self.is_incable:
-            self.definite.runstep.run.mark_unsuccessful()
+            self.definite.runstep.mark_unsuccessful()
         else:
             self.definite.run.mark_unsuccessful()
 
@@ -1310,7 +1310,8 @@ class RunStep(RunComponent):
     @transaction.atomic
     def create(cls, pipelinestep, run, start=True):
         """Create a new RunStep from a PipelineStep."""
-        runstep = cls(pipelinestep=pipelinestep, run=run, _complete=False)
+        runstep = cls(pipelinestep=pipelinestep, run=run, _complete=False,
+                      _successful=True)
         if start:
             runstep.start()
         runstep.clean()

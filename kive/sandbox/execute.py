@@ -92,7 +92,8 @@ class Sandbox:
             inputs = [x.dataset for x in run.inputs.order_by("index")]
             sandbox_path = run.sandbox_path
         else:
-            self.run = my_pipeline.pipeline_instances.create(start_time=timezone.now(), user=user)
+            self.run = my_pipeline.pipeline_instances.create(start_time=timezone.now(), user=user,
+                                                             _complete=False, _successful=True)
             users_allowed = users_allowed or []
             groups_allowed = groups_allowed or []
             self.run.users_allowed.add(*users_allowed)
@@ -304,7 +305,8 @@ class Sandbox:
                 curr_record.mark_complete()
                 curr_record.mark_unsuccessful()
 
-                curr_record.stop(save=True, clean=False)
+                curr_record.stop(save=False, clean=False)
+                curr_record.save()
                 curr_record.complete_clean()
 
             # Attempt to reuse this PipelineCable.
@@ -389,7 +391,10 @@ class Sandbox:
 
                 if not recover:
                     curr_record.mark_complete()
-                    curr_record.stop(save=True, clean=False)
+                    # This is marked unsuccessful by what we just recovered.
+                    assert not self.is_successful(use_cache=True)
+                    curr_record.stop(save=False, clean=False)
+                curr_record.save()
                 curr_record.clean()
                 return curr_record
 
@@ -467,6 +472,7 @@ class Sandbox:
 
                     # Update state variables.
                     curr_RS.mark_unsuccessful()
+                    # There is no recovering_record to mark unsuccessful as this is not a recovery.
                     curr_RS.mark_complete()
 
                     curr_RS.stop(save=True, clean=True)
@@ -543,10 +549,13 @@ class Sandbox:
                     # Failed recovery. Return RunStep with failed ExecLogs.
                     self.logger.warn("Recovery of Dataset {} failed".format(curr_in_dataset))
 
-                    curr_RS.mark_complete()
                     curr_RS.is_cancelled = True
+                    if not recover:
+                        curr_RS.mark_complete()
+                        curr_RS.stop(save=False, clean=True)
+                    assert not invoking_record.is_successful(use_cache=True)
 
-                    curr_RS.stop(save=True, clean=True)
+                    curr_RS.save()
                     return curr_RS
 
         # Run code.
@@ -561,7 +570,8 @@ class Sandbox:
 
             curr_RS.mark_complete()
             if not subrun.is_successful(use_cache=True):
-                curr_RS.mark_unsuccessful()
+                # curr_RS should be marked by the execution.
+                assert not curr_RS.is_successful(use_cache=True)
 
             curr_RS.stop(save=True, clean=True)
             return curr_RS
@@ -663,10 +673,9 @@ class Sandbox:
                     stop_now = True
 
             if stop_now:
-
                 # Update the state fields.
                 curr_run.mark_complete()
-                curr_run.mark_unsuccessful()
+                assert not curr_run.is_successful(use_cache=True)
 
                 curr_run.stop(save=True, clean=True)
                 return curr_run
@@ -708,7 +717,7 @@ class Sandbox:
 
                 # Update state.
                 curr_run.mark_complete()
-                curr_run.mark_unsuccessful()
+                assert not curr_run.is_successful(use_cache=True)
 
                 curr_run.stop(save=True, clean=True)
                 return curr_run
@@ -886,7 +895,8 @@ class Sandbox:
         at most one of run_to_start and task_completed may not be None.
          - if both are None then we're starting the top-level run
          - if run_to_start is not None then we're starting a sub-pipeline
-         - if task_completed is not None then we're resuming either the top-level run or a sub-run.
+         - if task_completed is not None then we're resuming either the top-level run or a sub-run
+         - if task_completed is not None then it is successful
         """
         assert (type(task_completed) in (archive.models.RunStep,
                                          archive.models.RunSIC,
@@ -1023,15 +1033,15 @@ class Sandbox:
 
             # If the step we just started is for a Method, and it was successfully reused, then we add its step
             # number to the list of those just completed.  This may then allow subsequent steps to also be started.
+
+            return_because_fail = False
             if not curr_RS.pipelinestep.is_subpipeline:
                 if curr_RS.is_cancelled:
                     self.logger.debug("Step %d (%s) cancelled", step.step_num, step)
-                    run_to_resume.mark_unsuccessful(save=True)
-                    return
+                    return_because_fail = True
                 elif curr_RS.reused and not curr_RS.is_successful(use_cache=True):
                     self.logger.debug("Step %d (%s) failed on reuse", step.step_num, step)
-                    run_to_resume.mark_unsuccessful(save=True)
-                    return
+                    return_because_fail = True
                 elif curr_RS.is_complete(use_cache=True):
                     step_nums_completed.append(step.step_num)
             # Otherwise, we look and see if any of its outcables are complete.  If so, then add them to the
@@ -1040,14 +1050,15 @@ class Sandbox:
                 for roc in curr_RS.child_run.runoutputcables.all():
                     if roc.is_cancelled:
                         self.logger.debug("Cable %s cancelled", roc.pipelineoutputcable)
-                        run_to_resume.mark_unsuccessful(save=True)
-                        return
+                        return_because_fail = True
                     elif roc.reused and not roc.successful_reuse():
                         self.logger.debug("Cable %s failed on reuse", roc.pipelineoutputcable)
-                        run_to_resume.mark_unsuccessful(save=True)
-                        return
+                        return_because_fail = True
                     elif roc.is_complete():
                         cables_completed.append(roc)
+            if return_because_fail:
+                assert not run_to_resume.is_successful(use_cache=True)
+                return
 
         # Now go through the output cables and do the same.
         for outcable in pipeline_to_resume.outcables.order_by("output_idx"):
@@ -1098,13 +1109,16 @@ class Sandbox:
                 if not cr.is_complete(use_cache=True):
                     all_complete = False
 
+                return_because_fail = False
                 if cr.is_cancelled:
                     self.logger.debug("Cable %s cancelled", roc.pipelineoutputcable)
-                    run_to_resume.mark_unsuccessful(save=True)
-                    return
+                    return_because_fail = True
                 elif cr.reused and not cr.successful_reuse():
                     self.logger.debug("Cable %s failed on reuse", roc.pipelineoutputcable)
-                    run_to_resume.mark_unsuccessful(save=True)
+                    return_because_fail = True
+
+                if return_because_fail:
+                    assert not run_to_resume.is_successful(use_cache=True)
                     return
 
             else:
@@ -1290,7 +1304,7 @@ class Sandbox:
 
                 curr_RS.mark_complete()
                 # We don't need to mark this unsuccessful as the cable already did it.
-                # curr_RS.mark_unsuccessful()
+                assert not curr_RS.is_successful(use_cache=True)
 
                 curr_RS.stop(save=True, clean=False)
                 curr_RS.complete_clean()
@@ -1348,8 +1362,7 @@ class Sandbox:
                 # Update state.
                 if curr_run.is_complete(use_cache=True):
                     curr_RS.mark_complete()
-                if not curr_run.is_successful(use_cache=True):
-                    curr_RS.mark_unsuccessful()
+                assert curr_run.is_successful(use_cache=True) == curr_RS.is_successful(use_cache=True)
 
                 curr_RS.save()
                 return curr_RS
@@ -1589,6 +1602,9 @@ def finish_cable(cable_execute_dict, worker_rank):
         ).definite
     curr_ER = None
 
+    recover = recovering_record is not None
+    invoking_record = recovering_record or curr_record
+
     # It's possible that this cable was completed in the time between the Manager queueing this task
     # and the worker starting it.  If so we can use the ExecRecord, and maybe even fully reuse it
     # if this was not called by finish_step.
@@ -1612,11 +1628,13 @@ def finish_cable(cable_execute_dict, worker_rank):
                         curr_record.reused = True
                         curr_record.execrecord = curr_ER
 
-                        curr_record.mark_complete()
                         if not can_reuse["successful"]:
-                            curr_record.mark_unsuccessful()
+                            # If this is a recovery we do *not* mark curr_record as failed.
+                            invoking_record.mark_unsuccessful()
+                        if not recover:
+                            curr_record.mark_complete()
+                            curr_record.stop(save=True, clean=False)
 
-                        curr_record.stop(save=True, clean=False)
                         curr_record.complete_clean()
                         return curr_record
             succeeded_yet = True
@@ -1637,8 +1655,6 @@ def finish_cable(cable_execute_dict, worker_rank):
 
     cable = curr_record.definite.component
 
-    recover = recovering_record is not None
-
     # Write the input dataset to the sandbox if necessary.
     # FIXME at some point in the future this will have to be updated to mean "write to the local sandbox".
     if not input_dataset_in_sdbx:
@@ -1649,10 +1665,10 @@ def finish_cable(cable_execute_dict, worker_rank):
             logger.error("[%d] could not copy file %s to file %s.",
                          worker_rank, input_dataset.dataset_file.path, input_dataset_path)
 
-            curr_record.mark_unsuccessful()
-            curr_record.mark_complete()
-
-            curr_record.stop(save=True, clean=True)
+            invoking_record.mark_unsuccessful()
+            if not recover:
+                curr_record.mark_complete()
+                curr_record.stop(save=True, clean=True)
             return curr_record
 
     if not recover:
@@ -1714,7 +1730,10 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_dat
                     missing_output = True
 
                     # Update state variables.
-                    curr_record.mark_unsuccessful()
+                    if recover:
+                        recovering_record.mark_unsuccessful()
+                    else:
+                        curr_record.mark_unsuccessful()
 
                 elif cable.is_trivial():
                     output_dataset = input_dataset
@@ -1783,7 +1802,10 @@ def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_dat
                                                        cable.max_rows_out, curr_log, user)
 
         if check.is_fail():
-            curr_record.mark_unsuccessful()
+            if recover:
+                recovering_record.mark_unsuccessful()
+            else:
+                curr_record.mark_unsuccessful()
 
         # If a sandbox was specified and we were successful, update the sandbox.
         if sandbox_to_update is not None and output_dataset.is_OK() and not recover:
@@ -1830,6 +1852,7 @@ def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
     assert not curr_RS.pipelinestep.is_subpipeline
 
     recover = recovering_record is not None
+    invoking_record = recovering_record or curr_RS
 
     ####
     # Gather inputs: finish all input cables -- we want them written to the sandbox now, which is never
@@ -1838,7 +1861,7 @@ def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
     input_paths = []
     for curr_execute_dict in cable_info_dicts:
         # Update the cable execution information with the recovering record if applicable.
-        if recovering_record is not None:
+        if recover:
             curr_execute_dict["recovering_record_pk"] = recovering_record.pk
 
         curr_RSIC = finish_cable(curr_execute_dict, worker_rank)
@@ -1848,10 +1871,11 @@ def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
             logger.error("[%d] PipelineStepInputCable %s failed.", worker_rank, curr_RSIC)
 
             # Update state variables.
-            curr_RS.mark_unsuccessful()
-            curr_RS.mark_complete()
+            assert not invoking_record.is_successful(use_cache=True)
+            if not recover:
+                curr_RS.mark_complete()
+                curr_RS.stop(save=True, clean=False)
 
-            curr_RS.stop(save=True, clean=False)
             curr_RS.complete_clean()
             return curr_RS
 
@@ -1880,6 +1904,7 @@ def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
                             curr_RS.mark_complete()
                             if not can_reuse["successful"]:
                                 curr_RS.mark_unsuccessful()
+                                # We don't need to mark the recovering_record, as here, it isn't recovering.
 
                             curr_RS.stop(save=True, clean=False)
                             curr_RS.complete_clean()
@@ -1932,7 +1957,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
         curr_log.stop(save=True, clean=False)
 
         # Update state variables:
-        runstep.mark_unsuccessful()
+        invoking_record.mark_unsuccessful()
 
         if not recover:
             runstep.mark_complete()
@@ -1956,10 +1981,11 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
 
         # Update state variables.
         runstep.is_cancelled = True
-        runstep.mark_complete()
-        runstep.mark_unsuccessful()
+        if not recover:
+            runstep.mark_complete()
+            runstep.save()
+        invoking_record.mark_unsuccessful()
 
-        runstep.save()
         raise e
 
     logger.debug("[%d] Method execution complete, ExecLog saved (started = %s, ended = %s)",
@@ -2000,7 +2026,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                             bad_output_found = True
 
                             # Update state variables.
-                            runstep.mark_unsuccessful()
+                            invoking_record.mark_unsuccessful()
 
                         else:
                             # If necessary, create new Dataset for output, and create the Dataset
@@ -2073,7 +2099,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                     file_is_present = False
 
                     # Update state variables.
-                    runstep.mark_unsuccessful()
+                    invoking_record.mark_unsuccessful()
 
             if file_is_present:
                 # Perform integrity check.
@@ -2083,11 +2109,9 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
 
                 # Update state variables.
                 if check.is_fail():
-                    runstep.mark_unsuccessful()
-
-                if check.is_fail():
                     logger.warn("[%d] IntegrityCheckLog failed for %s", worker_rank, output_path)
                     bad_output_found = True
+                    invoking_record.mark_unsuccessful()
 
                 elif not output_dataset.content_checks.exists():
                     summary_path = "{}_summary".format(output_path)
@@ -2096,11 +2120,9 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                         curr_output.get_max_row(), curr_log, user)
 
                     if check.is_fail():
-                        runstep.mark_unsuccessful()
-
-                    if check.is_fail():
                         logger.warn("[%d] ContentCheckLog failed for %s", worker_rank, output_path)
                         bad_output_found = True
+                        invoking_record.mark_unsuccessful()
 
         # Recovering or filling in old ER? No.
         else:
@@ -2114,6 +2136,7 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
         if check and check.is_fail():
             logger.warn("[%d] %s failed for %s", worker_rank, check.__class__.__name__, output_path)
             bad_output_found = True
+            invoking_record.mark_unsuccessful()
 
         # Check OK? Yes.
         elif check:
