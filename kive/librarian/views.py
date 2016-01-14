@@ -112,7 +112,7 @@ def dataset_view(request, dataset_id):
 
     if dataset.file_source is not None:
         generating_run = dataset.file_source.top_level_run
-        addable_users.exclude(pk=generating_run.user)
+        addable_users.exclude(pk=generating_run.user_id)
         addable_users.exclude(pk__in=generating_run.users_allowed.values_list("pk", flat=True))
         addable_groups.exclude(pk__in=generating_run.groups_allowed.values_list("pk", flat=True))
 
