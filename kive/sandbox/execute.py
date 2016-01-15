@@ -378,6 +378,9 @@ class Sandbox:
             self.logger.debug("Symbolic only: running recover({})".format(input_dataset))
 
             successful_recovery = self.recover(input_dataset, curr_record)
+            # Refresh curr_record.
+            curr_record = curr_record.__class__.objects.get(pk=curr_record.pk)
+
             successful_str = "successful" if successful_recovery else "unsuccessful"
             self.logger.debug("Recovery was {}".format(successful_str))
             # Success? No.
@@ -392,7 +395,7 @@ class Sandbox:
                 if not recover:
                     curr_record.mark_complete()
                     # This is marked unsuccessful by what we just recovered.
-                    assert not self.is_successful(use_cache=True)
+                    assert not curr_record.is_successful(use_cache=True)
                     curr_record.stop(save=False, clean=False)
                 curr_record.save()
                 curr_record.clean()
@@ -461,6 +464,9 @@ class Sandbox:
                 curr_RSIC = self.execute_cable(corresp_cable, curr_RS, recovering_record=None,
                                                input_dataset=inputs[i], output_path=cable_path)
 
+                # Refresh curr_RS.
+                curr_RS = RunStep.objects.get(pk=curr_RS.pk)
+
                 # Cable failed, return incomplete RunStep.
                 if not curr_RSIC.is_successful():
                     if curr_RSIC.is_cancelled:
@@ -471,7 +477,7 @@ class Sandbox:
                         self.logger.error("PipelineStepInputCable {} failed.".format(curr_RSIC))
 
                     # Update state variables.
-                    curr_RS.mark_unsuccessful()
+                    assert not curr_RS.is_unsuccessful(use_cache=True)
                     # There is no recovering_record to mark unsuccessful as this is not a recovery.
                     curr_RS.mark_complete()
 
@@ -549,6 +555,8 @@ class Sandbox:
                     # Failed recovery. Return RunStep with failed ExecLogs.
                     self.logger.warn("Recovery of Dataset {} failed".format(curr_in_dataset))
 
+                    # Refresh curr_RS.
+                    curr_RS = RunStep.objects.get(pk=curr_RS.pk)
                     curr_RS.is_cancelled = True
                     if not recover:
                         curr_RS.mark_complete()
@@ -568,6 +576,8 @@ class Sandbox:
                 parent_runstep=curr_RS
             )
 
+            # Refresh curr_RS before updating it.
+            curr_RS = RunStep.objects.get(pk=curr_RS.pk)
             curr_RS.mark_complete()
             if not subrun.is_successful(use_cache=True):
                 # curr_RS should be marked by the execution.
@@ -653,6 +663,8 @@ class Sandbox:
 
             curr_RS = self.execute_step(step, curr_run, recovering_record=None, inputs=step_inputs,
                                         step_run_dir=run_dir)
+            # Refresh curr_run.
+            curr_run = Run.objects.get(pk=curr_run.pk)
             self.logger.debug("DONE EXECUTING STEP {}".format(step))
 
             # Bail if we failed -- either due to a bad input, during execution, or by reusing a failed ExecRecord.
@@ -675,7 +687,6 @@ class Sandbox:
             if stop_now:
                 # Update the state fields.
                 curr_run.mark_complete()
-                curr_run = Run.objects.get(pk=curr_run.pk)
                 assert not curr_run.is_successful(use_cache=True)
 
                 curr_run.stop(save=True, clean=True)
@@ -707,6 +718,8 @@ class Sandbox:
             output_path = os.path.join(self.out_dir, out_file_name)
             curr_ROC = self.execute_cable(outcable, curr_run, recovering_record=None,
                                           input_dataset=source_dataset, output_path=output_path)
+            # Refresh curr_run.
+            curr_run = Run.objects.get(pk=curr_run.pk)
 
             if not curr_ROC.is_successful():
                 if curr_ROC.is_cancelled:
@@ -1029,6 +1042,9 @@ class Sandbox:
             run_dir = os.path.join(sandbox_path, "step{}".format(step.step_num))
             curr_RS = self.reuse_or_prepare_step(step, run_to_resume, step_inputs, run_dir)
 
+            # Refresh run_to_resume.
+            run_to_resume = Run.objects.get(pk=run_to_resume.pk)
+
             if not curr_RS.is_complete(use_cache=True):
                 all_complete = False
 
@@ -1099,32 +1115,36 @@ class Sandbox:
                         fed_by_newly_completed = True
                         break
 
-            if fed_by_newly_completed:
-                # We can now start this cable.
-                file_suffix = "raw" if outcable.is_raw() else "csv"
-                out_file_name = "run{}_{}.{}".format(run_to_resume.pk, outcable.output_name, file_suffix)
-                output_path = os.path.join(self.out_dir, out_file_name)
-                cable_exec_info = self.reuse_or_prepare_cable(outcable, run_to_resume, source_dataset, output_path)
-                cr = cable_exec_info.cable_record
-
-                if not cr.is_complete(use_cache=True):
-                    all_complete = False
-
-                return_because_fail = False
-                if cr.is_cancelled:
-                    self.logger.debug("Cable %s cancelled", roc.pipelineoutputcable)
-                    return_because_fail = True
-                elif cr.reused and not cr.successful_reuse():
-                    self.logger.debug("Cable %s failed on reuse", roc.pipelineoutputcable)
-                    return_because_fail = True
-
-                if return_because_fail:
-                    assert not run_to_resume.is_successful(use_cache=True)
-                    return
-
-            else:
+            if not fed_by_newly_completed:
                 # This outcable cannot be run yet.
                 all_complete = False
+                continue
+
+            # We can now start this cable.
+            file_suffix = "raw" if outcable.is_raw() else "csv"
+            out_file_name = "run{}_{}.{}".format(run_to_resume.pk, outcable.output_name, file_suffix)
+            output_path = os.path.join(self.out_dir, out_file_name)
+            cable_exec_info = self.reuse_or_prepare_cable(outcable, run_to_resume, source_dataset, output_path)
+
+            # Refresh run_to_resume.
+            run_to_resume = Run.objects.get(pk=run_to_resume.pk)
+
+            cr = cable_exec_info.cable_record
+
+            if not cr.is_complete(use_cache=True):
+                all_complete = False
+
+            return_because_fail = False
+            if cr.is_cancelled:
+                self.logger.debug("Cable %s cancelled", roc.pipelineoutputcable)
+                return_because_fail = True
+            elif cr.reused and not cr.successful_reuse():
+                self.logger.debug("Cable %s failed on reuse", roc.pipelineoutputcable)
+                return_because_fail = True
+
+            if return_because_fail:
+                assert not run_to_resume.is_successful(use_cache=True)
+                return
 
         if all_complete:
             run_to_resume.mark_complete()
@@ -1296,6 +1316,9 @@ class Sandbox:
 
             cable_exec_info = self.reuse_or_prepare_cable(corresp_cable, curr_RS, inputs[i], cable_path)
 
+            # Refresh curr_RS.
+            curr_RS = RunStep.objects.get(pk=curr_RS.pk)
+
             cable_info_list.append(cable_exec_info)
 
             # If the cable was cancelled (e.g. due to bad input), we bail.
@@ -1359,6 +1382,9 @@ class Sandbox:
                 curr_run.users_allowed.add(self.run.users_allowed.all())
                 curr_run.groups_allowed.add(self.run.groups_allowed.all())
                 self.advance_pipeline(run_to_start=curr_run)
+
+                # Refresh curr_RS.
+                curr_RS = RunStep.objects.get(pk=curr_run.pk)
 
                 # Update state.
                 if curr_run.is_complete(use_cache=True):
@@ -1866,6 +1892,8 @@ def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
             curr_execute_dict["recovering_record_pk"] = recovering_record.pk
 
         curr_RSIC = finish_cable(curr_execute_dict, worker_rank)
+        # Refresh invoking_record.
+        invoking_record = invoking_record.__class__.objects.get(pk=invoking_record.pk)
 
         # Cable failed, return incomplete RunStep.
         if not curr_RSIC.is_successful():

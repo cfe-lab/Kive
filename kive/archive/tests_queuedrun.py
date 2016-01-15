@@ -481,7 +481,7 @@ class RestoreReusableDatasetTest(TestCase):
         manager.worker_status = {}
         manager.find_new_runs()
         while manager.task_queue:
-            tasks = manager.task_queuœe
+            tasks = manager.task_queue
             manager.task_queue = []
             for sandbox, task in tasks:
                 task_info = sandbox.get_task_info(task)
