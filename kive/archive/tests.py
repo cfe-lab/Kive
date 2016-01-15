@@ -3114,11 +3114,14 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         """Should handle lots of output to stdout or stderr without deadlocking."""
         iteration_count = 100000
         python_code = """\
-#! /usr/bin/python
+#! /usr/bin/env python
 import sys
 
-for i in range(%d):
-    print i
+with open(sys.argv[2], "wb") as f:
+    f.write("word\\n")
+    for i in range(%d):
+        print i
+        f.write("{}\\n".format(i))
 """ % iteration_count
         expected_output = '\n'.join(map(str, range(iteration_count))) + '\n'
 

@@ -476,12 +476,12 @@ class RestoreReusableDatasetTest(TestCase):
     def execute_pipeline(self, pipeline):
         run_to_process = self.create_run_to_process(pipeline)
 
-        manager = Manager(0, None)
+        manager = Manager(0)
         manager.max_host_cpus = 1
         manager.worker_status = {}
         manager.find_new_runs()
         while manager.task_queue:
-            tasks = manager.task_queue
+            tasks = manager.task_queuœe
             manager.task_queue = []
             for sandbox, task in tasks:
                 task_info = sandbox.get_task_info(task)

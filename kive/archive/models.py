@@ -720,9 +720,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
     def mark_unsuccessful(self):
         self._successful = False
-        self.save()
+        self.save(update_fields=["_successful"])
         if self.parent_runstep is not None:
-            self.parent_runstep.run.mark_unsuccessful()
+            self.parent_runstep.mark_unsuccessful()
 
     def mark_complete(self, save=False):
         self._complete = True
@@ -1157,13 +1157,12 @@ class RunComponent(stopwatch.models.Stopwatch):
 
     def mark_unsuccessful(self):
         self._successful = False
+        self.save(update_fields=["_successful"])
 
         if self.is_incable:
             self.definite.runstep.mark_unsuccessful()
         else:
             self.definite.run.mark_unsuccessful()
-
-        self.save(update_fields=["_successful"])
 
     @update_field("_successful")
     def is_successful(self, use_cache=False, **kwargs):

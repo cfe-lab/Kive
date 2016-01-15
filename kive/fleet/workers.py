@@ -50,7 +50,7 @@ class Manager:
     assigning the resulting tasks to workers.
     """
 
-    def __init__(self, worker_count, quit_idle, manage_script):
+    def __init__(self, worker_count, quit_idle=False, manage_script=None):
         self.worker_count = worker_count
         self.quit_idle = quit_idle
         self.manage_script = manage_script

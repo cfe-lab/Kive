@@ -13,7 +13,7 @@ from django.db import transaction, OperationalError, InternalError
 from django.contrib.auth.models import User
 
 import archive.models
-from archive.models import RunStep
+from archive.models import RunStep, Run
 from constants import dirnames, extensions
 import file_access_utils
 import librarian.models
@@ -675,6 +675,7 @@ class Sandbox:
             if stop_now:
                 # Update the state fields.
                 curr_run.mark_complete()
+                curr_run = Run.objects.get(pk=curr_run.pk)
                 assert not curr_run.is_successful(use_cache=True)
 
                 curr_run.stop(save=True, clean=True)
@@ -2108,21 +2109,11 @@ def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_
                 check = output_dataset.check_integrity(output_path, user, curr_log)
 
                 # Update state variables.
-                if check.is_fail():
-                    logger.warn("[%d] IntegrityCheckLog failed for %s", worker_rank, output_path)
-                    bad_output_found = True
-                    invoking_record.mark_unsuccessful()
-
-                elif not output_dataset.content_checks.exists():
+                if not check.is_fail() and not output_dataset.content_checks.exists():
                     summary_path = "{}_summary".format(output_path)
                     check = output_dataset.check_file_contents(
                         output_path, summary_path, curr_output.get_min_row(),
                         curr_output.get_max_row(), curr_log, user)
-
-                    if check.is_fail():
-                        logger.warn("[%d] ContentCheckLog failed for %s", worker_rank, output_path)
-                        bad_output_found = True
-                        invoking_record.mark_unsuccessful()
 
         # Recovering or filling in old ER? No.
         else:
