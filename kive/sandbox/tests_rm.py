@@ -352,7 +352,7 @@ class ExecuteTestsRM(TestCase):
         """
         run1 = self.sandbox_complement.execute_pipeline()
         run2 = self.sandbox_complement.execute_pipeline()
-        self.assertEqual(run1 is run2, True)
+        self.assertEqual(run1.pk, run2.pk)
 
 
 class BadRunTests(TestCase):
