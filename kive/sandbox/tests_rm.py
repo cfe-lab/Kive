@@ -14,6 +14,7 @@ import kive.testing_utils as tools
 from pipeline.models import Pipeline, PipelineFamily
 from kive.tests import install_fixture_files, restore_production_files
 from method.models import Method
+from fleet.workers import Manager
 import file_access_utils
 
 
@@ -332,8 +333,7 @@ class ExecuteDiscardedIntermediateTests(TestCase):
         """
         # In the fixture, we already ran self.pipeline_revcomp_v2, which discards the intermediate
         # output.  We now run v3, which will recover it.
-        sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v3, [self.dataset_labdata])
-        sandbox.execute_pipeline()
+        Manager.execute_pipeline(self.user_alice, self.pipeline_revcomp_v3, [self.dataset_labdata])
 
 
 class ExecuteTestsRM(TestCase):
@@ -377,9 +377,8 @@ class BadRunTests(TestCase):
 
         Note that this doesn't occur if using ssh to an unprivileged account for execution.
         """
-        sandbox = Sandbox(self.user_grandpa, self.pipeline_faulty, [self.dataset_grandpa])
-        sandbox.execute_pipeline()
-        runstep1 = sandbox.run.runsteps.first()
+        run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_faulty, [self.dataset_grandpa])
+        runstep1 = run.runsteps.first()
         log = runstep1.log
         interm_dataset = runstep1.execrecord.execrecordouts.first().dataset
 
@@ -389,16 +388,15 @@ class BadRunTests(TestCase):
 
     def test_method_fails(self):
         """Properly handle a failed method in a pipeline."""
-        sandbox = Sandbox(self.user_grandpa, self.pipeline_fubar, [self.dataset_grandpa])
-        sandbox.execute_pipeline()
-        self.assertIsNone(sandbox.run.complete_clean())
-        self.assertFalse(sandbox.run.is_successful())
+        run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_fubar, [self.dataset_grandpa])
+        self.assertIsNone(run.complete_clean())
+        self.assertFalse(run.is_successful())
 
-        runstep1 = sandbox.run.runsteps.get(pipelinestep__step_num=1)
+        runstep1 = run.runsteps.get(pipelinestep__step_num=1)
         self.assertIsNone(runstep1.complete_clean())
         self.assertTrue(runstep1.successful_execution())
 
-        runstep2 = sandbox.run.runsteps.get(pipelinestep__step_num=2)
+        runstep2 = run.runsteps.get(pipelinestep__step_num=2)
         self.assertIsNone(runstep2.complete_clean())
         self.assertFalse(runstep2.successful_execution())
 
@@ -433,18 +431,18 @@ class FindDatasetTests(TestCase):
         self.dataset_words = Dataset.objects.get(name='blahblah')
         self.user_bob = User.objects.get(username='bob')
 
-        sandbox = Sandbox(self.user_bob, self.pipeline_noop, [self.dataset_words])
-        sandbox.execute_pipeline()
-        self.assertIsNone(sandbox.run.complete_clean())
-        self.assertTrue(sandbox.run.is_successful())
+        x = Sandbox(self.user_bob, self.pipeline_noop, [self.dataset_words])
+        x.execute_pipeline()
+        self.assertIsNone(x.run.complete_clean())
+        self.assertTrue(x.run.is_successful())
 
-        run, gen = sandbox.first_generator_of_dataset(self.dataset_words)
-        self.assertEqual(run, sandbox.run)
+        run, gen = x.first_generator_of_dataset(self.dataset_words)
+        self.assertEqual(run, x.run)
         self.assertEqual(gen, None)
 
-        dataset_out_intermediate = sandbox.run.runsteps.first().execrecord.execrecordouts.first().dataset
-        run_2, gen_2 = sandbox.first_generator_of_dataset(dataset_out_intermediate)
-        self.assertEqual(run_2, sandbox.run)
+        dataset_out_intermediate = x.run.runsteps.first().execrecord.execrecordouts.first().dataset
+        run_2, gen_2 = x.first_generator_of_dataset(dataset_out_intermediate)
+        self.assertEqual(run_2, x.run)
         self.assertEqual(gen_2, self.pipeline_noop.steps.first())
 
     def test_find_dataset_pipeline_input_and_intermediate_custom_wire(self):

@@ -517,6 +517,35 @@ class Manager:
                 except OSError as e:
                     mgr_logger.warning(e)
 
+    @classmethod
+    def execute_pipeline(cls, user, pipeline, inputs, users_allowed=None, groups_allowed=None,
+                         name=None, description=None):
+        """
+        Execute the specified top-level Pipeline with the given inputs.
+
+        This will create a run and start a fleet to run it.  This is only used for testing,
+        and so a precondition is that sys.argv[1] is the management script used to invoke
+        the tests.
+        """
+        run = pipeline.pipeline_instances.create(user=user, _complete=False, _successful=True,
+                                                 name=name, description=description)
+        users_allowed = users_allowed or []
+        groups_allowed = groups_allowed or []
+        run.users_allowed.add(*users_allowed)
+        run.groups_allowed.add(*groups_allowed)
+
+        for idx, curr_input in enumerate(inputs, start=1):
+            run.inputs.create(dataset=curr_input, index=idx)
+
+        # Confirm that the inputs are OK.
+        pipeline.check_inputs(inputs)
+
+        # The run is already in the queue, so we can just start the fleet and let it exit
+        # when it finishes.
+        manager = cls(1, quit_idle=True, manage_script=sys.argv[0])
+        manager.main_procedure()
+        return run
+
 
 class Worker:
     """

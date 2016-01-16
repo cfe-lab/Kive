@@ -64,8 +64,7 @@ class Sandbox:
 
     # cable_map maps cables to ROC/RSIC.
 
-    def __init__(self, user=None, my_pipeline=None, inputs=None, users_allowed=None, groups_allowed=None,
-                 sandbox_path=None, run=None):
+    def __init__(self, run):
         """
         Sets up a sandbox environment to run a Pipeline: space on
         the file system, along with dataset_fs_map/socket_map/etc.
@@ -85,21 +84,11 @@ class Sandbox:
         PRECONDITIONS
         inputs must have real data
         """
-        if run:
-            self.run = run
-            user = run.user
-            my_pipeline = run.pipeline
-            inputs = [x.dataset for x in run.inputs.order_by("index")]
-            sandbox_path = run.sandbox_path
-        else:
-            self.run = my_pipeline.pipeline_instances.create(start_time=timezone.now(), user=user,
-                                                             _complete=False, _successful=True)
-            users_allowed = users_allowed or []
-            groups_allowed = groups_allowed or []
-            self.run.users_allowed.add(*users_allowed)
-            self.run.groups_allowed.add(*groups_allowed)
-            self.run.save()
-
+        self.run = run
+        user = run.user
+        my_pipeline = run.pipeline
+        inputs = [x.dataset for x in run.inputs.order_by("index")]
+        sandbox_path = run.sandbox_path
         assert all([i.has_data() for i in inputs])
 
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -252,501 +241,6 @@ class Sandbox:
                                                    user=self.user)
         ccl.add_missing_output()
 
-    def execute_cable(self, cable, parent_record, recovering_record=None, input_dataset=None, output_path=None):
-        """Execute cable on the input.
-
-        INPUTS
-        cable           PSIC/POC to execute
-        input_dataset        dataset fed into the PSIC/POC
-        output_path     Where the output file should be written
-        parent_record   If not a recovery, the Run or RunStep
-                        executing the cable; if a recovery, the
-                        RunAtomic invoking the recovery
-        recover         whether or not to execute the step in recovery
-                        mode
-
-        OUTPUTS
-        curr_record     RSIC/ROC that describes this execution.
-
-        NOTES
-        Recovering is to re-compute something reused to recover the data
-        output_path is recovered using the maps.
-        dataset_fs_map and cable_map will have been updated.
-
-        PRECONDITIONS
-        1) input_dataset has an appropriate CDT for feeding this cable.
-        2) All the _maps are "up to date" for this step
-        3) input_dataset is clean
-        4) If not recovering, input_dataset and output_path must both be set
-        """
-        recover = recovering_record is not None
-
-        # TODO: assertion for precondition 1?
-        # FIXME: do we need this clean?
-        assert input_dataset is None or input_dataset.clean() is None
-        assert recover or (input_dataset and output_path)
-
-        self.logger.debug("STARTING EXECUTING CABLE")
-
-        # Recovering? No.
-        if not recover:
-
-            # Create new RSIC/ROC
-            curr_record = archive.models.RunCable.create(cable, parent_record)
-            self.logger.debug("Not recovering - created {}".format(curr_record.__class__.__name__))
-            self.logger.debug("Cable keeps output? {}".format(curr_record.keeps_output()))
-
-            # We bail out if the input has somehow been corrupted.
-            if not input_dataset.is_OK():
-                self.logger.debug("Input %s has corrupted.  Cancelling.", input_dataset)
-
-                # Update some state variables.
-                curr_record.is_cancelled = True
-                curr_record.mark_complete()
-                curr_record.mark_unsuccessful()
-
-                curr_record.stop(save=False, clean=False)
-                curr_record.save()
-                curr_record.complete_clean()
-
-            # Attempt to reuse this PipelineCable.
-            curr_ER = None
-
-            succeeded_yet = False
-            while not succeeded_yet:
-                try:
-                    with transaction.atomic():
-                        curr_ER, can_reuse = curr_record.get_suitable_ER(input_dataset)
-                        if curr_ER is not None:
-                            output_dataset = curr_ER.execrecordouts.first().dataset
-                            # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now
-                            # and don't need to execute it for a parent step, we can return.
-                            if not can_reuse["successful"] or can_reuse["fully reusable"]:
-                                self.logger.debug(
-                                    "ExecRecord {} is reusable (successful = {})".format(
-                                        curr_ER, can_reuse["successful"])
-                                )
-                                curr_record.reused = True
-                                curr_record.execrecord = curr_ER
-
-                                # Update state variables:
-                                curr_record.mark_complete()
-                                if not can_reuse["successful"]:
-                                    curr_record.mark_unsuccessful()
-
-                                curr_record.stop(save=False, clean=False)
-                                curr_record.complete_clean()
-                                curr_record.save()
-                                self.update_cable_maps(curr_record, output_dataset, output_path)
-                                return curr_record
-                    succeeded_yet = True
-                except (OperationalError, InternalError):
-                    wait_time = random.random()
-                    self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time)
-                    time.sleep(wait_time)
-
-            # At this point, we know we did not reuse an ExecRecord -- we're either filling one in
-            # or creating a new one.
-            curr_record.reused = False
-            self.logger.debug("No ER to completely reuse - committed to executing cable")
-
-            # Get or create CDT for cable output (Evaluate cable wiring)
-            if cable.is_trivial():
-                output_CDT = input_dataset.get_cdt()
-            else:
-                output_CDT = cable.find_compounddatatype() or cable.create_compounddatatype()
-
-        # Recovering? Yes.
-        else:
-            self.logger.debug("Recovering - will update old ER")
-
-            # Retrieve appropriate RSIC/ROC
-            curr_record = self.cable_map[(parent_record, cable)]
-
-            # Retrieve input_dataset and output_path from maps
-            curr_ER = curr_record.execrecord
-            input_dataset = curr_ER.execrecordins.first().dataset
-            output_dataset = curr_ER.execrecordouts.first().dataset
-            output_CDT = output_dataset.get_cdt()
-            output_path = self.find_dataset(output_dataset)
-
-        dataset_path = self.find_dataset(input_dataset)
-        # Is input in the sandbox? No.
-        if dataset_path is None:
-
-            # Recover dataset.
-            self.logger.debug("Symbolic only: running recover({})".format(input_dataset))
-
-            successful_recovery = self.recover(input_dataset, curr_record)
-            # Refresh curr_record.
-            curr_record = curr_record.__class__.objects.get(pk=curr_record.pk)
-
-            successful_str = "successful" if successful_recovery else "unsuccessful"
-            self.logger.debug("Recovery was {}".format(successful_str))
-            # Success? No.
-            if not successful_recovery:
-
-                # End. Return incomplete curr_record.
-                self.logger.warn("Recovery failed - returning RSIC/ROC without ExecLog")
-
-                # Update state variables: this cable is cancelled as it can no longer proceed.
-                curr_record.is_cancelled = True
-
-                if not recover:
-                    curr_record.mark_complete()
-                    # This is marked unsuccessful by what we just recovered.
-                    assert not curr_record.is_successful(use_cache=True)
-                    curr_record.stop(save=False, clean=False)
-                curr_record.save()
-                curr_record.clean()
-                return curr_record
-
-            # Success? Yes.
-            dataset_path = self.find_dataset(input_dataset)
-            self.logger.debug("Dataset recovered: running run_cable({})".format(dataset_path))
-
-        # This is only meant for single-threaded execution so we set worker rank to 1.
-        return _finish_cable_h(1, curr_record, cable, self.user, curr_ER, input_dataset, dataset_path,
-                               output_path, output_CDT, recovering_record=recovering_record,
-                               sandbox_to_update=self)
-
-    def execute_step(self, pipelinestep, parent_run, recovering_record=None, inputs=None,
-                     step_run_dir=None):
-        """Execute the PipelineStep on the inputs.
-
-        * If code is run, outputs go to paths specified in output_paths.
-        * Requisite code is placed in step_run_dir (must be specified if not recovering).
-        * If recovering, doesn't create new RS/ER; fills in old RS with a new EL
-          In this case, step_run_dir is ignored and retrieved using the maps.
-
-        If this is called during recovery, recovering_record must be the RunAtomic
-        which is recovering this step.  If recovering_record is None then this is
-        not a recovery.
-
-        Inputs written to:  [step run dir]/input_data/step[step num]_[input name]
-        Outputs written to: [step run dir]/output_data/step[step num]_[output name]
-        Logs written to:    [step run dir]/logs/step[step num]_std(out|err).txt
-        """
-        recover = recovering_record is not None
-
-        # Note: corrupt inputs will be caught by the input cables.
-        assert recover or inputs is not None
-        assert recover or step_run_dir
-
-        # Create or retrieve RunStep and set up run/input/output/log directories.
-        if recover:
-            step_run_dir, curr_RS = self.ps_map[(parent_run, pipelinestep)]
-            self.logger.debug("Recovering step {} in directory {}".format(pipelinestep, step_run_dir))
-        else:
-            curr_RS = archive.models.RunStep.create(pipelinestep, parent_run)
-            input_names = ", ".join(str(i) for i in inputs)
-            self.logger.debug("Executing step {} in directory {} on inputs {}"
-                              .format(pipelinestep, step_run_dir, input_names))
-
-        _in_dir, _out_dir, log_dir = _setup_step_paths(step_run_dir, recover)
-
-        # Construct or retrieve output_paths.
-        output_paths = []
-        for curr_output in pipelinestep.outputs:
-            if recover:
-                corresp_dataset = self.socket_map[(parent_run, pipelinestep, curr_output)]
-                output_paths.append(self.dataset_fs_map[corresp_dataset])
-            else:
-                output_paths.append(self.step_xput_path(curr_RS, curr_output, step_run_dir))
-
-        # Run step's input cables, or retrieve inputs_after_cable from maps.
-        inputs_after_cable = []
-        for i, curr_input in enumerate(pipelinestep.inputs):
-            if not recover:
-                # Run a cable.
-                corresp_cable = pipelinestep.cables_in.get(dest=curr_input)
-                cable_path = self.step_xput_path(curr_RS, curr_input, step_run_dir)
-                curr_RSIC = self.execute_cable(corresp_cable, curr_RS, recovering_record=None,
-                                               input_dataset=inputs[i], output_path=cable_path)
-
-                # Refresh curr_RS.
-                curr_RS = RunStep.objects.get(pk=curr_RS.pk)
-
-                # Cable failed, return incomplete RunStep.
-                if not curr_RSIC.is_successful():
-                    if curr_RSIC.is_cancelled:
-                        self.logger.error("PipelineStepInputCable {} cancelled.".format(curr_RSIC))
-                    elif curr_RSIC.reused:
-                        self.logger.error("PipelineStepInputCable {} failed on reuse.".format(curr_RSIC))
-                    else:
-                        self.logger.error("PipelineStepInputCable {} failed.".format(curr_RSIC))
-
-                    # Update state variables.
-                    assert not curr_RS.is_unsuccessful(use_cache=True)
-                    # There is no recovering_record to mark unsuccessful as this is not a recovery.
-                    curr_RS.mark_complete()
-
-                    curr_RS.stop(save=True, clean=True)
-                    return curr_RS
-
-                # Cable succeeded.
-                inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
-            else:
-                corresp_ERI = curr_RS.execrecord.execrecordins.get(generic_input=curr_input)
-                inputs_after_cable.append(corresp_ERI.dataset)
-
-        # Look for ExecRecord.
-        succeeded_yet = False
-        while not succeeded_yet:
-            try:
-                with transaction.atomic():
-                    if pipelinestep.is_subpipeline:
-                        curr_ER = None
-                        self.logger.debug("Step {} is a sub-pipeline, so no ExecRecord is applicable".
-                                          format(pipelinestep))
-                    else:
-                        if recover:
-                            curr_ER = librarian.models.ExecRecord.objects.get(pk=curr_RS.execrecord.pk)
-                        else:
-                            curr_ER, can_reuse = curr_RS.get_suitable_ER(inputs_after_cable)
-                            if curr_ER is not None:
-                                # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it
-                                # now, we can return.
-                                if not can_reuse["successful"] or can_reuse["fully reusable"]:
-                                    self.logger.debug(
-                                        "ExecRecord {} is reusable (successful = {})".format(
-                                            curr_ER, can_reuse["successful"])
-                                    )
-                                    curr_RS.reused = True
-                                    curr_RS.execrecord = curr_ER
-
-                                    # Update state variables.
-                                    curr_RS.mark_complete()
-                                    if not can_reuse["successful"]:
-                                        curr_RS.mark_unsuccessful()
-
-                                    curr_RS.stop(save=False, clean=False)
-                                    curr_RS.complete_clean()
-                                    curr_RS.save()
-                                    self.update_step_maps(curr_RS, step_run_dir, output_paths)
-                                    return curr_RS
-
-                                else:
-                                    self.logger.debug("Filling in ExecRecord {}".format(curr_ER))
-
-                            else:
-                                self.logger.debug("No compatible ExecRecord found - will create new ExecRecord")
-
-                            curr_RS.reused = False
-                            curr_RS.save()
-                succeeded_yet = True
-            except (OperationalError, InternalError):
-                wait_time = random.random()
-                self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time)
-                time.sleep(wait_time)
-
-        invoking_record = recovering_record if recover else curr_RS
-
-        # Gather inputs.
-        for curr_in_dataset in inputs_after_cable:
-
-            # Check if required Datasets are on the file system for running code.
-            if self.find_dataset(curr_in_dataset) is None:
-                self.logger.debug("Dataset {} not on file system: recovering".format(curr_in_dataset))
-
-                # Run recover() on missing datasets.
-                if not self.recover(curr_in_dataset, invoking_record):
-
-                    # Failed recovery. Return RunStep with failed ExecLogs.
-                    self.logger.warn("Recovery of Dataset {} failed".format(curr_in_dataset))
-
-                    # Refresh curr_RS.
-                    curr_RS = RunStep.objects.get(pk=curr_RS.pk)
-                    curr_RS.is_cancelled = True
-                    if not recover:
-                        curr_RS.mark_complete()
-                        curr_RS.stop(save=False, clean=True)
-                    assert not invoking_record.is_successful(use_cache=True)
-
-                    curr_RS.save()
-                    return curr_RS
-
-        # Run code.
-        # If the step is a sub-Pipeline, execute it and return the RunStep.
-        if pipelinestep.is_subpipeline:
-            subrun = self.execute_pipeline(
-                pipeline=pipelinestep.transformation.pipeline,
-                input_datasets=inputs_after_cable,
-                sandbox_path=step_run_dir,
-                parent_runstep=curr_RS
-            )
-
-            # Refresh curr_RS before updating it.
-            curr_RS = RunStep.objects.get(pk=curr_RS.pk)
-            curr_RS.mark_complete()
-            if not subrun.is_successful(use_cache=True):
-                # curr_RS should be marked by the execution.
-                assert not curr_RS.is_successful(use_cache=True)
-
-            curr_RS.stop(save=True, clean=True)
-            return curr_RS
-
-        input_paths = [self.dataset_fs_map[x] for x in inputs_after_cable]
-
-        # This is only meant for single-threaded use so we just say the worker rank is 1.
-        return _finish_step_h(1, self.user, curr_RS, step_run_dir, curr_ER, inputs_after_cable, input_paths,
-                              output_paths, log_dir, recovering_record, sandbox_to_update=self)
-
-    def execute_pipeline(self, pipeline=None, input_datasets=None, sandbox_path=None, parent_runstep=None):
-        """
-        Execute the specified Pipeline with the given inputs.
-
-        INPUTS
-        If a top level pipeline, pipeline, input_datasets, sandbox_path,
-        and parent_runstep are all None.
-
-        Outputs written to: [sandbox_path]/output_data/run[run PK]_[output name].(csv|raw)
-        """
-        is_set = (pipeline is not None, input_datasets is not None, sandbox_path is not None, parent_runstep is not None)
-        if any(is_set) and not all(is_set):
-            raise ValueError("Either none or all parameters must be None")
-
-        if self.run.is_complete():
-            self.logger.warn('A Pipeline has already been run in Sandbox "{}", returning the previous Run'.format(self))
-            return self.run
-
-        curr_run = self.run
-
-        if pipeline:
-            pipeline.check_inputs(input_datasets)
-            self.logger.debug("executing a sub-pipeline with input_datasets {}".format(input_datasets))
-            curr_run = pipeline.pipeline_instances.create(user=self.user, parent_runstep=parent_runstep)
-            curr_run.users_allowed.add(*self.run.users_allowed.all())
-            curr_run.groups_allowed.add(*self.run.groups_allowed.all())
-        else:
-            pipeline = self.pipeline
-
-        curr_run.start(save=True, clean=False)
-        sandbox_path = sandbox_path or self.sandbox_path
-
-        for step in pipeline.steps.order_by("step_num"):
-            self.logger.debug("Executing step {} - looking for cables feeding into this step".format(step))
-
-            step_inputs = []
-            run_dir = os.path.join(sandbox_path, "step{}".format(step.step_num))
-
-            # Before executing a step, we need to know what input datasets to feed into the step for execution.
-            # Because pipeline steps includes the cable execution prior to the transformation,
-            # the datasets we need are upstream of the *PSIC* leading to this step.
-
-            # For each PSIC leading to this step...
-            for psic in step.cables_in.order_by("dest__dataset_idx"):
-                # The socket is upstream of that PSIC.
-                socket = psic.source.definite
-
-                run_to_query = curr_run
-                # If the PSIC comes from another step, the generator is the source pipeline step,
-                # or the output cable if it's a sub-pipeline.
-                if psic.source_step != 0:
-                    generator = pipeline.steps.get(step_num=psic.source_step)
-                    if socket.transformation.is_pipeline:
-                        run_to_query = curr_run.runsteps.get(pipelinestep=generator).child_run
-                        generator = generator.transformation.pipeline.outcables.get(output_idx=socket.dataset_idx)
-
-                # Otherwise, the psic comes from step 0
-                else:
-                    # The dataset was uploaded...
-                    generator = None
-                    # ... unless this step is a subpipeline.
-                    if parent_runstep is not None:
-                        # Get the cable in the outer pipeline step that feeds this PSIC.
-                        run_to_query = parent_runstep.run
-                        cables_into_subpipeline = parent_runstep.pipelinestep.cables_in
-                        generator = cables_into_subpipeline.get(dest=psic.source)
-
-                step_inputs.append(self.socket_map[(run_to_query, generator, socket)])
-
-            curr_RS = self.execute_step(step, curr_run, recovering_record=None, inputs=step_inputs,
-                                        step_run_dir=run_dir)
-            # Refresh curr_run.
-            curr_run = Run.objects.get(pk=curr_run.pk)
-            self.logger.debug("DONE EXECUTING STEP {}".format(step))
-
-            # Bail if we failed -- either due to a bad input, during execution, or by reusing a failed ExecRecord.
-            stop_now = False
-            if curr_RS.is_cancelled:
-                self.logger.warn("Step cancelled: returning the run")
-                stop_now = True
-            elif not curr_RS.reused:
-                if not curr_RS.is_complete(use_cache=True) or not curr_RS.is_successful(use_cache=True):
-                    self.logger.warn("Step failed to execute: returning the run")
-                    stop_now = True
-            else:
-                if curr_RS.execrecord is None:
-                    self.logger.critical("Step is reused but has no ExecRecord: THIS SHOULD NEVER HAPPEN")
-                    stop_now = True
-                elif not curr_RS.check_ER_usable(curr_RS.execrecord)["successful"]:
-                    self.logger.warn("Step reuses a failed ExecRecord: returning the run")
-                    stop_now = True
-
-            if stop_now:
-                # Update the state fields.
-                curr_run.mark_complete()
-                assert not curr_run.is_successful(use_cache=True)
-
-                curr_run.stop(save=True, clean=True)
-                return curr_run
-
-        self.logger.debug("Finished executing steps, executing POCs")
-        for outcable in pipeline.outcables.all():
-            generator = None
-            run_to_query = curr_run
-
-            # Consider the source step of this POC.  The socket is the TO from a pipeline step.
-            source_step = pipeline.steps.get(step_num=outcable.source_step)
-            socket = outcable.source
-
-            # The generator of interest is usually just the source pipeline step.
-            if not source_step.transformation.is_pipeline:
-                generator = source_step
-            # But if this step contains a subpipeline...
-            else:
-                # The generator is the subpipeline's output cable.  Retrieve the subrun so we can
-                # look up the right Dataset.
-                generator = source_step.transformation.pipeline.outcables.get(output_idx=socket.dataset_idx)
-                runstep_containing_subrun = curr_run.runsteps.get(pipelinestep__step_num=outcable.source_step)
-                run_to_query = archive.models.Run.objects.get(parent_runstep=runstep_containing_subrun)
-
-            source_dataset = self.socket_map[(run_to_query, generator, socket)]
-            file_suffix = "raw" if outcable.is_raw() else "csv"
-            out_file_name = "run{}_{}.{}".format(curr_run.pk, outcable.output_name, file_suffix)
-            output_path = os.path.join(self.out_dir, out_file_name)
-            curr_ROC = self.execute_cable(outcable, curr_run, recovering_record=None,
-                                          input_dataset=source_dataset, output_path=output_path)
-            # Refresh curr_run.
-            curr_run = Run.objects.get(pk=curr_run.pk)
-
-            if not curr_ROC.is_successful():
-                if curr_ROC.is_cancelled:
-                    self.logger.debug("Cable %s cancelled due to corrupted input", curr_ROC)
-                elif curr_ROC.reused:
-                    self.logger.debug("Reuse of cable %s failed", curr_ROC)
-                else:
-                    self.logger.debug("Execution of cable %s failed", curr_ROC)
-
-                # Update state.
-                curr_run.mark_complete()
-                assert not curr_run.is_successful(use_cache=True)
-
-                curr_run.stop(save=True, clean=True)
-                return curr_run
-
-        self.logger.debug("Finished executing output cables")
-
-        # Update state.
-        curr_run.mark_complete()
-
-        curr_run.stop(save=True, clean=False)
-        curr_run.complete_clean(use_cache=True)
-        self.logger.debug("DONE EXECUTING PIPELINE - Run is complete, clean, and saved")
-
-        return curr_run
-
     def first_generator_of_dataset(self, dataset_to_find, curr_run=None):
         """
         Find the (run, generator) pair which first produced a Dataset.
@@ -816,60 +310,6 @@ class Sandbox:
 
         # If we're here, we didn't find it.
         return (None, None)
-
-    def recover(self, dataset_to_recover, invoking_record):
-        """
-        Writes dataset_to_recover to the file system.
-
-        INPUTS
-        dataset_to_recover   The dataset we want to recover.
-        invoking_record RunAtomic initiating the recovery
-
-        OUTPUTS
-        Returns True if successful - otherwise False.
-
-        PRE
-        dataset_to_recover is in the maps but no corresponding file is on the file system.
-        """
-        if dataset_to_recover.has_data():
-            self.logger.debug("Dataset is in the DB - writing it to the file system")
-            location = self.dataset_fs_map[dataset_to_recover]
-            try:
-                shutil.copyfile(dataset_to_recover.dataset_file.path, location)
-            except IOError:
-                self.logger.error("could not copy file {} to file {}.".format(dataset_to_recover.dataset_file.path, location))
-                return False
-            return True
-
-        self.logger.debug("Performing computation to create missing Dataset")
-
-        # Search for the generator of the dataset in the Pipeline.
-        curr_run, generator = self.first_generator_of_dataset(dataset_to_recover)
-
-        if curr_run is None:
-            raise ValueError('Dataset "{}" was not found in Pipeline "{}" and cannot be recovered'
-                             .format(dataset_to_recover, self.pipeline))
-        elif generator is None:
-            raise ValueError('Dataset "{}" is an input to Pipeline "{}" and cannot be recovered'
-                             .format(dataset_to_recover, self.pipeline))
-
-        self.logger.debug('Executing {} "{}" in recovery mode'.format(generator.__class__.__name__, generator))
-        if type(generator) == pipeline.models.PipelineStep:
-            curr_record = self.execute_step(generator, curr_run, recovering_record=invoking_record)
-        elif type(generator) == pipeline.models.PipelineStepInputCable:
-            parent_rs = curr_run.runsteps.filter(pipelinestep=generator.pipelinestep)
-            curr_record = self.execute_cable(generator, parent_rs, recovering_record=invoking_record)
-        else:
-            curr_record = self.execute_cable(generator, curr_run, recovering_record=invoking_record)
-
-        # Determine whether recovery was successful:
-        # - if there is no ExecLog in curr_record, then it was unsuccessful (failed on a deeper recovery)
-        # - if there is an ExecLog and it is unsuccessful, then it was unsuccessful (failed on this recovery)
-        log_of_recovery = curr_record.log
-        if log_of_recovery is None:
-            return False
-        return (log_of_recovery.is_complete() and log_of_recovery.is_successful() and
-                log_of_recovery.all_checks_passed())
 
     ####
     # Code to execute code in an MPI environment.
@@ -1340,7 +780,7 @@ class Sandbox:
                 symbolically_okay_datasets.append(inputs[i])
 
         # Bundle up the information required to process this step.
-        _in_dir, _out_dir, log_dir = _setup_step_paths(step_run_dir, False)
+        _in_dir, _out_dir, log_dir = self._setup_step_paths(step_run_dir, False)
 
         # Construct output_paths.
         output_paths = [self.step_xput_path(curr_RS, x, step_run_dir) for x in pipelinestep.outputs]
@@ -1580,374 +1020,90 @@ class Sandbox:
             cable_out_dataset = task_finished.execrecord.execrecordouts.first().dataset
             self.update_cable_maps(task_finished, cable_out_dataset, task_execute_info.output_path)
 
+    @staticmethod
+    def _setup_step_paths(step_run_dir, recover):
+        """Set up paths for running a PipelineStep.
 
-def _setup_step_paths(step_run_dir, recover):
-    """Set up paths for running a PipelineStep.
+        INPUTS
+        step_run_dir    root directory where step will be run
+        recover         are we recovering? (if so, test if the
+                        directories are there instead of creating them)
 
-    INPUTS
-    step_run_dir    root directory where step will be run
-    recover         are we recovering? (if so, test if the
-                    directories are there instead of creating them)
+        OUTPUTS
+        in_dir          directory to put step's inputs
+        out_dir         directory where step will put its outputs
+        log_dir         directory to put logs in
+        """
+        log_dir = os.path.join(step_run_dir, dirnames.LOG_DIR)
+        out_dir = os.path.join(step_run_dir, dirnames.OUT_DIR)
+        in_dir = os.path.join(step_run_dir, dirnames.IN_DIR)
 
-    OUTPUTS
-    in_dir          directory to put step's inputs
-    out_dir         directory where step will put its outputs
-    log_dir         directory to put logs in
-    """
-    log_dir = os.path.join(step_run_dir, dirnames.LOG_DIR)
-    out_dir = os.path.join(step_run_dir, dirnames.OUT_DIR)
-    in_dir = os.path.join(step_run_dir, dirnames.IN_DIR)
+        for workdir in [step_run_dir, log_dir, out_dir, in_dir]:
+            file_access_utils.set_up_directory(workdir, tolerate=recover)
+            file_access_utils.configure_sandbox_permissions(workdir)
+        return (in_dir, out_dir, log_dir)
 
-    for workdir in [step_run_dir, log_dir, out_dir, in_dir]:
-        file_access_utils.set_up_directory(workdir, tolerate=recover)
-        file_access_utils.configure_sandbox_permissions(workdir)
-    return (in_dir, out_dir, log_dir)
+    # This function will be called by fleet Workers.  Since they do not have access
+    # to the Sandboxes, we need to pass in all the information they need via a dictionary
+    # representation of a RunCableExecuteInfo.
+    @staticmethod
+    def finish_cable(cable_execute_dict, worker_rank):
+        """
+        Finishes an un-reused cable that has already been prepared for execution.
 
+        If we are reaching this point, we know that the data required for input_dataset is either
+        in place in the sandbox or available in the database.
 
-# This function will be called by fleet Workers.  Since they do not have access
-# to the Sandboxes, we need to pass in all the information they need via a dictionary
-# representation of a RunCableExecuteInfo.
-def finish_cable(cable_execute_dict, worker_rank):
-    """
-    Finishes an un-reused cable that has already been prepared for execution.
+        This function is called by finish_step, because we want it to be called by the same
+        worker(s) as the step is, so its output is on the local filesystem of the worker, which
+        may be a remote MPI host.
+        """
+        # Retrieve info from the database using the PKs passed.
+        curr_record = archive.models.RunComponent.objects.get(pk=cable_execute_dict["cable_record_pk"]).definite
+        input_dataset = librarian.models.Dataset.objects.get(pk=cable_execute_dict["input_dataset_pk"])
+        output_path = cable_execute_dict["output_path"]
+        recovering_record = None
+        if cable_execute_dict["recovering_record_pk"] is not None:
+            recovering_record = archive.models.RunComponent.objects.get(
+                pk=cable_execute_dict["recovering_record_pk"]
+            ).definite
+        curr_ER = None
 
-    If we are reaching this point, we know that the data required for input_dataset is either
-    in place in the sandbox or available in the database.
+        recover = recovering_record is not None
+        invoking_record = recovering_record or curr_record
 
-    This function is called by finish_step, because we want it to be called by the same
-    worker(s) as the step is, so its output is on the local filesystem of the worker, which
-    may be a remote MPI host.
-    """
-    # Retrieve info from the database using the PKs passed.
-    curr_record = archive.models.RunComponent.objects.get(pk=cable_execute_dict["cable_record_pk"]).definite
-    input_dataset = librarian.models.Dataset.objects.get(pk=cable_execute_dict["input_dataset_pk"])
-    output_path = cable_execute_dict["output_path"]
-    recovering_record = None
-    if cable_execute_dict["recovering_record_pk"] is not None:
-        recovering_record = archive.models.RunComponent.objects.get(
-            pk=cable_execute_dict["recovering_record_pk"]
-        ).definite
-    curr_ER = None
-
-    recover = recovering_record is not None
-    invoking_record = recovering_record or curr_record
-
-    # It's possible that this cable was completed in the time between the Manager queueing this task
-    # and the worker starting it.  If so we can use the ExecRecord, and maybe even fully reuse it
-    # if this was not called by finish_step.
-    succeeded_yet = False
-    while not succeeded_yet:
-        try:
-            with transaction.atomic():
-                if cable_execute_dict["execrecord_pk"] is not None:
-                    curr_ER = librarian.models.ExecRecord.objects.get(pk=cable_execute_dict["execrecord_pk"])
-                    can_reuse = curr_record.check_ER_usable(curr_ER)
-                else:
-                    curr_ER, can_reuse = curr_record.get_suitable_ER(input_dataset)
-
-                if curr_ER is not None:
-                    # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
-                    # execute it for a parent step, we can return.
-                    if (not can_reuse["successful"] or
-                            (can_reuse["fully reusable"] and cable_execute_dict["by_step_pk"] is None)):
-                        logger.debug("[%d] ExecRecord %s is reusable (successful = %s)",
-                                     worker_rank, curr_ER, can_reuse["successful"])
-                        curr_record.reused = True
-                        curr_record.execrecord = curr_ER
-
-                        if not can_reuse["successful"]:
-                            # If this is a recovery we do *not* mark curr_record as failed.
-                            invoking_record.mark_unsuccessful()
-                        if not recover:
-                            curr_record.mark_complete()
-                            curr_record.stop(save=True, clean=False)
-
-                        curr_record.complete_clean()
-                        return curr_record
-            succeeded_yet = True
-        except (OperationalError, InternalError):
-            wait_time = random.random()
-            logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
-                         worker_rank, wait_time)
-            time.sleep(wait_time)
-
-    # We're now committed to actually running this cable.
-    input_dataset_path = cable_execute_dict["input_dataset_path"]
-    user = User.objects.get(pk=cable_execute_dict["user_pk"])
-
-    # Preconditions to test.
-    # assert curr_record is not None
-    input_dataset_in_sdbx = file_access_utils.file_exists(input_dataset_path)
-    assert input_dataset_in_sdbx or input_dataset.has_data()
-
-    cable = curr_record.definite.component
-
-    # Write the input dataset to the sandbox if necessary.
-    # FIXME at some point in the future this will have to be updated to mean "write to the local sandbox".
-    if not input_dataset_in_sdbx:
-        logger.debug("[%d] Dataset is in the DB - writing it to the file system", worker_rank)
-        try:
-            shutil.copyfile(input_dataset.dataset_file.path, input_dataset_path)
-        except IOError:
-            logger.error("[%d] could not copy file %s to file %s.",
-                         worker_rank, input_dataset.dataset_file.path, input_dataset_path)
-
-            invoking_record.mark_unsuccessful()
-            if not recover:
-                curr_record.mark_complete()
-                curr_record.stop(save=True, clean=True)
-            return curr_record
-
-    if not recover:
-        # Get or create CDT for cable output (Evaluate cable wiring)
-        output_CDT = input_dataset.get_cdt()
-        if not cable.is_trivial():
-            output_CDT = cable.find_compounddatatype() or cable.create_compounddatatype()
-
-    else:
-        logger.debug("[%d] Recovering - will update old ER", worker_rank)
-        output_dataset = curr_ER.execrecordouts.first().dataset
-        output_CDT = output_dataset.get_cdt()
-
-    return _finish_cable_h(worker_rank, curr_record, cable, user, curr_ER, input_dataset, input_dataset_path,
-                           output_path, output_CDT, recovering_record)
-
-
-def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_dataset, input_dataset_path, output_path,
-                    output_CDT, recovering_record, sandbox_to_update=None):
-    """
-    Helper for finish_cable and execute_cable.
-    """
-    recover = recovering_record is not None
-    # Create ExecLog invoked by...
-    if not recover:
-        # ...this RunCable.
-        invoking_record = curr_record
-    else:
-        # ...the recovering RunAtomic.
-        invoking_record = recovering_record
-    curr_log = archive.models.ExecLog.create(curr_record, invoking_record)
-
-    # Run cable (this completes EL).
-    cable.run_cable(input_dataset_path, output_path, curr_record, curr_log)
-
-    # Here, we're authoring/modifying an ExecRecord, so we use a transaction.
-    preexisting_ER = execrecord is not None
-    succeeded_yet = False
-    while not succeeded_yet:
-        try:
-            with transaction.atomic():
-                missing_output = False
-                start_time = timezone.now()
-                if not file_access_utils.file_exists(output_path):
-                    end_time = timezone.now()
-                    # It's conceivable that the linking could fail in the
-                    # trivial case; in which case we should associate a "missing data"
-                    # check to input_dataset == output_dataset.
-                    if cable.is_trivial():
-                        output_dataset = input_dataset
-                    if execrecord is None:
-                        output_dataset = librarian.models.Dataset.create_empty(
-                            cdt=output_CDT,
-                            file_source=curr_record
-                        )
-                    else:
-                        output_dataset = execrecord.execrecordouts.first().dataset
-                    output_dataset.mark_missing(start_time, end_time, curr_log, user)
-                    missing_output = True
-
-                    # Update state variables.
-                    if recover:
-                        recovering_record.mark_unsuccessful()
-                    else:
-                        curr_record.mark_unsuccessful()
-
-                elif cable.is_trivial():
-                    output_dataset = input_dataset
-
-                else:
-                    # Do we need to keep this output?
-                    make_dataset = curr_record.keeps_output()
-                    dataset_name = curr_record.output_name()
-                    dataset_desc = curr_record.output_description()
-                    if not make_dataset:
-                        logger.debug("[%d] Cable doesn't keep output: not creating a dataset", worker_rank)
-
-                    if execrecord is not None:
-                        output_dataset = execrecord.execrecordouts.first().dataset
-                        if make_dataset:
-                            output_dataset.register_file(output_path)
-
-                    else:
-                        output_dataset = librarian.models.Dataset.create_dataset(
-                            output_path,
-                            cdt=output_CDT,
-                            keep_file=make_dataset,
-                            name=dataset_name,
-                            description=dataset_desc,
-                            file_source=curr_record,
-                            check=False
-                        )
-
-                # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
-                if not recover:
-                    if execrecord is None:
-                        logger.debug("[%d] No ExecRecord already in use - creating fresh cable ExecRecord",
-                                     worker_rank)
-                        # Make ExecRecord, linking it to the ExecLog.
-                        execrecord = librarian.models.ExecRecord.create(curr_log, cable, [input_dataset], [output_dataset])
-                    # Link ER to RunCable (this may have already been linked; that's fine).
-                    curr_record.link_execrecord(execrecord, reused=False)
-
-                else:
-                    logger.debug("[%d] This was a recovery - not linking RSIC/RunOutputCable to ExecRecord",
-                                 worker_rank)
-            succeeded_yet = True
-        except (OperationalError, InternalError):
-            wait_time = random.random()
-            logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
-                         worker_rank, wait_time)
-            time.sleep(wait_time)
-
-    ####
-    # Check outputs
-    ####
-
-    if not missing_output:
-        # Did ER already exist (with vetted output), or is cable trivial, or recovering? Yes.
-        if (preexisting_ER and (output_dataset.is_OK() or output_dataset.any_failed_checks())) or cable.is_trivial() or recover:
-            logger.debug("[%d] Performing integrity check of trivial or previously generated output", worker_rank)
-            # Perform integrity check.
-            check = output_dataset.check_integrity(output_path, user, curr_log, output_dataset.MD5_checksum)
-
-        # Did ER already exist, or is cable trivial, or recovering? No.
-        else:
-            logger.debug("[%d] Performing content check for output generated for the first time", worker_rank)
-            summary_path = "{}_summary".format(output_path)
-            # Perform content check.
-            check = output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
-                                                       cable.max_rows_out, curr_log, user)
-
-        if check.is_fail():
-            if recover:
-                recovering_record.mark_unsuccessful()
-            else:
-                curr_record.mark_unsuccessful()
-
-        # If a sandbox was specified and we were successful, update the sandbox.
-        if sandbox_to_update is not None and output_dataset.is_OK() and not recover:
-            # Success! Update dataset_fs/socket/cable_map.
-            sandbox_to_update.update_cable_maps(curr_record, output_dataset, output_path)
-
-    logger.debug("[%d] DONE EXECUTING %s '%s'", worker_rank, type(cable).__name__, cable)
-
-    # End. Return curr_record.  Stop the clock if this was not a recovery.
-    if not recover:
-        curr_record.mark_complete()
-        curr_record.stop(save=False, clean=False)
-    curr_record.save()
-    curr_record.complete_clean()
-    return curr_record
-
-
-# The actual running of code happens here.  We copy and modify this from execute_step.
-def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
-    """
-    Carry out the task specified by step_execute_dict.
-
-    Precondition: the task must be ready to go, i.e. its inputs must all be in place.  Also
-    it should not have been run previously.  This should not be a RunStep representing a Pipeline.
-    """
-    # Break out the execution info.
-    curr_RS = archive.models.RunStep.objects.get(pk=step_execute_dict["runstep_pk"])
-    curr_RS.start()
-    step_run_dir = step_execute_dict["step_run_dir"]
-    curr_ER = None
-    if step_execute_dict["execrecord_pk"] is not None:
-        curr_ER = librarian.models.ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
-    cable_info_dicts = step_execute_dict["cable_info_dicts"]
-    output_paths = step_execute_dict["output_paths"]
-    user = User.objects.get(pk=step_execute_dict["user_pk"])
-    log_dir = step_execute_dict["log_dir"]
-
-    recovering_record = None
-    if step_execute_dict["recovering_record_pk"] is not None:
-        recovering_record = archive.models.RunComponent.objects.get(
-            pk=step_execute_dict["recovering_record_pk"]
-        ).definite
-
-    assert not curr_RS.pipelinestep.is_subpipeline
-
-    recover = recovering_record is not None
-    invoking_record = recovering_record or curr_RS
-
-    ####
-    # Gather inputs: finish all input cables -- we want them written to the sandbox now, which is never
-    # done by reuse_or_prepare_cable.
-    inputs_after_cable = []
-    input_paths = []
-    for curr_execute_dict in cable_info_dicts:
-        # Update the cable execution information with the recovering record if applicable.
-        if recover:
-            curr_execute_dict["recovering_record_pk"] = recovering_record.pk
-
-        curr_RSIC = finish_cable(curr_execute_dict, worker_rank)
-        # Refresh invoking_record.
-        invoking_record = invoking_record.__class__.objects.get(pk=invoking_record.pk)
-
-        # Cable failed, return incomplete RunStep.
-        if not curr_RSIC.is_successful():
-            logger.error("[%d] PipelineStepInputCable %s failed.", worker_rank, curr_RSIC)
-
-            # Update state variables.
-            assert not invoking_record.is_successful(use_cache=True)
-            if not recover:
-                curr_RS.mark_complete()
-                curr_RS.stop(save=True, clean=False)
-
-            curr_RS.complete_clean()
-            return curr_RS
-
-        # Cable succeeded.
-        inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
-        input_paths.append(curr_execute_dict["output_path"])
-
-    # Check again to see if a compatible ER was completed while this task
-    # waited on the queue.  If this isn't a recovery, we can just stop.
-    if recover:
-        assert curr_ER is not None
-    else:
+        # It's possible that this cable was completed in the time between the Manager queueing this task
+        # and the worker starting it.  If so we can use the ExecRecord, and maybe even fully reuse it
+        # if this was not called by finish_step.
         succeeded_yet = False
         while not succeeded_yet:
             try:
                 with transaction.atomic():
+                    if cable_execute_dict["execrecord_pk"] is not None:
+                        curr_ER = librarian.models.ExecRecord.objects.get(pk=cable_execute_dict["execrecord_pk"])
+                        can_reuse = curr_record.check_ER_usable(curr_ER)
+                    else:
+                        curr_ER, can_reuse = curr_record.get_suitable_ER(input_dataset)
+
                     if curr_ER is not None:
-                        can_reuse = curr_RS.check_ER_usable(curr_ER)
-                        # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
-                        if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                        # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
+                        # execute it for a parent step, we can return.
+                        if (not can_reuse["successful"] or
+                                (can_reuse["fully reusable"] and cable_execute_dict["by_step_pk"] is None)):
                             logger.debug("[%d] ExecRecord %s is reusable (successful = %s)",
                                          worker_rank, curr_ER, can_reuse["successful"])
-                            curr_RS.reused = True
-                            curr_RS.execrecord = curr_ER
+                            curr_record.reused = True
+                            curr_record.execrecord = curr_ER
 
-                            curr_RS.mark_complete()
                             if not can_reuse["successful"]:
-                                curr_RS.mark_unsuccessful()
-                                # We don't need to mark the recovering_record, as here, it isn't recovering.
+                                # If this is a recovery we do *not* mark curr_record as failed.
+                                invoking_record.mark_unsuccessful()
+                            if not recover:
+                                curr_record.mark_complete()
+                                curr_record.stop(save=True, clean=False)
 
-                            curr_RS.stop(save=True, clean=False)
-                            curr_RS.complete_clean()
-                            return curr_RS
-
-                        else:
-                            logger.debug("[%d] ExecRecord not reusable %s", worker_rank, curr_ER)
-                            curr_ER = None
-
-                    else:
-                        logger.debug("[%d] No compatible ExecRecord found yet", worker_rank)
-
-                    curr_RS.reused = False
-                    curr_RS.save()
+                            curr_record.complete_clean()
+                            return curr_record
                 succeeded_yet = True
             except (OperationalError, InternalError):
                 wait_time = random.random()
@@ -1955,226 +1111,512 @@ def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
                              worker_rank, wait_time)
                 time.sleep(wait_time)
 
-    return _finish_step_h(worker_rank, user, curr_RS, step_run_dir, curr_ER, inputs_after_cable, input_paths,
-                          output_paths, log_dir, recovering_record, stop_execution_callback=stop_execution_callback)
+        # We're now committed to actually running this cable.
+        input_dataset_path = cable_execute_dict["input_dataset_path"]
+        user = User.objects.get(pk=cable_execute_dict["user_pk"])
 
+        # Preconditions to test.
+        # assert curr_record is not None
+        input_dataset_in_sdbx = file_access_utils.file_exists(input_dataset_path)
+        assert input_dataset_in_sdbx or input_dataset.has_data()
 
-def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_after_cable, input_paths, output_paths,
-                   log_dir, recovering_record, sandbox_to_update=None, stop_execution_callback=None):
-    """
-    Helper for execute_step and finish_step.
-    """
-    recover = recovering_record is not None
-    invoking_record = recovering_record if recover else runstep
-    pipelinestep = runstep.pipelinestep
+        cable = curr_record.definite.component
 
-    # Run code, creating ExecLog and MethodOutput.
-    curr_log = archive.models.ExecLog.create(runstep, invoking_record)
-    stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
-    stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
+        # Write the input dataset to the sandbox if necessary.
+        # FIXME at some point in the future this will have to be updated to mean "write to the local sandbox".
+        if not input_dataset_in_sdbx:
+            logger.debug("[%d] Dataset is in the DB - writing it to the file system", worker_rank)
+            try:
+                shutil.copyfile(input_dataset.dataset_file.path, input_dataset_path)
+            except IOError:
+                logger.error("[%d] could not copy file %s to file %s.",
+                             worker_rank, input_dataset.dataset_file.path, input_dataset_path)
 
-    # Check the integrity of the code before we run.
-    if not pipelinestep.transformation.definite.driver.check_md5():
-        logger.error("[%d] Method code has gone corrupt for %s or its " +
-                     "dependencies; stopping step",
-                     worker_rank,
-                     pipelinestep.transformation.definite.driver)
-        # Stop everything!
-        curr_log.start()
-        curr_log.methodoutput.are_checksums_OK = False
-        curr_log.methodoutput.save()
-        curr_log.stop(save=True, clean=False)
-
-        # Update state variables:
-        invoking_record.mark_unsuccessful()
+                invoking_record.mark_unsuccessful()
+                if not recover:
+                    curr_record.mark_complete()
+                    curr_record.stop(save=True, clean=True)
+                return curr_record
 
         if not recover:
+            # Get or create CDT for cable output (Evaluate cable wiring)
+            output_CDT = input_dataset.get_cdt()
+            if not cable.is_trivial():
+                output_CDT = cable.find_compounddatatype() or cable.create_compounddatatype()
+
+        else:
+            logger.debug("[%d] Recovering - will update old ER", worker_rank)
+            output_dataset = curr_ER.execrecordouts.first().dataset
+            output_CDT = output_dataset.get_cdt()
+
+        return Sandbox._finish_cable_h(worker_rank, curr_record, cable, user, curr_ER,
+                                       input_dataset, input_dataset_path,
+                                       output_path, output_CDT, recovering_record)
+
+    @staticmethod
+    def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_dataset, input_dataset_path, output_path,
+                        output_CDT, recovering_record, sandbox_to_update=None):
+        """
+        Helper for finish_cable and execute_cable.
+        """
+        recover = recovering_record is not None
+        # Create ExecLog invoked by...
+        if not recover:
+            # ...this RunCable.
+            invoking_record = curr_record
+        else:
+            # ...the recovering RunAtomic.
+            invoking_record = recovering_record
+        curr_log = archive.models.ExecLog.create(curr_record, invoking_record)
+
+        # Run cable (this completes EL).
+        cable.run_cable(input_dataset_path, output_path, curr_record, curr_log)
+
+        # Here, we're authoring/modifying an ExecRecord, so we use a transaction.
+        preexisting_ER = execrecord is not None
+        succeeded_yet = False
+        while not succeeded_yet:
+            try:
+                with transaction.atomic():
+                    missing_output = False
+                    start_time = timezone.now()
+                    if not file_access_utils.file_exists(output_path):
+                        end_time = timezone.now()
+                        # It's conceivable that the linking could fail in the
+                        # trivial case; in which case we should associate a "missing data"
+                        # check to input_dataset == output_dataset.
+                        if cable.is_trivial():
+                            output_dataset = input_dataset
+                        if execrecord is None:
+                            output_dataset = librarian.models.Dataset.create_empty(
+                                cdt=output_CDT,
+                                file_source=curr_record
+                            )
+                        else:
+                            output_dataset = execrecord.execrecordouts.first().dataset
+                        output_dataset.mark_missing(start_time, end_time, curr_log, user)
+                        missing_output = True
+
+                        # Update state variables.
+                        if recover:
+                            recovering_record.mark_unsuccessful()
+                        else:
+                            curr_record.mark_unsuccessful()
+
+                    elif cable.is_trivial():
+                        output_dataset = input_dataset
+
+                    else:
+                        # Do we need to keep this output?
+                        make_dataset = curr_record.keeps_output()
+                        dataset_name = curr_record.output_name()
+                        dataset_desc = curr_record.output_description()
+                        if not make_dataset:
+                            logger.debug("[%d] Cable doesn't keep output: not creating a dataset", worker_rank)
+
+                        if execrecord is not None:
+                            output_dataset = execrecord.execrecordouts.first().dataset
+                            if make_dataset:
+                                output_dataset.register_file(output_path)
+
+                        else:
+                            output_dataset = librarian.models.Dataset.create_dataset(
+                                output_path,
+                                cdt=output_CDT,
+                                keep_file=make_dataset,
+                                name=dataset_name,
+                                description=dataset_desc,
+                                file_source=curr_record,
+                                check=False
+                            )
+
+                    # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
+                    if not recover:
+                        if execrecord is None:
+                            logger.debug("[%d] No ExecRecord already in use - creating fresh cable ExecRecord",
+                                         worker_rank)
+                            # Make ExecRecord, linking it to the ExecLog.
+                            execrecord = librarian.models.ExecRecord.create(curr_log, cable, [input_dataset], [output_dataset])
+                        # Link ER to RunCable (this may have already been linked; that's fine).
+                        curr_record.link_execrecord(execrecord, reused=False)
+
+                    else:
+                        logger.debug("[%d] This was a recovery - not linking RSIC/RunOutputCable to ExecRecord",
+                                     worker_rank)
+                succeeded_yet = True
+            except (OperationalError, InternalError):
+                wait_time = random.random()
+                logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
+                             worker_rank, wait_time)
+                time.sleep(wait_time)
+
+        ####
+        # Check outputs
+        ####
+
+        if not missing_output:
+            # Did ER already exist (with vetted output), or is cable trivial, or recovering? Yes.
+            if (preexisting_ER and (output_dataset.is_OK() or output_dataset.any_failed_checks())) or cable.is_trivial() or recover:
+                logger.debug("[%d] Performing integrity check of trivial or previously generated output", worker_rank)
+                # Perform integrity check.
+                check = output_dataset.check_integrity(output_path, user, curr_log, output_dataset.MD5_checksum)
+
+            # Did ER already exist, or is cable trivial, or recovering? No.
+            else:
+                logger.debug("[%d] Performing content check for output generated for the first time", worker_rank)
+                summary_path = "{}_summary".format(output_path)
+                # Perform content check.
+                check = output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
+                                                           cable.max_rows_out, curr_log, user)
+
+            if check.is_fail():
+                if recover:
+                    recovering_record.mark_unsuccessful()
+                else:
+                    curr_record.mark_unsuccessful()
+
+            # If a sandbox was specified and we were successful, update the sandbox.
+            if sandbox_to_update is not None and output_dataset.is_OK() and not recover:
+                # Success! Update dataset_fs/socket/cable_map.
+                sandbox_to_update.update_cable_maps(curr_record, output_dataset, output_path)
+
+        logger.debug("[%d] DONE EXECUTING %s '%s'", worker_rank, type(cable).__name__, cable)
+
+        # End. Return curr_record.  Stop the clock if this was not a recovery.
+        if not recover:
+            curr_record.mark_complete()
+            curr_record.stop(save=False, clean=False)
+        curr_record.save()
+        curr_record.complete_clean()
+        return curr_record
+
+    # The actual running of code happens here.  We copy and modify this from execute_step.
+    @staticmethod
+    def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
+        """
+        Carry out the task specified by step_execute_dict.
+
+        Precondition: the task must be ready to go, i.e. its inputs must all be in place.  Also
+        it should not have been run previously.  This should not be a RunStep representing a Pipeline.
+        """
+        # Break out the execution info.
+        curr_RS = archive.models.RunStep.objects.get(pk=step_execute_dict["runstep_pk"])
+        curr_RS.start()
+        step_run_dir = step_execute_dict["step_run_dir"]
+        curr_ER = None
+        if step_execute_dict["execrecord_pk"] is not None:
+            curr_ER = librarian.models.ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
+        cable_info_dicts = step_execute_dict["cable_info_dicts"]
+        output_paths = step_execute_dict["output_paths"]
+        user = User.objects.get(pk=step_execute_dict["user_pk"])
+        log_dir = step_execute_dict["log_dir"]
+
+        recovering_record = None
+        if step_execute_dict["recovering_record_pk"] is not None:
+            recovering_record = archive.models.RunComponent.objects.get(
+                pk=step_execute_dict["recovering_record_pk"]
+            ).definite
+
+        assert not curr_RS.pipelinestep.is_subpipeline
+
+        recover = recovering_record is not None
+        invoking_record = recovering_record or curr_RS
+
+        ####
+        # Gather inputs: finish all input cables -- we want them written to the sandbox now, which is never
+        # done by reuse_or_prepare_cable.
+        inputs_after_cable = []
+        input_paths = []
+        for curr_execute_dict in cable_info_dicts:
+            # Update the cable execution information with the recovering record if applicable.
+            if recover:
+                curr_execute_dict["recovering_record_pk"] = recovering_record.pk
+
+            curr_RSIC = Sandbox.finish_cable(curr_execute_dict, worker_rank)
+            # Refresh invoking_record.
+            invoking_record = invoking_record.__class__.objects.get(pk=invoking_record.pk)
+
+            # Cable failed, return incomplete RunStep.
+            if not curr_RSIC.is_successful():
+                logger.error("[%d] PipelineStepInputCable %s failed.", worker_rank, curr_RSIC)
+
+                # Update state variables.
+                assert not invoking_record.is_successful(use_cache=True)
+                if not recover:
+                    curr_RS.mark_complete()
+                    curr_RS.stop(save=True, clean=False)
+
+                curr_RS.complete_clean()
+                return curr_RS
+
+            # Cable succeeded.
+            inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
+            input_paths.append(curr_execute_dict["output_path"])
+
+        # Check again to see if a compatible ER was completed while this task
+        # waited on the queue.  If this isn't a recovery, we can just stop.
+        if recover:
+            assert curr_ER is not None
+        else:
+            succeeded_yet = False
+            while not succeeded_yet:
+                try:
+                    with transaction.atomic():
+                        if curr_ER is not None:
+                            can_reuse = curr_RS.check_ER_usable(curr_ER)
+                            # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
+                            if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                                logger.debug("[%d] ExecRecord %s is reusable (successful = %s)",
+                                             worker_rank, curr_ER, can_reuse["successful"])
+                                curr_RS.reused = True
+                                curr_RS.execrecord = curr_ER
+
+                                curr_RS.mark_complete()
+                                if not can_reuse["successful"]:
+                                    curr_RS.mark_unsuccessful()
+                                    # We don't need to mark the recovering_record, as here, it isn't recovering.
+
+                                curr_RS.stop(save=True, clean=False)
+                                curr_RS.complete_clean()
+                                return curr_RS
+
+                            else:
+                                logger.debug("[%d] ExecRecord not reusable %s", worker_rank, curr_ER)
+                                curr_ER = None
+
+                        else:
+                            logger.debug("[%d] No compatible ExecRecord found yet", worker_rank)
+
+                        curr_RS.reused = False
+                        curr_RS.save()
+                    succeeded_yet = True
+                except (OperationalError, InternalError):
+                    wait_time = random.random()
+                    logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
+                                 worker_rank, wait_time)
+                    time.sleep(wait_time)
+
+        return Sandbox._finish_step_h(worker_rank, user, curr_RS, step_run_dir, curr_ER, inputs_after_cable,
+                                      input_paths, output_paths, log_dir, recovering_record,
+                                      stop_execution_callback=stop_execution_callback)
+
+    @staticmethod
+    def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_after_cable, input_paths, output_paths,
+                       log_dir, recovering_record, sandbox_to_update=None, stop_execution_callback=None):
+        """
+        Helper for execute_step and finish_step.
+        """
+        recover = recovering_record is not None
+        invoking_record = recovering_record if recover else runstep
+        pipelinestep = runstep.pipelinestep
+
+        # Run code, creating ExecLog and MethodOutput.
+        curr_log = archive.models.ExecLog.create(runstep, invoking_record)
+        stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
+        stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
+
+        # Check the integrity of the code before we run.
+        if not pipelinestep.transformation.definite.driver.check_md5():
+            logger.error("[%d] Method code has gone corrupt for %s or its " +
+                         "dependencies; stopping step",
+                         worker_rank,
+                         pipelinestep.transformation.definite.driver)
+            # Stop everything!
+            curr_log.start()
+            curr_log.methodoutput.are_checksums_OK = False
+            curr_log.methodoutput.save()
+            curr_log.stop(save=True, clean=False)
+
+            # Update state variables:
+            invoking_record.mark_unsuccessful()
+
+            if not recover:
+                runstep.mark_complete()
+                runstep.stop(save=False, clean=False)
+            runstep.save()
+            runstep.complete_clean()
+            return runstep
+
+        # From here on the code is assumed to not be corrupted.
+        try:
+            with open(stdout_path, "w+") as out_write, open(stderr_path, "w+") as err_write:
+                pipelinestep.transformation.definite.run_code(
+                    step_run_dir, input_paths,
+                    output_paths, [out_write], [err_write],
+                    curr_log, curr_log.methodoutput,
+                    stop_execution_callback=stop_execution_callback
+                )
+        except StopExecution as e:
+            # Immediately end, marking the RunStep as cancelled, and re-raise e.
+            logger.debug("[%d] Method execution stopped.", worker_rank)
+
+            # Update state variables.
+            runstep.is_cancelled = True
+            if not recover:
+                runstep.mark_complete()
+                runstep.save()
+            invoking_record.mark_unsuccessful()
+
+            raise e
+
+        logger.debug("[%d] Method execution complete, ExecLog saved (started = %s, ended = %s)",
+                     worker_rank, curr_log.start_time, curr_log.end_time)
+
+        preexisting_ER = execrecord is not None
+        succeeded_yet = False
+        while not succeeded_yet:
+            try:
+                with transaction.atomic():
+                    # Create outputs.
+                    # bad_output_found indicates we have detected problems with the output.
+                    bad_output_found = not curr_log.is_successful()
+                    output_datasets = []
+                    logger.debug("[%d] ExecLog.is_successful() == %s", worker_rank, curr_log.is_successful())
+
+                    if not recover:
+                        if preexisting_ER:
+                            logger.debug("[%d] Filling in pre-existing ExecRecord with PipelineStep outputs", worker_rank)
+                        else:
+                            logger.debug("[%d] Creating new Datasets for PipelineStep outputs", worker_rank)
+
+                        for i, curr_output in enumerate(pipelinestep.outputs):
+                            output_path = output_paths[i]
+                            output_CDT = curr_output.get_cdt()
+
+                            # Check that the file exists, as we did for cables.
+                            start_time = timezone.now()
+                            if not file_access_utils.file_exists(output_path):
+                                end_time = timezone.now()
+                                if preexisting_ER:
+                                    output_dataset = execrecord.get_execrecordout(curr_output).dataset
+                                else:
+                                    output_dataset = librarian.models.Dataset.create_empty(
+                                        cdt=output_CDT, file_source=runstep)
+                                output_dataset.mark_missing(start_time, end_time, curr_log, user)
+
+                                bad_output_found = True
+
+                                # Update state variables.
+                                invoking_record.mark_unsuccessful()
+
+                            else:
+                                # If necessary, create new Dataset for output, and create the Dataset
+                                # if it's to be retained.
+                                dataset_name = runstep.output_name(curr_output)
+                                dataset_desc = runstep.output_description(curr_output)
+                                make_dataset = runstep.keeps_output(curr_output)
+
+                                if preexisting_ER:
+                                    # Wrap in a transaction to prevent concurrent authoring of Datasets to
+                                    # an existing Dataset.
+                                    output_ERO = execrecord.get_execrecordout(curr_output)
+                                    with transaction.atomic():
+                                        output_dataset = librarian.models.Dataset.objects.select_for_update().filter(
+                                            pk=output_ERO.dataset.pk
+                                        ).first()
+                                        if make_dataset and not output_dataset.has_data():
+                                            output_dataset.register_file(output_path)
+
+                                else:
+                                    output_dataset = librarian.models.Dataset.create_dataset(
+                                        output_path,
+                                        cdt=output_CDT,
+                                        keep_file=make_dataset,
+                                        name=dataset_name,
+                                        description=dataset_desc,
+                                        file_source=runstep,
+                                        check=False
+                                    )
+                                    logger.debug("[%d] First time seeing file: saved md5 %s",
+                                                 worker_rank, output_dataset.MD5_checksum)
+                            output_datasets.append(output_dataset)
+
+                        # Create ExecRecord if there isn't already one.
+                        if not preexisting_ER:
+                            # Make new ExecRecord, linking it to the ExecLog
+                            logger.debug("[%d] Creating fresh ExecRecord", worker_rank)
+                            execrecord = librarian.models.ExecRecord.create(curr_log, pipelinestep,
+                                                                            inputs_after_cable, output_datasets)
+
+                        # Link ExecRecord to RunStep (it may already have been linked; that's fine).
+                        runstep.link_execrecord(execrecord, False)
+
+                succeeded_yet = True
+            except (OperationalError, InternalError):
+                wait_time = random.random()
+                logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.", worker_rank, wait_time)
+                time.sleep(wait_time)
+
+        # Check outputs.
+        for i, curr_output in enumerate(pipelinestep.outputs):
+            output_path = output_paths[i]
+            output_dataset = execrecord.get_execrecordout(curr_output).dataset
+            check = None
+
+            if bad_output_found:
+                logger.debug("[%d] Bad output found; no check on %s was done", worker_rank, output_path)
+
+            # Recovering or filling in old ER? Yes.
+            elif preexisting_ER:
+
+                file_is_present = True
+                if recover:
+                    # Check that the file exists as in the non-recovery case.
+                    start_time = timezone.now()
+                    if not file_access_utils.file_exists(output_path):
+                        end_time = timezone.now()
+                        check = output_dataset.mark_missing(start_time, end_time, curr_log, user)
+                        logger.debug("[%d] During recovery, output (%s) is missing", worker_rank, output_path)
+                        file_is_present = False
+
+                        # Update state variables.
+                        invoking_record.mark_unsuccessful()
+
+                if file_is_present:
+                    # Perform integrity check.
+                    logger.debug("[%d] Dataset has been computed before, checking integrity of %s",
+                                 worker_rank, output_dataset)
+                    check = output_dataset.check_integrity(output_path, user, curr_log)
+
+                    # Update state variables.
+                    if not check.is_fail() and not output_dataset.content_checks.exists():
+                        summary_path = "{}_summary".format(output_path)
+                        check = output_dataset.check_file_contents(
+                            output_path, summary_path, curr_output.get_min_row(),
+                            curr_output.get_max_row(), curr_log, user)
+
+            # Recovering or filling in old ER? No.
+            else:
+                # Perform content check.
+                logger.debug("[%d] %s is new data - performing content check", worker_rank, output_dataset)
+                summary_path = "{}_summary".format(output_path)
+                check = output_dataset.check_file_contents(output_path, summary_path, curr_output.get_min_row(),
+                                                      curr_output.get_max_row(), curr_log, user)
+
+            # Check OK? No.
+            if check and check.is_fail():
+                logger.warn("[%d] %s failed for %s", worker_rank, check.__class__.__name__, output_path)
+                bad_output_found = True
+                invoking_record.mark_unsuccessful()
+
+            # Check OK? Yes.
+            elif check:
+                logger.debug("[%d] %s passed for %s", worker_rank, check.__class__.__name__, output_path)
+
+        execrecord.complete_clean()
+
+        # End. Return runstep.  Stop the clock if this was a recovery.
+        if not recover:
+            # Update state variables.
             runstep.mark_complete()
+            if sandbox_to_update is not None:
+                # Since reused=False, step_run_dir represents where the step *actually is*.
+                sandbox_to_update.update_step_maps(runstep, step_run_dir, output_paths)
+
             runstep.stop(save=False, clean=False)
         runstep.save()
         runstep.complete_clean()
         return runstep
-
-    # From here on the code is assumed to not be corrupted.
-    try:
-        with open(stdout_path, "w+") as out_write, open(stderr_path, "w+") as err_write:
-            pipelinestep.transformation.definite.run_code(
-                step_run_dir, input_paths,
-                output_paths, [out_write], [err_write],
-                curr_log, curr_log.methodoutput,
-                stop_execution_callback=stop_execution_callback
-            )
-    except StopExecution as e:
-        # Immediately end, marking the RunStep as cancelled, and re-raise e.
-        logger.debug("[%d] Method execution stopped.", worker_rank)
-
-        # Update state variables.
-        runstep.is_cancelled = True
-        if not recover:
-            runstep.mark_complete()
-            runstep.save()
-        invoking_record.mark_unsuccessful()
-
-        raise e
-
-    logger.debug("[%d] Method execution complete, ExecLog saved (started = %s, ended = %s)",
-                 worker_rank, curr_log.start_time, curr_log.end_time)
-
-    preexisting_ER = execrecord is not None
-    succeeded_yet = False
-    while not succeeded_yet:
-        try:
-            with transaction.atomic():
-                # Create outputs.
-                # bad_output_found indicates we have detected problems with the output.
-                bad_output_found = not curr_log.is_successful()
-                output_datasets = []
-                logger.debug("[%d] ExecLog.is_successful() == %s", worker_rank, curr_log.is_successful())
-
-                if not recover:
-                    if preexisting_ER:
-                        logger.debug("[%d] Filling in pre-existing ExecRecord with PipelineStep outputs", worker_rank)
-                    else:
-                        logger.debug("[%d] Creating new Datasets for PipelineStep outputs", worker_rank)
-
-                    for i, curr_output in enumerate(pipelinestep.outputs):
-                        output_path = output_paths[i]
-                        output_CDT = curr_output.get_cdt()
-
-                        # Check that the file exists, as we did for cables.
-                        start_time = timezone.now()
-                        if not file_access_utils.file_exists(output_path):
-                            end_time = timezone.now()
-                            if preexisting_ER:
-                                output_dataset = execrecord.get_execrecordout(curr_output).dataset
-                            else:
-                                output_dataset = librarian.models.Dataset.create_empty(
-                                    cdt=output_CDT, file_source=runstep)
-                            output_dataset.mark_missing(start_time, end_time, curr_log, user)
-
-                            bad_output_found = True
-
-                            # Update state variables.
-                            invoking_record.mark_unsuccessful()
-
-                        else:
-                            # If necessary, create new Dataset for output, and create the Dataset
-                            # if it's to be retained.
-                            dataset_name = runstep.output_name(curr_output)
-                            dataset_desc = runstep.output_description(curr_output)
-                            make_dataset = runstep.keeps_output(curr_output)
-
-                            if preexisting_ER:
-                                # Wrap in a transaction to prevent concurrent authoring of Datasets to
-                                # an existing Dataset.
-                                output_ERO = execrecord.get_execrecordout(curr_output)
-                                with transaction.atomic():
-                                    output_dataset = librarian.models.Dataset.objects.select_for_update().filter(
-                                        pk=output_ERO.dataset.pk
-                                    ).first()
-                                    if make_dataset and not output_dataset.has_data():
-                                        output_dataset.register_file(output_path)
-
-                            else:
-                                output_dataset = librarian.models.Dataset.create_dataset(
-                                    output_path,
-                                    cdt=output_CDT,
-                                    keep_file=make_dataset,
-                                    name=dataset_name,
-                                    description=dataset_desc,
-                                    file_source=runstep,
-                                    check=False
-                                )
-                                logger.debug("[%d] First time seeing file: saved md5 %s",
-                                             worker_rank, output_dataset.MD5_checksum)
-                        output_datasets.append(output_dataset)
-
-                    # Create ExecRecord if there isn't already one.
-                    if not preexisting_ER:
-                        # Make new ExecRecord, linking it to the ExecLog
-                        logger.debug("[%d] Creating fresh ExecRecord", worker_rank)
-                        execrecord = librarian.models.ExecRecord.create(curr_log, pipelinestep,
-                                                                        inputs_after_cable, output_datasets)
-
-                    # Link ExecRecord to RunStep (it may already have been linked; that's fine).
-                    runstep.link_execrecord(execrecord, False)
-
-            succeeded_yet = True
-        except (OperationalError, InternalError):
-            wait_time = random.random()
-            logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.", worker_rank, wait_time)
-            time.sleep(wait_time)
-
-    # Check outputs.
-    for i, curr_output in enumerate(pipelinestep.outputs):
-        output_path = output_paths[i]
-        output_dataset = execrecord.get_execrecordout(curr_output).dataset
-        check = None
-
-        if bad_output_found:
-            logger.debug("[%d] Bad output found; no check on %s was done", worker_rank, output_path)
-
-        # Recovering or filling in old ER? Yes.
-        elif preexisting_ER:
-
-            file_is_present = True
-            if recover:
-                # Check that the file exists as in the non-recovery case.
-                start_time = timezone.now()
-                if not file_access_utils.file_exists(output_path):
-                    end_time = timezone.now()
-                    check = output_dataset.mark_missing(start_time, end_time, curr_log, user)
-                    logger.debug("[%d] During recovery, output (%s) is missing", worker_rank, output_path)
-                    file_is_present = False
-
-                    # Update state variables.
-                    invoking_record.mark_unsuccessful()
-
-            if file_is_present:
-                # Perform integrity check.
-                logger.debug("[%d] Dataset has been computed before, checking integrity of %s",
-                             worker_rank, output_dataset)
-                check = output_dataset.check_integrity(output_path, user, curr_log)
-
-                # Update state variables.
-                if not check.is_fail() and not output_dataset.content_checks.exists():
-                    summary_path = "{}_summary".format(output_path)
-                    check = output_dataset.check_file_contents(
-                        output_path, summary_path, curr_output.get_min_row(),
-                        curr_output.get_max_row(), curr_log, user)
-
-        # Recovering or filling in old ER? No.
-        else:
-            # Perform content check.
-            logger.debug("[%d] %s is new data - performing content check", worker_rank, output_dataset)
-            summary_path = "{}_summary".format(output_path)
-            check = output_dataset.check_file_contents(output_path, summary_path, curr_output.get_min_row(),
-                                                  curr_output.get_max_row(), curr_log, user)
-
-        # Check OK? No.
-        if check and check.is_fail():
-            logger.warn("[%d] %s failed for %s", worker_rank, check.__class__.__name__, output_path)
-            bad_output_found = True
-            invoking_record.mark_unsuccessful()
-
-        # Check OK? Yes.
-        elif check:
-            logger.debug("[%d] %s passed for %s", worker_rank, check.__class__.__name__, output_path)
-
-    execrecord.complete_clean()
-
-    # End. Return runstep.  Stop the clock if this was a recovery.
-    if not recover:
-        # Update state variables.
-        runstep.mark_complete()
-        if sandbox_to_update is not None:
-            # Since reused=False, step_run_dir represents where the step *actually is*.
-            sandbox_to_update.update_step_maps(runstep, step_run_dir, output_paths)
-
-        runstep.stop(save=False, clean=False)
-    runstep.save()
-    runstep.complete_clean()
-    return runstep
 
 
 class RunPlan(object):

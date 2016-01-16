@@ -14,7 +14,7 @@ from metadata.models import Datatype, CompoundDatatype, CustomConstraint, everyo
 from method.models import MethodFamily, CodeResource
 from librarian.models import Dataset
 from datachecking.models import ContentCheckLog
-from sandbox.execute import Sandbox
+from fleet.workers import Manager
 
 import kive.testing_utils as tools
 import file_access_utils
@@ -392,9 +392,8 @@ class CustomConstraintTests(TestCase):
         compound datatype as input.
         """
         good_dataset = self._test_upload_data_good()
-        sandbox = Sandbox(self.user_oscar, pipeline, [good_dataset])
-        sandbox.execute_pipeline()
-        runstep = sandbox.run.runsteps.first()
+        run = Manager.execute_pipeline(self.user_oscar, pipeline, [good_dataset])
+        runstep = run.runsteps.first()
         execlog = runstep.log
         output_dataset = runstep.execrecord.execrecordouts.first().dataset
         content_check = output_dataset.content_checks.first()

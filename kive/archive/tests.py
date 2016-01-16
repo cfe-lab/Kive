@@ -28,6 +28,7 @@ from method.models import Method, MethodFamily, CodeResource
 from pipeline.models import Pipeline, PipelineStep, PipelineFamily
 
 import sandbox.execute
+from fleet.workers import Manager
 import kive.testing_utils as tools
 
 # Rather than define everyone_group here, we import this function to prevent compile-time
@@ -486,10 +487,8 @@ class ArchiveTestCaseHelpers:
         # Set up a dataset with words in it called self.dataset_words.
         tools.make_words_dataset(self)
 
-        run_sandbox = sandbox.execute.Sandbox(self.user_bob, p_top, [self.dataset_words],
-                                              groups_allowed=[everyone_group()])
-        run_sandbox.execute_pipeline()
-        self.deep_nested_run = run_sandbox.run
+        self.deep_nested_run = Manager.execute_pipeline(self.user_bob, p_top, [self.dataset_words],
+                                                        groups_allowed=[everyone_group()])
 
 
 class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
@@ -1266,40 +1265,6 @@ class RunComponentTooManyChecks(TestCase):
     fixtures = ["run_component_too_many_checks"]
 
     def setUp(self):
-        # tools.create_word_reversal_environment(self)
-        #
-        # # Set up and run a Pipeline that throws away its intermediate data.
-        # self.two_step_pl = tools.make_first_pipeline("Two-step pipeline",
-        #                                              "Toy pipeline for testing data check cleaning of RunSteps.",
-        #                                              self.user_bob)
-        # tools.create_linear_pipeline(self.two_step_pl, [self.method_noop_wordbacks, self.method_noop_wordbacks],
-        #                              "data", "samedata")
-        # first_step = self.two_step_pl.steps.get(step_num=1)
-        # first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
-        # first_step.save()
-        #
-        # self.two_step_sdbx = sandbox.execute.Sandbox(self.user_bob, self.two_step_pl, [self.dataset_wordbacks],
-        #                                              groups_allowed=[everyone_group()])
-        # self.two_step_sdbx.execute_pipeline()
-        #
-        # # The second one's second step will have to recover its first step.  (Its input cable is trivial
-        # # and is able to reuse the input cable from the first Pipeline's second step.)
-        # self.following_pl = tools.make_first_pipeline(
-        #     "Pipeline that will follow the first",
-        #     "Toy pipeline that will need to recover its first step when following the above.",
-        #     self.user_bob
-        # )
-        # tools.create_linear_pipeline(self.following_pl, [self.method_noop_wordbacks, self.method_reverse],
-        #                              "data", "reversed_data")
-        # first_step = self.following_pl.steps.get(step_num=1)
-        # first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
-        # first_step.save()
-        #
-        # self.following_sdbx = sandbox.execute.Sandbox(self.user_bob, self.following_pl, [self.dataset_wordbacks],
-        #                                               groups_allowed=[everyone_group()])
-        # self.following_sdbx.execute_pipeline()
-        # second_step = self.following_sdbx.run.runsteps.get(pipelinestep__step_num=2)
-        # assert(second_step.invoked_logs.count() == 2)
         install_fixture_files("run_component_too_many_checks")
         self.user_bob = User.objects.get(username="bob")
 
@@ -3074,9 +3039,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         # Set up a words dataset.
         tools.make_words_dataset(self)
 
-        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.dataset_words],
-                                                   groups_allowed=[everyone_group()])
-        self.sandbox_one.execute_pipeline()
+        run1 = Manager.execute_pipeline(self.user_bob, p_one, [self.dataset_words],
+                                        groups_allowed=[everyone_group()])
 
         # Oops!  Between runs, self.method_noop gets screwed with.
         with tempfile.TemporaryFile() as f:
@@ -3093,14 +3057,13 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         # create for p_one.
         p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
-        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.dataset_words],
-                                                   groups_allowed=[everyone_group()])
-        self.sandbox_two.execute_pipeline()
+        run2 = Manager.execute_pipeline(self.user_bob, p_two, [self.dataset_words],
+                                        groups_allowed=[everyone_group()])
 
         # In the second run: the transformation of the second step should have tried to invoke the log of step 1 and
         # failed.
-        run2_step1 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=1)
-        run2_step2 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
+        run2_step1 = run2.runsteps.get(pipelinestep__step_num=1)
+        run2_step2 = run2.runsteps.get(pipelinestep__step_num=2)
 
         self.assertFalse(run2_step2.has_log)
         self.assertEquals(run2_step2.invoked_logs.count(), 1)
@@ -3147,11 +3110,10 @@ with open(sys.argv[2], "wb") as f:
         # Set up a words dataset.
         tools.make_words_dataset(self)
 
-        active_sandbox = sandbox.execute.Sandbox(self.user_bob, pipeline, [self.dataset_words],
-                                                 groups_allowed=[everyone_group()])
-        active_sandbox.execute_pipeline()
+        active_run = Manager.execute_pipeline(self.user_bob, pipeline, [self.dataset_words],
+                                              groups_allowed=[everyone_group()])
 
-        run_step = active_sandbox.run.runsteps.get(pipelinestep__step_num=1)
+        run_step = active_run.runsteps.get(pipelinestep__step_num=1)
         stdout_file = run_step.log.methodoutput.output_log
         stdout_file.open()
         try:
@@ -3283,8 +3245,7 @@ year,month,day,hour,minute,second,microsecond
         # Mark the output of step 1 as not retained.
         p_one.steps.get(step_num=1).add_deletion(self.curr_time_method.outputs.first())
 
-        self.sandbox_one = sandbox.execute.Sandbox(self.user_bob, p_one, [self.time_SD])
-        self.sandbox_one.execute_pipeline()
+        run1 = Manager.execute_pipeline(self.user_bob, p_one, [self.time_SD])
 
         # Oops!  The first step should not have been marked as deterministic.
         p_two = tools.make_first_pipeline("p_two", "time then trivial", self.user_bob)
@@ -3295,13 +3256,12 @@ year,month,day,hour,minute,second,microsecond
         # create for p_one.
         p_two.steps.get(step_num=1).add_deletion(self.curr_time_method.outputs.first())
 
-        self.sandbox_two = sandbox.execute.Sandbox(self.user_bob, p_two, [self.time_SD])
-        self.sandbox_two.execute_pipeline()
+        run2 = Manager.execute_pipeline(self.user_bob, p_two, [self.time_SD])
 
         # In the second run: the transformation of the second step should have tried to invoke the log of step 1 and
         # failed.
-        run2_step1 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=1)
-        run2_step2 = self.sandbox_two.run.runsteps.get(pipelinestep__step_num=2)
+        run2_step1 = run2.runsteps.get(pipelinestep__step_num=1)
+        run2_step2 = run2.runsteps.get(pipelinestep__step_num=2)
 
         self.assertFalse(run2_step2.has_log)
         self.assertEquals(run2_step2.invoked_logs.count(), 1)
@@ -3599,10 +3559,10 @@ class RunStepReuseFailedExecRecordTests(TestCase):
 
         # The first Pipeline should fail.  The second will reuse the first step's ExecRecord, and will not
         # throw an exception, even though the ExecRecord doesn't provide the necessary output.
-        run_1 = sandbox.execute.Sandbox(self.user_grandpa, failing_pipeline, [self.dataset_words],
-                                        groups_allowed=[everyone_group()]).execute_pipeline()
-        run_2 = sandbox.execute.Sandbox(self.user_grandpa, failing_pl_2, [self.dataset_words],
-                                        groups_allowed=[everyone_group()]).execute_pipeline()
+        run_1 = Manager.execute_pipeline(self.user_grandpa, failing_pipeline, [self.dataset_words],
+                                         groups_allowed=[everyone_group()])
+        run_2 = Manager.execute_pipeline(self.user_grandpa, failing_pl_2, [self.dataset_words],
+                                         groups_allowed=[everyone_group()])
 
         self.assertEquals(run_1.runsteps.get(pipelinestep__step_num=1).execrecord,
                           run_2.runsteps.get(pipelinestep__step_num=1).execrecord)

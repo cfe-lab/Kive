@@ -8,7 +8,7 @@ from django.core.files import File
 from django.core.files.base import ContentFile
 from django.test import TestCase
 
-from archive.models import Dataset
+from archive.models import Run
 from constants import datatypes
 from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
 from kive.testing_utils import clean_up_all_files
@@ -19,6 +19,7 @@ from method.models import CodeResource, CodeResourceRevision, Method, MethodFami
 from method.tests import samplecode_path
 from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox, RunPlan, StepPlan, DatasetPlan
+from fleet.workers import Manager
 import file_access_utils
 
 
@@ -224,8 +225,7 @@ class ExecuteTests(ExecuteTestsBase):
         # Execute pipeline
         pipeline = self.pX
         inputs = [self.dataset]
-        mySandbox = Sandbox(self.myUser, pipeline, inputs)
-        mySandbox.execute_pipeline()
+        Manager.execute_pipeline(self.myUser, pipeline, inputs)
 
     def test_pipeline_execute_B_twostep_pipeline_with_recycling(self):
         """Two step pipeline with second step identical to the first"""
@@ -278,8 +278,7 @@ class ExecuteTests(ExecuteTestsBase):
         # Execute pipeline
         pipeline = self.pX
         inputs = [self.dataset]
-        mySandbox = Sandbox(self.myUser, pipeline, inputs)
-        mySandbox.execute_pipeline()
+        Manager.execute_pipeline(self.myUser, pipeline, inputs)
 
     def test_pipeline_execute_C_twostep_pipeline_with_subpipeline(self):
         """Two step pipeline with second step identical to the first"""
@@ -368,8 +367,7 @@ class ExecuteTests(ExecuteTestsBase):
         # Execute pipeline
         pipeline = self.pX
         inputs = [input_dataset]
-        mySandbox = Sandbox(self.myUser, pipeline, inputs)
-        mySandbox.execute_pipeline()
+        Manager.execute_pipeline(self.myUser, pipeline, inputs)
 
     def test_pipeline_all_inputs_OK_nonraw(self):
         """Execute a Pipeline with OK non-raw inputs."""
@@ -377,7 +375,7 @@ class ExecuteTests(ExecuteTestsBase):
         inputs = self.find_inputs_for_pipeline(pipeline)
         self.assertTrue(all(i.is_OK() for i in inputs))
         self.assertFalse(all(i.is_raw() for i in inputs))
-        run = Sandbox(self.myUser, pipeline, inputs).execute_pipeline()
+        run = Manager.execute_pipeline(self.myUser, pipeline, inputs)
         self.assertTrue(run.is_complete())
 
         self.assertTrue(run.is_successful())
@@ -392,7 +390,7 @@ class ExecuteTests(ExecuteTestsBase):
         inputs = self.find_inputs_for_pipeline(pipeline)
         self.assertTrue(all(i.is_OK() for i in inputs))
         self.assertTrue(any(i.is_raw() for i in inputs))
-        run = Sandbox(self.myUser, pipeline, inputs).execute_pipeline()
+        run = Manager.execute_pipeline(self.myUser, pipeline, inputs)
         self.assertTrue(run.is_complete())
         self.assertTrue(run.is_successful())
         self.assertIsNone(run.clean())
@@ -404,7 +402,6 @@ class ExecuteTests(ExecuteTestsBase):
         inputs = self.find_inputs_for_pipeline(pipeline)
         self.assertTrue(all(i.is_OK() for i in inputs))
         self.assertFalse(all(i.is_raw() for i in inputs))
-        sandbox = Sandbox(self.myUser, pipeline, inputs)
 
         for i, dataset in enumerate(inputs, start=1):
             if not dataset.is_raw():
@@ -413,48 +410,38 @@ class ExecuteTests(ExecuteTestsBase):
                 bad_ccl.save()
                 bad_ccl.add_missing_output()
                 break
-
-        run = pipeline.pipeline_instances.create(user=self.myUser)
-        run.save()
-        runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
-        runstep.save()
-
         self.assertFalse(all(i.is_OK() for i in inputs))
+
         self.assertRaisesRegexp(
             ValueError,
             re.escape('Dataset {} passed as input {} to Pipeline "{}" is not OK'
                       .format(bad_input, bad_index, pipeline)),
-            lambda: sandbox.execute_pipeline(pipeline, inputs, sandbox.sandbox_path, runstep))
+            lambda: Manager.execute_pipeline(self.myUser, pipeline, inputs)
+        )
 
     def test_pipeline_inputs_not_OK_raw(self):
         """Can't execute a Pipeline with non-OK raw inputs."""
-        user = self.myUser
-        pipeline = self.find_raw_pipeline(user)
+        pipeline = self.find_raw_pipeline(self.myUser)
         self.assertIsNotNone(pipeline)
         inputs = self.find_inputs_for_pipeline(pipeline)
         self.assertTrue(all(i.is_OK() for i in inputs))
         self.assertTrue(any(i.is_raw() for i in inputs))
-        sandbox = Sandbox(user, pipeline, inputs)
 
         for i, dataset in enumerate(inputs, start=1):
             if dataset.is_raw():
                 bad_input, bad_index = dataset, i
-                bad_icl = IntegrityCheckLog(dataset=dataset, user=user)
+                bad_icl = IntegrityCheckLog(dataset=dataset, user=self.myUser)
                 bad_icl.save()
                 MD5Conflict(integritychecklog=bad_icl, conflicting_dataset=dataset).save()
                 break
-
-        run = pipeline.pipeline_instances.create(user=user)
-        run.save()
-        runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
-        runstep.save()
-
         self.assertFalse(all(i.is_OK() for i in inputs))
+
         self.assertRaisesRegexp(
             ValueError,
             re.escape('Dataset {} passed as input {} to Pipeline "{}" is not OK'
                       .format(bad_input, bad_index, pipeline)),
-            lambda: sandbox.execute_pipeline(pipeline, inputs, sandbox.sandbox_path, runstep))
+            lambda: Manager.execute_pipeline(self.myUser, pipeline, inputs)
+        )
 
     def test_crr_corrupted(self):
         """
@@ -463,15 +450,17 @@ class ExecuteTests(ExecuteTestsBase):
         self.mA_crr.content_file.save("NowCorrupted.dat", ContentFile("CORRUPTED"))
         self.mA_crr.save()
 
-        sandbox = Sandbox(self.myUser, self.pX, [self.dataset])
-        sandbox.execute_pipeline()
+        run = Manager.execute_pipeline(self.myUser, self.pX, [self.dataset])
 
         # This Run should have failed right away.
-        self.assertEquals(sandbox.run.runsteps.count(), 1)
-        rs = sandbox.run.runsteps.first()
+        rs = run.runsteps.first()
 
         self.assertFalse(rs.log.methodoutput.are_checksums_OK)
-        self.assertFalse(sandbox.run.is_successful())
+        self.assertFalse(run.is_successful(use_cache=True))
+        self.assertFalse(run.is_successful())
+
+        for cancelled_rs in run.runsteps.exclude(pk=rs.pk):
+            self.assertTrue(cancelled_rs.is_cancelled)
 
 
 class SandboxTests(ExecuteTestsBase):
@@ -485,7 +474,7 @@ class SandboxTests(ExecuteTestsBase):
         p.create_input(compounddatatype=self.pX_in_cdt, dataset_name="in", dataset_idx=1)
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expects 1 inputs, but 0 were supplied'.format(p)),
-                                lambda: Sandbox(self.myUser, p, []))
+                                lambda: Manager.execute_pipeline(self.myUser, p, []))
 
     def test_sandbox_too_many_inputs(self):
         """
@@ -495,7 +484,7 @@ class SandboxTests(ExecuteTestsBase):
         p.save()
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expects 0 inputs, but 1 were supplied'.format(p)),
-                                lambda: Sandbox(self.myUser, p, [self.dataset]))
+                                lambda: Manager.execute_pipeline(self.myUser, p, [self.dataset]))
 
     def test_sandbox_correct_inputs(self):
         """
@@ -509,7 +498,7 @@ class SandboxTests(ExecuteTestsBase):
                        min_row=8,
                        max_row=12)
         # Assert no ValueError raised.
-        Sandbox(self.myUser, p, [self.dataset])
+        Manager.execute_pipeline(self.myUser, p, [self.dataset])
 
     def test_sandbox_raw_expected_nonraw_supplied(self):
         """
@@ -521,7 +510,7 @@ class SandboxTests(ExecuteTestsBase):
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expected input {} to be raw, but got one with '
                                           'CompoundDatatype "{}"'.format(p, 1, self.dataset.structure.compounddatatype)),
-                                lambda: Sandbox(self.myUser, p, [self.dataset]))
+                                lambda: Manager.execute_pipeline(self.myUser, p, [self.dataset]))
 
     def test_sandbox_nonraw_expected_raw_supplied(self):
         """
@@ -542,7 +531,7 @@ class SandboxTests(ExecuteTestsBase):
         self.assertRaisesRegexp(ValueError,
                                 re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
                                           .format(p, 1, self.pX_in_cdt)),
-                                lambda: Sandbox(self.myUser, p, [raw_dataset]))
+                                lambda: Manager.execute_pipeline(self.myUser, p, [raw_dataset]))
         os.remove(tf.name)
 
     def test_sandbox_cdt_mismatch(self):
@@ -557,7 +546,7 @@ class SandboxTests(ExecuteTestsBase):
                                 re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got one '
                                           'with CompoundDatatype "{}"'
                                           .format(p, 1, self.mA_in_cdt, self.dataset.structure.compounddatatype)),
-                                lambda: Sandbox(self.myUser, p, [self.dataset]))
+                                lambda: Manager.execute_pipeline(self.myUser, p, [self.dataset]))
 
     def test_sandbox_too_many_rows(self):
         """
@@ -576,7 +565,7 @@ class SandboxTests(ExecuteTestsBase):
             'but got one with {}'.format(p, 1, 2, 4, self.dataset.num_rows()))
         self.assertRaisesRegexp(ValueError,
                                 re.escape(expected_message),
-                                lambda: Sandbox(self.myUser, p, [self.dataset]))
+                                lambda: Manager.execute_pipeline(self.myUser, p, [self.dataset]))
 
     def test_sandbox_too_few_rows(self):
         """
@@ -594,7 +583,7 @@ class SandboxTests(ExecuteTestsBase):
             'but got one with {}'.format(p, 1, 20, sys.maxint, self.dataset.num_rows()))
         self.assertRaisesRegexp(ValueError,
                                 re.escape(expected_message),
-                                lambda: Sandbox(self.myUser, p, [self.dataset]))
+                                lambda: Manager.execute_pipeline(self.myUser, p, [self.dataset]))
 
 
 class RestoreReusableDatasetTest(TestCase):
@@ -623,7 +612,11 @@ class RestoreReusableDatasetTest(TestCase):
         pipeline = Pipeline.objects.get(revision_name='sums only')
         dataset = Dataset.objects.get(name='pairs')
 
-        sandbox = Sandbox(pipeline.user, pipeline, [dataset])
+        run = Run(user=pipeline.user, pipeline=pipeline)
+        run.save()
+        run.inputs.create(dataset=dataset, index=1)
+
+        sandbox = Sandbox(run)
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)
         step_plans = run_plan.step_plans
@@ -646,7 +639,12 @@ class RestoreReusableDatasetTest(TestCase):
         input_dataset = Dataset.objects.get(name='pairs')
         step1_output_dataset = Dataset.objects.get(id=2)
         step2_output_dataset = Dataset.objects.get(id=3)
-        sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
+
+        run = Run(user=pipeline.user, pipeline=pipeline)
+        run.save()
+        run.inputs.create(dataset=input_dataset, index=1)
+
+        sandbox = Sandbox(run)
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)
 
@@ -661,7 +659,13 @@ class RestoreReusableDatasetTest(TestCase):
     def test_create_run_steps_for_new_run(self):
         pipeline = Pipeline.objects.get(revision_name='sums and products')
         input_dataset = Dataset.objects.get(name='pairs')
-        sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
+
+        run = Run(user=pipeline.user, pipeline=pipeline)
+        run.save()
+        run.inputs.create(dataset=input_dataset, index=1)
+
+        sandbox = Sandbox(run)
+
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)
 
@@ -680,7 +684,13 @@ class RestoreReusableDatasetTest(TestCase):
         pipeline.steps.get(step_num=1).outputs_to_delete.clear()
 
         input_dataset = Dataset.objects.get(name='pairs')
-        sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
+
+        run = Run(user=pipeline.user, pipeline=pipeline)
+        run.save()
+        run.inputs.create(dataset=input_dataset, index=1)
+
+        sandbox = Sandbox(run)
+
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)
 
@@ -699,7 +709,13 @@ class RestoreReusableDatasetTest(TestCase):
         method.clean()
 
         input_dataset = Dataset.objects.get(name='pairs')
-        sandbox = Sandbox(pipeline.user, pipeline, [input_dataset])
+
+        run = Run(user=pipeline.user, pipeline=pipeline)
+        run.save()
+        run.inputs.create(dataset=input_dataset, index=1)
+
+        sandbox = Sandbox(run)
+
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)
 

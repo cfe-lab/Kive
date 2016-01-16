@@ -21,7 +21,7 @@ from pipeline.models import Pipeline, PipelineFamily, PipelineStep
 from archive.models import RunStep, ExecLog, MethodOutput
 from datachecking.models import VerificationLog
 from portal.models import StagedFile
-import sandbox.execute
+from fleet.workers import Manager
 
 
 samplecode_path = "../samplecode"
@@ -989,10 +989,8 @@ CCCTCCTC
     p_nested.create_outputs()
     p_nested.save()
 
-    first_run_sdbx = sandbox.execute.Sandbox(remover, noop_pl, [seq_dataset], groups_allowed=[])
-    first_run_sdbx.execute_pipeline()
-    second_run_sdbx = sandbox.execute.Sandbox(remover, noop_pl, [seq_dataset], groups_allowed=[])
-    second_run_sdbx.execute_pipeline()
+    first_run = Manager.execute_pipeline(remover, noop_pl, [seq_dataset], groups_allowed=[])
+    second_run = Manager.execute_pipeline(remover, noop_pl, [seq_dataset], groups_allowed=[])
 
     two_step_noop_pl = make_first_pipeline(
         "Nucleotide Sequence two-step Noop",
@@ -1020,8 +1018,7 @@ TTTTTTC
         description="A dataset for use in the removal test case with the two-step Pipeline."
     )
 
-    two_step_run_sdbx = sandbox.execute.Sandbox(remover, two_step_noop_pl, [two_step_seq_dataset], groups_allowed=[])
-    two_step_run_sdbx.execute_pipeline()
+    two_step_run = Manager.execute_pipeline(remover, two_step_noop_pl, [two_step_seq_dataset], groups_allowed=[])
 
 
 def create_sandbox_testing_tools_environment(case):
@@ -1793,13 +1790,8 @@ def create_sequence_manipulation_environment(case):
 
     # Alice uploads the data to the system.
     case.dataset_labdata = Dataset.create_dataset(file_path=case.datafile.name, user=case.user_alice,
-                                                cdt=case.cdt_record, keep_file=True, name="lab data",
-                                                description="data from the lab")
-
-    # Now Alice is ready to run her pipelines. The system creates a Sandbox
-    # where she will run each of her pipelines.
-    case.sandbox_complement = sandbox.execute.Sandbox(case.user_alice, case.pipeline_complement, [case.dataset_labdata])
-    case.sandbox_revcomp = sandbox.execute.Sandbox(case.user_alice, case.pipeline_revcomp, [case.dataset_labdata])
+                                                  cdt=case.cdt_record, keep_file=True, name="lab data",
+                                                  description="data from the lab")
 
     # A second version of the complement Pipeline which doesn't keep any output.
     case.pipeline_complement_v2 = Pipeline(family=case.pipeline_complement.family, revision_name="2",

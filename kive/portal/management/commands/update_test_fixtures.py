@@ -195,11 +195,7 @@ class SimpleRunBuilder(FixtureBuilder):
         # Set up a dataset with words in it called self.dataset_words.
         tools.make_words_dataset(self)
 
-        run_sandbox = Sandbox(self.user_bob,
-                              p_basic,
-                              [self.dataset_words],
-                              groups_allowed=[everyone_group()])
-        run_sandbox.execute_pipeline()
+        Manager.execute_pipeline(self.user_bob, p_basic, [self.dataset_words], groups_allowed=[everyone_group()])
 
 
 class DeepNestedRunBuilder(FixtureBuilder):
@@ -235,9 +231,7 @@ class DeepNestedRunBuilder(FixtureBuilder):
         # Set up a dataset with words in it called self.dataset_words.
         tools.make_words_dataset(self)
 
-        run_sandbox = Sandbox(self.user_bob, p_top, [self.dataset_words],
-                              groups_allowed=[everyone_group()])
-        run_sandbox.execute_pipeline()
+        Manager.execute_pipeline(self.user_bob, p_top, [self.dataset_words], groups_allowed=[everyone_group()])
 
 
 class RestoreReusableDatasetBuilder(FixtureBuilder):
@@ -614,8 +608,7 @@ class RunApiTestsEnvironmentBuilder(FixtureBuilder):
         self.pX_2.create_outputs()
 
         # Run this pipeline.
-        sbox = Sandbox(self.myUser, self.pX_2, [self.dataset])
-        sbox.execute_pipeline()
+        Manager.execute_pipeline(self.myUser, self.pX_2, [self.dataset])
 
 
 class RunComponentTooManyChecksEnvironmentBuilder(FixtureBuilder):
@@ -635,9 +628,8 @@ class RunComponentTooManyChecksEnvironmentBuilder(FixtureBuilder):
         first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
         first_step.save()
 
-        self.two_step_sdbx = Sandbox(self.user_bob, self.two_step_pl, [self.dataset_wordbacks],
-                                     groups_allowed=[everyone_group()])
-        self.two_step_sdbx.execute_pipeline()
+        Manager.execute_pipeline(self.user_bob, self.two_step_pl, [self.dataset_wordbacks],
+                                 groups_allowed=[everyone_group()])
 
         # The second one's second step will have to recover its first step.  (Its input cable is trivial
         # and is able to reuse the input cable from the first Pipeline's second step.)
@@ -652,10 +644,9 @@ class RunComponentTooManyChecksEnvironmentBuilder(FixtureBuilder):
         first_step.add_deletion(self.method_noop_wordbacks.outputs.first())
         first_step.save()
 
-        self.following_sdbx = Sandbox(self.user_bob, self.following_pl, [self.dataset_wordbacks],
-                                      groups_allowed=[everyone_group()])
-        self.following_sdbx.execute_pipeline()
-        second_step = self.following_sdbx.run.runsteps.get(pipelinestep__step_num=2)
+        following_run = Manager.execute_pipeline(self.user_bob, self.following_pl, [self.dataset_wordbacks],
+                                                 groups_allowed=[everyone_group()])
+        second_step = following_run.runsteps.get(pipelinestep__step_num=2)
         assert(second_step.invoked_logs.count() == 2)
 
         # FIXME are there other files that aren't properly being removed?
@@ -699,29 +690,18 @@ class RunPipelinesRecoveringReusedStepEnvironmentBuilder(FixtureBuilder):
         # Set up a words dataset.
         tools.make_words_dataset(self)
 
-        run_one = Run(
-            user=self.user_bob,
-            name="RunOne",
-            description="Bob runs p_one",
-            pipeline=p_one
-        )
-        run_one.save()
-        run_one.inputs.create(dataset=self.dataset_words, index=1)
-        run_one.groups_allowed.add(everyone_group())
-        sandbox_one = Sandbox(run=run_one)
-        sandbox_one.execute_pipeline()
+        Manager.execute_pipeline(user=self.user_bob, pipeline=p_one, inputs=[self.dataset_words],
+                                 groups_allowed=[everyone_group()],
+                                 name="RunOne", description="Bob runs p_one")
 
-        run_two = Run(
+        Manager.execute_pipeline(
             user=self.user_bob,
+            pipeline=p_two,
+            inputs=[self.dataset_words],
+            groups_allowed=[everyone_group()],
             name="RunOne",
-            description="Bob runs p_two, which tries to reuse part of run_one but ultimately needs to recover",
-            pipeline=p_two
+            description="Bob runs p_two, which tries to reuse part of run_one but ultimately needs to recover"
         )
-        run_two.save()
-        run_two.inputs.create(dataset=self.dataset_words, index=1)
-        run_two.groups_allowed.add(everyone_group())
-        sandbox_two = Sandbox(run=run_two)
-        sandbox_two.execute_pipeline()
 
 
 class ExecuteResultTestsRMEnvironmentBuilder(FixtureBuilder):
@@ -736,16 +716,15 @@ class ExecuteResultTestsRMEnvironmentBuilder(FixtureBuilder):
         tools.create_sequence_manipulation_environment(self)
 
         # Many tests use this run.
-        self.sandbox_complement.execute_pipeline()
+        Manager.execute_pipeline(self.user_alice, self.pipeline_complement, [self.dataset_labdata])
 
         # An identically-specified second run that reuses the stuff from the first.
-        sandbox2 = Sandbox(self.user_alice, self.pipeline_complement, [self.dataset_labdata])
-        sandbox2.execute_pipeline()
+        Manager.execute_pipeline(self.user_alice, self.pipeline_complement, [self.dataset_labdata])
 
         # A couple more runs, used by another test.
-        sandbox_reverse = Sandbox(self.user_alice, self.pipeline_reverse, [self.dataset_labdata])
-        sandbox_reverse.execute_pipeline()
-        self.sandbox_revcomp.execute_pipeline()
+        Manager.execute_pipeline(self.user_alice, self.pipeline_reverse, [self.dataset_labdata])
+
+        Manager.execute_pipeline(self.user_alice, self.pipeline_revcomp, [self.dataset_labdata])
 
         # This is usually done in tools.destroy_sequence_manipulation_environment.
         if os.path.exists(self.datafile.name):
@@ -764,8 +743,7 @@ class ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder(FixtureBuilder):
         tools.create_sequence_manipulation_environment(self)
 
         # This run will discard intermediate data.
-        sandbox = Sandbox(self.user_alice, self.pipeline_revcomp_v2, [self.dataset_labdata])
-        sandbox.execute_pipeline()
+        Manager.execute_pipeline(self.user_alice, self.pipeline_revcomp_v2, [self.dataset_labdata])
 
         # This is usually done in tools.destroy_sequence_manipulation_environment.
         if os.path.exists(self.datafile.name):

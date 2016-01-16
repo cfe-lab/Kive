@@ -35,7 +35,7 @@ from method.models import CodeResource, CodeResourceDependency, \
 from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
 import portal.models
 import kive.testing_utils as tools
-import sandbox.execute
+from fleet.workers import Manager
 from transformation.models import Transformation
 
 
@@ -2403,8 +2403,7 @@ with open(outfile, "wb") as f:
         """
         The ExecRecord of a non-reusable Method should not be found compatible.
         """
-        sdbx = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_dataset])
-        sdbx.execute_pipeline()
+        Manager.execute_pipeline(self.user_rob, self.test_nonreusable, [self.numbers_dataset])
 
         rng_step = self.test_nonreusable.steps.get(step_num=1)
         runstep = rng_step.pipelinestep_instances.first()
@@ -2415,16 +2414,14 @@ with open(outfile, "wb") as f:
         Running a non-reusable Method twice does not reuse an ExecRecord, and
         subsequent steps and cables in the same Pipeline will have different ExecRecords also.
         """
-        sdbx = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_dataset])
-        sdbx.execute_pipeline()
-        first_step_1 = sdbx.run.runsteps.get(pipelinestep__step_num=1)
-        second_step_1 = sdbx.run.runsteps.get(pipelinestep__step_num=2)
+        run = Manager.execute_pipeline(self.user_rob, self.test_nonreusable, [self.numbers_dataset])
+        first_step_1 = run.runsteps.get(pipelinestep__step_num=1)
+        second_step_1 = run.runsteps.get(pipelinestep__step_num=2)
         joining_cable_1 = second_step_1.RSICs.get(PSIC__dest=self.inc_method.inputs.get(dataset_name="incrementor"))
 
-        sdbx2 = sandbox.execute.Sandbox(self.user_rob, self.test_nonreusable, [self.numbers_dataset])
-        sdbx2.execute_pipeline()
-        first_step_2 = sdbx2.run.runsteps.get(pipelinestep__step_num=1)
-        second_step_2 = sdbx2.run.runsteps.get(pipelinestep__step_num=2)
+        run2 = Manager.execute_pipeline(self.user_rob, self.test_nonreusable, [self.numbers_dataset])
+        first_step_2 = run2.runsteps.get(pipelinestep__step_num=1)
+        second_step_2 = run2.runsteps.get(pipelinestep__step_num=2)
         joining_cable_2 = second_step_2.RSICs.get(PSIC__dest=self.inc_method.inputs.get(dataset_name="incrementor"))
 
         self.assertNotEqual(first_step_1.execrecord, first_step_2.execrecord)
