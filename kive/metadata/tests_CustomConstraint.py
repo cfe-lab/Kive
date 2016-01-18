@@ -392,7 +392,7 @@ class CustomConstraintTests(TestCase):
         compound datatype as input.
         """
         good_dataset = self._test_upload_data_good()
-        run = Manager.execute_pipeline(self.user_oscar, pipeline, [good_dataset])
+        run = Manager.execute_pipeline(self.user_oscar, pipeline, [good_dataset]).get_last_run()
         runstep = run.runsteps.first()
         execlog = runstep.log
         output_dataset = runstep.execrecord.execrecordouts.first().dataset

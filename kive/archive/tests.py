@@ -488,7 +488,7 @@ class ArchiveTestCaseHelpers:
         tools.make_words_dataset(self)
 
         self.deep_nested_run = Manager.execute_pipeline(self.user_bob, p_top, [self.dataset_words],
-                                                        groups_allowed=[everyone_group()])
+                                                        groups_allowed=[everyone_group()]).get_last_run()
 
 
 class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
@@ -3040,7 +3040,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         tools.make_words_dataset(self)
 
         run1 = Manager.execute_pipeline(self.user_bob, p_one, [self.dataset_words],
-                                        groups_allowed=[everyone_group()])
+                                        groups_allowed=[everyone_group()]).get_last_run()
 
         # Oops!  Between runs, self.method_noop gets screwed with.
         with tempfile.TemporaryFile() as f:
@@ -3058,7 +3058,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
         run2 = Manager.execute_pipeline(self.user_bob, p_two, [self.dataset_words],
-                                        groups_allowed=[everyone_group()])
+                                        groups_allowed=[everyone_group()]).get_last_run()
 
         # In the second run: the transformation of the second step should have tried to invoke the log of step 1 and
         # failed.
@@ -3111,7 +3111,7 @@ with open(sys.argv[2], "wb") as f:
         tools.make_words_dataset(self)
 
         active_run = Manager.execute_pipeline(self.user_bob, pipeline, [self.dataset_words],
-                                              groups_allowed=[everyone_group()])
+                                              groups_allowed=[everyone_group()]).get_last_run()
 
         run_step = active_run.runsteps.get(pipelinestep__step_num=1)
         stdout_file = run_step.log.methodoutput.output_log
@@ -3245,7 +3245,7 @@ year,month,day,hour,minute,second,microsecond
         # Mark the output of step 1 as not retained.
         p_one.steps.get(step_num=1).add_deletion(self.curr_time_method.outputs.first())
 
-        run1 = Manager.execute_pipeline(self.user_bob, p_one, [self.time_SD])
+        run1 = Manager.execute_pipeline(self.user_bob, p_one, [self.time_SD]).get_last_run()
 
         # Oops!  The first step should not have been marked as deterministic.
         p_two = tools.make_first_pipeline("p_two", "time then trivial", self.user_bob)
@@ -3256,7 +3256,7 @@ year,month,day,hour,minute,second,microsecond
         # create for p_one.
         p_two.steps.get(step_num=1).add_deletion(self.curr_time_method.outputs.first())
 
-        run2 = Manager.execute_pipeline(self.user_bob, p_two, [self.time_SD])
+        run2 = Manager.execute_pipeline(self.user_bob, p_two, [self.time_SD]).get_last_run()
 
         # In the second run: the transformation of the second step should have tried to invoke the log of step 1 and
         # failed.
@@ -3560,9 +3560,9 @@ class RunStepReuseFailedExecRecordTests(TestCase):
         # The first Pipeline should fail.  The second will reuse the first step's ExecRecord, and will not
         # throw an exception, even though the ExecRecord doesn't provide the necessary output.
         run_1 = Manager.execute_pipeline(self.user_grandpa, failing_pipeline, [self.dataset_words],
-                                         groups_allowed=[everyone_group()])
+                                         groups_allowed=[everyone_group()]).get_last_run()
         run_2 = Manager.execute_pipeline(self.user_grandpa, failing_pl_2, [self.dataset_words],
-                                         groups_allowed=[everyone_group()])
+                                         groups_allowed=[everyone_group()]).get_last_run()
 
         self.assertEquals(run_1.runsteps.get(pipelinestep__step_num=1).execrecord,
                           run_2.runsteps.get(pipelinestep__step_num=1).execrecord)

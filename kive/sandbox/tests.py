@@ -375,7 +375,7 @@ class ExecuteTests(ExecuteTestsBase):
         inputs = self.find_inputs_for_pipeline(pipeline)
         self.assertTrue(all(i.is_OK() for i in inputs))
         self.assertFalse(all(i.is_raw() for i in inputs))
-        run = Manager.execute_pipeline(self.myUser, pipeline, inputs)
+        run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
         self.assertTrue(run.is_complete())
 
         self.assertTrue(run.is_successful())
@@ -390,7 +390,7 @@ class ExecuteTests(ExecuteTestsBase):
         inputs = self.find_inputs_for_pipeline(pipeline)
         self.assertTrue(all(i.is_OK() for i in inputs))
         self.assertTrue(any(i.is_raw() for i in inputs))
-        run = Manager.execute_pipeline(self.myUser, pipeline, inputs)
+        run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
         self.assertTrue(run.is_complete())
         self.assertTrue(run.is_successful())
         self.assertIsNone(run.clean())
@@ -450,7 +450,7 @@ class ExecuteTests(ExecuteTestsBase):
         self.mA_crr.content_file.save("NowCorrupted.dat", ContentFile("CORRUPTED"))
         self.mA_crr.save()
 
-        run = Manager.execute_pipeline(self.myUser, self.pX, [self.dataset])
+        run = Manager.execute_pipeline(self.myUser, self.pX, [self.dataset]).get_last_run()
 
         # This Run should have failed right away.
         rs = run.runsteps.first()
@@ -507,10 +507,12 @@ class SandboxTests(ExecuteTestsBase):
         p = Pipeline(family=self.pf, revision_name="blah", revision_desc="blah blah", user=self.myUser)
         p.save()
         p.create_input(dataset_name="in", dataset_idx=1)
-        self.assertRaisesRegexp(ValueError,
-                                re.escape('Pipeline "{}" expected input {} to be raw, but got one with '
-                                          'CompoundDatatype "{}"'.format(p, 1, self.dataset.structure.compounddatatype)),
-                                lambda: Manager.execute_pipeline(self.myUser, p, [self.dataset]))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('Pipeline "{}" expected input {} to be raw, but got one with '
+                      'CompoundDatatype "{}"'.format(p, 1, self.dataset.structure.compounddatatype)),
+            lambda: Manager.execute_pipeline(self.myUser, p, [self.dataset])
+        )
 
     def test_sandbox_nonraw_expected_raw_supplied(self):
         """
@@ -528,10 +530,12 @@ class SandboxTests(ExecuteTestsBase):
             name="foo",
             description="bar"
         )
-        self.assertRaisesRegexp(ValueError,
-                                re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
-                                          .format(p, 1, self.pX_in_cdt)),
-                                lambda: Manager.execute_pipeline(self.myUser, p, [raw_dataset]))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('Pipeline "{}" expected input {} to be of CompoundDatatype "{}", but got raw'
+                      .format(p, 1, self.pX_in_cdt)),
+            lambda: Manager.execute_pipeline(self.myUser, p, [raw_dataset])
+        )
         os.remove(tf.name)
 
     def test_sandbox_cdt_mismatch(self):

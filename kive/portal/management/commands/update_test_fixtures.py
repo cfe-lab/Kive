@@ -645,7 +645,7 @@ class RunComponentTooManyChecksEnvironmentBuilder(FixtureBuilder):
         first_step.save()
 
         following_run = Manager.execute_pipeline(self.user_bob, self.following_pl, [self.dataset_wordbacks],
-                                                 groups_allowed=[everyone_group()])
+                                                 groups_allowed=[everyone_group()]).get_last_run()
         second_step = following_run.runsteps.get(pipelinestep__step_num=2)
         assert(second_step.invoked_logs.count() == 2)
 

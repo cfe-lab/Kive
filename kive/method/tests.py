@@ -2403,7 +2403,7 @@ with open(outfile, "wb") as f:
         """
         The ExecRecord of a non-reusable Method should not be found compatible.
         """
-        Manager.execute_pipeline(self.user_rob, self.test_nonreusable, [self.numbers_dataset])
+        Manager.execute_pipeline(self.user_rob, self.test_nonreusable, [self.numbers_dataset]).get_last_run()
 
         rng_step = self.test_nonreusable.steps.get(step_num=1)
         runstep = rng_step.pipelinestep_instances.first()
@@ -2414,12 +2414,12 @@ with open(outfile, "wb") as f:
         Running a non-reusable Method twice does not reuse an ExecRecord, and
         subsequent steps and cables in the same Pipeline will have different ExecRecords also.
         """
-        run = Manager.execute_pipeline(self.user_rob, self.test_nonreusable, [self.numbers_dataset])
+        run = Manager.execute_pipeline(self.user_rob, self.test_nonreusable, [self.numbers_dataset]).get_last_run()
         first_step_1 = run.runsteps.get(pipelinestep__step_num=1)
         second_step_1 = run.runsteps.get(pipelinestep__step_num=2)
         joining_cable_1 = second_step_1.RSICs.get(PSIC__dest=self.inc_method.inputs.get(dataset_name="incrementor"))
 
-        run2 = Manager.execute_pipeline(self.user_rob, self.test_nonreusable, [self.numbers_dataset])
+        run2 = Manager.execute_pipeline(self.user_rob, self.test_nonreusable, [self.numbers_dataset]).get_last_run()
         first_step_2 = run2.runsteps.get(pipelinestep__step_num=1)
         second_step_2 = run2.runsteps.get(pipelinestep__step_num=2)
         joining_cable_2 = second_step_2.RSICs.get(PSIC__dest=self.inc_method.inputs.get(dataset_name="incrementor"))

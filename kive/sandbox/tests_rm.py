@@ -336,25 +336,6 @@ class ExecuteDiscardedIntermediateTests(TestCase):
         Manager.execute_pipeline(self.user_alice, self.pipeline_revcomp_v3, [self.dataset_labdata])
 
 
-class ExecuteTestsRM(TestCase):
-    """
-    Tests of actually executing Pipelines, and of the Sandboxes.
-    """
-    def setUp(self):
-        tools.create_sequence_manipulation_environment(self)
-
-    def tearDown(self):
-        tools.destroy_sequence_manipulation_environment(self)
-
-    def test_execute_pipeline_twice(self):
-        """
-        You can't execute a pipeline twice in the same Sandbox.
-        """
-        run1 = self.sandbox_complement.execute_pipeline()
-        run2 = self.sandbox_complement.execute_pipeline()
-        self.assertEqual(run1.pk, run2.pk)
-
-
 class BadRunTests(TestCase):
     """
     Tests for when things go wrong during Pipeline execution.
@@ -377,7 +358,7 @@ class BadRunTests(TestCase):
 
         Note that this doesn't occur if using ssh to an unprivileged account for execution.
         """
-        run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_faulty, [self.dataset_grandpa])
+        run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_faulty, [self.dataset_grandpa]).get_last_run()
         runstep1 = run.runsteps.first()
         log = runstep1.log
         interm_dataset = runstep1.execrecord.execrecordouts.first().dataset
@@ -388,7 +369,7 @@ class BadRunTests(TestCase):
 
     def test_method_fails(self):
         """Properly handle a failed method in a pipeline."""
-        run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_fubar, [self.dataset_grandpa])
+        run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_fubar, [self.dataset_grandpa]).get_last_run()
         self.assertIsNone(run.complete_clean())
         self.assertFalse(run.is_successful())
 
@@ -459,8 +440,8 @@ class FindDatasetTests(TestCase):
         self.dataset_backwords = Dataset.objects.get(name='backwords')
         self.user_bob = User.objects.get(username='bob')
 
-        sandbox = Sandbox(self.user_bob, self.pipeline_twostep, [self.dataset_backwords])
-        sandbox.execute_pipeline()
+        mgr = Manager.execute_pipeline(self.user_bob, self.pipeline_twostep, [self.dataset_backwords])
+        sandbox = mgr.history_queue.pop()
         self.assertIsNone(sandbox.run.complete_clean())
         self.assertTrue(sandbox.run.is_successful())
 
@@ -490,8 +471,8 @@ class FindDatasetTests(TestCase):
         self.dataset_backwords = Dataset.objects.get(name='backwords')
         self.user_bob = User.objects.get(username='bob')
 
-        sandbox = Sandbox(self.user_bob, self.pipeline_nested, [self.dataset_backwords])
-        sandbox.execute_pipeline()
+        mgr = Manager.execute_pipeline(self.user_bob, self.pipeline_nested, [self.dataset_backwords])
+        sandbox = mgr.history_queue.pop()
         self.assertIsNone(sandbox.run.complete_clean())
         self.assertTrue(sandbox.run.is_successful())
 
@@ -535,13 +516,12 @@ class RawTests(SandboxRMTestCase):
 
     def test_execute_pipeline_raw(self):
         """Execute a raw Pipeline."""
-        sandbox = Sandbox(self.user_bob, self.pipeline_raw, [self.dataset_raw])
-        sandbox.execute_pipeline()
+        Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw])
 
     def test_execute_pipeline_raw_twice(self):
         """Execute a raw Pipeline and reuse an ExecRecord."""
-        Sandbox(self.user_bob, self.pipeline_raw, [self.dataset_raw]).execute_pipeline()
-        Sandbox(self.user_bob, self.pipeline_raw, [self.dataset_raw]).execute_pipeline()
+        Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw])
+        Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw])
 
     def tearDown(self):
         super(RawTests, self).tearDown()

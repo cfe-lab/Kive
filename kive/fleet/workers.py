@@ -2,7 +2,7 @@
 Defines the manager and the "workers" that manage and carry out the execution of Pipelines.
 """
 
-from collections import defaultdict
+from collections import defaultdict, deque
 import logging
 from mpi4py import MPI
 import sys
@@ -50,7 +50,7 @@ class Manager:
     assigning the resulting tasks to workers.
     """
 
-    def __init__(self, worker_count, quit_idle=False, manage_script=None):
+    def __init__(self, worker_count, quit_idle=False, manage_script=None, history=0):
         self.worker_count = worker_count
         self.quit_idle = quit_idle
         self.manage_script = manage_script
@@ -73,6 +73,9 @@ class Manager:
 
         # A reverse lookup table for the above.
         self.hostnames = {}
+
+        # A queue of recently-completed runs, to a maximum specified by history.
+        self.history_queue = deque(maxlen=history)
 
     def _startup(self, comm):
         """
@@ -269,7 +272,9 @@ class Manager:
                 mgr_logger.info('Cleaning up failed run "%s" (pk=%d) (Pipeline: %s, User: %s)',
                                 curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
 
-            self.active_sandboxes.pop(curr_sdbx.run)
+            finished_sandbox = self.active_sandboxes.pop(curr_sdbx.run)
+            if self.history_queue.maxlen > 0:
+                self.history_queue.append(finished_sandbox)
 
             curr_sdbx.run.mark_complete()
             curr_sdbx.run.stop(save=True)
@@ -542,9 +547,21 @@ class Manager:
 
         # The run is already in the queue, so we can just start the fleet and let it exit
         # when it finishes.
-        manager = cls(1, quit_idle=True, manage_script=sys.argv[0])
+        manager = cls(1, quit_idle=True, manage_script=sys.argv[0], history=1)
         manager.main_procedure()
-        return run
+        return manager
+
+    def get_last_run(self):
+        """
+        Retrieve the last completed run from the history.
+
+        If no history is retained, return None.
+        """
+        if self.history_queue.maxlen == 0:
+            return None
+
+        last_completed_sdbx = self.history_queue.pop()
+        return last_completed_sdbx.run
 
 
 class Worker:
