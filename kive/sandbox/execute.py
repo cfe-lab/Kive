@@ -371,7 +371,7 @@ class Sandbox:
         self.run_plan = RunPlan()
         self.run_plan.load(self.run, self.inputs)
 
-        self.run_plan.create_run_steps()
+        self.run_plan.find_consistent_execution()
 
         pipeline_to_resume = run_to_resume.pipeline
 
@@ -1045,7 +1045,8 @@ class Sandbox:
 
     # This function will be called by fleet Workers.  Since they do not have access
     # to the Sandboxes, we need to pass in all the information they need via a dictionary
-    # representation of a RunCableExecuteInfo.
+    # representation of a RunCableExecuteInfo.  It does not update the Sandbox maps either,
+    # as that falls to the Manager (who has the Sandbox).
     @staticmethod
     def finish_cable(cable_execute_dict, worker_rank):
         """
@@ -1149,31 +1150,13 @@ class Sandbox:
             output_dataset = curr_ER.execrecordouts.first().dataset
             output_CDT = output_dataset.get_cdt()
 
-        return Sandbox._finish_cable_h(worker_rank, curr_record, cable, user, curr_ER,
-                                       input_dataset, input_dataset_path,
-                                       output_path, output_CDT, recovering_record)
-
-    @staticmethod
-    def _finish_cable_h(worker_rank, curr_record, cable, user, execrecord, input_dataset, input_dataset_path, output_path,
-                        output_CDT, recovering_record, sandbox_to_update=None):
-        """
-        Helper for finish_cable and execute_cable.
-        """
-        recover = recovering_record is not None
-        # Create ExecLog invoked by...
-        if not recover:
-            # ...this RunCable.
-            invoking_record = curr_record
-        else:
-            # ...the recovering RunAtomic.
-            invoking_record = recovering_record
         curr_log = archive.models.ExecLog.create(curr_record, invoking_record)
 
         # Run cable (this completes EL).
         cable.run_cable(input_dataset_path, output_path, curr_record, curr_log)
 
         # Here, we're authoring/modifying an ExecRecord, so we use a transaction.
-        preexisting_ER = execrecord is not None
+        preexisting_ER = curr_ER is not None
         succeeded_yet = False
         while not succeeded_yet:
             try:
@@ -1187,13 +1170,13 @@ class Sandbox:
                         # check to input_dataset == output_dataset.
                         if cable.is_trivial():
                             output_dataset = input_dataset
-                        if execrecord is None:
+                        if curr_ER is None:
                             output_dataset = librarian.models.Dataset.create_empty(
                                 cdt=output_CDT,
                                 file_source=curr_record
                             )
                         else:
-                            output_dataset = execrecord.execrecordouts.first().dataset
+                            output_dataset = curr_ER.execrecordouts.first().dataset
                         output_dataset.mark_missing(start_time, end_time, curr_log, user)
                         missing_output = True
 
@@ -1214,8 +1197,8 @@ class Sandbox:
                         if not make_dataset:
                             logger.debug("[%d] Cable doesn't keep output: not creating a dataset", worker_rank)
 
-                        if execrecord is not None:
-                            output_dataset = execrecord.execrecordouts.first().dataset
+                        if curr_ER is not None:
+                            output_dataset = curr_ER.execrecordouts.first().dataset
                             if make_dataset:
                                 output_dataset.register_file(output_path)
 
@@ -1232,13 +1215,13 @@ class Sandbox:
 
                     # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
                     if not recover:
-                        if execrecord is None:
+                        if curr_ER is None:
                             logger.debug("[%d] No ExecRecord already in use - creating fresh cable ExecRecord",
                                          worker_rank)
                             # Make ExecRecord, linking it to the ExecLog.
-                            execrecord = librarian.models.ExecRecord.create(curr_log, cable, [input_dataset], [output_dataset])
+                            curr_ER = librarian.models.ExecRecord.create(curr_log, cable, [input_dataset], [output_dataset])
                         # Link ER to RunCable (this may have already been linked; that's fine).
-                        curr_record.link_execrecord(execrecord, reused=False)
+                        curr_record.link_execrecord(curr_ER, reused=False)
 
                     else:
                         logger.debug("[%d] This was a recovery - not linking RSIC/RunOutputCable to ExecRecord",
@@ -1275,11 +1258,6 @@ class Sandbox:
                 else:
                     curr_record.mark_unsuccessful()
 
-            # If a sandbox was specified and we were successful, update the sandbox.
-            if sandbox_to_update is not None and output_dataset.is_OK() and not recover:
-                # Success! Update dataset_fs/socket/cable_map.
-                sandbox_to_update.update_cable_maps(curr_record, output_dataset, output_path)
-
         logger.debug("[%d] DONE EXECUTING %s '%s'", worker_rank, type(cable).__name__, cable)
 
         # End. Return curr_record.  Stop the clock if this was not a recovery.
@@ -1290,7 +1268,7 @@ class Sandbox:
         curr_record.complete_clean()
         return curr_record
 
-    # The actual running of code happens here.  We copy and modify this from execute_step.
+    # The actual running of code happens here.
     @staticmethod
     def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
         """
@@ -1396,22 +1374,10 @@ class Sandbox:
                                  worker_rank, wait_time)
                     time.sleep(wait_time)
 
-        return Sandbox._finish_step_h(worker_rank, user, curr_RS, step_run_dir, curr_ER, inputs_after_cable,
-                                      input_paths, output_paths, log_dir, recovering_record,
-                                      stop_execution_callback=stop_execution_callback)
-
-    @staticmethod
-    def _finish_step_h(worker_rank, user, runstep, step_run_dir, execrecord, inputs_after_cable, input_paths, output_paths,
-                       log_dir, recovering_record, sandbox_to_update=None, stop_execution_callback=None):
-        """
-        Helper for execute_step and finish_step.
-        """
-        recover = recovering_record is not None
-        invoking_record = recovering_record if recover else runstep
-        pipelinestep = runstep.pipelinestep
+        pipelinestep = curr_RS.pipelinestep
 
         # Run code, creating ExecLog and MethodOutput.
-        curr_log = archive.models.ExecLog.create(runstep, invoking_record)
+        curr_log = archive.models.ExecLog.create(curr_RS, invoking_record)
         stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
         stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
 
@@ -1431,11 +1397,11 @@ class Sandbox:
             invoking_record.mark_unsuccessful()
 
             if not recover:
-                runstep.mark_complete()
-                runstep.stop(save=False, clean=False)
-            runstep.save()
-            runstep.complete_clean()
-            return runstep
+                curr_RS.mark_complete()
+                curr_RS.stop(save=False, clean=False)
+            curr_RS.save()
+            curr_RS.complete_clean()
+            return curr_RS
 
         # From here on the code is assumed to not be corrupted.
         try:
@@ -1451,10 +1417,10 @@ class Sandbox:
             logger.debug("[%d] Method execution stopped.", worker_rank)
 
             # Update state variables.
-            runstep.is_cancelled = True
+            curr_RS.is_cancelled = True
             if not recover:
-                runstep.mark_complete()
-                runstep.save()
+                curr_RS.mark_complete()
+                curr_RS.save()
             invoking_record.mark_unsuccessful()
 
             raise e
@@ -1462,7 +1428,7 @@ class Sandbox:
         logger.debug("[%d] Method execution complete, ExecLog saved (started = %s, ended = %s)",
                      worker_rank, curr_log.start_time, curr_log.end_time)
 
-        preexisting_ER = execrecord is not None
+        preexisting_ER = curr_ER is not None
         succeeded_yet = False
         while not succeeded_yet:
             try:
@@ -1488,10 +1454,10 @@ class Sandbox:
                             if not file_access_utils.file_exists(output_path):
                                 end_time = timezone.now()
                                 if preexisting_ER:
-                                    output_dataset = execrecord.get_execrecordout(curr_output).dataset
+                                    output_dataset = curr_ER.get_execrecordout(curr_output).dataset
                                 else:
                                     output_dataset = librarian.models.Dataset.create_empty(
-                                        cdt=output_CDT, file_source=runstep)
+                                        cdt=output_CDT, file_source=curr_RS)
                                 output_dataset.mark_missing(start_time, end_time, curr_log, user)
 
                                 bad_output_found = True
@@ -1502,14 +1468,14 @@ class Sandbox:
                             else:
                                 # If necessary, create new Dataset for output, and create the Dataset
                                 # if it's to be retained.
-                                dataset_name = runstep.output_name(curr_output)
-                                dataset_desc = runstep.output_description(curr_output)
-                                make_dataset = runstep.keeps_output(curr_output)
+                                dataset_name = curr_RS.output_name(curr_output)
+                                dataset_desc = curr_RS.output_description(curr_output)
+                                make_dataset = curr_RS.keeps_output(curr_output)
 
                                 if preexisting_ER:
                                     # Wrap in a transaction to prevent concurrent authoring of Datasets to
                                     # an existing Dataset.
-                                    output_ERO = execrecord.get_execrecordout(curr_output)
+                                    output_ERO = curr_ER.get_execrecordout(curr_output)
                                     with transaction.atomic():
                                         output_dataset = librarian.models.Dataset.objects.select_for_update().filter(
                                             pk=output_ERO.dataset.pk
@@ -1524,7 +1490,7 @@ class Sandbox:
                                         keep_file=make_dataset,
                                         name=dataset_name,
                                         description=dataset_desc,
-                                        file_source=runstep,
+                                        file_source=curr_RS,
                                         check=False
                                     )
                                     logger.debug("[%d] First time seeing file: saved md5 %s",
@@ -1535,11 +1501,11 @@ class Sandbox:
                         if not preexisting_ER:
                             # Make new ExecRecord, linking it to the ExecLog
                             logger.debug("[%d] Creating fresh ExecRecord", worker_rank)
-                            execrecord = librarian.models.ExecRecord.create(curr_log, pipelinestep,
+                            curr_ER = librarian.models.ExecRecord.create(curr_log, pipelinestep,
                                                                             inputs_after_cable, output_datasets)
 
                         # Link ExecRecord to RunStep (it may already have been linked; that's fine).
-                        runstep.link_execrecord(execrecord, False)
+                        curr_RS.link_execrecord(curr_ER, False)
 
                 succeeded_yet = True
             except (OperationalError, InternalError):
@@ -1550,7 +1516,7 @@ class Sandbox:
         # Check outputs.
         for i, curr_output in enumerate(pipelinestep.outputs):
             output_path = output_paths[i]
-            output_dataset = execrecord.get_execrecordout(curr_output).dataset
+            output_dataset = curr_ER.get_execrecordout(curr_output).dataset
             check = None
 
             if bad_output_found:
@@ -1603,38 +1569,48 @@ class Sandbox:
             elif check:
                 logger.debug("[%d] %s passed for %s", worker_rank, check.__class__.__name__, output_path)
 
-        execrecord.complete_clean()
+        curr_ER.complete_clean()
 
-        # End. Return runstep.  Stop the clock if this was a recovery.
+        # End. Return curr_RS.  Stop the clock if this was a recovery.
         if not recover:
             # Update state variables.
-            runstep.mark_complete()
-            if sandbox_to_update is not None:
-                # Since reused=False, step_run_dir represents where the step *actually is*.
-                sandbox_to_update.update_step_maps(runstep, step_run_dir, output_paths)
-
-            runstep.stop(save=False, clean=False)
-        runstep.save()
-        runstep.complete_clean()
-        return runstep
+            curr_RS.mark_complete()
+            curr_RS.stop(save=False, clean=False)
+        curr_RS.save()
+        curr_RS.complete_clean()
+        return curr_RS
 
 
 class RunPlan(object):
-    """ Hold the plan for which steps will be executed in a sandbox.
+    """
+    Hold the plan for which steps will be executed in a sandbox.
 
     Also holds the dependencies between steps and cables, as well as the
     ExecRecord that will be reused for each step and cable that doesn't have
     to be run this time.
+
+    This is required to avoid incoherencies where steps use different results from
+    the same preceding step in a Pipeline (for example, if that step is not deterministic.
     """
-    def load(self, run, inputs):
+    def load(self, run, inputs, subpipeline_step=None):
         """ Load the steps from the pipeline and dataset dependencies.
 
         Links pipeline inputs and step outputs to the inputs of other steps.
+
+        run refers to the top-level run.  subpipeline is None or the PipelineStep
+        that represents the sub-Pipeline.  This may be more than one layer deep in
+        the top-level Pipeline.
         """
         self.run = run
         self.step_plans = []
         self.inputs = [DatasetPlan(input_item) for input_item in inputs]
-        for step in run.pipeline.steps.all():
+        if subpipeline_step:
+            assert subpipeline_step.transformation.is_pipeline
+            self.pipeline = subpipeline_step.transformation.definite
+        else:
+            self.pipeline = run.pipeline
+
+        for step in self.pipeline.steps.all():
             step_plan = StepPlan(step.step_num)
             step_plan.pipeline_step = step
             self.step_plans.append(step_plan)
@@ -1650,24 +1626,66 @@ class RunPlan(object):
                     output_index = cable.source.definite.dataset_idx-1
                     input_plan = self.step_plans[step_index].outputs[output_index]
                 step_plan.inputs.append(input_plan)
+
+            if step.is_subpipeline:
+                step_plan.subrun_plan = RunPlan()
+                step_plan.subrun_plan.load(run, inputs, subpipeline=step)
+
         self.outputs = []
-        for cable in run.pipeline.outcables.order_by("output_idx"):
+        for cable in self.pipeline.outcables.order_by("output_idx"):
             step_index = cable.source_step-1
             output_index = cable.source.definite.dataset_idx-1
             output_plan = self.step_plans[step_index].outputs[output_index]
             self.outputs.append(output_plan)
 
+    def find_consistent_execution(self):
+        """
+        Flesh out the plan for executing this run.
+
+        First, StepPlans are created for each RunStep, creating RunSteps if necessary.
+        Then, suitable ExecRecords are identified where possible and added to the StepPlans.
+        Lastly, we iterate over all of the StepPlans until we've identified a consistent
+        plan for execution that will not lead to incoherent results.
+        """
+        self.create_run_steps()
+        self.find_ERs()
+        self.identify_changes()
+
     def create_run_steps(self):
-        """ Create run steps and find suitable execrecords. """
+        """
+        Find or create the RunSteps in the Run.
+        """
         for step_plan in self.step_plans:
             run_step = self.run.runsteps.filter(
                 pipelinestep__step_num=step_plan.step_num).first()
             if run_step is None:
                 run_step = RunStep.create(step_plan.pipeline_step, self.run, start=False)
+
+                if run_step.pipeline_step.transformation.is_pipeline:
+                    subrun = Run(
+                        user=self.run.user,
+                        pipeline=run_step.pipeline_step.transformation.definite,
+                        parent_runstep=run_step
+                    )
+                    subrun.save()
+                    subrun.users_allowed.add(*self.run.users_allowed.all())
+                    subrun.groups_allowed.add(*self.run.groups_allowed.all())
+
             step_plan.run_step = run_step
 
-            if run_step.execrecord is not None:
-                step_plan.execrecord = run_step.execrecord
+            if run_step.pipeline_step.transformation.is_pipeline:
+                step_plan.subrun_plan.create_run_steps()
+
+    def find_ERs(self):
+        """
+        Looks for suitable ExecRecords for the RunSteps and populates step_plan with them.
+        """
+        for step_plan in self.step_plans:
+            if step_plan.pipeline_step.is_subpipeline:
+                step_plan.subrun_plan.find_ERs()
+                continue
+            elif step_plan.run_step.execrecord is not None:
+                step_plan.execrecord = step_plan.run_step.execrecord
             else:
                 input_datasets = [plan.dataset for plan in step_plan.inputs]
                 if all(input_datasets):
@@ -1680,7 +1698,6 @@ class RunPlan(object):
                         continue
                     if (not summary['fully reusable'] and
                             method.reusable != Method.DETERMINISTIC):
-
                         continue
                     step_plan.execrecord = execrecord
 
@@ -1695,37 +1712,49 @@ class RunPlan(object):
                 output = step_plan.outputs[dataset_idx-1]
                 output.dataset = execrecordout.dataset
 
+    def identify_changes(self):
         is_changed = True
         while is_changed:
-            is_changed = self._walk_backward() or self._walk_forward()
+            is_changed = self.walk_backward() or self.walk_forward()
 
-    def _walk_backward(self):
+    def walk_backward(self):
         """ Walk backward through the steps, flagging needed runs.
 
         @return: True if any new steps were flagged for running.
         """
         is_changed = False
         for step_plan in reversed(self.step_plans):
-            if not step_plan.execrecord:
+            if step_plan.pipeline_step.is_subpipeline:
+                is_changed = step_plan.subrun_plan.walk_backward() or is_changed
+
+            elif not step_plan.execrecord:
                 for input_plan in step_plan.inputs:
                     if not input_plan.has_data():
                         source_plan = self.step_plans[input_plan.step_num-1]
-                        is_changed = source_plan.check_rerun() or is_changed
+                        if not source_plan.pipeline_step.is_subpipeline:
+                            is_changed = source_plan.check_rerun() or is_changed
+                        else:
+                            # Look up the step of the sub-run that produced this output.
+                            is_changed = source_plan.subrun_plan.check_rerun(source_plan.output_num) or is_changed
         return is_changed
 
-    def _walk_forward(self):
+    def walk_forward(self):
         """ Walk forward through the steps, flagging needed runs.
 
         @return: True if any new steps were flagged for running.
         """
         is_changed = False
         for step_plan in self.step_plans:
-            for input_plan in step_plan.inputs:
-                if not input_plan.dataset and step_plan.execrecord:
-                    step_plan.execrecord = None
-                    for output_plan in step_plan.outputs:
-                        output_plan.dataset = None
-                    is_changed = True
+            if step_plan.pipeline_step.is_subpipeline:
+                is_changed = step_plan.subrun_plan.walk_forward() or is_changed
+
+            else:
+                for input_plan in step_plan.inputs:
+                    if not input_plan.dataset and step_plan.execrecord:
+                        step_plan.execrecord = None
+                        for output_plan in step_plan.outputs:
+                            output_plan.dataset = None
+                        is_changed = True
         return is_changed
 
 
@@ -1740,23 +1769,40 @@ class StepPlan(object):
         self.inputs = []
         self.outputs = []
 
-    def check_rerun(self):
-        """ Check that this step can recreate one of its missing outputs.
+    def check_rerun(self, output_idx=None):
+        """
+        Check that this step can recreate one of its missing outputs.
 
         If the execrecord cannot be restored, don't use it, and mark all
-        the outputs as having no data.
+        the outputs as having no data.  If this StepPlan is for a sub-Pipeline,
+        then output_idx must be specified; otherwise, it is ignored.
+
         @return: True if the execrecord had to be abandoned.
         """
-        if not self.execrecord:
-            return False
-        method = self.run_step.transformation.definite
-        if method.reusable == Method.DETERMINISTIC:
-            return False
+        if self.pipeline_step.is_subpipeline:
+            assert output_idx is not None
+            # Look up the step that produced this output.
+            curr_output_plan = self.subrun_plan.outputs[output_idx-1]
+            source_step_plan = self.subrun_plan.step_plans[curr_output_plan.step_num-1]
 
-        self.execrecord = None
-        for output_plan in self.outputs:
-            output_plan.dataset = None
-        return True
+            return source_step_plan.check_rerun(output_idx=source_step_plan.output_num)
+
+        else:
+            if not self.execrecord:
+                # It didn't have an ExecRecord so there is no change to whether this needs to be rerun or not.
+                return False
+
+            # At this point, we know self.execrecord exists.
+            method = self.run_step.transformation.definite
+            if method.reusable == Method.DETERMINISTIC:
+                # There will be no trouble reusing the execrecord.
+                return False
+
+            # At this point we know the Method is not deterministic, so we'll have to re-run it.
+            self.execrecord = None
+            for output_plan in self.outputs:
+                output_plan.dataset = None
+            return True
 
     def __repr__(self):
         return 'StepPlan({})'.format(self.step_num)

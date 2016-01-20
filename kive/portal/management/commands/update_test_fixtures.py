@@ -25,7 +25,6 @@ from method.models import CodeResource, MethodFamily, Method,\
 import pipeline.models
 from pipeline.models import PipelineFamily
 import portal.models
-from sandbox.execute import Sandbox, finish_step, finish_cable
 import sandbox.tests
 from archive.models import Dataset, RunStep, Run
 from fleet.workers import Manager
@@ -205,6 +204,11 @@ class DeepNestedRunBuilder(FixtureBuilder):
     def build(self):
         tools.create_archive_test_environment(self)
         user = User.objects.get(username='john')
+
+        # First, let's clear out the other stuff: there are two runs for pE and pD each.
+        for run in Run.objects.filter(pipeline__family__name="Pipeline_family"):
+            run.delete()
+
         # Everything in this pipeline will be a no-op, so all can be linked together
         # without remorse.
         p_basic = tools.make_first_pipeline("p_basic", "innermost pipeline", user)
@@ -259,31 +263,8 @@ x,y
         dataset.clean()
         dataset.grant_everyone_access()
 
-        run_to_process = Run(pipeline=pipeline1, user=user)
-        run_to_process.save()
-        run_to_process.clean()
-        run_to_process.inputs.create(dataset=dataset, index=1)
-
-        manager = Manager(0, None)
-        manager.max_host_cpus = 1
-        manager.worker_status = {}
-        manager.find_new_runs()
-        while manager.task_queue:
-            tasks = manager.task_queue
-            manager.task_queue = []
-            for sandbox, task in tasks:
-                task_info = sandbox.get_task_info(task)
-                task_info_dict = task_info.dict_repr()
-                worker_rank = 1
-                manager.tasks_in_progress[worker_rank] = {"task": task,
-                                                          "vassals": []}
-                if type(task) == RunStep:
-                    sandbox_result = finish_step(task_info_dict, worker_rank)
-                else:
-                    sandbox_result = finish_cable(task_info_dict, worker_rank)
-                manager.note_progress(worker_rank, sandbox_result)
-        run_to_process = Run.objects.get(id=run_to_process.id)
-        run_to_process.collect_garbage()  # Delete sandbox directories
+        run = Manager.execute_pipeline(user=user, pipeline=pipeline1, inputs=[dataset]).get_last_run()
+        run.collect_garbage()  # Delete sandbox directories
 
     def create_pipelines(self, user):
         """ Create two pipelines: sums_only and sums_and_products.
@@ -647,7 +628,7 @@ class RunComponentTooManyChecksEnvironmentBuilder(FixtureBuilder):
         following_run = Manager.execute_pipeline(self.user_bob, self.following_pl, [self.dataset_wordbacks],
                                                  groups_allowed=[everyone_group()]).get_last_run()
         second_step = following_run.runsteps.get(pipelinestep__step_num=2)
-        assert(second_step.invoked_logs.count() == 2)
+        assert(second_step.invoked_logs.count() == 3)
 
         # FIXME are there other files that aren't properly being removed?
         if hasattr(self, "words_datafile"):
@@ -832,18 +813,18 @@ class Command(BaseCommand):
     help = "Update test fixtures by running scripts and dumping test data."
 
     def handle(self, *args, **options):
-        EMSandboxTestEnvironmentBuilder().run()
-        ArchiveTestEnvironmentBuilder().run()
+        # EMSandboxTestEnvironmentBuilder().run()
+        # ArchiveTestEnvironmentBuilder().run()
         DeepNestedRunBuilder().run()
-        SimpleRunBuilder().run()
-        RemovalTestEnvironmentBuilder().run()
-        RunApiTestsEnvironmentBuilder().run()
-        RunComponentTooManyChecksEnvironmentBuilder().run()
-        RunPipelinesRecoveringReusedStepEnvironmentBuilder().run()
-        ExecuteResultTestsRMEnvironmentBuilder().run()
-        ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
-        RestoreReusableDatasetBuilder().run()
-        ExecuteTestsBuilder().run()
-        FindDatasetsBuilder().run()
+        # SimpleRunBuilder().run()
+        # RemovalTestEnvironmentBuilder().run()
+        # RunApiTestsEnvironmentBuilder().run()
+        # RunComponentTooManyChecksEnvironmentBuilder().run()
+        # RunPipelinesRecoveringReusedStepEnvironmentBuilder().run()
+        # ExecuteResultTestsRMEnvironmentBuilder().run()
+        # ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
+        # RestoreReusableDatasetBuilder().run()
+        # ExecuteTestsBuilder().run()
+        # FindDatasetsBuilder().run()
 
         self.stdout.write('Done.')

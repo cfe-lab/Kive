@@ -23,7 +23,7 @@ from kive.testing_utils import clean_up_all_files
 from kive import settings
 from kive.tests import install_fixture_files, restore_production_files, DuckContext
 from fleet.workers import Manager
-from sandbox.execute import finish_step, finish_cable
+from sandbox.execute import Sandbox
 
 
 class QueuedRunTest(TestCase):
@@ -490,9 +490,9 @@ class RestoreReusableDatasetTest(TestCase):
                 manager.tasks_in_progress[worker_rank] = {"task": task,
                                                           "vassals": []}
                 if type(task) == RunStep:
-                    sandbox_result = finish_step(task_info_dict, worker_rank)
+                    sandbox_result = Sandbox.finish_step(task_info_dict, worker_rank)
                 else:
-                    sandbox_result = finish_cable(task_info_dict, worker_rank)
+                    sandbox_result = Sandbox.finish_cable(task_info_dict, worker_rank)
                 manager.note_progress(worker_rank, sandbox_result)
 
         return Run.objects.get(id=run_to_process.id)

@@ -663,7 +663,7 @@ class PipelineStep(models.Model):
 
     def threads_needed(self):
         if self.transformation.is_pipeline:
-            return self.transformation.threads_needed()
+            return self.transformation.definite.threads_needed()
         return self.transformation.definite.threads
 
 

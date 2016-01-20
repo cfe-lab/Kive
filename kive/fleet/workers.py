@@ -18,7 +18,8 @@ from django.utils import timezone
 
 import archive.models
 from archive.models import Dataset, Run, ExceedsSystemCapabilities
-import sandbox.execute
+
+from sandbox.execute import Sandbox, sandbox_glob
 from fleet.exceptions import StopExecution
 
 mgr_logger = logging.getLogger("fleet.Manager")
@@ -115,7 +116,7 @@ class Manager:
         """
         Receive a request to start a pipeline running.
         """
-        new_sdbx = sandbox.execute.Sandbox(run=run_to_start)
+        new_sdbx = Sandbox(run=run_to_start)
         new_sdbx.advance_pipeline()
 
         # If we were able to reuse throughout, then we're totally done.  Otherwise we
@@ -256,6 +257,7 @@ class Manager:
                 # Update maps and advance the pipeline.
                 curr_sdbx.update_sandbox(task_finished)
                 curr_sdbx.advance_pipeline(task_completed=just_finished["task"])
+                curr_sdbx.run = Run.objects.get(pk=curr_sdbx.run.pk)
                 if curr_sdbx.run.is_complete(use_cache=True):
                     mgr_logger.info('Rest of Run "%s" (pk=%d) completely reused (Pipeline: %s, User: %s)',
                                     curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
@@ -388,7 +390,7 @@ class Manager:
         # Look for new jobs to run.  We will also
         # build in a delay here so we don't clog up the database.
         mgr_logger.debug("Looking for new runs....")
-        pending_runs = Run.find_unstarted().order_by("time_queued")
+        pending_runs = Run.find_unstarted().order_by("time_queued").filter(parent_runstep__isnull=True)
 
         mgr_logger.debug("Pending runs: {}".format(pending_runs))
 
@@ -509,7 +511,7 @@ class Manager:
         mgr_logger.debug("Checking for orphaned sandbox directories to clean up....")
 
         sdbx_path = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
-        for putative_sdbx in glob.glob(os.path.join(sdbx_path, sandbox.execute.sandbox_glob)):
+        for putative_sdbx in glob.glob(os.path.join(sdbx_path, sandbox_glob)):
 
             # Remove this sandbox if there is no Run that is on record as having used it.
             matching_rtps = Run.objects.filter(
@@ -532,6 +534,8 @@ class Manager:
         and so a precondition is that sys.argv[1] is the management script used to invoke
         the tests.
         """
+        name = name or ""
+        description = description or ""
         run = pipeline.pipeline_instances.create(user=user, _complete=False, _successful=True,
                                                  name=name, description=description)
         users_allowed = users_allowed or []
@@ -557,7 +561,7 @@ class Manager:
 
         If no history is retained, return None.
         """
-        if self.history_queue.maxlen == 0:
+        if self.history_queue.maxlen == 0 or len(self.history_queue) == 0:
             return None
 
         last_completed_sdbx = self.history_queue.pop()
@@ -627,10 +631,10 @@ class Worker:
 
             try:
                 if type(task) == archive.models.RunStep:
-                    sandbox_result = sandbox.execute.finish_step(task_info_dict, self.rank, self.check_for_stop)
+                    sandbox_result = Sandbox.finish_step(task_info_dict, self.rank, self.check_for_stop)
 
                 else:
-                    sandbox_result = sandbox.execute.finish_cable(task_info_dict, self.rank)
+                    sandbox_result = Sandbox.finish_cable(task_info_dict, self.rank)
                 worker_logger.debug(
                     "%s %s completed.  Returning results to Manager.",
                     task.__class__.__name__,

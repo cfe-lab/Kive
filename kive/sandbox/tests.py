@@ -638,7 +638,7 @@ class RestoreReusableDatasetTest(TestCase):
         self.assertEqual([DatasetPlan(step_num=2, output_num=1)],
                          run_plan.outputs)
 
-    def test_create_run_steps_for_rerun(self):
+    def test_find_consistent_execution_for_rerun(self):
         pipeline = Pipeline.objects.get(revision_name='sums only')
         input_dataset = Dataset.objects.get(name='pairs')
         step1_output_dataset = Dataset.objects.get(id=2)
@@ -652,7 +652,7 @@ class RestoreReusableDatasetTest(TestCase):
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)
 
-        run_plan.create_run_steps()
+        run_plan.find_consistent_execution()
         step_plans = run_plan.step_plans
 
         self.assertEqual([DatasetPlan(step1_output_dataset)],
@@ -660,7 +660,7 @@ class RestoreReusableDatasetTest(TestCase):
         self.assertEqual([DatasetPlan(step2_output_dataset)],
                          step_plans[1].outputs)
 
-    def test_create_run_steps_for_new_run(self):
+    def test_find_consistent_execution_for_new_run(self):
         pipeline = Pipeline.objects.get(revision_name='sums and products')
         input_dataset = Dataset.objects.get(name='pairs')
 
@@ -673,7 +673,7 @@ class RestoreReusableDatasetTest(TestCase):
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)
 
-        run_plan.create_run_steps()
+        run_plan.find_consistent_execution()
         step_plans = run_plan.step_plans
 
         self.assertEqual([DatasetPlan(step_num=1, output_num=1)],
@@ -683,7 +683,7 @@ class RestoreReusableDatasetTest(TestCase):
         self.assertEqual([DatasetPlan(step_num=3, output_num=1)],
                          step_plans[2].outputs)
 
-    def test_create_run_steps_with_missing_output(self):
+    def test_find_consistent_execution_with_missing_output(self):
         pipeline = Pipeline.objects.get(revision_name='sums only')
         pipeline.steps.get(step_num=1).outputs_to_delete.clear()
 
@@ -698,12 +698,12 @@ class RestoreReusableDatasetTest(TestCase):
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)
 
-        run_plan.create_run_steps()
+        run_plan.find_consistent_execution()
         step_plans = run_plan.step_plans
 
         self.assertIsNone(step_plans[0].execrecord)
 
-    def test_create_run_steps_with_missing_output_of_deterministic_method(self):
+    def test_find_consistent_execution_with_missing_output_of_deterministic_method(self):
         pipeline = Pipeline.objects.get(revision_name='sums only')
         pipeline_step = pipeline.steps.get(step_num=1)
         pipeline_step.outputs_to_delete.clear()
@@ -723,7 +723,7 @@ class RestoreReusableDatasetTest(TestCase):
         run_plan = RunPlan()
         run_plan.load(sandbox.run, sandbox.inputs)
 
-        run_plan.create_run_steps()
+        run_plan.find_consistent_execution()
         step_plans = run_plan.step_plans
 
         self.assertIsNotNone(step_plans[0].execrecord)
