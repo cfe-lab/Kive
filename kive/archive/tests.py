@@ -17,7 +17,7 @@ from django.core.urlresolvers import reverse, resolve
 from rest_framework import status
 from rest_framework.test import force_authenticate
 
-from archive.models import Dataset, ExecLog, MethodOutput, Run, RunComponent,\
+from archive.models import ExecLog, MethodOutput, Run, RunComponent,\
     RunOutputCable, RunStep, RunSIC
 from datachecking.models import BadData
 from file_access_utils import compute_md5
@@ -452,8 +452,10 @@ class ArchiveTestCaseHelpers:
         self.make_complete_non_reused(self.D11_21_ROC, [self.C1_in_dataset], [self.C1_in_dataset])
         self.C1_in_dataset.file_source = self.D11_21_ROC
         self.C1_in_dataset.save()
-        self.C1_in_dataset.content_checks.create(execlog=self.D11_21_ROC.log, start_time=timezone.now(),
-                                               end_time=timezone.now(), user=self.myUser)
+        self.C1_in_dataset.content_checks.create(execlog=self.D11_21_ROC.log,
+                                                 start_time=timezone.now(),
+                                                 end_time=timezone.now(),
+                                                 user=self.myUser)
         self.D11_21_ROC.stop(save=True)
         if bp == "subrun_complete":
             return
@@ -1770,7 +1772,6 @@ class RunSICTests(ArchiveTestCase):
         self.make_complete_reused(self.E11_32_RSIC, [self.doublet_dataset], [self.E11_32_output_dataset],
                                   other_runstep)
         self.E11_32.keep_output = True
-        ero = self.E11_32_RSIC.execrecord.execrecordouts.first()
 
         self.assertTrue(self.E11_32_RSIC.is_complete())
         self.assertIsNone(self.E11_32_RSIC.complete_clean())
@@ -3826,19 +3827,19 @@ class GetAllAtomicRunComponentsTests(TestCase):
         # The stuff that should be in all_rcs:
         atomics = []
         # Look at each step of p_top.
-        for top_step_num in (1,2,3):
+        for top_step_num in (1, 2, 3):
             curr_top_step = self.run.runsteps.get(pipelinestep__step_num=top_step_num)
             atomics += list(curr_top_step.RSICs.all())
 
             # Descend into p_sub.
             curr_p_sub_run = curr_top_step.child_run
-            for sub_step_num in (1,2):
+            for sub_step_num in (1, 2):
                 curr_sub_step = curr_p_sub_run.runsteps.get(pipelinestep__step_num=sub_step_num)
                 atomics += list(curr_sub_step.RSICs.all())
 
                 # Descend into p_basic.
                 curr_p_basic_run = curr_sub_step.child_run
-                for third_lvl_step_num in (1,2):
+                for third_lvl_step_num in (1, 2):
                     curr_basic_step = curr_p_basic_run.runsteps.get(pipelinestep__step_num=third_lvl_step_num)
                     atomics += list(curr_basic_step.RSICs.all())
                     atomics.append(curr_basic_step)
@@ -3976,7 +3977,7 @@ class EligiblePermissionsTests(TestCase):
         self.assertFalse(addable_users.exists())
         self.assertFalse(addable_groups.exists())
 
-    def test_eligible_permissions_reused_run_restricted(self):
+    def test_eligible_permissions_reused_run_permissions(self):
         """
         Case where the Run reuses steps from previous Runs and the original Run had some permissions.
         """
