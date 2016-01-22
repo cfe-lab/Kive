@@ -21,7 +21,6 @@ from django.utils.encoding import python_2_unicode_compatible
 from django.utils import timezone
 from django.contrib.auth.models import User, Group
 
-import archive.signals
 import archive.exceptions
 from constants import maxlengths, groups
 from datachecking.models import ContentCheckLog, IntegrityCheckLog
@@ -376,14 +375,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             # Log the status
             status += log_char
             if detailed:
-                cable_progress[pipeline_cable.id] = {'status': step_status, 'dataset_id': None, 'md5': None}
-                try:
-                    dataset = run_cables[0].execrecord.execrecordouts.first().dataset
-                    cable_progress[pipeline_cable.id]['dataset_id'] = dataset.pk \
-                        if dataset.has_data() else None
-                    cable_progress[pipeline_cable.id]['md5'] = dataset.MD5_checksum
-                except:
-                    pass
+                cable_progress[pipeline_cable.id] = {'status': step_status}
 
         if detailed:
             result['step_progress'] = step_progress
@@ -2779,4 +2771,3 @@ class MethodOutput(models.Model):
         self.code_redacted = True
         self.save()
         self.execlog.record.redact()
-
