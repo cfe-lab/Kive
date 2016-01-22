@@ -216,8 +216,8 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
                                      'runsteps__pipelinestep__cables_in',
                                      'runsteps__pipelinestep__transformation__method',
                                      'runsteps__pipelinestep__transformation__pipeline',
-                                     'pipeline__outcables__poc_instances__run',
-                                     'pipeline__outcables__poc_instances__log',
+                                     'pipeline__outcables',
+                                     'runoutputcables__pipelineoutputcable',
                                      'pipeline__steps')
 
     @staticmethod

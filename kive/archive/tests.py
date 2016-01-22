@@ -3626,7 +3626,6 @@ class MethodOutputApiTests(BaseTestCases.ApiTestCase):
         self.code_redaction_path = reverse("methodoutput-code-redaction-plan",
                                            kwargs={'pk': self.detail_pk})
 
-        # This should equal metadata.ajax.CompoundDatatypeViewSet.as_view({"get": "list"}).
         self.list_view, _, _ = resolve(self.list_path)
         self.detail_view, _, _ = resolve(self.detail_path)
         self.output_redaction_view, _, _ = resolve(self.output_redaction_path)

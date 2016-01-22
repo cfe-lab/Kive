@@ -349,17 +349,18 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         status += "-"
 
         # Which outcables are in progress?
-        cables = self.pipeline.outcables.order_by("output_idx")
+        cables = sorted(self.pipeline.outcables.all(),
+                        key=attrgetter('output_idx'))
+        run_output_cables = {c.pipelineoutputcable: c
+                             for c in self.runoutputcables.all()}
         for pipeline_cable in cables:
-
-            curr_roc_qs = self.runoutputcables.filter(pipelineoutputcable=pipeline_cable)
+            curr_roc = run_output_cables.get(pipeline_cable)
             log_char = ""
             step_status = ""
-            if not curr_roc_qs.exists():
+            if curr_roc is None:
                 log_char = "."
                 step_status = "WAITING"
             else:
-                curr_roc = curr_roc_qs.first()
                 if curr_roc.is_complete(use_cache=True, dont_save=True):
                     log_char = "*"
                     step_status = "CLEAR"

@@ -628,6 +628,8 @@ class RunApiTests(TestCase):
         self.factory = APIRequestFactory()
         self.run_list_path = reverse('run-list')
         self.run_list_view, _, _ = resolve(self.run_list_path)
+        self.run_status_path = reverse('run-status')
+        self.run_status_view, _, _ = resolve(self.run_status_path)
 
     def tearDown(self):
         clean_up_all_files()
@@ -651,6 +653,16 @@ class RunApiTests(TestCase):
             self.assertIn('id', run)
             self.assertIn('removal_plan', run)
             self.assertIn('run_status', run)
+
+    def test_run_status(self):
+        expected_runs = 1
+        request = self.factory.get(self.run_status_path)
+        force_authenticate(request, user=self.myUser)
+        response = self.run_status_view(request).render()
+        data = response.render().data
+
+        self.assertEquals(len(data), expected_runs)
+        self.assertEqual('**-**', data[0]['run_progress']['status'])
 
     def test_pipeline_execute_plus_details_and_run_remove(self):
         # TODO: This should be split into one test to test the pipeline execution
