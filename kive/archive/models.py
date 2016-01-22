@@ -1925,14 +1925,6 @@ class RunCable(RunComponent):
     def is_trivial(self):
         return self.component.is_trivial()
 
-    # @update_field("_complete")
-    # def is_complete(self, **kwargs):
-    #     return super(RunCable, self).is_complete()
-
-    # @update_field("_successful")
-    # def is_successful(self, **kwargs):
-    #     return super(RunCable, self).is_successful()
-
     def _clean_not_reused(self):
         """
         Check coherence of a RunCable which has decided not to reuse an

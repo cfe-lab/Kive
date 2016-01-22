@@ -147,6 +147,9 @@ class Sandbox:
         # and the values are all of the Datasets they're waiting for.
         self.waiting_for = {}
 
+        # For each sub-pipeline, we track how many of their input cables have completed.
+        self.sub_pipeline_cable_tracker = {}
+
     def step_xput_path(self, runstep, transformationxput, step_run_dir):
         """Path in Sandbox for PipelineStep TransformationXput."""
         file_suffix = extensions.RAW if transformationxput.is_raw() else extensions.CSV
@@ -380,7 +383,8 @@ class Sandbox:
 
         sandbox_path = self.sandbox_path
         if run_to_resume != self.run:
-            sandbox_path = (self.step_execute_info[(run_to_resume, run_to_resume.parent_runstep.pipelinestep)]
+            sandbox_path = (self.step_execute_info[(run_to_resume.parent_runstep.run,
+                                                    run_to_resume.parent_runstep.pipelinestep)]
                             .step_run_dir)
 
         # A list of steps/tasks that have just completed, including those that may have
@@ -391,25 +395,78 @@ class Sandbox:
             step_nums_completed = [task_completed.step_num]
         elif task_completed is None:
             step_nums_completed = [0]
+        elif type(task_completed) == archive.models.RunSIC:
+            assert task_completed.runstep.pipelinestep.is_subpipeline
+            # We don't track the RunSICs completed, as they only ever apply to a single step and so
+            # don't need to be tracked for subsequent steps in the Pipeline.
         else:
             cables_completed = [task_completed]
 
         # A tracker for whether everything is complete or not.
         all_complete = True
 
+        def advance_subpipeline_helper(runstep):
+            self.advance_pipeline(run_to_start=runstep.child_run)
+
+            subrun_successful = True
+            for roc in runstep.child_run.runoutputcables.all():
+                if roc.is_cancelled:
+                    self.logger.debug("Cable %s cancelled", roc.pipelineoutputcable)
+                    subrun_successful = False
+                elif roc.reused and not roc.successful_reuse():
+                    self.logger.debug("Cable %s failed on reuse", roc.pipelineoutputcable)
+                    subrun_successful = False
+                elif roc.is_complete():
+                    cables_completed.append(roc)
+
+            # Refresh RunStep from the database.
+            runstep = RunStep.objects.get(pk=runstep.pk)
+            return runstep.is_complete(use_cache=True), subrun_successful
+
         # Go through steps in order, looking for input cables pointing at the task(s) that have completed.
         # If task_completed is None, then we are starting the pipeline and we look at the pipeline inputs.
         for step in pipeline_to_resume.steps.order_by("step_num"):
+            matching_runsteps = run_to_resume.runsteps.filter(pipelinestep=step,
+                                                               RSICs__isnull=False)
             # If this is already running, we skip it.
-            corresp_runstep = run_to_resume.runsteps.filter(pipelinestep=step,
-                                                            RSICs__isnull=False)
-            if corresp_runstep.exists():
-                # We don't advance sub-pipelines -- if those are waiting on tasks in their parent run,
-                # then that would be a case for enqueue_runnable_tasks.
+            if matching_runsteps.exists():
+                curr_RS = matching_runsteps.first()
+                # If this is a sub-Pipeline, we advance it if possible; otherwise, we continue.
+                if not step.is_subpipeline or type(task_completed) != archive.models.RunSIC:
+                    if not curr_RS.is_complete(use_cache=True):
+                        all_complete = False
+                    continue
 
-                if not corresp_runstep.first().is_complete(use_cache=True):
-                    all_complete = False
-                continue
+                else:
+                    # This is a sub-Pipeline, and the task completed was a RunSIC.  Check
+                    # if it belongs to that sub-Run.
+                    corresp_RSICs = curr_RS.RSICs.filter(pk=task_completed.pk)
+                    if not corresp_RSICs.exists():
+                        all_complete = False
+                    else:
+                        # This is fed by one of the things that just finished.
+                        RSIC_just_finished = corresp_RSICs.first()
+
+                        # Check if all of the cables are done yet.
+                        self.sub_pipeline_cable_tracker[curr_RS].remove(RSIC_just_finished)
+                        if len(self.sub_pipeline_cable_tracker[curr_RS]) != 0:
+                            all_complete = False
+                            continue
+
+                        # Now, we can advance the sub-Pipeline.
+                        advance_subpipeline_helper(curr_RS)
+
+                        subrun_complete, subrun_successful = advance_subpipeline_helper(curr_RS)
+                        if not subrun_complete:
+                            all_complete = False
+                        if not subrun_successful:
+                            # Refresh run_to_resume.
+                            run_to_resume = Run.objects.get(pk=run_to_resume.pk)
+                            assert not run_to_resume.is_successful(use_cache=True)
+                            return
+
+                        # We've done all we can with this sub-Pipeline, so we move on to the next step.
+                        continue
 
             # At this point we know this step hasn't been *really* started yet (the RunStep may exist
             # but is not started).  FIXME should this just look at start_time?
@@ -479,7 +536,75 @@ class Sandbox:
 
             # Start execution of this step.
             self.logger.debug("Beginning execution of step %d (%s)", step.step_num, step)
+            curr_RS = self.run_plan.step_plans[step.step_num-1].run_step
             run_dir = os.path.join(sandbox_path, "step{}".format(step.step_num))
+
+            # At this point we know that all inputs are available.
+            if step.is_subpipeline:
+                # We start all of the RunSICs in motion.  If they all successfully reuse,
+                # we advance the sub-pipeline.
+                self.sub_pipeline_cable_tracker[curr_RS] = set()
+
+                all_RSICs_done = True
+                for input_cable in step.cables_in.order_by("dest__dataset_idx"):
+
+                    cable_exec_info = self.reuse_or_prepare_cable(
+                        input_cable,
+                        curr_RS,
+                        step_inputs[input_cable.dest.dataset_idx-1],
+                        run_dir
+                    )
+
+                    cable_record = cable_exec_info.cable_record
+                    self.sub_pipeline_cable_tracker[curr_RS].add(cable_record)
+
+                    # If the cable was cancelled (e.g. due to bad input), we bail.
+                    return_because_fail = False
+                    if cable_exec_info.cancelled:
+                        self.logger.debug("Input cable %s to sub-pipeline step %s was cancelled",
+                                          cable_exec_info.cable_record,
+                                          curr_RS)
+                        return_because_fail = True
+                    elif cable_exec_info.cable_record.reused and not cable_exec_info.cable_record.successful_reuse():
+                        self.logger.debug("Input cable %s to sub-pipeline step %s failed on reuse",
+                                          cable_exec_info.cable_record,
+                                          curr_RS)
+                        return_because_fail = True
+
+                    if return_because_fail:
+                        curr_RS = RunStep.objects.get(pk=curr_RS.pk)
+                        curr_RS.mark_complete()
+                        # We don't need to mark this unsuccessful as the cable already did it.
+                        assert not curr_RS.is_successful(use_cache=True)
+
+                        curr_RS.stop(save=True, clean=False)
+                        curr_RS.complete_clean()
+
+                        # We don't mark the Run as complete in case something is still running.
+                        return
+
+                    if not cable_record.is_complete(use_cache=True):
+                        all_RSICs_done = False
+
+                if not all_RSICs_done:
+                    all_complete = False
+                else:
+                    # Now, we can advance the sub-Pipeline.
+                    advance_subpipeline_helper(curr_RS)
+
+                    # The helper updates our maps and such.
+                    subrun_complete, subrun_successful = advance_subpipeline_helper(curr_RS)
+                    if not subrun_complete:
+                        all_complete = False
+                    if not subrun_successful:
+                        # Refresh run_to_resume.
+                        run_to_resume = Run.objects.get(pk=run_to_resume.pk)
+                        assert not run_to_resume.is_successful(use_cache=True)
+                        return
+
+                continue
+
+            # At this point, we know the step is not a sub-Pipeline, so we go about our business.
             curr_RS = self.reuse_or_prepare_step(step, run_to_resume, step_inputs, run_dir)
 
             # Refresh run_to_resume.
@@ -492,27 +617,14 @@ class Sandbox:
             # number to the list of those just completed.  This may then allow subsequent steps to also be started.
 
             return_because_fail = False
-            if not curr_RS.pipelinestep.is_subpipeline:
-                if curr_RS.is_cancelled:
-                    self.logger.debug("Step %d (%s) cancelled", step.step_num, step)
-                    return_because_fail = True
-                elif curr_RS.reused and not curr_RS.is_successful(use_cache=True):
-                    self.logger.debug("Step %d (%s) failed on reuse", step.step_num, step)
-                    return_because_fail = True
-                elif curr_RS.is_complete(use_cache=True):
-                    step_nums_completed.append(step.step_num)
-            # Otherwise, we look and see if any of its outcables are complete.  If so, then add them to the
-            # list -- they may allow stuff to run.
-            else:
-                for roc in curr_RS.child_run.runoutputcables.all():
-                    if roc.is_cancelled:
-                        self.logger.debug("Cable %s cancelled", roc.pipelineoutputcable)
-                        return_because_fail = True
-                    elif roc.reused and not roc.successful_reuse():
-                        self.logger.debug("Cable %s failed on reuse", roc.pipelineoutputcable)
-                        return_because_fail = True
-                    elif roc.is_complete():
-                        cables_completed.append(roc)
+            if curr_RS.is_cancelled:
+                self.logger.debug("Step %d (%s) cancelled", step.step_num, step)
+                return_because_fail = True
+            elif curr_RS.reused and not curr_RS.is_successful(use_cache=True):
+                self.logger.debug("Step %d (%s) failed on reuse", step.step_num, step)
+                return_because_fail = True
+            elif curr_RS.is_complete(use_cache=True):
+                step_nums_completed.append(step.step_num)
             if return_because_fail:
                 assert not run_to_resume.is_successful(use_cache=True)
                 return
@@ -576,10 +688,10 @@ class Sandbox:
 
             return_because_fail = False
             if cr.is_cancelled:
-                self.logger.debug("Cable %s cancelled", roc.pipelineoutputcable)
+                self.logger.debug("Cable %s cancelled", cr.pipelineoutputcable)
                 return_because_fail = True
             elif cr.reused and not cr.successful_reuse():
-                self.logger.debug("Cable %s failed on reuse", roc.pipelineoutputcable)
+                self.logger.debug("Cable %s failed on reuse", cr.pipelineoutputcable)
                 return_because_fail = True
 
             if return_because_fail:
@@ -620,8 +732,8 @@ class Sandbox:
             curr_record.complete_clean()
 
             # Return a RunCableExecuteInfo that is marked as cancelled.
-            exec_info = RunCableExecuteInfo(curr_record, self.user, None, input_dataset, self.dataset_fs_map[input_dataset],
-                                            output_path, by_step=by_step)
+            exec_info = RunCableExecuteInfo(curr_record, self.user, None, input_dataset,
+                                            self.dataset_fs_map[input_dataset], output_path, by_step=by_step)
             exec_info.cancel()
             self.cable_execute_info[(curr_record.parent_run, cable)] = exec_info
             return exec_info
@@ -674,8 +786,7 @@ class Sandbox:
         self.logger.debug("No ER to completely reuse - preparing execution of this cable")
 
         # Check the availability of input_dataset; recover if necessary.  Queue for execution
-        # if cable is an outcable (incables are handled by their parent step to ensure
-        # that the data is written onto the host and filesystem handling the step).
+        # if cable is an outcable or an incable that feeds a sub-Pipeline.
         exec_info.ready_to_go = self.enqueue_cable(exec_info, force=False)
         return exec_info
 
@@ -707,24 +818,26 @@ class Sandbox:
         # If this is independent of any step recovery, we add it to the queue; either by marking it as
         # waiting for stuff that's going to recover, or by throwing it directly onto the list of tasks to
         # perform.
+        queue_cable = (cable_record.component.is_outcable or cable_record.runstep.pipelinestep.is_subpipeline or
+                       (force and by_step is None))
         if dataset_path is None and not input_dataset.has_data():
             self.logger.debug("Cable input requires non-trivial recovery")
             self.queue_recovery(input_dataset, recovering_record=recovering_record)
 
-            if cable_record.component.is_outcable or (force and by_step is None):
+            if queue_cable:
                 self.tasks_waiting[input_dataset].append(cable_record)
                 self.waiting_for[cable_record] = [input_dataset]
 
         else:
             ready_to_go = True
-            if cable_record.component.is_outcable or (force and by_step is None):
+            if queue_cable:
                 self.queue_for_processing.append(cable_record)
 
         return ready_to_go
 
     # Function that reuses or prepares a step, which will later be complemented by a finish_step
-    # method.  We make these by breaking execute_step into two components.
-    # This would not be called if you were recovering.
+    # method.  This would not be called if you were recovering.  This will not be called
+    # on steps that are sub-Pipelines.
     def reuse_or_prepare_step(self, pipelinestep, parent_run, inputs, step_run_dir):
         """
         Reuse step if possible; prepare it for execution if not.
@@ -737,6 +850,8 @@ class Sandbox:
         step_plan = self.run_plan.step_plans[pipelinestep.step_num-1]
         curr_RS = step_plan.run_step
         curr_RS.start()
+
+        assert not pipelinestep.is_subpipeline
 
         # Note: bad inputs will be caught by the cables.
         input_names = ", ".join(str(i) for i in inputs)
@@ -762,22 +877,30 @@ class Sandbox:
             cable_info_list.append(cable_exec_info)
 
             # If the cable was cancelled (e.g. due to bad input), we bail.
+            return_because_fail = False
             if cable_exec_info.cancelled:
                 self.logger.debug("Input cable %s to step %s was cancelled", cable_exec_info.cable_record,
                                   curr_RS)
-
-                curr_RS.mark_complete()
-                # We don't need to mark this unsuccessful as the cable already did it.
-                assert not curr_RS.is_successful(use_cache=True)
-
-                curr_RS.stop(save=True, clean=False)
-                curr_RS.complete_clean()
+                return_because_fail = True
+            elif cable_exec_info.cable_record.reused and not cable_exec_info.cable_record.successful_reuse():
+                self.logger.debug("Input cable %s to step %s failed on reuse", cable_exec_info.cable_record,
+                                  curr_RS)
+                return_because_fail = True
             # If the cable is not complete and not ready to go, we need to recover its input.
             elif not cable_exec_info.cable_record.is_complete():
                 if not cable_exec_info.ready_to_go:
                     datasets_to_recover.append(inputs[i])
             elif not cable_exec_info.execrecord.execrecordouts.first().dataset.has_data():
                 symbolically_okay_datasets.append(inputs[i])
+
+            if return_because_fail:
+                curr_RS.mark_complete()
+                # We don't need to mark this unsuccessful as the cable already did it.
+                assert not curr_RS.is_successful(use_cache=True)
+
+                curr_RS.stop(save=True, clean=False)
+                curr_RS.complete_clean()
+
 
         # Bundle up the information required to process this step.
         _in_dir, _out_dir, log_dir = self._setup_step_paths(step_run_dir, False)
@@ -813,26 +936,6 @@ class Sandbox:
             inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
 
         if all_inputs_present:
-            # Recurse if this step is a sub-pipeline.
-            if pipelinestep.is_subpipeline:
-                # Start the sub-pipeline.
-                self.logger.debug("Executing a sub-pipeline with input_dataset(s): {}".format(inputs_after_cable))
-                subpipeline_to_run = pipelinestep.transformation.definite
-                curr_run = subpipeline_to_run.pipeline_instances.create(user=self.user, parent_runstep=curr_RS)
-                curr_run.users_allowed.add(self.run.users_allowed.all())
-                curr_run.groups_allowed.add(self.run.groups_allowed.all())
-                self.advance_pipeline(run_to_start=curr_run)
-
-                # Refresh curr_RS.
-                curr_RS = RunStep.objects.get(pk=curr_run.pk)
-
-                # Update state.
-                if curr_run.is_complete(use_cache=True):
-                    curr_RS.mark_complete()
-                assert curr_run.is_successful(use_cache=True) == curr_RS.is_successful(use_cache=True)
-
-                curr_RS.save()
-                return curr_RS
 
             # Look for a reusable ExecRecord.  If we find it, then complete the RunStep.
             succeeded_yet = False
@@ -1592,23 +1695,24 @@ class RunPlan(object):
     This is required to avoid incoherencies where steps use different results from
     the same preceding step in a Pipeline (for example, if that step is not deterministic.
     """
-    def load(self, run, inputs, subpipeline_step=None):
+    def load(self, top_level_run, inputs, subpipeline_step=None):
         """ Load the steps from the pipeline and dataset dependencies.
 
         Links pipeline inputs and step outputs to the inputs of other steps.
 
-        run refers to the top-level run.  subpipeline is None or the PipelineStep
+        top_level_run refers to the top-level top_level_run.  subpipeline is None or the PipelineStep
         that represents the sub-Pipeline.  This may be more than one layer deep in
         the top-level Pipeline.
         """
-        self.run = run
+        self.top_level_run = top_level_run
+        self.run = top_level_run if not subpipeline_step else None
         self.step_plans = []
         self.inputs = [DatasetPlan(input_item) for input_item in inputs]
         if subpipeline_step:
             assert subpipeline_step.transformation.is_pipeline
             self.pipeline = subpipeline_step.transformation.definite
         else:
-            self.pipeline = run.pipeline
+            self.pipeline = top_level_run.pipeline
 
         for step in self.pipeline.steps.all():
             step_plan = StepPlan(step.step_num)
@@ -1629,7 +1733,7 @@ class RunPlan(object):
 
             if step.is_subpipeline:
                 step_plan.subrun_plan = RunPlan()
-                step_plan.subrun_plan.load(run, inputs, subpipeline=step)
+                step_plan.subrun_plan.load(top_level_run, inputs, subpipeline_step=step)
 
         self.outputs = []
         for cable in self.pipeline.outcables.order_by("output_idx"):
@@ -1651,30 +1755,37 @@ class RunPlan(object):
         self.find_ERs()
         self.identify_changes()
 
-    def create_run_steps(self):
+    def create_run_steps(self, subrun=None):
         """
-        Find or create the RunSteps in the Run.
+        Find or create the RunSteps in the Run.  Subrun RunPlans are also assigned Runs at this point.
         """
+        if subrun:
+            self.run = subrun
+
         for step_plan in self.step_plans:
+            step_subrun = None
             run_step = self.run.runsteps.filter(
                 pipelinestep__step_num=step_plan.step_num).first()
             if run_step is None:
                 run_step = RunStep.create(step_plan.pipeline_step, self.run, start=False)
 
-                if run_step.pipeline_step.transformation.is_pipeline:
-                    subrun = Run(
-                        user=self.run.user,
-                        pipeline=run_step.pipeline_step.transformation.definite,
+                if run_step.pipelinestep.transformation.is_pipeline:
+                    step_subrun = Run(
+                        user=self.top_level_run.user,
+                        pipeline=run_step.pipelinestep.transformation.definite,
                         parent_runstep=run_step
                     )
-                    subrun.save()
-                    subrun.users_allowed.add(*self.run.users_allowed.all())
-                    subrun.groups_allowed.add(*self.run.groups_allowed.all())
+                    step_subrun.save()
+                    step_subrun.users_allowed.add(*self.top_level_run.users_allowed.all())
+                    step_subrun.groups_allowed.add(*self.top_level_run.groups_allowed.all())
+
+            elif run_step.pipelinestep.transformation.is_pipeline:
+                step_subrun = run_step.child_run
+
+            if step_subrun:
+                step_plan.subrun_plan.create_run_steps(step_subrun)
 
             step_plan.run_step = run_step
-
-            if run_step.pipeline_step.transformation.is_pipeline:
-                step_plan.subrun_plan.create_run_steps()
 
     def find_ERs(self):
         """
@@ -1692,7 +1803,7 @@ class RunPlan(object):
                     method = step_plan.pipeline_step.transformation.definite
                     if method.reusable == Method.NON_REUSABLE:
                         continue
-                    execrecord, summary = run_step.get_suitable_ER(input_datasets)
+                    execrecord, summary = step_plan.run_step.get_suitable_ER(input_datasets)
                     if not summary:
                         # no exec record, have to run
                         continue
@@ -1871,7 +1982,9 @@ class RunStepExecuteInfo:
         self.recovering_record = recovering_record
         self.output_paths = output_paths
         # FIXME in the future this number may vary across runs.
-        self.threads_required = runstep.transformation.definite.threads
+        self.threads_required = None
+        if not runstep.pipelinestep.is_subpipeline:
+            self.threads_required = runstep.transformation.definite.threads
 
     def flag_for_recovery(self, recovering_record):
         assert self.recovering_record is None

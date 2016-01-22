@@ -390,6 +390,7 @@ class Manager:
         # Look for new jobs to run.  We will also
         # build in a delay here so we don't clog up the database.
         mgr_logger.debug("Looking for new runs....")
+
         pending_runs = Run.find_unstarted().order_by("time_queued").filter(parent_runstep__isnull=True)
 
         mgr_logger.debug("Pending runs: {}".format(pending_runs))
