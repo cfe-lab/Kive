@@ -7,6 +7,7 @@ import random
 import shutil
 import tempfile
 import time
+import itertools
 
 from django.utils import timezone
 from django.db import transaction, OperationalError, InternalError
@@ -405,12 +406,10 @@ class Sandbox:
                                                     run_to_resume.parent_runstep.pipelinestep)]
                             .step_run_dir)
 
-        # A list of steps/tasks that have just completed, including those that may have
-        # just successfully been reused during this call to advance_pipeline.
-        step_nums_completed = [x.step_num for x in steps_completed if x.run == run_to_resume]
-
+        # Update our lists of components completed.
+        step_nums_completed = []
         if type(task_completed) == archive.models.RunStep:
-            step_nums_completed.append(task_completed.step_num)
+            steps_completed.append(task_completed)
         elif type(task_completed) == archive.models.RunSIC:
             assert task_completed.runstep.pipelinestep.is_subpipeline
             incables_completed.append(task_completed)
@@ -418,7 +417,9 @@ class Sandbox:
             outcables_completed.append(task_completed)
         elif task_completed is None and run_to_advance is None:
             # This indicates that the only things accessible are the inputs.
-            step_nums_completed = [0]
+            step_nums_completed.append(0)
+
+        step_nums_completed += [x.step_num for x in steps_completed if x.run == run_to_resume]
 
         # A tracker for whether everything is complete or not.
         all_complete = True
@@ -451,9 +452,6 @@ class Sandbox:
         # Go through steps in order, looking for input cables pointing at the task(s) that have completed.
         # If task_completed is None, then we are starting the pipeline and we look at the pipeline inputs.
         for step in pipeline_to_resume.steps.order_by("step_num"):
-
-            print "FOO {}".format(step.step_num)
-
             matching_runsteps = run_to_resume.runsteps.filter(pipelinestep=step, RSICs__isnull=False)
 
             # If this is already running, we skip it.
@@ -461,42 +459,56 @@ class Sandbox:
                 curr_RS = matching_runsteps.first()
 
                 # If this is a sub-Pipeline, we advance it if possible; otherwise, we continue.
-                if not step.is_subpipeline or type(task_completed) != archive.models.RunSIC:
+                if not step.is_subpipeline:
                     if not curr_RS.is_complete(use_cache=True):
                         all_complete = False
                     continue
 
                 else:
-                    # This is a sub-Pipeline, and the task completed was a RunSIC.  Check
-                    # if it belongs to that sub-Run.
-                    feeder_RSICs = curr_RS.RSICs.filter(pk__in=[x.pk for x in incables_completed])
-                    if not feeder_RSICs.exists():
-                        all_complete = False
-                    else:
-                        # Check if all of the cables are done yet.
-                        self.sub_pipeline_cable_tracker[curr_RS].difference_update(set(feeder_RSICs))
-                        if len(self.sub_pipeline_cable_tracker[curr_RS]) != 0:
+                    if type(task_completed) == archive.models.RunSIC:
+                        # This is a sub-Pipeline, and the task completed was a RunSIC.  Check
+                        # if it belongs to that sub-Run.
+                        feeder_RSICs = curr_RS.RSICs.filter(pk__in=[x.pk for x in incables_completed])
+                        if not feeder_RSICs.exists():
                             all_complete = False
+                        else:
+                            # Check if all of the cables are done yet.
+                            self.sub_pipeline_cable_tracker[curr_RS].difference_update(set(feeder_RSICs))
+                            if len(self.sub_pipeline_cable_tracker[curr_RS]) != 0:
+                                all_complete = False
+                                continue
+
+                    else:
+                        # Look in the lists of tasks completed.  Do any of them belong to this sub-run?
+                        complete_subtask_exists = False
+                        for task in itertools.chain(steps_completed, outcables_completed, incables_completed):
+                            task_coords = task.get_coordinates()
+                            curr_step_coords = curr_RS.get_coordinates()
+                            if task_coords[0:len(curr_step_coords)] == curr_step_coords:
+                                complete_subtask_exists = True
+                                break
+
+                        if not complete_subtask_exists:
                             continue
 
-                        # Now, we can advance the sub-Pipeline.  Note that this also updates the
-                        # steps/outcables/incables_completed.
-                        sub_run_complete, sub_run_successful = advance_subpipeline_helper(
-                            curr_RS,
-                            steps_so_far=steps_completed,
-                            outcables_so_far=outcables_completed,
-                            incables_so_far=incables_completed
-                        )
-                        if not sub_run_complete:
-                            all_complete = False
-                        if not sub_run_successful:
-                            # Refresh run_to_resume.
-                            run_to_resume = Run.objects.get(pk=run_to_resume.pk)
-                            assert not run_to_resume.is_successful(use_cache=True)
-                            return steps_completed, outcables_completed, incables_completed
+                    # Now, we can advance the sub-Pipeline.  Note that this also updates the
+                    # steps/outcables/incables_completed.
+                    sub_run_complete, sub_run_successful = advance_subpipeline_helper(
+                        curr_RS,
+                        steps_so_far=steps_completed,
+                        outcables_so_far=outcables_completed,
+                        incables_so_far=incables_completed
+                    )
+                    if not sub_run_complete:
+                        all_complete = False
+                    if not sub_run_successful:
+                        # Refresh run_to_resume.
+                        run_to_resume = Run.objects.get(pk=run_to_resume.pk)
+                        assert not run_to_resume.is_successful(use_cache=True)
+                        return steps_completed, outcables_completed, incables_completed
 
-                        # We've done all we can with this sub-Pipeline, so we move on to the next step.
-                        continue
+                    # We've done all we can with this sub-Pipeline, so we move on to the next step.
+                    continue
 
             # At this point we know this step hasn't been *really* started yet (the RunStep may exist
             # but is not started).  FIXME should this just look at start_time?
@@ -615,8 +627,11 @@ class Sandbox:
                     cable_info_list.append(cable_exec_info)
 
                     cable_record = cable_exec_info.cable_record
-                    if not cable_record.is_complete(use_cache=True):
+                    if cable_record.is_complete(use_cache=True):
+                        incables_completed.append(cable_record)
+                    else:
                         self.sub_pipeline_cable_tracker[curr_RS].add(cable_record)
+                        all_RSICs_done = False
 
                     # If the cable was cancelled (e.g. due to bad input), we bail.
                     return_because_fail = False
@@ -641,10 +656,7 @@ class Sandbox:
                         curr_RS.complete_clean()
 
                         # We don't mark the Run as complete in case something is still running.
-                        return
-
-                    if not cable_record.is_complete(use_cache=True):
-                        all_RSICs_done = False
+                        return steps_completed, incables_completed, outcables_completed
 
                 # Bundle up the information required to process this step.
                 _in_dir, _out_dir, log_dir = self._setup_step_paths(run_dir, False)
@@ -671,7 +683,7 @@ class Sandbox:
                         # Refresh run_to_resume.
                         run_to_resume = Run.objects.get(pk=run_to_resume.pk)
                         assert not run_to_resume.is_successful(use_cache=True)
-                        return
+                        return steps_completed, incables_completed, outcables_completed
 
                 continue
 
@@ -766,7 +778,7 @@ class Sandbox:
 
             if return_because_fail:
                 assert not run_to_resume.is_successful(use_cache=True)
-                return
+                return steps_completed, incables_completed, outcables_completed
 
         if all_complete:
             self.logger.debug("Run (coordinates %s) completed.", run_to_resume.get_coordinates())
