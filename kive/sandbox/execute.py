@@ -342,8 +342,8 @@ class Sandbox:
 
         self.queue_for_processing = self.queue_for_processing + taxiing_for_takeoff
 
-    def advance_pipeline(self, task_completed=None, run_to_advance=None, steps_completed=None,
-                         outcables_completed=None, incables_completed=None):
+    def advance_pipeline(self, task_completed=None, run_to_advance=None, incables_completed=None,
+                         steps_completed=None, outcables_completed=None):
         """
         Proceed through a pipeline, seeing what can run now that a step or cable has just completed.
 
@@ -355,7 +355,7 @@ class Sandbox:
 
         If run_to_advance is specified, it means this is a recursive call, attempting to advance
         a sub-Pipeline given the new stuff that has been finished so far (which is passed on
-        through the parameters steps_completed, outcables_completed, and incables_completed).
+        through the parameters incables_completed, steps_completed, and outcables_completed).
 
         PRE:
         at most one of run_to_advance and task_completed may not be None.
@@ -366,9 +366,9 @@ class Sandbox:
                 task_completed is None)
         assert not (run_to_advance is not None and task_completed is not None)
 
+        incables_completed = incables_completed or []
         steps_completed = steps_completed or []
         outcables_completed = outcables_completed or []
-        incables_completed = incables_completed or []
 
         run_to_resume = self.run
         if run_to_advance:
@@ -408,11 +408,11 @@ class Sandbox:
 
         # Update our lists of components completed.
         step_nums_completed = []
-        if type(task_completed) == archive.models.RunStep:
-            steps_completed.append(task_completed)
-        elif type(task_completed) == archive.models.RunSIC:
+        if type(task_completed) == archive.models.RunSIC:
             assert task_completed.runstep.pipelinestep.is_subpipeline
             incables_completed.append(task_completed)
+        elif type(task_completed) == archive.models.RunStep:
+            steps_completed.append(task_completed)
         elif type(task_completed) == archive.models.RunOutputCable:
             outcables_completed.append(task_completed)
         elif task_completed is None and run_to_advance is None:
@@ -424,12 +424,12 @@ class Sandbox:
         # A tracker for whether everything is complete or not.
         all_complete = True
 
-        def advance_subpipeline_helper(runstep, steps_so_far, outcables_so_far, incables_so_far):
+        def advance_subpipeline_helper(runstep, incables_so_far, steps_so_far, outcables_so_far):
             steps_so_far, outcables_so_far, incables_so_far = self.advance_pipeline(
                 run_to_advance=runstep.child_run,
+                incables_completed=incables_so_far,
                 steps_completed=steps_so_far,
-                outcables_completed=outcables_so_far,
-                incables_completed=incables_so_far
+                outcables_completed=outcables_so_far
             )
 
             sub_run_successful = True
@@ -481,7 +481,7 @@ class Sandbox:
                     else:
                         # Look in the lists of tasks completed.  Do any of them belong to this sub-run?
                         complete_subtask_exists = False
-                        for task in itertools.chain(steps_completed, outcables_completed, incables_completed):
+                        for task in itertools.chain(incables_completed, steps_completed, outcables_completed):
                             task_coords = task.get_coordinates()
                             curr_step_coords = curr_RS.get_coordinates()
                             if task_coords[0:len(curr_step_coords)] == curr_step_coords:
@@ -495,9 +495,9 @@ class Sandbox:
                     # steps/outcables/incables_completed.
                     sub_run_complete, sub_run_successful = advance_subpipeline_helper(
                         curr_RS,
+                        incables_so_far=incables_completed,
                         steps_so_far=steps_completed,
-                        outcables_so_far=outcables_completed,
-                        incables_so_far=incables_completed
+                        outcables_so_far=outcables_completed
                     )
                     if not sub_run_complete:
                         all_complete = False
@@ -505,7 +505,7 @@ class Sandbox:
                         # Refresh run_to_resume.
                         run_to_resume = Run.objects.get(pk=run_to_resume.pk)
                         assert not run_to_resume.is_successful(use_cache=True)
-                        return steps_completed, outcables_completed, incables_completed
+                        return incables_completed, steps_completed, outcables_completed
 
                     # We've done all we can with this sub-Pipeline, so we move on to the next step.
                     continue
@@ -656,7 +656,7 @@ class Sandbox:
                         curr_RS.complete_clean()
 
                         # We don't mark the Run as complete in case something is still running.
-                        return steps_completed, incables_completed, outcables_completed
+                        return incables_completed, steps_completed, outcables_completed
 
                 # Bundle up the information required to process this step.
                 _in_dir, _out_dir, log_dir = self._setup_step_paths(run_dir, False)
@@ -673,9 +673,9 @@ class Sandbox:
                     # The helper updates our maps and such.
                     sub_run_complete, sub_run_successful = advance_subpipeline_helper(
                         curr_RS,
+                        incables_so_far=incables_completed,
                         steps_so_far=steps_completed,
-                        outcables_so_far=outcables_completed,
-                        incables_so_far=incables_completed
+                        outcables_so_far=outcables_completed
                     )
                     if not sub_run_complete:
                         all_complete = False
@@ -683,7 +683,7 @@ class Sandbox:
                         # Refresh run_to_resume.
                         run_to_resume = Run.objects.get(pk=run_to_resume.pk)
                         assert not run_to_resume.is_successful(use_cache=True)
-                        return steps_completed, incables_completed, outcables_completed
+                        return incables_completed, steps_completed, outcables_completed
 
                 continue
 
@@ -710,7 +710,7 @@ class Sandbox:
                 step_nums_completed.append(step.step_num)
             if return_because_fail:
                 assert not run_to_resume.is_successful(use_cache=True)
-                return steps_completed, incables_completed, outcables_completed
+                return incables_completed, steps_completed, outcables_completed
 
         # Now go through the output cables and do the same.
         for outcable in pipeline_to_resume.outcables.order_by("output_idx"):
@@ -767,6 +767,8 @@ class Sandbox:
 
             if not cr.is_complete(use_cache=True):
                 all_complete = False
+            else:
+                outcables_completed.append(cr)
 
             return_because_fail = False
             if cr.is_cancelled:
@@ -778,7 +780,7 @@ class Sandbox:
 
             if return_because_fail:
                 assert not run_to_resume.is_successful(use_cache=True)
-                return steps_completed, incables_completed, outcables_completed
+                return incables_completed, steps_completed, outcables_completed
 
         if all_complete:
             self.logger.debug("Run (coordinates %s) completed.", run_to_resume.get_coordinates())
@@ -786,7 +788,7 @@ class Sandbox:
                 run_to_resume.mark_complete()
                 run_to_resume.save()
 
-        return steps_completed, incables_completed, outcables_completed
+        return incables_completed, steps_completed, outcables_completed
 
     # Modified from execute_cable.
     def reuse_or_prepare_cable(self, cable, parent_record, input_dataset, output_path):
