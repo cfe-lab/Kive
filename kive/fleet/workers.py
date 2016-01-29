@@ -46,7 +46,7 @@ def adjust_log_files(target_logger, rank):
         adjust_log_files(target_logger.parent, rank)
 
 
-class MPIFleetInterface:
+class MPIFleetInterface(object):
     """
     Base class for both MPIManagerInterface and MPIWorkerInterface.
     """
@@ -60,11 +60,11 @@ class MPIFleetInterface:
         return self.comm.Get_size()
 
     @staticmethod
-    def get_hostname(self):
+    def get_hostname():
         return MPI.Get_processor_name()
 
 
-class ThreadFleetInterface:
+class ThreadFleetInterface(object):
     """
     Base class for both ThreadManagerInterface and ThreadWorkerInterface.
     """
@@ -75,7 +75,7 @@ class ThreadFleetInterface:
         raise NotImplementedError()
 
     @staticmethod
-    def get_hostname(self):
+    def get_hostname():
         return socket.gethostname()
 
 
@@ -99,8 +99,8 @@ class MPIManagerInterface(MPIFleetInterface):
                                 info=mpi_info).Merge()
         )
 
-    def send_task_to_worker(self, task_info, worker):
-        self.comm.send(task_info.dict_repr(), dest=worker, tag=Worker.ASSIGNMENT)
+    def send_task_to_worker(self, task_info, worker_rank):
+        self.comm.send(task_info.dict_repr(), dest=worker_rank, tag=Worker.ASSIGNMENT)
 
     def probe_for_finished_worker(self):
         return self.comm.Iprobe(source=MPI.ANY_SOURCE, tag=Worker.FINISHED)
@@ -138,14 +138,14 @@ class MPIManagerInterface(MPIFleetInterface):
         self.comm.Disconnect()
 
 
-class ThreadManagerInterface:
+class ThreadManagerInterface(ThreadFleetInterface):
     def __init__(self, worker_count):
         # Elements of this queue will be 2-tuples (foreman rank, result PK).
         self.finished_queues = [Queue.Queue() for _ in range(worker_count)]
 
         self.worker_count = worker_count
         self.worker_threads = []
-        self.workers = [None] * worker_count
+        self.worker_interfaces = [None] * worker_count
 
         tmi = self
 
@@ -158,12 +158,14 @@ class ThreadManagerInterface:
                 self.worker.main_procedure()
 
         for idx in range(worker_count):
-            # Each thread will create a worker that adds itself to self.workers.
-            self.worker_threads.append(threading.Thread(target=WorkerThreadStarter(idx)))
+            # Each thread will create a worker that adds itself to self.worker_interfaces.
+            worker_thread = threading.Thread(target=WorkerThreadStarter(idx))
+            worker_thread.start()
+            self.worker_threads.append(worker_thread)
 
-    def send_task_to_worker(self, task_info, worker):
-        self.workers[worker.rank-1].interface.job_queue.put(
-            (task_info, Worker.ASSIGNMENT),
+    def send_task_to_worker(self, task_info, worker_rank):
+        self.worker_interfaces[worker_rank-1].job_queue.put(
+            (task_info.dict_repr(), Worker.ASSIGNMENT),
             block=True
         )
 
@@ -174,11 +176,10 @@ class ThreadManagerInterface:
         return False
 
     def receive_finished(self):
-        for idx, worker_queue in enumerate(self.finished_queues):
+        for worker_queue in self.finished_queues:
             if not worker_queue.empty():
-                result_pk = worker_queue.get(block=True)
-                break
-        return idx, result_pk
+                # This looks like (rank, result_pk).
+                return worker_queue.get(block=True)
 
     def get_rank(self):
         return 0
@@ -188,8 +189,8 @@ class ThreadManagerInterface:
 
     def take_rollcall(self):
         roster = defaultdict(list)
-        for worker in self.workers:
-            roster[worker.interface.get_hostname()].append(worker.rank)
+        for worker_interface in self.worker_interfaces:
+            roster[worker_interface.get_hostname()].append(worker_interface.get_rank())
         return roster
 
     def stop_run(self, foreman):
@@ -199,25 +200,25 @@ class ThreadManagerInterface:
         self.finished_queues[foreman.rank-1].get(block=True)
 
     def shut_down_fleet(self):
-        for worker in self.workers:
-            worker.interface.job_queue.put(("SHUTDOWN", Worker.SHUTDOWN))
+        for worker_interface in self.worker_interfaces:
+            worker_interface.job_queue.put(("SHUTDOWN", Worker.SHUTDOWN))
         for thread in self.worker_threads:
             thread.join()
 
 
-class Manager:
+class Manager(object):
     """
     Coordinates the execution of pipelines.
 
     The manager is responsible for handling new Run requests and
-    assigning the resulting tasks to workers.
+    assigning the resulting tasks to worker_interfaces.
     """
 
     def __init__(self, interface, quit_idle=False, history=0):
         self.quit_idle = quit_idle
         self.interface = interface
 
-        # tasks_in_progress tracks what jobs are assigned to what workers:
+        # tasks_in_progress tracks what jobs are assigned to what worker_interfaces:
         # foreman -|--> {"task": task, "vassals": vassals}
         self.tasks_in_progress = {}
         # task_queue is a list of 2-tuples (sandbox, runstep/runcable).
@@ -241,7 +242,7 @@ class Manager:
 
     def _startup(self):
         """
-        Set up/register the workers and prepare to run.
+        Set up/register the worker_interfaces and prepare to run.
 
         INPUTS
         roster: a dictionary structured much like a host file, keyed by
@@ -314,7 +315,7 @@ class Manager:
         # we blow up.
         if task_info.threads_required > self.max_host_cpus:
             mgr_logger.info(
-                "Task %s requested %d threads but there are only %d workers.  Terminating parent run (%s).",
+                "Task %s requested %d threads but there are only %d worker_interfaces.  Terminating parent run (%s).",
                 task, task_info.threads_required, self.max_host_cpus, task.top_level_run)
             task.not_enough_CPUs.create(threads_requested=task_info.threads_required,
                                         max_available=self.max_host_cpus)
@@ -324,11 +325,11 @@ class Manager:
         while True:
             for host in candidate_hosts:
                 workers_available = [x for x in self.roster[host] if self.is_worker_ready(x)]
-                # If there are enough workers available to start the task, then have at it.
+                # If there are enough worker_interfaces available to start the task, then have at it.
                 if len(workers_available) >= task_info.threads_required:
-                    # We're going to assign the task to workers on this host.
+                    # We're going to assign the task to worker_interfaces on this host.
                     team = [workers_available[i] for i in range(task_info.threads_required)]
-                    mgr_logger.debug("Assigning task {} to workers {}".format(task, team))
+                    mgr_logger.debug("Assigning task {} to worker_interfaces {}".format(task, team))
 
                     # Send the job to the "lord":
                     self.interface.send_task_to_worker(task_info, team[0])
@@ -338,7 +339,7 @@ class Manager:
                         "vassals": vassals
                     }
                     self.worker_status[team[0]] = Worker.LORD
-                    # Denote the other workers as "vassals".
+                    # Denote the other worker_interfaces as "vassals".
                     for worker_rank in vassals:
                         self.worker_status[worker_rank] = Worker.VASSAL
                     return
@@ -350,7 +351,7 @@ class Manager:
                 time.sleep(settings.SLEEP_SECONDS)
             lord_rank, result_pk = self.interface.receive_finished()
 
-            # Note the task that just finished, and release its workers.
+            # Note the task that just finished, and release its worker_interfaces.
             # If this fails it will throw an exception.
             self.worker_finished(lord_rank, result_pk)
 
@@ -664,7 +665,7 @@ class Manager:
 
     @classmethod
     def execute_pipeline(cls, user, pipeline, inputs, users_allowed=None, groups_allowed=None,
-                         name=None, description=None, threaded=False):
+                         name=None, description=None, threaded=True):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
@@ -718,8 +719,8 @@ class MPIWorkerInterface(MPIFleetInterface):
     """
     def __init__(self):
         super(MPIWorkerInterface, self).__init__(MPI.Comm.Get_parent().Merge())
-        self.rank = self.get_rank()
-        self.hostname = self.get_hostname()
+        self.rank = super(MPIWorkerInterface, self).get_rank()
+        self.hostname = super(MPIWorkerInterface, self).get_hostname()
 
     def report_for_duty(self):
         return self.comm.send((self.hostname, self.rank), dest=0, tag=Worker.ROLLCALL)
@@ -751,9 +752,9 @@ class ThreadWorkerInterface(ThreadFleetInterface):
     """
     def __init__(self, rank, manager_interface):
         self.rank = rank
-        assert type(manager_interface) == ThreadManagerInterface
+        assert isinstance(manager_interface, ThreadManagerInterface)
         self.manager_interface = manager_interface
-        self.manager_interface.workers[rank-1] = self
+        self.manager_interface.worker_interfaces[rank-1] = self
         self.job_queue = Queue.Queue()
         self.stop_queue = Queue.Queue()
 
@@ -780,13 +781,13 @@ class ThreadWorkerInterface(ThreadFleetInterface):
         return task_info_dict, tag
 
     def send_finished_task(self, message):
-        self.manager_interface.finished_queues[self.get_rank-1].put(message)
+        self.manager_interface.finished_queues[self.get_rank()-1].put(message)
 
     def close(self):
         pass
 
 
-class Worker:
+class Worker(object):
     """
     Performs the actual computational tasks required of Pipelines.
     """
