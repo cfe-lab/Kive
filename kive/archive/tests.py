@@ -459,36 +459,37 @@ class ArchiveTestCaseHelpers:
         if bp == "subrun_complete":
             return
 
-    def _setup_deep_nested_run(self, user):
-        """Set up a pipeline with sub-sub-pipelines to test recursion."""
-        # Everything in this pipeline will be a no-op, so all can be linked together
-        # without remorse.
-        p_basic = tools.make_first_pipeline("p_basic", "innermost pipeline", user)
-        tools.create_linear_pipeline(p_basic, [self.method_noop, self.method_noop], "basic_in", "basic_out")
-        p_basic.family.grant_everyone_access()
-        p_basic.grant_everyone_access()
-        p_basic.create_outputs()
-        p_basic.save()
-
-        p_sub = tools.make_first_pipeline("p_sub", "second-level pipeline", user)
-        tools.create_linear_pipeline(p_sub, [p_basic, p_basic], "sub_in", "sub_out")
-        p_sub.family.grant_everyone_access()
-        p_sub.grant_everyone_access()
-        p_sub.create_outputs()
-        p_sub.save()
-
-        p_top = tools.make_first_pipeline("p_top", "top-level pipeline", user)
-        tools.create_linear_pipeline(p_top, [p_sub, p_sub, p_sub], "top_in", "top_out")
-        p_top.family.grant_everyone_access()
-        p_top.grant_everyone_access()
-        p_top.create_outputs()
-        p_top.save()
-
-        # Set up a dataset with words in it called self.dataset_words.
-        tools.make_words_dataset(self)
-
-        self.deep_nested_run = Manager.execute_pipeline(self.user_bob, p_top, [self.dataset_words],
-                                                        groups_allowed=[everyone_group()]).get_last_run()
+    # This code is no longer used, but is the basis for the deep_nested_run test fixture.
+    # def _setup_deep_nested_run(self, user):
+    #     """Set up a pipeline with sub-sub-pipelines to test recursion."""
+    #     # Everything in this pipeline will be a no-op, so all can be linked together
+    #     # without remorse.
+    #     p_basic = tools.make_first_pipeline("p_basic", "innermost pipeline", user)
+    #     tools.create_linear_pipeline(p_basic, [self.method_noop, self.method_noop], "basic_in", "basic_out")
+    #     p_basic.family.grant_everyone_access()
+    #     p_basic.grant_everyone_access()
+    #     p_basic.create_outputs()
+    #     p_basic.save()
+    #
+    #     p_sub = tools.make_first_pipeline("p_sub", "second-level pipeline", user)
+    #     tools.create_linear_pipeline(p_sub, [p_basic, p_basic], "sub_in", "sub_out")
+    #     p_sub.family.grant_everyone_access()
+    #     p_sub.grant_everyone_access()
+    #     p_sub.create_outputs()
+    #     p_sub.save()
+    #
+    #     p_top = tools.make_first_pipeline("p_top", "top-level pipeline", user)
+    #     tools.create_linear_pipeline(p_top, [p_sub, p_sub, p_sub], "top_in", "top_out")
+    #     p_top.family.grant_everyone_access()
+    #     p_top.grant_everyone_access()
+    #     p_top.create_outputs()
+    #     p_top.save()
+    #
+    #     # Set up a dataset with words in it called self.dataset_words.
+    #     tools.make_words_dataset(self)
+    #
+    #     self.deep_nested_run = Manager.execute_pipeline(self.user_bob, p_top, [self.dataset_words],
+    #                                                     groups_allowed=[everyone_group()]).get_last_run()
 
 
 class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
@@ -3027,6 +3028,11 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
 
     def test_runcomponent_unsuccessful_failed_invoked_log(self):
         """Testing of a RunComponent which has a failed invoked_log and never gets to its own execution."""
+
+        # First, clear out some of the runs created in the fixture that we don't want.
+        for unwanted_run in Run.objects.filter(pipeline__family__name="Pipeline_family"):
+            unwanted_run.delete()
+
         # Run two pipelines, the second of which reuses parts of the first, but the method has been
         # screwed with in between.
         p_one = tools.make_first_pipeline("p_one", "two no-ops", self.user_bob)
@@ -3040,7 +3046,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         tools.make_words_dataset(self)
 
         run1 = Manager.execute_pipeline(self.user_bob, p_one, [self.dataset_words],
-                                        groups_allowed=[everyone_group()]).get_last_run()
+                                        groups_allowed=[everyone_group()], test=True).get_last_run()
 
         # Oops!  Between runs, self.method_noop gets screwed with.
         with tempfile.TemporaryFile() as f:
@@ -3058,7 +3064,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         p_two.steps.get(step_num=1).add_deletion(self.method_noop.outputs.first())
 
         run2 = Manager.execute_pipeline(self.user_bob, p_two, [self.dataset_words],
-                                        groups_allowed=[everyone_group()]).get_last_run()
+                                        groups_allowed=[everyone_group()], test=True).get_last_run()
 
         # In the second run: the transformation of the second step should have tried to invoke the log of step 1 and
         # failed.
@@ -3075,6 +3081,11 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
 
     def test_long_output(self):
         """Should handle lots of output to stdout or stderr without deadlocking."""
+
+        # First, clear out some of the runs created in the fixture that we don't want.
+        for unwanted_run in Run.objects.filter(pipeline__family__name="Pipeline_family"):
+            unwanted_run.delete()
+
         iteration_count = 100000
         python_code = """\
 #! /usr/bin/env python
@@ -3111,7 +3122,7 @@ with open(sys.argv[2], "wb") as f:
         tools.make_words_dataset(self)
 
         active_run = Manager.execute_pipeline(self.user_bob, pipeline, [self.dataset_words],
-                                              groups_allowed=[everyone_group()]).get_last_run()
+                                              groups_allowed=[everyone_group()], test=True).get_last_run()
 
         run_step = active_run.runsteps.get(pipelinestep__step_num=1)
         stdout_file = run_step.log.methodoutput.output_log

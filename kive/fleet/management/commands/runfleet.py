@@ -15,8 +15,9 @@ class Command(BaseCommand):
                     help='Shut down the fleet as soon as it is idle.'))
 
     def handle(self, *args, **options):
-        worker_count = options['workers']
-        quit_idle = options['quit_idle']
-        manage_script = sys.argv[0]
-        manager = fleet.workers.Manager(worker_count, quit_idle, manage_script)
+        manager_interface = fleet.workers.MPIManagerInterface(
+            worker_count=options["workers"],
+            manage_script=sys.argv[0]
+        )
+        manager = fleet.workers.Manager(manager_interface, options["quit_idle"])
         manager.main_procedure()

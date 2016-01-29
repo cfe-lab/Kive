@@ -40,6 +40,9 @@ class FixtureBuilder(object):
         raise NotImplementedError()
 
     def run(self):
+        print "--------"
+        print self.get_name()
+        print "--------"
         call_command('reset')
 
         before_filename = 'test_fixture_before.json'
@@ -160,8 +163,12 @@ class EMSandboxTestEnvironmentBuilder(FixtureBuilder):
     def build(self):
         tools.create_eric_martin_test_environment(self)
         tools.create_sandbox_testing_tools_environment(self)
-        self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
-        self.pE_run.grant_everyone_access()
+
+        pE_run = self.pE.pipeline_instances.create(user=self.myUser, name='pE_run')
+        pE_run.grant_everyone_access()
+        pE_run.inputs.create(dataset=self.triplet_dataset, index=1)
+        pE_run.inputs.create(dataset=self.singlet_dataset, index=2)
+        pE_run.inputs.create(dataset=self.raw_dataset, index=3)
 
 
 class ArchiveTestEnvironmentBuilder(FixtureBuilder):
@@ -179,8 +186,7 @@ class SimpleRunBuilder(FixtureBuilder):
     def build(self):
         tools.create_eric_martin_test_environment(self)
         tools.create_sandbox_testing_tools_environment(self)
-        self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
-        self.pE_run.grant_everyone_access()
+
         user = User.objects.get(username='john')
         # Everything in this pipeline will be a no-op, so all can be linked together
         # without remorse.
@@ -202,12 +208,9 @@ class DeepNestedRunBuilder(FixtureBuilder):
         return 'deep_nested_run.json'
 
     def build(self):
-        tools.create_archive_test_environment(self)
+        tools.create_eric_martin_test_environment(self)
+        tools.create_sandbox_testing_tools_environment(self)
         user = User.objects.get(username='john')
-
-        # First, let's clear out the other stuff: there are two runs for pE and pD each.
-        for run in Run.objects.filter(pipeline__family__name="Pipeline_family"):
-            run.delete()
 
         # Everything in this pipeline will be a no-op, so all can be linked together
         # without remorse.
@@ -646,8 +649,6 @@ class RunPipelinesRecoveringReusedStepEnvironmentBuilder(FixtureBuilder):
     def build(self):
         tools.create_eric_martin_test_environment(self)
         tools.create_sandbox_testing_tools_environment(self)
-        self.pE_run = self.pE.pipeline_instances.create(user=self.myUser)
-        self.pE_run.grant_everyone_access()
 
         p_one = tools.make_first_pipeline("p_one", "two no-ops", self.myUser)
         p_one.family.grant_everyone_access()
@@ -813,18 +814,18 @@ class Command(BaseCommand):
     help = "Update test fixtures by running scripts and dumping test data."
 
     def handle(self, *args, **options):
-        # EMSandboxTestEnvironmentBuilder().run()
-        # ArchiveTestEnvironmentBuilder().run()
+        EMSandboxTestEnvironmentBuilder().run()
+        ArchiveTestEnvironmentBuilder().run()
         DeepNestedRunBuilder().run()
-        # SimpleRunBuilder().run()
-        # RemovalTestEnvironmentBuilder().run()
-        # RunApiTestsEnvironmentBuilder().run()
-        # RunComponentTooManyChecksEnvironmentBuilder().run()
-        # RunPipelinesRecoveringReusedStepEnvironmentBuilder().run()
-        # ExecuteResultTestsRMEnvironmentBuilder().run()
-        # ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
-        # RestoreReusableDatasetBuilder().run()
-        # ExecuteTestsBuilder().run()
-        # FindDatasetsBuilder().run()
+        SimpleRunBuilder().run()
+        RemovalTestEnvironmentBuilder().run()
+        RunApiTestsEnvironmentBuilder().run()
+        RunComponentTooManyChecksEnvironmentBuilder().run()
+        RunPipelinesRecoveringReusedStepEnvironmentBuilder().run()
+        ExecuteResultTestsRMEnvironmentBuilder().run()
+        ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
+        RestoreReusableDatasetBuilder().run()
+        ExecuteTestsBuilder().run()
+        FindDatasetsBuilder().run()
 
         self.stdout.write('Done.')

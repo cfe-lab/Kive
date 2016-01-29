@@ -12,6 +12,9 @@ import itertools
 import os
 import glob
 import shutil
+import threading
+import Queue
+import socket
 
 from django.conf import settings
 from django.utils import timezone
@@ -43,6 +46,165 @@ def adjust_log_files(target_logger, rank):
         adjust_log_files(target_logger.parent, rank)
 
 
+class MPIFleetInterface:
+    """
+    Base class for both MPIManagerInterface and MPIWorkerInterface.
+    """
+    def __init__(self, comm):
+        self.comm = comm
+
+    def get_rank(self):
+        return self.comm.Get_rank()
+
+    def get_size(self):
+        return self.comm.Get_size()
+
+    @staticmethod
+    def get_hostname(self):
+        return MPI.Get_processor_name()
+
+
+class ThreadFleetInterface:
+    """
+    Base class for both ThreadManagerInterface and ThreadWorkerInterface.
+    """
+    def get_rank(self):
+        raise NotImplementedError()
+
+    def get_size(self):
+        raise NotImplementedError()
+
+    @staticmethod
+    def get_hostname(self):
+        return socket.gethostname()
+
+
+class MPIManagerInterface(MPIFleetInterface):
+    """
+    Object that is used by a Manager to communicate with Workers.
+
+    This handles spawning processes to run Workers.
+    """
+    def __init__(self, worker_count, manage_script):
+        self.worker_count = worker_count
+        self.manage_script = manage_script
+        mpi_info = MPI.Info.Create()
+        mpi_info.Set("add-hostfile", "kive/hostfile")
+
+        spawn_args = [self.manage_script, "fleetworker"]
+        super(MPIManagerInterface, self).__init__(
+            MPI.COMM_SELF.Spawn(sys.executable,
+                                args=spawn_args,
+                                maxprocs=self.worker_count,
+                                info=mpi_info).Merge()
+        )
+
+    def send_task_to_worker(self, task_info, worker):
+        self.comm.send(task_info.dict_repr(), dest=worker, tag=Worker.ASSIGNMENT)
+
+    def probe_for_finished_worker(self):
+        return self.comm.Iprobe(source=MPI.ANY_SOURCE, tag=Worker.FINISHED)
+
+    def receive_finished(self):
+        # This returns the rank of the
+        lord_rank, result_pk = self.comm.recv(source=MPI.ANY_SOURCE, tag=Worker.FINISHED)
+        return lord_rank, result_pk
+
+    def take_rollcall(self):
+        roster = defaultdict(list)
+        workers_reported = 0
+        workers_expected = self.get_size()
+        while workers_reported < workers_expected - 1:
+            hostname, rank = self.comm.recv(source=MPI.ANY_SOURCE, tag=Worker.ROLLCALL)
+            mgr_logger.info("Worker {} on host {} has reported for duty".format(rank, hostname))
+            roster[hostname].append(rank)
+            workers_reported += 1
+
+        return roster
+
+    def stop_run(self, foreman):
+        """
+        Instructs the foreman to stop the task.  Blocks while waiting for a response.
+        """
+        self.comm.isend("STOP", dest=foreman, tag=Worker.STOP)
+        # Either the foreman got the message and ended the task, or it
+        # finished the task.
+        self.comm.recv(source=foreman, tag=Worker.FINISHED)
+
+    def shut_down_fleet(self):
+        for rank in range(self.get_size()):
+            if rank != self.get_rank():
+                self.comm.send(dest=rank, tag=Worker.SHUTDOWN)
+        self.comm.Disconnect()
+
+
+class ThreadManagerInterface:
+    def __init__(self, worker_count):
+        # Elements of this queue will be 2-tuples (foreman rank, result PK).
+        self.finished_queues = [Queue.Queue() for _ in range(worker_count)]
+
+        self.worker_count = worker_count
+        self.worker_threads = []
+        self.workers = [None] * worker_count
+
+        tmi = self
+
+        class WorkerThreadStarter:
+            def __init__(self, rank):
+                worker_interface = ThreadWorkerInterface(rank=rank, manager_interface=tmi)
+                self.worker = Worker(interface=worker_interface)
+
+            def __call__(self, *args, **kwargs):
+                self.worker.main_procedure()
+
+        for idx in range(worker_count):
+            # Each thread will create a worker that adds itself to self.workers.
+            self.worker_threads.append(threading.Thread(target=WorkerThreadStarter(idx)))
+
+    def send_task_to_worker(self, task_info, worker):
+        self.workers[worker.rank-1].interface.job_queue.put(
+            (task_info, Worker.ASSIGNMENT),
+            block=True
+        )
+
+    def probe_for_finished_worker(self):
+        for worker_queue in self.finished_queues:
+            if not worker_queue.empty():
+                return True
+        return False
+
+    def receive_finished(self):
+        for idx, worker_queue in enumerate(self.finished_queues):
+            if not worker_queue.empty():
+                result_pk = worker_queue.get(block=True)
+                break
+        return idx, result_pk
+
+    def get_rank(self):
+        return 0
+
+    def get_size(self):
+        return self.worker_count
+
+    def take_rollcall(self):
+        roster = defaultdict(list)
+        for worker in self.workers:
+            roster[worker.interface.get_hostname()].append(worker.rank)
+        return roster
+
+    def stop_run(self, foreman):
+        foreman.interface.message_queue.put(("STOP", Worker.STOP))
+        # Either the foreman got the message and ended the task, or it
+        # finished the task.  Either way, we wait for a message from this Worker.
+        self.finished_queues[foreman.rank-1].get(block=True)
+
+    def shut_down_fleet(self):
+        for worker in self.workers:
+            worker.interface.job_queue.put(("SHUTDOWN", Worker.SHUTDOWN))
+        for thread in self.worker_threads:
+            thread.join()
+
+
 class Manager:
     """
     Coordinates the execution of pipelines.
@@ -51,10 +213,9 @@ class Manager:
     assigning the resulting tasks to workers.
     """
 
-    def __init__(self, worker_count, quit_idle=False, manage_script=None, history=0):
-        self.worker_count = worker_count
+    def __init__(self, interface, quit_idle=False, history=0):
         self.quit_idle = quit_idle
-        self.manage_script = manage_script
+        self.interface = interface
 
         # tasks_in_progress tracks what jobs are assigned to what workers:
         # foreman -|--> {"task": task, "vassals": vassals}
@@ -78,7 +239,7 @@ class Manager:
         # A queue of recently-completed runs, to a maximum specified by history.
         self.history_queue = deque(maxlen=history)
 
-    def _startup(self, comm):
+    def _startup(self):
         """
         Set up/register the workers and prepare to run.
 
@@ -86,27 +247,16 @@ class Manager:
         roster: a dictionary structured much like a host file, keyed by
         hostnames and containing the number of Workers on each host.
         """
-        # Set up our communicator and other MPI info.
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.count = self.comm.Get_size()
-        self.mgr_hostname = MPI.Get_processor_name()
+        adjust_log_files(mgr_logger, self.interface.get_rank())
+        mgr_logger.info("Manager started on host {}".format(self.interface.get_hostname()))
 
-        adjust_log_files(mgr_logger, self.rank)
-        mgr_logger.info("Manager started on host {}".format(self.mgr_hostname))
-
-        workers_reported = 0
-        while workers_reported < self.count - 1:
-            hostname, rank = self.comm.recv(source=MPI.ANY_SOURCE, tag=Worker.ROLLCALL)
-            mgr_logger.info("Worker {} on host {} has reported for duty".format(rank, hostname))
-            self.roster[hostname].append(rank)
-            workers_reported += 1
+        self.roster = self.interface.take_rollcall()
 
         for hostname in self.roster:
             for rank in self.roster[hostname]:
                 self.hostnames[rank] = hostname
 
-        self.worker_status = [Worker.READY for _ in range(self.count)]
+        self.worker_status = [Worker.READY for _ in range(self.interface.get_size())]
         self.max_host_cpus = max([len(self.roster[x]) for x in self.roster])
 
     def is_worker_ready(self, rank):
@@ -118,6 +268,9 @@ class Manager:
         """
         new_sdbx = Sandbox(run=run_to_start)
         new_sdbx.advance_pipeline()
+
+        # Refresh run_to_start.
+        run_to_start = Run.objects.get(pk=run_to_start.pk)
 
         # If we were able to reuse throughout, then we're totally done.  Otherwise we
         # need to do some bookkeeping.
@@ -178,7 +331,7 @@ class Manager:
                     mgr_logger.debug("Assigning task {} to workers {}".format(task, team))
 
                     # Send the job to the "lord":
-                    self.comm.send(task_info.dict_repr(), dest=team[0], tag=Worker.ASSIGNMENT)
+                    self.interface.send_task_to_worker(task_info, team[0])
                     vassals = team[1:len(team)]
                     self.tasks_in_progress[team[0]] = {
                         "task": task,
@@ -193,11 +346,9 @@ class Manager:
             # Having reached this point, we know that no host was capable of taking on the task.
             # We block and wait for a worker to become ready, so we can try again.
             mgr_logger.debug("Waiting for host to become ready....")
-            while not self.comm.Iprobe(source=MPI.ANY_SOURCE,
-                                       tag=Worker.FINISHED):
+            while not self.interface.probe_for_finished_worker():
                 time.sleep(settings.SLEEP_SECONDS)
-            lord_rank, result_pk = self.comm.recv(source=MPI.ANY_SOURCE,
-                                                  tag=Worker.FINISHED)
+            lord_rank, result_pk = self.interface.receive_finished()
 
             # Note the task that just finished, and release its workers.
             # If this fails it will throw an exception.
@@ -289,23 +440,13 @@ class Manager:
         return workers_freed
 
     def main_procedure(self):
-        mpi_info = MPI.Info.Create()
-        mpi_info.Set("add-hostfile", "kive/hostfile")
-
-        comm = MPI.COMM_SELF.Spawn(sys.executable,
-                                   args=[self.manage_script, 'fleetworker'],
-                                   maxprocs=self.worker_count,
-                                   info=mpi_info).Merge()
         try:
-            self._startup(comm)
+            self._startup()
             self.main_loop()
             mgr_logger.info("Manager shutting down.")
         except:
             mgr_logger.error("Manager failed.", exc_info=True)
-        for rank in range(self.comm.Get_size()):
-            if rank != self.comm.Get_rank():
-                self.comm.send(dest=rank, tag=Worker.SHUTDOWN)
-        comm.Disconnect()
+        self.interface.shut_down_fleet()
 
     def worker_finished(self, lord_rank, result_pk):
         """Handle bookkeeping when a worker finishes."""
@@ -370,9 +511,8 @@ class Manager:
 
     def wait_for_polling(self, time_to_poll):
         while time.time() < time_to_poll:
-            if self.comm.Iprobe(source=MPI.ANY_SOURCE, tag=Worker.FINISHED):
-                lord_rank, result_pk = self.comm.recv(source=MPI.ANY_SOURCE,
-                                                      tag=Worker.FINISHED)
+            if self.interface.probe_for_finished_worker():
+                lord_rank, result_pk = self.interface.receive_finished()
                 try:
                     self.worker_finished(lord_rank, result_pk)
                     break
@@ -451,10 +591,7 @@ class Manager:
                 break
 
         if foreman_found:
-            self.comm.isend("STOP", dest=foreman, tag=Worker.STOP)
-            # Either the foreman got the message and ended the task, or it
-            # finished the task.
-            self.comm.recv(source=foreman, tag=Worker.FINISHED)
+            self.interface.stop_run(foreman)
 
             self.worker_status[foreman] = Worker.READY
             for worker_rank in self.tasks_in_progress[foreman]["vassals"]:
@@ -527,7 +664,7 @@ class Manager:
 
     @classmethod
     def execute_pipeline(cls, user, pipeline, inputs, users_allowed=None, groups_allowed=None,
-                         name=None, description=None):
+                         name=None, description=None, threaded=False):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
@@ -552,7 +689,11 @@ class Manager:
 
         # The run is already in the queue, so we can just start the fleet and let it exit
         # when it finishes.
-        manager = cls(1, quit_idle=True, manage_script=sys.argv[0], history=1)
+        if not threaded:
+            interface = MPIManagerInterface(worker_count=1, manage_script=sys.argv[0])
+        else:
+            interface = ThreadManagerInterface(worker_count=1)
+        manager = cls(interface=interface, quit_idle=True, history=1)
         manager.main_procedure()
         return manager
 
@@ -567,6 +708,82 @@ class Manager:
 
         last_completed_sdbx = self.history_queue.pop()
         return last_completed_sdbx.run
+
+
+class MPIWorkerInterface(MPIFleetInterface):
+    """
+    Object that is used by a Worker to communicate with the Manager.
+
+    This handles setting up the MPI communicator.
+    """
+    def __init__(self):
+        super(MPIWorkerInterface, self).__init__(MPI.Comm.Get_parent().Merge())
+        self.rank = self.get_rank()
+        self.hostname = self.get_hostname()
+
+    def report_for_duty(self):
+        return self.comm.send((self.hostname, self.rank), dest=0, tag=Worker.ROLLCALL)
+
+    def stop_run_callback(self):
+        if self.comm.Iprobe(source=0, tag=Worker.STOP):
+            return self.comm.recv(source=0, tag=Worker.STOP)
+        return
+
+    def probe_for_task(self):
+        return self.comm.Iprobe(source=0, tag=MPI.ANY_TAG)
+
+    def get_task_info(self):
+        status = MPI.Status()
+        task_info_dict = self.comm.recv(source=0, tag=MPI.ANY_TAG, status=status)
+        tag = status.Get_tag()
+        return task_info_dict, tag
+
+    def send_finished_task(self, message):
+        return self.comm.send(message, dest=0, tag=Worker.FINISHED)
+
+    def close(self):
+        self.comm.Disconnect()
+
+
+class ThreadWorkerInterface(ThreadFleetInterface):
+    """
+    Analogue of MPIWorkerInterface where threads are used instead of MPI.
+    """
+    def __init__(self, rank, manager_interface):
+        self.rank = rank
+        assert type(manager_interface) == ThreadManagerInterface
+        self.manager_interface = manager_interface
+        self.manager_interface.workers[rank-1] = self
+        self.job_queue = Queue.Queue()
+        self.stop_queue = Queue.Queue()
+
+    def get_rank(self):
+        return self.rank
+
+    def get_size(self):
+        return self.manager_interface.get_size()
+
+    def report_for_duty(self):
+        # This isn't necessary -- the Manager interface can track the threads it starts by itself.
+        pass
+
+    def stop_run_callback(self):
+        if not self.stop_queue.empty():
+            return self.stop_queue.get(block=True)
+        return
+
+    def probe_for_task(self):
+        return not self.job_queue.empty()
+
+    def get_task_info(self):
+        task_info_dict, tag = self.job_queue.get()
+        return task_info_dict, tag
+
+    def send_finished_task(self, message):
+        self.manager_interface.finished_queues[self.get_rank-1].put(message)
+
+    def close(self):
+        pass
 
 
 class Worker:
@@ -585,35 +802,23 @@ class Worker:
 
     FAILURE = -1
 
-    def __init__(self, comm):
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.count = self.comm.Get_size()
-        self.wkr_hostname = MPI.Get_processor_name()
-
+    def __init__(self, interface):
+        self.interface = interface
+        self.rank = self.interface.get_rank()
         adjust_log_files(worker_logger, self.rank)
-        worker_logger.debug("Worker {} started on host {}".format(self.rank, self.wkr_hostname))
+        worker_logger.debug("Worker {} started on host {}".format(self.rank, self.interface.get_hostname()))
 
         # Report to the manager.
-        self.comm.send((self.wkr_hostname, self.rank), dest=0, tag=Worker.ROLLCALL)
-
-    def check_for_stop(self):
-        """
-        A callback that checks for a Worker.STOP message from the Manager.
-        """
-        if self.comm.Iprobe(source=0, tag=Worker.STOP):
-            return self.comm.recv(source=0, tag=Worker.STOP)
-        return
+        self.interface.report_for_duty()
 
     def receive_and_perform_task(self):
         """
         Looks for an assigned task and performs it.
         """
-        status = MPI.Status()
-        while not self.comm.Iprobe(source=0, tag=MPI.ANY_TAG):
+        while not self.interface.probe_for_task():
             time.sleep(settings.SLEEP_SECONDS)
-        task_info_dict = self.comm.recv(source=0, tag=MPI.ANY_TAG, status=status)
-        tag = status.Get_tag()
+        task_info_dict, tag = self.interface.get_task_info()
+
         if tag == self.SHUTDOWN:
             worker_logger.info("Worker {} shutting down.".format(self.rank))
             return tag
@@ -632,7 +837,7 @@ class Worker:
 
             try:
                 if type(task) == archive.models.RunStep:
-                    sandbox_result = Sandbox.finish_step(task_info_dict, self.rank, self.check_for_stop)
+                    sandbox_result = Sandbox.finish_step(task_info_dict, self.rank, self.interface.stop_run_callback)
 
                 else:
                     sandbox_result = Sandbox.finish_cable(task_info_dict, self.rank)
@@ -656,7 +861,7 @@ class Worker:
             worker_logger.error("[%d] Task %s failed.", self.rank, task, exc_info=True)
 
         message = (self.rank, result)
-        self.comm.send(message, dest=0, tag=Worker.FINISHED)
+        self.interface.send_finished_task(message)
         worker_logger.debug("Sent {} to Manager".format(message))
 
         return tag

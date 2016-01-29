@@ -7,9 +7,9 @@ class Command(BaseCommand):
     help = 'Worker process to execute pipelines.'
     
     def handle(self, *args, **options):
-        comm = MPI.Comm.Get_parent().Merge()
+        interface = fleet.workers.MPIWorkerInterface()
 
-        worker = fleet.workers.Worker(comm)
+        worker = fleet.workers.Worker(interface)
         worker.main_procedure()
             
-        comm.Disconnect()
+        interface.close()

@@ -551,16 +551,6 @@ def create_eric_martin_test_environment(case):
         source_pin=case.triplet_cdt.members.get(column_idx=3), dest_pin=case.doublet_cdt.members.get(column_idx=1))
     case.pE.clean()
 
-    # Runs for the pipelines.
-    case.pD_run = case.pD.pipeline_instances.create(user=case.myUser,
-                                                    name='pD_run')
-    case.pD_run.save()
-    case.pD_run.grant_everyone_access()
-    case.pE_run = case.pE.pipeline_instances.create(user=case.myUser,
-                                                    name='pE_run')
-    case.pE_run.save()
-    case.pE_run.grant_everyone_access()
-
     # November 7, 2013: use a helper function (defined in
     # librarian.models) to define our Datasets.
 
@@ -808,9 +798,6 @@ def load_eric_martin_test_environment(case):
     case.E21_41_wire2 = case.E21_41.custom_wires.get(
         source_pin=case.triplet_cdt.members.get(column_idx=3))
 
-    case.pD_run = case.pD.pipeline_instances.get(name='pD_run')
-    case.pE_run = case.pE.pipeline_instances.get(name='pE_run')
-
     case.triplet_dataset = Dataset.objects.get(
         name="triplet",
         dataset_file__endswith="step_0_triplet.csv")
@@ -870,6 +857,19 @@ def create_librarian_test_environment(case):
     """
     create_eric_martin_test_environment(case)
 
+    # Runs for the pipelines.
+    case.pD_run = case.pD.pipeline_instances.create(user=case.myUser,
+                                                    name='pD_run')
+    case.pD_run.save()
+    case.pD_run.grant_everyone_access()
+    case.pE_run = case.pE.pipeline_instances.create(user=case.myUser,
+                                                    name='pE_run')
+    case.pE_run.save()
+    case.pE_run.grant_everyone_access()
+    case.pE_run.inputs.create(dataset=case.triplet_dataset, index=1)
+    case.pE_run.inputs.create(dataset=case.singlet_dataset, index=2)
+    case.pE_run.inputs.create(dataset=case.raw_dataset, index=3)
+
     # Some ExecRecords, some failed, others not.
     i = 0
     for step in PipelineStep.objects.all():
@@ -895,6 +895,8 @@ def create_librarian_test_environment(case):
 
 def load_librarian_test_environment(case):
     load_eric_martin_test_environment(case)
+    case.pD_run = case.pD.pipeline_instances.get(name='pD_run')
+    case.pE_run = case.pE.pipeline_instances.get(name='pE_run')
 
 
 def create_removal_test_environment():
