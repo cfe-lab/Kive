@@ -2403,7 +2403,7 @@ with open(outfile, "wb") as f:
         """
         The ExecRecord of a non-reusable Method should not be found compatible.
         """
-        Manager.execute_pipeline(self.user_rob, self.test_nonreusable, [self.numbers_dataset]).get_last_run()
+        Manager.execute_pipeline(self.user_rob, self.test_nonreusable, [self.numbers_dataset])
 
         rng_step = self.test_nonreusable.steps.get(step_num=1)
         runstep = rng_step.pipelinestep_instances.first()

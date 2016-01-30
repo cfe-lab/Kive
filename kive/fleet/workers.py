@@ -211,14 +211,14 @@ class Manager(object):
     Coordinates the execution of pipelines.
 
     The manager is responsible for handling new Run requests and
-    assigning the resulting tasks to worker_interfaces.
+    assigning the resulting tasks to workers.
     """
 
     def __init__(self, interface, quit_idle=False, history=0):
         self.quit_idle = quit_idle
         self.interface = interface
 
-        # tasks_in_progress tracks what jobs are assigned to what worker_interfaces:
+        # tasks_in_progress tracks what jobs are assigned to what workers:
         # foreman -|--> {"task": task, "vassals": vassals}
         self.tasks_in_progress = {}
         # task_queue is a list of 2-tuples (sandbox, runstep/runcable).
@@ -242,7 +242,7 @@ class Manager(object):
 
     def _startup(self):
         """
-        Set up/register the worker_interfaces and prepare to run.
+        Set up/register the workers and prepare to run.
 
         INPUTS
         roster: a dictionary structured much like a host file, keyed by
@@ -315,7 +315,7 @@ class Manager(object):
         # we blow up.
         if task_info.threads_required > self.max_host_cpus:
             mgr_logger.info(
-                "Task %s requested %d threads but there are only %d worker_interfaces.  Terminating parent run (%s).",
+                "Task %s requested %d threads but there are only %d workers.  Terminating parent run (%s).",
                 task, task_info.threads_required, self.max_host_cpus, task.top_level_run)
             task.not_enough_CPUs.create(threads_requested=task_info.threads_required,
                                         max_available=self.max_host_cpus)
@@ -325,11 +325,11 @@ class Manager(object):
         while True:
             for host in candidate_hosts:
                 workers_available = [x for x in self.roster[host] if self.is_worker_ready(x)]
-                # If there are enough worker_interfaces available to start the task, then have at it.
+                # If there are enough workers available to start the task, then have at it.
                 if len(workers_available) >= task_info.threads_required:
-                    # We're going to assign the task to worker_interfaces on this host.
+                    # We're going to assign the task to workers on this host.
                     team = [workers_available[i] for i in range(task_info.threads_required)]
-                    mgr_logger.debug("Assigning task {} to worker_interfaces {}".format(task, team))
+                    mgr_logger.debug("Assigning task {} to worker {}".format(task, team))
 
                     # Send the job to the "lord":
                     self.interface.send_task_to_worker(task_info, team[0])
@@ -339,7 +339,7 @@ class Manager(object):
                         "vassals": vassals
                     }
                     self.worker_status[team[0]] = Worker.LORD
-                    # Denote the other worker_interfaces as "vassals".
+                    # Denote the other workers as "vassals".
                     for worker_rank in vassals:
                         self.worker_status[worker_rank] = Worker.VASSAL
                     return
@@ -351,7 +351,7 @@ class Manager(object):
                 time.sleep(settings.SLEEP_SECONDS)
             lord_rank, result_pk = self.interface.receive_finished()
 
-            # Note the task that just finished, and release its worker_interfaces.
+            # Note the task that just finished, and release its workers.
             # If this fails it will throw an exception.
             self.worker_finished(lord_rank, result_pk)
 

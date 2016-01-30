@@ -3046,7 +3046,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         tools.make_words_dataset(self)
 
         run1 = Manager.execute_pipeline(self.user_bob, p_one, [self.dataset_words],
-                                        groups_allowed=[everyone_group()], test=True).get_last_run()
+                                        groups_allowed=[everyone_group()]).get_last_run()
 
         # Oops!  Between runs, self.method_noop gets screwed with.
         with tempfile.TemporaryFile() as f:
@@ -3122,7 +3122,7 @@ with open(sys.argv[2], "wb") as f:
         tools.make_words_dataset(self)
 
         active_run = Manager.execute_pipeline(self.user_bob, pipeline, [self.dataset_words],
-                                              groups_allowed=[everyone_group()], test=True).get_last_run()
+                                              groups_allowed=[everyone_group()]).get_last_run()
 
         run_step = active_run.runsteps.get(pipelinestep__step_num=1)
         stdout_file = run_step.log.methodoutput.output_log

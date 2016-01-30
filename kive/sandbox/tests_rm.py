@@ -333,7 +333,13 @@ class ExecuteDiscardedIntermediateTests(TestCase):
         """
         # In the fixture, we already ran self.pipeline_revcomp_v2, which discards the intermediate
         # output.  We now run v3, which will recover it.
-        Manager.execute_pipeline(self.user_alice, self.pipeline_revcomp_v3, [self.dataset_labdata])
+        run = Manager.execute_pipeline(
+            self.user_alice,
+            self.pipeline_revcomp_v3,
+            [self.dataset_labdata]
+        ).get_last_run()
+        self.assertTrue(run.is_complete(use_cache=True))
+        self.assertTrue(run.is_successful(use_cache=True))
 
 
 class BadRunTests(TestCase):
@@ -516,12 +522,18 @@ class RawTests(SandboxRMTestCase):
 
     def test_execute_pipeline_raw(self):
         """Execute a raw Pipeline."""
-        Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw])
+        run = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
+        self.assertTrue(run.is_complete(use_cache=True))
+        self.assertTrue(run.is_successful(use_cache=True))
 
     def test_execute_pipeline_raw_twice(self):
         """Execute a raw Pipeline and reuse an ExecRecord."""
-        Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw])
-        Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw])
+        run = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
+        self.assertTrue(run.is_complete(use_cache=True))
+        self.assertTrue(run.is_successful(use_cache=True))
+        run2 = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
+        self.assertTrue(run2.is_complete(use_cache=True))
+        self.assertTrue(run2.is_successful(use_cache=True))
 
     def tearDown(self):
         super(RawTests, self).tearDown()

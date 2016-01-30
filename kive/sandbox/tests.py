@@ -225,7 +225,9 @@ class ExecuteTests(ExecuteTestsBase):
         # Execute pipeline
         pipeline = self.pX
         inputs = [self.dataset]
-        Manager.execute_pipeline(self.myUser, pipeline, inputs)
+        run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        self.assertTrue(run.is_complete(use_cache=True))
+        self.assertTrue(run.is_successful(use_cache=True))
 
     def test_pipeline_execute_B_twostep_pipeline_with_recycling(self):
         """Two step pipeline with second step identical to the first"""
@@ -278,7 +280,9 @@ class ExecuteTests(ExecuteTestsBase):
         # Execute pipeline
         pipeline = self.pX
         inputs = [self.dataset]
-        Manager.execute_pipeline(self.myUser, pipeline, inputs)
+        run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        self.assertTrue(run.is_complete(use_cache=True))
+        self.assertTrue(run.is_successful(use_cache=True))
 
     def test_pipeline_execute_C_twostep_pipeline_with_subpipeline(self):
         """Two step pipeline with second step identical to the first"""
@@ -367,7 +371,9 @@ class ExecuteTests(ExecuteTestsBase):
         # Execute pipeline
         pipeline = self.pX
         inputs = [input_dataset]
-        Manager.execute_pipeline(self.myUser, pipeline, inputs)
+        run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        self.assertTrue(run.is_complete(use_cache=True))
+        self.assertTrue(run.is_successful(use_cache=True))
 
     def test_pipeline_all_inputs_OK_nonraw(self):
         """Execute a Pipeline with OK non-raw inputs."""
