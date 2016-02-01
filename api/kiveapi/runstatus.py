@@ -107,14 +107,11 @@ class RunStatus(object):
 
     def get_results(self):
         """
-        Gets all the datasets that resulted from this
-        pipeline (including intermediate results).
+        Gets all the datasets that resulted from this pipeline.
 
-        :return: A dictionary of Dataset objects, keyed by name. If the run is
-            incomplete, return None.
+        Includes pipeline outputs and intermediate results. If the run is still
+        active, return any outputs that are ready.
+        :return: A dictionary of Dataset objects, keyed by name.
         """
-        if not self.is_complete():
-            return None
-
         datasets = self.api.get(self.results_url).json()['output_summary']
         return {d['name']: Dataset(d, self.api) for d in datasets}

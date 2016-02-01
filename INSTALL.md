@@ -571,7 +571,10 @@ To create a diagram of the entire database:
 
 Running a pipeline
 ------------------
-Load a sample pipeline by running the `./nukeForDemo.bash` or `./nukeSimple.bash`.
+To erase all the data in your database and load a sample pipeline:
+
+    ./manage.py reset --load demo
+
 Then make sure the fleet is running as described above. Finally, navigate to
 the user portal, analysis, and launch the pipeline. 
 
