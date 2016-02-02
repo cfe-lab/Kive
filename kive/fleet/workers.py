@@ -16,6 +16,7 @@ import threading
 import Queue
 import socket
 
+from django.db import connection
 from django.conf import settings
 from django.utils import timezone
 
@@ -387,6 +388,7 @@ class Manager(object):
         # If this run has failed (either due to this task or another),
         # we mop up.
         clean_up_now = False
+        curr_sdbx.run = Run.objects.get(pk=curr_sdbx.run.pk)
         if not curr_sdbx.run.is_successful(use_cache=True):
             self.mop_up_terminated_sandbox(curr_sdbx)
             if not task_finished.is_successful(use_cache=True):
@@ -839,7 +841,6 @@ class Worker(object):
             try:
                 if type(task) == archive.models.RunStep:
                     sandbox_result = Sandbox.finish_step(task_info_dict, self.rank, self.interface.stop_run_callback)
-
                 else:
                     sandbox_result = Sandbox.finish_cable(task_info_dict, self.rank)
                 worker_logger.debug(
@@ -874,6 +875,7 @@ class Worker(object):
         tag = None
         while tag != self.SHUTDOWN:
             tag = self.receive_and_perform_task()
+        connection.close()
 
 
 class WorkerFailedException(Exception):

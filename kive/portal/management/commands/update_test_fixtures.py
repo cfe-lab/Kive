@@ -179,6 +179,14 @@ class ArchiveTestEnvironmentBuilder(FixtureBuilder):
         tools.create_archive_test_environment(self)
 
 
+class ArchiveNoRunsTestEnvironmentBuilder(FixtureBuilder):
+    def get_name(self):
+        return 'archive_no_runs_test_environment.json'
+
+    def build(self):
+        tools.create_archive_no_runs_test_environment(self)
+
+
 class SimpleRunBuilder(FixtureBuilder):
     def get_name(self):
         return 'simple_run.json'
@@ -816,6 +824,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         EMSandboxTestEnvironmentBuilder().run()
         ArchiveTestEnvironmentBuilder().run()
+        ArchiveNoRunsTestEnvironmentBuilder().run()
         DeepNestedRunBuilder().run()
         SimpleRunBuilder().run()
         RemovalTestEnvironmentBuilder().run()

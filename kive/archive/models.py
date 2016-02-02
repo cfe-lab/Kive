@@ -2251,6 +2251,7 @@ class RunSIC(RunCable):
     Related to :model:`librarian.models.ExecRecord`
     Related to :model:`pipeline.models.PipelineStepInputCable`
     """
+    # FIXME need to rename this because it conflicts with the runstep field of RunComponent
     runstep = models.ForeignKey(RunStep, related_name="RSICs")
     PSIC = models.ForeignKey("pipeline.PipelineStepInputCable", related_name="psic_instances")
 

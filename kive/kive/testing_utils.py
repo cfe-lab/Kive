@@ -1110,6 +1110,16 @@ def load_archive_test_environment(case):
     load_sandbox_testing_tools_environment(case)
 
 
+def create_archive_no_runs_test_environment(case):
+    create_eric_martin_test_environment(case)
+    create_sandbox_testing_tools_environment(case)
+
+
+def load_archive_no_runs_test_environment(case):
+    load_eric_martin_test_environment(case)
+    load_sandbox_testing_tools_environment(case)
+
+
 def create_method_test_environment(case):
     """Set up default database state that includes some CRs, CRRs, Methods, etc."""
     # This sets up the DTs and CDTs used in our metadata tests.
