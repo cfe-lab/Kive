@@ -2110,7 +2110,7 @@ class RunCable(RunComponent):
 
         In sequence, the checks we perform:
          - check coherence of start_time and end_time
-         - PSIC/POC belongs to runstep.pipelinestep/run.pipeline
+         - PSIC/POC belongs to dest_runstep.pipelinestep/run.pipeline
 
          - if an ExecLog is attached, clean it
 
@@ -2252,7 +2252,7 @@ class RunSIC(RunCable):
     Related to :model:`pipeline.models.PipelineStepInputCable`
     """
     # FIXME need to rename this because it conflicts with the runstep field of RunComponent
-    runstep = models.ForeignKey(RunStep, related_name="RSICs")
+    dest_runstep = models.ForeignKey(RunStep, related_name="RSICs")
     PSIC = models.ForeignKey("pipeline.PipelineStepInputCable", related_name="psic_instances")
 
     # Implicit from RunCable: execrecord, reused, log, output, invoked_logs, start_time, end_time.
@@ -2260,7 +2260,7 @@ class RunSIC(RunCable):
     class Meta:
         # Uniqueness constraint ensures that no POC is multiply-represented
         # within a run step.
-        unique_together = ("runstep", "PSIC")
+        unique_together = ("dest_runstep", "PSIC")
 
     @classmethod
     def create(cls, PSIC, runstep):
@@ -2282,14 +2282,14 @@ class RunSIC(RunCable):
 
     @property
     def parent_run(self):
-        return self.runstep.run
+        return self.dest_runstep.run
 
     @property
     def top_level_run(self):
         """
         Returns the top-level Run this belongs to.
         """
-        return self.runstep.top_level_run
+        return self.dest_runstep.top_level_run
 
     @property
     def pipeline(self):
@@ -2297,7 +2297,7 @@ class RunSIC(RunCable):
 
     @property
     def parent(self):
-        return self.runstep
+        return self.dest_runstep
 
     @property
     def is_step(self):
@@ -2313,7 +2313,7 @@ class RunSIC(RunCable):
 
     # TODO: fix for sub-pipelines
     def output_name(self):
-        return "run{}_step{}_input{}".format(self.parent_run.pk, self.runstep.step_num, self.PSIC.dest.dataset_idx)
+        return "run{}_step{}_input{}".format(self.parent_run.pk, self.dest_runstep.step_num, self.PSIC.dest.dataset_idx)
 
     def output_description(self):
         run = self.top_level_run
@@ -2321,7 +2321,7 @@ class RunSIC(RunCable):
                 .format(self.pipeline, run.start_time, run.user))
         desc += "run: {}\n".format(run.pk)
         desc += "user: {}\n".format(run.user)
-        desc += "step: {}\n".format(self.runstep.step_num)
+        desc += "step: {}\n".format(self.dest_runstep.step_num)
         desc += "input: {}".format(self.PSIC.dest.dataset_name)
         return desc
 
@@ -2337,9 +2337,9 @@ class RunSIC(RunCable):
         """
         Checks that the PSIC and PipelineStep are coherent.
         """
-        if (not self.runstep.pipelinestep.cables_in.filter(pk=self.PSIC.pk).exists()):
+        if (not self.dest_runstep.pipelinestep.cables_in.filter(pk=self.PSIC.pk).exists()):
             raise ValidationError('PSIC "{}" does not belong to PipelineStep "{}"'
-                                  .format(self.PSIC, self.runstep.pipelinestep))
+                                  .format(self.PSIC, self.dest_runstep.pipelinestep))
 
     def get_coordinates(self):
         """
@@ -2349,7 +2349,7 @@ class RunSIC(RunCable):
         Implicitly, if you are comparing a RunSIC with a RunStep that has
         the same coordinates, the RunSIC is deemed to come first.
         """
-        return self.runstep.get_coordinates()
+        return self.dest_runstep.get_coordinates()
 
 
 class RunOutputCable(RunCable):

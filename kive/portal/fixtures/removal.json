@@ -169,7 +169,7 @@
             "pipelinestep": 1, 
             "run": 1
         }, 
-        "model": "archive.runstep", 
+        "model": "archive.dest_runstep",
         "pk": 1
     }, 
     {
@@ -177,7 +177,7 @@
             "pipelinestep": 1, 
             "run": 2
         }, 
-        "model": "archive.runstep", 
+        "model": "archive.dest_runstep",
         "pk": 4
     }, 
     {
@@ -185,7 +185,7 @@
             "pipelinestep": 4, 
             "run": 3
         }, 
-        "model": "archive.runstep", 
+        "model": "archive.dest_runstep",
         "pk": 7
     }, 
     {
@@ -193,7 +193,7 @@
             "pipelinestep": 5, 
             "run": 3
         }, 
-        "model": "archive.runstep", 
+        "model": "archive.dest_runstep",
         "pk": 9
     }, 
     {
