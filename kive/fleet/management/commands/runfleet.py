@@ -7,12 +7,21 @@ import sys
 class Command(BaseCommand):
     help = 'Launches the manager and worker_interfaces to execute pipelines.'
 
-    option_list = BaseCommand.option_list + (
-        make_option('--worker_interfaces', '-w', type='int', default=1),
-        make_option('--quit-idle',
-                    '-q',
-                    action='store_true',
-                    help='Shut down the fleet as soon as it is idle.'))
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "-w",
+            "--worker_interfaces",
+            dest="worker_interfaces",
+            type="int",
+            default=1
+        )
+        parser.add_argument(
+            "-q",
+            "--quit-idle",
+            dest="quit_idle",
+            action="store_true",
+            help="Shut down the fleet as soon as it is idle."
+        )
 
     def handle(self, *args, **options):
         manager_interface = fleet.workers.MPIManagerInterface(

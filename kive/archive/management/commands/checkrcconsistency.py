@@ -8,8 +8,14 @@ class Command(BaseCommand):
     help = " Checks for and optionally fixes inconsistencies between the normalized fields " \
            "_successful and _complete on RunSteps and RunCables. "
 
-    option_list = BaseCommand.option_list + (
-        make_option('--fix-inconsistencies', '-f', type='choice', choices=['0', '1'], default='1'), )
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "-f",
+            "--fix-inconsistencies",
+            dest="fix_inconsistencies",
+            choices=['0', '1'],
+            default='1'
+        )
 
     def handle(self, *args, **options):
         fix_inconsistencies = options['fix_inconsistencies']

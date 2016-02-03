@@ -17,9 +17,14 @@ from portal.utils import update_all_contenttypes
 
 class Command(BaseCommand):
     help = 'Resets the database and loads sample data.'
-    
-    option_list = BaseCommand.option_list + (
-        make_option('--load', '-l', help="fixture name to load"), )
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "-l",
+            "--load",
+            dest="load",
+            help="fixture name to load"
+        )
     
     def handle(self, *args, **options):
         fixture = options['load']
