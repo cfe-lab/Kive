@@ -6,9 +6,12 @@ from django.core.management import call_command
 from django.contrib.auth.management import create_permissions
 from django.apps import apps as django_apps
 
+import portal.utils
+
 
 def load_initial_groups(apps, schema_editor):
     # update_all_contenttypes(verbosity=0)
+    portal.utils.update_all_contenttypes()
     auth_app_config = django_apps.get_app_config("auth")
     create_permissions(auth_app_config, verbosity=0)
     call_command("loaddata", "initial_groups", app_label="metadata")
@@ -25,11 +28,12 @@ def load_initial_data(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("metadata", "0007_auto_20150218_1045")
+        ("metadata", "0007_auto_20150218_1045"),
+        ("contenttypes", "0002_remove_content_type_name")
     ]
 
     operations = [
-        migrations.RunPython(load_initial_groups),
-        migrations.RunPython(load_initial_user),
-        migrations.RunPython(load_initial_data)
+        migrations.RunPython(load_initial_groups, reverse_code=migrations.RunPython.noop),
+        migrations.RunPython(load_initial_user, reverse_code=migrations.RunPython.noop),
+        migrations.RunPython(load_initial_data, reverse_code=migrations.RunPython.noop)
     ]

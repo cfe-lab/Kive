@@ -2264,7 +2264,7 @@ class RunSIC(RunCable):
 
     @classmethod
     def create(cls, PSIC, runstep):
-        runsic = cls(PSIC=PSIC, runstep=runstep)
+        runsic = cls(PSIC=PSIC, dest_runstep=runstep)
         runsic.start()
         runsic.clean()
         runsic.save()

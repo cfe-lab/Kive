@@ -386,13 +386,13 @@ class AccessControl(models.Model):
         User,
         related_name="%(app_label)s_%(class)s_has_access_to",
         help_text="Which users have access?",
-        null=True, blank=True
+        blank=True
     )
     groups_allowed = models.ManyToManyField(
         Group,
         related_name="%(app_label)s_%(class)s_has_access_to",
         help_text="What groups have access?",
-        null=True, blank=True
+        blank=True
     )
 
     class Meta:
@@ -591,8 +591,13 @@ class Datatype(AccessControl):
     # auto_now_add: set to now on instantiation (editable=False)
     date_created = models.DateTimeField("Date created", auto_now_add=True, help_text="Date Datatype was defined")
 
-    restricts = models.ManyToManyField('self', symmetrical=False, related_name="restricted_by", null=True, blank=True,
-                                       help_text="Captures hierarchical is-a classifications among Datatypes")
+    restricts = models.ManyToManyField(
+        'self',
+        symmetrical=False,
+        related_name="restricted_by",
+        blank=True,
+        help_text="Captures hierarchical is-a classifications among Datatypes"
+    )
 
     prototype = models.OneToOneField("librarian.Dataset", null=True, blank=True,
                                      related_name="datatype_modelled", on_delete=models.SET_NULL)

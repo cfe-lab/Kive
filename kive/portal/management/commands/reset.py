@@ -12,6 +12,7 @@ import archive.models
 import librarian.models
 import datachecking.models
 import portal.models
+from portal.utils import update_all_contenttypes
 
 
 class Command(BaseCommand):
@@ -35,7 +36,8 @@ class Command(BaseCommand):
             target_path = os.path.join(settings.MEDIA_ROOT, target)
             if os.path.isdir(target_path):
                 shutil.rmtree(target_path)
-        
+
+        update_all_contenttypes(verbosity=0)
         call_command("flush", interactive=False)
         call_command("migrate")
         # flush truncates all tables, so we need to re-load this stuff.

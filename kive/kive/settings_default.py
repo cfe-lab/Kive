@@ -16,6 +16,8 @@ ADMINS = (
     # ('Your Name', 'your_email@example.com'),
 )
 
+AUTH_USER_MODEL = "auth.User"
+
 MANAGERS = ADMINS
 
 DATABASES = {

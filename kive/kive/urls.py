@@ -1,4 +1,4 @@
-from django.conf.urls import patterns, url, include
+from django.conf.urls import url, include
 import django.contrib.auth.views
 
 from archive.ajax import MethodOutputViewSet, RunViewSet

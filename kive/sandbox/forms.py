@@ -3,7 +3,8 @@ Forms for running a Pipeline.
 """
 
 from django import forms
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group
+from django.contrib.auth import get_user_model
 
 from pipeline.models import PipelineFamily, Pipeline
 from archive.models import Run
@@ -40,8 +41,6 @@ class RunDetailsForm(forms.ModelForm):
     permissions = metadata.forms.PermissionsField(
         label="Users and groups allowed",
         help_text="Which users and groups are allowed access to this run?",
-        user_queryset=User.objects.all(),
-        group_queryset=Group.objects.all(),
         required=False
     )
 
@@ -68,7 +67,7 @@ class RunDetailsForm(forms.ModelForm):
 
         # We can't simply use "users_allowed or User.objects.all()" because we may specify
         # an empty QuerySet, and that's falsy.
-        users_allowed = users_allowed if users_allowed is not None else User.objects.all()
+        users_allowed = users_allowed if users_allowed is not None else get_user_model().objects.all()
         groups_allowed = groups_allowed if groups_allowed is not None else Group.objects.all()
         self.fields["permissions"].set_users_groups_allowed(users_allowed, groups_allowed)
 

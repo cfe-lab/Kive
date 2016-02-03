@@ -409,7 +409,7 @@ class Sandbox:
         # Update our lists of components completed.
         step_nums_completed = []
         if type(task_completed) == archive.models.RunSIC:
-            assert task_completed.runstep.pipelinestep.is_subpipeline
+            assert task_completed.dest_runstep.pipelinestep.is_subpipeline
             incables_completed.append(task_completed)
         elif type(task_completed) == archive.models.RunStep:
             steps_completed.append(task_completed)
@@ -536,7 +536,7 @@ class Sandbox:
 
                 pipeline_inputs_fed = []
                 for incable in incables_completed:
-                    if run_to_resume.parent_runstep != incable.runstep:
+                    if run_to_resume.parent_runstep != incable.dest_runstep:
                         continue
                     pipeline_inputs_fed.append(incable.PSIC.dest)
 
@@ -907,7 +907,7 @@ class Sandbox:
         # If this is independent of any step recovery, we add it to the queue; either by marking it as
         # waiting for stuff that's going to recover, or by throwing it directly onto the list of tasks to
         # perform.
-        queue_cable = (cable_record.component.is_outcable or cable_record.runstep.pipelinestep.is_subpipeline or
+        queue_cable = (cable_record.component.is_outcable or cable_record.dest_runstep.pipelinestep.is_subpipeline or
                        (force and by_step is None))
         if dataset_path is None and not input_dataset.has_data():
             self.logger.debug("Cable input requires non-trivial recovery")

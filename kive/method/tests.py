@@ -13,7 +13,6 @@ import unittest
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.contrib.contenttypes.management import update_all_contenttypes
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.core.management import call_command
@@ -37,6 +36,7 @@ import portal.models
 import kive.testing_utils as tools
 from fleet.workers import Manager
 from transformation.models import Transformation
+from portal.utils import update_all_contenttypes
 
 
 # This was previously defined here but has been moved to metadata.tests.

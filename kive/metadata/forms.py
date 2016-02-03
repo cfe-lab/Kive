@@ -5,7 +5,8 @@ import json
 import copy
 
 from django import forms
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group
+from django.contrib.auth import get_user_model
 from django.template import loader, Context
 
 from metadata.models import Datatype, BasicConstraint, CompoundDatatypeMember, CompoundDatatype
@@ -16,7 +17,7 @@ def setup_form_users_allowed(form, users_allowed):
     Helper that sets up the users_allowed field on a Form or ModelForm that has a users_allowed
     ModelMultipleChoiceField (e.g. anything that inherits from AccessControl).
     """
-    form.fields["users_allowed"].queryset = users_allowed if users_allowed else User.objects.all()
+    form.fields["users_allowed"].queryset = users_allowed if users_allowed else get_user_model().objects.all()
 
 
 def setup_form_groups_allowed(form, groups_allowed):
@@ -122,22 +123,24 @@ class PermissionsField(forms.MultiValueField):
     # prototype as PermissionsWidget.
     widget = PermissionsWidget
 
-    def __init__(self, user_queryset=None, group_queryset=None, widget=None,
-                 require_all_fields=False, *args, **kwargs):
-        user_queryset = user_queryset or User.objects.all()
-        group_queryset = group_queryset or Group.objects.all()
+    def __init__(self, widget=None, require_all_fields=False, *args, **kwargs):
+        # In order to avoid problems with using the User model at import time, we
+        # set the queryset to None.  This means we must set it later using
+        # set_user_groups_allowed, at run time.
+        # user_queryset = user_queryset or get_user_model().objects.all()
+        # group_queryset = group_queryset or Group.objects.all()
 
         fields = (
-            forms.ModelMultipleChoiceField(queryset=user_queryset, required=False),
-            forms.ModelMultipleChoiceField(queryset=group_queryset, required=False)
+            forms.ModelMultipleChoiceField(queryset=None, required=False),
+            forms.ModelMultipleChoiceField(queryset=None, required=False)
         )
 
         widget = widget or self.widget()
         if isinstance(widget, type):
             widget = widget()
-        # As per a typical ChoiceField, we override the widget's default choices with ours.
-        widget.widgets[0].choices = user_choices(user_queryset)
-        widget.widgets[1].choices = group_choices(group_queryset)
+        # This will be set later, at run time.
+        widget.widgets[0].choices = user_choices([])
+        widget.widgets[1].choices = group_choices([])
 
         super(PermissionsField, self).__init__(
             widget=widget,
@@ -175,8 +178,6 @@ class AccessControlForm(forms.Form):
     permissions = PermissionsField(
         label="Users and groups allowed",
         help_text="Which users and groups are allowed access to this resource?",
-        user_queryset=User.objects.all(),
-        group_queryset=Group.objects.all(),
         required=False
     )
 
@@ -188,7 +189,8 @@ class AccessControlForm(forms.Form):
             if "permissions_{}".format(idx) in self.initial:
                 self.fields["permissions"].fields[idx].initial = self.initial["permissions_{}".format(idx)]
 
-        possible_users_allowed = possible_users_allowed or User.objects.all()
+        # This is now at run time, so we can set the permissions.
+        possible_users_allowed = possible_users_allowed or get_user_model().objects.all()
         possible_groups_allowed = possible_groups_allowed or Group.objects.all()
         self.fields["permissions"].set_users_groups_allowed(possible_users_allowed, possible_groups_allowed)
 
@@ -198,8 +200,6 @@ class DatatypeForm (forms.ModelForm):
     permissions = PermissionsField(
         label="Users and groups allowed",
         help_text="Which users and groups are allowed access to this Datatype?",
-        user_queryset=User.objects.all(),
-        group_queryset=Group.objects.all(),
         required=False
     )
 
@@ -215,7 +215,8 @@ class DatatypeForm (forms.ModelForm):
 
     def __init__(self, data=None, users_allowed=None, groups_allowed=None, *args, **kwargs):
         super(DatatypeForm, self).__init__(data, *args, **kwargs)
-        users_allowed = users_allowed or User.objects.all()
+
+        users_allowed = users_allowed or get_user_model().objects.all()
         groups_allowed = groups_allowed or Group.objects.all()
         self.fields["permissions"].set_users_groups_allowed(users_allowed, groups_allowed)
 
@@ -225,8 +226,6 @@ class DatatypeDetailsForm (forms.ModelForm):
     permissions = PermissionsField(
         label="Users and groups allowed",
         help_text="Which users and groups are allowed access to this Datatype?",
-        user_queryset=User.objects.all(),
-        group_queryset=Group.objects.all(),
         required=False
     )
 
@@ -286,8 +285,6 @@ class CompoundDatatypeForm(forms.ModelForm):
     permissions = PermissionsField(
         label="Users and groups allowed",
         help_text="Which users and groups are allowed access to this CompoundDatatype?",
-        user_queryset=User.objects.all(),
-        group_queryset=Group.objects.all(),
         required=False
     )
 
@@ -297,7 +294,7 @@ class CompoundDatatypeForm(forms.ModelForm):
 
     def __init__(self, data=None, users_allowed=None, groups_allowed=None, *args, **kwargs):
         super(CompoundDatatypeForm, self).__init__(data, *args, **kwargs)
-        users_allowed = users_allowed if users_allowed is not None else User.objects.all()
+        users_allowed = users_allowed if users_allowed is not None else get_user_model().objects.all()
         groups_allowed = groups_allowed if groups_allowed is not None else Group.objects.all()
         self.fields["permissions"].set_users_groups_allowed(users_allowed, groups_allowed)
 

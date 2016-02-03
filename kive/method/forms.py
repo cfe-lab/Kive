@@ -4,7 +4,8 @@ Generate an HTML form to create a new Datatype object
 
 from django.http import Http404
 from django import forms
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import Group
+from django.contrib.auth import get_user_model
 
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from metadata.models import CompoundDatatype
@@ -23,8 +24,6 @@ class CodeResourceDetailsForm(forms.ModelForm):
     permissions = PermissionsField(
         label="Users and groups allowed",
         help_text="Which users and groups are allowed access to this CodeResource?",
-        user_queryset=User.objects.all(),
-        group_queryset=Group.objects.all(),
         required=False
     )
 
@@ -33,7 +32,7 @@ class CodeResourceDetailsForm(forms.ModelForm):
         fields = ("name", "description", "permissions")
 
     def __init__(self, data=None, addable_users=None, addable_groups=None, *args, **kwargs):
-        addable_users = addable_users if addable_users is not None else User.objects.all()
+        addable_users = addable_users if addable_users is not None else get_user_model().objects.all()
         addable_groups = addable_groups if addable_groups is not None else Group.objects.all()
         super(CodeResourceDetailsForm, self).__init__(data, *args, **kwargs)
         self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)
@@ -80,8 +79,6 @@ class CodeResourceRevisionDetailsForm(forms.ModelForm):
     permissions = PermissionsField(
         label="Users and groups allowed",
         help_text="Which users and groups are allowed access to this CodeResourceRevision?",
-        user_queryset=User.objects.all(),
-        group_queryset=Group.objects.all(),
         required=False
     )
 
@@ -90,7 +87,7 @@ class CodeResourceRevisionDetailsForm(forms.ModelForm):
         fields = ("revision_name", "revision_desc", "permissions")
 
     def __init__(self, data=None, addable_users=None, addable_groups=None, *args, **kwargs):
-        addable_users = addable_users if addable_users is not None else User.objects.all()
+        addable_users = addable_users if addable_users is not None else get_user_model().objects.all()
         addable_groups = addable_groups if addable_groups is not None else Group.objects.all()
         super(CodeResourceRevisionDetailsForm, self).__init__(data, *args, **kwargs)
         self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)
@@ -147,7 +144,7 @@ class CodeResourceDependencyForm(forms.Form):
     # The attrs to the widget are to enhance the resulting HTML output.
     coderesource = forms.ChoiceField(
         widget=forms.Select(attrs={'class': 'coderesource'}),
-        choices=[('', '--- CodeResource ---')] + [(x.id, x.name) for x in CodeResource.objects.all()]
+        choices=[('', '--- CodeResource ---')]
     )
 
     # We override this field so that it doesn't try to validate.
@@ -239,8 +236,7 @@ class MethodForm(MethodReviseForm):
     Form used in creating a Method.
     """
     coderesource = forms.ChoiceField(
-        choices = ([('', '--- CodeResource ---')] +
-                   [(x.id, x.name) for x in CodeResource.objects.all().order_by('name')]),
+        choices=[('', '--- CodeResource ---')],
         label="Code resource",
         help_text="The code resource for which this method is a set of instructions.",
         required=True)
@@ -260,8 +256,6 @@ class MethodDetailsForm(forms.ModelForm):
     permissions = PermissionsField(
         label="Users and groups allowed",
         help_text="Which users and groups are allowed access to this Method?",
-        user_queryset=User.objects.all(),
-        group_queryset=Group.objects.all(),
         required=False
     )
 
@@ -270,7 +264,7 @@ class MethodDetailsForm(forms.ModelForm):
         fields = ("revision_name", "revision_desc", "permissions")
 
     def __init__(self, data=None, addable_users=None, addable_groups=None, *args, **kwargs):
-        addable_users = addable_users if addable_users is not None else User.objects.all()
+        addable_users = addable_users if addable_users is not None else get_user_model().objects.all()
         addable_groups = addable_groups if addable_groups is not None else Group.objects.all()
         super(MethodDetailsForm, self).__init__(data, *args, **kwargs)
         self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)
@@ -312,8 +306,6 @@ class MethodFamilyForm (forms.ModelForm):
     permissions = PermissionsField(
         label="Users and groups allowed",
         help_text="Which users and groups are allowed access to this MethodFamily?",
-        user_queryset=User.objects.all(),
-        group_queryset=Group.objects.all(),
         required=False
     )
 
@@ -330,7 +322,7 @@ class MethodFamilyForm (forms.ModelForm):
         fields = ("name", "description", "permissions")
 
     def __init__(self, data=None, addable_users=None, addable_groups=None, *args, **kwargs):
-        addable_users = addable_users if addable_users is not None else User.objects.all()
+        addable_users = addable_users if addable_users is not None else get_user_model().objects.all()
         addable_groups = addable_groups if addable_groups is not None else Group.objects.all()
         super(MethodFamilyForm, self).__init__(data, *args, **kwargs)
         self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)

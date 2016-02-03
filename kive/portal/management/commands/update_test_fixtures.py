@@ -26,7 +26,6 @@ import pipeline.models
 from pipeline.models import PipelineFamily
 import portal.models
 import sandbox.tests
-from archive.models import Dataset, RunStep, Run
 from fleet.workers import Manager
 
 
@@ -71,7 +70,7 @@ class FixtureBuilder(object):
 
         self.replace_timestamps(dump_objects)
         self.rename_dataset_files(os.path.join(settings.MEDIA_ROOT,
-                                               archive.models.Dataset.UPLOAD_DIR),
+                                               Dataset.UPLOAD_DIR),
                                   dump_objects)
 
         dump_filename = os.path.join('portal', 'fixtures', self.get_name())
@@ -84,7 +83,7 @@ class FixtureBuilder(object):
         # If any files were created at this time, we have to stash them in the appropriate place.
         targets = [
             method.models.CodeResourceRevision.UPLOAD_DIR,
-            archive.models.Dataset.UPLOAD_DIR,
+            Dataset.UPLOAD_DIR,
             archive.models.MethodOutput.UPLOAD_DIR,
             datachecking.models.VerificationLog.UPLOAD_DIR,
             portal.models.StagedFile.UPLOAD_DIR,
