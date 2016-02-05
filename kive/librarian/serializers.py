@@ -39,6 +39,7 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             'compounddatatype',
             'filesize',
             'filesize_display',
+            'MD5_checksum',
 
             'user',  # inherited
             'users_allowed',

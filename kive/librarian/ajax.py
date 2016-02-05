@@ -18,8 +18,6 @@ from kive.ajax import RemovableModelViewSet, RedactModelMixin, IsGrantedReadCrea
     StandardPagination, CleanCreateModelMixin, SearchableModelMixin,\
     convert_validation
 
-from librarian.models import Dataset
-
 JSON_CONTENT_TYPE = 'application/json'
 
 
@@ -59,6 +57,7 @@ class DatasetViewSet(RemovableModelViewSet,
     * filters[n][key]=createdbefore&filters[n][val]=match - Dataset was created before this time/date
     * filters[n][key]=cdt&filters[n][val]=id - only include datasets with the
         compound datatype id, or raw type if id is missing.
+    * filters[n][key]=md5&filters[n][val]=match - md5 checksum matches the value
     """
     queryset = Dataset.objects.all()
     serializer_class = DatasetSerializer
@@ -91,6 +90,8 @@ class DatasetViewSet(RemovableModelViewSet,
                 return queryset.filter(structure__isnull=True)
             else:
                 return queryset.filter(structure__compounddatatype=value)
+        if key == 'md5':
+            return queryset.filter(MD5_checksum=value)
 
         if key in ('createdafter', 'createdbefore'):
             t = timezone.make_aware(datetime.strptime(value, '%d %b %Y %H:%M'),

@@ -1154,7 +1154,7 @@ class Sandbox:
 
         if all_complete:
             run_to_resume.mark_complete()
-            run_to_resume.save()
+            run_to_resume.stop(save=True)
 
     # Modified from execute_cable.
     def reuse_or_prepare_cable(self, cable, parent_record, input_dataset, output_path):
