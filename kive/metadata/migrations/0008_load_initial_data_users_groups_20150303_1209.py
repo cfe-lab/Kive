@@ -11,7 +11,7 @@ import portal.utils
 
 def load_initial_groups(apps, schema_editor):
     # update_all_contenttypes(verbosity=0)
-    portal.utils.update_all_contenttypes()
+    portal.utils.update_all_contenttypes(verbosity=0)
     auth_app_config = django_apps.get_app_config("auth")
     create_permissions(auth_app_config, verbosity=0)
     call_command("loaddata", "initial_groups", app_label="metadata")

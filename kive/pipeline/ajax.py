@@ -99,7 +99,6 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
         raise APIException('Unknown filter key: {}'.format(key))
 
 
-
 class PipelineViewSet(CleanCreateModelMixin,
                       RemovableModelViewSet,
                       SearchableModelMixin):
@@ -122,19 +121,23 @@ class PipelineViewSet(CleanCreateModelMixin,
             'steps__cables_in__source__transformationoutput',
             'steps__outputs_to_delete',
             'inputs__structure',
+            'inputs__transformation',
             'outcables__source__structure',
             'outcables__source__transformationinput',
             'outcables__source__transformationoutput',
             'outcables__custom_wires__source_pin',
-            'outcables__custom_wires__dest_pin').\
-            select_related(
-            'steps__transformation__pipeline',
-            'steps__transformation__method',
+            'outcables__custom_wires__dest_pin',
             'outcables__pipeline',
-            'outcables__output_cdt',
-            'outcables__source'
-            'inputs__transformation'
+            'outcables__output_cdt'
         )
+        # .select_related(
+        #     'steps__transformation__pipeline',
+        #     'steps__transformation__method',
+        #     'outcables__pipeline',
+        #     'outcables__output_cdt',
+        #     'outcables__source'
+        #     'inputs__transformation'
+        # )
 
         return prefetchd
 

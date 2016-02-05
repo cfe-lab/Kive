@@ -281,6 +281,20 @@ class Manager(object):
                             run_to_start, run_to_start.pipeline, run_to_start.user)
             run_to_start.stop(save=True)
             run_to_start.complete_clean(use_cache=True)
+
+        elif not run_to_start.is_successful(use_cache=False):
+            # The run failed somewhere in reuse.  This hasn't affected any of our maps yet, so we
+            # just report it and discard it.
+            mgr_logger.info('Run "%s" (pk=%d) (Pipeline: %s, User: %s) failed on reuse',
+                            run_to_start, run_to_start.pk, run_to_start.pipeline, run_to_start.user)
+
+            if self.history_queue.maxlen > 0:
+                self.history_queue.append(new_sdbx)
+
+            run_to_start.mark_complete()
+            run_to_start.stop(save=True)
+            run_to_start.complete_clean(use_cache=True)
+
         else:
             self.active_sandboxes[run_to_start] = new_sdbx
             for task in new_sdbx.hand_tasks_to_fleet():
@@ -417,6 +431,13 @@ class Manager(object):
                                     curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
                     if not tasks_currently_running:
                         clean_up_now = True
+
+                elif not curr_sdbx.run.is_successful(use_cache=False):
+                    # The task that just finished was unsuccessful.  We mop up the sandbox.
+                    self.mop_up_terminated_sandbox(curr_sdbx)
+                    if not tasks_currently_running:
+                        clean_up_now = True
+
 
             if not clean_up_now:
                 # The Run is still going and there may be more stuff to do.

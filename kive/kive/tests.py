@@ -22,6 +22,7 @@ class DuckRequest(object):
     """ A fake request used to test serializers. """
     def __init__(self, user=None):
         self.user = user or kive_user()
+        self.GET = {}
 
     def build_absolute_uri(self, url):
         return url

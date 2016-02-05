@@ -897,9 +897,9 @@
             "is_active": true, 
             "is_staff": false, 
             "is_superuser": false, 
-            "last_login": "2000-01-01T00:00:00Z", 
+            "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$15000$h6XYJGz28SZR$GIrwyzfHvPT1nCSx94vRBcVDqYrbVc4g70O8mCRz3z0=", 
+            "password": "pbkdf2_sha256$24000$4mrr8ePauoWA$lwXVMktYic0Vu0XGBmbTht6bTMRaanGHe1afUeD21AM=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -961,7 +961,7 @@
         "fields": {
             "MD5_checksum": "092ef90fe0201f4b002cd200f7754d45", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_01/tmpJgia1r", 
+            "dataset_file": "Datasets/2016_02/tmpNZ4qen", 
             "date_created": "2000-01-01T00:00:01Z", 
             "description": "blahblahblah", 
             "file_source": null, 
@@ -979,7 +979,7 @@
         "fields": {
             "MD5_checksum": "a1973a61d21c568692491609397bcc0b", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_01/tmp8GZtEg", 
+            "dataset_file": "Datasets/2016_02/tmpsF7Zzo", 
             "date_created": "2000-01-01T00:00:01Z", 
             "description": "random reversed words", 
             "file_source": null, 
@@ -997,8 +997,8 @@
         "fields": {
             "MD5_checksum": "ff6ed7de7a665be6b5a023f8eb7c0642", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_01/tmpaxrM6l", 
-            "date_created": "2000-01-01T00:00:02Z", 
+            "dataset_file": "Datasets/2016_02/tmpHMBecG", 
+            "date_created": "2000-01-01T00:00:01Z", 
             "description": "random reversed words", 
             "file_source": null, 
             "groups_allowed": [
@@ -1062,7 +1062,7 @@
         "fields": {
             "MD5_checksum": "55d9a706ac81b733f851a279d27d8cf2", 
             "coderesource": 2, 
-            "content_file": "CodeResources/fdopen_DnrzxCJ", 
+            "content_file": "CodeResources/fdopen_SvLO6c1", 
             "groups_allowed": [
                 1
             ], 
@@ -1457,7 +1457,7 @@
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:00Z", 
+            "revision_DateTime": "2000-01-01T00:00:01Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
             "user": 2, 
@@ -1499,7 +1499,7 @@
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:03Z", 
+            "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
             "user": 2, 
@@ -1522,7 +1522,7 @@
     {
         "fields": {
             "dataset": 2, 
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
             "start_time": "2000-01-01T00:00:01Z", 
             "user": 2
@@ -1535,7 +1535,7 @@
             "dataset": 3, 
             "end_time": "2000-01-01T00:00:02Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:02Z", 
+            "start_time": "2000-01-01T00:00:01Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 

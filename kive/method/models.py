@@ -833,10 +833,17 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                     method_popen.poll()
 
                 # Having stopped one way or another, make sure we capture the rest of the output.
+
                 self._capture_stream(method_popen.stderr, error_streams)
                 self._capture_stream(method_popen.stdout, output_streams)
                 if not is_terminated:
+                    print "BOH"
                     return_code = method_popen.returncode
+
+        print "BAZ"
+        print method_popen.returncode
+        print return_code
+        print "QUX"
 
         for stream in output_streams + error_streams:
             stream.flush()

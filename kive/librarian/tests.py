@@ -62,7 +62,7 @@ def ER_from_PSIC(run, PS, PSIC):
     PipelineStepInputCable, for a particular run and pipeline step.
     """
     myRS = run.runsteps.create(pipelinestep=PS)
-    myRSIC = PSIC.psic_instances.create(runstep=myRS)
+    myRSIC = PSIC.psic_instances.create(dest_runstep=myRS)
     return ER_from_record(myRSIC)
 
 

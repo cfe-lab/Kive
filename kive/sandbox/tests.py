@@ -6,7 +6,7 @@ import tempfile
 from django.contrib.auth.models import User
 from django.core.files import File
 from django.core.files.base import ContentFile
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 
 from archive.models import Run
 from constants import datatypes
@@ -174,7 +174,20 @@ class ExecuteTestsBase(TestCase):
         restore_production_files()
 
 
-class ExecuteTests(ExecuteTestsBase):
+class ExecuteTransactionTestsBase(TransactionTestCase):
+    fixtures = ['execute_tests']
+
+    def setUp(self):
+        install_fixture_files("execute_tests")
+        execute_tests_environment_load(self)
+
+    def tearDown(self):
+        clean_up_all_files()
+        restore_production_files()
+
+
+class ExecuteTests(ExecuteTransactionTestsBase):
+    serialized_rollback = True
 
     def find_raw_pipeline(self, user):
         """Find a Pipeline with a raw input."""

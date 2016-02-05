@@ -44,13 +44,13 @@ class MethodOutputViewSet(ReadOnlyModelViewSet):
                       'error_redacted': method_output.redact_error_log,
                       'code_redacted': method_output.redact_return_code}
 
-        unexpected_keys = set(request.DATA.keys()) - set(redactions.keys())
+        unexpected_keys = set(request.data.keys()) - set(redactions.keys())
         if unexpected_keys:
             return Response(
                 {'errors': ['Cannot update fields ' + ','.join(unexpected_keys)]},
                 status=status.HTTP_400_BAD_REQUEST)
         for field, redact in redactions.iteritems():
-            if request.DATA.get(field, False):
+            if request.data.get(field, False):
                 redact()
         return self.patch_object(request, pk)
 

@@ -402,7 +402,7 @@ Settings
 Since Kive is a Django project, the majority of the installation
 procedure follows the standard instructions for Django.  The first thing you
 need to do is to make a copy of `/kive/settings_default.py` called
-`settings.py` (remember, all paths are relative to `/kive` so we mean
+`/kive/settings.py` (remember, all paths are relative to `/kive` so we mean
 `/kive/kive/settings_default.py`).  This is a standard step in the
 installation of a Django project where you configure project settings.  Within
 the `DATABASES['default']` dictionary, modify the respective values to indicate

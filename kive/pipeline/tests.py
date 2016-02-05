@@ -2912,7 +2912,8 @@ class PipelineUpdateTests(PipelineTestCase):
         data = PipelineStepUpdateSerializer(
             updates,
             many=True,
-            context=DuckContext()).data
+            context=DuckContext()
+        ).data
         
         self.assertEqual(len(data), 1)
         update = data[0]
@@ -3923,7 +3924,7 @@ class PipelineStepInputCable_tests(PipelineTestCase):
         pipelinestep = self.DNAcompv1_p.steps.first()
         runstep = pipelinestep.pipelinestep_instances.create(run=run)
         psic = pipelinestep.cables_in.first()
-        rsic = psic.psic_instances.create(runstep=runstep)
+        rsic = psic.psic_instances.create(dest_runstep=runstep)
         log = ExecLog(record=rsic, invoking_record=rsic)
         log.save()
         psic.run_cable(source, output_file, rsic, log)

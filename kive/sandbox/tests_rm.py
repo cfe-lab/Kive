@@ -342,11 +342,11 @@ class ExecuteDiscardedIntermediateTests(TestCase):
         self.assertTrue(run.is_successful(use_cache=True))
 
 
-class BadRunTests(TestCase):
+class BadRunTests(TransactionTestCase):
     """
     Tests for when things go wrong during Pipeline execution.
     """
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
+    # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         tools.create_grandpa_sandbox_environment(self)

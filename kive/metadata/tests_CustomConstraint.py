@@ -7,7 +7,7 @@ import shutil
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from django.conf import settings
 
 from metadata.models import Datatype, CompoundDatatype, CustomConstraint, everyone_group
@@ -22,12 +22,10 @@ import file_access_utils
 from constants import datatypes, CDTs
 
 
-class CustomConstraintTests(TestCase):
+class CustomConstraintTestPreamble(object):
     """
     Test the creation and use of custom constraints.
     """
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
         self.user_oscar = User.objects.create_user('oscar', 'oscar@thegrouch.com', 'garbage')
@@ -201,6 +199,114 @@ class CustomConstraintTests(TestCase):
         log.save()
         return log
 
+    def _test_content_check_integrity(self, content_check, execlog, dataset):
+        """
+        Things which should be true about a ContentCheckLog, whether or not
+        it indicated errors.
+        """
+        self.assertEqual(content_check.clean(), None)
+        self.assertEqual(content_check.execlog, execlog)
+        self.assertEqual(content_check.dataset, dataset)
+        self.assertIsNotNone(content_check.end_time)
+        self.assertEqual(content_check.start_time.date(),
+                content_check.end_time.date())
+        self.assertEqual(content_check.start_time <= content_check.end_time,
+                True)
+
+    def _test_upload_data_good(self):
+        """
+        Helper function to upload good data.
+        """
+        dataset_good = Dataset.create_dataset(
+            self.good_datafile,
+            user=self.user_oscar,
+            cdt=self.cdt_constraints,
+            name="good data",
+            description="data which conforms to all its constraints"
+        )
+        return dataset_good
+
+    def _test_upload_data_bad(self):
+        """
+        Helper function to upload bad data.
+        """
+        dataset_bad = Dataset.create_dataset(
+            self.bad_datafile,
+            user=self.user_oscar,
+            cdt=self.cdt_constraints,
+            name="good data",
+            description="data which conforms to all its constraints"
+        )
+        return dataset_bad
+
+    def _test_setup_prototype_good(self):
+        prototype_cdt = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
+        prototype_file = self._setup_datafile(prototype_cdt,
+                [["hello", "True"], ["hell", "True"], ["hel", "False"],
+                 ["he", "True"], ["h", "False"]])
+        prototype_SD = Dataset.create_dataset(
+            prototype_file,
+            user=self.user_oscar,
+            cdt=prototype_cdt,
+            name="good prototype",
+            description="working prototype for constraint CDT")
+        os.remove(prototype_file)
+
+        # Add a prototype to the custom DT, and make a new CDT.
+        self.dt_custom.prototype = prototype_SD
+        self.dt_custom.save()
+        cdt = self._setup_compounddatatype([self.dt_basic, self.dt_custom], ["letter strings", "words"],
+                                           self.user_oscar)
+        return cdt
+
+    def _test_setup_prototype_bad(self):
+        prototype_cdt = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
+        prototype_file = self._setup_datafile(prototype_cdt,
+                [["hello", "False"], ["hell", "True"], ["hel", "False"],
+                 ["he", "True"], ["h", "False"]])
+        prototype_SD = Dataset.create_dataset(
+            prototype_file,
+            user=self.user_oscar,
+            cdt=prototype_cdt,
+            name="good prototype",
+            description="working prototype for constraint CDT"
+        )
+        os.remove(prototype_file)
+
+        # Add a prototype to the custom DT.
+        self.dt_custom.prototype = prototype_SD
+        self.dt_custom.save()
+        return self.dt_custom
+
+    def _test_execute_pipeline_constraints(self, pipeline):
+        """
+        Helper function to execute a pipeline with the cdt_constraints
+        compound datatype as input.
+        """
+        good_dataset = self._test_upload_data_good()
+        run = Manager.execute_pipeline(self.user_oscar, pipeline, [good_dataset]).get_last_run()
+        runstep = run.runsteps.first()
+        execlog = runstep.log
+        output_dataset = runstep.execrecord.execrecordouts.first().dataset
+        content_check = output_dataset.content_checks.first()
+        return (content_check, execlog, output_dataset)
+
+    def _test_verification_log(self, verif_log, content_check, CDTM):
+        """
+        Checks which should pass for any VerificationLog, succesful or not.
+        """
+        self.assertIsNotNone(verif_log)
+        self.assertIsNone(verif_log.clean())
+        self.assertEqual(verif_log.contentchecklog, content_check)
+        self.assertEqual(verif_log.CDTM, CDTM)
+        self.assertIsNotNone(verif_log.start_time)
+        self.assertIsNotNone(verif_log.end_time)
+        self.assertEqual(verif_log.end_time.date(), verif_log.start_time.date())
+        self.assertEqual(verif_log.start_time <= verif_log.end_time, True)
+
+
+class CustomConstraintTests(CustomConstraintTestPreamble, TestCase):
+
     def test_summarize_CSV_no_output(self):
         """
         A verification method which produces no output should throw a ValueError.
@@ -307,117 +413,6 @@ class CustomConstraintTests(TestCase):
                       )
         )
 
-    def _test_content_check_integrity(self, content_check, execlog, dataset):
-        """
-        Things which should be true about a ContentCheckLog, whether or not
-        it indicated errors.
-        """
-        self.assertEqual(content_check.clean(), None)
-        self.assertEqual(content_check.execlog, execlog)
-        self.assertEqual(content_check.dataset, dataset)
-        self.assertIsNotNone(content_check.end_time)
-        self.assertEqual(content_check.start_time.date(),
-                content_check.end_time.date())
-        self.assertEqual(content_check.start_time <= content_check.end_time,
-                True)
-
-    def _test_upload_data_good(self):
-        """
-        Helper function to upload good data.
-        """
-        dataset_good = Dataset.create_dataset(
-            self.good_datafile,
-            user=self.user_oscar,
-            cdt=self.cdt_constraints,
-            name="good data",
-            description="data which conforms to all its constraints"
-        )
-        return dataset_good
-
-    def _test_upload_data_bad(self):
-        """
-        Helper function to upload bad data.
-        """
-        dataset_bad = Dataset.create_dataset(
-            self.bad_datafile,
-            user=self.user_oscar,
-            cdt=self.cdt_constraints,
-            name="good data",
-            description="data which conforms to all its constraints"
-        )
-        return dataset_bad
-
-    def _test_setup_prototype_good(self):
-        prototype_cdt = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
-        prototype_file = self._setup_datafile(prototype_cdt, 
-                [["hello", "True"], ["hell", "True"], ["hel", "False"],
-                 ["he", "True"], ["h", "False"]])
-        prototype_SD = Dataset.create_dataset(
-            prototype_file,
-            user=self.user_oscar,
-            cdt=prototype_cdt,
-            name="good prototype",
-            description="working prototype for constraint CDT")
-        os.remove(prototype_file)
-
-        # Add a prototype to the custom DT, and make a new CDT.
-        self.dt_custom.prototype = prototype_SD
-        self.dt_custom.save()
-        cdt = self._setup_compounddatatype([self.dt_basic, self.dt_custom], ["letter strings", "words"],
-                                           self.user_oscar)
-        return cdt
-
-    def _test_setup_prototype_bad(self):
-        prototype_cdt = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
-        prototype_file = self._setup_datafile(prototype_cdt, 
-                [["hello", "False"], ["hell", "True"], ["hel", "False"],
-                 ["he", "True"], ["h", "False"]])
-        prototype_SD = Dataset.create_dataset(
-            prototype_file,
-            user=self.user_oscar,
-            cdt=prototype_cdt,
-            name="good prototype",
-            description="working prototype for constraint CDT"
-        )
-        os.remove(prototype_file)
-
-        # Add a prototype to the custom DT.
-        self.dt_custom.prototype = prototype_SD
-        self.dt_custom.save()
-        return self.dt_custom
-
-    def _test_execute_pipeline_constraints(self, pipeline):
-        """
-        Helper function to execute a pipeline with the cdt_constraints 
-        compound datatype as input.
-        """
-        good_dataset = self._test_upload_data_good()
-        run = Manager.execute_pipeline(self.user_oscar, pipeline, [good_dataset]).get_last_run()
-        runstep = run.runsteps.first()
-        execlog = runstep.log
-        output_dataset = runstep.execrecord.execrecordouts.first().dataset
-        content_check = output_dataset.content_checks.first()
-        return (content_check, execlog, output_dataset)
-
-    def test_execute_pipeline_content_check_good(self):
-        """
-        Test the integrity of the ContentCheck created while running a
-        Pipeline on some data with CustomConstraints.
-        """
-        content_check, execlog, dataset_out = self._test_execute_pipeline_constraints(self.pipeline_noop)
-        self._test_content_check_integrity(content_check, execlog, dataset_out)
-        self.assertEqual(content_check.is_fail(), False)
-
-    def test_execute_pipeline_content_check_bad(self):
-        """
-        Test the integrity of the ContentCheck created while running a
-        Pipeline on some data with CustomConstraints, where the output data
-        does not pass the content check.
-        """
-        content_check, execlog, dataset_out = self._test_execute_pipeline_constraints(self.pipeline_mangle)
-        self._test_content_check_integrity(content_check, execlog, dataset_out)
-        self.assertEqual(content_check.is_fail(), True)
-
     def test_upload_data_content_check_good(self):
         """
         Test the integrity of a ContentCheck created when uploading a dataset.
@@ -426,45 +421,6 @@ class CustomConstraintTests(TestCase):
         content_check = dataset_good.content_checks.first()
         self._test_content_check_integrity(content_check, None, dataset_good)
         self.assertEqual(content_check.is_fail(), False)
-
-    def _test_verification_log(self, verif_log, content_check, CDTM):
-        """
-        Checks which should pass for any VerificationLog, succesful or not.
-        """
-        self.assertIsNotNone(verif_log)
-        self.assertIsNone(verif_log.clean())
-        self.assertEqual(verif_log.contentchecklog, content_check) 
-        self.assertEqual(verif_log.CDTM, CDTM)
-        self.assertIsNotNone(verif_log.start_time)
-        self.assertIsNotNone(verif_log.end_time)
-        self.assertEqual(verif_log.end_time.date(), verif_log.start_time.date())
-        self.assertEqual(verif_log.start_time <= verif_log.end_time, True)
-
-    def test_execute_pipeline_verification_log_good(self):
-        """
-        Test the integrity of the VerificationLog created while running a
-        Pipeline on some data with CustomConstraints.
-        """
-        content_check, execlog, dataset_out = self._test_execute_pipeline_constraints(self.pipeline_noop)
-
-        verif_log = content_check.verification_logs.first()
-        self._test_verification_log(verif_log, content_check, self.cdt_constraints.members.last())
-        self.assertEqual(verif_log.return_code, 0)
-        self.assertEqual(verif_log.output_log.read(), "")
-        self.assertEqual(verif_log.error_log.read(), "")
-
-    def test_execute_pipeline_verification_log_bad(self):
-        """
-        Test the integrity of the VerificationLog created while running a
-        Pipeline on some data with CustomConstraints, when the data does not
-        conform.
-        """
-        content_check, execlog, dataset_out = self._test_execute_pipeline_constraints(self.pipeline_mangle)
-        verif_log = content_check.verification_logs.first()
-        self._test_verification_log(verif_log, content_check, self.cdt_constraints.members.last())
-        self.assertEqual(verif_log.return_code, 0)
-        self.assertEqual(verif_log.output_log.read(), "")
-        self.assertEqual(verif_log.error_log.read(), "")
 
     def test_upload_data_verification_log_good(self):
         """
@@ -508,3 +464,50 @@ class CustomConstraintTests(TestCase):
                                 re.escape('The prototype for Datatype "{}" indicates the value "{}" should be '
                                           'invalid, but it passed all constraints'.format(dt, "hello")),
                                 dt.clean)
+
+
+class CustomConstraintTestsWithExecution(CustomConstraintTestPreamble, TransactionTestCase):
+    def test_execute_pipeline_content_check_good(self):
+        """
+        Test the integrity of the ContentCheck created while running a
+        Pipeline on some data with CustomConstraints.
+        """
+        content_check, execlog, dataset_out = self._test_execute_pipeline_constraints(self.pipeline_noop)
+        self._test_content_check_integrity(content_check, execlog, dataset_out)
+        self.assertEqual(content_check.is_fail(), False)
+
+    def test_execute_pipeline_content_check_bad(self):
+        """
+        Test the integrity of the ContentCheck created while running a
+        Pipeline on some data with CustomConstraints, where the output data
+        does not pass the content check.
+        """
+        content_check, execlog, dataset_out = self._test_execute_pipeline_constraints(self.pipeline_mangle)
+        self._test_content_check_integrity(content_check, execlog, dataset_out)
+        self.assertEqual(content_check.is_fail(), True)
+
+    def test_execute_pipeline_verification_log_good(self):
+        """
+        Test the integrity of the VerificationLog created while running a
+        Pipeline on some data with CustomConstraints.
+        """
+        content_check, execlog, dataset_out = self._test_execute_pipeline_constraints(self.pipeline_noop)
+
+        verif_log = content_check.verification_logs.first()
+        self._test_verification_log(verif_log, content_check, self.cdt_constraints.members.last())
+        self.assertEqual(verif_log.return_code, 0)
+        self.assertEqual(verif_log.output_log.read(), "")
+        self.assertEqual(verif_log.error_log.read(), "")
+
+    def test_execute_pipeline_verification_log_bad(self):
+        """
+        Test the integrity of the VerificationLog created while running a
+        Pipeline on some data with CustomConstraints, when the data does not
+        conform.
+        """
+        content_check, execlog, dataset_out = self._test_execute_pipeline_constraints(self.pipeline_mangle)
+        verif_log = content_check.verification_logs.first()
+        self._test_verification_log(verif_log, content_check, self.cdt_constraints.members.last())
+        self.assertEqual(verif_log.return_code, 0)
+        self.assertEqual(verif_log.output_log.read(), "")
+        self.assertEqual(verif_log.error_log.read(), "")

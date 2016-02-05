@@ -14,7 +14,7 @@ from django.db import transaction, OperationalError, InternalError
 from django.contrib.auth.models import User
 
 import archive.models
-from archive.models import RunStep, Run
+from archive.models import RunStep, Run, MethodOutput
 from constants import dirnames, extensions
 import file_access_utils
 import librarian.models
@@ -786,7 +786,7 @@ class Sandbox:
             self.logger.debug("Run (coordinates %s) completed.", run_to_resume.get_coordinates())
             with transaction.atomic():
                 run_to_resume.mark_complete()
-                run_to_resume.save()
+                run_to_resume.stop(save=True)
 
         return incables_completed, steps_completed, outcables_completed
 
@@ -1702,7 +1702,7 @@ class Sandbox:
                             # Make new ExecRecord, linking it to the ExecLog
                             logger.debug("[%d] Creating fresh ExecRecord", worker_rank)
                             curr_ER = librarian.models.ExecRecord.create(curr_log, pipelinestep,
-                                                                            inputs_after_cable, output_datasets)
+                                                                         inputs_after_cable, output_datasets)
 
                         # Link ExecRecord to RunStep (it may already have been linked; that's fine).
                         curr_RS.link_execrecord(curr_ER, False)

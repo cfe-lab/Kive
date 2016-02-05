@@ -94,7 +94,7 @@ class ArchiveTestCaseHelpers:
         output datasets for each cable, in order.
         """
         for i, cable in enumerate(runstep.pipelinestep.cables_in.order_by("dest__dataset_idx")):
-            rsic = cable.psic_instances.create(runstep=runstep)
+            rsic = cable.psic_instances.create(dest_runstep=runstep)
             self.make_complete_non_reused(rsic, [input_SDs[i]], [output_SDs[i]])
 
     def step_through_runstep_creation(self, bp):
@@ -109,7 +109,7 @@ class ArchiveTestCaseHelpers:
         if bp == "first_runstep":
             return
 
-        self.E03_11_RSIC = self.E03_11.psic_instances.create(runstep=self.step_E1_RS)
+        self.E03_11_RSIC = self.E03_11.psic_instances.create(dest_runstep=self.step_E1_RS)
         self.make_complete_non_reused(self.E03_11_RSIC, [self.raw_dataset], [self.raw_dataset])
         self.raw_dataset.integrity_checks.create(execlog=self.E03_11_RSIC.log, user=self.myUser)
         if bp == "first_rsic":
@@ -233,7 +233,7 @@ class ArchiveTestCaseHelpers:
             return
 
         # First RunSIC associated and completed.
-        step_E1_RSIC = self.step_E1.cables_in.first().psic_instances.create(runstep=self.step_E1_RS)
+        step_E1_RSIC = self.step_E1.cables_in.first().psic_instances.create(dest_runstep=self.step_E1_RS)
         if bp == "first_cable_created":
             return
 
@@ -392,7 +392,7 @@ class ArchiveTestCaseHelpers:
         if bp == "runstep":
             return
 
-        self.E11_32_RSIC = self.E11_32.psic_instances.create(runstep=self.step_E3_RS)
+        self.E11_32_RSIC = self.E11_32.psic_instances.create(dest_runstep=self.step_E3_RS)
         if bp == "rsic_created":
             return
 
@@ -404,7 +404,7 @@ class ArchiveTestCaseHelpers:
         if bp == "rsic_completed":
             return
 
-        self.E21_31_RSIC = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
+        self.E21_31_RSIC = self.E21_31.psic_instances.create(dest_runstep=self.step_E3_RS)
         self.make_complete_non_reused(self.E21_31_RSIC, [self.C1_in_dataset], [self.C1_in_dataset])
         # C1_in_dataset is not created by this RSIC, so associate an ICL.
         self.C1_in_dataset.integrity_checks.create(execlog=self.E21_31_RSIC.log, user=self.myUser)
@@ -906,7 +906,7 @@ class RunStepTests(ArchiveTestCase):
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_run.grant_everyone_access()
         other_runstep = self.step_E1.pipelinestep_instances.create(run=other_run)
-        rsic = self.E03_11.psic_instances.create(runstep=other_runstep)
+        rsic = self.E03_11.psic_instances.create(dest_runstep=other_runstep)
         self.make_complete_non_reused(rsic, [self.raw_dataset], [self.raw_dataset])
         self.make_complete_non_reused(other_runstep, [self.raw_dataset], [self.doublet_dataset])
 
@@ -942,7 +942,7 @@ class RunStepTests(ArchiveTestCase):
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_run.grant_everyone_access()
         other_runstep = self.step_E1.pipelinestep_instances.create(run=other_run)
-        rsic = self.E03_11.psic_instances.create(runstep=other_runstep)
+        rsic = self.E03_11.psic_instances.create(dest_runstep=other_runstep)
         self.make_complete_non_reused(rsic, [self.raw_dataset], [self.raw_dataset])
         self.make_complete_non_reused(other_runstep, [self.raw_dataset], [self.doublet_dataset])
 
@@ -1553,7 +1553,7 @@ class RunSICTests(ArchiveTestCase):
         RunStep's PipelineStep, is not clean.
         """
         self.step_through_runsic_creation("runstep")
-        rsic = self.E01_21.psic_instances.create(runstep=self.step_E3_RS)
+        rsic = self.E01_21.psic_instances.create(dest_runstep=self.step_E3_RS)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('PSIC "{}" does not belong to PipelineStep "{}"'
                                           .format(self.E01_21, self.step_E3)),
@@ -1591,7 +1591,7 @@ class RunSICTests(ArchiveTestCase):
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_run.grant_everyone_access()
         other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
-        other_rsic = self.E11_32.psic_instances.create(runstep=other_runstep)
+        other_rsic = self.E11_32.psic_instances.create(dest_runstep=other_runstep)
         self.make_complete_non_reused(other_rsic, [self.doublet_dataset], [self.C2_in_dataset])
         self.E11_32_RSIC.execrecord = other_rsic.execrecord
 
@@ -1640,7 +1640,7 @@ class RunSICTests(ArchiveTestCase):
         self.step_through_runsic_creation("rsic_created")
 
         # Create an incompatible RunSIC.
-        runsic = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
+        runsic = self.E21_31.psic_instances.create(dest_runstep=self.step_E3_RS)
         self.make_complete_non_reused(runsic, [self.C1_in_dataset], [self.C1_in_dataset])
 
         run = self.pE.pipeline_instances.create(user=self.myUser)
@@ -1666,7 +1666,7 @@ class RunSICTests(ArchiveTestCase):
         other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
 
         self.make_complete_reused(self.E11_32_RSIC, [self.doublet_dataset], [self.C2_in_dataset], other_runstep)
-        self.E21_31_RSIC = self.E21_31.psic_instances.create(runstep=self.step_E3_RS)
+        self.E21_31_RSIC = self.E21_31.psic_instances.create(dest_runstep=self.step_E3_RS)
         self.make_complete_non_reused(self.E21_31_RSIC, [self.C1_in_dataset], [self.C1_in_dataset])
         self.make_complete_non_reused(self.step_E3_RS,
                                       [self.C1_in_dataset, self.C2_in_dataset],
@@ -1800,7 +1800,7 @@ class RunSICTests(ArchiveTestCase):
 
         # Create an incompatible RunSIC.
         runstep = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
-        runsic = self.E02_22.psic_instances.create(runstep=runstep)
+        runsic = self.E02_22.psic_instances.create(dest_runstep=runstep)
         self.make_complete_non_reused(runsic, [self.singlet_dataset], [self.singlet_dataset])
         self.E11_32_RSIC.execrecord = runsic.execrecord
         self.assertRaisesRegexp(
@@ -3228,6 +3228,16 @@ class IsCompleteSuccessfulExecutionActualExecutionTests(TransactionTestCase):
 
     serialized_rollback = True
 
+    # def _fixture_setup(self):
+    #
+    #     from django.db import connections
+    #
+    #     for db_name in self._databases_names(include_mirrors=False):
+    #         if hasattr(connections[db_name], "_test_serialized_contents"):
+    #             print connections[db_name]._test_serialized_contents
+    #
+    #     super(IsCompleteSuccessfulExecutionActualExecutionTests, self)._fixture_setup()
+
     def setUp(self):
         install_fixture_files("archive_no_runs_test_environment")
         tools.load_archive_no_runs_test_environment(self)
@@ -3540,7 +3550,7 @@ class TopLevelRunOnDeepNestedRunTests(TestCase):
                 self.assertEquals(self.deep_nested_run, roc.top_level_run)
 
 
-class RunStepReuseFailedExecRecordTests(TestCase):
+class RunStepReuseFailedExecRecordTests(TransactionTestCase):
     # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):

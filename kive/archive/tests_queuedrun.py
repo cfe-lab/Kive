@@ -100,8 +100,8 @@ class QueuedRunTest(TestCase):
                            pipelinestep=pipeline_step,
                            start_time=timezone.now())
         run_step.save()
-        run_step_input_cable = RunSIC(PSIC=pipeline_step.cables_in.first())
-        run_step.RSICs.add(run_step_input_cable)
+        run_step_input_cable = RunSIC(PSIC=pipeline_step.cables_in.first(),
+                                      dest_runstep=run_step).save()
 
         return run
 
@@ -158,8 +158,8 @@ class QueuedRunTest(TestCase):
     def test_run_progress_output_ready(self):
         run = self.create_with_completed_run_step()
         pipeline_output_cable = run.pipeline.outcables.first()
-        run.runoutputcables.add(RunOutputCable(
-            pipelineoutputcable=pipeline_output_cable))
+        roc = RunOutputCable(pipelineoutputcable=pipeline_output_cable, run=run)
+        roc.save()
 
         progress = run.get_run_progress()
 
@@ -169,8 +169,10 @@ class QueuedRunTest(TestCase):
         run = self.create_with_completed_run_step()
         pipeline_output_cable = run.pipeline.outcables.first()
         run_output_cable = RunOutputCable(
-            pipelineoutputcable=pipeline_output_cable)
-        run.runoutputcables.add(run_output_cable)
+            pipelineoutputcable=pipeline_output_cable,
+            run=run
+        )
+        run_output_cable.save()
         self.add_exec_log(run_output_cable)
 
         progress = run.get_run_progress()
@@ -181,8 +183,10 @@ class QueuedRunTest(TestCase):
         run = self.create_with_completed_run_step()
         pipeline_output_cable = run.pipeline.outcables.first()
         run_output_cable = RunOutputCable(
-            pipelineoutputcable=pipeline_output_cable)
-        run.runoutputcables.add(run_output_cable)
+            pipelineoutputcable=pipeline_output_cable,
+            run=run
+        )
+        run_output_cable.save()
         self.add_exec_log(run_output_cable)
         self.add_exec_record(run_output_cable)
 
