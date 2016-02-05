@@ -28,12 +28,12 @@ class DatasetViewSet(RemovableModelViewSet,
                      RedactModelMixin,
                      SearchableModelMixin):
     """ List and modify datasets.
-    
+
     POST to the list to upload a new dataset, DELETE an instance to remove it
     along with all runs that produced or consumed it, or PATCH is_redacted=true
     on an instance to blank its contents along with any other instances or logs
     that used it as input.
-    
+
     Query parameters for the list view:
     * page_size=n - limit the results and page through them
     * is_granted=true - For administrators, this limits the list to only include
@@ -73,7 +73,7 @@ class DatasetViewSet(RemovableModelViewSet,
     def filter_queryset(self, queryset):
         queryset = super(DatasetViewSet, self).filter_queryset(queryset)
         return self.apply_filters(queryset)
-    
+
     def _add_filter(self, queryset, key, value):
         if key == 'smart':
             return queryset.filter(Q(name__icontains=value) |
