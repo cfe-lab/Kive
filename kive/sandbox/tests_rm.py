@@ -9,12 +9,12 @@ import shutil
 import os.path
 
 from librarian.models import Dataset
-from sandbox.execute import Sandbox
 import kive.testing_utils as tools
 from pipeline.models import Pipeline, PipelineFamily
 from kive.tests import install_fixture_files, restore_production_files
 from method.models import Method
 from fleet.workers import Manager
+from archive.models import Run
 import file_access_utils
 
 
@@ -29,8 +29,6 @@ class SandboxRMTestCase(TestCase):
 
 
 class SandboxRMTransactionTestCase(TransactionTestCase):
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
 
@@ -293,7 +291,7 @@ class ExecuteResultTestsRM(TestCase):
         self.assertEqual(outcable_input_dataset.num_rows(), outcable_output_dataset.num_rows())
 
 
-class ExecuteDiscardedIntermediateTests(TestCase):
+class ExecuteDiscardedIntermediateTests(TransactionTestCase):
     fixtures = ["execute_discarded_intermediate_tests_rm"]
 
     def setUp(self):
@@ -394,7 +392,7 @@ class BadRunTests(TransactionTestCase):
         self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().dataset])
 
 
-class FindDatasetTests(TestCase):
+class FindDatasetTests(TransactionTestCase):
     """
     Tests for first_generator_of_dataset.
     """
@@ -418,8 +416,8 @@ class FindDatasetTests(TestCase):
         self.dataset_words = Dataset.objects.get(name='blahblah')
         self.user_bob = User.objects.get(username='bob')
 
-        x = Sandbox(self.user_bob, self.pipeline_noop, [self.dataset_words])
-        x.execute_pipeline()
+        mgr = Manager.execute_pipeline(self.user_bob, self.pipeline_noop, [self.dataset_words])
+        x = mgr.history_queue.pop()
         self.assertIsNone(x.run.complete_clean())
         self.assertTrue(x.run.is_successful())
 
@@ -500,7 +498,8 @@ class FindDatasetTests(TestCase):
         self.assertEqual(gen_2, cable.PSIC)
 
 
-class RawTests(SandboxRMTestCase):
+class RawTests(SandboxRMTransactionTestCase):
+    serialized_rollback = True
 
     def setUp(self):
         super(RawTests, self).setUp()
@@ -523,15 +522,19 @@ class RawTests(SandboxRMTestCase):
     def test_execute_pipeline_raw(self):
         """Execute a raw Pipeline."""
         run = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
+        run = Run.objects.get(pk=run.pk)
         self.assertTrue(run.is_complete(use_cache=True))
         self.assertTrue(run.is_successful(use_cache=True))
 
     def test_execute_pipeline_raw_twice(self):
         """Execute a raw Pipeline and reuse an ExecRecord."""
         run = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
+        run = Run.objects.get(pk=run.pk)
         self.assertTrue(run.is_complete(use_cache=True))
         self.assertTrue(run.is_successful(use_cache=True))
+
         run2 = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
+        run2 = Run.objects.get(pk=run2.pk)
         self.assertTrue(run2.is_complete(use_cache=True))
         self.assertTrue(run2.is_successful(use_cache=True))
 

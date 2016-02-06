@@ -1939,11 +1939,8 @@ class RunPlan(object):
                 for input_plan in step_plan.inputs:
                     if not input_plan.has_data():
                         source_plan = self.step_plans[input_plan.step_num-1]
-                        if not source_plan.pipeline_step.is_subpipeline:
-                            is_changed = source_plan.check_rerun() or is_changed
-                        else:
-                            # Look up the step of the sub-run that produced this output.
-                            is_changed = source_plan.subrun_plan.check_rerun(source_plan.output_num) or is_changed
+                        is_changed = source_plan.check_rerun(input_plan.output_num) or is_changed
+
         return is_changed
 
     def walk_forward(self):
@@ -1993,7 +1990,7 @@ class StepPlan(object):
             curr_output_plan = self.subrun_plan.outputs[output_idx-1]
             source_step_plan = self.subrun_plan.step_plans[curr_output_plan.step_num-1]
 
-            return source_step_plan.check_rerun(output_idx=source_step_plan.output_num)
+            return source_step_plan.check_rerun(output_idx=output_idx)
 
         else:
             if not self.execrecord:

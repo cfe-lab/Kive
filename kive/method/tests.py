@@ -44,7 +44,7 @@ samplecode_path = metadata.tests.samplecode_path
 
 
 class FileAccessTests(TransactionTestCase):
-    # fixtures = ["initial_groups", "initial_user", "initial_data"]
+    serialized_rollback = True
 
     def setUp(self):
         tools.fd_count("FDs (start)")
@@ -55,9 +55,9 @@ class FileAccessTests(TransactionTestCase):
         # call_command("flush", interactive=False)
         # auth_app_config = django_apps.get_app_config("auth")
         # create_permissions(auth_app_config, verbosity=0)
-        call_command("loaddata", "initial_groups", verbosity=0)
-        call_command("loaddata", "initial_user", verbosity=0)
-        call_command("loaddata", "initial_data", verbosity=0)
+        # call_command("loaddata", "initial_groups", verbosity=0)
+        # call_command("loaddata", "initial_user", verbosity=0)
+        # call_command("loaddata", "initial_data", verbosity=0)
 
         # A typical user.
         self.user_randy = User.objects.create_user("Randy", "theotherrford@deco.ca", "hat")

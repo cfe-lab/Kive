@@ -276,29 +276,30 @@ class Manager(object):
 
         # If we were able to reuse throughout, then we're totally done.  Otherwise we
         # need to do some bookkeeping.
+        finished_already = False
         if run_to_start.is_complete(use_cache=True):
             mgr_logger.info('Run "%s" completely reused (Pipeline: %s, User: %s)',
                             run_to_start, run_to_start.pipeline, run_to_start.user)
-            run_to_start.stop(save=True)
-            run_to_start.complete_clean(use_cache=True)
+            finished_already = True
 
-        elif not run_to_start.is_successful(use_cache=False):
+        elif not run_to_start.is_successful(use_cache=True):
             # The run failed somewhere in reuse.  This hasn't affected any of our maps yet, so we
             # just report it and discard it.
             mgr_logger.info('Run "%s" (pk=%d) (Pipeline: %s, User: %s) failed on reuse',
                             run_to_start, run_to_start.pk, run_to_start.pipeline, run_to_start.user)
-
-            if self.history_queue.maxlen > 0:
-                self.history_queue.append(new_sdbx)
-
             run_to_start.mark_complete()
-            run_to_start.stop(save=True)
-            run_to_start.complete_clean(use_cache=True)
+            finished_already = True
 
         else:
             self.active_sandboxes[run_to_start] = new_sdbx
             for task in new_sdbx.hand_tasks_to_fleet():
                 self.task_queue.append((new_sdbx, task))
+
+        if finished_already:
+            run_to_start.stop(save=True)
+            run_to_start.complete_clean(use_cache=True)
+            if self.history_queue.maxlen > 0:
+                self.history_queue.append(new_sdbx)
 
         return new_sdbx
 
