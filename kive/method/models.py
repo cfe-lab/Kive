@@ -821,7 +821,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 # While periodically checking for a STOP message, we
                 # monitor the progress of method_popen and update the
                 # streams.
-                while method_popen.returncode is not None:
+                while method_popen.returncode is None:
                     if stop_execution_callback() is not None:
                         # We have received a STOP message.  Terminate method_popen.
                         method_popen.terminate()
@@ -985,7 +985,10 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
         pipelines_affected = set([ps.pipeline for ps in self.pipelinesteps.all()])
         for pipeline_affected in pipelines_affected:
-            curr_datasets_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = pipeline_affected.remove_list()
+            (curr_datasets_listed,
+             curr_ERs_listed,
+             curr_runs_listed,
+             curr_pipelines_listed) = pipeline_affected.remove_list()
             datasets_listed.update(curr_datasets_listed)
             ERs_listed.update(curr_ERs_listed)
             runs_listed.update(curr_runs_listed)
