@@ -122,7 +122,7 @@ class DatasetViewSet(RemovableModelViewSet,
         accessible_datasets = Dataset.filter_by_user(request.user)
         dataset = self.get_object()
 
-        if dataset not in accessible_datasets:
+        if not accessible_datasets.filter(pk=dataset.pk).exists():
             return Response(None, status=status.HTTP_404_NOT_FOUND)
 
         return _build_download_response(dataset.dataset_file)

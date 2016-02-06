@@ -15,7 +15,7 @@ class Command(BaseCommand):
     help = "Exercise the Run.is_complete() method for performance testing. "
 
     def handle(self, *args, **options):
-        self.count_queries(self.test_ajax)
+        self.count_queries(self.test_ajax_download)
 
     def check_many_runs(self):
         RUN_COUNT = 100
@@ -80,3 +80,13 @@ class Command(BaseCommand):
         response = run_status_view(request).render()
         data = response.render().data
         return data['count']
+
+    def test_ajax_download(self):
+        factory = APIRequestFactory()
+        dataset_path = reverse('dataset-download', kwargs={'pk': 283134})
+        dataset_view, _, _ = resolve(dataset_path)
+        request = factory.get(dataset_path)
+        force_authenticate(request, user=kive_user())
+        response = dataset_view(request, pk=283134)
+        content = response.content
+        return content
