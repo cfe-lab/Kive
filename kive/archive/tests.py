@@ -39,6 +39,12 @@ from metadata.models import kive_user, everyone_group, CompoundDatatype
 from constants import groups
 
 
+from django.db import connections
+from django.apps import apps
+from django.core import serializers
+from django.utils.six import StringIO
+
+
 class ArchiveTestCaseHelpers:
     def __init__(self):
         pass
@@ -2484,7 +2490,7 @@ class ExecLogTests(ArchiveTestCase):
         step_E1_RS = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
         execlog = ExecLog(record=step_E1_RS, invoking_record=step_E1_RS)
         execlog.save()
-        self.assertIsNone(execlog.delete())
+        execlog.delete()
 
     def test_clean_record_not_RunComponent(self):
         """record of ExecLog should be a RunComponent."""
@@ -3228,15 +3234,39 @@ class IsCompleteSuccessfulExecutionActualExecutionTests(TransactionTestCase):
 
     serialized_rollback = True
 
-    # def _fixture_setup(self):
-    #
-    #     from django.db import connections
-    #
-    #     for db_name in self._databases_names(include_mirrors=False):
-    #         if hasattr(connections[db_name], "_test_serialized_contents"):
-    #             print connections[db_name]._test_serialized_contents
-    #
-    #     super(IsCompleteSuccessfulExecutionActualExecutionTests, self)._fixture_setup()
+    def _fixture_setup(self):
+
+        for db_name in self._databases_names(include_mirrors=False):
+            # Reset sequences
+            if self.reset_sequences:
+                self._reset_sequences(db_name)
+
+            with open("DBCONTENTS.json", "wb") as f:
+                f.write(connections[db_name]._test_serialized_contents)
+
+            # If we need to provide replica initial data from migrated apps,
+            # then do so.
+            if self.serialized_rollback and hasattr(connections[db_name], "_test_serialized_contents"):
+                if self.available_apps is not None:
+                    apps.unset_available_apps()
+
+                with connections[db_name].constraint_checks_disabled():
+                    data = StringIO(connections[db_name]._test_serialized_contents)
+                    for obj in serializers.deserialize(
+                            "json",
+                            data,
+                            using=connections[db_name].creation.connection.alias,
+                            ignorenonexistent=False):
+                        obj.save()
+
+                if self.available_apps is not None:
+                    apps.set_available_apps(self.available_apps)
+
+            if self.fixtures:
+                # We have to use this slightly awkward syntax due to the fact
+                # that we're using *args and **kwargs together.
+                call_command('loaddata', *self.fixtures,
+                             **{'verbosity': 0, 'database': db_name})
 
     def setUp(self):
         install_fixture_files("archive_no_runs_test_environment")

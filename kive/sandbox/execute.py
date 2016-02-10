@@ -452,7 +452,7 @@ class Sandbox:
         # Go through steps in order, looking for input cables pointing at the task(s) that have completed.
         # If task_completed is None, then we are starting the pipeline and we look at the pipeline inputs.
         for step in pipeline_to_resume.steps.order_by("step_num"):
-            matching_runsteps = run_to_resume.runsteps.filter(pipelinestep=step, RSICs__isnull=False)
+            matching_runsteps = run_to_resume.runsteps.filter(pipelinestep=step, start_time__isnull=False)
 
             # If this is already running, we skip it.
             if matching_runsteps.exists():
@@ -515,7 +515,9 @@ class Sandbox:
 
             # If this step is not fed at all by any of the tasks that just completed,
             # we skip it -- it can't have just become ready to go.
-            fed_by_newly_completed = False
+            # Special case: this step has no inputs (for example, it's a random number generator).
+            # If so, we just go ahead.
+            fed_by_newly_completed = not step.cables_in.exists()
             if step.cables_in.filter(source_step__in=step_nums_completed).exists():
                 fed_by_newly_completed = True
             if not fed_by_newly_completed:
@@ -1479,7 +1481,8 @@ class Sandbox:
         """
         # Break out the execution info.
         curr_RS = archive.models.RunStep.objects.get(pk=step_execute_dict["runstep_pk"])
-        curr_RS.start()
+        # This was already started when we called reuse_or_prepare_step.
+        # curr_RS.start()
         step_run_dir = step_execute_dict["step_run_dir"]
         curr_ER = None
         if step_execute_dict["execrecord_pk"] is not None:

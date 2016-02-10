@@ -728,7 +728,12 @@ class RunApiTests(TestCase):
         response = view(request, *args, **kwargs)
         data = response.render().data
 
-        self.assertEquals(data['Datasets'], 3)
+        # 4 Datasets created:
+        #  - 1 by the custom input cable to step 1 (and this is reused by the input cable to step 2)
+        #  - 1 by step 1
+        #  - 1 by step 2
+        #  - 1 by the custom output cable
+        self.assertEquals(data['Datasets'], 4)
         self.assertEquals(data['Runs'], 1)
         self.assertEquals(data['Datatypes'], 0)
 

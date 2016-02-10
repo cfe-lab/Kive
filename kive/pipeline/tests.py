@@ -60,7 +60,7 @@ class PipelineFamilyTests(PipelineTestCase):
 
     def test_delete_pipeline_family(self):
         """Can I delete a PipelineFamily?"""
-        self.assertIsNone(PipelineFamily.objects.first().delete())
+        PipelineFamily.objects.first().delete()
 
     # def test_published_version_display_name_is_none(self):
     #     family = PipelineFamily.objects.get(name='DNAcomplement')
@@ -2274,7 +2274,7 @@ class PipelineTests(PipelineTestCase):
         """Deleting a Pipeline is possible."""
         family = PipelineFamily(user=self.user); family.save()
         pipeline = Pipeline(family=family, user=self.user); pipeline.save()
-        self.assertIsNone(pipeline.delete())
+        pipeline.delete()
 
 
 class PipelineStepTests(PipelineTestCase):
@@ -2566,13 +2566,13 @@ class PipelineStepTests(PipelineTestCase):
 class PipelineStepInputCableTests(PipelineTestCase):
     def test_delete_pipeline_step_input_cable(self):
         """Deleting a PipelineStepInputCable is possible."""
-        self.assertIsNone(PipelineStepInputCable.objects.first().delete())
+        PipelineStepInputCable.objects.first().delete()
 
 
 class PipelineOutputCableTests(PipelineTestCase):
     def test_delete_pipeline_output_cable(self):
         """Deleting a PipelineOutputCable is possible."""
-        self.assertIsNone(PipelineOutputCable.objects.first().delete())
+        PipelineOutputCable.objects.first().delete()
 
     def test_pipeline_trivial_cable(self):
         """

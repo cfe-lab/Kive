@@ -586,7 +586,7 @@ class RunApiTestsEnvironmentBuilder(FixtureBuilder):
             column_idx=3,
             datatype=self.string_dt)
 
-        # Second cable is not a trivial - we assign the new CDT to it
+        # Second cable is not trivial - we assign the new CDT to it
         self.outcable_2.output_cdt = self.pipeline_out2_cdt
         self.outcable_2.save()
 

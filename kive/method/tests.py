@@ -2139,7 +2139,7 @@ class MethodTests(MethodTestCase):
 
     def test_delete_method(self):
         """Deleting a method is possible."""
-        self.assertIsNone(Method.objects.first().delete())
+        Method.objects.first().delete()
 
     def test_identical_self(self):
         """A Method should be identical to itself."""
@@ -2229,9 +2229,9 @@ class NonReusableMethodTests(TransactionTestCase):
     def setUp(self):
         # Loading the fixtures using the 'fixtures' attribute doesn't work due to
         # subtleties in how Django's tests run.
-        call_command("loaddata", "initial_groups", verbosity=0)
-        call_command("loaddata", "initial_user", verbosity=0)
-        call_command("loaddata", "initial_data", verbosity=0)
+        # call_command("loaddata", "initial_groups", verbosity=0)
+        # call_command("loaddata", "initial_user", verbosity=0)
+        # call_command("loaddata", "initial_data", verbosity=0)
 
         # An unpredictable, non-reusable user.
         self.user_rob = User.objects.create_user('rob', 'rford@toronto.ca', 'football')

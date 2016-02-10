@@ -389,7 +389,7 @@ class ExecRecordTests(LibrarianTestCase):
         execrecord = ExecRecord(generator=execlog)
         execrecord.save()
 
-        self.assertIsNone(ExecRecord.objects.first().delete())
+        ExecRecord.objects.first().delete()
 
     def test_ER_links_POC_so_ERI_must_link_TO_that_POC_gets_output_from(self):
         # ER links POC: ERI must link to the TO that the POC gets output from
