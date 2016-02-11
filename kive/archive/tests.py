@@ -7,7 +7,6 @@ import re
 import tempfile
 import json
 
-from django.core.management import call_command
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.core.files import File
@@ -24,11 +23,10 @@ from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, Dataset, DatasetStructure
 
-from kive.tests import BaseTestCases, install_fixture_files, restore_production_files
+from kive.tests import BaseTestCases, KiveTransactionTestCase, install_fixture_files, restore_production_files
 from method.models import Method, MethodFamily, CodeResource
 from pipeline.models import Pipeline, PipelineStep, PipelineFamily
 
-import sandbox.execute
 from fleet.workers import Manager
 import kive.testing_utils as tools
 
@@ -37,12 +35,6 @@ import kive.testing_utils as tools
 from metadata.models import kive_user, everyone_group, CompoundDatatype
 
 from constants import groups
-
-
-from django.db import connections
-from django.apps import apps
-from django.core import serializers
-from django.utils.six import StringIO
 
 
 class ArchiveTestCaseHelpers:
@@ -3229,44 +3221,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         self.assertTrue(self.pE_run.is_successful())
 
 
-class IsCompleteSuccessfulExecutionActualExecutionTests(TransactionTestCase):
+class IsCompleteSuccessfulExecutionActualExecutionTests(KiveTransactionTestCase):
     fixtures = ["archive_no_runs_test_environment"]
-
-    serialized_rollback = True
-
-    def _fixture_setup(self):
-
-        for db_name in self._databases_names(include_mirrors=False):
-            # Reset sequences
-            if self.reset_sequences:
-                self._reset_sequences(db_name)
-
-            with open("DBCONTENTS.json", "wb") as f:
-                f.write(connections[db_name]._test_serialized_contents)
-
-            # If we need to provide replica initial data from migrated apps,
-            # then do so.
-            if self.serialized_rollback and hasattr(connections[db_name], "_test_serialized_contents"):
-                if self.available_apps is not None:
-                    apps.unset_available_apps()
-
-                with connections[db_name].constraint_checks_disabled():
-                    data = StringIO(connections[db_name]._test_serialized_contents)
-                    for obj in serializers.deserialize(
-                            "json",
-                            data,
-                            using=connections[db_name].creation.connection.alias,
-                            ignorenonexistent=False):
-                        obj.save()
-
-                if self.available_apps is not None:
-                    apps.set_available_apps(self.available_apps)
-
-            if self.fixtures:
-                # We have to use this slightly awkward syntax due to the fact
-                # that we're using *args and **kwargs together.
-                call_command('loaddata', *self.fixtures,
-                             **{'verbosity': 0, 'database': db_name})
 
     def setUp(self):
         install_fixture_files("archive_no_runs_test_environment")
@@ -3580,7 +3536,7 @@ class TopLevelRunOnDeepNestedRunTests(TestCase):
                 self.assertEquals(self.deep_nested_run, roc.top_level_run)
 
 
-class RunStepReuseFailedExecRecordTests(TransactionTestCase):
+class RunStepReuseFailedExecRecordTests(KiveTransactionTestCase):
     # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):

@@ -11,7 +11,7 @@ import os.path
 from librarian.models import Dataset
 import kive.testing_utils as tools
 from pipeline.models import Pipeline, PipelineFamily
-from kive.tests import install_fixture_files, restore_production_files
+from kive.tests import install_fixture_files, restore_production_files, KiveTransactionTestCase
 from method.models import Method
 from fleet.workers import Manager
 from archive.models import Run
@@ -28,7 +28,7 @@ class SandboxRMTestCase(TestCase):
         tools.destroy_sandbox_testing_tools_environment(self)
 
 
-class SandboxRMTransactionTestCase(TransactionTestCase):
+class SandboxRMTransactionTestCase(KiveTransactionTestCase):
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
 
@@ -291,7 +291,7 @@ class ExecuteResultTestsRM(TestCase):
         self.assertEqual(outcable_input_dataset.num_rows(), outcable_output_dataset.num_rows())
 
 
-class ExecuteDiscardedIntermediateTests(TransactionTestCase):
+class ExecuteDiscardedIntermediateTests(KiveTransactionTestCase):
     fixtures = ["execute_discarded_intermediate_tests_rm"]
 
     def setUp(self):
@@ -340,7 +340,7 @@ class ExecuteDiscardedIntermediateTests(TransactionTestCase):
         self.assertTrue(run.is_successful(use_cache=True))
 
 
-class BadRunTests(TransactionTestCase):
+class BadRunTests(KiveTransactionTestCase):
     """
     Tests for when things go wrong during Pipeline execution.
     """
@@ -392,7 +392,7 @@ class BadRunTests(TransactionTestCase):
         self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().dataset])
 
 
-class FindDatasetTests(TransactionTestCase):
+class FindDatasetTests(KiveTransactionTestCase):
     """
     Tests for first_generator_of_dataset.
     """
@@ -499,7 +499,6 @@ class FindDatasetTests(TransactionTestCase):
 
 
 class RawTests(SandboxRMTransactionTestCase):
-    serialized_rollback = True
 
     def setUp(self):
         super(RawTests, self).setUp()

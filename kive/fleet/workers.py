@@ -345,7 +345,7 @@ class Manager(object):
                 if len(workers_available) >= task_info.threads_required:
                     # We're going to assign the task to workers on this host.
                     team = [workers_available[i] for i in range(task_info.threads_required)]
-                    mgr_logger.debug("Assigning task {} to worker {}".format(task, team))
+                    mgr_logger.debug("Assigning task {} to worker(s) {}".format(task, team))
 
                     # Send the job to the "lord":
                     self.interface.send_task_to_worker(task_info, team[0])

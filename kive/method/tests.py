@@ -25,7 +25,7 @@ from rest_framework.test import force_authenticate
 
 from constants import datatypes
 import file_access_utils
-from kive.tests import BaseTestCases
+from kive.tests import BaseTestCases, KiveTransactionTestCase
 import librarian.models
 from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
 import metadata.tests
@@ -43,21 +43,11 @@ from portal.utils import update_all_contenttypes
 samplecode_path = metadata.tests.samplecode_path
 
 
-class FileAccessTests(TransactionTestCase):
+class FileAccessTests(KiveTransactionTestCase):
     serialized_rollback = True
 
     def setUp(self):
         tools.fd_count("FDs (start)")
-
-        # Since these fixtures touch ContentType and Permission, loading them in the
-        # 'fixtures' attribute doesn't work.
-        # update_all_contenttypes(verbosity=0)
-        # call_command("flush", interactive=False)
-        # auth_app_config = django_apps.get_app_config("auth")
-        # create_permissions(auth_app_config, verbosity=0)
-        # call_command("loaddata", "initial_groups", verbosity=0)
-        # call_command("loaddata", "initial_user", verbosity=0)
-        # call_command("loaddata", "initial_data", verbosity=0)
 
         # A typical user.
         self.user_randy = User.objects.create_user("Randy", "theotherrford@deco.ca", "hat")
@@ -2223,7 +2213,7 @@ class MethodFamilyTests(MethodTestCase):
         self.assertEqual(unicode(self.DNAcomp_mf), "DNAcomplement")
 
 
-class NonReusableMethodTests(TransactionTestCase):
+class NonReusableMethodTests(KiveTransactionTestCase):
     # fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):

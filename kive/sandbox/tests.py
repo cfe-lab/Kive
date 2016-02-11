@@ -6,13 +6,13 @@ import tempfile
 from django.contrib.auth.models import User
 from django.core.files import File
 from django.core.files.base import ContentFile
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase
 
 from archive.models import Run
 from constants import datatypes
 from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
 from kive.testing_utils import clean_up_all_files
-from kive.tests import install_fixture_files, restore_production_files
+from kive.tests import install_fixture_files, restore_production_files, KiveTransactionTestCase
 from librarian.models import Dataset, DatasetStructure
 from metadata.models import Datatype, CompoundDatatype, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
@@ -21,6 +21,10 @@ from pipeline.models import Pipeline, PipelineFamily
 from sandbox.execute import Sandbox, RunPlan, StepPlan, DatasetPlan
 from fleet.workers import Manager
 import file_access_utils
+
+
+from django.db import connection
+from django.conf import settings
 
 
 def execute_tests_environment_setup(case):
@@ -174,7 +178,7 @@ class ExecuteTestsBase(TestCase):
         restore_production_files()
 
 
-class ExecuteTransactionTestsBase(TransactionTestCase):
+class ExecuteTransactionTestsBase(KiveTransactionTestCase):
     fixtures = ['execute_tests']
 
     def setUp(self):
@@ -187,7 +191,6 @@ class ExecuteTransactionTestsBase(TransactionTestCase):
 
 
 class ExecuteTests(ExecuteTransactionTestsBase):
-    serialized_rollback = True
 
     def find_raw_pipeline(self, user):
         """Find a Pipeline with a raw input."""

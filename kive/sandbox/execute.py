@@ -452,13 +452,11 @@ class Sandbox:
         # Go through steps in order, looking for input cables pointing at the task(s) that have completed.
         # If task_completed is None, then we are starting the pipeline and we look at the pipeline inputs.
         for step in pipeline_to_resume.steps.order_by("step_num"):
+            # If this is already running, we skip it, unless it's a sub-Pipeline.
             matching_runsteps = run_to_resume.runsteps.filter(pipelinestep=step, start_time__isnull=False)
-
-            # If this is already running, we skip it.
             if matching_runsteps.exists():
                 curr_RS = matching_runsteps.first()
 
-                # If this is a sub-Pipeline, we advance it if possible; otherwise, we continue.
                 if not step.is_subpipeline:
                     if not curr_RS.is_complete(use_cache=True):
                         all_complete = False
@@ -607,8 +605,10 @@ class Sandbox:
 
             # At this point we know that all inputs are available.
             if step.is_subpipeline:
-                self.logger.debug("Step %s (coordinates %s) is a sub-Pipeline.  Handling its input cables.",
+                self.logger.debug("Step %s (coordinates %s) is a sub-Pipeline.  Marking it "
+                                  "as started, and handling its input cables.",
                                   curr_RS, curr_RS.get_coordinates())
+                curr_RS.start(save=True)
 
                 # We start all of the RunSICs in motion.  If they all successfully reuse,
                 # we advance the sub-pipeline.

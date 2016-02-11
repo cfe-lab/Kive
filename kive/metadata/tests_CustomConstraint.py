@@ -7,7 +7,7 @@ import shutil
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase
 from django.conf import settings
 
 from metadata.models import Datatype, CompoundDatatype, CustomConstraint, everyone_group
@@ -15,6 +15,7 @@ from method.models import MethodFamily, CodeResource
 from librarian.models import Dataset
 from datachecking.models import ContentCheckLog
 from fleet.workers import Manager
+from kive.tests import KiveTransactionTestCase
 
 import kive.testing_utils as tools
 import file_access_utils
@@ -466,7 +467,7 @@ class CustomConstraintTests(CustomConstraintTestPreamble, TestCase):
                                 dt.clean)
 
 
-class CustomConstraintTestsWithExecution(CustomConstraintTestPreamble, TransactionTestCase):
+class CustomConstraintTestsWithExecution(CustomConstraintTestPreamble, KiveTransactionTestCase):
     def test_execute_pipeline_content_check_good(self):
         """
         Test the integrity of the ContentCheck created while running a

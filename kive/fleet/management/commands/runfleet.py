@@ -12,7 +12,7 @@ class Command(BaseCommand):
             "-w",
             "--worker_interfaces",
             dest="worker_interfaces",
-            type="int",
+            type=int,
             default=1
         )
         parser.add_argument(
