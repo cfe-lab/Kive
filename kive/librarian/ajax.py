@@ -18,8 +18,6 @@ from kive.ajax import RemovableModelViewSet, RedactModelMixin, IsGrantedReadCrea
     StandardPagination, CleanCreateModelMixin, SearchableModelMixin,\
     convert_validation
 
-from librarian.models import Dataset
-
 JSON_CONTENT_TYPE = 'application/json'
 
 
@@ -28,12 +26,12 @@ class DatasetViewSet(RemovableModelViewSet,
                      RedactModelMixin,
                      SearchableModelMixin):
     """ List and modify datasets.
-    
+
     POST to the list to upload a new dataset, DELETE an instance to remove it
     along with all runs that produced or consumed it, or PATCH is_redacted=true
     on an instance to blank its contents along with any other instances or logs
     that used it as input.
-    
+
     Query parameters for the list view:
     * page_size=n - limit the results and page through them
     * is_granted=true - For administrators, this limits the list to only include
@@ -59,6 +57,7 @@ class DatasetViewSet(RemovableModelViewSet,
     * filters[n][key]=createdbefore&filters[n][val]=match - Dataset was created before this time/date
     * filters[n][key]=cdt&filters[n][val]=id - only include datasets with the
         compound datatype id, or raw type if id is missing.
+    * filters[n][key]=md5&filters[n][val]=match - md5 checksum matches the value
     """
     queryset = Dataset.objects.all()
     serializer_class = DatasetSerializer
@@ -73,7 +72,7 @@ class DatasetViewSet(RemovableModelViewSet,
     def filter_queryset(self, queryset):
         queryset = super(DatasetViewSet, self).filter_queryset(queryset)
         return self.apply_filters(queryset)
-    
+
     def _add_filter(self, queryset, key, value):
         if key == 'smart':
             return queryset.filter(Q(name__icontains=value) |
@@ -91,6 +90,8 @@ class DatasetViewSet(RemovableModelViewSet,
                 return queryset.filter(structure__isnull=True)
             else:
                 return queryset.filter(structure__compounddatatype=value)
+        if key == 'md5':
+            return queryset.filter(MD5_checksum=value)
 
         if key in ('createdafter', 'createdbefore'):
             t = timezone.make_aware(datetime.strptime(value, '%d %b %Y %H:%M'),
@@ -121,7 +122,7 @@ class DatasetViewSet(RemovableModelViewSet,
         accessible_datasets = Dataset.filter_by_user(request.user)
         dataset = self.get_object()
 
-        if dataset not in accessible_datasets:
+        if not accessible_datasets.filter(pk=dataset.pk).exists():
             return Response(None, status=status.HTTP_404_NOT_FOUND)
 
         return _build_download_response(dataset.dataset_file)

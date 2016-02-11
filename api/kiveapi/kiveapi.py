@@ -41,7 +41,7 @@ class KiveAPI(Session):
 
             'api_get_datasets': '/api/datasets/',
             'api_get_dataset': '/api/datasets/{dataset-id}/',
-            'api_get_datasets_name': '/api/datasets/?filters[0][key]=name&filters[0][val]={name}',
+            'api_get_datasets_name': '/api/datasets/?{filters}',
             'api_dataset_add': '/api/datasets/',
             'api_dataset_dl': '/api/datasets/{dataset-id}/download/',
 
@@ -183,7 +183,7 @@ class KiveAPI(Session):
         dataset = self.get('@api_get_dataset', context={'dataset-id': dataset_id}).json()
         return Dataset(dataset, self)
 
-    def find_datasets(self, dataset_id=None, dataset_name=None):
+    def find_datasets(self, dataset_id=None, dataset_name=None, md5=None):
         """
 
         :param kwargs:
@@ -192,9 +192,17 @@ class KiveAPI(Session):
         if dataset_id is not None:
             return self.get_dataset(dataset_id)
 
+        filters = {}
         if dataset_name is not None:
+            filters['name'] = dataset_name
+        if md5 is not None:
+            filters['md5'] = md5
+        if filters:
+            filter_text = '&'.join(
+                'filters[{}][key]={}&filters[{}][val]={}'.format(i, key, i, val)
+                for i, (key, val) in enumerate(filters.iteritems()))
             datasets = self.get('@api_get_datasets_name',
-                                context={'name': dataset_name}).json()
+                                context={'filters': filter_text}).json()
             return [Dataset(d, self) for d in datasets]
         return self.get_datasets()
 

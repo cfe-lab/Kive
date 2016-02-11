@@ -21,7 +21,6 @@ from django.utils.encoding import python_2_unicode_compatible
 from django.utils import timezone
 from django.contrib.auth.models import User, Group
 
-import archive.signals
 import archive.exceptions
 from constants import maxlengths, groups
 from datachecking.models import ContentCheckLog, IntegrityCheckLog
@@ -350,17 +349,18 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         status += "-"
 
         # Which outcables are in progress?
-        cables = self.pipeline.outcables.order_by("output_idx")
+        cables = sorted(self.pipeline.outcables.all(),
+                        key=attrgetter('output_idx'))
+        run_output_cables = {c.pipelineoutputcable: c
+                             for c in self.runoutputcables.all()}
         for pipeline_cable in cables:
-
-            curr_roc_qs = self.runoutputcables.filter(pipelineoutputcable=pipeline_cable)
+            curr_roc = run_output_cables.get(pipeline_cable)
             log_char = ""
             step_status = ""
-            if not curr_roc_qs.exists():
+            if curr_roc is None:
                 log_char = "."
                 step_status = "WAITING"
             else:
-                curr_roc = curr_roc_qs.first()
                 if curr_roc.is_complete(use_cache=True, dont_save=True):
                     log_char = "*"
                     step_status = "CLEAR"
@@ -376,14 +376,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             # Log the status
             status += log_char
             if detailed:
-                cable_progress[pipeline_cable.id] = {'status': step_status, 'dataset_id': None, 'md5': None}
-                try:
-                    dataset = run_cables[0].execrecord.execrecordouts.first().dataset
-                    cable_progress[pipeline_cable.id]['dataset_id'] = dataset.pk \
-                        if dataset.has_data() else None
-                    cable_progress[pipeline_cable.id]['md5'] = dataset.MD5_checksum
-                except:
-                    pass
+                cable_progress[pipeline_cable.id] = {'status': step_status}
 
         if detailed:
             result['step_progress'] = step_progress
@@ -2772,4 +2765,3 @@ class MethodOutput(models.Model):
         self.code_redacted = True
         self.save()
         self.execlog.record.redact()
-

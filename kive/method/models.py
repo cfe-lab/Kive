@@ -985,7 +985,10 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
         pipelines_affected = set([ps.pipeline for ps in self.pipelinesteps.all()])
         for pipeline_affected in pipelines_affected:
-            curr_datasets_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = pipeline_affected.remove_list()
+            (curr_datasets_listed,
+             curr_ERs_listed,
+             curr_runs_listed,
+             curr_pipelines_listed) = pipeline_affected.remove_list()
             datasets_listed.update(curr_datasets_listed)
             ERs_listed.update(curr_ERs_listed)
             runs_listed.update(curr_runs_listed)

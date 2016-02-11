@@ -118,8 +118,9 @@ class Sandbox:
         for i, pipeline_input in enumerate(inputs, start=1):
             corresp_pipeline_input = self.pipeline.inputs.get(dataset_idx=i)
             self.socket_map[(self.run, None, corresp_pipeline_input)] = pipeline_input
-            self.dataset_fs_map[pipeline_input] = os.path.join(in_dir,
-                                                          "run{}_{}".format(self.run.pk, corresp_pipeline_input.pk))
+            self.dataset_fs_map[pipeline_input] = os.path.join(
+                in_dir,
+                "run{}_{}".format(self.run.pk, corresp_pipeline_input.pk))
 
         # Make the sandbox directory.
         self.logger.debug("file_access_utils.set_up_directory({})".format(self.sandbox_path))
@@ -822,8 +823,13 @@ class Sandbox:
             curr_record.complete_clean()
 
             # Return a RunCableExecuteInfo that is marked as cancelled.
-            exec_info = RunCableExecuteInfo(curr_record, self.user, None, input_dataset,
-                                            self.dataset_fs_map[input_dataset], output_path, by_step=by_step)
+            exec_info = RunCableExecuteInfo(curr_record,
+                                            self.user,
+                                            None,
+                                            input_dataset,
+                                            self.dataset_fs_map[input_dataset],
+                                            output_path,
+                                            by_step=by_step)
             exec_info.cancel()
             self.cable_execute_info[(curr_record.parent_run, cable)] = exec_info
             return exec_info
@@ -864,9 +870,13 @@ class Sandbox:
                 time.sleep(wait_time)
 
         # Bundle up execution info in case this needs to be run, either by recovery or as a first execution.
-        exec_info = RunCableExecuteInfo(curr_record, self.user, curr_ER, input_dataset,
+        exec_info = RunCableExecuteInfo(curr_record,
+                                        self.user,
+                                        curr_ER,
+                                        input_dataset,
                                         self.dataset_fs_map[input_dataset],
-                                        output_path, by_step=by_step)
+                                        output_path,
+                                        by_step=by_step)
         self.cable_execute_info[(curr_record.parent_run, cable)] = exec_info
         if return_now:
             return exec_info
@@ -1421,7 +1431,12 @@ class Sandbox:
                             logger.debug("[%d] No ExecRecord already in use - creating fresh cable ExecRecord",
                                          worker_rank)
                             # Make ExecRecord, linking it to the ExecLog.
-                            curr_ER = librarian.models.ExecRecord.create(curr_log, cable, [input_dataset], [output_dataset])
+                            curr_ER = librarian.models.ExecRecord.create(
+                                curr_log,
+                                cable,
+                                [input_dataset],
+                                [output_dataset]
+                            )
                         # Link ER to RunCable (this may have already been linked; that's fine).
                         curr_record.link_execrecord(curr_ER, reused=False)
 
@@ -1438,7 +1453,6 @@ class Sandbox:
         ####
         # Check outputs
         ####
-
         if not missing_output:
             # Did ER already exist (with vetted output), or is cable trivial, or recovering? Yes.
             if (preexisting_ER and (output_dataset.is_OK() or output_dataset.any_failed_checks())) or cable.is_trivial() or recover:
@@ -1759,8 +1773,14 @@ class Sandbox:
                 # Perform content check.
                 logger.debug("[%d] %s is new data - performing content check", worker_rank, output_dataset)
                 summary_path = "{}_summary".format(output_path)
-                check = output_dataset.check_file_contents(output_path, summary_path, curr_output.get_min_row(),
-                                                      curr_output.get_max_row(), curr_log, user)
+                check = output_dataset.check_file_contents(
+                    output_path,
+                    summary_path,
+                    curr_output.get_min_row(),
+                    curr_output.get_max_row(),
+                    curr_log,
+                    user
+                )
 
             # Check OK? No.
             if check and check.is_fail():
