@@ -104,7 +104,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
         inputs = []
         pipeline_inputs = run.pipeline.inputs
 
-        for i, input in enumerate(run.inputs.all()):
+        for i, input in enumerate(run.inputs.order_by('index')):
             has_data = input.dataset.has_data()
             if has_data:
                 input_name = input.dataset.name

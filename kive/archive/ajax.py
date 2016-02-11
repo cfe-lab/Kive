@@ -114,9 +114,8 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
         users, this has no effect.
 
     Alternate list view: runs/status/
-    This will return status summaries for all the requested runs, up to a limit.
-    It also returns has_more, which is true if more runs matched the search
-    criteria than the limit. Query parameters:
+    This will return status summaries for all the requested runs.
+    Query parameters:
 
     * is_granted - same as above
     * filters[n][key]=x&filters[n][val]=y - Apply different filters to the
