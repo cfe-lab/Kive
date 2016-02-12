@@ -242,6 +242,11 @@ class ExecuteTests(ExecuteTransactionTestsBase):
         pipeline = self.pX
         inputs = [self.dataset]
         run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+
+        for step in run.runsteps.all():
+
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
         self.assertTrue(run.is_complete(use_cache=True))
         self.assertTrue(run.is_successful(use_cache=True))
 
@@ -297,6 +302,8 @@ class ExecuteTests(ExecuteTransactionTestsBase):
         pipeline = self.pX
         inputs = [self.dataset]
         run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
         self.assertTrue(run.is_complete(use_cache=True))
         self.assertTrue(run.is_successful(use_cache=True))
 
@@ -388,6 +395,8 @@ class ExecuteTests(ExecuteTransactionTestsBase):
         pipeline = self.pX
         inputs = [input_dataset]
         run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
         self.assertTrue(run.is_complete(use_cache=True))
         self.assertTrue(run.is_successful(use_cache=True))
 
@@ -398,9 +407,14 @@ class ExecuteTests(ExecuteTransactionTestsBase):
         self.assertTrue(all(i.is_OK() for i in inputs))
         self.assertFalse(all(i.is_raw() for i in inputs))
         run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
-        self.assertTrue(run.is_complete())
 
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
+        self.assertTrue(run.is_complete(use_cache=True))
+        self.assertTrue(run.is_successful(use_cache=True))
+        self.assertTrue(run.is_complete())
         self.assertTrue(run.is_successful())
+
         self.assertIsNone(run.clean())
         self.assertIsNone(run.complete_clean())
 
@@ -413,8 +427,14 @@ class ExecuteTests(ExecuteTransactionTestsBase):
         self.assertTrue(all(i.is_OK() for i in inputs))
         self.assertTrue(any(i.is_raw() for i in inputs))
         run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
+        self.assertTrue(run.is_complete(use_cache=True))
+        self.assertTrue(run.is_successful(use_cache=True))
         self.assertTrue(run.is_complete())
         self.assertTrue(run.is_successful())
+
         self.assertIsNone(run.clean())
         self.assertIsNone(run.complete_clean())
 
@@ -478,6 +498,18 @@ class ExecuteTests(ExecuteTransactionTestsBase):
         rs = run.runsteps.first()
 
         self.assertFalse(rs.log.methodoutput.are_checksums_OK)
+
+        self.assertTrue(rs._complete is not None)
+        self.assertTrue(rs._successful is not None)
+        self.assertTrue(rs.is_complete(use_cache=True))
+        self.assertFalse(rs.is_successful(use_cache=True))
+        self.assertTrue(rs.is_complete())
+        self.assertFalse(rs.is_successful())
+
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
+        self.assertTrue(run.is_complete(use_cache=True))
+        self.assertTrue(run.is_complete())
         self.assertFalse(run.is_successful(use_cache=True))
         self.assertFalse(run.is_successful())
 

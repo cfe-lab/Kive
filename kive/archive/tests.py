@@ -460,38 +460,6 @@ class ArchiveTestCaseHelpers:
         if bp == "subrun_complete":
             return
 
-    # This code is no longer used, but is the basis for the deep_nested_run test fixture.
-    # def _setup_deep_nested_run(self, user):
-    #     """Set up a pipeline with sub-sub-pipelines to test recursion."""
-    #     # Everything in this pipeline will be a no-op, so all can be linked together
-    #     # without remorse.
-    #     p_basic = tools.make_first_pipeline("p_basic", "innermost pipeline", user)
-    #     tools.create_linear_pipeline(p_basic, [self.method_noop, self.method_noop], "basic_in", "basic_out")
-    #     p_basic.family.grant_everyone_access()
-    #     p_basic.grant_everyone_access()
-    #     p_basic.create_outputs()
-    #     p_basic.save()
-    #
-    #     p_sub = tools.make_first_pipeline("p_sub", "second-level pipeline", user)
-    #     tools.create_linear_pipeline(p_sub, [p_basic, p_basic], "sub_in", "sub_out")
-    #     p_sub.family.grant_everyone_access()
-    #     p_sub.grant_everyone_access()
-    #     p_sub.create_outputs()
-    #     p_sub.save()
-    #
-    #     p_top = tools.make_first_pipeline("p_top", "top-level pipeline", user)
-    #     tools.create_linear_pipeline(p_top, [p_sub, p_sub, p_sub], "top_in", "top_out")
-    #     p_top.family.grant_everyone_access()
-    #     p_top.grant_everyone_access()
-    #     p_top.create_outputs()
-    #     p_top.save()
-    #
-    #     # Set up a dataset with words in it called self.dataset_words.
-    #     tools.make_words_dataset(self)
-    #
-    #     self.deep_nested_run = Manager.execute_pipeline(self.user_bob, p_top, [self.dataset_words],
-    #                                                     groups_allowed=[everyone_group()]).get_last_run()
-
 
 class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
     fixtures = ["archive_test_environment"]
@@ -3380,6 +3348,21 @@ year,month,day,hour,minute,second,microsecond
         run2_step1_RSIC = run2_step1.RSICs.first()
         run2_step2 = run2.runsteps.get(pipelinestep__step_num=2)
 
+        self.assertTrue(run2_step1._complete is not None)
+        self.assertTrue(run2_step1._successful is not None)
+        self.assertTrue(run2_step1.is_complete(use_cache=True))
+        self.assertFalse(run2_step1.is_successful(use_cache=True))
+        self.assertTrue(run2_step1.is_complete())
+        self.assertFalse(run2_step1.is_successful())
+
+        self.assertTrue(run2_step2._complete is not None)
+        self.assertTrue(run2_step2._successful is not None)
+        self.assertTrue(run2_step2.is_complete(use_cache=True))
+        self.assertFalse(run2_step2.is_successful(use_cache=True))
+        self.assertTrue(run2_step2.is_complete())
+        self.assertFalse(run2_step2.successful_execution())
+        self.assertFalse(run2_step2.is_successful())
+
         self.assertFalse(run2_step2.has_log)
         self.assertEquals(run2_step2.invoked_logs.count(), 2)
         self.assertEquals(set(run2_step2.invoked_logs.all()), {run2_step1.log, run2_step1_RSIC.log})
@@ -3437,7 +3420,12 @@ with open(sys.argv[2], "wb") as f:
         finally:
             stdout_file.close()
 
+        self.assertTrue(run_step._complete is not None)
+        self.assertTrue(run_step._successful is not None)
+        self.assertTrue(run_step.is_complete(use_cache=True))
+        self.assertTrue(run_step.is_successful(use_cache=True))
         self.assertTrue(run_step.is_complete())
+        self.assertTrue(run_step.is_successful())
         self.assertTrue(run_step.log.is_successful())
         self.assertEqual(stdout_content, expected_output)
 
@@ -3474,6 +3462,37 @@ with open(sys.argv[2], "wb") as f:
         run2_step1_RSIC = run2_step1.RSICs.first()
         run2_step2 = run2.runsteps.get(pipelinestep__step_num=2)
 
+        self.assertTrue(run2_step1_RSIC._complete is not None)
+        self.assertTrue(run2_step1_RSIC._successful is not None)
+        self.assertTrue(run2_step1_RSIC.is_complete(use_cache=True))
+        self.assertTrue(run2_step1_RSIC.is_successful(use_cache=True))
+        self.assertTrue(run2_step1_RSIC.is_complete())
+        self.assertTrue(run2_step1_RSIC.is_successful())
+
+        self.assertTrue(run2_step1._complete is not None)
+        self.assertTrue(run2_step1._successful is not None)
+        self.assertTrue(run2_step1.is_complete(use_cache=True))
+        self.assertFalse(run2_step1.is_successful(use_cache=True))
+        self.assertTrue(run2_step1.is_complete())
+
+        # Old policy: run2_step1 should remain successful
+        # New policy: it should be failed
+
+        self.assertFalse(run2_step1.is_successful())
+
+        # The corresponding step from run1 should have also been marked as unsuccessful.
+        run1_step1 = run1.runsteps.get(pipelinestep__step_num=1)
+        self.assertTrue(run1_step1._successful is not None)
+        self.assertFalse(run1_step1.is_successful(use_cache=True))
+
+        self.assertTrue(run2_step2._complete is not None)
+        self.assertTrue(run2_step2._successful is not None)
+        self.assertTrue(run2_step2.is_complete(use_cache=True))
+        self.assertFalse(run2_step2.is_successful(use_cache=True))
+        self.assertTrue(run2_step2.is_complete())
+        self.assertFalse(run2_step2.successful_execution())
+        self.assertFalse(run2_step2.is_successful())
+
         self.assertFalse(run2_step2.has_log)
         self.assertEquals(run2_step2.invoked_logs.count(), 2)
         self.assertEquals(set(run2_step2.invoked_logs.all()), {run2_step1.log, run2_step1_RSIC.log})
@@ -3481,8 +3500,6 @@ with open(sys.argv[2], "wb") as f:
         self.assertTrue(run2_step1_RSIC.log.is_successful())
         self.assertTrue(run2_step1.log.is_successful())
         self.assertFalse(run2_step1.log.all_checks_passed())
-        self.assertTrue(run2_step2.is_complete())
-        self.assertFalse(run2_step2.successful_execution())
 
 
 class TopLevelRunTests(TestCase, ArchiveTestCaseHelpers):

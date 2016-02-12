@@ -717,8 +717,24 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         if self.parent_runstep is not None:
             self.parent_runstep.mark_unsuccessful()
 
-    def mark_complete(self, save=False):
+    def mark_complete(self, save=False, mark_all_components=False):
         self._complete = True
+
+        if mark_all_components:
+            for step in self.runsteps.all():
+                for rsic in step.RSICs.all():
+                    rsic.mark_complete()
+                    rsic.save()
+
+                if step.has_subrun():
+                    step.child_run.mark_complete(save=True, mark_all_components=True)
+                step.mark_complete()
+                step.save()
+
+            for outcable in self.runoutputcables.all():
+                outcable.mark_complete()
+                outcable.save()
+
         if save:
             self.save()
 
@@ -1040,6 +1056,34 @@ class RunComponent(stopwatch.models.Stopwatch):
 
     def mark_complete(self):
         self._complete = True
+
+    def failed_mark_complete(self, tasks_still_running):
+        """
+        Marks this RunComponent as complete and recurses as necessary.
+
+        This is used when a RunComponent belonging to a failed top-level Run
+        finishes.  It figures out whether it should mark the containing sub-Run
+        (or top-level Run) as complete or not.
+
+        Note that this is overridden by RunSIC.
+        """
+        self.mark_complete()
+        self.save()
+
+        tasks_outside_this_subrun = []
+        for task in tasks_still_running:
+            if self.parent_run == task.parent_run:
+                # This sub-Run is still in progress, so we just terminate.
+                return
+            tasks_outside_this_subrun.append(task)
+
+        # Having reached this point, we know that there were no other tasks
+        # belonging to the same sub-Run as self, so we can mark that sub-Run
+        # as complete.
+        self.parent_run.mark_complete(save=True)
+        # Recurse upward if necessary.
+        if self.parent_run.parent_runstep is not None:
+            self.parent_run.parent_runstep.failed_mark_complete(tasks_outside_this_subrun)
 
     @update_field("_complete")
     def is_complete(self, use_cache=False, **kwargs):
@@ -1508,21 +1552,22 @@ class RunStep(RunComponent):
         for to in self.pipelinestep.transformation.outputs.all():
             # Get the associated ERO.
             corresp_ero = self.execrecord.execrecordouts.get(generic_output=to)
+            corresp_ds = corresp_ero.dataset
 
             if self.pipelinestep.outputs_to_delete.filter(dataset_name=to.dataset_name).exists():
                 # This output is deleted; there should be no associated Dataset.
-                if self.outputs.filter(pk=corresp_ero.dataset.pk).exists():
+                if self.outputs.filter(pk=corresp_ds.pk).exists() and corresp_ds.has_data():
                     raise ValidationError('Output "{}" of RunStep "{}" is deleted; no data should be associated'
                                           .format(to, self))
 
-            elif corresp_ero.dataset in outputs_missing:
+            elif corresp_ds in outputs_missing:
                 # This output is missing; there should be no associated Dataset.
-                if self.outputs.filter(pk=corresp_ero.dataset.pk).exists():
+                if self.outputs.filter(pk=corresp_ds.pk).exists() and corresp_ds.has_data():
                     raise ValidationError('Output "{}" of RunStep "{}" is missing; no data should be associated'
                                           .format(to, self))
 
             # The corresponding ERO should have existent data.
-            elif not corresp_ero.dataset.has_data():
+            elif not corresp_ds.has_data():
                 raise ValidationError('ExecRecordOut "{}" of RunStep "{}" should reference existent data'
                                       .format(corresp_ero, self))
 
@@ -1699,9 +1744,16 @@ class RunStep(RunComponent):
         # and successful.  Proceed to check the RunComponent stuff.
         return RunComponent.is_complete(self, use_cache=use_cache, **kwargs)
 
-    # @update_field("_successful")
-    # def is_successful(self, **kwargs):
-    #     return super(RunStep, self).is_successful(**kwargs)
+    @update_field("_successful")
+    def is_successful(self, **kwargs):
+        if self.has_log:
+            try:
+                if not self.log.methodoutput.are_checksums_OK:
+                    return False
+            except MethodOutput.DoesNotExist:
+                pass
+
+        return super(RunStep, self).is_successful(**kwargs)
 
     def successful_execution(self):
         """
@@ -2343,6 +2395,25 @@ class RunSIC(RunCable):
         the same coordinates, the RunSIC is deemed to come first.
         """
         return self.dest_runstep.get_coordinates()
+
+    def failed_mark_complete(self, tasks_still_running):
+        """
+        Marks this RunSIC as complete and recurses as necessary.
+
+        This overrides the method on RunComponent.
+        """
+        self.mark_complete()
+        self.save()
+
+        tasks_outside_this_runstep = []
+        for task in tasks_still_running:
+            if isinstance(task, RunSIC) and self.dest_runstep == task.dest_runstep:
+                # This RunStep is still in progress, so we just terminate.
+                return
+            tasks_outside_this_runstep.append(task)
+
+        # No other RunSICs of our RunStep were running, so we can propagate upward.
+        self.dest_runstep.failed_mark_complete(tasks_outside_this_runstep)
 
 
 class RunOutputCable(RunCable):

@@ -393,12 +393,20 @@ class Manager(object):
         for worker_rank in workers_freed:
             self.worker_status[worker_rank] = Worker.READY
 
-        # Is anything from the run still processing?
+        # Is anything from the run still processing?  If this was a recovery, is anything else
+        # recovering for the invoking record?
         tasks_currently_running = False
+        task_from_same_recovery = False
+
+        curr_run_tasks = []
         for task_info in self.tasks_in_progress.itervalues():
-            if task_info['task'].run == just_finished['task'].run:
+            if task_info['task'].top_level_run == just_finished['task'].top_level_run:
+                curr_run_tasks.append(task_info['task'])
                 tasks_currently_running = True
-                break
+
+                if task_execute_info.is_recovery():
+                    if task_info['task'].recovering_record == task_execute_info.recovering_record:
+                        task_from_same_recovery = True
 
         # If this run has failed (either due to this task or another),
         # we mop up.
@@ -410,6 +418,16 @@ class Manager(object):
                 mgr_logger.info('Task %s (pk=%d) of run "%s" (pk=%d) (Pipeline: %s, User: %s) failed.',
                                 task_finished, task_finished.pk, curr_sdbx.run, curr_sdbx.run.pk,
                                 curr_sdbx.pipeline, curr_sdbx.user)
+
+            task_finished.failed_mark_complete(curr_run_tasks)
+
+            if task_execute_info.is_recovery():
+                recovering_task = archive.models.RunComponent.objects.get(
+                    pk=task_execute_info.recovering_record.pk
+                ).definite
+                if not recovering_task.is_successful(use_cache=True) and not task_from_same_recovery:
+                    recovering_task.failed_mark_complete(curr_run_tasks)
+                    recovering_task.save()
 
             if not tasks_currently_running:
                 clean_up_now = True
@@ -454,7 +472,7 @@ class Manager(object):
             if self.history_queue.maxlen > 0:
                 self.history_queue.append(finished_sandbox)
 
-            curr_sdbx.run.mark_complete()
+            curr_sdbx.run.mark_complete(mark_all_components=not curr_sdbx.run.is_successful(use_cache=True))
             curr_sdbx.run.stop(save=True)
             curr_sdbx.run.complete_clean(use_cache=True)
 

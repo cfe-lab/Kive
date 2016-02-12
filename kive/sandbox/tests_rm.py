@@ -336,6 +336,9 @@ class ExecuteDiscardedIntermediateTests(KiveTransactionTestCase):
             self.pipeline_revcomp_v3,
             [self.dataset_labdata]
         ).get_last_run()
+
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
         self.assertTrue(run.is_complete(use_cache=True))
         self.assertTrue(run.is_successful(use_cache=True))
 
@@ -367,6 +370,16 @@ class BadRunTests(KiveTransactionTestCase):
         log = runstep1.log
         interm_dataset = runstep1.execrecord.execrecordouts.first().dataset
 
+        self.assertTrue(runstep1._complete is not None)
+        self.assertTrue(runstep1._successful is not None)
+        self.assertTrue(runstep1.is_complete(use_cache=True))
+        self.assertFalse(runstep1.is_successful(use_cache=True))
+
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
+        self.assertTrue(run.is_complete(use_cache=True))
+        self.assertFalse(run.is_successful(use_cache=True))
+
         self.assertEqual(log.is_successful(), False)
         self.assertEqual(log.methodoutput.return_code, -1)
         self.assertEqual(log.missing_outputs(), [interm_dataset])
@@ -374,14 +387,27 @@ class BadRunTests(KiveTransactionTestCase):
     def test_method_fails(self):
         """Properly handle a failed method in a pipeline."""
         run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_fubar, [self.dataset_grandpa]).get_last_run()
+
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
+        self.assertTrue(run.is_complete(use_cache=True))
+        self.assertFalse(run.is_successful(use_cache=True))
         self.assertIsNone(run.complete_clean())
         self.assertFalse(run.is_successful())
 
         runstep1 = run.runsteps.get(pipelinestep__step_num=1)
+        self.assertTrue(runstep1._complete is not None)
+        self.assertTrue(runstep1._successful is not None)
+        self.assertTrue(runstep1.is_complete(use_cache=True))
+        self.assertTrue(runstep1.is_successful(use_cache=True))
         self.assertIsNone(runstep1.complete_clean())
         self.assertTrue(runstep1.successful_execution())
 
         runstep2 = run.runsteps.get(pipelinestep__step_num=2)
+        self.assertTrue(runstep2._complete is not None)
+        self.assertTrue(runstep2._successful is not None)
+        self.assertTrue(runstep2.is_complete(use_cache=True))
+        self.assertFalse(runstep2.is_successful(use_cache=True))
         self.assertIsNone(runstep2.complete_clean())
         self.assertFalse(runstep2.successful_execution())
 
@@ -522,6 +548,8 @@ class RawTests(SandboxRMTransactionTestCase):
         """Execute a raw Pipeline."""
         run = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
         run = Run.objects.get(pk=run.pk)
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
         self.assertTrue(run.is_complete(use_cache=True))
         self.assertTrue(run.is_successful(use_cache=True))
 
@@ -529,11 +557,15 @@ class RawTests(SandboxRMTransactionTestCase):
         """Execute a raw Pipeline and reuse an ExecRecord."""
         run = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
         run = Run.objects.get(pk=run.pk)
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
         self.assertTrue(run.is_complete(use_cache=True))
         self.assertTrue(run.is_successful(use_cache=True))
 
         run2 = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
         run2 = Run.objects.get(pk=run2.pk)
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
         self.assertTrue(run2.is_complete(use_cache=True))
         self.assertTrue(run2.is_successful(use_cache=True))
 

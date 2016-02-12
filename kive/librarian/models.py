@@ -481,20 +481,23 @@ class Dataset(metadata.models.AccessControl):
             assert set(users_allowed) == set(file_source.top_level_run.users_allowed.all())
             assert set(groups_allowed) == set(file_source.top_level_run.groups_allowed.all())
 
-        empty_SD = instance or cls()
-        empty_SD.user = user
-        empty_SD.MD5_checksum = ""
-        empty_SD.dataset_file = None
-        empty_SD.clean()
-        empty_SD.save()
-        if cdt:
-            empty_SD.create_structure(cdt)
+        with transaction.atomic():
+            empty_SD = instance or cls()
+            empty_SD.user = user
+            empty_SD.MD5_checksum = ""
+            empty_SD.dataset_file = None
+            empty_SD.file_source = file_source
+            # Save so we can add structure and permissions.
+            empty_SD.save()
 
-        for user in users_allowed:
-            empty_SD.users_allowed.add(user)
-        for group in groups_allowed:
-            empty_SD.groups_allowed.add(group)
-        empty_SD.save()
+            if cdt:
+                empty_SD.create_structure(cdt)
+
+            for user in users_allowed:
+                empty_SD.users_allowed.add(user)
+            for group in groups_allowed:
+                empty_SD.groups_allowed.add(group)
+            empty_SD.clean()
 
         return empty_SD
 
@@ -540,7 +543,7 @@ class Dataset(metadata.models.AccessControl):
         with transaction.atomic():
             new_dataset = cls.create_empty(user, cdt=cdt,
                                            users_allowed=users_allowed, groups_allowed=groups_allowed,
-                                           instance=instance)
+                                           instance=instance, file_source=file_source)
 
             new_dataset.name = name or ""
             new_dataset.description = description or ""
@@ -591,7 +594,6 @@ class Dataset(metadata.models.AccessControl):
 
             if keep_file:
                 new_dataset.register_file(file_path=file_path, file_handle=file_handle)
-                new_dataset.file_source = file_source
             else:
                 if new_dataset.is_raw():
                     new_dataset.set_MD5(file_name, file_handle)
@@ -830,10 +832,9 @@ class Dataset(metadata.models.AccessControl):
         """
         Mark RunComponents that use this as an output as failed.
         """
-        if self.has_data() and self.file_source is not None:
-            creating_ER = self.file_source.execrecord
-            for rc in creating_ER.used_by_components.all():
-                rc.mark_unsuccessful()
+        # if self.has_data() and self.file_source is not None:
+        if self.file_source is not None:
+            self.file_source.execrecord.notify_runcomponents_of_failure()
 
     def is_OK(self):
         """
@@ -1390,6 +1391,13 @@ class ExecRecord(models.Model):
     def remove(self):
         removal_plan = self.build_removal_plan()
         metadata.models.remove_helper(removal_plan)
+
+    def notify_runcomponents_of_failure(self):
+        """
+        Mark RunComponents that use this ExecRecord as failed.
+        """
+        for rc in self.used_by_components.all():
+            rc.mark_unsuccessful()
 
 
 @python_2_unicode_compatible

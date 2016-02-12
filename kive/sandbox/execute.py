@@ -1309,8 +1309,10 @@ class Sandbox:
                             curr_record.execrecord = curr_ER
 
                             if not can_reuse["successful"]:
-                                # If this is a recovery we do *not* mark curr_record as failed.
-                                invoking_record.mark_unsuccessful()
+                                # Mark both curr_record and invoking_record as failed (if they're different).
+                                curr_record.mark_unsuccessful()
+                                if recover:
+                                    recovering_record.mark_unsuccessful()
                             if not recover:
                                 curr_record.mark_complete()
                                 curr_record.stop(save=True, clean=False)
@@ -1345,8 +1347,10 @@ class Sandbox:
                 logger.error("[%d] could not copy file %s to file %s.",
                              worker_rank, input_dataset.dataset_file.path, input_dataset_path)
 
-                invoking_record.mark_unsuccessful()
-                if not recover:
+                curr_record.mark_unsuccessful()
+                if recover:
+                    recovering_record.mark_unsuccessful()
+                else:
                     curr_record.mark_complete()
                     curr_record.stop(save=True, clean=True)
                 return curr_record
@@ -1393,10 +1397,11 @@ class Sandbox:
                         missing_output = True
 
                         # Update state variables.
+                        curr_record.mark_unsuccessful()
                         if recover:
                             recovering_record.mark_unsuccessful()
-                        else:
-                            curr_record.mark_unsuccessful()
+                        if preexisting_ER:
+                            curr_ER.notify_runcomponents_of_failure()
 
                     elif cable.is_trivial():
                         output_dataset = input_dataset
@@ -1457,22 +1462,21 @@ class Sandbox:
             # Did ER already exist (with vetted output), or is cable trivial, or recovering? Yes.
             if (preexisting_ER and (output_dataset.is_OK() or output_dataset.any_failed_checks())) or cable.is_trivial() or recover:
                 logger.debug("[%d] Performing integrity check of trivial or previously generated output", worker_rank)
-                # Perform integrity check.
+                # Perform integrity check.  Note: if this fails, it will notify all RunComponents using it.
                 check = output_dataset.check_integrity(output_path, user, curr_log, output_dataset.MD5_checksum)
 
             # Did ER already exist, or is cable trivial, or recovering? No.
             else:
                 logger.debug("[%d] Performing content check for output generated for the first time", worker_rank)
                 summary_path = "{}_summary".format(output_path)
-                # Perform content check.
+                # Perform content check.  Note: if this fails, it will notify all RunComponents using it.
                 check = output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
                                                            cable.max_rows_out, curr_log, user)
 
             if check.is_fail():
+                curr_record.mark_unsuccessful()
                 if recover:
                     recovering_record.mark_unsuccessful()
-                else:
-                    curr_record.mark_unsuccessful()
 
         logger.debug("[%d] DONE EXECUTING %s '%s'", worker_rank, type(cable).__name__, cable)
 
@@ -1501,6 +1505,7 @@ class Sandbox:
         curr_ER = None
         if step_execute_dict["execrecord_pk"] is not None:
             curr_ER = librarian.models.ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
+        preexisting_ER = curr_ER is not None
         cable_info_dicts = step_execute_dict["cable_info_dicts"]
         output_paths = step_execute_dict["output_paths"]
         user = User.objects.get(pk=step_execute_dict["user_pk"])
@@ -1551,13 +1556,13 @@ class Sandbox:
         # Check again to see if a compatible ER was completed while this task
         # waited on the queue.  If this isn't a recovery, we can just stop.
         if recover:
-            assert curr_ER is not None
+            assert preexisting_ER
         else:
             succeeded_yet = False
             while not succeeded_yet:
                 try:
                     with transaction.atomic():
-                        if curr_ER is not None:
+                        if preexisting_ER:
                             can_reuse = curr_RS.check_ER_usable(curr_ER)
                             # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
                             if not can_reuse["successful"] or can_reuse["fully reusable"]:
@@ -1611,9 +1616,10 @@ class Sandbox:
             curr_log.stop(save=True, clean=False)
 
             # Update state variables:
-            invoking_record.mark_unsuccessful()
-
-            if not recover:
+            curr_RS.mark_unsuccessful()
+            if recover:
+                recovering_record.mark_unsuccessful()
+            else:
                 curr_RS.mark_complete()
                 curr_RS.stop(save=False, clean=False)
             curr_RS.save()
@@ -1638,14 +1644,20 @@ class Sandbox:
             if not recover:
                 curr_RS.mark_complete()
                 curr_RS.save()
-            invoking_record.mark_unsuccessful()
+            curr_RS.mark_unsuccessful()
+            if recover:
+                recovering_record.mark_unsuccessful()
 
             raise e
 
         logger.debug("[%d] Method execution complete, ExecLog saved (started = %s, ended = %s)",
                      worker_rank, curr_log.start_time, curr_log.end_time)
 
-        preexisting_ER = curr_ER is not None
+        if (preexisting_ER and curr_log.methodoutput.return_code != 0
+                and curr_RS.pipelinestep.transformation.definite.reusable == Method.DETERMINISTIC):
+            # If this code is marked as deterministic, the return code should have been 0.
+            curr_ER.notify_runcomponents_of_failure()
+
         succeeded_yet = False
         while not succeeded_yet:
             try:
@@ -1679,8 +1691,12 @@ class Sandbox:
 
                                 bad_output_found = True
 
-                                # Update state variables.
-                                invoking_record.mark_unsuccessful()
+                                # Update state variables.  We're not recovering so we don't update
+                                # recovering_record.
+                                curr_RS.mark_unsuccessful()
+                                curr_RS_method = curr_RS.pipelinestep.transformation.definite
+                                if preexisting_ER and curr_RS_method.reusable == Method.DETERMINISTIC:
+                                    curr_ER.notify_runcomponents_of_failure()
 
                             else:
                                 # If necessary, create new Dataset for output, and create the Dataset
@@ -1753,7 +1769,8 @@ class Sandbox:
                         file_is_present = False
 
                         # Update state variables.
-                        invoking_record.mark_unsuccessful()
+                        curr_RS.mark_unsuccessful()
+                        recovering_record.mark_unsuccessful()
 
                 if file_is_present:
                     # Perform integrity check.
@@ -1786,7 +1803,9 @@ class Sandbox:
             if check and check.is_fail():
                 logger.warn("[%d] %s failed for %s", worker_rank, check.__class__.__name__, output_path)
                 bad_output_found = True
-                invoking_record.mark_unsuccessful()
+                curr_RS.mark_unsuccessful()
+                if recover:
+                    recovering_record.mark_unsuccessful()
 
             # Check OK? Yes.
             elif check:
