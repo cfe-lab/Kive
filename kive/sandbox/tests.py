@@ -235,6 +235,33 @@ class ExecuteTests(ExecuteTransactionTestsBase):
             input_datasets.append(dataset)
         return input_datasets
 
+    def check_run_OK(self, run):
+        for step in run.runsteps.all():
+            for rsic in step.RSICs.all():
+                self.assertTrue(rsic._complete is not None)
+                self.assertTrue(rsic._successful is not None)
+                self.assertTrue(rsic.is_complete(use_cache=True))
+                self.assertTrue(rsic.is_successful(use_cache=True))
+
+            if step.has_subrun():
+                self.check_all_components_OK(step.child_run)
+
+            self.assertTrue(step._complete is not None)
+            self.assertTrue(step._successful is not None)
+            self.assertTrue(step.is_complete(use_cache=True))
+            self.assertTrue(step.is_successful(use_cache=True))
+
+        for outcable in run.runoutputcables.all():
+            self.assertTrue(outcable._complete is not None)
+            self.assertTrue(outcable._successful is not None)
+            self.assertTrue(outcable.is_complete(use_cache=True))
+            self.assertTrue(outcable.is_successful(use_cache=True))
+
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
+        self.assertTrue(run.is_complete(use_cache=True))
+        self.assertTrue(run.is_successful(use_cache=True))
+
     def test_pipeline_execute_A_simple_onestep_pipeline(self):
         """Execution of a one-step pipeline."""
 
@@ -243,12 +270,7 @@ class ExecuteTests(ExecuteTransactionTestsBase):
         inputs = [self.dataset]
         run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
 
-        for step in run.runsteps.all():
-
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_successful(use_cache=True))
+        self.check_run_OK(run)
 
     def test_pipeline_execute_B_twostep_pipeline_with_recycling(self):
         """Two step pipeline with second step identical to the first"""
@@ -302,10 +324,8 @@ class ExecuteTests(ExecuteTransactionTestsBase):
         pipeline = self.pX
         inputs = [self.dataset]
         run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_successful(use_cache=True))
+
+        self.check_run_OK(run)
 
     def test_pipeline_execute_C_twostep_pipeline_with_subpipeline(self):
         """Two step pipeline with second step identical to the first"""
@@ -395,10 +415,7 @@ class ExecuteTests(ExecuteTransactionTestsBase):
         pipeline = self.pX
         inputs = [input_dataset]
         run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_successful(use_cache=True))
+        self.check_run_OK(run)
 
     def test_pipeline_all_inputs_OK_nonraw(self):
         """Execute a Pipeline with OK non-raw inputs."""
@@ -408,10 +425,9 @@ class ExecuteTests(ExecuteTransactionTestsBase):
         self.assertFalse(all(i.is_raw() for i in inputs))
         run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
 
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_successful(use_cache=True))
+        self.check_run_OK(run)
+
+        # Check the full is_complete and is_successful.
         self.assertTrue(run.is_complete())
         self.assertTrue(run.is_successful())
 
@@ -428,10 +444,8 @@ class ExecuteTests(ExecuteTransactionTestsBase):
         self.assertTrue(any(i.is_raw() for i in inputs))
         run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
 
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_successful(use_cache=True))
+        self.check_run_OK(run)
+
         self.assertTrue(run.is_complete())
         self.assertTrue(run.is_successful())
 

@@ -2000,7 +2000,7 @@ class RunCable(RunComponent):
 
         # If this cable is trivial, there should be no data
         # associated.
-        if self.has_data():
+        if self.has_data() and self.outputs.first().has_data():
             if self._pipeline_cable().is_trivial():
                 raise ValidationError(
                     '{} "{}" is trivial and should not have generated any Datasets'.format(
@@ -2040,7 +2040,8 @@ class RunCable(RunComponent):
         """
         # If output of the cable not marked as kept, there shouldn't be a Dataset.
         if not self.keeps_output():
-            if self.has_data():
+            # Check if the attached output has real data associated to it.
+            if self.has_data() and self.outputs.first().has_data():
                 raise ValidationError(
                     '{} "{}" does not keep its output but a dataset was registered'.format(
                         self._cable_type_str(), self)
@@ -2048,7 +2049,7 @@ class RunCable(RunComponent):
 
         # If EL shows missing output, there shouldn't be a Dataset.
         elif self.log.missing_outputs():
-            if self.has_data():
+            if self.has_data() and self.outputs.first().has_data():
                 raise ValidationError('{} "{}" had missing output but a dataset was registered'.format(
                     self._cable_type_str(), self))
 
@@ -2128,7 +2129,7 @@ class RunCable(RunComponent):
                 # there should be associated data, and it should match that
                 # of corresp_ero.
                 if not self.reused and not self._pipeline_cable().is_trivial():
-                    if not self.has_data():
+                    if not (self.has_data() and self.outputs.first().has_data()):
                         raise ValidationError('{} "{}" was not reused, trivial, or deleted; it should have '
                                               'produced data'.format(self._cable_type_str(), self))
 
