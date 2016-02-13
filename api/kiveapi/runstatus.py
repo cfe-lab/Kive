@@ -105,6 +105,15 @@ class RunStatus(object):
         status = self._grab_stats()['status']
         return 100*float(status.count('*'))/float(len(status) - status.count('-'))
 
+    def get_inputs(self):
+        """
+        Gets all the datasets that fed this pipeline.
+
+        :return: A list of Dataset objects.
+        """
+        datasets = self.api.get(self.results_url).json()['input_summary']
+        return [Dataset(d, self.api) for d in datasets]
+
     def get_results(self):
         """
         Gets all the datasets that resulted from this pipeline.

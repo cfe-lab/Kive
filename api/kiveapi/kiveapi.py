@@ -183,20 +183,32 @@ class KiveAPI(Session):
         dataset = self.get('@api_get_dataset', context={'dataset-id': dataset_id}).json()
         return Dataset(dataset, self)
 
-    def find_datasets(self, dataset_id=None, dataset_name=None, md5=None):
+    def find_datasets(self,
+                      dataset_id=None,
+                      dataset_name=None,
+                      md5=None,
+                      cdt=None):
         """
 
-        :param kwargs:
-        :return:
+        :param dataset_id: a specific dataset id to find, result will be a list
+            with one entry
+        :param dataset_name: a string that must be contained in the dataset
+            names
+        :param md5: a checksum that must match the dataset checksums
+        :param cdt: a CompoundDataType object that must match the datasets'
+            compound data types
+        :return: a list of Dataset objects
         """
         if dataset_id is not None:
-            return self.get_dataset(dataset_id)
+            return [self.get_dataset(dataset_id)]
 
         filters = {}
         if dataset_name is not None:
             filters['name'] = dataset_name
         if md5 is not None:
             filters['md5'] = md5
+        if cdt is not None:
+            filters['cdt'] = cdt.cdt_id
         if filters:
             filter_text = '&'.join(
                 'filters[{}][key]={}&filters[{}][val]={}'.format(i, key, i, val)
