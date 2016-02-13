@@ -1623,7 +1623,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$eoiWqyLhESdK$uhZJ3DViz4MnBSH1kpYfhxpoVbnxQiWcI2Vc81CVgPU=", 
+            "password": "pbkdf2_sha256$24000$huyYwViYaA35$I5/tZsEIWN4aNZDGvAMBqssghxEAnuYuL785VZmvLJQ=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -1641,7 +1641,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$79MnuwceiC99$bx1+fH1Z7vOXgHgxjifcDRgVsfmqvDoJmSKKWTPhlSM=", 
+            "password": "pbkdf2_sha256$24000$7W3O90CqGUJQ$rlulUZ0WDmbOLJiTr0MBSxl4yiZlVxF1ws38ukAIpUE=", 
             "user_permissions": [], 
             "username": "ringo"
         }, 
@@ -1661,7 +1661,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$VHVBkKRWT7qQ$/Njf/c2B8hsDrihExscnJ3tyYl/iCzd6hkW46Qn1Qo8=", 
+            "password": "pbkdf2_sha256$24000$9Njuwv6wad7O$jrthoEmv8I1spvgQIHMnBZ+2+KfHuGdfLBOGKuJypaA=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -1904,7 +1904,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2016-02-03T19:05:42.392Z", 
+            "time_queued": "2016-02-13T00:20:38.564Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1928,7 +1928,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2016-02-03T19:05:42.401Z", 
+            "time_queued": "2016-02-13T00:20:38.573Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1950,7 +1950,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2016-02-03T19:05:42.420Z", 
+            "time_queued": "2016-02-13T00:20:38.593Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1972,7 +1972,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2016-02-03T19:05:42.488Z", 
+            "time_queued": "2016-02-13T00:20:38.683Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1994,7 +1994,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2016-02-03T19:05:42.546Z", 
+            "time_queued": "2016-02-13T00:20:38.739Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -2132,7 +2132,7 @@
             "MD5_checksum": "10a4bd15d1300fcaf5a3bdad54ef1d28", 
             "_redacted": false, 
             "dataset_file": "", 
-            "date_created": "2000-01-01T00:00:01Z", 
+            "date_created": "2000-01-01T00:00:02Z", 
             "description": "", 
             "file_source": null, 
             "groups_allowed": [
@@ -2167,7 +2167,7 @@
         "fields": {
             "MD5_checksum": "00fd50bfe7ac63e2165a442f4101e05c", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_02/step_0_singlet_8NgqTqc.csv", 
+            "dataset_file": "Datasets/2016_02/step_0_singlet_HCJcjw6.csv", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "file_source": null, 
@@ -2185,7 +2185,7 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_02/step_0_raw_0ZjDySM.fasta", 
+            "dataset_file": "Datasets/2016_02/step_0_raw_60uHG5Z.fasta", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "file_source": null, 
@@ -2203,7 +2203,7 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_02/step_0_raw_czTVcHQ.fasta", 
+            "dataset_file": "Datasets/2016_02/step_0_raw_2ttySuW.fasta", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "file_source": null, 
@@ -2738,7 +2738,7 @@
     {
         "fields": {
             "dataset": 7, 
-            "end_time": "2000-01-01T00:00:01Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "execlog": null, 
             "start_time": "2000-01-01T00:00:01Z", 
             "user": 2
@@ -2751,7 +2751,7 @@
             "dataset": 8, 
             "end_time": "2000-01-01T00:00:02Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:01Z", 
+            "start_time": "2000-01-01T00:00:02Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -2826,7 +2826,7 @@
     {
         "fields": {
             "dataset": 17, 
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:03Z", 
             "execlog": null, 
             "start_time": "2000-01-01T00:00:02Z", 
             "user": 2
