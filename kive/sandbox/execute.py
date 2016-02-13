@@ -447,7 +447,7 @@ class Sandbox:
             # Refresh RunStep from the database.
             runstep = RunStep.objects.get(pk=runstep.pk)
             if runstep.child_run.is_complete(use_cache=True):
-                runstep.mark_complete()
+                runstep.mark_complete(save=True)
             return runstep.is_complete(use_cache=True), sub_run_successful
 
         # Go through steps in order, looking for input cables pointing at the task(s) that have completed.
@@ -1581,8 +1581,9 @@ class Sandbox:
                                 return curr_RS
 
                             else:
-                                logger.debug("[%d] ExecRecord not reusable %s", worker_rank, curr_ER)
-                                curr_ER = None
+                                logger.debug("[%d] ExecRecord not fully reusable -- filling it in %s",
+                                             worker_rank, curr_ER)
+                                # curr_ER = None
 
                         else:
                             logger.debug("[%d] No compatible ExecRecord found yet", worker_rank)

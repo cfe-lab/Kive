@@ -723,17 +723,14 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         if mark_all_components:
             for step in self.runsteps.all():
                 for rsic in step.RSICs.all():
-                    rsic.mark_complete()
-                    rsic.save()
+                    rsic.mark_complete(save=True)
 
                 if step.has_subrun():
                     step.child_run.mark_complete(save=True, mark_all_components=True)
-                step.mark_complete()
-                step.save()
+                step.mark_complete(save=True)
 
             for outcable in self.runoutputcables.all():
-                outcable.mark_complete()
-                outcable.save()
+                outcable.mark_complete(save=True)
 
         if save:
             self.save()
@@ -1054,8 +1051,10 @@ class RunComponent(stopwatch.models.Stopwatch):
                     self.__class__.__name__, self)
             )
 
-    def mark_complete(self):
+    def mark_complete(self, save=False):
         self._complete = True
+        if save:
+            self.save(update_fields=["_complete"])
 
     def failed_mark_complete(self, tasks_still_running):
         """
@@ -1067,8 +1066,7 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         Note that this is overridden by RunSIC.
         """
-        self.mark_complete()
-        self.save()
+        self.mark_complete(save=True)
 
         tasks_outside_this_subrun = []
         for task in tasks_still_running:
@@ -2403,8 +2401,7 @@ class RunSIC(RunCable):
 
         This overrides the method on RunComponent.
         """
-        self.mark_complete()
-        self.save()
+        self.mark_complete(save=True)
 
         tasks_outside_this_runstep = []
         for task in tasks_still_running:

@@ -244,7 +244,7 @@ class ExecuteTests(ExecuteTransactionTestsBase):
                 self.assertTrue(rsic.is_successful(use_cache=True))
 
             if step.has_subrun():
-                self.check_all_components_OK(step.child_run)
+                self.check_run_OK(step.child_run)
 
             self.assertTrue(step._complete is not None)
             self.assertTrue(step._successful is not None)
