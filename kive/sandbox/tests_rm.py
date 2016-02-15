@@ -355,6 +355,14 @@ class BadRunTests(KiveTransactionTestCase):
     def tearDown(self):
         tools.destroy_grandpa_sandbox_environment(self)
 
+    def cable_tester(self, runstep):
+        for rsic in runstep.RSICs.all():
+            self.assertTrue(rsic._complete is not None)
+            self.assertTrue(rsic._successful is not None)
+            self.assertTrue(rsic.is_complete(use_cache=True))
+            self.assertTrue(rsic.is_successful(use_cache=True))
+
+
     @unittest.skipIf(
         settings.KIVE_SANDBOX_WORKER_ACCOUNT,
         "OSError will not be thrown when using SSH to the Kive sandbox worker account"
@@ -370,6 +378,7 @@ class BadRunTests(KiveTransactionTestCase):
         log = runstep1.log
         interm_dataset = runstep1.execrecord.execrecordouts.first().dataset
 
+        self.cable_tester(runstep1)
         self.assertTrue(runstep1._complete is not None)
         self.assertTrue(runstep1._successful is not None)
         self.assertTrue(runstep1.is_complete(use_cache=True))
@@ -396,6 +405,7 @@ class BadRunTests(KiveTransactionTestCase):
         self.assertFalse(run.is_successful())
 
         runstep1 = run.runsteps.get(pipelinestep__step_num=1)
+        self.cable_tester(runstep1)
         self.assertTrue(runstep1._complete is not None)
         self.assertTrue(runstep1._successful is not None)
         self.assertTrue(runstep1.is_complete(use_cache=True))
@@ -404,6 +414,7 @@ class BadRunTests(KiveTransactionTestCase):
         self.assertTrue(runstep1.successful_execution())
 
         runstep2 = run.runsteps.get(pipelinestep__step_num=2)
+        self.cable_tester(runstep2)
         self.assertTrue(runstep2._complete is not None)
         self.assertTrue(runstep2._successful is not None)
         self.assertTrue(runstep2.is_complete(use_cache=True))
