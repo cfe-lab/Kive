@@ -546,7 +546,7 @@ code on a developer workstation.
 5. To launch a fleet manager and workers, you need to run the following command
     and replace X with the number of workers you want:
 
-    python manage.py runfleet --workers X
+        python manage.py runfleet --workers X
     
 Creating a UML diagram of the backend
 -------------------------------------

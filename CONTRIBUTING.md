@@ -109,6 +109,7 @@ Once you have set up your production server, this is how to deploy a new release
         ./manage.py runfleet --workers 191 &>/dev/null &
 
     If you're still using the apache user, launch is slightly different.
+    
         sudo -u apache ls /  # Just test that you can log in as apache
         sudo -u apache LD_LIBRARY_PATH=$LD_LIBRARY_PATH PATH=$PATH ./manage.py runfleet --workers 191 &>/dev/null &
         
