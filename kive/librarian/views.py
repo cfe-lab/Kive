@@ -12,7 +12,7 @@ from django.core.urlresolvers import reverse
 from django.db import transaction
 from django.forms.formsets import formset_factory
 from django.http import HttpResponse, HttpResponseRedirect, Http404
-from django.template import loader, RequestContext
+from django.template import loader
 from wsgiref.util import FileWrapper
 from django.conf import settings
 
@@ -38,8 +38,8 @@ def _build_download_response(source_file):
 
 def _build_raw_viewer(request, file, name, download=None, return_to_url=None):
     t = loader.get_template("librarian/raw_view.html")
-    c = RequestContext(request, {"file": file, "name": name, 'download': download, 'return': return_to_url})
-    return HttpResponse(t.render(c))
+    c = {"file": file, "name": name, 'download': download, 'return': return_to_url}
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -48,10 +48,9 @@ def datasets(request):
     Display a list of all Datasets in database
     """
     t = loader.get_template('librarian/datasets.html')
-    c = RequestContext(request)
-    c['is_user_admin'] = admin_check(request.user)
+    c = {'is_user_admin': admin_check(request.user)}
 
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -145,16 +144,13 @@ def dataset_view(request, dataset_id):
             initial={"name": dataset.name, "description": dataset.description}
         )
 
-    c = RequestContext(
-        request,
-        {
-            "is_admin": admin_check(request.user),
-            "is_owner": dataset.user == request.user,
-            "dataset": dataset,
-            "return": return_url,
-            "dataset_form": dataset_form
-        }
-    )
+    c = {
+        "is_admin": admin_check(request.user),
+        "is_owner": dataset.user == request.user,
+        "dataset": dataset,
+        "return": return_url,
+        "dataset_form": dataset_form
+    }
     if dataset.is_raw():
         t = loader.get_template("librarian/raw_dataset_view.html")
     else:
@@ -176,7 +172,7 @@ def dataset_view(request, dataset_id):
                 "DATASET_DISPLAY_MAX": settings.DATASET_DISPLAY_MAX
             }
         )
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -185,7 +181,7 @@ def datasets_add(request):
     Add datasets to db.
     """
     t = loader.get_template('librarian/datasets_add.html')
-    c = RequestContext(request)
+    c = {}
     if request.method == 'POST':
         # The new Dataset; we need it here for validation purposes.
 
@@ -238,7 +234,7 @@ def datasets_add(request):
         df = DatasetForm(user=request.user, prefix="single")
         c.update({'singleDataset': df})
 
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render(c, request))
 
 
 class BulkDatasetDisplay:
@@ -255,7 +251,7 @@ def datasets_add_archive(request):
     Add datasets in bulk to db.  Redirect to /datasets_bulk view so user can examine upload status of each dataset.
     """
     # Redirect to page to allow user to view status of added datasets.
-    c = RequestContext(request)
+    c = {}
     t = loader.get_template('librarian/datasets_bulk.html')
     archive_add_dataset_form = None
 
@@ -331,7 +327,7 @@ def datasets_add_archive(request):
         archive_dataset_form = ArchiveAddDatasetForm(user=request.user)
         c.update({'archiveAddDatasetForm': archive_dataset_form})
 
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -340,7 +336,7 @@ def datasets_add_bulk(request):
     Add datasets in bulk to db.  Redirect to /datasets_bulk view so user can examine upload status of each dataset.
     """
     # Redirect to page to allow user to view status of added datasets.
-    c = RequestContext(request)
+    c = {}
     t = loader.get_template('librarian/datasets_bulk.html')
     if request.method == 'POST':
         try:
@@ -407,7 +403,7 @@ def datasets_add_bulk(request):
         bulk_dataset_form = BulkAddDatasetForm(user=request.user)
         c.update({'bulkAddDatasetForm': bulk_dataset_form})
 
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -419,7 +415,7 @@ def datasets_bulk(request):
     :param request:
     :return:
     """
-    c = RequestContext(request)
+    c = {}
     t = loader.get_template('librarian/datasets_bulk.html')
     if request.method == 'POST':
         BulkDatasetUpdateFormSet = formset_factory(form=BulkDatasetUpdateForm)
@@ -459,7 +455,7 @@ def datasets_bulk(request):
         bulk_dataset_form = BulkAddDatasetForm(user=request.user)
         c.update({'bulkAddDatasetForm': bulk_dataset_form})
 
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -494,13 +490,12 @@ def dataset_lookup(request, md5_checksum=None):
             }]
 
     t = loader.get_template('librarian/dataset_lookup.html')
-    c = RequestContext(request, {'datasets': datasets, 'datasets_as_inputs': datasets_as_inputs, 'md5': md5_checksum})
+    c = {'datasets': datasets, 'datasets_as_inputs': datasets_as_inputs, 'md5': md5_checksum}
 
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
 def lookup(request):
     t = loader.get_template("librarian/lookup.html")
-    c = RequestContext(request, {})
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render({}, request))

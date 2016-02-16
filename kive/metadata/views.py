@@ -3,12 +3,11 @@ metadata.views
 """
 
 from django.http import HttpResponse, HttpResponseRedirect, Http404
-from django.template import loader, RequestContext
+from django.template import loader
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth.models import User, Group
 
 import re
 import logging
@@ -20,8 +19,6 @@ from metadata.forms import CompoundDatatypeForm, CompoundDatatypeMemberForm, \
 from metadata.models import BasicConstraint, CompoundDatatype, \
     CompoundDatatypeMember, Datatype, get_builtin_types
 from portal.views import developer_check, admin_check
-from metadata.serializers import DatatypeSerializer, CompoundDatatypeSerializer
-import json
 
 
 LOGGER = logging.getLogger(__name__)
@@ -34,12 +31,10 @@ def datatypes(request):
     Render table and form on user request for datatypes.html
     """
     t = loader.get_template('metadata/datatypes.html')
-    c = RequestContext(
-        request,
-        {
-            "is_user_admin": admin_check(request.user)
-        })
-    return HttpResponse(t.render(c))
+    c = {
+        "is_user_admin": admin_check(request.user)
+    }
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -49,7 +44,7 @@ def datatype_add(request):
     Render form for creating a new Datatype
     """
     t = loader.get_template('metadata/datatype_add.html')
-    c = RequestContext(request)
+    c = {}
 
     # A dummy Datatype to be used for filling in a DatatypeForm.
     dt = Datatype(user=request.user, date_created=timezone.now())
@@ -145,7 +140,7 @@ def datatype_add(request):
         scform = StringConstraintForm()
 
     c.update({'datatype_form': dform, 'int_con_form': icform, 'str_con_form': scform})
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -195,16 +190,14 @@ def datatype_detail(request, id):
         )
 
     t = loader.get_template('metadata/datatype_detail.html')
-    c = RequestContext(
-        request,
-        {
-            "datatype": dt,
-            "constraints": dt.basic_constraints.all(),
-            "datatype_form": datatype_form,
-            "is_owner": request.user == dt.user,
-            "is_admin": admin_check(request.user)
-        })
-    return HttpResponse(t.render(c))
+    c = {
+        "datatype": dt,
+        "constraints": dt.basic_constraints.all(),
+        "datatype_form": datatype_form,
+        "is_owner": request.user == dt.user,
+        "is_admin": admin_check(request.user)
+    }
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -214,8 +207,8 @@ def compound_datatypes(request):
     Render list of all CompoundDatatypes
     """
     t = loader.get_template('metadata/compound_datatypes.html')
-    c = RequestContext(request, {'is_user_admin': admin_check(request.user)})
-    return HttpResponse(t.render(c))
+    c = {'is_user_admin': admin_check(request.user)}
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -252,7 +245,13 @@ def compound_datatype_detail(request, id):
         )
         try:
             if cdt_form.is_valid():
-                cdt.grant_from_json(cdt_form.cleaned_data["permissions"])
+                with transaction.atomic():
+                    cdt.grant_from_json(cdt_form.cleaned_data["permissions"])
+                    cdt.name = cdt_form.cleaned_data["name"]
+                    # If this was blanked out, we add the default name (i.e. the CDT's string
+                    # representation.
+                    cdt.set_name()
+                    cdt.save()
 
                 return HttpResponseRedirect("/compound_datatypes")
         except (AttributeError, ValidationError, ValueError) as e:
@@ -262,21 +261,20 @@ def compound_datatype_detail(request, id):
     else:
         # A blank form which we can use to make submission and editing easier.
         cdt_form = CompoundDatatypeForm(
+            initial={"name": cdt.name},
             users_allowed=addable_users,
             groups_allowed=addable_groups
         )
 
     t = loader.get_template('metadata/compound_datatype_detail.html')
-    c = RequestContext(
-        request,
-        {
-            "cdt": cdt,
-            "members": cdt.members.order_by("column_idx"),
-            "cdt_form": cdt_form,
-            "is_owner": request.user == cdt.user,
-            "is_admin": admin_check(request.user)
-        })
-    return HttpResponse(t.render(c))
+    c = {
+        "cdt": cdt,
+        "members": cdt.members.order_by("column_idx"),
+        "cdt_form": cdt_form,
+        "is_owner": request.user == cdt.user,
+        "is_admin": admin_check(request.user)
+    }
+    return HttpResponse(t.render(c, request))
 
 
 # FIXME make this use a formset!
@@ -317,7 +315,7 @@ def compound_datatype_add(request):
     """
     Add CompoundDatatype from a dynamic set of CompoundDatatypeMember forms.
     """
-    c = RequestContext(request)
+    c = {}
     if request.method == 'POST':
         # Create a parent CDT object so we can define its members.
         dummy_cdt = CompoundDatatype(user=request.user)
@@ -354,6 +352,10 @@ def compound_datatype_add(request):
                 if not all_good:
                     raise CDTDefException()
 
+                # If no name was specified, set its name to be its string representation.
+                # This only does anything if the name is blank.
+                compound_datatype.set_name()
+
                 compound_datatype.full_clean()
 
             # Success!
@@ -369,9 +371,13 @@ def compound_datatype_add(request):
 
     # Note that even if there were exceptions thrown the forms have been properly annotated with errors.
     t = loader.get_template('metadata/compound_datatype_add.html')
-    c.push({"cdt_form": cdt_form,
+    c.update(
+        {
+            "cdt_form": cdt_form,
             'cdm_forms': member_forms,
-            'first_form': member_forms and member_forms[0]})
+            'first_form': member_forms and member_forms[0]
+        }
+    )
 
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render(c, request))
 

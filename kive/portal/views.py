@@ -2,7 +2,7 @@
 portal.views
 """
 from django.http import HttpResponse, HttpResponseRedirect
-from django.template import loader, RequestContext
+from django.template import loader
 from django.contrib.auth.decorators import login_required, user_passes_test
 
 from constants import groups
@@ -26,8 +26,8 @@ def home(request):
         return HttpResponseRedirect("/usr.html")
 
     t = loader.get_template('portal/index.html')
-    c = RequestContext(request, {"is_developer": user_is_developer})
-    return HttpResponse(t.render(c))
+    c = {"is_developer": user_is_developer}
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -37,8 +37,7 @@ def dev(request):
     Developer portal
     """
     t = loader.get_template('portal/dev.html')
-    c = RequestContext(request)
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render({}, request))
 
 
 @login_required
@@ -47,5 +46,4 @@ def usr(request):
     User portal
     """
     t = loader.get_template('portal/usr.html')
-    c = RequestContext(request)
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render({}, request))

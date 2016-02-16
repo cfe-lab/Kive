@@ -6,7 +6,7 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponse, HttpResponseRedirect, Http404
-from django.template import loader, RequestContext
+from django.template import loader
 
 from datetime import datetime
 import logging
@@ -33,13 +33,11 @@ def resources(request):
     Display a list of all code resources (parents) in database
     """
     t = loader.get_template('method/resources.html')
-    c = RequestContext(
-        request,
-        {
-            "is_user_admin": admin_check(request.user)
-        })
+    c = {
+        "is_user_admin": admin_check(request.user)
+    }
 
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -102,26 +100,24 @@ def resource_revisions(request, id):
         crv_form = CodeResourceRevisionForm()
         dep_forms = [CodeResourceDependencyForm(user=request.user, auto_id='id_%s_0')]
 
-        c = RequestContext(request,
-                           {'revision_form': crv_form,
-                            'parent_revision': None,
-                            'coderesource': coderesource,
-                            'dep_forms': dep_forms})
-        return HttpResponse(t.render(c))
+        c = {
+            'revision_form': crv_form,
+            'parent_revision': None,
+            'coderesource': coderesource,
+            'dep_forms': dep_forms
+        }
+        return HttpResponse(t.render(c, request))
 
     # Load template, setup context
     t = loader.get_template('method/resource_revisions.html')
-    c = RequestContext(
-        request,
-        {
-            'coderesource': coderesource,
-            "resource_form": resource_form,
-            'revisions': revisions,
-            'is_admin': admin_check(request.user),
-            "is_owner": request.user == coderesource.user
-        }
-    )
-    return HttpResponse(t.render(c))
+    c = {
+        'coderesource': coderesource,
+        "resource_form": resource_form,
+        'revisions': revisions,
+        'is_admin': admin_check(request.user),
+        "is_owner": request.user == coderesource.user
+    }
+    return HttpResponse(t.render(c, request))
 
 
 def _make_dep_forms(query_dict, user):
@@ -297,10 +293,11 @@ def resource_add(request):
         response_dep_forms = [CodeResourceDependencyForm(user=creating_user,
                                                          auto_id='id_%s_0')]
     t = loader.get_template('method/resource_add.html')
-    c = RequestContext(request,
-                       {'resource_form': resource_form,
-                        'dep_forms': response_dep_forms})
-    return HttpResponse(t.render(c))
+    c = {
+        'resource_form': resource_form,
+        'dep_forms': response_dep_forms
+    }
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -311,7 +308,7 @@ def resource_revision_add(request, id):
     revision to this code resource.
     """
     t = loader.get_template('method/resource_revision_add.html')
-    c = RequestContext(request)
+    c = {}
     creating_user = request.user
 
     # Use POST information (id) to retrieve the CRv being revised.
@@ -411,7 +408,7 @@ def resource_revision_add(request, id):
             'dep_forms': dep_forms
         }
     )
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -466,16 +463,13 @@ def resource_revision_view(request, id):
         )
 
     t = loader.get_template("method/resource_revision_view.html")
-    c = RequestContext(
-        request,
-        {
-            "revision": revision,
-            "revision_form": revision_form,
-            "is_owner": revision.user == request.user,
-            "is_admin": admin_check(request.user)
-        }
-    )
-    return HttpResponse(t.render(c))
+    c = {
+        "revision": revision,
+        "revision_form": revision_form,
+        "is_owner": revision.user == request.user,
+        "is_admin": admin_check(request.user)
+    }
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -485,12 +479,10 @@ def method_families(request):
     Display a list of all MethodFamily objects in database.
     """
     t = loader.get_template("method/method_families.html")
-    c = RequestContext(
-        request,
-        {
-            "is_user_admin": admin_check(request.user)
-        })
-    return HttpResponse(t.render(c))
+    c = {
+        "is_user_admin": admin_check(request.user)
+    }
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -544,15 +536,13 @@ def methods(request, id):
         )
 
     t = loader.get_template('method/methods.html')
-    c = RequestContext(request,
-                       {
-                           "family": family,
-                           "family_form": mf_form,
-                           "is_admin": admin_check(request.user),
-                           "is_owner": request.user == family.user
-
-                       })
-    return HttpResponse(t.render(c))
+    c = {
+        "family": family,
+        "family_form": mf_form,
+        "is_admin": admin_check(request.user),
+        "is_owner": request.user == family.user
+    }
+    return HttpResponse(t.render(c, request))
 
 
 def create_method_forms(request_post, user, family=None):
@@ -799,16 +789,13 @@ def method_view(request, id):
         )
 
     t = loader.get_template("method/method_view.html")
-    c = RequestContext(
-        request,
-        {
-            "method": method,
-            "method_form": method_form,
-            "is_owner": method.user == request.user,
-            "is_admin": admin_check(request.user)
-        }
-    )
-    return HttpResponse(t.render(c))
+    c = {
+        "method": method,
+        "method_form": method_form,
+        "is_owner": method.user == request.user,
+        "is_admin": admin_check(request.user)
+    }
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -864,7 +851,7 @@ def _method_creation_helper(request, method_family=None):
         header = "Add a new Method to MethodFamily '%s'" % method_family.name
 
     t = loader.get_template('method/method.html')
-    c = RequestContext(request)
+    c = {}
     if request.method == 'POST':
         family_form, method_form, input_form_tuples, output_form_tuples = create_method_forms(
             request.POST, creating_user, family=method_family)
@@ -914,7 +901,7 @@ def _method_creation_helper(request, method_family=None):
             'family': method_family,
             'header': header
         })
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -925,7 +912,7 @@ def method_revise(request, id):
     previous version.
     """
     t = loader.get_template('method/method.html')
-    c = RequestContext(request)
+    c = {}
     creating_user = request.user
 
     # Retrieve the most recent member of this Method's family.
@@ -1023,11 +1010,15 @@ def method_revise(request, id):
     method_revise_form.fields['revisions'].widget.choices = [
         (str(x.id), '{}: {}'.format(x.revision_number, x.revision_name)) for x in all_revisions
     ]
-    c.update({'coderesource': this_code_resource,
-              'method_form': method_revise_form,
-              'input_forms': input_form_tuples,
-              'output_forms': output_form_tuples,
-              'family': family,
-              'family_form': family_form,
-              'parent': parent_method})
-    return HttpResponse(t.render(c))
+    c.update(
+        {
+            'coderesource': this_code_resource,
+            'method_form': method_revise_form,
+            'input_forms': input_form_tuples,
+            'output_forms': output_form_tuples,
+            'family': family,
+            'family_form': family_form,
+            'parent': parent_method
+        }
+    )
+    return HttpResponse(t.render(c, request))

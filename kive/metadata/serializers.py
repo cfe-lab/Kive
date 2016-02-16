@@ -45,7 +45,8 @@ class CompoundDatatypeSerializer(serializers.ModelSerializer):
             'users_allowed',
             'groups_allowed',
             'removal_plan',
-            'absolute_url'
+            'absolute_url',
+            'name'
         )
 
     def get_representation(self, obj):

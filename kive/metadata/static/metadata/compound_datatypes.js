@@ -1,5 +1,5 @@
 function cdt_link($td, cdt) {
-    var $a = $("<a/>").attr("href", cdt.absolute_url).text(cdt.representation);
+    var $a = $("<a/>").attr("href", cdt.absolute_url).text(cdt.name);
     $td.append($a);
 }
 
@@ -16,7 +16,8 @@ var CompoundDatatypesTable = function($table, is_user_admin, $active_filters, $n
     );
 
     this.list_url = "api/compounddatatypes/";
-    this.registerColumn("Scheme", cdt_link);
+    this.registerColumn("Name", cdt_link);
+    this.registerColumn("Scheme", "representation");
 
     this.registerStandardColumn("user");
     this.registerStandardColumn("users_allowed");
@@ -32,13 +33,6 @@ CompoundDatatypesTable.prototype.getQueryParams = function() {
 };
 
 CompoundDatatypesTable.prototype.buildTable = function(rows) {
-    rows.sort(function(a, b) {
-        return (a.representation < b.representation ?
-                -1 :
-                a.representation > b.representation ?
-                        1 :
-                        a.id - b.id);
-    });
     permissions.PermissionsTable.prototype.buildTable.apply(this, [rows]);
 };
 

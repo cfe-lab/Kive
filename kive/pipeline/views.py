@@ -3,7 +3,7 @@ pipeline views
 """
 
 from django.http import HttpResponse, HttpResponseRedirect, Http404
-from django.template import loader, RequestContext
+from django.template import loader
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.exceptions import ValidationError
 
@@ -29,12 +29,10 @@ def pipeline_families(request):
     root members (without parent).
     """
     t = loader.get_template('pipeline/pipeline_families.html')
-    c = RequestContext(
-        request,
-        {
-            "is_user_admin": admin_check(request.user)
-        })
-    return HttpResponse(t.render(c))
+    c = {
+        "is_user_admin": admin_check(request.user)
+    }
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -88,14 +86,13 @@ def pipelines(request, id):
         )
 
     t = loader.get_template('pipeline/pipelines.html')
-    c = RequestContext(request,
-                       {
-                           "family": family,
-                           "family_form": pf_form,
-                           "is_admin": admin_check(request.user),
-                           "is_owner": request.user == family.user
-                       })
-    return HttpResponse(t.render(c))
+    c = {
+        "family": family,
+        "family_form": pf_form,
+        "is_admin": admin_check(request.user),
+        "is_owner": request.user == family.user
+    }
+    return HttpResponse(t.render(c, request))
 
 
 def prepare_pipeline_dict(request_body, user):
@@ -111,7 +108,7 @@ def prepare_pipeline_dict(request_body, user):
 
 def _get_compound_datatypes(request):
     """ Get a sorted list of (name, id) pairs for compound datatypes. """
-    compound_datatypes = [(cdt.short_name, cdt.pk)
+    compound_datatypes = [(cdt.name, cdt.pk)
                           for cdt in CompoundDatatype.filter_by_user(request.user)]
     compound_datatypes.sort()
     return compound_datatypes
@@ -126,11 +123,12 @@ def pipeline_new(request):
     t = loader.get_template('pipeline/pipeline.html')
     method_families = MethodFamily.filter_by_user(request.user).order_by('name')
     acf = metadata.forms.AccessControlForm()
-    c = RequestContext(request, {'method_families': method_families,
-                                 'compound_datatypes': _get_compound_datatypes(request),
-                                 "access_control_form": acf})
-
-    return HttpResponse(t.render(c))
+    c = {
+        'method_families': method_families,
+        'compound_datatypes': _get_compound_datatypes(request),
+        "access_control_form": acf
+    }
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -162,17 +160,14 @@ def pipeline_add(request, id=None):
         }
     )
 
-    c = RequestContext(
-        request,
-        {
-            "family": family,
-            'method_families': method_families,
-            'compound_datatypes': _get_compound_datatypes(request),
-            "access_control_form": acf
-        }
-    )
+    c = {
+        "family": family,
+        "method_families": method_families,
+        "compound_datatypes": _get_compound_datatypes(request),
+        "access_control_form": acf
+    }
 
-    return HttpResponse(t.render(c))
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -214,19 +209,15 @@ def pipeline_revise(request, id):
             context={"request": request}
         ).data
     )
-    c = RequestContext(
-        request,
-        {
-            "family": parent_revision.family,
-            "parent_revision": parent_revision,
-            "parent_revision_json": parent_revision_json,
-            'method_families': method_families,
-            'compound_datatypes': _get_compound_datatypes(request),
-            "access_control_form": acf
-        }
-    )
-
-    return HttpResponse(t.render(c))
+    c = {
+        "family": parent_revision.family,
+        "parent_revision": parent_revision,
+        "parent_revision_json": parent_revision_json,
+        "method_families": method_families,
+        "compound_datatypes": _get_compound_datatypes(request),
+        "access_control_form": acf
+    }
+    return HttpResponse(t.render(c, request))
 
 
 @login_required
@@ -303,17 +294,14 @@ def pipeline_view(request, id):
         )
 
     t = loader.get_template("pipeline/pipeline_view.html")
-    c = RequestContext(
-        request,
-        {
-            "pipeline": pipeline,
-            "pipeline_form": pipeline_form,
-            "pipeline_dict": json.dumps(PipelineSerializer(
-                pipeline,
-                context={"request": request}
-            ).data),
-            "is_owner": pipeline.user == request.user,
-            "is_admin": admin_check(request.user)
-        }
-    )
-    return HttpResponse(t.render(c))
+    c = {
+        "pipeline": pipeline,
+        "pipeline_form": pipeline_form,
+        "pipeline_dict": json.dumps(PipelineSerializer(
+            pipeline,
+            context={"request": request}
+        ).data),
+        "is_owner": pipeline.user == request.user,
+        "is_admin": admin_check(request.user)
+    }
+    return HttpResponse(t.render(c, request))

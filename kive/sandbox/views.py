@@ -1,12 +1,11 @@
 import json
-import itertools
 import logging
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import HttpResponse, Http404, HttpResponseRedirect
-from django.template import loader, RequestContext
+from django.template import loader
 from django.views.decorators.http import require_GET, require_POST
 from django.contrib.auth.models import User, Group
 
@@ -15,7 +14,6 @@ from archive.serializers import RunOutputsSerializer
 from pipeline.models import Pipeline
 from portal.views import admin_check
 from sandbox.forms import InputSubmissionForm, RunSubmissionForm, RunDetailsForm
-from constants import groups
 
 
 LOGGER = logging.getLogger(__name__)
@@ -25,8 +23,8 @@ LOGGER = logging.getLogger(__name__)
 def choose_pipeline(request, error_message=''):
     """Create forms for all Pipelines in Shipyard."""
     template = loader.get_template("sandbox/choose_pipeline.html")
-    context = RequestContext(request, {"error_msg": error_message })
-    return HttpResponse(template.render(context))
+    context = {"error_msg": error_message}
+    return HttpResponse(template.render(context, request))
 
 
 @login_required
@@ -41,7 +39,7 @@ def _choose_inputs_for_pipeline(request,
                                 rsf=None,
                                 input_error_message=''):
     """Load the input selection page."""
-    context = RequestContext(request)
+    context = {}
 
     template = loader.get_template("sandbox/choose_inputs.html")
     pipeline_qs = Pipeline.filter_by_user(request.user).filter(pk=pipeline_pk)
@@ -57,7 +55,7 @@ def _choose_inputs_for_pipeline(request,
                     "run_submission_form": rsf,
                     "input_error_msg": input_error_message,
                     "pipeline": pipeline})
-    return HttpResponse(template.render(context))
+    return HttpResponse(template.render(context, request))
 
 
 class RunSubmissionError(Exception):
@@ -146,11 +144,12 @@ def run_pipeline(request):
 @login_required
 def runs(request):
     """Display all active runs for this user."""
-    context = RequestContext(request)
-    context["user"] = request.user
-    context['is_user_admin'] = admin_check(request.user)
+    context = {
+        "user": request.user,
+        "is_user_admin": admin_check(request.user)
+    }
     template = loader.get_template("sandbox/runs.html")
-    return HttpResponse(template.render(context))
+    return HttpResponse(template.render(context, request))
 
 
 @login_required
@@ -230,20 +229,17 @@ def view_results(request, run_id):
         )
 
     template = loader.get_template("sandbox/view_results.html")
-    context = RequestContext(
-        request,
-        {
-            "run": run,
-            "outputs": json.dumps(RunOutputsSerializer(run, context={'request': request}).data),
-            "run_form": run_form,
-            "is_complete": run_complete,
-            "is_owner": run.user == request.user,
-            "is_user_admin": admin_check(request.user),
-            "back_to_view": go_back_to_view
-        }
-    )
+    context = {
+        "run": run,
+        "outputs": json.dumps(RunOutputsSerializer(run, context={'request': request}).data),
+        "run_form": run_form,
+        "is_complete": run_complete,
+        "is_owner": run.user == request.user,
+        "is_user_admin": admin_check(request.user),
+        "back_to_view": go_back_to_view
+    }
 
-    return HttpResponse(template.render(context))
+    return HttpResponse(template.render(context, request))
 
 
 @login_required
@@ -251,11 +247,8 @@ def view_run(request, run_id, md5=None):
     run = Run.objects.get(pk=run_id)
 
     template = loader.get_template("sandbox/view_run.html")
-    context = RequestContext(
-        request,
-        {
-            'run': run,
-            'md5': md5
-        }
-    )
-    return HttpResponse(template.render(context))
+    context = {
+        'run': run,
+        'md5': md5
+    }
+    return HttpResponse(template.render(context, request))

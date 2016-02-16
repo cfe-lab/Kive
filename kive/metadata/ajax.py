@@ -108,7 +108,8 @@ class CompoundDatatypeViewSet(RemovableModelViewSet, SearchableModelMixin):
         matching_members = None
         if key == "smart":
             matching_members = CompoundDatatypeMember.objects.filter(
-                (Q(column_name__icontains=value) |
+                (Q(compounddatatype__name__icontains=value) |
+                 Q(column_name__icontains=value) |
                  Q(datatype__name__icontains=value)) &
                 Q(compounddatatype__in=all_pks)
             )
@@ -119,7 +120,7 @@ class CompoundDatatypeViewSet(RemovableModelViewSet, SearchableModelMixin):
             )
             return queryset.filter(pk__in=CDT_pks)
 
-        if key == "name":
+        if key == "column_name":
             matching_members = CompoundDatatypeMember.objects.filter(
                 compounddatatype__in=all_pks,
                 column_name__icontains=value
@@ -134,6 +135,9 @@ class CompoundDatatypeViewSet(RemovableModelViewSet, SearchableModelMixin):
         if matching_members:
             CDT_pks = matching_members.values_list("compounddatatype", flat=True)
             return queryset.filter(pk__in=CDT_pks)
+
+        if key == "name":
+            return queryset.filter(Q(name__icontains=value))
 
         if key == "user":
             return queryset.filter(Q(user__username__icontains=value))

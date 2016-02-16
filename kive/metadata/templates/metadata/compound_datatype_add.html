@@ -24,6 +24,12 @@
 
     {{ cdt_form.non_field_errors }}
 
+    <h3>Name:</h3>
+    {{ cdt_form.name }}
+    <div class="helptext">{{ cdt_form.name.help_text }}</div>
+    <div class="errortext">{{ cdt_form.name.errors }}</div>
+
+    <h3>Columns:</h3>
     <p>
     <input type="button" id="addForm" value="+" class="add" /><input type="button" id="removeForm" value="&minus;" class="remove" />
     <small>Add/subtract form fields</small>

@@ -7,7 +7,7 @@ import copy
 from django import forms
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
-from django.template import loader, Context
+from django.template import loader
 
 from metadata.models import Datatype, BasicConstraint, CompoundDatatypeMember, CompoundDatatype
 
@@ -99,14 +99,12 @@ class PermissionsWidget(forms.MultiWidget):
         pw_template = loader.get_template("metadata/permissions_widget.html")
         users = [{"id": x[0], "username": x[1]} for x in self.user_choices]
         groups = [{"id": x[0], "name": x[1]} for x in self.group_choices]
-        c = Context(
-            {
-                "users": users,
-                "groups": groups,
-                "users_widget": rendered_widgets[0],
-                "groups_widget": rendered_widgets[1]
-            }
-        )
+        c = {
+            "users": users,
+            "groups": groups,
+            "users_widget": rendered_widgets[0],
+            "groups_widget": rendered_widgets[1]
+        }
         return pw_template.render(c)
 
 
@@ -281,6 +279,14 @@ class CompoundDatatypeMemberForm(forms.ModelForm):
 
 
 class CompoundDatatypeForm(forms.ModelForm):
+    name = forms.CharField(
+        widget=forms.TextInput(
+            attrs={"size": 125}
+        ),
+        required=False,
+        help_text="Name of this CompoundDatatype.  If left blank, the name will default to "
+                  "a tuple representation of its columns."
+    )
 
     permissions = PermissionsField(
         label="Users and groups allowed",

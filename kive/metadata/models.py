@@ -1633,6 +1633,13 @@ class CompoundDatatype(AccessControl):
     Related to :model:`copperfish.CompoundDatatypeMember`
     Related to :model:`copperfish.Dataset`
     """
+    # This could be pretty long, so we use a TextField instead of a CharField.
+    # This will require us to be careful about the widgets we use.
+    name = models.TextField(
+        "Name",
+        help_text="The name of this CompoundDatatype",
+        blank=True
+    )
 
     RAW_ID = "__raw__"
     RAW_VERBOSE_NAME = "Unstructured"
@@ -1641,9 +1648,24 @@ class CompoundDatatype(AccessControl):
     #   members (CompoundDatatypeMember/ForeignKey)
     #   conforming_datasets (DatasetStructure/ForeignKey)
 
+    class Meta:
+        ordering = ["name"]
+
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
+
+    def set_name(self, save=True):
+        """
+        Set the name of the CompoundDatatype to be its string representation.
+
+        This is necessary as we have to save the CDT before we can add members,
+        so we will have to be able to set the name after the fact.
+        """
+        if self.name == "":
+            self.name = self._format()
+            if save:
+                self.save(update_fields=['name'])
 
     def _format(self, limit=None):
         """ Represent CompoundDatatype with a list of its members.
@@ -1695,7 +1717,7 @@ class CompoundDatatype(AccessControl):
         @param user: A valid user to filter which compound datatypes are visible.
         @return: [(id, short_name)]
         """
-        choices = ((x.id, x.short_name)
+        choices = ((x.id, x.name)
                    for x in CompoundDatatype.filter_by_user(user))
 
         return sorted(choices, key=lambda x: (x[1], x[0]))  # short_name, then id

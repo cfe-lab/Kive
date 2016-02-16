@@ -21,7 +21,7 @@
 {% block content %}
 
 <a href="/compound_datatypes" rel="prev">Return to summary view</a>
-<h2><code>{{ cdt.short_name }}</code></h2>
+<h2><code>{{ cdt.name }}</code></h2>
 
 {% if not is_owner and is_admin %}
     <div id="lock"><img src=""/></div>
@@ -34,6 +34,11 @@
 {% endif %}
 
 <table>
+<tr>
+    <td>Name:</td>
+    <td colspan="2">{{ cdt_form.name }}</td>
+</tr>
+
 <tr>
     <td>Creator:</td>
     <td>{{ cdt.user }}</td>
