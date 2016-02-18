@@ -66,7 +66,8 @@ var RunsTable = function($table, user, is_user_admin, $no_results, $active_filte
         if (run.stopped_by !== null) {
             $td.append(" (Stopped by user " + run.stopped_by + ")");
         }
-        else if (runsTable.user === run.user) {
+        else if (run.run_progress.end === null &&
+                (runsTable.user === run.user || ! runsTable.is_locked)) {
             var $stop_link = $("<a/>");
             $stop_link.attr("href", run.url)
                 .attr("run_id", run.id)

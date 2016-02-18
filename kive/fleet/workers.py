@@ -457,7 +457,6 @@ class Manager(object):
                     if not tasks_currently_running:
                         clean_up_now = True
 
-
             if not clean_up_now:
                 # The Run is still going and there may be more stuff to do.
                 for task in curr_sdbx.hand_tasks_to_fleet():
@@ -619,29 +618,31 @@ class Manager(object):
         """
         if run not in self.active_sandboxes:
             # This hasn't started yet, so we can just skip this one.
-            mgr_logger.debug("Run (pk={}) has not started yet so cannot be stopped".format(run.pk, run.stopped_by))
-            return
+            mgr_logger.warn("Run (pk=%d) is not active so just marking stopped",
+                            run.pk)
+        else:
+            mgr_logger.debug("Stopping run (pk=%d) on behalf of user %s",
+                             run.pk,
+                             run.stopped_by)
 
-        mgr_logger.debug("Stopping run (pk={}) on behalf of user {}".format(run.pk, run.stopped_by))
+            sandbox_to_end = self.active_sandboxes[run]
 
-        sandbox_to_end = self.active_sandboxes[run]
+            # Send a message to the foreman in charge of running this task.
+            foreman_found = False
+            for foreman in self.tasks_in_progress:
+                if self.tasks_in_progress[foreman]["task"].top_level_run == run:
+                    foreman_found = True
+                    break
 
-        # Send a message to the foreman in charge of running this task.
-        foreman_found = False
-        for foreman in self.tasks_in_progress:
-            if self.tasks_in_progress[foreman]["task"].top_level_run == run:
-                foreman_found = True
-                break
+            if foreman_found:
+                self.interface.stop_run(foreman)
 
-        if foreman_found:
-            self.interface.stop_run(foreman)
+                self.worker_status[foreman] = Worker.READY
+                for worker_rank in self.tasks_in_progress[foreman]["vassals"]:
+                    self.worker_status[worker_rank] = Worker.READY
 
-            self.worker_status[foreman] = Worker.READY
-            for worker_rank in self.tasks_in_progress[foreman]["vassals"]:
-                self.worker_status[worker_rank] = Worker.READY
-
-        # Cancel all tasks on the task queue pertaining to this run.
-        self.mop_up_terminated_sandbox(sandbox_to_end)
+            # Cancel all tasks on the task queue pertaining to this run.
+            self.mop_up_terminated_sandbox(sandbox_to_end)
         run.stop(save=True)
 
         mgr_logger.debug("Run (pk={}) stopped by user {}".format(run.pk, run.stopped_by))
