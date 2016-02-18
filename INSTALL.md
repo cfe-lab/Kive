@@ -51,17 +51,19 @@ Installing Django
 -----------------
 
 Instructions for downloading and installing Django can be found at [djangoproject.com](https://www.djangoproject.com/download/).
-If you are already running Django 1.6, installing should be as painless as running
+If you are already running an earlier version of Django, installing should be
+as painless as running
 
-    pip install Django==1.7.4
+    pip install Django==1.9.2
 
 (substitute the appropriate version number if you wish to use a different version -- a newer one, for example).  You will likely need to run this using `sudo` unless you only installed Django locally and not
 system-wide.  Also, many systems have multiple Python installations, so make sure that
 `pip` is using the correct one. Django REST Framework can also be installed via
 
-    pip install djangorestframework==3.1.2
+    pip install djangorestframework==3.3.2
 
-Instructions for downloading and installing `django-extensions` may be found
+If you want to generate UML diagrams for your models, install
+`django-extensions`. Instructions for downloading and installing may be found
 [here](http://django-extensions.readthedocs.org/en/latest/installation_instructions.html).
 The easiest way is to use `pip` again.
 
