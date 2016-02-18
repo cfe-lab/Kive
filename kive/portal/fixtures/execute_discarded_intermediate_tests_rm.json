@@ -74,7 +74,7 @@
             "_complete": true, 
             "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:07Z", 
+            "end_time": "2000-01-01T00:00:06Z", 
             "execrecord": 1, 
             "is_cancelled": false, 
             "reused": false, 
@@ -1388,7 +1388,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$MiwBNZtqdLeJ$g1epho3Grh0rrKswmotSOHU0M2iBiFtqiDcsNDyDJU4=", 
+            "password": "pbkdf2_sha256$24000$7GPpseLKZ5bC$Tg4TG/zjxoLO+1zVk1VrVxW9IEDfuCWG60gqYUQ00m8=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -1408,7 +1408,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$NV5orAem21pj$f0lKF93UnG0B2MHXHx2G22XjXocgKXRezTeLM4QQIIg=", 
+            "password": "pbkdf2_sha256$24000$1sFbJQZz7XV0$ZCDzwCbWs5v0F1hLWyRFU/iCzn9MjlzbQZZKWKAAORY=", 
             "user_permissions": [], 
             "username": "alice"
         }, 
@@ -1456,6 +1456,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1467,6 +1468,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 3, 
             "users_allowed": []
         }, 
@@ -1485,10 +1487,10 @@
             "paused_by": null, 
             "pipeline": 10, 
             "purged": false, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/useralice_run1_5fYbuB", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/useralice_run1_fFlYnH", 
             "start_time": "2000-01-01T00:00:06Z", 
             "stopped_by": null, 
-            "time_queued": "2016-02-13T00:25:36.983Z", 
+            "time_queued": "2016-02-18T22:22:49.882Z", 
             "user": 3, 
             "users_allowed": []
         }, 
@@ -1499,7 +1501,7 @@
         "fields": {
             "MD5_checksum": "0082bc75b97d81a1b92adaa894fef1bd", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_02/tmp9Ugg7d", 
+            "dataset_file": "Datasets/2016_02/tmpSWOoW7", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "data from the lab", 
             "file_source": null, 
@@ -1517,7 +1519,7 @@
             "_redacted": false, 
             "dataset_file": "", 
             "date_created": "2000-01-01T00:00:07Z", 
-            "description": "Generated data from a run of pipeline \"DNA revcomp:2 (2)\" started at 2016-02-13 00:25:39.088407+00:00 by alice\nrun: 1\nuser: alice\nstep: 1\noutput: reversed_DNA", 
+            "description": "Generated data from a run of pipeline \"DNA revcomp:2 (2)\" started at 2016-02-18 22:22:51.961465+00:00 by alice\nrun: 1\nuser: alice\nstep: 1\noutput: reversed_DNA", 
             "file_source": 1, 
             "groups_allowed": [], 
             "name": "run1_step1_outputreversed_DNA", 
@@ -1533,7 +1535,7 @@
             "_redacted": false, 
             "dataset_file": "", 
             "date_created": "2000-01-01T00:00:09Z", 
-            "description": "Generated data from a run of pipeline \"DNA revcomp:2 (2)\" started at 2016-02-13 00:25:39.088407+00:00 by alice\nrun: 1\nuser: alice\nstep: 2\noutput: complemented_DNA", 
+            "description": "Generated data from a run of pipeline \"DNA revcomp:2 (2)\" started at 2016-02-18 22:22:51.961465+00:00 by alice\nrun: 1\nuser: alice\nstep: 2\noutput: complemented_DNA", 
             "file_source": 2, 
             "groups_allowed": [], 
             "name": "run1_step2_outputcomplemented_DNA", 
@@ -1622,7 +1624,7 @@
         "fields": {
             "MD5_checksum": "5699120b018a7932c07be0412483c622", 
             "coderesource": 2, 
-            "content_file": "CodeResources/fdopen_JunhSjZ", 
+            "content_file": "CodeResources/fdopen_kJxZOCh", 
             "groups_allowed": [
                 1
             ], 
@@ -1641,7 +1643,7 @@
         "fields": {
             "MD5_checksum": "196144423c5bb98d59d78c729ce842f4", 
             "coderesource": 3, 
-            "content_file": "CodeResources/fdopen_eNEY2tD", 
+            "content_file": "CodeResources/fdopen_B238jIj", 
             "groups_allowed": [
                 1
             ], 
@@ -1660,7 +1662,7 @@
         "fields": {
             "MD5_checksum": "30e9a1ac1dad0c134d41bf826a53ba68", 
             "coderesource": 4, 
-            "content_file": "CodeResources/fdopen_QeXCCBo", 
+            "content_file": "CodeResources/fdopen_oy4PeLf", 
             "groups_allowed": [
                 1
             ], 
@@ -2088,7 +2090,7 @@
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:00Z", 
+            "revision_DateTime": "2000-01-01T00:00:01Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
             "user": 3, 
@@ -2211,9 +2213,9 @@
     {
         "fields": {
             "dataset": 1, 
-            "end_time": "2000-01-01T00:00:07Z", 
+            "end_time": "2000-01-01T00:00:06Z", 
             "execlog": 1, 
-            "start_time": "2000-01-01T00:00:07Z", 
+            "start_time": "2000-01-01T00:00:06Z", 
             "user": 3
         }, 
         "model": "datachecking.integritychecklog", 

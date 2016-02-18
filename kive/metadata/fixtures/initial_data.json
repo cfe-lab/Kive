@@ -217,47 +217,53 @@
     "pk": 6
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 1,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(to_test: string?)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 1
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 2,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(failed_row: natural number)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 2
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 3,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(example: string?, valid: boolean)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 3
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 4,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(FASTA header: string?, FASTA sequence: molecular sequence?)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 4
+    }
 }
+
+
 ]

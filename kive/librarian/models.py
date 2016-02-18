@@ -569,7 +569,7 @@ class Dataset(metadata.models.AccessControl):
                     execlog=None,
                     checking_user=user
                 )
-                shutil.rmtree(run_dir)
+                # shutil.rmtree(run_dir)
                 if content_check.is_fail():
                     if content_check.baddata.bad_header:
                         raise ValueError('The header of file "{}" does not match the CompoundDatatype "{}"'

@@ -1,234 +1,255 @@
 [
 {
+    "model": "metadata.compounddatatype",
+    "pk": 1,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(to_test: string?)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 1
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 2,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(failed_row: natural number)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 2
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 3,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(example: string?, valid: boolean)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 3
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 4,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(FASTA header: string?, FASTA sequence: molecular sequence?)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 4
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 5,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(x: integer, y: integer)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 5
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 6,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(sum: integer, product: integer)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 6
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 7,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(qname: string, flag: integer, rname: string, pos: integer, mapq: integer, cigar: string, rnext: string, pnext: integer, tlen: integer, seq: nucleotide sequence, qual: string)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 7
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 8,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(sample_name: string, qname: string, flag: integer, rname: string, pos: integer, mapq: integer, cigar: string, rnext: string, pnext: integer, tlen: integer, seq: nucleotide sequence, qual: string)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 8
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 9,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(sample_name: string, type: string, count: integer)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 9
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 10,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(region: string, sequence: nucleotide sequence)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 10
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 11,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(sample: string, refname: string, qcut: integer, rank: integer, count: integer, offset: integer, seq: nucleotide sequence)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 11
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 12,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(sample: string, qname: string, fwd_rev: string, refname: string, pos: integer, insert: nucleotide sequence, qual: string)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 12
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 13,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(sample: string, qname: string, qcut: integer, seq1: nucleotide sequence, qual1: string, seq2: nucleotide sequence, qual2: string, prop_N: float, mseq: nucleotide sequence)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 13
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 14,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(sample: string, seed: string, region: string, q-cutoff: integer, query.nuc.pos: string?, refseq.nuc.pos: integer, A: string, C: string, G: string, T: string)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 14
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 15,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(sample: string, seed: string, region: string, q-cutoff: integer, query.aa.pos: string?, refseq.aa.pos: integer, A: integer, C: integer, D: integer, E: integer, F: integer, G: integer, H: integer, I: integer, K: integer, L: integer, M: integer, N: integer, P: integer, Q: integer, R: integer, S: integer, T: integer, V: integer, W: integer, Y: integer, *: integer)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 15
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 16,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(sample: string, seed: string, region: string, qcut: integer, left: integer, insert: molecular sequence, count: integer)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 16
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 17,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(sample: string, region: string, q-cutoff: integer, s-number: string, consensus-percent-cutoff: string, sequence: nucleotide sequence)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 17
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 18,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(sample: string, seed: string, region: string, qcut: integer, queryseq: molecular sequence, refseq: molecular sequence)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 18
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 19,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(sample: string, seed: string, qcut: integer, region: string, index: integer, count: integer, seq: nucleotide sequence)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 19
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 20,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(sample: string, rank: integer, count: integer, g2p: string?, fpr: string?, aligned: molecular sequence?, error: string?)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 20
+    }
 },
 {
+    "model": "metadata.compounddatatype",
+    "pk": 21,
     "fields": {
-        "users_allowed": [],
         "user": 1,
+        "name": "(sample: string, project: string, region: string, seed: string, q.cut: integer, min.coverage: integer, which.key.pos: integer, off.score: integer, on.score: integer)",
+        "users_allowed": [],
         "groups_allowed": [
             1
         ]
-    },
-    "model": "metadata.compounddatatype",
-    "pk": 21
+    }
 },
 {
     "fields": {

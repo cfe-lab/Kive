@@ -1123,20 +1123,20 @@
     }, 
     {
         "fields": {
-            "compounddatatype": 12, 
-            "max_row": 5, 
+            "compounddatatype": 13, 
+            "max_row": null, 
             "min_row": null, 
-            "transf_xput": 17
+            "transf_xput": 18
         }, 
         "model": "transformation.xputstructure", 
         "pk": 13
     }, 
     {
         "fields": {
-            "compounddatatype": 13, 
-            "max_row": null, 
+            "compounddatatype": 12, 
+            "max_row": 5, 
             "min_row": null, 
-            "transf_xput": 18
+            "transf_xput": 19
         }, 
         "model": "transformation.xputstructure", 
         "pk": 14
@@ -1354,8 +1354,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 1, 
-            "dataset_name": "E1_out", 
+            "dataset_idx": 3, 
+            "dataset_name": "E3_rawout", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -1372,8 +1372,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 3, 
-            "dataset_name": "E3_rawout", 
+            "dataset_idx": 1, 
+            "dataset_name": "E1_out", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -1419,7 +1419,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$cHQsuxVbO21a$7tH6jg+lFfI1y66k0qx9u6gkShAxVOsQ9+ax1ihifF8=", 
+            "password": "pbkdf2_sha256$24000$NXyAmnEMytKx$nhZyi2u0F3uafxFTpVCmqC7zA5n6aORCb37k8ECR7M8=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -1437,7 +1437,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$SKQOjSHIco3z$sLYR5G7AJNNZQHHgOGCh8D0XqO82Oetbm9TKQpSZkWk=", 
+            "password": "pbkdf2_sha256$24000$ohOr6OURFnN9$hSK8LYr9VoJJSKybjXhFJ2EF7qdvzIZKmA2W0SRhEvI=", 
             "user_permissions": [], 
             "username": "ringo"
         }, 
@@ -1457,7 +1457,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$jOIf8EmM76q1$kzj9eh+lTqeoRpARkVgef6Obyee15UdPPAYFUi9tbe4=", 
+            "password": "pbkdf2_sha256$24000$JGw4s8jn1KnQ$7TaxZX51Y39Z4PPGY/4BeXGobXO5DzRtFGyJE5Bbcsk=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -1523,6 +1523,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1532,6 +1533,7 @@
     {
         "fields": {
             "groups_allowed": [], 
+            "name": "", 
             "user": 2, 
             "users_allowed": [
                 3
@@ -1545,6 +1547,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1556,6 +1559,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1567,6 +1571,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1578,6 +1583,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1589,6 +1595,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1600,6 +1607,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1611,6 +1619,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1622,6 +1631,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1633,6 +1643,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1644,6 +1655,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1655,6 +1667,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1666,6 +1679,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1677,6 +1691,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 4, 
             "users_allowed": []
         }, 
@@ -1700,7 +1715,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2016-02-13T00:20:19.111Z", 
+            "time_queued": "2016-02-18T22:17:23.147Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1838,7 +1853,7 @@
             "MD5_checksum": "10a4bd15d1300fcaf5a3bdad54ef1d28", 
             "_redacted": false, 
             "dataset_file": "", 
-            "date_created": "2000-01-01T00:00:02Z", 
+            "date_created": "2000-01-01T00:00:01Z", 
             "description": "", 
             "file_source": null, 
             "groups_allowed": [
@@ -1873,7 +1888,7 @@
         "fields": {
             "MD5_checksum": "00fd50bfe7ac63e2165a442f4101e05c", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_02/step_0_singlet_3RVeaUN.csv", 
+            "dataset_file": "Datasets/2016_02/step_0_singlet_kegaXk6.csv", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "file_source": null, 
@@ -1891,7 +1906,7 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_02/step_0_raw_inyUSfQ.fasta", 
+            "dataset_file": "Datasets/2016_02/step_0_raw_k8sTJMx.fasta", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "file_source": null, 
@@ -1909,7 +1924,7 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_02/step_0_raw_kgpTIHZ.fasta", 
+            "dataset_file": "Datasets/2016_02/step_0_raw_lEBupV9.fasta", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "file_source": null, 
@@ -2444,7 +2459,7 @@
     {
         "fields": {
             "dataset": 7, 
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
             "start_time": "2000-01-01T00:00:01Z", 
             "user": 2
@@ -2532,7 +2547,7 @@
     {
         "fields": {
             "dataset": 17, 
-            "end_time": "2000-01-01T00:00:03Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "execlog": null, 
             "start_time": "2000-01-01T00:00:02Z", 
             "user": 2

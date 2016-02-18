@@ -899,7 +899,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$FfPW72YQjfSN$DZjwX4slotR9qgkAnhocTUA+C/b+qvsp2ESJQ89vAws=", 
+            "password": "pbkdf2_sha256$24000$k5IlvAypmrZy$b0ZcRNnW/eT1ZyCNzMFR+ZMHujrErwMFzBIg8EKkXsY=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -929,6 +929,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -940,6 +941,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -951,6 +953,7 @@
             "groups_allowed": [
                 1
             ], 
+            "name": "", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -961,7 +964,7 @@
         "fields": {
             "MD5_checksum": "092ef90fe0201f4b002cd200f7754d45", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_02/tmp644Geb", 
+            "dataset_file": "Datasets/2016_02/tmpmGeheN", 
             "date_created": "2000-01-01T00:00:01Z", 
             "description": "blahblahblah", 
             "file_source": null, 
@@ -979,7 +982,7 @@
         "fields": {
             "MD5_checksum": "a1973a61d21c568692491609397bcc0b", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_02/tmpwWGwXU", 
+            "dataset_file": "Datasets/2016_02/tmpmANKHa", 
             "date_created": "2000-01-01T00:00:01Z", 
             "description": "random reversed words", 
             "file_source": null, 
@@ -997,8 +1000,8 @@
         "fields": {
             "MD5_checksum": "ff6ed7de7a665be6b5a023f8eb7c0642", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_02/tmppHINXQ", 
-            "date_created": "2000-01-01T00:00:02Z", 
+            "dataset_file": "Datasets/2016_02/tmpLR4jVT", 
+            "date_created": "2000-01-01T00:00:01Z", 
             "description": "random reversed words", 
             "file_source": null, 
             "groups_allowed": [
@@ -1062,7 +1065,7 @@
         "fields": {
             "MD5_checksum": "55d9a706ac81b733f851a279d27d8cf2", 
             "coderesource": 2, 
-            "content_file": "CodeResources/fdopen_B8XyHxu", 
+            "content_file": "CodeResources/fdopen_F7BBuRp", 
             "groups_allowed": [
                 1
             ], 
@@ -1499,7 +1502,7 @@
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:03Z", 
+            "revision_DateTime": "2000-01-01T00:00:02Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
             "user": 2, 
@@ -1522,7 +1525,7 @@
     {
         "fields": {
             "dataset": 2, 
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
             "start_time": "2000-01-01T00:00:01Z", 
             "user": 2
