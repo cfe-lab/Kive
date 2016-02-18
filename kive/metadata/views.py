@@ -11,7 +11,6 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 
 import re
 import logging
-import itertools
 
 from constants import datatypes as dt_pks
 from metadata.forms import CompoundDatatypeForm, CompoundDatatypeMemberForm, \

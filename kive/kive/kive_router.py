@@ -8,6 +8,7 @@ from rest_framework.routers import Route
 import itertools
 from django.core.exceptions import ImproperlyConfigured
 
+
 class KiveRouter(routers.DefaultRouter):
     def get_api_root_view(self):
         """

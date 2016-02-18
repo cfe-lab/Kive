@@ -713,7 +713,8 @@ $(function() {
             $.ajax({
                 type: 'POST',
                 url: '/api/pipelines/',
-                data: {'_content': JSON.stringify(form_data), "_content_type": "application/json"},
+                contentType: "application/json",
+                data: JSON.stringify(form_data),
                 dataType: 'json',
                 success: function(result) {
                     $('#id_submit_error').html('').hide();
@@ -747,13 +748,13 @@ $(function() {
             $.ajax({
                 type: 'POST',
                 url: '/api/pipelinefamilies/',
-                data: {'_content': JSON.stringify({
+                data: JSON.stringify({
                     users_allowed: users_allowed || [],
                     groups_allowed: groups_allowed || [],
                     name: family_name,
-                    description: family_desc,
+                    description: family_desc
                 }),
-                "_content_type": "application/json"},
+                contentType: "application/json",
                 dataType: 'json',
                 success: function(result) {
                     submit_pipeline(result.id);
