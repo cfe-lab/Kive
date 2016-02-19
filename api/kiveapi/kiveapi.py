@@ -3,7 +3,6 @@ Contains the main class for the accessing Kive's
 RESTful API.
 
 """
-import json
 import logging
 
 import requests

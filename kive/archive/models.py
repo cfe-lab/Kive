@@ -280,7 +280,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             'user': u}
         """
 
-        result = {'name': self.display_name}
+        result = {'name': self.display_name,
+                  'start': self._format_time(self.start_time),
+                  'end': self._format_time(self.end_time)}
         if hasattr(self, "not_enough_CPUs"):
             esc = self.not_enough_CPUs
             result['status'] = "Too many threads ({} from {})".format(
@@ -385,8 +387,6 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         result['status'] = status
         result['id'] = self.pk
-        result['start'] = self._format_time(self.start_time)
-        result['end'] = self._format_time(self.end_time)
 
         return result
 
