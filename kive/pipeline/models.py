@@ -847,16 +847,28 @@ class PipelineCable(models.Model):
 
         if self.is_trivial():
             self.logger.debug("Trivial cable, making sym link: os.link({},{})".format(source, output_path))
+            source_stat = os.stat(source)
+
             try:
-                link_result = os.link(source, output_path)
+                os.link(source, output_path)
                 curr_log.stop(save=True, clean=True)
-                return link_result
-            except OSError as ex:
-                ex.strerror = '{} occurred while linking {} to {}'.format(
-                    ex.strerror,
+                return
+            except OSError:
+                logger.warning(
+                    "OSError occurred while linking %s to %s",
                     source,
-                    output_path)
-                raise
+                    output_path,
+                    exc_info=True
+                )
+
+                # It's possible that the link actually got created, so check for that.
+                if os.path.exists(output_path):
+                    output_stat = os.stat(output_path)
+                    if source_stat.st_ino == output_stat.st_ino:
+                        logger.debug("Link was actually successful; moving on")
+                        return
+                    else:
+                        raise
 
         # Make a dict encapsulating the mapping required: keyed by the output column name, with value
         # being the input column name.
