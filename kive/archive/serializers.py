@@ -306,10 +306,13 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
         """
         pipeline = Pipeline.objects.get(pk=data["pipeline"])
 
-        if len(data["inputs"]) != pipeline.inputs.count():
+        posted_input_count = len(data["inputs"])
+        pipeline_input_count = pipeline.inputs.count()
+        if posted_input_count != pipeline_input_count:
             raise serializers.ValidationError(
-                'Number of inputs must equal the number of Pipeline inputs'
-            )
+                'Pipeline has {} inputs, but only received {}.'.format(
+                    pipeline_input_count,
+                    posted_input_count))
 
         inputs_sated = [x["index"] for x in data["inputs"]]
         if len(inputs_sated) != len(set(inputs_sated)):

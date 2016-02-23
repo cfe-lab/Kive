@@ -3,7 +3,6 @@ Contains the main class for the accessing Kive's
 RESTful API.
 
 """
-import json
 import logging
 
 import requests
@@ -138,11 +137,13 @@ class KiveAPI(Session):
         url = self._prep_url(nargs[0])
         nargs[0] = url
         is_json = kwargs.pop('is_json', True)
-        if hasattr(self, 'csrf_token'):
-            nargs[1]['csrfmiddlewaretoken'] = self.csrf_token
         headers = kwargs.get('headers', {})
         kwargs['headers'] = headers
         headers.setdefault('referer', url)
+        if 'json' in kwargs:
+            headers.setdefault('Content-Type', 'application/json')
+        if hasattr(self, 'csrf_token'):
+            headers.setdefault('X-CSRFToken', self.csrf_token)
         return self._validate_response(super(KiveAPI, self).post(*nargs, **kwargs),
                                        is_json=is_json)
 
@@ -346,10 +347,9 @@ class KiveAPI(Session):
                       name=name,
                       users_allowed=users_allowed,
                       groups_allowed=groups_allowed)
-        form = dict(_content_type='application/json',
-                    _content=json.dumps(params))
-
-        run = self.post('@api_runs', form).json()
+        run = self.post('@api_runs',
+                        json=params,
+                        is_json=True).json()
         return RunStatus(run, self)
 
     def get_run(self, id):
