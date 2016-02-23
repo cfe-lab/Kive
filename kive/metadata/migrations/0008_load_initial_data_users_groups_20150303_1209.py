@@ -6,8 +6,12 @@ from django.core.management import call_command
 from django.contrib.auth.management import create_permissions
 from django.apps import apps as django_apps
 
+<<<<<<< 4dba4e463c9aadbc02aeb840d897b8fa61cd0c47
 from datetime import datetime
 from pytz import timezone
+=======
+import json
+>>>>>>> Some changes to data migration.
 
 import portal.utils
 
@@ -21,12 +25,10 @@ def load_initial_groups(apps, schema_editor):
     call_command("loaddata", "initial_groups", app_label="metadata")
 
 
-@transaction.atomic
 def load_initial_user(apps, schema_editor):
     call_command("loaddata", "initial_user", app_label="metadata")
 
 
-@transaction.atomic
 def load_initial_data(apps, schema_editor):
     """
     Defines some system built-in Datatypes and CompoundDatatypes.
