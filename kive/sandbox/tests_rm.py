@@ -19,8 +19,6 @@ import file_access_utils
 
 
 class SandboxRMTestCase(TestCase):
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
 
@@ -347,8 +345,6 @@ class BadRunTests(KiveTransactionTestCase):
     """
     Tests for when things go wrong during Pipeline execution.
     """
-    # fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
         tools.create_grandpa_sandbox_environment(self)
 

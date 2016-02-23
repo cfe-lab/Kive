@@ -6,8 +6,6 @@ from metadata.models import *
 
 
 class TransformationTestCase(TestCase):
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
         self.transf_user = User.objects.create_user('transformer', 'morethanmeetstheeye@aol.com', 'rodimus')
         self.transf_user.save()

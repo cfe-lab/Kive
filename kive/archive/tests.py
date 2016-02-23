@@ -3555,8 +3555,6 @@ class TopLevelRunOnDeepNestedRunTests(TestCase):
 
 
 class RunStepReuseFailedExecRecordTests(KiveTransactionTestCase):
-    # fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
         tools.create_grandpa_sandbox_environment(self)
         tools.make_words_dataset(self)

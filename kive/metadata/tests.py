@@ -27,8 +27,6 @@ class MetadataTestCase(TestCase):
     
     Other test classes that require this state can extend this one.
     """
-    # fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
         tools.create_metadata_test_environment(self)
 
@@ -42,8 +40,6 @@ class MetadataTransactionTestCase(TransactionTestCase):
 
     Other test classes that require this state can extend this one.
     """
-    # fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
         tools.create_metadata_test_environment(self)
 

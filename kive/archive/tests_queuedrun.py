@@ -35,7 +35,7 @@ class QueuedRunTest(TestCase):
     * - complete
     Overall format is steps-outcables-displayname
     """
-    fixtures = ['initial_data', "initial_groups", 'initial_user', 'converter_pipeline']
+    fixtures = ['converter_pipeline']
 
     def setUp(self):
         self.converter_pf = PipelineFamily.objects.get(name="Fasta2CSV")

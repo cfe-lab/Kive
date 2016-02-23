@@ -73,8 +73,6 @@ class LibrarianTestCase(TestCase):
     This extends PipelineTestCase, which itself extended
     other stuff (follow the chain).
     """
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
         """Set up default database state for librarian unit testing."""
         tools.create_librarian_test_environment(self)
@@ -1820,8 +1818,6 @@ class DatasetSerializerTests(TestCase):
     """
     Tests of DatasetSerializer.
     """
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
         self.factory = APIRequestFactory()
         self.list_path = reverse("dataset-list")

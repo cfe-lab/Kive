@@ -40,8 +40,6 @@ class PipelineTestCase(TestCase):
     """
     Set up a database state for unit testing Pipeline.
     """
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
         """Set up default database state for Pipeline unit testing."""
         tools.create_pipeline_test_environment(self)
@@ -4432,8 +4430,6 @@ class PipelineSerializerTests(TestCase):
     """
     Tests of PipelineSerializer and its offshoots.
     """
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
         create_pipeline_deserialization_environment(self)

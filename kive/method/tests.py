@@ -224,8 +224,6 @@ class MethodTestCase(TestCase):
     This sets up all the stuff used in the Metadata tests, as well as some of the Datatypes
     and CDTs we use here.
     """
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
         """Set up default database state for Method unit testing."""
         tools.create_method_test_environment(self)
@@ -2214,15 +2212,7 @@ class MethodFamilyTests(MethodTestCase):
 
 
 class NonReusableMethodTests(KiveTransactionTestCase):
-    # fixtures = ["initial_data", "initial_groups", "initial_user"]
-
     def setUp(self):
-        # Loading the fixtures using the 'fixtures' attribute doesn't work due to
-        # subtleties in how Django's tests run.
-        # call_command("loaddata", "initial_groups", verbosity=0)
-        # call_command("loaddata", "initial_user", verbosity=0)
-        # call_command("loaddata", "initial_data", verbosity=0)
-
         # An unpredictable, non-reusable user.
         self.user_rob = User.objects.create_user('rob', 'rford@toronto.ca', 'football')
         self.user_rob.save()

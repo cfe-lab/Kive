@@ -13,7 +13,7 @@ from librarian.models import Dataset
 import method.models
 import kive.testing_utils as tools
 
-# This comes from the initial_data fixture.
+# This comes from the initial_user fixture.
 kive_user = User.objects.get(pk=1)
 
 test_fasta = Dataset.create_dataset("../samplecode/step_0_raw.fasta", file_path=None, user=kive_user, cdt=None,

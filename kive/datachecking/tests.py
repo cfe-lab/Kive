@@ -19,7 +19,6 @@ import kive.testing_utils as tools
 
 
 class BlankableTestCase(TestCase):
-    fixtures = ["initial_data", "initial_groups", "initial_user"]
 
     def setUp(self):
         self.user_doug = User.objects.create_user('doug', 'dford@deco.com', 'durrrrr')
