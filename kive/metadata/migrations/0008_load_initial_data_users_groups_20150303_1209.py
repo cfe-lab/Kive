@@ -133,7 +133,7 @@ def load_initial_data(apps, schema_editor):
     MolSeq_DT.save()
     MolSeq_DT.restricts.add(STR_DT)
     MolSeq_DT.basic_constraints.create(
-        pk=2,
+        pk=3,
         ruletype="regexp",
         rule="[A-Za-z*?-]*"
     )
@@ -149,7 +149,7 @@ def load_initial_data(apps, schema_editor):
     NucSeq_DT.save()
     NucSeq_DT.restricts.add(STR_DT)
     NucSeq_DT.basic_constraints.create(
-        pk=3,
+        pk=5,
         ruletype="regexp",
         rule="[ACGTUNacgtuWRKYSMBDHVNwrkysmbdhvn-]*"
     )
