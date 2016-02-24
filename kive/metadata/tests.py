@@ -2490,11 +2490,13 @@ class CompoundDatatypeApiTests(TestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        # There are four CDTs loaded into the Database by default.
+        # There are four CDTs loaded into the Database by default, and they're
+        # sorted alphabetically.  See the migration where they're defined for
+        # details.
         self.assertEquals(len(response.data), 4)
-        self.assertEquals(response.data[0]['id'], 1)
+        self.assertEquals(response.data[0]['id'], 4)
         self.assertEquals(response.data[2]['representation'],
-                          '(example: string?, valid: boolean)')
+                          '(failed_row: natural number)')
 
     def test_detail(self):
         request = self.factory.get(self.detail_path)

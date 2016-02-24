@@ -972,7 +972,7 @@ class RunSerializerTests(TestCase):
 
         self.assertFalse(rtp_serializer.is_valid())
         self.assertEquals(rtp_serializer.errors["non_field_errors"],
-                          [u"Number of inputs must equal the number of Pipeline inputs"])
+                          [u"Pipeline has 3 inputs, but only received 2."])
 
     def test_validate_inputs_oversated(self):
         """
