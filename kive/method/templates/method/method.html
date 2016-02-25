@@ -186,6 +186,37 @@ Revise method '{{ parent.revision_name }}' in family '{{ family.name }}'
     </tr>
 </table>
 
+<h3>Dependencies</h3>
+<p>
+   Dependencies are other code resources that this Method requires to execute, e.g. if your driver is a Python script
+    that uses a module called "antigravity", then the module is a dependency.
+</p>
+
+<input type="button" id="addDependencyForm" value="+" class="add" /><input type="button" id="removeDependencyForm" value="&minus;" class="remove"/> <small>Add/subtract dependency form fields</small><br/>
+ <table class="formtable">
+    <thead>
+        <tr><th>Code resource</th><th>Revision</th><th>Path</th><th>Filename</th></tr>
+    </thead>
+    <tbody id="dependencyForms">
+        {% for dep_form in dep_forms %}
+        <tr>
+            <td>{{ dep_form.coderesource }}
+                <div class="errortext">{{ dep_form.non_field_errors }}</div>
+                <div class="errortext">{{ dep_form.coderesource.errors }}</div>
+            </td>
+            <td>{{ dep_form.revisions }}
+                <div class="errortext">{{ dep_form.revisions.errors }}</div>
+            </td>
+            <td>{{ dep_form.path }}
+                <div class="errortext">{{ dep_form.path.errors }}</div>
+            </td>
+            <td>{{ dep_form.filename }}
+                <div class="errortext">{{ dep_form.filename.errors }}</div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 
 <h3>Inputs</h3>
     <input type="button" id="addInputForm" class="add" value="+"/><input type="button" id="removeInputForm" class="remove" value="&minus;"/>

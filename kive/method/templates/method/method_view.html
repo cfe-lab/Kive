@@ -91,6 +91,10 @@
         {% endif %}
     </td>
 </tr>
+<tr>
+    <td>Driver:</td>
+    <td>{{ method.driver }}</td>
+</tr>
 
 </table>
 
@@ -100,6 +104,25 @@
 {% endif %}
 
 {{ method_form.errors }}
+
+{% if method.dependencies.count > 0 %}
+<h3>Dependencies</h3>
+
+    <table id="dependencies">
+    <thead>
+        <tr><th>Code resource revision</th><th>Path</th><th>Filename</th></tr>
+    </thead>
+    <tbody>
+    {% for dep in method.dependencies.all %}
+        <tr>
+        <td>{{ dep.requirement }}</td>
+        <td>{{ dep.path }}</td>
+        <td>{{ dep.filename }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+    </table>
+{% endif %}
 
 <h3>Inputs</h3>
 

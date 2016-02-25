@@ -442,10 +442,10 @@ def _make_dep_forms(query_dict, user):
     """
     Helper for resource_add and resource_revision_add that creates the MethodDependencyForms.
     """
-    num_dep_forms = sum([1 for k in query_dict.iterkeys() if k.startswith('method_')])
+    num_dep_forms = sum([1 for k in query_dict.iterkeys() if k.startswith('coderesource_')])
     dep_forms = []
     for i in range(num_dep_forms):
-        this_cr = query_dict['method_'+str(i)]  # PK of the Method
+        this_cr = query_dict['coderesource_'+str(i)]  # PK of the Method
         if this_cr == '':
             # Ignore blank CR dependency forms.
             dep_forms.append(None)
@@ -454,7 +454,7 @@ def _make_dep_forms(query_dict, user):
         dep_forms.append(
             MethodDependencyForm(
                 {
-                    'method': query_dict['method_'+str(i)],
+                    'coderesource': query_dict['coderesource_'+str(i)],
                     'revisions': query_dict['revisions_'+str(i)],
                     'path': query_dict['path_'+str(i)],
                     'filename': query_dict['filename_'+str(i)]
@@ -924,7 +924,7 @@ def method_revise(request, id):
                 "permissions": [parent_users_allowed, parent_groups_allowed]
             })
 
-        dependencies = parent_revision.dependencies.all()
+        dependencies = parent_method.dependencies.all()
         dep_forms = []
         for i, dependency in enumerate(dependencies):
             its_crv = dependency.requirement
