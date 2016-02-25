@@ -1097,12 +1097,13 @@ class MethodDependency(models.Model):
 
     def __str__(self):
         """Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
+        dep_filename = self.filename or self.requirement.coderesource.filename
         return "{} {} requires {} {} as {}".format(
             self.method.family,
             self.method,
             self.requirement.coderesource,
             self.requirement,
-            os.path.join(self.path, self.filename)
+            os.path.join(self.path, dep_filename)
         )
 
 
