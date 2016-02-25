@@ -453,6 +453,13 @@ class CodeResourceRevision(metadata.models.AccessControl):
                     dependant.coderesourcerevision.build_removal_plan(removal_plan)
                 )
 
+        for dependant in self.used_by.all().select_related("method"):
+            if dependant.method not in removal_plan["Methods"]:
+                update_removal_plan(
+                    removal_plan,
+                    dependant.method.build_removal_plan(removal_plan)
+                )
+
         for method in self.methods.all():
             if method not in removal_plan["Methods"]:
                 update_removal_plan(removal_plan, method.build_removal_plan(removal_plan))
@@ -675,6 +682,11 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             raise ValidationError('Method "{}" cannot have CodeResourceRevision "{}" as a driver, because it has no '
                                   'content file.'.format(self, self.driver))
 
+        # Check if dependencies conflict with each other.
+        dependency_paths = self.list_all_filepaths()
+        if len(set(dependency_paths)) != len(dependency_paths):
+            raise ValidationError("Conflicting dependencies")
+
         # Check that permissions are coherent.
         self.validate_restrict_access([self.family])
         self.validate_restrict_access([self.driver])
@@ -747,6 +759,53 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         # As in _poll_stream, this drops the trailing \n.
         for dest_stream in dest_streams:
             dest_stream.write(source_contents)
+
+    def list_all_filepaths(self):
+        """
+        Return all file paths associated with this Method, with the driver coming first.
+        """
+        file_paths = [self.driver.coderesource.filename]
+        file_paths.extend([os.path.join(dep.path, dep.filename) for dep in self.dependencies.all()])
+        return file_paths
+
+    def install(self, install_path):
+        """
+        Install this Method's code into the specified path.
+
+        PRE: install_path exists and has all the sufficient permissions for us
+        to write our files into.
+        """
+        base_name = self.driver.coderesource.filename
+        self.logger.debug("Writing code to {}".format(install_path))
+
+        destination_path = os.path.join(install_path, base_name)
+        with open(destination_path, "w") as f:
+            self.content_file.open()
+            with self.content_file:
+                shutil.copyfileobj(self.content_file, f)
+        # Make sure this is written with read, write, and execute
+        # permission.
+        os.chmod(destination_path, stat.S_IRWXU)
+        # This will tailor the permissions further if we are running
+        # sandboxes with another user account via SSH.
+        file_access_utils.configure_sandbox_permissions(destination_path)
+
+        for dep in self.dependencies.all():
+            # Create any necessary sub-directory.  This directory may already exist due
+            # to another dependency -- or if depPath is "." -- so we catch os.error.
+            # We propagate any other errors.
+            dep_dir = os.path.normpath(os.path.join(install_path, dep.path))
+            try:
+                os.makedirs(dep_dir)
+            except os.error:
+                pass
+
+            # Write the dependency.
+            dep_path = os.path.join(dep_dir, dep.filename)
+            with open(dep_path, "wb") as f:
+                dep.requirement.content_file.open()
+                with dep.requirement.content_file:
+                    shutil.copyfileobj(dep.requirement.content_file, f)
 
     def run_code(self,
                  run_path,
@@ -916,7 +975,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 raise ValueError(reason)
 
         self.logger.debug("Installing CodeResourceRevision driver to file system: {}".format(self.driver))
-        self.driver.install(run_path)
+        self.install(run_path)
 
         # At this point, run_path has all of the necessary stuff
         # written into place.  It remains to execute the code.
@@ -995,6 +1054,56 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             pipelines_listed.update(curr_pipelines_listed)
 
         return datasets_listed, ERs_listed, runs_listed, pipelines_listed
+
+
+@python_2_unicode_compatible
+class MethodDependency(models.Model):
+    """
+    CodeResourceRevisions needed by a Method in support of its driver.
+
+    Related to :model:`method.CodeResourceRevision`
+    """
+    method = models.ForeignKey(Method, related_name="dependencies")
+
+    # Dependency is a codeResourceRevision
+    requirement = models.ForeignKey(CodeResourceRevision, related_name="used_by")
+
+    # Where to place it during runtime relative to the Method's sandbox directory.
+    path = models.CharField(
+        "Dependency path",
+        max_length=255,
+        help_text="Where a dependency must exist in the sandbox",
+        blank=True
+    )
+
+    filename = models.CharField(
+        "Dependency file name",
+        max_length=255,
+        help_text="The file name the dependency is given in the sandbox at execution",
+        blank=True
+    )
+
+    def clean(self):
+        """
+        dep_path cannot reference ".."
+        """
+        # Collapse down to a canonical path
+        self.path = os.path.normpath(self.path)
+        if any(component == ".." for component in self.path.split(os.sep)):
+            raise ValidationError("path cannot reference ../")
+
+        # Check that user/group access is coherent.
+        self.method.validate_restrict_access([self.requirement])
+
+    def __str__(self):
+        """Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
+        return "{} {} requires {} {} as {}".format(
+            self.method.family,
+            self.method,
+            self.requirement.coderesource,
+            self.requirement,
+            os.path.join(self.path, self.filename)
+        )
 
 
 @python_2_unicode_compatible
