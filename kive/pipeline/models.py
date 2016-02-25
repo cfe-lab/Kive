@@ -103,21 +103,6 @@ class PipelineFamily(transformation.models.TransformationFamily):
 
         return removal_plan
 
-    def remove_list(self):
-        datasets_listed = set()
-        ERs_listed = set()
-        runs_listed = set()
-        pipelines_listed = set()
-
-        for pipeline in self.members.all():
-            curr_datasets_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = pipeline.remove_list()
-            datasets_listed.update(curr_datasets_listed)
-            ERs_listed.update(curr_ERs_listed)
-            runs_listed.update(curr_runs_listed)
-            pipelines_listed.update(curr_pipelines_listed)
-
-        return datasets_listed, ERs_listed, runs_listed, pipelines_listed
-
 
 class PipelineSerializationException(exceptions.Exception):
     """
@@ -392,29 +377,6 @@ class Pipeline(transformation.models.Transformation):
                 )
 
         return removal_plan
-
-    @transaction.atomic
-    def remove_list(self):
-        datasets_to_remove = set()
-        ERs_to_remove = set()
-        runs_to_remove = set()
-        pipelines_to_remove = {self}
-
-        for run in self.pipeline_instances.all():
-            curr_datasets_to_remove, curr_ERs_to_remove, curr_runs_to_remove = run.remove_list()
-            datasets_to_remove.update(curr_datasets_to_remove)
-            ERs_to_remove.update(curr_ERs_to_remove)
-            runs_to_remove.update(curr_runs_to_remove)
-
-        # Remove any pipeline that uses this one as a sub-pipeline.
-        for ps in self.pipelinesteps.all():
-            curr_datasets_to_remove, curr_ERs_to_remove, curr_runs_to_remove = ps.pipeline.remove_list()
-            datasets_to_remove.update(curr_datasets_to_remove)
-            ERs_to_remove.update(curr_ERs_to_remove)
-            runs_to_remove.update(curr_runs_to_remove)
-            pipelines_to_remove.add(ps.pipeline)
-
-        return datasets_to_remove, ERs_to_remove, runs_to_remove, pipelines_to_remove
 
     def find_step_updates(self):
         updates = []

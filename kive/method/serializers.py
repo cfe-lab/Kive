@@ -3,7 +3,7 @@ from django.core.files import File
 
 from rest_framework import serializers
 
-from method.models import Method, MethodFamily, CodeResource, CodeResourceRevision, CodeResourceDependency
+from method.models import Method, MethodDependency, MethodFamily, CodeResource, CodeResourceRevision
 from transformation.serializers import TransformationInputSerializer, TransformationOutputSerializer
 from kive.serializers import AccessControlSerializer
 import portal.models
@@ -33,14 +33,14 @@ class CodeResourceSerializer(AccessControlSerializer,
         )
 
 
-class CodeResourceDependencySerializer(serializers.ModelSerializer):
+class MethodDependencySerializer(serializers.ModelSerializer):
 
     class Meta:
-        model = CodeResourceDependency
+        model = MethodDependency
         fields = (
             "requirement",
-            "depPath",
-            "depFileName"
+            "path",
+            "filename"
         )
 
 
@@ -66,12 +66,6 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
                                      serializers.ModelSerializer):
     coderesource = serializers.SlugRelatedField(slug_field='name',
                                                 queryset=CodeResource.objects.all())
-
-    dependencies = CodeResourceDependencySerializer(
-        many=True,
-        allow_null=True,
-        required=False
-    )
 
     download_url = serializers.HyperlinkedIdentityField(view_name='coderesourcerevision-download')
     removal_plan = serializers.HyperlinkedIdentityField(view_name='coderesourcerevision-removal-plan')
@@ -109,7 +103,6 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
             'revision_DateTime',
             "content_file",
             "staged_file",
-            "dependencies",
             "download_url",
             "MD5_checksum"
         )
@@ -141,7 +134,6 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
         crr_data = validated_data
         users_allowed = crr_data.pop("users_allowed") if "users_allowed" in crr_data else []
         groups_allowed = crr_data.pop("groups_allowed") if "groups_allowed" in crr_data else []
-        dependencies = crr_data.pop("dependencies") if "dependencies" in crr_data else []
         staged_file = crr_data.pop("staged_file") if "staged_file" in crr_data else None
 
         with transaction.atomic():
@@ -153,9 +145,6 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
 
             crr.users_allowed.add(*users_allowed)
             crr.groups_allowed.add(*groups_allowed)
-
-            for dep_data in dependencies:
-                crr.dependencies.create(**dep_data)
 
         if staged_file is not None:
             staged_file.delete()
@@ -211,6 +200,12 @@ class MethodSerializer(AccessControlSerializer,
     inputs = TransformationInputSerializer(many=True, allow_null=True, required=False)
     outputs = TransformationOutputSerializer(many=True, allow_null=True, required=False)
 
+    dependencies = MethodDependencySerializer(
+        many=True,
+        allow_null=True,
+        required=False
+    )
+
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='method-removal-plan')
 
@@ -242,6 +237,7 @@ class MethodSerializer(AccessControlSerializer,
             "driver",
             "reusable",
             "threads",
+            "dependencies",
             "inputs",
             "outputs"
         )
@@ -274,6 +270,7 @@ class MethodSerializer(AccessControlSerializer,
         groups_allowed = method_data.pop("groups_allowed")
         inputs = method_data.pop("inputs")
         outputs = method_data.pop("outputs")
+        dependencies = method_data.pop("dependencies") if "dependencies" in method_data else []
 
         method = Method.objects.create(**method_data)
         method.users_allowed.add(*users_allowed)
@@ -295,5 +292,8 @@ class MethodSerializer(AccessControlSerializer,
 
         for output_data in outputs:
             create_xput(output_data, method.outputs)
+
+        for dep_data in dependencies:
+            method.dependencies.create(**dep_data)
 
         return method

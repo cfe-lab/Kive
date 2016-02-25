@@ -466,90 +466,63 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
         return removal_plan
 
-    @transaction.atomic
-    def remove_list(self):
-        datasets_listed = set()
-        ERs_listed = set()
-        runs_listed = set()
-        pipelines_listed = set()
-        methods_listed = set()
-        CRRs_listed = {self}
-
-        for dependant in self.needed_by.all().select_related("coderesourcerevision"):
-            stuff_removed = dependant.coderesourcerevision.remove_list()
-            datasets_listed.update(stuff_removed[0])
-            ERs_listed.update(stuff_removed[1])
-            runs_listed.update(stuff_removed[2])
-            pipelines_listed.update(stuff_removed[3])
-            methods_listed.update(stuff_removed[4])
-            CRRs_listed.update(stuff_removed[5])
-
-        for method in self.members.all():
-            stuff_removed = method.remove_list()
-            datasets_listed.update(stuff_removed[0])
-            ERs_listed.update(stuff_removed[1])
-            runs_listed.update(stuff_removed[2])
-            pipelines_listed.update(stuff_removed[3])
-
-        return datasets_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed, CRRs_listed
-
     def find_update(self):
         update = self.coderesource.revisions.latest('revision_number')
         return update if update != self else None
 
 
-@python_2_unicode_compatible
-class CodeResourceDependency(models.Model):
-    """
-    Dependencies of a CodeResourceRevision - themselves also CRRs.
-
-    Related to :model:`method.CodeResourceRevision`
-    """
-
-    coderesourcerevision = models.ForeignKey(CodeResourceRevision, related_name="dependencies")
-
-    # Dependency is a codeResourceRevision
-    requirement = models.ForeignKey(CodeResourceRevision, related_name="needed_by")
-
-    # Where to place it during runtime relative to the CodeResource
-    # that relies on this CodeResourceDependency.
-    depPath = models.CharField(
-        "Dependency path",
-        max_length=255,
-        help_text="Where a code resource dependency must exist in the sandbox relative to it's parent",
-        blank=True)
-
-    depFileName = models.CharField(
-        "Dependency file name",
-        max_length=255,
-        help_text="The file name the dependency is given on the sandbox at execution",
-        blank=True)
-
-    def clean(self):
-        """
-        depPath cannot reference ".."
-        """
-        # Collapse down to a canonical path
-        self.depPath = os.path.normpath(self.depPath)
-        if any(component == ".." for component in self.depPath.split(os.sep)):
-            raise ValidationError("depPath cannot reference ../")
-
-        # If the child CR is a meta-package (no filename), we cannot
-        # have a depFileName as this makes no sense
-        if self.requirement.coderesource.filename == "" and self.depFileName != "":
-            raise ValidationError("Metapackage dependencies cannot have a depFileName")
-
-        # Check that user/group access is coherent.
-        self.coderesourcerevision.validate_restrict_access([self.requirement])
-
-    def __str__(self):
-        """Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
-        return "{} {} requires {} {} as {}".format(
-                self.coderesourcerevision.coderesource,
-                self.coderesourcerevision,
-                self.requirement.coderesource,
-                self.requirement,
-                os.path.join(self.depPath, self.depFileName))
+# @python_2_unicode_compatible
+# class CodeResourceDependency(models.Model):
+#     """
+#     Dependencies of a CodeResourceRevision - themselves also CRRs.
+#
+#     Related to :model:`method.CodeResourceRevision`
+#     """
+#
+#     coderesourcerevision = models.ForeignKey(CodeResourceRevision, related_name="dependencies")
+#
+#     # Dependency is a codeResourceRevision
+#     requirement = models.ForeignKey(CodeResourceRevision, related_name="needed_by")
+#
+#     # Where to place it during runtime relative to the CodeResource
+#     # that relies on this CodeResourceDependency.
+#     depPath = models.CharField(
+#         "Dependency path",
+#         max_length=255,
+#         help_text="Where a code resource dependency must exist in the sandbox relative to it's parent",
+#         blank=True)
+#
+#     depFileName = models.CharField(
+#         "Dependency file name",
+#         max_length=255,
+#         help_text="The file name the dependency is given on the sandbox at execution",
+#         blank=True)
+#
+#     def clean(self):
+#         """
+#         depPath cannot reference ".."
+#         """
+#         # Collapse down to a canonical path
+#         self.depPath = os.path.normpath(self.depPath)
+#         if any(component == ".." for component in self.depPath.split(os.sep)):
+#             raise ValidationError("depPath cannot reference ../")
+#
+#         # If the child CR is a meta-package (no filename), we cannot
+#         # have a depFileName as this makes no sense
+#         if self.requirement.coderesource.filename == "" and self.depFileName != "":
+#             raise ValidationError("Metapackage dependencies cannot have a depFileName")
+#
+#         # Check that user/group access is coherent.
+#         self.coderesourcerevision.validate_restrict_access([self.requirement])
+#
+#     def __str__(self):
+#         """Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
+#         return "{} {} requires {} {} as {}".format(
+#                 self.coderesourcerevision.coderesource,
+#                 self.coderesourcerevision,
+#                 self.requirement.coderesource,
+#                 self.requirement,
+#                 os.path.join(self.depPath, self.depFileName))
 
 
 @python_2_unicode_compatible
@@ -1036,25 +1009,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
         return removal_plan
 
-    def remove_list(self):
-        datasets_listed = set()
-        ERs_listed = set()
-        runs_listed = set()
-        pipelines_listed = set()
-
-        pipelines_affected = set([ps.pipeline for ps in self.pipelinesteps.all()])
-        for pipeline_affected in pipelines_affected:
-            (curr_datasets_listed,
-             curr_ERs_listed,
-             curr_runs_listed,
-             curr_pipelines_listed) = pipeline_affected.remove_list()
-            datasets_listed.update(curr_datasets_listed)
-            ERs_listed.update(curr_ERs_listed)
-            runs_listed.update(curr_runs_listed)
-            pipelines_listed.update(curr_pipelines_listed)
-
-        return datasets_listed, ERs_listed, runs_listed, pipelines_listed
-
 
 @python_2_unicode_compatible
 class MethodDependency(models.Model):
@@ -1160,23 +1114,6 @@ class MethodFamily(transformation.models.TransformationFamily):
                 update_removal_plan(removal_plan, method.build_removal_plan(removal_plan))
 
         return removal_plan
-
-    def remove_list(self):
-        datasets_listed = set()
-        ERs_listed = set()
-        runs_listed = set()
-        pipelines_listed = set()
-        methods_listed = set()
-
-        for method in self.members.all():
-            curr_datasets_lsited, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = method.remove_list()
-            datasets_listed.update(curr_datasets_lsited)
-            ERs_listed.update(curr_ERs_listed)
-            runs_listed.update(curr_runs_listed)
-            pipelines_listed.update(curr_pipelines_listed)
-            methods_listed.add(method)
-
-        return datasets_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed
 
 
 # Register signals.

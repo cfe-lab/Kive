@@ -134,12 +134,12 @@ def _get_code_resource_list(user, but_not_this_one=None):
     return [('', '--- CodeResource ---')] + [(x.id, x.name) for x in queryset]
 
 
-class CodeResourceDependencyForm(forms.Form):
+class MethodDependencyForm(forms.Form):
     """
-    Form for submitting a CodeResourceDependency.
+    Form for submitting a MethodDependency.
 
     initial:  A dictionary to pass initial values from view function
-    parent:  Primary key (ID) of CodeResource having this dependency.
+    parent:  Primary key (ID) of Method having this dependency.
     """
     # The attrs to the widget are to enhance the resulting HTML output.
     coderesource = forms.ChoiceField(
@@ -150,22 +150,22 @@ class CodeResourceDependencyForm(forms.Form):
     # We override this field so that it doesn't try to validate.
     revisions = forms.IntegerField(widget=forms.Select(choices=[('', '--- select a CodeResource first ---')]))
 
-    depPath = forms.CharField(
+    path = forms.CharField(
         label="Dependency path",
         help_text="Where a code resource dependency must exist in the sandbox relative to it's parent",
         required=False
     )
 
-    depFileName = forms.CharField(
+    filename = forms.CharField(
         label="Dependency file name",
         help_text="The file name the dependency is given on the sandbox at execution",
         required=False
     )
 
-    def __init__(self, data=None, user=None, initial=None, parent=None, *args, **kwargs):
-        super(CodeResourceDependencyForm, self).__init__(data, initial=initial, *args, **kwargs)
+    def __init__(self, data=None, user=None, initial=None, *args, **kwargs):
+        super(MethodDependencyForm, self).__init__(data, initial=initial, *args, **kwargs)
 
-        eligible_crs = _get_code_resource_list(user, parent)
+        eligible_crs = _get_code_resource_list(user)
         self.fields['coderesource'].choices = eligible_crs
 
         # Re-populate drop-downs before rendering if possible.
@@ -271,7 +271,6 @@ class MethodDetailsForm(forms.ModelForm):
 
 
 class TransformationXputForm (forms.Form):
-
     dataset_name = forms.CharField()
 
 
