@@ -500,23 +500,26 @@ $(function() {
                     var $method_family = $('#id_select_method_family', menu);
                     $method_family.val(sel.family);
                     var request = updateMethodRevisionsMenu.call($method_family[0]); // trigger ajax
-                    if (sel.new_code_resource_revision) {
+                    if (sel.new_code_resource_revision || sel.new_dependencies) {
                         request.done(function() {
-                            var name = sel.new_code_resource_revision.revision_name;
+                            var name = "[";
+                            if (sel.new_code_resource_revision) {
+                                name += "driver updated (" + sel.new_code_resource_revision.revision_name + ")";
+                            }
+                            if (sel.new_dependencies) {
+                                name += "; dependencies updated (";
+                                for (var i = 0; i < sel.new_dependencies.length; i++) {
+                                    if (i > 0) {
+                                        name += ", ";
+                                    }
+                                    name += sel.new_dependencies[i].revision_name;
+                                }
+                                name += ")";
+                            }
+                            name += "]";
+
                             $('<option>', { value: sel.pk })
                                 .text('new: ' + name)
-                                .prependTo($("#id_select_method", menu));
-                        });
-                    }
-                    if (sel.new_dependencies) {
-                        request.done(function() {
-                            var name = "new: ";
-                            for (var i = 0; i < sel.new_dependencies.length; i++) {
-                                if (i > 0) name += ", ";
-                                name += sel.new_dependencies[i].revision_name;
-                            }
-                            $('<option>', { value: sel.pk })
-                                .text(name)
                                 .prependTo($("#id_select_method", menu));
                         });
                     }

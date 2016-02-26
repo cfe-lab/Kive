@@ -123,7 +123,7 @@ def _get_code_resource_list(user, but_not_this_one=None):
     Gets all CodeResources other than that of the specified one.
 
     This is required to refresh the list of eligible CodeResources during the
-    addition of a new CodeResourceDependency.
+    addition of a new MethodDependency.
     """
     if user is None:
         queryset = CodeResource.objects.all()

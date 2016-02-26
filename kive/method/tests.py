@@ -29,8 +29,8 @@ from kive.tests import BaseTestCases, KiveTransactionTestCase
 import librarian.models
 from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
 import metadata.tests
-from method.models import CodeResource, CodeResourceDependency, \
-    CodeResourceRevision, Method, MethodFamily
+from method.models import CodeResource, CodeResourceRevision, \
+    Method, MethodFamily, MethodDependency
 from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
 import portal.models
 import kive.testing_utils as tools

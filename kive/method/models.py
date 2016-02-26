@@ -121,7 +121,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
     A particular revision of a code resource.
 
     Related to :model:`method.CodeResource`
-    Related to :model:`method.CodeResourceDependency`
+    Related to :model:`method.MethodDependency`
     Related to :model:`method.Method`
     """
     UPLOAD_DIR = "CodeResources"

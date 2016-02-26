@@ -106,12 +106,14 @@ def prepare_pipeline_dict(request_body, user):
     form_data["user"] = user.pk
     return form_data
 
+
 def _get_compound_datatypes(request):
     """ Get a sorted list of (name, id) pairs for compound datatypes. """
     compound_datatypes = [(cdt.name, cdt.pk)
                           for cdt in CompoundDatatype.filter_by_user(request.user)]
     compound_datatypes.sort()
     return compound_datatypes
+
 
 @login_required
 @user_passes_test(developer_check)

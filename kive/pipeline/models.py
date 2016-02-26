@@ -379,9 +379,20 @@ class Pipeline(transformation.models.Transformation):
         return removal_plan
 
     def find_step_updates(self):
+        """
+        Look for updated versions of all steps of this Pipeline.
+
+        If a step's Method has been updated, that is identified as the update
+        candidate.  Otherwise, we look at the driver and dependencies of
+        the Method and propose a new Method that uses the new code and leaves
+        all other settings the same (the path and filename of the
+        dependencies are left the same, no additional dependencies are
+        identified, inputs and outputs are left the same).
+
+        TODO: update this code to handle sub-Pipelines within the Pipeline.
+        """
         updates = []
         for step in self.steps.all():
-            update = None
             transformation = step.transformation.find_update()
             # TODO: handle nested pipelines
             if transformation is not None and transformation.is_method:
@@ -389,20 +400,20 @@ class Pipeline(transformation.models.Transformation):
                 update.method = transformation.definite
                 updates.append(update)
             else:
-                driver = getattr(step.transformation.definite, 'driver', None)
+                step_method = step.transformation.definite
+                driver = getattr(step_method, 'driver', None)
                 if driver is not None:
                     next_driver = driver.find_update()
-                    if next_driver is not None:
-                        update = PipelineStepUpdate(step.step_num)
-                        update.code_resource_revision = next_driver
-                        updates.append(update)
-                    for dependency in driver.dependencies.all():
+                    new_dependencies = []
+                    for dependency in step_method.dependencies.all():
                         next_dependency = dependency.requirement.find_update()
                         if next_dependency is not None:
-                            if update is None:
-                                update = PipelineStepUpdate(step.step_num)
-                                updates.append(update)
-                            update.dependencies.append(next_dependency)
+                            new_dependencies.append(next_dependency)
+                    if next_driver is not None or new_dependencies:
+                        update = PipelineStepUpdate(step.step_num)
+                        update.code_resource_revision = next_driver
+                        update.dependencies = new_dependencies
+                        updates.append(update)
         return updates
 
     def get_all_atomic_steps_cables(self):
@@ -630,7 +641,8 @@ class PipelineStep(models.Model):
 
 
 class PipelineStepUpdate(object):
-    """ A data object to hold details about how a pipeline step can be updated.
+    """
+    A data object to hold details about how a pipeline step can be updated.
     """
     def __init__(self, step_num):
         self.step_num = step_num

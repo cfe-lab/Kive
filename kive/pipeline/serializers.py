@@ -81,7 +81,6 @@ class PipelineStepSerializer(serializers.ModelSerializer):
         required=False
     )
 
-
     class Meta:
         model = PipelineStep
         fields = (
@@ -364,59 +363,62 @@ class PipelineSerializer(AccessControlSerializer,
             # This is a ManyToManyField so it must be populated after the step
             # itself is created.
             new_outputs_to_delete_names = step_data.pop("new_outputs_to_delete_names", [])
-            code_resource_revision_id = step_data.pop(
-                "new_code_resource_revision_id",
-                None)
-            dependency_ids = step_data.pop("new_dependency_ids", [])
+            new_driver_pk = step_data.pop("new_code_resource_revision_id", None)
+            new_dependency_ids = step_data.pop("new_dependency_ids", [])
 
+            # If a new Method was found by Check for Updates, then it's already
+            # been put into step_data["transformation"], i.e. "old_method" is
+            # already set to the new version.
             old_method = step_data["transformation"].definite
             new_method = methods_already_upgraded.get(old_method, old_method)
             if old_method not in methods_already_upgraded:
                 # Look to see if we need to make a new version of the Method.
-                if dependency_ids:
-                    dependency_revisions = CodeResourceRevision.objects.filter(
-                        id__in=dependency_ids)
-                    revision_name = ', '.join(
-                        [d.revision_name for d in dependency_revisions])
-                    revision_description = '\n---\n'.join(
-                        [d.revision_desc for d in dependency_revisions])
+                updated_driver = old_method.driver
+                if new_driver_pk is not None:
+                    updated_driver = CodeResourceRevision.objects.get(pk=new_driver_pk)
+
+                revision_name = updated_driver.revision_name
+                revision_description = updated_driver.revision_desc
+
+                if new_dependency_ids:
+                    dependency_revisions = CodeResourceRevision.objects.filter(id__in=new_dependency_ids)
+                    revision_name += " ({})".format(
+                        ', '.join([d.revision_name for d in dependency_revisions])
+                    )
+                    revision_description += " ({})".format(
+                        '\n---\n'.join([d.revision_desc for d in dependency_revisions])
+                    )
                     resource_map = {d.coderesource_id: d for d in dependency_revisions}
-                    old_revision = step_data['transformation'].definite.driver
-                    new_revision = old_revision.coderesource.revisions.create(
+
+                if new_driver_pk is not None or new_dependency_ids:
+                    # Create a new Method from the updated driver and dependencies.
+                    new_method = old_method.family.members.create(
                         revision_name=revision_name,
                         revision_desc=revision_description,
-                        revision_parent=old_revision,
-                        content_file=old_revision.content_file,
-                        user=pipeline.user)
-                    new_revision.users_allowed.add(*users_allowed)
-                    new_revision.groups_allowed.add(*groups_allowed)
-                    code_resource_revision_id = new_revision.id
-                    for old_dependency in old_revision.dependencies.select_related('requirement'):
-                        dependency_revision = resource_map.get(
-                            old_dependency.requirement.coderesource_id,
-                            None)
-                        if dependency_revision is None:
-                            dependency_revision = old_dependency.requirement
-                        new_revision.dependencies.create(
-                            requirement=dependency_revision,
-                            depPath=old_dependency.depPath,
-                            depFileName=old_dependency.depFileName)
-                if code_resource_revision_id is not None:
-                    code_revision = CodeResourceRevision.objects.get(
-                        id=code_resource_revision_id)
-                    old_method = step_data['transformation'].definite
-                    new_method = old_method.family.members.create(
-                        revision_name=code_revision.revision_name,
-                        revision_desc=code_revision.revision_desc,
                         revision_parent=old_method,
-                        driver=code_revision,
+                        driver=updated_driver,
                         reusable=old_method.reusable,
                         tainted=old_method.tainted,
                         threads=old_method.threads,
-                        user=pipeline.user)
+                        user=pipeline.user
+                    )
                     new_method.copy_io_from_parent()
                     new_method.users_allowed.add(*users_allowed)
                     new_method.groups_allowed.add(*groups_allowed)
+
+                    for old_dependency in old_method.dependencies.select_related('requirement'):
+                        dependency_revision = resource_map.get(
+                            old_dependency.requirement.coderesource_id,
+                            None
+                        )
+                        if dependency_revision is None:
+                            dependency_revision = old_dependency.requirement
+                        new_method.dependencies.create(
+                            requirement=dependency_revision,
+                            path=old_dependency.path,
+                            filename=old_dependency.filename
+                        )
+
                     # Add this to the lookup table of methods that have already seen an upgrade.
                     methods_already_upgraded[old_method] = new_method
             step_data['transformation'] = new_method
