@@ -13,7 +13,6 @@ from django.db.models.signals import post_delete
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator
 from django.core.files import File
-from django.core.files.base import ContentFile
 from django.utils.encoding import python_2_unicode_compatible
 from django.conf import settings
 from django.core.urlresolvers import reverse
@@ -163,8 +162,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
     content_file = models.FileField(
         "File contents",
         upload_to=UPLOAD_DIR,
-        help_text="File contents of this code resource revision",
-        default=ContentFile("")
+        help_text="File contents of this code resource revision"
     )
 
     MD5_checksum = models.CharField(
