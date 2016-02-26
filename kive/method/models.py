@@ -13,6 +13,7 @@ from django.db.models.signals import post_delete
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator
 from django.core.files import File
+from django.core.files.base import ContentFile
 from django.utils.encoding import python_2_unicode_compatible
 from django.conf import settings
 from django.core.urlresolvers import reverse
@@ -51,7 +52,7 @@ class CodeResource(metadata.models.AccessControl):
     # contains a slash. They can't start or end with spaces.
     filename = models.CharField("Resource file name", max_length=maxlengths.MAX_FILENAME_LENGTH,
                                 help_text="The filename for this resource",
-                                blank=True, validators=[
+                                validators=[
                                     RegexValidator(regex="^(\b|([-_.()\w]+ *)*[-_.()\w]+)$",
                                                    message="Invalid code resource filename"),
                                 ])
@@ -136,16 +137,19 @@ class CodeResourceRevision(metadata.models.AccessControl):
     # revision_number is allowed to be null because it's automatically set on save
     revision_number = models.PositiveIntegerField(
         'Revision number', help_text="Revision number of code resource",
-        blank=True)
+        blank=True
+    )
 
     revision_name = models.CharField(
         max_length=maxlengths.MAX_NAME_LENGTH,
         help_text="A name to differentiate revisions of a CodeResource",
-        blank=True)
+        blank=True
+    )
 
     revision_DateTime = models.DateTimeField(
         auto_now_add=True,
-        help_text="Date this resource revision was uploaded")
+        help_text="Date this resource revision was uploaded"
+    )
 
     revision_parent = models.ForeignKey('self', related_name="descendants", null=True, blank=True,
                                         on_delete=models.SET_NULL)
@@ -153,19 +157,21 @@ class CodeResourceRevision(metadata.models.AccessControl):
         "Revision description",
         help_text="A description for this particular resource revision",
         max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
-        blank=True)
+        blank=True
+    )
 
     content_file = models.FileField(
         "File contents",
         upload_to=UPLOAD_DIR,
-        null=True,
-        blank=True,
-        help_text="File contents of this code resource revision")
+        help_text="File contents of this code resource revision",
+        default=ContentFile("")
+    )
 
     MD5_checksum = models.CharField(
         max_length=64,
         blank=True,
-        help_text="Used to validate file contents of this resource revision")
+        help_text="Used to validate file contents of this resource revision"
+    )
 
     class Meta:
         unique_together = (("coderesource", "revision_number"))
@@ -217,72 +223,6 @@ class CodeResourceRevision(metadata.models.AccessControl):
             self.revision_number = self.coderesource.next_revision()
 
         super(CodeResourceRevision, self).save(*args, **kwargs)
-
-    # # This CRR includes it's own filename at the root
-    # def list_all_filepaths(self):
-    #     """Return all filepaths associated with this CodeResourceRevision.
-    #
-    #     Filepaths are listed recursively following a root-first scheme,
-    #     with the filepaths of the children listed in order.
-    #     """
-    #     return self.list_all_filepaths_h(self.coderesource.filename)
-    #
-    # # Self is be a dependency CRR, base_name is it's file name, specified either
-    # # by the parent dependency layer, or in the case of a top-level CR, just CRR.name
-    # def list_all_filepaths_h(self, base_name):
-    #
-    #     # Filepath includes the original file which has dependencies.
-    #     # If just a library of dependencies (IE, base_name=""), don't
-    #     # add base_path.
-    #     all_filepaths = []
-    #     if base_name != "":
-    #         all_filepaths = [unicode(base_name)]
-    #
-    #     # For each dependency in this code resource revision
-    #     for dep in self.dependencies.all():
-    #
-    #         # Get all file paths of the CR of the child dependency
-    #         # relative to itself
-    #         dep_fn = dep.depFileName
-    #         # If depFileName is blank, check and see if the
-    #         # corresponding CodeResource had a filename (i.e. if this
-    #         # is a non-metapackage CRR and so there is an associated
-    #         # file).
-    #         if dep_fn == "":
-    #             dep_fn = dep.requirement.coderesource.filename
-    #
-    #         inner_dep_paths = dep.requirement.list_all_filepaths_h(dep_fn)
-    #
-    #         # Convert the paths from being relative to the child CRR to being
-    #         # relative to the current parent CRR by appending pathing
-    #         # information from the dependency layer
-    #         for paths in inner_dep_paths:
-    #             correctedPath = os.path.join(dep.depPath, paths)
-    #             all_filepaths.append(unicode(correctedPath))
-    #
-    #     return all_filepaths
-    #
-    # def has_circular_dependence(self):
-    #     """Detect any circular dependences defined in this CodeResourceRevision."""
-    #     return self.has_circular_dependence_h([])
-    #
-    # def has_circular_dependence_h(self, dependants):
-    #     """Helper for has_circular_dependence.
-    #
-    #     dependants is an accumulator that tracks all of the all of the
-    #     CRRs that have this one as a dependency.
-    #     """
-    #     # Base case: self is dependant on itself, in which case, return true.
-    #     if self in dependants:
-    #         return True
-    #
-    #     # Recursive case: go to all dependencies and check them.
-    #     check_dep = False
-    #     for dep in self.dependencies.all():
-    #         if dep.requirement.has_circular_dependence_h(dependants + [self]):
-    #             check_dep = True
-    #
-    #     return check_dep
 
     def compute_md5(self):
         """Computes the MD5 checksum of the CodeResourceRevision."""
@@ -360,67 +300,10 @@ class CodeResourceRevision(metadata.models.AccessControl):
                     }
                 )
 
-        # If content file exists, it must have a file name
-        if self.content_file and self.coderesource.filename == "":
-            raise ValidationError("If content file exists, it must have a file name")
-
-        # If no content file exists, it must not have a file name
-        if not self.content_file and self.coderesource.filename != "":
-            raise ValidationError("Cannot have a filename specified in the absence of a content file")
-
         # Check that user/group access is coherent.
         self.validate_restrict_access([self.coderesource])
         if self.revision_parent is not None:
             self.validate_restrict_access([self.revision_parent])
-
-    # def install(self, install_path):
-    #     """
-    #     Install this CRR into the specified path.
-    #
-    #     PRE: install_path exists and has all the sufficient permissions for us
-    #     to write our files into.
-    #     """
-    #     self.install_h(install_path, self.coderesource.filename)
-    #
-    # def install_h(self, install_path, base_name):
-    #     """Helper for install."""
-    #     self.logger.debug("Writing code to {}".format(install_path))
-    #
-    #     # Install if not a metapackage.
-    #     if base_name != "":
-    #         dest_path = os.path.join(install_path, base_name)
-    #         with open(dest_path, "w") as f:
-    #             self.content_file.open()
-    #             with self.content_file:
-    #                 shutil.copyfileobj(self.content_file, f)
-    #         # Make sure this is written with read, write, and execute
-    #         # permission.
-    #         os.chmod(dest_path, stat.S_IRWXU)
-    #         # This will tailor the permissions further if we are running
-    #         # sandboxes with another user account via SSH.
-    #         file_access_utils.configure_sandbox_permissions(dest_path)
-    #
-    #     for dep in self.dependencies.all():
-    #         # Create any necessary sub-directory.  This should never
-    #         # fail because we're in a nice clean working directory and
-    #         # we already checked that this CRR doesn't have file
-    #         # conflicts.  (Thus if an exception is raised, we want to
-    #         # propagate it as that's a pretty deep problem.)
-    #         path_for_deps = os.path.normpath(os.path.join(install_path, dep.depPath))
-    #         # the directory may already exist due to another dependency --
-    #         # or if depPath is ".".
-    #         try:
-    #             os.makedirs(path_for_deps)
-    #         except os.error:
-    #             pass
-    #
-    #         # Get the base name of this dependency.  If no special value
-    #         # is specified in dep, then use the dependency's CRR name.
-    #         dep_fn = dep.depFileName
-    #         if dep_fn == "":
-    #             dep_fn = dep.requirement.coderesource.filename
-    #
-    #         dep.requirement.install_h(path_for_deps, dep_fn)
 
     @transaction.atomic
     def remove(self):
@@ -451,60 +334,6 @@ class CodeResourceRevision(metadata.models.AccessControl):
         return update if update != self else None
 
 
-# @python_2_unicode_compatible
-# class CodeResourceDependency(models.Model):
-#     """
-#     Dependencies of a CodeResourceRevision - themselves also CRRs.
-#
-#     Related to :model:`method.CodeResourceRevision`
-#     """
-#
-#     coderesourcerevision = models.ForeignKey(CodeResourceRevision, related_name="dependencies")
-#
-#     # Dependency is a codeResourceRevision
-#     requirement = models.ForeignKey(CodeResourceRevision, related_name="needed_by")
-#
-#     # Where to place it during runtime relative to the CodeResource
-#     # that relies on this CodeResourceDependency.
-#     depPath = models.CharField(
-#         "Dependency path",
-#         max_length=255,
-#         help_text="Where a code resource dependency must exist in the sandbox relative to it's parent",
-#         blank=True)
-#
-#     depFileName = models.CharField(
-#         "Dependency file name",
-#         max_length=255,
-#         help_text="The file name the dependency is given on the sandbox at execution",
-#         blank=True)
-#
-#     def clean(self):
-#         """
-#         depPath cannot reference ".."
-#         """
-#         # Collapse down to a canonical path
-#         self.depPath = os.path.normpath(self.depPath)
-#         if any(component == ".." for component in self.depPath.split(os.sep)):
-#             raise ValidationError("depPath cannot reference ../")
-#
-#         # If the child CR is a meta-package (no filename), we cannot
-#         # have a depFileName as this makes no sense
-#         if self.requirement.coderesource.filename == "" and self.depFileName != "":
-#             raise ValidationError("Metapackage dependencies cannot have a depFileName")
-#
-#         # Check that user/group access is coherent.
-#         self.coderesourcerevision.validate_restrict_access([self.requirement])
-#
-#     def __str__(self):
-#         """Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
-#         return "{} {} requires {} {} as {}".format(
-#                 self.coderesourcerevision.coderesource,
-#                 self.coderesourcerevision,
-#                 self.requirement.coderesource,
-#                 self.requirement,
-#                 os.path.join(self.depPath, self.depFileName))
-
-
 @python_2_unicode_compatible
 class Method(transformation.models.Transformation):
     """
@@ -528,7 +357,7 @@ class Method(transformation.models.Transformation):
     revision_parent = models.ForeignKey("self", related_name="descendants", null=True, blank=True,
                                         on_delete=models.SET_NULL)
 
-    # moved this here from Transformation so that it can be put into the
+    # Moved this here from Transformation so that it can be put into the
     # unique_together statement below. Allowed to be blank because it's
     # automatically set on save.
     revision_number = models.PositiveIntegerField(
@@ -558,9 +387,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         default=1,
         validators=[MinValueValidator(1)]
     )
-
-    # Implicitly defined:
-    # - execrecords: from ExecRecord
 
     class Meta:
         unique_together = (("family", "revision_number"))
@@ -631,9 +457,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         - Method does not have a Metapackage as a driver.
         """
         super(Method, self).clean()
-        if not self.driver.content_file:
-            raise ValidationError('Method "{}" cannot have CodeResourceRevision "{}" as a driver, because it has no '
-                                  'content file.'.format(self, self.driver))
 
         for dep in self.dependencies.all():
             dep.clean()
