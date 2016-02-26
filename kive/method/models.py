@@ -128,8 +128,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
     # Implicitly defined
     #   descendents (self/ForeignKey)
-    #   dependencies (CodeResourceDependency/ForeignKey)
-    #   needed_by (CodeResourceDependency/ForeignKey)
+    #   used_by (MethodDependency/ForeignKey)
     #   methods (Method/ForeignKey)
 
     coderesource = models.ForeignKey(CodeResource, related_name="revisions")
@@ -219,71 +218,71 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
         super(CodeResourceRevision, self).save(*args, **kwargs)
 
-    # This CRR includes it's own filename at the root
-    def list_all_filepaths(self):
-        """Return all filepaths associated with this CodeResourceRevision.
-
-        Filepaths are listed recursively following a root-first scheme,
-        with the filepaths of the children listed in order.
-        """
-        return self.list_all_filepaths_h(self.coderesource.filename)
-
-    # Self is be a dependency CRR, base_name is it's file name, specified either
-    # by the parent dependency layer, or in the case of a top-level CR, just CRR.name
-    def list_all_filepaths_h(self, base_name):
-
-        # Filepath includes the original file which has dependencies.
-        # If just a library of dependencies (IE, base_name=""), don't
-        # add base_path.
-        all_filepaths = []
-        if base_name != "":
-            all_filepaths = [unicode(base_name)]
-
-        # For each dependency in this code resource revision
-        for dep in self.dependencies.all():
-
-            # Get all file paths of the CR of the child dependency
-            # relative to itself
-            dep_fn = dep.depFileName
-            # If depFileName is blank, check and see if the
-            # corresponding CodeResource had a filename (i.e. if this
-            # is a non-metapackage CRR and so there is an associated
-            # file).
-            if dep_fn == "":
-                dep_fn = dep.requirement.coderesource.filename
-
-            inner_dep_paths = dep.requirement.list_all_filepaths_h(dep_fn)
-
-            # Convert the paths from being relative to the child CRR to being
-            # relative to the current parent CRR by appending pathing
-            # information from the dependency layer
-            for paths in inner_dep_paths:
-                correctedPath = os.path.join(dep.depPath, paths)
-                all_filepaths.append(unicode(correctedPath))
-
-        return all_filepaths
-
-    def has_circular_dependence(self):
-        """Detect any circular dependences defined in this CodeResourceRevision."""
-        return self.has_circular_dependence_h([])
-
-    def has_circular_dependence_h(self, dependants):
-        """Helper for has_circular_dependence.
-
-        dependants is an accumulator that tracks all of the all of the
-        CRRs that have this one as a dependency.
-        """
-        # Base case: self is dependant on itself, in which case, return true.
-        if self in dependants:
-            return True
-
-        # Recursive case: go to all dependencies and check them.
-        check_dep = False
-        for dep in self.dependencies.all():
-            if dep.requirement.has_circular_dependence_h(dependants + [self]):
-                check_dep = True
-
-        return check_dep
+    # # This CRR includes it's own filename at the root
+    # def list_all_filepaths(self):
+    #     """Return all filepaths associated with this CodeResourceRevision.
+    #
+    #     Filepaths are listed recursively following a root-first scheme,
+    #     with the filepaths of the children listed in order.
+    #     """
+    #     return self.list_all_filepaths_h(self.coderesource.filename)
+    #
+    # # Self is be a dependency CRR, base_name is it's file name, specified either
+    # # by the parent dependency layer, or in the case of a top-level CR, just CRR.name
+    # def list_all_filepaths_h(self, base_name):
+    #
+    #     # Filepath includes the original file which has dependencies.
+    #     # If just a library of dependencies (IE, base_name=""), don't
+    #     # add base_path.
+    #     all_filepaths = []
+    #     if base_name != "":
+    #         all_filepaths = [unicode(base_name)]
+    #
+    #     # For each dependency in this code resource revision
+    #     for dep in self.dependencies.all():
+    #
+    #         # Get all file paths of the CR of the child dependency
+    #         # relative to itself
+    #         dep_fn = dep.depFileName
+    #         # If depFileName is blank, check and see if the
+    #         # corresponding CodeResource had a filename (i.e. if this
+    #         # is a non-metapackage CRR and so there is an associated
+    #         # file).
+    #         if dep_fn == "":
+    #             dep_fn = dep.requirement.coderesource.filename
+    #
+    #         inner_dep_paths = dep.requirement.list_all_filepaths_h(dep_fn)
+    #
+    #         # Convert the paths from being relative to the child CRR to being
+    #         # relative to the current parent CRR by appending pathing
+    #         # information from the dependency layer
+    #         for paths in inner_dep_paths:
+    #             correctedPath = os.path.join(dep.depPath, paths)
+    #             all_filepaths.append(unicode(correctedPath))
+    #
+    #     return all_filepaths
+    #
+    # def has_circular_dependence(self):
+    #     """Detect any circular dependences defined in this CodeResourceRevision."""
+    #     return self.has_circular_dependence_h([])
+    #
+    # def has_circular_dependence_h(self, dependants):
+    #     """Helper for has_circular_dependence.
+    #
+    #     dependants is an accumulator that tracks all of the all of the
+    #     CRRs that have this one as a dependency.
+    #     """
+    #     # Base case: self is dependant on itself, in which case, return true.
+    #     if self in dependants:
+    #         return True
+    #
+    #     # Recursive case: go to all dependencies and check them.
+    #     check_dep = False
+    #     for dep in self.dependencies.all():
+    #         if dep.requirement.has_circular_dependence_h(dependants + [self]):
+    #             check_dep = True
+    #
+    #     return check_dep
 
     def compute_md5(self):
         """Computes the MD5 checksum of the CodeResourceRevision."""
@@ -361,18 +360,6 @@ class CodeResourceRevision(metadata.models.AccessControl):
                     }
                 )
 
-        # Check for a circular dependency.
-        if self.has_circular_dependence():
-            raise ValidationError("Self-referential dependency")
-
-        for dep in self.dependencies.all():
-            dep.clean()
-
-        # Check if dependencies conflict with each other
-        listOfDependencyPaths = self.list_all_filepaths()
-        if len(set(listOfDependencyPaths)) != len(listOfDependencyPaths):
-            raise ValidationError("Conflicting dependencies")
-
         # If content file exists, it must have a file name
         if self.content_file and self.coderesource.filename == "":
             raise ValidationError("If content file exists, it must have a file name")
@@ -386,54 +373,54 @@ class CodeResourceRevision(metadata.models.AccessControl):
         if self.revision_parent is not None:
             self.validate_restrict_access([self.revision_parent])
 
-    def install(self, install_path):
-        """
-        Install this CRR into the specified path.
-
-        PRE: install_path exists and has all the sufficient permissions for us
-        to write our files into.
-        """
-        self.install_h(install_path, self.coderesource.filename)
-
-    def install_h(self, install_path, base_name):
-        """Helper for install."""
-        self.logger.debug("Writing code to {}".format(install_path))
-
-        # Install if not a metapackage.
-        if base_name != "":
-            dest_path = os.path.join(install_path, base_name)
-            with open(dest_path, "w") as f:
-                self.content_file.open()
-                with self.content_file:
-                    shutil.copyfileobj(self.content_file, f)
-            # Make sure this is written with read, write, and execute
-            # permission.
-            os.chmod(dest_path, stat.S_IRWXU)
-            # This will tailor the permissions further if we are running
-            # sandboxes with another user account via SSH.
-            file_access_utils.configure_sandbox_permissions(dest_path)
-
-        for dep in self.dependencies.all():
-            # Create any necessary sub-directory.  This should never
-            # fail because we're in a nice clean working directory and
-            # we already checked that this CRR doesn't have file
-            # conflicts.  (Thus if an exception is raised, we want to
-            # propagate it as that's a pretty deep problem.)
-            path_for_deps = os.path.normpath(os.path.join(install_path, dep.depPath))
-            # the directory may already exist due to another dependency --
-            # or if depPath is ".".
-            try:
-                os.makedirs(path_for_deps)
-            except os.error:
-                pass
-
-            # Get the base name of this dependency.  If no special value
-            # is specified in dep, then use the dependency's CRR name.
-            dep_fn = dep.depFileName
-            if dep_fn == "":
-                dep_fn = dep.requirement.coderesource.filename
-
-            dep.requirement.install_h(path_for_deps, dep_fn)
+    # def install(self, install_path):
+    #     """
+    #     Install this CRR into the specified path.
+    #
+    #     PRE: install_path exists and has all the sufficient permissions for us
+    #     to write our files into.
+    #     """
+    #     self.install_h(install_path, self.coderesource.filename)
+    #
+    # def install_h(self, install_path, base_name):
+    #     """Helper for install."""
+    #     self.logger.debug("Writing code to {}".format(install_path))
+    #
+    #     # Install if not a metapackage.
+    #     if base_name != "":
+    #         dest_path = os.path.join(install_path, base_name)
+    #         with open(dest_path, "w") as f:
+    #             self.content_file.open()
+    #             with self.content_file:
+    #                 shutil.copyfileobj(self.content_file, f)
+    #         # Make sure this is written with read, write, and execute
+    #         # permission.
+    #         os.chmod(dest_path, stat.S_IRWXU)
+    #         # This will tailor the permissions further if we are running
+    #         # sandboxes with another user account via SSH.
+    #         file_access_utils.configure_sandbox_permissions(dest_path)
+    #
+    #     for dep in self.dependencies.all():
+    #         # Create any necessary sub-directory.  This should never
+    #         # fail because we're in a nice clean working directory and
+    #         # we already checked that this CRR doesn't have file
+    #         # conflicts.  (Thus if an exception is raised, we want to
+    #         # propagate it as that's a pretty deep problem.)
+    #         path_for_deps = os.path.normpath(os.path.join(install_path, dep.depPath))
+    #         # the directory may already exist due to another dependency --
+    #         # or if depPath is ".".
+    #         try:
+    #             os.makedirs(path_for_deps)
+    #         except os.error:
+    #             pass
+    #
+    #         # Get the base name of this dependency.  If no special value
+    #         # is specified in dep, then use the dependency's CRR name.
+    #         dep_fn = dep.depFileName
+    #         if dep_fn == "":
+    #             dep_fn = dep.requirement.coderesource.filename
+    #
+    #         dep.requirement.install_h(path_for_deps, dep_fn)
 
     @transaction.atomic
     def remove(self):
@@ -445,13 +432,6 @@ class CodeResourceRevision(metadata.models.AccessControl):
         removal_plan = removal_accumulator or empty_removal_plan()
         assert self not in removal_plan["CodeResourceRevisions"]
         removal_plan["CodeResourceRevisions"].add(self)
-
-        for dependant in self.needed_by.all().select_related("coderesourcerevision"):
-            if dependant.coderesourcerevision not in removal_plan["CodeResourceRevisions"]:
-                update_removal_plan(
-                    removal_plan,
-                    dependant.coderesourcerevision.build_removal_plan(removal_plan)
-                )
 
         for dependant in self.used_by.all().select_related("method"):
             if dependant.method not in removal_plan["Methods"]:
@@ -654,6 +634,9 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         if not self.driver.content_file:
             raise ValidationError('Method "{}" cannot have CodeResourceRevision "{}" as a driver, because it has no '
                                   'content file.'.format(self, self.driver))
+
+        for dep in self.dependencies.all():
+            dep.clean()
 
         # Check if dependencies conflict with each other.
         dependency_paths = self.list_all_filepaths()
