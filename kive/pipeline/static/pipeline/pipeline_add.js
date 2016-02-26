@@ -500,14 +500,17 @@ $(function() {
                     var $method_family = $('#id_select_method_family', menu);
                     $method_family.val(sel.family);
                     var request = updateMethodRevisionsMenu.call($method_family[0]); // trigger ajax
-                    if (sel.new_code_resource_revision || sel.new_dependencies) {
+                    if (sel.new_code_resource_revision || (sel.new_dependencies && sel.new_dependencies.length > 0)) {
                         request.done(function() {
                             var name = "[";
                             if (sel.new_code_resource_revision) {
                                 name += "driver updated (" + sel.new_code_resource_revision.revision_name + ")";
+                                if (sel.new_dependencies && sel.new_dependencies.length > 0) {
+                                    name += "; ";
+                                }
                             }
-                            if (sel.new_dependencies) {
-                                name += "; dependencies updated (";
+                            if (sel.new_dependencies && sel.new_dependencies.length > 0) {
+                                name += "dependencies updated (";
                                 for (var i = 0; i < sel.new_dependencies.length; i++) {
                                     if (i > 0) {
                                         name += ", ";

@@ -462,7 +462,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         # Check if dependencies conflict with each other.
         dependency_paths = self.list_all_filepaths()
         if len(set(dependency_paths)) != len(dependency_paths):
-            raise ValidationError("Conflicting dependencies")
+            raise ValidationError("Conflicting dependencies (full list: {})".format(dependency_paths))
 
         # Check that permissions are coherent.
         self.validate_restrict_access([self.family])
@@ -541,8 +541,10 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         """
         Return all file paths associated with this Method, with the driver coming first.
         """
-        file_paths = [self.driver.coderesource.filename]
-        file_paths.extend([os.path.join(dep.path, dep.filename) for dep in self.dependencies.all()])
+        file_paths = [os.path.normpath(self.driver.coderesource.filename)]
+        file_paths.extend(
+            [os.path.normpath(os.path.join(dep.path, dep.get_filename())) for dep in self.dependencies.all()]
+        )
         return file_paths
 
     def install(self, install_path):
@@ -855,14 +857,16 @@ class MethodDependency(models.Model):
 
     def __str__(self):
         """Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
-        dep_filename = self.filename or self.requirement.coderesource.filename
         return "{} {} requires {} {} as {}".format(
             self.method.family,
             self.method,
             self.requirement.coderesource,
             self.requirement,
-            os.path.join(self.path, dep_filename)
+            os.path.join(self.path, self.get_filename())
         )
+
+    def get_filename(self):
+        return self.filename or self.requirement.coderesource.filename
 
 
 @python_2_unicode_compatible
