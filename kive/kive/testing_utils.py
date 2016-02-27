@@ -54,8 +54,7 @@ def fd_count(msg):
 
 def create_metadata_test_environment(case):
     """Setup default database state from which to perform unit testing."""
-    # Define a user.  This was previously in librarian/tests_queuedrunGETRIDOFTHIS,
-    # but we put it here now so all tests can use it.
+    # Define a user.
     case.myUser = User.objects.create_user('john',
                                            'lennon@thebeatles.com',
                                            'johnpassword')
@@ -934,8 +933,6 @@ cat "$1" > "$2"
         remover,
         grant_everyone_access=False
     )
-    # Use the defaults for path and filename.
-    pass_through.dependencies.create(requirement=noop)
 
     # A toy Datatype.
     nucleotide_seq = new_datatype("Nucleotide sequence", "Sequences of A, C, G, and T",

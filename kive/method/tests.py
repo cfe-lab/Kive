@@ -15,10 +15,9 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
-from django.core.management import call_command
 from django.core.urlresolvers import resolve
 
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase
 from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.test import force_authenticate
@@ -1107,53 +1106,57 @@ class CodeResourceRevisionTests(MethodTestCase):
         self.assertEqual(update, self.compv2_crRev)
 
 
-class CodeResourceDependencyTests(MethodTestCase):
+# FIXME gotta fix this after we address the problem with tests not running.
+class MethodDependencyTests(MethodTestCase):
+
+    def setUp(self):
+        super(MethodDependencyTests, self).setUp()
+
+        # self.DNAcompv1_m is defined in the setup, based on v1 of self.comp_cr:
+        # family name: "DNAcomplement"
+        # revision_name: "v1"
+        # revision_desc: "First version"
+        # driver: v1 of self.comp_cr
+        # v2 is a revision of comp_cr such that revision_name = v2.
+        self.v2 = self.comp_cr.revisions.get(revision_name="v2")
 
     def test_unicode(self):
         """
-        Unicode of CodeResourceDependency should return:
-        <self.crRev> requires <referenced crRev> as <filePath>
+        Unicode of MethodDependency should return:
+        <self.method> requires <referenced CRR> as <filePath>
         """
-
-        # v1 is a revision of comp_cr such that revision_name = v1
-        v1 = self.comp_cr.revisions.get(revision_name="v1")
-        v2 = self.comp_cr.revisions.get(revision_name="v2")
-
-        # Define a fake dependency where v1 requires v2 in subdir/foo.py
-        test_crd = CodeResourceDependency(coderesourcerevision=v1,
-                                          requirement=v2,
-                                          depPath="subdir",
-                                          depFileName="foo.py")
+        # Define a fake dependency where the method requires v2 in subdir/foo.py
+        test_dep = MethodDependency(method=self.DNAcompv1_m,
+                                    requirement=self.v2,
+                                    path="subdir",
+                                    filename="foo.py")
 
         # Display unicode for this dependency under valid conditions
         self.assertEquals(
-            unicode(test_crd),
-            "complement complement:1 (v1) requires complement complement:2 (v2) as subdir/foo.py")
+            unicode(test_dep),
+            "DNAcomplement DNAcomplement:1 (v1) requires complement complement:2 (v2) as subdir/foo.py")
 
     def test_invalid_dotdot_path_clean(self):
         """
         Dependency tries to go into a path outside its sandbox.
         """
-        v1 = self.comp_cr.revisions.get(revision_name="v1")
-        v2 = self.comp_cr.revisions.get(revision_name="v2")
-
-        bad_crd = CodeResourceDependency(coderesourcerevision=v1,
-                                         requirement=v2,
-                                         depPath="..",
-                                         depFileName="foo.py")
+        bad_dep = MethodDependency(method=self.DNAcompv1_m,
+                                   requirement=self.v2,
+                                   path="..",
+                                   filename="foo.py")
         self.assertRaisesRegexp(
             ValidationError,
-            "depPath cannot reference \.\./",
-            bad_crd.clean)
+            "path cannot reference \.\./",
+            bad_dep.clean)
 
-        bad_crd_2 = CodeResourceDependency(coderesourcerevision=v1,
-                                           requirement=v2,
-                                           depPath="../test",
-                                           depFileName="foo.py")
+        bad_dep_2 = MethodDependency(method=self.DNAcompv1_m,
+                                     requirement=self.v2,
+                                     path="../test",
+                                     filename="foo.py")
         self.assertRaisesRegexp(
             ValidationError,
-            "depPath cannot reference \.\./",
-            bad_crd_2.clean)
+            "path cannot reference \.\./",
+            bad_dep_2.clean)
         
     def test_valid_path_with_dotdot_clean(self):
         """
