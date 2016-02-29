@@ -20,6 +20,7 @@ class Dataset(object):
                 self.cdt = CompoundDatatype(obj['compounddatatype']) if 'compounddatatype' in obj else None
                 self.groups_allowed = obj.get('groups_allowed')
                 self.users_allowed = obj.get('users_allowed')
+                self.raw = obj
 
         except (ValueError, IndexError, KeyError):
             raise KiveMalformedDataException(

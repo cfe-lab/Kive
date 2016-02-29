@@ -16,8 +16,8 @@ fastq1 = kive.get_dataset(2)
 fastq2 = kive.get_dataset(3)
 
 # or get the data by name
-fastq1 = kive.find_datasets(dataset_name='1234A_R1.fastq')[0]
-fastq2 = kive.find_datasets(dataset_name='1234A_R2.fastq')[0]
+fastq1 = kive.find_datasets(name='1234A_R1.fastq')[0]
+fastq2 = kive.find_datasets(name='1234A_R2.fastq')[0]
 
 # Pipeline
 pipeline = kive.get_pipeline(13)

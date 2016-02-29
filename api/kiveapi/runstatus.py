@@ -16,9 +16,11 @@ class RunStatus(object):
 
     def __init__(self, obj, api):
         self.run_id = obj['id']
+        self.pipeline_id = obj['pipeline']
         self.url = obj['run_status']
         self.results_url = obj['run_outputs']
         self.api = api
+        self.raw = obj
 
     def _grab_stats(self):
         data = self.api.get(self.url).json()
