@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from django.db import models, migrations, transaction
+from django.db import models, migrations, transaction, DEFAULT_DB_ALIAS, connections
+from django.core.management.color import no_style
 from django.core.management import call_command
 from django.contrib.auth.management import create_permissions
 from django.apps import apps as django_apps
@@ -55,6 +56,8 @@ def load_initial_data(apps, schema_editor):
 
     Datatype = apps.get_model("metadata", "Datatype")
     CompoundDatatype = apps.get_model("metadata", "CompoundDatatype")
+    BasicConstraint = apps.get_model("metadata", "BasicConstraint")
+    CompoundDatatypeMember = apps.get_model("metadata", "CompoundDatatypeMember")
 
     # Note: even though Datatype typically has auto_now_add=True set, here we
     # need to specify it.  This is good, as we would rather not have the date
@@ -176,6 +179,16 @@ def load_initial_data(apps, schema_editor):
     fasta_cdt.members.create(pk=5, datatype=STR_DT, column_name="FASTA header", blankable=True, column_idx=1)
     fasta_cdt.members.create(pk=6, datatype=MolSeq_DT, column_name="FASTA sequence", blankable=True, column_idx=2)
     fasta_cdt.groups_allowed.add(everyone_group)
+
+    conn = connections[DEFAULT_DB_ALIAS]
+    if conn.features.supports_sequence_reset:
+        sql_list = conn.ops.sequence_reset_sql(
+            no_style(), [Datatype, BasicConstraint, CompoundDatatype, CompoundDatatypeMember])
+        if sql_list:
+            with transaction.atomic(using=DEFAULT_DB_ALIAS):
+                cursor = conn.cursor()
+                for sql in sql_list:
+                    cursor.execute(sql)
 
 
 @transaction.atomic
