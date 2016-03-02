@@ -611,20 +611,21 @@ class Manager(object):
         """
         Stop the specified run.
         """
+        mgr_logger.debug("Stopping run (pk=%d) on behalf of user %s",
+                         run.pk,
+                         run.stopped_by)
+
         if run.is_complete(use_cache=True):
             # This run already completed, so we ignore this call.
-            mgr_logger.warn("Run (pk=%d) is already complete", run.pk)
+            mgr_logger.warn("Run (pk=%d) is already complete; ignoring stop request.", run.pk)
             return
         elif run not in self.active_sandboxes:
-            # This hasn't started yet, so we can just skip this one.
+            # This hasn't started yet, or is a remnant from a fleet crash/shutdown,
+            # so we can just skip this one.
             mgr_logger.warn("Run (pk=%d) is not active.  Cancelling steps/cables that were unfinished.",
                             run.pk)
             run.cancel_unfinished()
         else:
-            mgr_logger.debug("Stopping run (pk=%d) on behalf of user %s",
-                             run.pk,
-                             run.stopped_by)
-
             sandbox_to_end = self.active_sandboxes[run]
 
             # Send a message to the foreman in charge of running this task.
