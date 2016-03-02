@@ -741,7 +741,35 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                 outcable.mark_complete(save=True)
 
         if save:
-            self.save()
+            self.save(update_fields=["_complete"])
+
+    def cancel_unstarted(self):
+        for step in self.runsteps.all():
+            for rsic in step.RSICs.filter(start_time__isnull=True):
+                rsic.mark_cancelled()
+
+            if step.has_subrun():
+                step.child_run.cancel_unstarted()
+
+            if not step.has_started():
+                step.mark_cancelled()
+
+        for outcable in self.runoutputcables.filter(start_time__isnull=True):
+            outcable.mark_cancelled()
+
+    def cancel_unfinished(self):
+        for step in self.runsteps.all():
+            for rsic in step.RSICs.filter(start_time__isnull=False, end_time__isnull=True):
+                rsic.mark_cancelled()
+
+            if step.has_subrun():
+                step.child_run.cancel_unfinished()
+
+            if step.has_started() and not step.has_ended():
+                step.mark_cancelled()
+
+        for outcable in self.runoutputcables.filter(start_time__isnull=False, end_time__isnull=True):
+            outcable.mark_cancelled()
 
 
 class RunInput(models.Model):
@@ -1203,7 +1231,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         self.save(update_fields=["_successful"])
 
         if self.is_incable:
-            self.definite.runstep.mark_unsuccessful()
+            self.definite.dest_runstep.mark_unsuccessful()
         else:
             self.definite.run.mark_unsuccessful()
 
@@ -1280,6 +1308,17 @@ class RunComponent(stopwatch.models.Stopwatch):
         if self.execrecord is not None:
             return self.execrecord.generator
         return None
+
+    def mark_cancelled(self):
+        """
+        Cancel this RunComponent, stopping it and marking it as complete.
+        """
+        self.is_cancelled = True
+        if self.has_started():
+            self.stop(save=False)
+        self.mark_complete(save=False)
+        self.mark_unsuccessful()
+        self.save()
 
 
 @python_2_unicode_compatible
@@ -1713,6 +1752,10 @@ class RunStep(RunComponent):
 
         if use_cache and self._complete is not None:
             return self._complete
+
+        # Has this been cancelled before even being attempted?
+        if self.is_cancelled:
+            return True
 
         # Sub-Pipeline case:
         if self.pipelinestep.transformation.is_pipeline:

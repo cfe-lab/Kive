@@ -287,7 +287,7 @@ class Manager(object):
             # just report it and discard it.
             mgr_logger.info('Run "%s" (pk=%d) (Pipeline: %s, User: %s) failed on reuse',
                             run_to_start, run_to_start.pk, run_to_start.pipeline, run_to_start.user)
-            run_to_start.mark_complete()
+            run_to_start.mark_complete(save=True)
             finished_already = True
 
         else:
@@ -313,25 +313,14 @@ class Manager(object):
             if task_sdbx != sandbox:
                 new_task_queue.append((task_sdbx, task))
             else:
-                task.is_cancelled = True
-                task.save()
                 if isinstance(task, archive.models.RunStep):
-                    for rsic in task.RSICs.all():
-                        if not rsic.is_complete(use_cache=True):
-                            rsic.is_cancelled = True
-                            rsic.save()
+                    for rsic in task.RSICs.filter(_complete=False):
+                        rsic.mark_cancelled()  # this saves rsic
+
+                task.mark_cancelled()  # this saves task
 
         # Cancel all components in the run that haven't started yet.
-        for runstep in sandbox.run.runsteps.filter(start_time__isnull=True):
-            runstep.is_cancelled = True
-            runstep.save()
-            for rsic in runstep.RSICs.all():
-                rsic.is_cancelled = True
-                rsic.save()
-
-        for roc in sandbox.run.runoutputcables.filter(start_time__isnull=True):
-            roc.is_cancelled = True
-            roc.save()
+        sandbox.run.cancel_unstarted()
 
         self.task_queue = new_task_queue
 
@@ -489,7 +478,7 @@ class Manager(object):
                 self.history_queue.append(finished_sandbox)
 
             curr_sdbx.run.mark_complete(mark_all_components=not curr_sdbx.run.is_successful(use_cache=True))
-            curr_sdbx.run.stop(save=True)
+            curr_sdbx.run.stop(save=True)  # this saves curr_sdbx.run
             curr_sdbx.run.complete_clean(use_cache=True)
 
             if curr_sdbx.run.is_successful(use_cache=True):
@@ -633,10 +622,15 @@ class Manager(object):
         """
         Stop the specified run.
         """
-        if run not in self.active_sandboxes:
+        if run.is_complete(use_cache=True):
+            # This run already completed, so we ignore this call.
+            mgr_logger.warn("Run (pk=%d) is already complete", run.pk)
+            return
+        elif run not in self.active_sandboxes:
             # This hasn't started yet, so we can just skip this one.
-            mgr_logger.warn("Run (pk=%d) is not active so just marking stopped",
+            mgr_logger.warn("Run (pk=%d) is not active.  Cancelling steps/cables that were unfinished.",
                             run.pk)
+            run.cancel_unfinished()
         else:
             mgr_logger.debug("Stopping run (pk=%d) on behalf of user %s",
                              run.pk,
@@ -660,6 +654,9 @@ class Manager(object):
 
             # Cancel all tasks on the task queue pertaining to this run.
             self.mop_up_terminated_sandbox(sandbox_to_end)
+
+        run.cancel_unstarted()
+        run.mark_complete(save=True, mark_all_components=True)
         run.stop(save=True)
 
         mgr_logger.debug("Run (pk={}) stopped by user {}".format(run.pk, run.stopped_by))
@@ -882,6 +879,12 @@ class Worker(object):
 
         if tag == self.SHUTDOWN:
             worker_logger.info("Worker {} shutting down.".format(self.rank))
+            return tag
+
+        elif tag == self.STOP:
+            # This was sent as an attempt to stop the last thing this Worker was
+            # doing, but was missed.
+            worker_logger.info("Worker {} received a stop message too late; ignoring.".format(self.rank))
             return tag
 
         try:
