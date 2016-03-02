@@ -12,7 +12,6 @@ import itertools
 import os
 import glob
 import shutil
-import threading
 import Queue
 import socket
 
@@ -65,10 +64,8 @@ class MPIFleetInterface(object):
         return MPI.Get_processor_name()
 
 
-class ThreadFleetInterface(object):
-    """
-    Base class for both ThreadManagerInterface and ThreadWorkerInterface.
-    """
+class SingleThreadedFleetInterface(object):
+    """ Base class for both single-threaded manager and worker. """
     def get_rank(self):
         raise NotImplementedError()
 
@@ -139,30 +136,21 @@ class MPIManagerInterface(MPIFleetInterface):
         self.comm.Disconnect()
 
 
-class ThreadManagerInterface(ThreadFleetInterface):
+class SingleThreadedManagerInterface(SingleThreadedFleetInterface):
     def __init__(self, worker_count):
         # Elements of this queue will be 2-tuples (foreman rank, result PK).
         self.finished_queues = [Queue.Queue() for _ in range(worker_count)]
 
         self.worker_count = worker_count
-        self.worker_threads = []
+        self.workers = []
         self.worker_interfaces = [None] * worker_count
 
-        tmi = self
-
-        class WorkerThreadStarter:
-            def __init__(self, rank):
-                worker_interface = ThreadWorkerInterface(rank=rank, manager_interface=tmi)
-                self.worker = Worker(interface=worker_interface)
-
-            def __call__(self, *args, **kwargs):
-                self.worker.main_procedure()
-
-        for idx in range(worker_count):
-            # Each thread will create a worker that adds itself to self.worker_interfaces.
-            worker_thread = threading.Thread(target=WorkerThreadStarter(idx))
-            worker_thread.start()
-            self.worker_threads.append(worker_thread)
+        for rank in range(worker_count):
+            # Each worker interface will add itself to self.worker_interfaces.
+            worker_interface = SingleThreadedWorkerInterface(
+                rank=rank,
+                manager_interface=self)
+            self.workers.append(Worker(interface=worker_interface))
 
     def send_task_to_worker(self, task_info, worker_rank):
         self.worker_interfaces[worker_rank-1].job_queue.put(
@@ -171,6 +159,10 @@ class ThreadManagerInterface(ThreadFleetInterface):
         )
 
     def probe_for_finished_worker(self):
+        for rank in range(self.worker_count):
+            worker_interface = self.worker_interfaces[rank]
+            if not worker_interface.job_queue.empty():
+                self.workers[rank].receive_and_perform_task()
         for worker_queue in self.finished_queues:
             if not worker_queue.empty():
                 return True
@@ -201,10 +193,7 @@ class ThreadManagerInterface(ThreadFleetInterface):
         self.finished_queues[foreman.rank-1].get(block=True)
 
     def shut_down_fleet(self):
-        for worker_interface in self.worker_interfaces:
-            worker_interface.job_queue.put(("SHUTDOWN", Worker.SHUTDOWN))
-        for thread in self.worker_threads:
-            thread.join()
+        pass
 
 
 class Manager(object):
@@ -721,8 +710,15 @@ class Manager(object):
                     mgr_logger.warning(e)
 
     @classmethod
-    def execute_pipeline(cls, user, pipeline, inputs, users_allowed=None, groups_allowed=None,
-                         name=None, description=None, threaded=True):
+    def execute_pipeline(cls,
+                         user,
+                         pipeline,
+                         inputs,
+                         users_allowed=None,
+                         groups_allowed=None,
+                         name=None,
+                         description=None,
+                         single_threaded=True):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
@@ -747,10 +743,10 @@ class Manager(object):
 
         # The run is already in the queue, so we can just start the fleet and let it exit
         # when it finishes.
-        if not threaded:
+        if not single_threaded:
             interface = MPIManagerInterface(worker_count=1, manage_script=sys.argv[0])
         else:
-            interface = ThreadManagerInterface(worker_count=1)
+            interface = SingleThreadedManagerInterface(worker_count=1)
         manager = cls(interface=interface, quit_idle=True, history=1)
         manager.main_procedure()
         return manager
@@ -803,13 +799,13 @@ class MPIWorkerInterface(MPIFleetInterface):
         self.comm.Disconnect()
 
 
-class ThreadWorkerInterface(ThreadFleetInterface):
+class SingleThreadedWorkerInterface(SingleThreadedFleetInterface):
     """
     Analogue of MPIWorkerInterface where threads are used instead of MPI.
     """
     def __init__(self, rank, manager_interface):
         self.rank = rank
-        assert isinstance(manager_interface, ThreadManagerInterface)
+        assert isinstance(manager_interface, SingleThreadedManagerInterface)
         self.manager_interface = manager_interface
         self.manager_interface.worker_interfaces[rank-1] = self
         self.job_queue = Queue.Queue()

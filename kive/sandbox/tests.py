@@ -23,10 +23,6 @@ from fleet.workers import Manager
 import file_access_utils
 
 
-from django.db import connection
-from django.conf import settings
-
-
 def execute_tests_environment_setup(case):
     # Users + method/pipeline families
     case.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
