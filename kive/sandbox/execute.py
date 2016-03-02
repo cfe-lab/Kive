@@ -1747,6 +1747,11 @@ class Sandbox:
                 logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.", worker_rank, wait_time)
                 time.sleep(wait_time)
 
+        if bad_output_found:
+            curr_RS.mark_unsuccessful()
+            if recover:
+                recovering_record.mark_unsuccessful()
+
         # Check outputs.
         for i, curr_output in enumerate(pipelinestep.outputs):
             output_path = output_paths[i]

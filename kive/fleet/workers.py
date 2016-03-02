@@ -315,6 +315,23 @@ class Manager(object):
             else:
                 task.is_cancelled = True
                 task.save()
+                if isinstance(task, archive.models.RunStep):
+                    for rsic in task.RSICs.all():
+                        if not rsic.is_complete(use_cache=True):
+                            rsic.is_cancelled = True
+                            rsic.save()
+
+        # Cancel all components in the run that haven't started yet.
+        for runstep in sandbox.run.runsteps.filter(start_time__isnull=True):
+            runstep.is_cancelled = True
+            runstep.save()
+            for rsic in runstep.RSICs.all():
+                rsic.is_cancelled = True
+                rsic.save()
+
+        for roc in sandbox.run.runoutputcables.filter(start_time__isnull=True):
+            roc.is_cancelled = True
+            roc.save()
 
         self.task_queue = new_task_queue
 
