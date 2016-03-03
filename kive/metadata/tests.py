@@ -2511,10 +2511,10 @@ class CompoundDatatypeApiTests(TestCase):
 
         # There are four CDTs loaded into the Database by default, and they're
         # sorted alphabetically.  See the migration where they're defined for
-        # details.
+        # details. SQLite sorts case-sensitive and PostgreSQL doesn't.
         self.assertEquals(len(response.data), 4)
-        self.assertEquals(response.data[0]['id'], 4)
-        self.assertEquals(response.data[2]['representation'],
+        cdt2 = next(cdt for cdt in response.data if cdt['id'] == 2)
+        self.assertEquals(cdt2['representation'],
                           '(failed_row: natural number)')
 
     def test_detail(self):
