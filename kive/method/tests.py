@@ -16,6 +16,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.core.urlresolvers import resolve
+from django.db import transaction
 
 from django.test import TestCase
 from rest_framework import status
@@ -24,7 +25,7 @@ from rest_framework.test import force_authenticate
 
 from constants import datatypes
 import file_access_utils
-from kive.tests import BaseTestCases, KiveTransactionTestCase
+from kive.tests import BaseTestCases
 import librarian.models
 from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
 import metadata.tests
@@ -42,7 +43,7 @@ from portal.utils import update_all_contenttypes
 samplecode_path = metadata.tests.samplecode_path
 
 
-class FileAccessTests(KiveTransactionTestCase):
+class FileAccessTests(TestCase):
     serialized_rollback = True
 
     def setUp(self):
@@ -81,7 +82,8 @@ class FileAccessTests(KiveTransactionTestCase):
                 content_file=File(f),
                 user=self.user_randy)
 
-        self.assertRaises(ValueError, test_crr.save)
+        with transaction.atomic():
+            self.assertRaises(ValueError, test_crr.save)
 
     def test_access_close_save(self):
         with open(os.path.join(samplecode_path, self.fn), "rb") as f:
@@ -96,7 +98,8 @@ class FileAccessTests(KiveTransactionTestCase):
             test_crr.content_file.read()
             tools.fd_count("access-!>close->save")
         tools.fd_count("access->close-!>save")
-        self.assertRaises(ValueError, test_crr.save)
+        with transaction.atomic():
+            self.assertRaises(ValueError, test_crr.save)
         tools.fd_count("access->close->save!")
 
     def test_close_access_save(self):
@@ -108,8 +111,9 @@ class FileAccessTests(KiveTransactionTestCase):
                 content_file=File(f),
                 user=self.user_randy)
 
-        self.assertRaises(ValueError, test_crr.content_file.read)
-        self.assertRaises(ValueError, test_crr.save)
+        with transaction.atomic():
+            self.assertRaises(ValueError, test_crr.content_file.read)
+            self.assertRaises(ValueError, test_crr.save)
 
     def test_save_close_access(self):
         with open(os.path.join(samplecode_path, self.fn), "rb") as f:
@@ -2213,7 +2217,7 @@ class MethodFamilyTests(MethodTestCase):
         self.assertEqual(unicode(self.DNAcomp_mf), "DNAcomplement")
 
 
-class NonReusableMethodTests(KiveTransactionTestCase):
+class NonReusableMethodTests(TestCase):
     def setUp(self):
         # An unpredictable, non-reusable user.
         self.user_rob = User.objects.create_user('rob', 'rford@toronto.ca', 'football')

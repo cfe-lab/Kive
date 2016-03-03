@@ -12,7 +12,7 @@ from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.core.files.base import ContentFile
 from django.utils import timezone
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase
 from django.core.urlresolvers import reverse, resolve
 from rest_framework import status
 from rest_framework.test import force_authenticate
@@ -23,7 +23,7 @@ from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, Dataset, DatasetStructure
 
-from kive.tests import BaseTestCases, KiveTransactionTestCase, install_fixture_files, restore_production_files
+from kive.tests import BaseTestCases, install_fixture_files, restore_production_files
 from method.models import Method, MethodFamily, CodeResource
 from pipeline.models import Pipeline, PipelineStep, PipelineFamily
 
@@ -462,17 +462,6 @@ class ArchiveTestCaseHelpers:
 
 
 class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
-    fixtures = ["archive_test_environment"]
-
-    def setUp(self):
-        install_fixture_files("archive_test_environment")
-        tools.load_archive_test_environment(self)
-
-    def tearDown(self):
-        restore_production_files()
-
-
-class ArchiveTransactionTestCase(TransactionTestCase, ArchiveTestCaseHelpers):
     fixtures = ["archive_test_environment"]
 
     def setUp(self):
@@ -3190,7 +3179,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         self.assertTrue(self.pE_run.is_successful())
 
 
-class IsCompleteSuccessfulExecutionActualExecutionTests(KiveTransactionTestCase):
+class IsCompleteSuccessfulExecutionActualExecutionTests(TestCase):
     fixtures = ["archive_no_runs_test_environment"]
 
     def setUp(self):
@@ -3321,8 +3310,10 @@ year,month,day,hour,minute,second,microsecond
         # Set up a words dataset.
         tools.make_words_dataset(self)
 
-        run1 = Manager.execute_pipeline(self.user_bob, p_one, [self.dataset_words],
-                                        groups_allowed=[everyone_group()]).get_last_run()
+        Manager.execute_pipeline(self.user_bob,
+                                 p_one,
+                                 [self.dataset_words],
+                                 groups_allowed=[everyone_group()])
 
         # Oops!  Between runs, self.method_noop gets screwed with.
         with tempfile.TemporaryFile() as f:
@@ -3554,7 +3545,7 @@ class TopLevelRunOnDeepNestedRunTests(TestCase):
                 self.assertEquals(self.deep_nested_run, roc.top_level_run)
 
 
-class RunStepReuseFailedExecRecordTests(KiveTransactionTestCase):
+class RunStepReuseFailedExecRecordTests(TestCase):
     def setUp(self):
         tools.create_grandpa_sandbox_environment(self)
         tools.make_words_dataset(self)

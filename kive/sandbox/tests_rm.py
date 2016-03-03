@@ -1,4 +1,4 @@
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.conf import settings
@@ -11,7 +11,7 @@ import os.path
 from librarian.models import Dataset
 import kive.testing_utils as tools
 from pipeline.models import Pipeline, PipelineFamily
-from kive.tests import install_fixture_files, restore_production_files, KiveTransactionTestCase
+from kive.tests import install_fixture_files, restore_production_files
 from method.models import Method
 from fleet.workers import Manager
 from archive.models import Run
@@ -19,14 +19,6 @@ import file_access_utils
 
 
 class SandboxRMTestCase(TestCase):
-    def setUp(self):
-        tools.create_sandbox_testing_tools_environment(self)
-
-    def tearDown(self):
-        tools.destroy_sandbox_testing_tools_environment(self)
-
-
-class SandboxRMTransactionTestCase(KiveTransactionTestCase):
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
 
@@ -289,7 +281,7 @@ class ExecuteResultTestsRM(TestCase):
         self.assertEqual(outcable_input_dataset.num_rows(), outcable_output_dataset.num_rows())
 
 
-class ExecuteDiscardedIntermediateTests(KiveTransactionTestCase):
+class ExecuteDiscardedIntermediateTests(TestCase):
     fixtures = ["execute_discarded_intermediate_tests_rm"]
 
     def setUp(self):
@@ -341,7 +333,7 @@ class ExecuteDiscardedIntermediateTests(KiveTransactionTestCase):
         self.assertTrue(run.is_successful(use_cache=True))
 
 
-class BadRunTests(KiveTransactionTestCase):
+class BadRunTests(TestCase):
     """
     Tests for when things go wrong during Pipeline execution.
     """
@@ -357,7 +349,6 @@ class BadRunTests(KiveTransactionTestCase):
             self.assertTrue(rsic._successful is not None)
             self.assertTrue(rsic.is_complete(use_cache=True))
             self.assertTrue(rsic.is_successful(use_cache=True))
-
 
     @unittest.skipIf(
         settings.KIVE_SANDBOX_WORKER_ACCOUNT,
@@ -425,7 +416,7 @@ class BadRunTests(KiveTransactionTestCase):
         self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().dataset])
 
 
-class FindDatasetTests(KiveTransactionTestCase):
+class FindDatasetTests(TestCase):
     """
     Tests for first_generator_of_dataset.
     """
@@ -531,7 +522,7 @@ class FindDatasetTests(KiveTransactionTestCase):
         self.assertEqual(gen_2, cable.PSIC)
 
 
-class RawTests(SandboxRMTransactionTestCase):
+class RawTests(SandboxRMTestCase):
 
     def setUp(self):
         super(RawTests, self).setUp()

@@ -12,7 +12,7 @@ from archive.models import Run
 from constants import datatypes
 from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
 from kive.testing_utils import clean_up_all_files
-from kive.tests import install_fixture_files, restore_production_files, KiveTransactionTestCase
+from kive.tests import install_fixture_files, restore_production_files
 from librarian.models import Dataset, DatasetStructure
 from metadata.models import Datatype, CompoundDatatype, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
@@ -174,19 +174,7 @@ class ExecuteTestsBase(TestCase):
         restore_production_files()
 
 
-class ExecuteTransactionTestsBase(KiveTransactionTestCase):
-    fixtures = ['execute_tests']
-
-    def setUp(self):
-        install_fixture_files("execute_tests")
-        execute_tests_environment_load(self)
-
-    def tearDown(self):
-        clean_up_all_files()
-        restore_production_files()
-
-
-class ExecuteTests(ExecuteTransactionTestsBase):
+class ExecuteTests(ExecuteTestsBase):
 
     def find_raw_pipeline(self, user):
         """Find a Pipeline with a raw input."""

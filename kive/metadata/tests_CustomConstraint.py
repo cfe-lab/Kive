@@ -15,7 +15,6 @@ from method.models import MethodFamily, CodeResource
 from librarian.models import Dataset
 from datachecking.models import ContentCheckLog
 from fleet.workers import Manager
-from kive.tests import KiveTransactionTestCase
 
 import kive.testing_utils as tools
 import file_access_utils
@@ -480,7 +479,7 @@ class CustomConstraintTests(CustomConstraintTestPreamble, TestCase):
                                 dt.clean)
 
 
-class CustomConstraintTestsWithExecution(CustomConstraintTestPreamble, KiveTransactionTestCase):
+class CustomConstraintTestsWithExecution(CustomConstraintTestPreamble, TestCase):
     def test_execute_pipeline_content_check_good(self):
         """
         Test the integrity of the ContentCheck created while running a

@@ -5,7 +5,7 @@ import os
 import re
 
 from django.core.exceptions import ValidationError
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase
 from django.core.urlresolvers import reverse, resolve
 from django.contrib.auth.models import User, Group
 
@@ -22,19 +22,6 @@ samplecode_path = "../samplecode"
 
 
 class MetadataTestCase(TestCase):
-    """
-    Set up a database state for unit testing.
-
-    Other test classes that require this state can extend this one.
-    """
-    def setUp(self):
-        tools.create_metadata_test_environment(self)
-
-    def tearDown(self):
-        tools.clean_up_all_files()
-
-
-class MetadataTransactionTestCase(TransactionTestCase):
     """
     Set up a database state for unit testing.
 
