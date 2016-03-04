@@ -615,6 +615,9 @@ class Manager(object):
                          run.pk,
                          run.stopped_by)
 
+        if not run.has_started():
+            run.start(save=False)
+
         if run.is_complete(use_cache=True):
             # This run already completed, so we ignore this call.
             mgr_logger.warn("Run (pk=%d) is already complete; ignoring stop request.", run.pk)
