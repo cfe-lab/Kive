@@ -1274,10 +1274,10 @@ class RunComponent(stopwatch.models.Stopwatch):
             if not invoked_log.is_successful():
                 return False
             icls = invoked_log.integrity_checks.all()
-            if any([x.is_fail() for x in icls]):
+            if any(x.is_fail() for x in icls):
                 return False
             ccls = invoked_log.content_checks.all()
-            if any([x.is_fail() for x in ccls]):
+            if any(x.is_fail() for x in ccls):
                 return False
         return True
 
@@ -1816,9 +1816,8 @@ class RunStep(RunComponent):
         PRE: this RunStep is not reused.
         """
         input_cables = self.RSICs.all()
-        if input_cables.exists():
-            if any(not ic.is_successful() for ic in input_cables):
-                return False
+        if any(not ic.is_successful() for ic in input_cables):
+            return False
 
         # At this point we know that all the cables were successful;
         # we check for failure during recovery or during its own
@@ -1864,8 +1863,9 @@ class RunStep(RunComponent):
         if transformation.definite.reusable == Method.NON_REUSABLE:
             return
 
-        query = ExecRecord.objects.filter(
-            used_by_components__runstep__pipelinestep__transformation=transformation)
+        execrecord_ids = RunStep.objects.filter(
+            pipelinestep__transformation=transformation).values('execrecord_id')
+        query = ExecRecord.objects.filter(id__in=execrecord_ids)
         for dataset_idx, dataset in enumerate(input_datasets, 1):
             query = query.filter(
                 execrecordins__generic_input__transformationinput__dataset_idx=dataset_idx,

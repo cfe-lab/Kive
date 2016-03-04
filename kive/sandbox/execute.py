@@ -798,7 +798,6 @@ class Sandbox:
         """
         Attempt to reuse the cable; prepare it for finishing if unable.
         """
-        assert input_dataset.clean() is None
         assert input_dataset in self.dataset_fs_map
 
         self.logger.debug("Checking whether cable can be reused")

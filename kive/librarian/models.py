@@ -863,23 +863,14 @@ class Dataset(metadata.models.AccessControl):
         return False
 
     def any_failed_checks(self):
-        """
-        Checks that this SD has never failed any check for integrity or contents.
-        """
-        icls = self.integrity_checks.all()
-        ccls = self.content_checks.all()
+        """ Checks if any integrity or content checks failed. """
+        if self.integrity_checks.filter(usurper__isnull=False).exists():
+            self.logger.debug("Dataset '{}' failed integrity check".format(self))
+            return True
 
-        # Look for failed integrity/content checks, and also check that at least one
-        # content check has been passed.
-        for icl in icls:
-            if icl.is_fail():
-                self.logger.debug("SD '{}' failed integrity check".format(self))
-                return True
-
-        for ccl in ccls:
-            if ccl.is_fail():
-                self.logger.debug("SD '{}' failed content check".format(self))
-                return True
+        if self.content_checks.filter(baddata__isnull=False).exists():
+            self.logger.debug("Dataset '{}' failed content check".format(self))
+            return True
 
         return False
 
@@ -1296,11 +1287,12 @@ class ExecRecord(models.Model):
     def has_ever_failed(self):
         """Has any execution of this ExecRecord ever failed?"""
         # Go through all RunSteps using this ExecRecord.
-        runsteps_using_this = []
-        for component_using_this in self.used_by_components.all():
-            if component_using_this.is_step:
-                runsteps_using_this.append(component_using_this.runstep)
-        return any(not runstep.successful_execution() for runstep in runsteps_using_this if not runstep.reused)
+        run_components = self.used_by_components.exclude(
+            reused=True).filter(runstep__isnull=False)
+        for component_using_this in run_components:
+            if not component_using_this.runstep.successful_execution():
+                return True
+        return False
 
     def is_redacted(self):
         for eri in self.execrecordins.all().select_related("dataset"):
