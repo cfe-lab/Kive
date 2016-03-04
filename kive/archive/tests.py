@@ -3998,6 +3998,8 @@ class EligiblePermissionsTests(TestCase):
 class CancelUnstartedUnfinishedTests(TestCase):
     """
     Tests of Run.cancel_unfinished and Run.cancel_unstarted.
+
+    Indirectly also tests RunComponent.mark_cancelled.
     """
     fixtures = ["deep_nested_run"]
 
