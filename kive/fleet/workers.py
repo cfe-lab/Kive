@@ -41,7 +41,9 @@ def adjust_log_files(target_logger, rank):
         if filename is not None:
             handler.close()
             fileRoot, fileExt = os.path.splitext(filename)
-            handler.baseFilename = '{}.{:03}{}'.format(fileRoot, rank, fileExt)
+            rank_suffix = '.{:03}'.format(rank)
+            if not fileRoot.endswith(rank_suffix):
+                handler.baseFilename = fileRoot + rank_suffix + fileExt
     if target_logger.parent is not None:
         adjust_log_files(target_logger.parent, rank)
 
