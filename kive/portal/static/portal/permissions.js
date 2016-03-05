@@ -463,9 +463,11 @@ var permissions = (function() {
         var $filter,
             $duplicates;
         $filter = $('<div class="filter"/>').data({ key: key, val: value });
-        $filter.append(
-                $('<span class="field"/>').text(key + ':'),
-                $('<span class="value"/>').text(value));
+
+        if (key != "smart") {
+            $filter.append($('<span class="field"/>').text(key + ':'));
+        }
+        $filter.append($('<span class="value"/>').text(value));
         $duplicates = $('div.filter', filterSet.$active).filter(function() {
             var $f = $(this);
             return $f.data('key') === key && $f.data('val') === value;
@@ -475,10 +477,27 @@ var permissions = (function() {
                 $filter.detach();
                 filterSet.onChange();
             }));
-            filterSet.$active.prepend($filter);
+            filterSet.$active.append($filter);
         }
 
         return $filter;
+    }
+
+    my.FilterSet.prototype.remove = function(key, value, skip_trigger) {
+        var $filters = this.$active.children();
+        if (typeof value == 'undefined') {
+            $filters.filter(function() {
+                return $(this).data('key') == key;
+            }).detach();
+        } else {
+            $filters.filter(function() {
+                return $(this).data('key') == key && $(this).data('val') == value;
+            }).detach();
+        }
+
+        if (skip_trigger === undefined) {
+            this.onChange();
+        }
     }
     
     my.FilterSet.prototype.add = function(key, value, skip_trigger) {

@@ -20,14 +20,17 @@
     margin: .25em 0 .5em;
 }
 .filter_ctrl input[type='submit'],
-.filter_ctrl input.ctrl {
+.filter_ctrl input.ctrl,
+.dataset-search-dlg input[type='submit'],
+.dataset-search-dlg input.ctrl {
     background-repeat: no-repeat;
     background-position: 3px 3px;
     text-indent: -999em; overflow: hidden;
 	font-size: 1.5em;
 	margin: .5em 0;
 }
-.filter_ctrl input[type='submit'] {
+.filter_ctrl input[type='submit'],
+.dataset-search-dlg input[type='submit'] {
     display: block;
     background-position: .6em 4px;
     background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRFREVJBAYL7Ozso6SmzM3Ob3BzgYKE////8GOoMQAAAAh0Uk5T/////////wDeg71ZAAAAaklEQVR42lSO0RbAMARDo6j//+ORtDubF1wRUFUOM+xVDNTqlhEHzDj3UGrg3U81mQDKVSlJS1MgzFxgC6wD3hXXHaQGI5BpF5YRbscMY3ZjE1TwVUAa7oV78JEm58R9zfILSH6gST4CDAA1OgRo8O828AAAAABJRU5ErkJggg==');

@@ -2,20 +2,23 @@ var choose_inputs = (function() {
     "use strict";
     var my = {};
     
-    function buildRadioButton($td, row, table) {
-        var name = row.name;
-        $td.append(
-                $('<label>').text(row.name).prepend($(
-                        '<input>',
-                        {
-                            type: 'radio',
-                            value: row.id,
-                            name: 'input_' + table.input_index
-                        })));
-    }
+    // function buildRadioButton($td, row, table) {
+    //     var name = row.name;
+    //     $td.append(
+    //             $('<label>').text(row.name).prepend($(
+    //                     '<input>',
+    //                     {
+    //                         type: 'radio',
+    //                         value: row.id,
+    //                         name: 'input_' + table.input_index
+    //                     })));
+    // }
     
+    function buildName($td, row) {
+        $td.text(row.name).addClass('primary').data('id', row.id);
+    }
     function buildDateCreated($td, row) {
-        $td.text(permissions.formatDate(row.date_created));
+        $td.text(permissions.formatDate(row.date_created)).addClass('date');
     }
     
     my.DatasetsTable = function(
@@ -38,7 +41,7 @@ var choose_inputs = (function() {
                     datasetsTable.page = 1;
                     datasetsTable.reloadTable();
                 });
-        this.registerColumn("Name", buildRadioButton, this);
+        this.registerColumn("Name", buildName);
         this.registerColumn("Date", buildDateCreated);
         this.registerColumn("File Size (B)", "filesize");
 
