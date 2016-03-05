@@ -7,15 +7,16 @@ from django.core.urlresolvers import reverse, resolve
 from django.db import connection
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from archive.models import Run
+from archive.models import Run, RunStep
 from metadata.models import kive_user
+from librarian.models import ExecRecord
 
 
 class Command(BaseCommand):
     help = "Exercise the Run.is_complete() method for performance testing. "
 
     def handle(self, *args, **options):
-        self.count_queries(self.test_ajax_download)
+        self.count_queries(self.test_many_execrecords)
 
     def check_many_runs(self):
         RUN_COUNT = 100
@@ -23,6 +24,23 @@ class Command(BaseCommand):
         complete_count = sum(1 for run in runs if run.is_complete())
         print('Found {} complete in {} most recent runs.'.format(complete_count,
                                                                  RUN_COUNT))
+
+    def test_many_runsteps(self):
+        COUNT = 100
+        run_steps = list(RunStep.objects.filter(
+            reused=False).prefetch_related('RSICs').order_by('-id')[:COUNT])
+        success_count = sum(1
+                            for step in run_steps
+                            if step.successful_execution())
+        print('Found {} successful in {} most recent runs.'.format(success_count,
+                                                                   len(run_steps)))
+
+    def test_many_execrecords(self):
+        COUNT = 100
+        execrecords = list(ExecRecord.objects.order_by('-id')[:COUNT])
+        fail_count = sum(1 for r in execrecords if r.has_ever_failed())
+        print('Found {} failed in {} most recent runs.'.format(fail_count,
+                                                               len(execrecords)))
 
     def count_queries(self, task):
         """ Count the queries triggered by task, and print a summary.

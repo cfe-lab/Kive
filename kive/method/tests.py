@@ -16,6 +16,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.core.urlresolvers import resolve
+from django.db import transaction
 
 from django.test import TestCase
 from rest_framework import status
@@ -24,7 +25,7 @@ from rest_framework.test import force_authenticate
 
 from constants import datatypes
 import file_access_utils
-from kive.tests import BaseTestCases, KiveTransactionTestCase
+from kive.tests import BaseTestCases
 import librarian.models
 from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
 import metadata.tests
@@ -42,7 +43,7 @@ from portal.utils import update_all_contenttypes
 samplecode_path = metadata.tests.samplecode_path
 
 
-class FileAccessTests(KiveTransactionTestCase):
+class FileAccessTests(TestCase):
     serialized_rollback = True
 
     def setUp(self):
@@ -81,7 +82,8 @@ class FileAccessTests(KiveTransactionTestCase):
                 content_file=File(f),
                 user=self.user_randy)
 
-        self.assertRaises(ValueError, test_crr.save)
+        with transaction.atomic():
+            self.assertRaises(ValueError, test_crr.save)
 
     def test_access_close_save(self):
         with open(os.path.join(samplecode_path, self.fn), "rb") as f:
@@ -96,7 +98,8 @@ class FileAccessTests(KiveTransactionTestCase):
             test_crr.content_file.read()
             tools.fd_count("access-!>close->save")
         tools.fd_count("access->close-!>save")
-        self.assertRaises(ValueError, test_crr.save)
+        with transaction.atomic():
+            self.assertRaises(ValueError, test_crr.save)
         tools.fd_count("access->close->save!")
 
     def test_close_access_save(self):
@@ -108,8 +111,9 @@ class FileAccessTests(KiveTransactionTestCase):
                 content_file=File(f),
                 user=self.user_randy)
 
-        self.assertRaises(ValueError, test_crr.content_file.read)
-        self.assertRaises(ValueError, test_crr.save)
+        with transaction.atomic():
+            self.assertRaises(ValueError, test_crr.content_file.read)
+            self.assertRaises(ValueError, test_crr.save)
 
     def test_save_close_access(self):
         with open(os.path.join(samplecode_path, self.fn), "rb") as f:
@@ -157,9 +161,8 @@ class FileAccessTests(KiveTransactionTestCase):
                 revision_name="v1",
                 revision_desc="First version",
                 content_file=File(f),
-                MD5_checksum = f_checksum,
+                MD5_checksum=f_checksum,
                 user=self.user_randy)
-
 
             tools.fd_count("open->File-!>save->close->clean->close")
             test_crr.save()
@@ -219,7 +222,7 @@ class FileAccessTests(KiveTransactionTestCase):
 class MethodTestCase(TestCase):
     """
     Set up a database state for unit testing.
-    
+
     This sets up all the stuff used in the Metadata tests, as well as some of the Datatypes
     and CDTs we use here.
     """
@@ -232,13 +235,13 @@ class MethodTestCase(TestCase):
 
 
 class CodeResourceTests(MethodTestCase):
-     
+
     def test_unicode(self):
         """
         unicode should return the codeResource name.
         """
         self.assertEquals(unicode(self.comp_cr), "complement")
-  
+
     def test_valid_name_clean_good(self):
         """
         Clean passes when codeResource name is file-system valid
@@ -266,7 +269,7 @@ class CodeResourceTests(MethodTestCase):
         self.assertRaisesRegexp(ValidationError, "Invalid code resource filename", invalid_cr.clean_fields)
 
     def test_invalid_name_starting_space_clean_bad(self):
-        """  
+        """
         Clean fails when CodeResource name isn't file-system valid
         """
         invalid_cr = CodeResource(name="test", filename=" test.py", description="desc", user=self.myUser)
@@ -274,7 +277,7 @@ class CodeResourceTests(MethodTestCase):
         self.assertRaisesRegexp(ValidationError, "Invalid code resource filename", invalid_cr.clean_fields)
 
     def test_invalid_name_invalid_symbol_clean_bad(self):
-        """  
+        """
         Clean fails when CodeResource name isn't file-system valid
         """
         invalid_cr = CodeResource(name="name", filename="test$.py", description="desc", user=self.myUser)
@@ -282,7 +285,7 @@ class CodeResourceTests(MethodTestCase):
         self.assertRaisesRegexp(ValidationError, "Invalid code resource filename", invalid_cr.clean_fields)
 
     def test_invalid_name_trailing_space_clean_bad(self):
-        """  
+        """
         Clean fails when CodeResource name isn't file-system valid
         """
         invalid_cr = CodeResource(name="name", filename="test.py ", description="desc", user=self.myUser)
@@ -377,7 +380,7 @@ class CodeResourceRevisionTests(MethodTestCase):
                                 "Self-referential dependency",
                                 self.test_cr_1_rev1.clean)
         self.test_cr_1_rev1.content_file.close()
-        
+
     def test_has_circular_dependence_several_direct_dep_self_2(self):
         """A CRR with several dependencies has itself as the second dependency."""
         self.test_cr_1_rev1.dependencies.create(
@@ -395,7 +398,7 @@ class CodeResourceRevisionTests(MethodTestCase):
         self.assertRaisesRegexp(ValidationError,
                                 "Self-referential dependency",
                                 self.test_cr_1_rev1.clean)
-        
+
     def test_has_circular_dependence_several_direct_dep_self_3(self):
         """A CRR with several dependencies has itself as the last dependency."""
         self.test_cr_1_rev1.dependencies.create(
@@ -428,7 +431,7 @@ class CodeResourceRevisionTests(MethodTestCase):
         self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
                           False)
         self.assertEquals(self.test_cr_1_rev1.clean(), None)
-        
+
     def test_has_circular_dependence_several_nested_dep_selfnested(self):
         """A CRR with several dependencies including itself as a nested one."""
         self.test_cr_1_rev1.dependencies.create(
@@ -451,7 +454,7 @@ class CodeResourceRevisionTests(MethodTestCase):
         self.assertRaisesRegexp(ValidationError,
                                 "Self-referential dependency",
                                 self.test_cr_1_rev1.clean)
-        
+
     def test_has_circular_dependence_nested_dep_has_circ(self):
         """A nested dependency is circular."""
         self.test_cr_1_rev1.dependencies.create(
@@ -473,7 +476,7 @@ class CodeResourceRevisionTests(MethodTestCase):
         self.assertRaisesRegexp(ValidationError,
                                 "Self-referential dependency",
                                 self.test_cr_2_rev1.clean)
-        
+
     def test_metapackage_cannot_have_file_bad_clean(self):
         """
         A CRR with a content file should have a filename associated with
@@ -533,14 +536,14 @@ class CodeResourceRevisionTests(MethodTestCase):
                           description="Some metapackage",
                           user=self.myUser)
         cr.save()
-        
+
         # Create crRev with a codeResource but no file contents
         no_file_crRev = CodeResourceRevision(
             coderesource=cr,
             revision_name="foo",
             revision_desc="foo",
             user=self.myUser)
-  
+
         no_file_crRev.clean()
 
         # After clean(), MD5 checksum should be the empty string
@@ -559,7 +562,7 @@ class CodeResourceRevisionTests(MethodTestCase):
         # Revision should have the correct MD5 checksum
         self.assertEquals(md5gen.hexdigest(), self.comp_cr.revisions.get(revision_name="v1").MD5_checksum)
 
-    def test_dependency_depends_on_nothing_clean_good (self):
+    def test_dependency_depends_on_nothing_clean_good(self):
         self.assertEqual(self.test_cr_1_rev1.clean(), None)
 
     def test_dependency_current_folder_same_name_clean_bad(self):
@@ -971,7 +974,7 @@ class CodeResourceRevisionTests(MethodTestCase):
             "Conflicting dependencies",
             self.test_cr_1_rev1.clean)
 
-    def test_dependency_list_all_filepaths_recursive_case_1 (self):
+    def test_dependency_list_all_filepaths_recursive_case_1(self):
         """
         Ensure list_all_filepaths generates the correct list
         A depends on B1/B2, B1 depends on C
@@ -1001,7 +1004,7 @@ class CodeResourceRevisionTests(MethodTestCase):
             {u'test_cr_1.py', u'B1_nested/B1.py', u'B1_nested/C_nested/C.py', u'B2.py'}
         )
 
-    def test_dependency_list_all_filepaths_recursive_case_2 (self):
+    def test_dependency_list_all_filepaths_recursive_case_2(self):
         """
         Ensure list_all_filepaths generates the correct list
         A depends on B1/B2, B2 depends on C
@@ -1097,12 +1100,12 @@ class CodeResourceRevisionTests(MethodTestCase):
 
     def test_find_update_not_found(self):
         update = self.compv2_crRev.find_update()
-        
+
         self.assertEqual(update, None)
 
     def test_find_update(self):
         update = self.compv1_crRev.find_update()
-        
+
         self.assertEqual(update, self.compv2_crRev)
 
 
@@ -1157,7 +1160,7 @@ class MethodDependencyTests(MethodTestCase):
             ValidationError,
             "path cannot reference \.\./",
             bad_dep_2.clean)
-        
+
     def test_valid_path_with_dotdot_clean(self):
         """
         Dependency goes into a path with a directory containing ".." in the name.
@@ -1170,7 +1173,7 @@ class MethodDependencyTests(MethodTestCase):
                                           depPath="..bar",
                                           depFileName="foo.py")
         self.assertEquals(good_crd.clean(), None)
-        
+
         good_crd_2 = CodeResourceDependency(coderesourcerevision=v1,
                                             requirement=v2,
                                             depPath="bar..",
@@ -1213,7 +1216,7 @@ class MethodDependencyTests(MethodTestCase):
                                             depPath="baz/..bar../blah",
                                             depFileName="foo.py")
         self.assertEquals(good_crd_8.clean(), None)
-        
+
     def test_cr_with_filename_dependency_with_good_path_and_filename_clean(self):
         """
         Check
@@ -1255,7 +1258,7 @@ class MethodDependencyTests(MethodTestCase):
                                           depFileName="foo.py")
 
         self.assertEqual(good_crd.clean(), None)
-        
+
     def test_metapackage_cannot_have_file_names_bad_clean(self):
 
         # Define a standard code resource
@@ -1276,7 +1279,7 @@ class MethodDependencyTests(MethodTestCase):
                 user=self.myUser)
             cr_rev_v1.full_clean()
             cr_rev_v1.save()
-        
+
         # Define a metapackage code resource (no file name)
         cr_meta = CodeResource(
                 name="test2_complement",
@@ -1325,7 +1328,7 @@ class MethodDependencyTests(MethodTestCase):
                 user=self.myUser)
             cr_rev_v1.full_clean()
             cr_rev_v1.save()
-        
+
         # Define a metapackage code resource (no file name)
         cr_meta = CodeResource(
                 name="test2_complement",
@@ -1345,9 +1348,9 @@ class MethodDependencyTests(MethodTestCase):
 
         # Add metapackage as a dependency to cr_rev_v1
         good_crd = CodeResourceDependency(coderesourcerevision=cr_rev_v1,
-                                         requirement=cr_meta_rev_v1,
-                                         depPath="testFolder/anotherFolder",
-                                         depFileName="")
+                                          requirement=cr_meta_rev_v1,
+                                          depPath="testFolder/anotherFolder",
+                                          depFileName="")
 
         self.assertEqual(good_crd.clean(), None)
 
@@ -1639,15 +1642,15 @@ class MethodTests(MethodTestCase):
 
         self.assertEqual(unicode(nofamily),
                          "[family unset]:None (foo)")
-        
+
     def test_display_name(self):
         method = Method(revision_number=1, revision_name='Example')
-        
+
         self.assertEqual(method.display_name, '1: Example')
-        
+
     def test_display_name_without_revision_name(self):
         method = Method(revision_number=1)
-        
+
         self.assertEqual(method.display_name, '1: ')
 
     def test_no_inputs_checkInputIndices_good(self):
@@ -1673,7 +1676,7 @@ class MethodTests(MethodTestCase):
 
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", 
+                     revision_desc="Foo version",
                      driver=self.compv1_crRev, user=self.myUser)
         foo.save()
 
@@ -1685,7 +1688,7 @@ class MethodTests(MethodTestCase):
         self.assertEquals(foo.check_input_indices(), None)
         self.assertEquals(foo.clean(), None)
 
-    def test_many_ordered_valid_inputs_checkInputIndices_good (self):
+    def test_many_ordered_valid_inputs_checkInputIndices_good(self):
         """
         Test check_input_indices on a method with several inputs,
         correctly indexed and in order.
@@ -1693,7 +1696,7 @@ class MethodTests(MethodTestCase):
 
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", 
+                     revision_desc="Foo version",
                      driver=self.compv1_crRev, user=self.myUser)
         foo.save()
 
@@ -1709,7 +1712,7 @@ class MethodTests(MethodTestCase):
         self.assertEquals(foo.check_input_indices(), None)
         self.assertEquals(foo.clean(), None)
 
-    def test_many_valid_inputs_scrambled_checkInputIndices_good (self):
+    def test_many_valid_inputs_scrambled_checkInputIndices_good(self):
         """
         Test check_input_indices on a method with several inputs,
         correctly indexed and in scrambled order.
@@ -1717,7 +1720,7 @@ class MethodTests(MethodTestCase):
 
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", 
+                     revision_desc="Foo version",
                      driver=self.compv1_crRev, user=self.myUser)
         foo.save()
 
@@ -1740,7 +1743,7 @@ class MethodTests(MethodTestCase):
 
         # Create Method with valid family, revision_name, description, driver
         foo = Method(family=self.DNAcomp_mf, revision_name="foo",
-                     revision_desc="Foo version", 
+                     revision_desc="Foo version",
                      driver=self.compv1_crRev, user=self.myUser)
         foo.save()
 
@@ -1761,7 +1764,7 @@ class MethodTests(MethodTestCase):
 
     def test_many_nonconsective_inputs_scrambled_checkInputIndices_bad(self):
         """Test input index check, badly-indexed multi-input case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version", 
+        foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version",
                      driver=self.compv1_crRev, user=self.myUser)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
@@ -1782,7 +1785,7 @@ class MethodTests(MethodTestCase):
 
     def test_no_outputs_checkOutputIndices_good(self):
         """Test output index check, one well-indexed output case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version", 
+        foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version",
                      driver=self.compv1_crRev, user=self.myUser)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
@@ -1793,7 +1796,7 @@ class MethodTests(MethodTestCase):
 
     def test_one_valid_output_checkOutputIndices_good(self):
         """Test output index check, one well-indexed output case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version", 
+        foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version",
                      driver=self.compv1_crRev, user=self.myUser)
         foo.save()
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
@@ -1803,9 +1806,9 @@ class MethodTests(MethodTestCase):
         self.assertEquals(foo.check_output_indices(), None)
         self.assertEquals(foo.clean(), None)
 
-    def test_many_valid_outputs_scrambled_checkOutputIndices_good (self):
+    def test_many_valid_outputs_scrambled_checkOutputIndices_good(self):
         """Test output index check, well-indexed multi-output (scrambled order) case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version", 
+        foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version",
                      driver=self.compv1_crRev, user=self.myUser)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
@@ -1819,9 +1822,9 @@ class MethodTests(MethodTestCase):
         self.assertEquals(foo.check_output_indices(), None)
         self.assertEquals(foo.clean(), None)
 
-    def test_one_invalid_output_checkOutputIndices_bad (self):
+    def test_one_invalid_output_checkOutputIndices_bad(self):
         """Test output index check, one badly-indexed output case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version", 
+        foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version",
                      driver=self.compv1_crRev, user=self.myUser)
         foo.save()
         foo.create_input(compounddatatype=self.DNAinput_cdt,
@@ -1840,10 +1843,10 @@ class MethodTests(MethodTestCase):
 
     def test_many_invalid_outputs_scrambled_checkOutputIndices_bad(self):
         """Test output index check, badly-indexed multi-output case."""
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version", 
+        foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version",
                      driver=self.compv1_crRev, user=self.myUser)
         foo.save()
-        
+
         foo.create_input(compounddatatype=self.DNAinput_cdt,
                          dataset_name="oneinput", dataset_idx=1)
         foo.create_output(compounddatatype=self.DNAoutput_cdt,
@@ -1866,7 +1869,7 @@ class MethodTests(MethodTestCase):
         """Test save when no method revision parent is specified."""
 
         # Define new Method with no parent
-        foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version", 
+        foo = Method(family=self.DNAcomp_mf, revision_name="foo", revision_desc="Foo version",
                      driver=self.compv1_crRev, user=self.myUser)
         foo.save()
 
@@ -2021,7 +2024,6 @@ class MethodTests(MethodTestCase):
         self.assertEqual(curr_out.get_min_row(), None)
         self.assertEqual(curr_out.get_max_row(), None)
 
-
         # If there are already inputs and outputs specified, then
         # they should not be overwritten.
 
@@ -2091,14 +2093,18 @@ class MethodTests(MethodTestCase):
         A metapackage cannot be a driver for a Method.
         """
         # Create a CodeResourceRevision with no content file (ie. a Metapackage).
-        res = CodeResource(user=self.myUser); res.save()
-        rev = CodeResourceRevision(coderesource=res, content_file=None, user=self.myUser); rev.clean(); rev.save()
-        f = MethodFamily(user=self.myUser); f.save()
+        res = CodeResource(user=self.myUser)
+        res.save()
+        rev = CodeResourceRevision(coderesource=res, content_file=None, user=self.myUser)
+        rev.clean()
+        rev.save()
+        f = MethodFamily(user=self.myUser)
+        f.save()
         m = Method(family=f, driver=rev, user=self.myUser)
         m.save()
-        m.create_input(compounddatatype = self.singlet_cdt,
-            dataset_name = "input",
-            dataset_idx = 1)
+        m.create_input(compounddatatype=self.singlet_cdt,
+                       dataset_name="input",
+                       dataset_idx=1)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('Method "{}" cannot have CodeResourceRevision "{}" as a driver, because it '
                                           'has no content file.'.format(m, rev)),
@@ -2124,9 +2130,10 @@ class MethodTests(MethodTestCase):
         """
         Trying to invoke code in a non-empty directory should fail.
         """
-        self.assertRaisesRegexp(ValueError,
+        self.assertRaisesRegexp(
+            ValueError,
             "Directory .* nonempty; contains file .*",
-            lambda : self.noop_method.invoke_code(self.scratch_dir, [self.noop_infile], []))
+            lambda: self.noop_method.invoke_code(self.scratch_dir, [self.noop_infile], []))
 
     def test_delete_method(self):
         """Deleting a method is possible."""
@@ -2144,15 +2151,15 @@ class MethodTests(MethodTestCase):
                     user=self.myUser)
         m2.save()
         for input in m1.inputs.order_by("dataset_idx"):
-            m2.create_input("x" + input.dataset_name, 
-                    compounddatatype=input.compounddatatype,
-                    min_row=input.get_min_row(), 
-                    max_row=input.get_max_row())
+            m2.create_input("x" + input.dataset_name,
+                            compounddatatype=input.compounddatatype,
+                            min_row=input.get_min_row(),
+                            max_row=input.get_max_row())
         for output in m1.outputs.order_by("dataset_idx"):
-            m2.create_output("x" + output.dataset_name, 
-                    compounddatatype=output.compounddatatype,
-                    min_row=output.get_min_row(), 
-                    max_row=output.get_max_row())
+            m2.create_output("x" + output.dataset_name,
+                             compounddatatype=output.compounddatatype,
+                             min_row=output.get_min_row(),
+                             max_row=output.get_max_row())
         self.assertFalse(m1.revision_name == m2.revision_name)
         self.assertFalse(m1.inputs.first().dataset_name == m2.inputs.first().dataset_name)
         self.assertFalse(m1.outputs.first().dataset_name == m2.outputs.first().dataset_name)
@@ -2165,15 +2172,15 @@ class MethodTests(MethodTestCase):
         m2 = Method(revision_name=m1.revision_name, driver=driver, family=m1.family, user=self.myUser)
         m2.save()
         for input in m1.inputs.order_by("dataset_idx"):
-            m2.create_input("x" + input.dataset_name, 
-                    compounddatatype=input.compounddatatype,
-                    min_row=input.get_min_row(), 
-                    max_row=input.get_max_row())
+            m2.create_input("x" + input.dataset_name,
+                            compounddatatype=input.compounddatatype,
+                            min_row=input.get_min_row(),
+                            max_row=input.get_max_row())
         for output in m1.outputs.order_by("dataset_idx"):
-            m2.create_output("x" + output.dataset_name, 
-                    compounddatatype=output.compounddatatype,
-                    min_row=output.get_min_row(), 
-                    max_row=output.get_max_row())
+            m2.create_output("x" + output.dataset_name,
+                             compounddatatype=output.compounddatatype,
+                             min_row=output.get_min_row(),
+                             max_row=output.get_max_row())
         self.assertTrue(super(Method, m1).is_identical(super(Method, m2)))
         self.assertFalse(m1.driver.pk == m2.driver.pk)
         self.assertFalse(m1.is_identical(m2))
@@ -2189,18 +2196,18 @@ class MethodTests(MethodTestCase):
 
     def test_find_update_not_found(self):
         update = self.RNAcompv2_m.find_update()
-        
+
         self.assertEqual(update, None)
 
     def test_find_update(self):
         update = self.RNAcompv1_m.find_update()
-        
+
         self.assertEqual(update, self.RNAcompv2_m)
 
     def test_find_update_not_found_from_transformation(self):
         transformation = Transformation.objects.get(pk=self.RNAcompv2_m.pk)
         update = transformation.find_update()
-        
+
         self.assertEqual(update, None)
 
 
@@ -2210,11 +2217,11 @@ class MethodFamilyTests(MethodTestCase):
         """
         unicode() for MethodFamily should display it's name.
         """
-        
+
         self.assertEqual(unicode(self.DNAcomp_mf), "DNAcomplement")
 
 
-class NonReusableMethodTests(KiveTransactionTestCase):
+class NonReusableMethodTests(TestCase):
     def setUp(self):
         # An unpredictable, non-reusable user.
         self.user_rob = User.objects.create_user('rob', 'rford@toronto.ca', 'football')
@@ -2414,7 +2421,7 @@ with open(outfile, "wb") as f:
 
 class MethodFamilyApiTests(BaseTestCases.ApiTestCase):
     fixtures = ['demo']
-    
+
     def setUp(self):
         super(MethodFamilyApiTests, self).setUp()
 
@@ -2456,7 +2463,7 @@ class MethodFamilyApiTests(BaseTestCases.ApiTestCase):
 
     def test_removal(self):
         start_count = MethodFamily.objects.all().count()
-        
+
         request = self.factory.delete(self.detail_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
@@ -2554,7 +2561,7 @@ class CodeResourceApiTests(BaseTestCases.ApiTestCase):
         response = cr_revisions_view(request, pk=self.noop_cr.pk)
 
         self.assertSetEqual(set([x.revision_number for x in self.noop_cr.revisions.all()]),
-                             set([x["revision_number"] for x in response.data]))
+                            set([x["revision_number"] for x in response.data]))
 
 
 def crr_test_setup(case):
@@ -2827,10 +2834,10 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         request = self.factory.post(self.list_path, self.crr_data, format="json")
         force_authenticate(request, user=kive_user())
         response = self.list_view(request)
-        
+
         self.assertDictEqual(
             response.data,
-            { 'non_field_errors': "depPath cannot reference ../" })
+            {'non_field_errors': "depPath cannot reference ../"})
 
     def test_download(self):
         request = self.factory.get(self.download_path)
@@ -2996,7 +3003,7 @@ class InvokeCodeTests(TestCase):
 
         with tempfile.NamedTemporaryFile() as f:
             f.write("#!/bin/bash\ncat $1 > $2")
-            revision = CodeResourceRevision(coderesource = resource, content_file=File(f),
+            revision = CodeResourceRevision(coderesource=resource, content_file=File(f),
                                             user=kive_user())
             revision.clean()
             revision.save()

@@ -38,7 +38,7 @@ class Stopwatch(models.Model):
 
         PRE: this object is clean.
         """
-        return (self.start_time is not None)
+        return self.start_time is not None
 
     def has_ended(self):
         """
@@ -48,7 +48,7 @@ class Stopwatch(models.Model):
 
         PRE: this object is clean.
         """
-        return (self.end_time is not None)
+        return self.end_time is not None
 
     @transaction.atomic
     def start(self, save=True, clean=False):

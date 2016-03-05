@@ -38,9 +38,8 @@ class KiveAPI(Session):
             'api_get_cdts': '/api/compounddatatypes/',
             'api_get_cdt': '/api/compounddatatypes/{cdt-id}/',
 
-            'api_get_datasets': '/api/datasets/',
             'api_get_dataset': '/api/datasets/{dataset-id}/',
-            'api_get_datasets_name': '/api/datasets/?{filters}',
+            'api_find_datasets': '/api/datasets/?{filters}',
             'api_dataset_add': '/api/datasets/',
             'api_dataset_dl': '/api/datasets/{dataset-id}/download/',
 
@@ -52,7 +51,7 @@ class KiveAPI(Session):
 
             'api_runs': '/api/runs/',
             'api_run': '/api/runs/{run-id}/',
-
+            'api_find_runs': '/api/runs/status/?{filters}',
         }
         super(KiveAPI, self).__init__()
         self.verify = verify
@@ -163,16 +162,6 @@ class KiveAPI(Session):
         return self._validate_response(super(KiveAPI, self).head(*newargs, **kwargs),
                                        is_json=False)
 
-    def get_datasets(self):
-        """
-        Returns a list of all datasets.
-
-        :return: A list of Dataset objects.
-        """
-
-        datasets = self.get('@api_get_datasets').json()
-        return [Dataset(d, self) for d in datasets]
-
     def get_dataset(self, dataset_id):
         """
         Gets a dataset in kive by its ID.
@@ -186,38 +175,30 @@ class KiveAPI(Session):
 
     def find_datasets(self,
                       dataset_id=None,
-                      dataset_name=None,
-                      md5=None,
-                      cdt=None):
-        """
+                      cdt=None,
+                      **kwargs):
+        """ Find a list of datasets that match search criteria.
 
         :param dataset_id: a specific dataset id to find, result will be a list
-            with one entry
-        :param dataset_name: a string that must be contained in the dataset
-            names
-        :param md5: a checksum that must match the dataset checksums
+            with one entry, and other search parameters will be ignored
         :param cdt: a CompoundDataType object that must match the datasets'
             compound data types
+        :param kwargs: other search parameters, with the same names as the
+            keys used by the API
         :return: a list of Dataset objects
         """
         if dataset_id is not None:
             return [self.get_dataset(dataset_id)]
 
-        filters = {}
-        if dataset_name is not None:
-            filters['name'] = dataset_name
-        if md5 is not None:
-            filters['md5'] = md5
+        filters = dict(kwargs)
         if cdt is not None:
             filters['cdt'] = cdt.cdt_id
-        if filters:
-            filter_text = '&'.join(
-                'filters[{}][key]={}&filters[{}][val]={}'.format(i, key, i, val)
-                for i, (key, val) in enumerate(filters.iteritems()))
-            datasets = self.get('@api_get_datasets_name',
-                                context={'filters': filter_text}).json()
-            return [Dataset(d, self) for d in datasets]
-        return self.get_datasets()
+        filter_text = '&'.join(
+            'filters[{}][key]={}&filters[{}][val]={}'.format(i, key, i, val)
+            for i, (key, val) in enumerate(filters.iteritems()))
+        datasets = self.get('@api_find_datasets',
+                            context={'filters': filter_text}).json()
+        return [Dataset(d, self) for d in datasets]
 
     def get_pipeline_families(self):
         """
@@ -360,3 +341,25 @@ class KiveAPI(Session):
         """
         data = self.get('@api_run', context={'run-id': id}).json()
         return RunStatus(data, self)
+
+    def find_runs(self,
+                  run_id=None,
+                  **kwargs):
+        """ Find a list of runs that match search criteria
+
+        :param run_id: a specific run id to find, result will be a list
+            with one entry, and other search parameters will be ignored
+        :param kwargs: other search parameters, with the same names as the
+            keys used by the API
+        :return: a list of RunStatus objects
+        """
+        if run_id is not None:
+            return [self.get_run(run_id)]
+
+        filters = kwargs
+        filter_text = '&'.join(
+            'filters[{}][key]={}&filters[{}][val]={}'.format(i, key, i, val)
+            for i, (key, val) in enumerate(filters.iteritems()))
+        runs = self.get('@api_find_runs',
+                        context={'filters': filter_text}).json()
+        return [RunStatus(run, self) for run in runs]

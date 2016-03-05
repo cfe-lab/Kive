@@ -15,12 +15,12 @@ kive.login('kive', 'kive')
 try:
     fastq1 = kive.add_dataset('New fastq file 1', 'None', open('exfastq1.fastq', 'r'), None, None, ["Everyone"])
 except KiveMalformedDataException:
-    fastq1 = kive.find_datasets(dataset_name='New fastq file 1')[0]
+    fastq1 = kive.find_datasets(name='New fastq file 1')[0]
 
 try:
     fastq2 = kive.add_dataset('New fastq file 2', 'None', open('exfastq2.fastq', 'r'), None, None, ["Everyone"])
 except KiveMalformedDataException:
-    fastq2 = kive.find_datasets(dataset_name='New fastq file 2')[0]
+    fastq2 = kive.find_datasets(name='New fastq file 2')[0]
 
 # Get the pipeline by family ID
 pipeline_family = kive.get_pipeline_family(2)

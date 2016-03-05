@@ -14,7 +14,7 @@ from django.db import transaction, OperationalError, InternalError
 from django.contrib.auth.models import User
 
 import archive.models
-from archive.models import RunStep, Run, MethodOutput
+from archive.models import RunStep, Run
 from constants import dirnames, extensions
 import file_access_utils
 import librarian.models
@@ -798,7 +798,6 @@ class Sandbox:
         """
         Attempt to reuse the cable; prepare it for finishing if unable.
         """
-        assert input_dataset.clean() is None
         assert input_dataset in self.dataset_fs_map
 
         self.logger.debug("Checking whether cable can be reused")
@@ -1009,7 +1008,6 @@ class Sandbox:
 
                 curr_RS.stop(save=True, clean=False)
                 curr_RS.complete_clean()
-
 
         # Bundle up the information required to process this step.
         _in_dir, _out_dir, log_dir = self._setup_step_paths(step_run_dir, False)
@@ -1460,7 +1458,9 @@ class Sandbox:
         ####
         if not missing_output:
             # Did ER already exist (with vetted output), or is cable trivial, or recovering? Yes.
-            if (preexisting_ER and (output_dataset.is_OK() or output_dataset.any_failed_checks())) or cable.is_trivial() or recover:
+            if ((preexisting_ER and (output_dataset.is_OK() or
+                                     output_dataset.any_failed_checks())) or
+                    cable.is_trivial() or recover):
                 logger.debug("[%d] Performing integrity check of trivial or previously generated output", worker_rank)
                 # Perform integrity check.  Note: if this fails, it will notify all RunComponents using it.
                 check = output_dataset.check_integrity(output_path, user, curr_log, output_dataset.MD5_checksum)
@@ -1564,7 +1564,8 @@ class Sandbox:
                     with transaction.atomic():
                         if preexisting_ER:
                             can_reuse = curr_RS.check_ER_usable(curr_ER)
-                            # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now, we can return.
+                            # If it was unsuccessful, we bail.
+                            # Alternately, if we can fully reuse it now, we can return.
                             if not can_reuse["successful"] or can_reuse["fully reusable"]:
                                 logger.debug("[%d] ExecRecord %s is reusable (successful = %s)",
                                              worker_rank, curr_ER, can_reuse["successful"])
@@ -1654,8 +1655,8 @@ class Sandbox:
         logger.debug("[%d] Method execution complete, ExecLog saved (started = %s, ended = %s)",
                      worker_rank, curr_log.start_time, curr_log.end_time)
 
-        if (preexisting_ER and curr_log.methodoutput.return_code != 0
-                and curr_RS.pipelinestep.transformation.definite.reusable == Method.DETERMINISTIC):
+        if (preexisting_ER and curr_log.methodoutput.return_code != 0 and
+                curr_RS.pipelinestep.transformation.definite.reusable == Method.DETERMINISTIC):
             # If this code is marked as deterministic, the return code should have been 0.
             curr_ER.notify_runcomponents_of_failure()
 
@@ -1671,7 +1672,8 @@ class Sandbox:
 
                     if not recover:
                         if preexisting_ER:
-                            logger.debug("[%d] Filling in pre-existing ExecRecord with PipelineStep outputs", worker_rank)
+                            logger.debug("[%d] Filling in pre-existing ExecRecord with PipelineStep outputs",
+                                         worker_rank)
                         else:
                             logger.debug("[%d] Creating new Datasets for PipelineStep outputs", worker_rank)
 
@@ -1746,6 +1748,11 @@ class Sandbox:
                 wait_time = random.random()
                 logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.", worker_rank, wait_time)
                 time.sleep(wait_time)
+
+        if bad_output_found:
+            curr_RS.mark_unsuccessful()
+            if recover:
+                recovering_record.mark_unsuccessful()
 
         # Check outputs.
         for i, curr_output in enumerate(pipelinestep.outputs):

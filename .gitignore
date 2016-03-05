@@ -15,6 +15,7 @@ kive/kive.log*
 kive/testreport.xml
 kive/timing.dat
 kive/timing.dot
+kive/timing.txt
 api/results
 # Ignore nodeJS modules
 node_modules/

@@ -12,7 +12,6 @@ import itertools
 import os
 import glob
 import shutil
-import threading
 import Queue
 import socket
 
@@ -42,7 +41,9 @@ def adjust_log_files(target_logger, rank):
         if filename is not None:
             handler.close()
             fileRoot, fileExt = os.path.splitext(filename)
-            handler.baseFilename = '{}.{:03}{}'.format(fileRoot, rank, fileExt)
+            rank_suffix = '.{:03}'.format(rank)
+            if not fileRoot.endswith(rank_suffix):
+                handler.baseFilename = fileRoot + rank_suffix + fileExt
     if target_logger.parent is not None:
         adjust_log_files(target_logger.parent, rank)
 
@@ -65,10 +66,8 @@ class MPIFleetInterface(object):
         return MPI.Get_processor_name()
 
 
-class ThreadFleetInterface(object):
-    """
-    Base class for both ThreadManagerInterface and ThreadWorkerInterface.
-    """
+class SingleThreadedFleetInterface(object):
+    """ Base class for both single-threaded manager and worker. """
     def get_rank(self):
         raise NotImplementedError()
 
@@ -139,30 +138,21 @@ class MPIManagerInterface(MPIFleetInterface):
         self.comm.Disconnect()
 
 
-class ThreadManagerInterface(ThreadFleetInterface):
+class SingleThreadedManagerInterface(SingleThreadedFleetInterface):
     def __init__(self, worker_count):
         # Elements of this queue will be 2-tuples (foreman rank, result PK).
         self.finished_queues = [Queue.Queue() for _ in range(worker_count)]
 
         self.worker_count = worker_count
-        self.worker_threads = []
+        self.workers = []
         self.worker_interfaces = [None] * worker_count
 
-        tmi = self
-
-        class WorkerThreadStarter:
-            def __init__(self, rank):
-                worker_interface = ThreadWorkerInterface(rank=rank, manager_interface=tmi)
-                self.worker = Worker(interface=worker_interface)
-
-            def __call__(self, *args, **kwargs):
-                self.worker.main_procedure()
-
-        for idx in range(worker_count):
-            # Each thread will create a worker that adds itself to self.worker_interfaces.
-            worker_thread = threading.Thread(target=WorkerThreadStarter(idx))
-            worker_thread.start()
-            self.worker_threads.append(worker_thread)
+        for rank in range(worker_count):
+            # Each worker interface will add itself to self.worker_interfaces.
+            worker_interface = SingleThreadedWorkerInterface(
+                rank=rank,
+                manager_interface=self)
+            self.workers.append(Worker(interface=worker_interface))
 
     def send_task_to_worker(self, task_info, worker_rank):
         self.worker_interfaces[worker_rank-1].job_queue.put(
@@ -171,6 +161,10 @@ class ThreadManagerInterface(ThreadFleetInterface):
         )
 
     def probe_for_finished_worker(self):
+        for rank in range(self.worker_count):
+            worker_interface = self.worker_interfaces[rank]
+            if not worker_interface.job_queue.empty():
+                self.workers[rank].receive_and_perform_task()
         for worker_queue in self.finished_queues:
             if not worker_queue.empty():
                 return True
@@ -201,10 +195,7 @@ class ThreadManagerInterface(ThreadFleetInterface):
         self.finished_queues[foreman.rank-1].get(block=True)
 
     def shut_down_fleet(self):
-        for worker_interface in self.worker_interfaces:
-            worker_interface.job_queue.put(("SHUTDOWN", Worker.SHUTDOWN))
-        for thread in self.worker_threads:
-            thread.join()
+        pass
 
 
 class Manager(object):
@@ -287,7 +278,7 @@ class Manager(object):
             # just report it and discard it.
             mgr_logger.info('Run "%s" (pk=%d) (Pipeline: %s, User: %s) failed on reuse',
                             run_to_start, run_to_start.pk, run_to_start.pipeline, run_to_start.user)
-            run_to_start.mark_complete()
+            run_to_start.mark_complete(save=True)
             finished_already = True
 
         else:
@@ -313,8 +304,14 @@ class Manager(object):
             if task_sdbx != sandbox:
                 new_task_queue.append((task_sdbx, task))
             else:
-                task.is_cancelled = True
-                task.save()
+                if isinstance(task, archive.models.RunStep):
+                    for rsic in task.RSICs.filter(_complete=False):
+                        rsic.mark_cancelled()  # this saves rsic
+
+                task.mark_cancelled()  # this saves task
+
+        # Cancel all components in the run that haven't started yet.
+        sandbox.run.cancel_unstarted()
 
         self.task_queue = new_task_queue
 
@@ -472,7 +469,7 @@ class Manager(object):
                 self.history_queue.append(finished_sandbox)
 
             curr_sdbx.run.mark_complete(mark_all_components=not curr_sdbx.run.is_successful(use_cache=True))
-            curr_sdbx.run.stop(save=True)
+            curr_sdbx.run.stop(save=True)  # this saves curr_sdbx.run
             curr_sdbx.run.complete_clean(use_cache=True)
 
             if curr_sdbx.run.is_successful(use_cache=True):
@@ -616,15 +613,24 @@ class Manager(object):
         """
         Stop the specified run.
         """
-        if run not in self.active_sandboxes:
-            # This hasn't started yet, so we can just skip this one.
-            mgr_logger.warn("Run (pk=%d) is not active so just marking stopped",
-                            run.pk)
-        else:
-            mgr_logger.debug("Stopping run (pk=%d) on behalf of user %s",
-                             run.pk,
-                             run.stopped_by)
+        mgr_logger.debug("Stopping run (pk=%d) on behalf of user %s",
+                         run.pk,
+                         run.stopped_by)
 
+        if not run.has_started():
+            run.start(save=False)
+
+        if run.is_complete(use_cache=True):
+            # This run already completed, so we ignore this call.
+            mgr_logger.warn("Run (pk=%d) is already complete; ignoring stop request.", run.pk)
+            return
+        elif run not in self.active_sandboxes:
+            # This hasn't started yet, or is a remnant from a fleet crash/shutdown,
+            # so we can just skip this one.
+            mgr_logger.warn("Run (pk=%d) is not active.  Cancelling steps/cables that were unfinished.",
+                            run.pk)
+            run.cancel_unfinished()
+        else:
             sandbox_to_end = self.active_sandboxes[run]
 
             # Send a message to the foreman in charge of running this task.
@@ -643,6 +649,9 @@ class Manager(object):
 
             # Cancel all tasks on the task queue pertaining to this run.
             self.mop_up_terminated_sandbox(sandbox_to_end)
+
+        run.cancel_unstarted()
+        run.mark_complete(save=True, mark_all_components=True)
         run.stop(save=True)
 
         mgr_logger.debug("Run (pk={}) stopped by user {}".format(run.pk, run.stopped_by))
@@ -707,8 +716,15 @@ class Manager(object):
                     mgr_logger.warning(e)
 
     @classmethod
-    def execute_pipeline(cls, user, pipeline, inputs, users_allowed=None, groups_allowed=None,
-                         name=None, description=None, threaded=True):
+    def execute_pipeline(cls,
+                         user,
+                         pipeline,
+                         inputs,
+                         users_allowed=None,
+                         groups_allowed=None,
+                         name=None,
+                         description=None,
+                         single_threaded=True):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
@@ -733,10 +749,10 @@ class Manager(object):
 
         # The run is already in the queue, so we can just start the fleet and let it exit
         # when it finishes.
-        if not threaded:
+        if not single_threaded:
             interface = MPIManagerInterface(worker_count=1, manage_script=sys.argv[0])
         else:
-            interface = ThreadManagerInterface(worker_count=1)
+            interface = SingleThreadedManagerInterface(worker_count=1)
         manager = cls(interface=interface, quit_idle=True, history=1)
         manager.main_procedure()
         return manager
@@ -789,13 +805,13 @@ class MPIWorkerInterface(MPIFleetInterface):
         self.comm.Disconnect()
 
 
-class ThreadWorkerInterface(ThreadFleetInterface):
+class SingleThreadedWorkerInterface(SingleThreadedFleetInterface):
     """
     Analogue of MPIWorkerInterface where threads are used instead of MPI.
     """
     def __init__(self, rank, manager_interface):
         self.rank = rank
-        assert isinstance(manager_interface, ThreadManagerInterface)
+        assert isinstance(manager_interface, SingleThreadedManagerInterface)
         self.manager_interface = manager_interface
         self.manager_interface.worker_interfaces[rank-1] = self
         self.job_queue = Queue.Queue()
@@ -865,6 +881,12 @@ class Worker(object):
 
         if tag == self.SHUTDOWN:
             worker_logger.info("Worker {} shutting down.".format(self.rank))
+            return tag
+
+        elif tag == self.STOP:
+            # This was sent as an attempt to stop the last thing this Worker was
+            # doing, but was missed.
+            worker_logger.info("Worker {} received a stop message too late; ignoring.".format(self.rank))
             return tag
 
         try:
