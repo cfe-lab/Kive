@@ -498,7 +498,7 @@ var permissions = (function() {
         if (skip_trigger === undefined) {
             this.onChange();
         }
-    }
+    };
     
     my.FilterSet.prototype.add = function(key, value, skip_trigger) {
         var $filter = addFilter(this, key, value);

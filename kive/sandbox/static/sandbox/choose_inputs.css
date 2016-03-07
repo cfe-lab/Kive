@@ -1,0 +1,164 @@
+#above_box {
+    position: relative;
+    border: 1px solid white;
+    padding: 1em;
+    width: 48em;
+    height: 50px;
+    padding-bottom: 0;
+    overflow: hidden;
+}
+#above_box h2 {
+    margin-top:0;
+}
+#insert_dataset {
+    position: absolute;
+    bottom: 0; left: -7em;
+    width: 4em;
+    padding: .25 1em;
+    font-size: 2em;
+}
+td.pipeline-input {
+    width: 15em;
+    height: 5em;
+}
+#dataset_input_table td.input-dataset {
+    text-indent: 1em;
+}
+#dataset_input_table td.input-dataset * {
+    text-indent: 0;
+}
+.select_dataset {
+    width: 100%;
+    font-size: 2.5em;
+    padding: .25em 1em;
+    line-height: 1.5em;
+}
+#insert_dataset, .select_dataset {
+    background-color: #22b24c;
+    color: white;
+    font-weight: bold;
+    border: 0;
+    margin-bottom: -1px;
+}
+#insert_dataset:focus,
+.select_dataset:focus {
+    outline: none;
+    cursor: pointer;
+}
+.dataset-search-dlg {
+    display: none;
+}
+.dataset-search-dlg .search_form {
+    border: 1px solid #ccc;
+    background-color: #fff;
+    margin-bottom: .5em;
+    padding: .2em .5em;
+}
+.dataset-search-dlg .search_form input[type="text"] {
+    border: 0;
+    font-size: 1.5em;
+}
+.dataset-search-dlg .search_button {
+    float: right;
+}
+.dataset-search-dlg .active_filters {
+    display: inline;
+}
+.dataset-search-dlg .search_filters {
+    float: left;
+    width: 12em;
+}
+.dataset-search-dlg .search_filters h4 {
+    margin-bottom: 0.5em;
+}
+.dataset-search-dlg .search_filters select {
+    display: block;
+    width: 10em;
+    margin-bottom: 0.25em;
+}
+.dataset-search-dlg table {
+    width: 40em;
+    font-size: 0.9em;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+.dataset-search-dlg tr.selected td,
+#dataset_input_table td.selected {
+    background-color: #238;
+    color: #fff;
+}
+.dataset-search-dlg h4 {
+    margin-bottom: -.75em;
+}
+.search_results table .error {
+    display: none;
+}
+.search_results table.none-selected-error {
+    outline: 1px solid red;
+}
+.search_results table.none-selected-error .error {
+    display: block;
+    color: red;
+    font-style: italic;
+}
+.ctrl {
+    cursor: pointer;
+}
+.close.ctrl {
+    float: right;
+}
+.select-all.ctrl {
+    float: right;
+    font-size: 0.8em;
+    text-decoration: underline;
+}
+#insert_dataset {
+    display: block;
+    clear: both;
+}
+
+#dataset_input_table {
+    width: 50em;
+}
+#dataset_input_table th {
+    text-align: center;
+}
+#dataset_input_table td {
+    padding: 0 1px 1px 0;
+    vertical-align: middle;
+    position: relative;
+}
+#dataset_input_table .remove.ctrl {
+    position: absolute;
+    right: 0; top: 0;
+    padding: 1em;
+    font-weight: bold;
+    height: 80px;
+    line-height: 40px;
+    box-sizing: border-box;
+    border-left: 1px solid white;
+}
+#dataset_input_table .remove.ctrl:hover {
+    background-color: #34a;
+}
+#dataset_input_table.inactive button {
+    background-color: #666;
+}
+#dataset_input_table.inactive button.receiving {
+    background-color: #aaa;
+    color: #aaa;
+}
+
+thead th {
+    vertical-align: bottom;
+}
+tfoot td {
+    text-align: center;
+}
+td.date {
+    min-width: 5.5em;
+}
