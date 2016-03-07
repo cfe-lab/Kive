@@ -184,7 +184,7 @@ $(function() {
                 .addClass('pipeline-input'),
             pipeline_original_row = $('tbody tr', dataset_input_table).eq(0).clone(),
             hidden_input = $('<input type="hidden">'),
-            input_dataset = $('<td>').addClass('primary insert_dataset pipeline-input')
+            input_dataset = $('<td>').addClass('primary input-dataset pipeline-input')
         ;
         return {
             plusButton: function(data) {
@@ -319,12 +319,17 @@ $(function() {
             $input_dataset.addClass('selected').prepend( uiFactory.removeCtrl() );
         }
 
-        // console.log($input_dataset.data());
+        console.log($input_dataset.data());
     };
     var removeDatasetFromInput = function() {
-        var $old_td = $(this).closest('td');
-        $old_td.find('.ctrl').remove()
-        $old_td.replaceWith( uiFactory.plusButtonCell( $old_td.data() ) );
+        var $old_td = $(this).closest('td'),
+            $row = $old_td.parent();
+
+        $old_td.replaceWith( $new_td = uiFactory.plusButtonCell( $old_td.data() ) );
+
+        if ($row.find('.input-dataset, .receiving').length == 0) {
+            $row.remove();
+        }
     };
     var creatorFilterHandler = function() {
         var value = $(this).val();
