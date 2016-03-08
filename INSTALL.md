@@ -11,6 +11,7 @@ Before installing Kive, you need to install some other software.
 * the Django REST framework (version 3.1 or higher)
 * PostgreSQL
 * psycopg2 (Python library for interfacing with PostgreSQL)
+* pytz
 * OpenMPI (optional, for running Kive on a cluster)
 * mpi4py (optional, for running Kive on a cluster)
 * django-extensions (optional, for creating a UML diagram of the backend
@@ -61,6 +62,10 @@ system-wide.  Also, many systems have multiple Python installations, so make sur
 `pip` is using the correct one. Django REST Framework can also be installed via
 
     pip install djangorestframework==3.3.2
+    
+You will also need the `pytz` module, which can simply be installed with
+
+    pip install pytz
 
 If you want to generate UML diagrams for your models, install
 `django-extensions`. Instructions for downloading and installing may be found
