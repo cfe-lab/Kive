@@ -37,6 +37,14 @@ $(function() {
         }
     };
 
+    var deselectAll = function() {
+        dataset_input_table
+            .find('.selected').removeClass('selected')
+            .find('.remove.ctrl').remove();
+    };
+    var stopProp = function(e) {
+        e.stopPropagation();
+    };
     var submitDatasetSearch = function(e) {
         e.preventDefault();
         dataset_search_table.filterSet.addFromForm(this);
@@ -55,7 +63,7 @@ $(function() {
                 .animate({
                     width: cellWidth,
                     left: cellOffsetX - insertBtnOffsetX
-                });
+                }, 150, 'linear');
         }
 
         // defining dialog_state's properties in this way makes them unenumerable and immutable.
@@ -205,7 +213,7 @@ $(function() {
         dataset_input_table.removeClass('inactive');
 
         if (
-            dataset_input_table.find('tr:has(.input-dataset)').length > 1 &&
+            dataset_input_table.find('tr:not(:has(.input-dataset))').length > 1 &&
             $row.find('.input-dataset').length === 0
         ) {
             $row.remove();
@@ -303,17 +311,16 @@ $(function() {
             dataset_search_table.$table.addClass('none-selected-error');
         }
     };
-    var toggleInputDatasetSelection = function() {
+    var toggleInputDatasetSelection = function(e) {
         var $input_dataset = $(this),
             is_selected = $input_dataset.hasClass('selected');
 
-        $input_dataset.closest('table')
-            .find('.selected').removeClass('selected')
-            .find('.remove.ctrl').remove();
+        deselectAll();
 
         if (!is_selected) {
             $input_dataset.addClass('selected').prepend( uiFactory.removeCtrl() );
         }
+        e.stopPropagation();
     };
     var removeDatasetFromInput = function() {
         var $old_td = $(this).closest('td'),
@@ -346,7 +353,8 @@ $(function() {
                 'week':   startOfValue,
                 'month':  startOfValue,
                 'year':   startOfValue
-            }
+            },
+            filter_set = dataset_search_table.filterSet
         ;
 
         return function() {
@@ -356,8 +364,8 @@ $(function() {
                 actions[value]();
             } else return;
 
-            dataset_search_table.filterSet.remove('createdafter');
-            dataset_search_table.filterSet.add(
+            filter_set.remove('createdafter');
+            filter_set.add(
                 'createdafter',
                 time.format('DD MMM YYYY HH:mm')
             );
@@ -389,20 +397,30 @@ $(function() {
             $(this).append(hidden_inputs);
         }
     };
+    var focusSearchField = function(e) {
+        if ( $(e.target).is('.search_form') ) {
+            $(this).find('input[type="text"]').trigger('focus');
+        }
+    }
 
     $.getJSON('/api/datasets/?format=json', initUsersList);
 
-    above_box             .on( 'click',    '.close.ctrl',           closeSearchDialog           );
+    above_box             .on( 'click',    '.close.ctrl',           closeSearchDialog           )
+                          .on( 'click',                             stopProp                    );
     input_set_dataset_btn .on( 'click',                             addSelectedDatasetsToInput  );
-    $('#run_pipeline')    .on( 'submit',                            mainSubmitHandler           );
+    $('#run_pipeline')    .on( 'submit',                            mainSubmitHandler           )
+                          .on( 'click',    'input, textarea',       stopProp                    );
+    $('.permissions-widget').on('click',                            stopProp                    );
     dataset_search_dialog .on( 'submit',   'form',                  submitDatasetSearch         )
                           .on( 'change',   '#date_added',           dateAddedFilterHandler      )
-                          .on( 'change',   '#creator',              creatorFilterHandler        );
+                          .on( 'change',   '#creator',              creatorFilterHandler        )
+    .find('.search_form') .on( 'click',                             focusSearchField            );
     dataset_input_table   .on( 'click',    '.input-dataset',        toggleInputDatasetSelection )
                           .on( 'click',    '.remove.ctrl',          removeDatasetFromInput      )
                           .on( 'click',    'button[name="input"]',  showInputSearchDlg          );
     $('.search_results')  .on( 'click',    'tbody tr',              selectSearchResult          )
                           .on( 'dblclick', 'tbody tr',              function() { input_set_dataset_btn.click(); } );
+    $('body')             .on( 'click',                             deselectAll                 );
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
