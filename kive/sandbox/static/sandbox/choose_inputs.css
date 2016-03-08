@@ -69,6 +69,12 @@
     .dataset-search-dlg .search_results table tr.selected td {
       background-color: #238;
       color: #fff; }
+    .dataset-search-dlg .search_results table thead th {
+      vertical-align: bottom; }
+    .dataset-search-dlg .search_results table tfoot td {
+      text-align: center; }
+    .dataset-search-dlg .search_results table td.date {
+      min-width: 5.5em; }
   #insert_dataset {
     background-color: #22b24c;
     color: white;
@@ -82,7 +88,8 @@
     padding: 0.25 1em;
     font-size: 2em;
     display: block;
-    clear: both; }
+    clear: both;
+    cursor: pointer; }
     #insert_dataset:focus {
       outline: none;
       cursor: pointer; }
@@ -111,47 +118,54 @@
 
 #dataset_input_table {
   width: 50em; }
-  #dataset_input_table th {
-    text-align: center; }
-  #dataset_input_table td {
+  #dataset_input_table thead th {
+    text-align: center;
+    border-bottom: 1px solid black; }
+  #dataset_input_table tbody td {
     padding: 0 1px 1px 0;
     vertical-align: middle;
     position: relative;
-    width: 15em;
     height: 5em; }
-    #dataset_input_table td.selected {
+    #dataset_input_table tbody td.selected {
       background-color: #238;
       color: #fff; }
-    #dataset_input_table td.input-dataset {
+    #dataset_input_table tbody td.input-dataset {
       text-indent: 1em; }
-      #dataset_input_table td.input-dataset * {
+      #dataset_input_table tbody td.input-dataset * {
         text-indent: 0; }
-  #dataset_input_table button.select_dataset {
+    #dataset_input_table tbody td:last-child {
+      padding-right: 0; }
+  #dataset_input_table tfoot td {
+    text-align: right; }
+    #dataset_input_table tfoot td label {
+      font-size: 0.8em;
+      font-style: italic; }
+    #dataset_input_table tfoot td button {
+      width: 100%;
+      font-size: 1.5em;
+      box-sizing: border-box;
+      margin-bottom: 1px; }
+    #dataset_input_table tfoot td .error {
+      color: #f00;
+      font-style: italic;
+      font-size: 0.8em;
+      float: left; }
+  #dataset_input_table button {
     background-color: #22b24c;
     color: white;
     font-weight: bold;
     border: 0;
     margin-bottom: -1px;
+    padding: 0.25em 1em;
     width: 100%;
     font-size: 2.5em;
-    padding: 0.25em 1em;
     line-height: 1.5em; }
-    #dataset_input_table button.select_dataset:focus {
+    #dataset_input_table button:focus {
       outline: none;
       cursor: pointer; }
-  #dataset_input_table.inactive button.select_dataset {
+  #dataset_input_table .inactive button {
     background-color: #666; }
-    #dataset_input_table.inactive button.select_dataset.receiving {
-      background-color: #aaa;
-      color: #aaa; }
-
-thead th {
-  vertical-align: bottom; }
-
-tfoot td {
-  text-align: center; }
-
-td.date {
-  min-width: 5.5em; }
+    #dataset_input_table .inactive button.receiving {
+      background-color: #aaa; }
 
 /*# sourceMappingURL=choose_inputs.css.map */

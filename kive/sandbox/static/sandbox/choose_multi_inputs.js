@@ -2,7 +2,7 @@ $(function() {
     // Security stuff to prevent cross-site scripting.
     noXSS();
     var is_user_admin = false, // Never show admin tools on this page
-        dataset_input_table = $('#dataset_input_table'),
+        dataset_input_table = $('#dataset_input_table tbody'),
         dataset_search_dialog = $('.dataset-search-dlg'),
         input_set_dataset_btn = $('#insert_dataset'),
         above_box = $('#above_box'),
@@ -12,8 +12,11 @@ $(function() {
             NaN, NaN,// these will be set later
             dataset_search_dialog.find('.active_filters'),
             dataset_search_dialog.find(".navigation_links")
-        )
+        ),
+        cell_width = 100/dataset_input_table.find('tr').eq(0).find('td').length + '%'
     ;
+
+    dataset_input_table.find('td').css('width', cell_width);
 
     above_box.hide = function() {
         this.animate({
@@ -35,6 +38,14 @@ $(function() {
         } else {
             callback();
         }
+    };
+    dataset_input_table.error = function(message) {
+        var $error_div = $(this).closest('table').find('.error');
+        $error_div.show().text(message);
+
+        setTimeout(function() {
+            $error_div.hide();
+        }, 5000)
     };
 
     var deselectAll = function() {
@@ -158,11 +169,13 @@ $(function() {
             // Set CSS classes for buttons
             dataset_input_table
                 .addClass('inactive')
-                .find('button')
-                .removeClass('receiving');
+                .find('.receiving')
+                .removeClass('receiving')
+                .text('+');
 
             $empty_input
-                .addClass('receiving');
+                .addClass('receiving')
+                .text('…');
 
             dataset_search_dialog.find('h2 em')
                 .text(input_name);
@@ -171,6 +184,7 @@ $(function() {
     var uiFactory = (function() {
         var remove_ctrl = $('<div>').addClass('remove ctrl').text('×'),
             plus_button_cell = $('<td>')
+                .css('width', cell_width)
                 .append(
                     $('<button>')
                         .attr('name', "input")
@@ -178,9 +192,9 @@ $(function() {
                         .text('+')
                 )
                 .addClass('pipeline-input'),
-            pipeline_original_row = $('tbody tr', dataset_input_table).eq(0).clone(),
+            pipeline_original_row = $('tr', dataset_input_table).eq(0).clone(),
             hidden_input = $('<input type="hidden">'),
-            input_dataset = $('<td>').addClass('primary input-dataset pipeline-input')
+            input_dataset = $('<td>').addClass('primary input-dataset pipeline-input').css('width', cell_width)
         ;
         return {
             plusButton: function(data) {
@@ -258,12 +272,14 @@ $(function() {
     var addSelectedDatasetsToInput = function(e) {
         var selected_vals = dataset_search_dialog.find('.search_results .selected .primary'),
             receiving_cell = $('button.receiving'),
-            receiving_cell_selector = 'td:nth-child(' + (receiving_cell.parent().index() + 1) + ')',// css pseudo-class is 1-indexed
-            blank_input_queue = receiving_cell
-                .closest('tr')
+            receiving_cell_selector = 'td:nth-child(' +
+                (receiving_cell.parent().index() + 1)
+                + ')',// css pseudo-class is 1-indexed
+            receiving_row = receiving_cell.closest('tr'),
+            blank_input_queue = receiving_row
                 .nextAll().addBack()
                 .children(receiving_cell_selector + ':has(button)'),
-            inactive_buttons = $('button:not(.receiving)', dataset_input_table),
+            inactive_buttons,
             new_row,
             selected_val,
             next_blank_input
@@ -274,17 +290,18 @@ $(function() {
 
             for (var i = 0; i < selected_vals.length; i++) {
                 selected_val = selected_vals.eq(i);
-                next_blank_input = blank_input_queue.eq(0);
 
-                if (blank_input_queue.length <= 1) {
+                if (blank_input_queue.length === 0) {
                     new_row = uiFactory.pipelineInputRow();
-                    $('tbody', dataset_input_table).append(new_row);
+                    new_row.insertAfter(receiving_row)
 
                     // push new row's cell
                     blank_input_queue = blank_input_queue.add(
                         new_row.find(receiving_cell_selector)
                     );
                 }
+
+                next_blank_input = blank_input_queue.eq(0);
 
                 next_blank_input.replaceWith(
                     uiFactory.inputDatasetCell(
@@ -298,10 +315,14 @@ $(function() {
                 blank_input_queue = blank_input_queue.not(next_blank_input);
             }
 
+            inactive_buttons = $('button:not(.receiving)', dataset_input_table);
+
             // decide where to go next
-            if (inactive_buttons.length && !e.metaKey && !e.ctrlKey) {
-                inactive_buttons
-                    .eq(0)
+            if ((e.metaKey || e.ctrlKey) && blank_input_queue.length) {
+                blank_input_queue.eq(0).find('button')
+                    .trigger('click');
+            } else if (inactive_buttons.length) {
+                inactive_buttons.eq(0)
                     .trigger('click');
             } else {
                 dataset_search_dialog.fadeOut('fast');
@@ -398,8 +419,20 @@ $(function() {
         }
     };
     var focusSearchField = function(e) {
+        // prevent this event from bubbling
         if ( $(e.target).is('.search_form') ) {
             $(this).find('input[type="text"]').trigger('focus');
+        }
+    }
+    var addNewRunRow = function() {
+        dataset_input_table.append(uiFactory.pipelineInputRow());
+    }
+    var removeLastRunRow = function() {
+        var $trs = dataset_input_table.find('tr')
+        if ($trs.length > 1) {
+            $trs.eq(-1).remove();
+        } else {
+            dataset_input_table.error("Error: You must have at least 1 run.");
         }
     }
 
@@ -421,6 +454,8 @@ $(function() {
     $('.search_results')  .on( 'click',    'tbody tr',              selectSearchResult          )
                           .on( 'dblclick', 'tbody tr',              function() { input_set_dataset_btn.click(); } );
     $('body')             .on( 'click',                             deselectAll                 );
+    $('#run_controls')    .on( 'click',    '.add_run',              addNewRunRow                )
+                          .on( 'click',    '.remove_run',           removeLastRunRow            );
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {

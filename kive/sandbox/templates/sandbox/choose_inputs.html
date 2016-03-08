@@ -29,6 +29,8 @@
 
 <div id="errors" class="errortext">{{ input_error_msg }}</div>
 
+<h4 id="pipeline_name">{{ pipeline }}</h4>
+
 <div id="above_box" class="hidden">
 
 <div class="dataset-search-dlg">
@@ -98,29 +100,35 @@
 
 </div>
 
-
 <table id="dataset_input_table">
 
-<thead>
-<tr>
-<th></th>
-{% for input in inputs %}
-    <th>{{ input.dataset_name }}</th>
-{% endfor %}
-</tr>
-</thead>
+    <thead>
+        <tr>
+        {% for input in inputs %}
+            <th>{{ input.dataset_name }}</th>
+        {% endfor %}
+        </tr>
+    </thead>
 
-<tbody>
-<tr>
-<td>{{ pipeline }}</td>
-{% for input in inputs %}
-    <td class="pipeline-input"><button name="input" data-input-name="{{ input.dataset_name }}" data-dataset-idx="{{ input.dataset_idx }}" data-cdt="{{ input.compounddatatype.id }}" class="select_dataset">+</button></td>
-{% endfor %}
-</tr>
-</tbody>
+    <tbody>
+        <tr>
+        {% for input in inputs %}
+            <td class="pipeline-input"><button name="input" data-input-name="{{ input.dataset_name }}" data-dataset-idx="{{ input.dataset_idx }}" data-cdt="{{ input.compounddatatype.id }}" class="select_dataset">+</button></td>
+        {% endfor %}
+        </tr>
+    </tbody>
+
+    <tfoot>
+        <tr>
+            <td colspan="999" id="run_controls">
+                <div class="error"></div>
+                <label>Add or remove rows:</label>
+                <input type="button" class="add_run left-button" value="+"/><input type="button" class="remove_run right-button" value="&minus;"/>
+            </td>
+        </tr>
+    </tfoot>
 
 </table>
-
 
 <form action="run_pipeline" id="run_pipeline" method="post">
 
