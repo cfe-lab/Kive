@@ -1,3 +1,8 @@
+# Instructions:
+# Run the script once, and it will create a configuration file in your home
+# folder. Edit that file to point at the server you want to dump from,
+# then run the script again. It will ask you which pipeline you want to dump.
+
 from collections import Counter
 import errno
 import json
@@ -40,11 +45,16 @@ def main():
     print 'Recent pipelines from {}:'.format(hostname)
     for pipeline in pipelines[:5]:
         print '{}, id {}'.format(pipeline, pipeline.pipeline_id)
-    pipeline_id = int(raw_input('Enter pipeline id to dump: '))
+    pipeline_request = raw_input("Enter pipeline id to dump, or 'm' for more:")
+    if pipeline_request == 'm':
+        for pipeline in pipelines[5:]:
+            print '{}, id {}'.format(pipeline, pipeline.pipeline_id)
+        pipeline_request = raw_input("Enter pipeline id to dump:")
+    pipeline_id = int(pipeline_request)
     dump_folder = 'utils/dump/{}_pipeline{}'.format(hostname, pipeline_id)
 
     if not os.path.isdir(dump_folder):
-        os.mkdir(dump_folder)
+        os.makedirs(dump_folder)
 
     compound_datatypes = {}  # {id: columns}
     for compound_datatype in kive.get_cdts():

@@ -1,9 +1,9 @@
 from setuptools import setup
 
 setup(name='kiveapi',
-      version='0.4',
-      description="A front end Python client for interfacing with Kive's RESTful API.",
+      version='0.5',
+      description="A front-end Python client for interfacing with Kive's RESTful API.",
       author='Joshua Horacsek',
       author_email='',
-      url='http://github.com/cfe-lab/py-kive-api',
+      url='https://github.com/cfe-lab/Kive',
       packages=['kiveapi'])
