@@ -282,7 +282,8 @@ $(function() {
             inactive_buttons,
             new_row,
             selected_val,
-            next_blank_input
+            next_blank_input,
+            last_filled_input
         ;
 
         if (selected_vals.length > 0) {
@@ -293,7 +294,7 @@ $(function() {
 
                 if (blank_input_queue.length === 0) {
                     new_row = uiFactory.pipelineInputRow();
-                    new_row.insertAfter(receiving_row)
+                    new_row.insertAfter(last_filled_input.closest('tr') || receiving_row)
 
                     // push new row's cell
                     blank_input_queue = blank_input_queue.add(
@@ -303,13 +304,13 @@ $(function() {
 
                 next_blank_input = blank_input_queue.eq(0);
 
-                next_blank_input.replaceWith(
-                    uiFactory.inputDatasetCell(
-                        selected_val.text(),
-                        selected_val.data('id'),
-                        $('button', next_blank_input).data()
-                    )
+                last_filled_input = uiFactory.inputDatasetCell(
+                    selected_val.text(),
+                    selected_val.data('id'),
+                    $('button', next_blank_input).data()
                 );
+
+                next_blank_input.replaceWith(last_filled_input);
 
                 // shift filled cell out of queue
                 blank_input_queue = blank_input_queue.not(next_blank_input);
@@ -428,9 +429,12 @@ $(function() {
         dataset_input_table.append(uiFactory.pipelineInputRow());
     }
     var removeLastRunRow = function() {
-        var $trs = dataset_input_table.find('tr')
-        if ($trs.length > 1) {
-            $trs.eq(-1).remove();
+        var $tr = dataset_input_table.find('tr').eq(-1);
+        if ($tr.length) {
+            if ($tr.find('.receiving').length) {
+                closeSearchDialog();
+            }
+            $tr.eq(-1).remove();
         } else {
             dataset_input_table.error("Error: You must have at least 1 run.");
         }
