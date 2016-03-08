@@ -313,247 +313,10 @@ class CodeResourceRevisionTests(MethodTestCase):
         no_cr_set.revision_name = "foo"
         self.assertEquals(unicode(no_cr_set), "foo")
 
-    # Tests of has_circular_dependence and clean
-    def test_has_circular_dependence_nodep(self):
-        """A CRR with no dependencies should not have any circular dependence."""
-        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
-                          False)
-        self.assertEquals(self.test_cr_1_rev1.clean(), None)
-        self.test_cr_1_rev1.content_file.close()
-
-    def test_has_circular_dependence_single_self_direct_dep(self):
-        """A CRR has itself as its lone dependency."""
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_1_rev1,
-            depPath=".",
-            depFileName="foo")
-        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(), True)
-        self.assertRaisesRegexp(ValidationError,
-                                "Self-referential dependency",
-                                self.test_cr_1_rev1.clean)
-        self.test_cr_1_rev1.content_file.close()
-
-    def test_has_circular_dependence_single_other_direct_dep(self):
-        """A CRR has a lone dependency (non-self)."""
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath=".",
-            depFileName="foo")
-        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
-                          False)
-        self.assertEquals(self.test_cr_1_rev1.clean(), None)
-        self.test_cr_1_rev1.content_file.close()
-
-    def test_has_circular_dependence_several_direct_dep_noself(self):
-        """A CRR with several direct dependencies (none are itself)."""
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath=".",
-            depFileName="foo")
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath=".")
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_4_rev1,
-            depPath=".")
-        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
-                          False)
-        self.assertEquals(self.test_cr_1_rev1.clean(), None)
-        self.test_cr_1_rev1.content_file.close()
-
-    def test_has_circular_dependence_several_direct_dep_self_1(self):
-        """A CRR with several dependencies has itself as the first dependency."""
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_1_rev1,
-            depPath=".",
-            depFileName="foo")
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath=".")
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath=".")
-        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
-                          True)
-
-        self.assertRaisesRegexp(ValidationError,
-                                "Self-referential dependency",
-                                self.test_cr_1_rev1.clean)
-        self.test_cr_1_rev1.content_file.close()
-
-    def test_has_circular_dependence_several_direct_dep_self_2(self):
-        """A CRR with several dependencies has itself as the second dependency."""
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath=".")
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_1_rev1,
-            depPath=".",
-            depFileName="foo")
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath=".")
-        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
-                          True)
-        self.assertRaisesRegexp(ValidationError,
-                                "Self-referential dependency",
-                                self.test_cr_1_rev1.clean)
-
-    def test_has_circular_dependence_several_direct_dep_self_3(self):
-        """A CRR with several dependencies has itself as the last dependency."""
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath=".")
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath=".")
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_1_rev1,
-            depPath=".",
-            depFileName="foo")
-        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
-                          True)
-        self.assertRaisesRegexp(ValidationError,
-                                "Self-referential dependency",
-                                self.test_cr_1_rev1.clean)
-
-    def test_has_circular_dependence_several_nested_dep_noself(self):
-        """A CRR with several dependencies including a nested one."""
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath=".")
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath=".")
-        self.test_cr_3_rev1.dependencies.create(
-            requirement=self.test_cr_4_rev1,
-            depPath=".")
-        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
-                          False)
-        self.assertEquals(self.test_cr_1_rev1.clean(), None)
-
-    def test_has_circular_dependence_several_nested_dep_selfnested(self):
-        """A CRR with several dependencies including itself as a nested one."""
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath=".")
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath=".")
-        self.test_cr_3_rev1.dependencies.create(
-            requirement=self.test_cr_1_rev1,
-            depPath=".")
-        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
-                          True)
-        self.assertEquals(self.test_cr_2_rev1.has_circular_dependence(),
-                          False)
-        # Note that test_cr_3_rev1 *is* circular, as it depends on 1 and
-        # 1 has a circular dependence.
-        self.assertEquals(self.test_cr_3_rev1.has_circular_dependence(),
-                          True)
-        self.assertRaisesRegexp(ValidationError,
-                                "Self-referential dependency",
-                                self.test_cr_1_rev1.clean)
-
-    def test_has_circular_dependence_nested_dep_has_circ(self):
-        """A nested dependency is circular."""
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath=".")
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath=".")
-        self.test_cr_2_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath=".")
-        self.assertEquals(self.test_cr_1_rev1.has_circular_dependence(),
-                          True)
-        self.assertRaisesRegexp(ValidationError,
-                                "Self-referential dependency",
-                                self.test_cr_1_rev1.clean)
-        self.assertEquals(self.test_cr_2_rev1.has_circular_dependence(),
-                          True)
-        self.assertRaisesRegexp(ValidationError,
-                                "Self-referential dependency",
-                                self.test_cr_2_rev1.clean)
-
-    def test_metapackage_cannot_have_file_bad_clean(self):
+    def test_clean_valid_MD5(self):
         """
-        A CRR with a content file should have a filename associated with
-        its parent CodeResource.
+        An MD5 should exist.
         """
-        cr = CodeResource(
-            name="test_complement",
-            filename="",
-            description="Complement DNA/RNA nucleotide sequences",
-            user=self.myUser)
-        cr.save()
-
-        # So it's revision does not have a content_file
-        with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
-            cr_rev_v1 = CodeResourceRevision(
-                coderesource=cr,
-                revision_name="v1",
-                revision_desc="First version",
-                content_file=File(f),
-                user=self.myUser)
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "If content file exists, it must have a file name",
-            cr_rev_v1.clean)
-
-    def test_non_metapackage_must_have_file_bad_clean(self):
-        """
-        A CRR with no content file should not have a filename associated with
-        its parent CodeResource.
-        """
-        cr = CodeResource(
-            name="nonmetapackage",
-            filename="foo",
-            description="Associated CRRs should have a content file",
-            user=self.myUser)
-        cr.save()
-
-        # Create a revision without a content_file.
-        cr_rev_v1 = CodeResourceRevision(
-            coderesource=cr,
-            revision_name="v1",
-            revision_desc="Has no content file!",
-            user=self.myUser)
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Cannot have a filename specified in the absence of a content file",
-            cr_rev_v1.clean)
-
-    def test_clean_blank_MD5_on_codeResourceRevision_without_file(self):
-        """
-        If no file is specified, MD5 should be empty string.
-        """
-        cr = CodeResource(name="foo",
-                          filename="",
-                          description="Some metapackage",
-                          user=self.myUser)
-        cr.save()
-
-        # Create crRev with a codeResource but no file contents
-        no_file_crRev = CodeResourceRevision(
-            coderesource=cr,
-            revision_name="foo",
-            revision_desc="foo",
-            user=self.myUser)
-
-        no_file_crRev.clean()
-
-        # After clean(), MD5 checksum should be the empty string
-        self.assertEquals(no_file_crRev.MD5_checksum, "")
-
-    def test_clean_valid_MD5_on_codeResourceRevision_with_file(self):
-        """
-        If file contents are associated with a crRev, an MD5 should exist.
-        """
-
         # Compute the reference MD5
         md5gen = hashlib.md5()
         with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
@@ -561,542 +324,6 @@ class CodeResourceRevisionTests(MethodTestCase):
 
         # Revision should have the correct MD5 checksum
         self.assertEquals(md5gen.hexdigest(), self.comp_cr.revisions.get(revision_name="v1").MD5_checksum)
-
-    def test_dependency_depends_on_nothing_clean_good(self):
-        self.assertEqual(self.test_cr_1_rev1.clean(), None)
-
-    def test_dependency_current_folder_same_name_clean_bad(self):
-        """
-        A depends on B - current folder, same name
-        """
-
-        # test_cr_1_rev1 is needed by test_cr_2_rev1
-        # It will have the same file name as test_cr_1
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="",
-            depFileName=self.test_cr_1.filename)
-
-        self.assertRaisesRegexp(ValidationError,
-                                "Conflicting dependencies",
-                                self.test_cr_1_rev1.clean)
-
-    def test_dependency_current_folder_different_name_clean_good(self):
-        """
-        1 depends on 2 - current folder, different name
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="",
-            depFileName="differentName.py")
-
-        self.assertEqual(self.test_cr_1_rev1.clean(), None)
-
-    def test_dependency_inner_folder_same_name_clean_good(self):
-        """
-        1 depends on 2 - different folder, same name
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="innerFolder/",
-            depFileName=self.test_cr_1.filename)
-
-        self.assertEqual(self.test_cr_1_rev1.clean(), None)
-
-    def test_dependency_inner_folder_different_name_clean_good(self):
-        """
-        1 depends on 2 - different folder, different name
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="innerFolder/",
-            depFileName="differentName.py")
-
-        self.assertEqual(self.test_cr_1_rev1.clean(), None)
-
-    def test_dependency_A_depends_BC_same_folder_no_conflicts_clean_good(self):
-        """
-        A depends on B, A depends on C
-        BC in same folder as A
-        Nothing conflicts
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="",
-            depFileName="name1.py")
-
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName="name2.py")
-
-        self.assertEqual(self.test_cr_1_rev1.clean(), None)
-
-    def test_dependency_A_depends_BC_same_folder_B_conflicts_with_A_clean_bad(self):
-        """
-        A depends on B, A depends on C
-        BC in same folder as A, B conflicts with A
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="",
-            depFileName="name1.py")
-
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName=self.test_cr_1.filename)
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Conflicting dependencies",
-            self.test_cr_1_rev1.clean)
-
-    def test_dependency_A_depends_BC_same_folder_C_conflicts_with_A_clean_bad(self):
-        """
-        A depends on B, A depends on C
-        BC in same folder as A, C conflicts with A
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="",
-            depFileName=self.test_cr_1.filename)
-
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName="notConflicting.py")
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Conflicting dependencies",
-            self.test_cr_1_rev1.clean)
-
-    def test_dependency_A_depends_BC_same_folder_B_conflicts_with_C_clean_bad(self):
-        """
-        A depends on B, A depends on C
-        BC in same folder as A, BC conflict
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="",
-            depFileName="colliding_name.py")
-
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName="colliding_name.py")
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Conflicting dependencies",
-            self.test_cr_1_rev1.clean)
-
-    def test_dependency_A_depends_BC_B_in_same_folder_no_conflicts_clean_good(self):
-        """
-        BC in same folder as A, B conflicts with A
-        B in same folder, C in different folder, nothing conflicts
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="",
-            depFileName="no_collision.py")
-
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="diffFolder",
-            depFileName="differentName.py")
-
-        self.assertEqual(self.test_cr_1_rev1.clean(), None)
-
-    def test_dependency_A_depends_BC_B_in_same_folder_B_conflicts_A_clean_bad(self):
-        """
-        A depends on B, A depends on C
-        B in same folder, C in different folder, B conflicts with A
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="",
-            depFileName=self.test_cr_1.filename)
-
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="diffFolder",
-            depFileName="differentName.py")
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Conflicting dependencies",
-            self.test_cr_1_rev1.clean)
-
-    def test_dependency_A_depends_BC_C_in_same_folder_no_conflict_clean_good(self):
-        """
-        A depends on B, A depends on C
-        B in different folder, C in same folder, nothing conflicts
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="diffFolder",
-            depFileName=self.test_cr_1.filename)
-
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName="differentName.py")
-
-        self.assertEqual(self.test_cr_1_rev1.clean(), None)
-
-    def test_dependency_A_depends_BC_C_in_same_folder_C_conflicts_with_A_clean_bad(self):
-        """
-        A depends on B, A depends on C
-        B in different folder, C in same folder, C conflicts with A
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="diffFolder",
-            depFileName=self.test_cr_1.filename)
-
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName=self.test_cr_1.filename)
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Conflicting dependencies",
-            self.test_cr_1_rev1.clean)
-
-    def test_dependency_A_depends_B_B_depends_C_all_same_folder_no_conflict_clean_good(self):
-        """
-        A depends on B, B depends on C
-        ABC in same folder - no conflicts
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="",
-            depFileName="differentName.py")
-
-        self.test_cr_2_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName="differetName2.py")
-
-        self.assertEqual(self.test_cr_1_rev1.clean(), None)
-
-    def test_dependency_A_depends_B_B_depends_C_all_same_folder_A_conflicts_C_clean_bad(self):
-        """
-        A depends on B, B depends on C
-        ABC in same folder - A conflicts with C
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="",
-            depFileName="differentName.py")
-
-        self.test_cr_2_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName=self.test_cr_1.filename)
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Conflicting dependencies",
-            self.test_cr_1_rev1.clean)
-
-    def test_dependency_A_depends_B_B_depends_C_all_same_folder_B_conflicts_C_clean_bad(self):
-        """
-        A depends on B, B depends on C
-        ABC in same folder - B conflicts with C
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="",
-            depFileName=self.test_cr_1.filename)
-
-        self.test_cr_2_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName="differentName.py")
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Conflicting dependencies",
-            self.test_cr_1_rev1.clean)
-
-    def test_dependency_A_depends_B_B_depends_C_BC_is_nested_no_conflicts_clean_good(self):
-        """
-        A depends on B, B depends on C
-        BC in nested folder - no conflicts
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="nestedFolder",
-            depFileName=self.test_cr_1.name)
-
-        self.test_cr_2_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName="differentName.py")
-
-        self.assertEqual(self.test_cr_1_rev1.clean(), None)
-
-    def test_dependency_A_depends_B_B_depends_C_BC_is_nested_B_conflicts_C_clean_bad(self):
-        """
-        A depends on B, B depends on C
-        BC in nested folder - B conflicts with C
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="nestedFolder",
-            depFileName="conflicting.py")
-
-        self.test_cr_2_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName="conflicting.py")
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Conflicting dependencies",
-            self.test_cr_1_rev1.clean)
-
-    def test_dependency_A_depends_B_B_depends_C_double_nested_clean_good(self):
-        """
-        A depends on B, B depends on C
-        B in nested folder, C in double nested folder - no conflicts
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="nestedFolder",
-            depFileName="conflicting.py")
-
-        self.test_cr_2_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="nestedFolder",
-            depFileName="conflicting.py")
-
-        self.assertEqual(self.test_cr_1_rev1.clean(), None)
-
-    def test_dependency_A_depends_B1B2B3_B1_depends_C_all_same_folder_no_conflicts_clean_good(self):
-        """
-        A depends on B1/B2/B3, B1 depends on C
-        A/B1B2B3/C in same folder - no conflicts
-        """
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="",
-            depFileName="1.py")
-
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName="2.py")
-
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName="3.py")
-
-        self.test_cr_2_rev1.dependencies.create(
-            requirement=self.test_cr_4_rev1,
-            depPath="",
-            depFileName="4.py")
-
-        self.assertEqual(self.test_cr_1_rev1.clean(), None)
-
-    def test_dependency_A_depends_B1B2B3_B2_depends_C_B1B2B3C_in_nested_B3_conflicts_C_clean_bad(self):
-        """
-        A depends on B1/B2/B3, B2 depends on C
-        B1B2B3C in nested folder - B3 conflicts with C
-        """
-
-        # A depends on B1
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="nested",
-            depFileName="1.py")
-
-        # A depends on B2
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="nested",
-            depFileName="2.py")
-
-        # A depends on B3***
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="nested",
-            depFileName="conflict.py")
-
-        # B2 depends on C
-        self.test_cr_3_rev1.dependencies.create(
-            requirement=self.test_cr_4_rev1,
-            depPath="",
-            depFileName="conflict.py")
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Conflicting dependencies",
-            self.test_cr_1_rev1.clean)
-
-    def test_dependency_A_depends_B1B2B3_B3_depends_C_B2B3C_in_nested_B2_conflicts_B3_clean_bad(self):
-        """
-        A depends on B1/B2/B3, B3 depends on C
-        B2B3 in nested folder - B2 conflicts with B3
-        """
-
-        # A depends on B1
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="",
-            depFileName="1.py")
-
-        # A depends on B2
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="nested",
-            depFileName="conflict.py")
-
-        # A depends on B3
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="nested",
-            depFileName="conflict.py")
-
-        # B3 depends on C
-        self.test_cr_3_rev1.dependencies.create(
-            requirement=self.test_cr_4_rev1,
-            depPath="",
-            depFileName="4.py")
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Conflicting dependencies",
-            self.test_cr_1_rev1.clean)
-
-    def test_dependency_list_all_filepaths_recursive_case_1(self):
-        """
-        Ensure list_all_filepaths generates the correct list
-        A depends on B1/B2, B1 depends on C
-        B1 is nested, B2 is not nested, C is nested wrt B1
-        """
-
-        # A depends on B1 (Which is nested)
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="B1_nested",
-            depFileName="B1.py")
-
-        # A depends on B2 (Which is not nested)
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName="B2.py")
-
-        # B1 depends on C (Nested wrt B1)
-        self.test_cr_2_rev1.dependencies.create(
-            requirement=self.test_cr_4_rev1,
-            depPath="C_nested",
-            depFileName="C.py")
-
-        self.assertSetEqual(
-            set(self.test_cr_1_rev1.list_all_filepaths()),
-            {u'test_cr_1.py', u'B1_nested/B1.py', u'B1_nested/C_nested/C.py', u'B2.py'}
-        )
-
-    def test_dependency_list_all_filepaths_recursive_case_2(self):
-        """
-        Ensure list_all_filepaths generates the correct list
-        A depends on B1/B2, B2 depends on C
-        B1 is nested, B2 is not nested, C is nested wrt B2
-        """
-        # A depends on B1 (Which is nested)
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="B1_nested",
-            depFileName="B1.py")
-
-        # A depends on B2 (Which is not nested)
-        self.test_cr_1_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="",
-            depFileName="B2.py")
-
-        # B2 depends on C (Nested wrt B2)
-        self.test_cr_3_rev1.dependencies.create(
-            requirement=self.test_cr_4_rev1,
-            depPath="C_nested",
-            depFileName="C.py")
-
-        self.assertSetEqual(
-            set(self.test_cr_1_rev1.list_all_filepaths()),
-            {u'test_cr_1.py', u'B1_nested/B1.py', u'B2.py', u'C_nested/C.py'}
-        )
-
-    def test_dependency_list_all_filepaths_with_metapackage(self):
-
-        # Define a code with a blank filename (metapackage)
-        # Give it dependencies
-        # Give one more dependency a nested dependency
-
-        # The following is for testing code resource dependencies
-        test_cr_6 = CodeResource(name="test_cr_6",
-                                 filename="",
-                                 description="CR6",
-                                 user=self.myUser)
-        test_cr_6.save()
-
-        # The revision has no content_file because it's a metapackage
-        test_cr_6_rev1 = CodeResourceRevision(coderesource=test_cr_6,
-                                              revision_name="v1_metapackage",
-                                              revision_desc="CR6-rev1",
-                                              user=self.myUser)
-        test_cr_6_rev1.save()
-
-        # Current-folder dependencies
-        test_cr_6_rev1.dependencies.create(
-            requirement=self.test_cr_2_rev1,
-            depPath="",
-            depFileName="B.py")
-
-        # Sub-folder dependencies
-        test_cr_6_rev1.dependencies.create(
-            requirement=self.test_cr_3_rev1,
-            depPath="nestedFolder",
-            depFileName="C.py")
-
-        # Nested dependencies
-        self.test_cr_3_rev1.dependencies.create(
-            requirement=self.test_cr_4_rev1,
-            depPath="deeperNestedFolder",
-            depFileName="D.py")
-
-        self.assertSetEqual(
-            set(test_cr_6_rev1.list_all_filepaths()),
-            {u'B.py', u'nestedFolder/C.py', u'nestedFolder/deeperNestedFolder/D.py'}
-        )
-
-        # FIXME
-        # test_cr_6_rev1.content_file.delete()
-        # test_cr_6_rev1.delete()
-
-    def test_dependency_list_all_filepaths_single_unnested_dep_blank_depFileName(self):
-        """List all filepaths when dependency has no depFileName set and is not nested.
-        """
-        self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath="")
-        self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
-                         [u'test_cr_1.py', u'test_cr_2.py'])
-
-    def test_dependency_list_all_filepaths_single_nested_dep_blank_depFileName(self):
-        """List all filepaths when dependency has no depFileName set and is nested.
-        """
-        self.test_cr_1_rev1.dependencies.create(
-                requirement=self.test_cr_2_rev1,
-                depPath="nest_folder")
-        self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
-                         [u'test_cr_1.py', u'nest_folder/test_cr_2.py'])
 
     def test_find_update_not_found(self):
         update = self.compv2_crRev.find_update()
@@ -1111,7 +338,6 @@ class CodeResourceRevisionTests(MethodTestCase):
 
 # FIXME gotta fix this after we address the problem with tests not running.
 class MethodDependencyTests(MethodTestCase):
-
     def setUp(self):
         super(MethodDependencyTests, self).setUp()
 
@@ -1165,194 +391,85 @@ class MethodDependencyTests(MethodTestCase):
         """
         Dependency goes into a path with a directory containing ".." in the name.
         """
-        v1 = self.comp_cr.revisions.get(revision_name="v1")
         v2 = self.comp_cr.revisions.get(revision_name="v2")
 
-        good_crd = CodeResourceDependency(coderesourcerevision=v1,
-                                          requirement=v2,
-                                          depPath="..bar",
-                                          depFileName="foo.py")
-        self.assertEquals(good_crd.clean(), None)
+        good_md = MethodDependency(
+            method=self.DNAcompv1_m,
+            requirement=v2,
+            path="..bar",
+            filename="foo.py"
+        )
+        self.assertEquals(good_md.clean(), None)
 
-        good_crd_2 = CodeResourceDependency(coderesourcerevision=v1,
-                                            requirement=v2,
-                                            depPath="bar..",
-                                            depFileName="foo.py")
-        self.assertEquals(good_crd_2.clean(), None)
+        good_md_2 = MethodDependency(
+            method=self.DNAcompv1_m,
+            requirement=v2,
+            path="bar..",
+            filename="foo.py"
+        )
+        self.assertEquals(good_md_2.clean(), None)
 
-        good_crd_3 = CodeResourceDependency(coderesourcerevision=v1,
-                                            requirement=v2,
-                                            depPath="baz/bar..",
-                                            depFileName="foo.py")
-        self.assertEquals(good_crd_3.clean(), None)
+        good_md_3 = MethodDependency(
+            method=self.DNAcompv1_m,
+            requirement=v2,
+            path="baz/bar..",
+            filename="foo.py"
+        )
+        self.assertEquals(good_md_3.clean(), None)
 
-        good_crd_4 = CodeResourceDependency(coderesourcerevision=v1,
-                                            requirement=v2,
-                                            depPath="baz/..bar",
-                                            depFileName="foo.py")
-        self.assertEquals(good_crd_4.clean(), None)
+        good_md_4 = MethodDependency(
+            method=self.DNAcompv1_m,
+            requirement=v2,
+            path="baz/..bar",
+            filename="foo.py"
+        )
+        self.assertEquals(good_md_4.clean(), None)
 
-        good_crd_5 = CodeResourceDependency(coderesourcerevision=v1,
-                                            requirement=v2,
-                                            depPath="baz/..bar..",
-                                            depFileName="foo.py")
-        self.assertEquals(good_crd_5.clean(), None)
+        good_md_5 = MethodDependency(
+            method=self.DNAcompv1_m,
+            requirement=v2,
+            path="baz/..bar..",
+            filename="foo.py"
+        )
+        self.assertEquals(good_md_5.clean(), None)
 
-        good_crd_6 = CodeResourceDependency(coderesourcerevision=v1,
-                                            requirement=v2,
-                                            depPath="..baz/bar..",
-                                            depFileName="foo.py")
-        self.assertEquals(good_crd_6.clean(), None)
+        good_md_6 = MethodDependency(
+            method=self.DNAcompv1_m,
+            requirement=v2,
+            path="..baz/bar..",
+            filename="foo.py"
+        )
+        self.assertEquals(good_md_6.clean(), None)
 
         # This case works because the ".." doesn't take us out of the sandbox
-        good_crd_7 = CodeResourceDependency(coderesourcerevision=v1,
-                                            requirement=v2,
-                                            depPath="baz/../bar",
-                                            depFileName="foo.py")
-        self.assertEquals(good_crd_7.clean(), None)
+        good_md_7 = MethodDependency(
+            method=self.DNAcompv1_m,
+            requirement=v2,
+            path="baz/../bar",
+            filename="foo.py"
+        )
+        self.assertEquals(good_md_7.clean(), None)
 
-        good_crd_8 = CodeResourceDependency(coderesourcerevision=v1,
-                                            requirement=v2,
-                                            depPath="baz/..bar../blah",
-                                            depFileName="foo.py")
-        self.assertEquals(good_crd_8.clean(), None)
+        good_md_8 = MethodDependency(
+            method=self.DNAcompv1_m,
+            requirement=v2,
+            path="baz/..bar../blah",
+            filename="foo.py")
+        self.assertEquals(good_md_8.clean(), None)
 
-    def test_cr_with_filename_dependency_with_good_path_and_filename_clean(self):
+    def test_method_dependency_with_good_path_and_filename_clean(self):
         """
-        Check
+        Test a MethodDependency with no problems.
         """
-        # cr_no_filename has name="complement" and filename="complement.py"
-        cr = CodeResource(
-                name="testing_complement",
-                filename="complement.py",
-                description="Complement DNA/RNA nucleotide sequences",
-                user=self.myUser)
-        cr.save()
+        v2 = self.comp_cr.revisions.get(revision_name="v2")
 
-        # Define cr_rev_v1 for cr
-        with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
-            cr_rev_v1 = CodeResourceRevision(
-                    coderesource=cr,
-                    revision_name="v1",
-                    revision_desc="First version",
-                    content_file=File(f),
-                    user=self.myUser)
-            cr_rev_v1.full_clean()
-            cr_rev_v1.save()
-
-        # Define cr_rev_v2 for cr
-        with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
-            cr_rev_v2 = CodeResourceRevision(
-                    coderesource=cr,
-                    revision_name="v2",
-                    revision_desc="Second version",
-                    content_file=File(f),
-                    user=self.myUser)
-            cr_rev_v2.full_clean()
-            cr_rev_v2.save()
-
-        # Define a code resource dependency for cr_rev_v1 with good paths and filenames
-        good_crd = CodeResourceDependency(coderesourcerevision=cr_rev_v1,
-                                          requirement=cr_rev_v2,
-                                          depPath="testFolder/anotherFolder",
-                                          depFileName="foo.py")
-
-        self.assertEqual(good_crd.clean(), None)
-
-    def test_metapackage_cannot_have_file_names_bad_clean(self):
-
-        # Define a standard code resource
-        cr = CodeResource(
-                name="test_complement",
-                filename="test.py",
-                description="Complement DNA/RNA nucleotide sequences",
-                user=self.myUser)
-        cr.save()
-
-        # Give it a file
-        with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
-            cr_rev_v1 = CodeResourceRevision(
-                coderesource=cr,
-                revision_name="v1",
-                revision_desc="First version",
-                content_file=File(f),
-                user=self.myUser)
-            cr_rev_v1.full_clean()
-            cr_rev_v1.save()
-
-        # Define a metapackage code resource (no file name)
-        cr_meta = CodeResource(
-                name="test2_complement",
-                filename="",
-                description="Complement DNA/RNA nucleotide sequences",
-                user=self.myUser)
-        cr_meta.save()
-
-        # Do not give it a file
-        cr_meta_rev_v1 = CodeResourceRevision(
-            coderesource=cr_meta,
-            revision_name="v1",
-            revision_desc="First version",
-            user=self.myUser)
-        cr_meta_rev_v1.full_clean()
-        cr_meta_rev_v1.save()
-
-        # Add metapackage as a dependency to cr_rev_v1, but invalidly give it a depFileName
-        bad_crd = CodeResourceDependency(coderesourcerevision=cr_rev_v1,
-                                         requirement=cr_meta_rev_v1,
-                                         depPath="testFolder/anotherFolder",
-                                         depFileName="foo.py")
-
-        self.assertRaisesRegexp(
-            ValidationError,
-            "Metapackage dependencies cannot have a depFileName",
-            bad_crd.clean)
-
-    def test_metapackage_good_clean(self):
-
-        # Define a standard code resource
-        cr = CodeResource(
-                name="test_complement",
-                filename="test.py",
-                description="Complement DNA/RNA nucleotide sequences",
-                user=self.myUser)
-        cr.save()
-
-        # Give it a file
-        with open(os.path.join(samplecode_path, "complement.py"), "rb") as f:
-            cr_rev_v1 = CodeResourceRevision(
-                coderesource=cr,
-                revision_name="v1",
-                revision_desc="First version",
-                content_file=File(f),
-                user=self.myUser)
-            cr_rev_v1.full_clean()
-            cr_rev_v1.save()
-
-        # Define a metapackage code resource (no file name)
-        cr_meta = CodeResource(
-                name="test2_complement",
-                filename="",
-                description="Complement DNA/RNA nucleotide sequences",
-                user=self.myUser)
-        cr_meta.save()
-
-        # Do not give it a file
-        cr_meta_rev_v1 = CodeResourceRevision(
-            coderesource=cr_meta,
-            revision_name="v1",
-            revision_desc="First version",
-            user=self.myUser)
-        cr_meta_rev_v1.full_clean()
-        cr_meta_rev_v1.save()
-
-        # Add metapackage as a dependency to cr_rev_v1
-        good_crd = CodeResourceDependency(coderesourcerevision=cr_rev_v1,
-                                          requirement=cr_meta_rev_v1,
-                                          depPath="testFolder/anotherFolder",
-                                          depFileName="")
-
-        self.assertEqual(good_crd.clean(), None)
+        # Define a MethodDependency for self.DNAcompv1_m with good paths and filenames.
+        good_md = MethodDependency(
+            method=self.DNAcompv1_m,
+            requirement=v2,
+            path="testFolder/anotherFolder",
+            filename="foo.py")
+        self.assertEqual(good_md.clean(), None)
 
 
 class CodeResourceRevisionInstallTests(MethodTestCase):
@@ -1385,7 +502,7 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
         """
         test_path = tempfile.mkdtemp(prefix="test_dependency_same_dir_dot")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath=".")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path=".")
         self.compv1_crRev.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.exists(os.path.join(test_path, "test_cr_1.py")))
@@ -1398,7 +515,7 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
         """
         test_path = tempfile.mkdtemp(prefix="test_dependency_same_dir_blank")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="")
         self.compv1_crRev.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.exists(os.path.join(test_path, "test_cr_1.py")))
@@ -1411,8 +528,8 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
         """
         test_path = tempfile.mkdtemp(prefix="test_dependency_override_dep_filename")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="",
-                                              depFileName="foo.py")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="",
+                                              filename="foo.py")
         self.compv1_crRev.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.exists(os.path.join(test_path, "foo.py")))
@@ -1426,7 +543,7 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
         """
         test_path = tempfile.mkdtemp(prefix="test_dependency_in_subdirectory")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="modules")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="modules")
         self.compv1_crRev.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.isdir(os.path.join(test_path, "modules")))
@@ -1440,8 +557,8 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
         """
         test_path = tempfile.mkdtemp(prefix="test_dependencies_in_same_subdirectory")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="modules")
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, depPath="modules")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="modules")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, path="modules")
         self.compv1_crRev.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.isdir(os.path.join(test_path, "modules")))
@@ -1456,8 +573,8 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
         """
         test_path = tempfile.mkdtemp(prefix="test_dependencies_in_same_directory")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="")
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, depPath="")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, path="")
         self.compv1_crRev.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.exists(os.path.join(test_path, "test_cr_1.py")))
@@ -1471,8 +588,8 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
         """
         test_path = tempfile.mkdtemp(prefix="test_dependencies_in_subsub_directory")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="modules/foo1")
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, depPath="modules/foo2")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="modules/foo1")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, path="modules/foo2")
         self.compv1_crRev.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.isdir(os.path.join(test_path, "modules/foo1")))
@@ -1488,7 +605,7 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
         """
         test_path = tempfile.mkdtemp(prefix="test_dependencies_from_same_coderesource_same_dir")
 
-        self.compv1_crRev.dependencies.create(requirement=self.compv2_crRev, depPath="", depFileName="foo.py")
+        self.compv1_crRev.dependencies.create(requirement=self.compv2_crRev, path="", filename="foo.py")
         self.compv1_crRev.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.exists(os.path.join(test_path, "foo.py")))
@@ -1510,9 +627,9 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
         """
         test_path = tempfile.mkdtemp(prefix="test_dependencies_in_various_places")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="modules")
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, depPath="moremodules")
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_3_rev1, depPath="modules/foo")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="modules")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, path="moremodules")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_3_rev1, path="modules/foo")
         self.compv1_crRev.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.isdir(os.path.join(test_path, "modules")))
@@ -1531,14 +648,14 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
         test_path = tempfile.mkdtemp(prefix="test_nested_dependencies")
 
         # Make test_cr_1_rev1 have its own dependencies.
-        self.test_cr_1_rev1.dependencies.create(requirement=self.script_1_crRev, depPath=".")
-        self.test_cr_1_rev1.dependencies.create(requirement=self.script_2_crRev, depPath="cr1mods")
+        self.test_cr_1_rev1.dependencies.create(requirement=self.script_1_crRev, path=".")
+        self.test_cr_1_rev1.dependencies.create(requirement=self.script_2_crRev, path="cr1mods")
 
-        self.test_cr_2_rev1.dependencies.create(requirement=self.script_3_crRev, depPath="cr2mods")
-        self.test_cr_2_rev1.dependencies.create(requirement=self.script_4_1_CRR, depPath="cr2mods/foo")
+        self.test_cr_2_rev1.dependencies.create(requirement=self.script_3_crRev, path="cr2mods")
+        self.test_cr_2_rev1.dependencies.create(requirement=self.script_4_1_CRR, path="cr2mods/foo")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, depPath="")
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, depPath="basemods")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="")
+        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, path="basemods")
         self.compv1_crRev.install(test_path)
 
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
@@ -1577,10 +694,10 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
         self.metapackage_r1.save()
 
         # Add dependencies.
-        self.metapackage_r1.dependencies.create(requirement=self.script_1_crRev, depPath=".")
-        self.metapackage_r1.dependencies.create(requirement=self.script_2_crRev, depPath=".")
-        self.metapackage_r1.dependencies.create(requirement=self.script_3_crRev, depPath="metamodules")
-        self.metapackage_r1.dependencies.create(requirement=self.script_4_1_CRR, depPath="metamodules/foo")
+        self.metapackage_r1.dependencies.create(requirement=self.script_1_crRev, path=".")
+        self.metapackage_r1.dependencies.create(requirement=self.script_2_crRev, path=".")
+        self.metapackage_r1.dependencies.create(requirement=self.script_3_crRev, path="metamodules")
+        self.metapackage_r1.dependencies.create(requirement=self.script_4_1_CRR, path="metamodules/foo")
 
     def test_metapackage(self):
         """
@@ -1606,7 +723,7 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
         test_path = tempfile.mkdtemp(prefix="test_dependency_is_metapackage")
         self._setup_metapackage()
 
-        self.compv1_crRev.dependencies.create(requirement=self.metapackage_r1, depPath="modules")
+        self.compv1_crRev.dependencies.create(requirement=self.metapackage_r1, path="modules")
 
         self.compv1_crRev.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
@@ -1624,6 +741,15 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
 
 
 class MethodTests(MethodTestCase):
+
+    def setUp(self):
+        self.test_dep_method = tools.make_first_method(
+            "TestMethodDependencies",
+            "Methods with dependencies",
+            self.test_cr_1_rev1,
+            self.myUser
+        )
+        tools.simple_method_io(self.test_dep_method, None, "dummy_in", "dummy_out")
 
     def test_with_family_unicode(self):
         """
@@ -2210,6 +1336,433 @@ class MethodTests(MethodTestCase):
 
         self.assertEqual(update, None)
 
+    def test_dependency_depends_on_nothing_clean_good(self):
+        self.test_dep_method.clean()
+
+    def test_dependency_current_folder_same_name_clean_bad(self):
+        """
+        A depends on B - current folder, same name
+        """
+        # We're giving the dependency a conflicting filename.
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="",
+            filename=self.test_cr_1.filename
+        )
+
+        self.assertRaisesRegexp(ValidationError,
+                                "Conflicting dependencies",
+                                self.test_dep_method.clean)
+
+    def test_dependency_current_folder_different_name_clean_good(self):
+        """
+        1 depends on 2 - current folder, different name
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="",
+            filename="differentName.py")
+
+        self.test_dep_method.clean()
+
+    def test_dependency_inner_folder_same_name_clean_good(self):
+        """
+        1 depends on 2 - different folder, same name
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="innerFolder/",
+            filename=self.test_cr_1.filename)
+
+        self.test_dep_method.clean()
+
+    def test_dependency_inner_folder_different_name_clean_good(self):
+        """
+        1 depends on 2 - different folder, different name
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="innerFolder/",
+            filename="differentName.py")
+
+        self.assertEqual(self.test_cr_1_rev1.clean(), None)
+
+    def test_dependency_A_depends_BC_same_folder_no_conflicts_clean_good(self):
+        """
+        A depends on B, A depends on C
+        BC in same folder as A
+        Nothing conflicts
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="",
+            filename="name1.py")
+
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            path="",
+            filename="name2.py")
+
+        self.test_dep_method.clean()
+
+    def test_dependency_A_depends_BC_same_folder_B_conflicts_with_A_clean_bad(self):
+        """
+        A depends on B, A depends on C
+        BC in same folder as A, B conflicts with A
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="",
+            filename="name1.py")
+
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            path="",
+            filename=self.test_cr_1.filename)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_dep_method.clean)
+
+    def test_dependency_A_depends_BC_same_folder_C_conflicts_with_A_clean_bad(self):
+        """
+        A depends on B, A depends on C
+        BC in same folder as A, C conflicts with A
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="",
+            filename=self.test_cr_1.filename)
+
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            path="",
+            filename="notConflicting.py")
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_dep_method.clean)
+
+    def test_dependency_A_depends_BC_same_folder_B_conflicts_with_C_clean_bad(self):
+        """
+        A depends on B, A depends on C
+        BC in same folder as A, BC conflict
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="",
+            filename="colliding_name.py")
+
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            path="",
+            filename="colliding_name.py")
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_dep_method.clean)
+
+    def test_dependency_A_depends_BC_B_in_same_folder_no_conflicts_clean_good(self):
+        """
+        BC in same folder as A, B conflicts with A
+        B in same folder, C in different folder, nothing conflicts
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="",
+            filename="no_collision.py")
+
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            path="diffFolder",
+            filename="differentName.py")
+
+        self.assertEqual(self.test_dep_method.clean(), None)
+
+    # def test_dependency_A_depends_BC_B_in_same_folder_B_conflicts_A_clean_bad(self):
+    #     """
+    #     A depends on B, A depends on C
+    #     B in same folder, C in different folder, B conflicts with A
+    #     """
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_2_rev1,
+    #         path="",
+    #         filename=self.test_cr_1.filename)
+    #
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_3_rev1,
+    #         path="diffFolder",
+    #         filename="differentName.py")
+    #
+    #     self.assertRaisesRegexp(
+    #         ValidationError,
+    #         "Conflicting dependencies",
+    #         self.test_cr_1_rev1.clean)
+
+    # def test_dependency_A_depends_BC_C_in_same_folder_no_conflict_clean_good(self):
+    #     """
+    #     A depends on B, A depends on C
+    #     B in different folder, C in same folder, nothing conflicts
+    #     """
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_2_rev1,
+    #         path="diffFolder",
+    #         filename=self.test_cr_1.filename)
+    #
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_3_rev1,
+    #         path="",
+    #         filename="differentName.py")
+    #
+    #     self.assertEqual(self.test_cr_1_rev1.clean(), None)
+
+    # def test_dependency_A_depends_BC_C_in_same_folder_C_conflicts_with_A_clean_bad(self):
+    #     """
+    #     A depends on B, A depends on C
+    #     B in different folder, C in same folder, C conflicts with A
+    #     """
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_2_rev1,
+    #         path="diffFolder",
+    #         filename=self.test_cr_1.filename)
+    #
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_3_rev1,
+    #         path="",
+    #         filename=self.test_cr_1.filename)
+    #
+    #     self.assertRaisesRegexp(
+    #         ValidationError,
+    #         "Conflicting dependencies",
+    #         self.test_cr_1_rev1.clean)
+
+
+    # MODIFY
+    # def test_dependency_A_depends_B1B2B3_B1_depends_C_all_same_folder_no_conflicts_clean_good(self):
+    #     """
+    #     A depends on B1/B2/B3, B1 depends on C
+    #     A/B1B2B3/C in same folder - no conflicts
+    #     """
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_2_rev1,
+    #         path="",
+    #         filename="1.py")
+    #
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_3_rev1,
+    #         path="",
+    #         filename="2.py")
+    #
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_3_rev1,
+    #         path="",
+    #         filename="3.py")
+    #
+    #     self.test_cr_2_rev1.dependencies.create(
+    #         requirement=self.test_cr_4_rev1,
+    #         path="",
+    #         filename="4.py")
+    #
+    #     self.assertEqual(self.test_cr_1_rev1.clean(), None)
+
+    # MODIFY?
+    # def test_dependency_A_depends_B1B2B3_B2_depends_C_B1B2B3C_in_nested_B3_conflicts_C_clean_bad(self):
+    #     """
+    #     A depends on B1/B2/B3, B2 depends on C
+    #     B1B2B3C in nested folder - B3 conflicts with C
+    #     """
+    #
+    #     # A depends on B1
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_2_rev1,
+    #         path="nested",
+    #         filename="1.py")
+    #
+    #     # A depends on B2
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_2_rev1,
+    #         path="nested",
+    #         filename="2.py")
+    #
+    #     # A depends on B3***
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_3_rev1,
+    #         path="nested",
+    #         filename="conflict.py")
+    #
+    #     # B2 depends on C
+    #     self.test_cr_3_rev1.dependencies.create(
+    #         requirement=self.test_cr_4_rev1,
+    #         path="",
+    #         filename="conflict.py")
+    #
+    #     self.assertRaisesRegexp(
+    #         ValidationError,
+    #         "Conflicting dependencies",
+    #         self.test_cr_1_rev1.clean)
+
+    # def test_dependency_A_depends_B1B2B3_B3_depends_C_B2B3C_in_nested_B2_conflicts_B3_clean_bad(self):
+    #     """
+    #     A depends on B1/B2/B3, B3 depends on C
+    #     B2B3 in nested folder - B2 conflicts with B3
+    #     """
+    #
+    #     # A depends on B1
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_2_rev1,
+    #         path="",
+    #         filename="1.py")
+    #
+    #     # A depends on B2
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_2_rev1,
+    #         path="nested",
+    #         filename="conflict.py")
+    #
+    #     # A depends on B3
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_3_rev1,
+    #         path="nested",
+    #         filename="conflict.py")
+    #
+    #     # B3 depends on C
+    #     self.test_cr_3_rev1.dependencies.create(
+    #         requirement=self.test_cr_4_rev1,
+    #         path="",
+    #         filename="4.py")
+    #
+    #     self.assertRaisesRegexp(
+    #         ValidationError,
+    #         "Conflicting dependencies",
+    #         self.test_cr_1_rev1.clean)
+    #
+    # def test_dependency_list_all_filepaths_recursive_case_1(self):
+    #     """
+    #     Ensure list_all_filepaths generates the correct list
+    #     A depends on B1/B2, B1 depends on C
+    #     B1 is nested, B2 is not nested, C is nested wrt B1
+    #     """
+    #
+    #     # A depends on B1 (Which is nested)
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_2_rev1,
+    #         path="B1_nested",
+    #         filename="B1.py")
+    #
+    #     # A depends on B2 (Which is not nested)
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_3_rev1,
+    #         path="",
+    #         filename="B2.py")
+    #
+    #     # B1 depends on C (Nested wrt B1)
+    #     self.test_cr_2_rev1.dependencies.create(
+    #         requirement=self.test_cr_4_rev1,
+    #         path="C_nested",
+    #         filename="C.py")
+    #
+    #     self.assertSetEqual(
+    #         set(self.test_cr_1_rev1.list_all_filepaths()),
+    #         {u'test_cr_1.py', u'B1_nested/B1.py', u'B1_nested/C_nested/C.py', u'B2.py'}
+    #     )
+    #
+    # def test_dependency_list_all_filepaths_recursive_case_2(self):
+    #     """
+    #     Ensure list_all_filepaths generates the correct list
+    #     A depends on B1/B2, B2 depends on C
+    #     B1 is nested, B2 is not nested, C is nested wrt B2
+    #     """
+    #     # A depends on B1 (Which is nested)
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_2_rev1,
+    #         path="B1_nested",
+    #         filename="B1.py")
+    #
+    #     # A depends on B2 (Which is not nested)
+    #     self.test_cr_1_rev1.dependencies.create(
+    #         requirement=self.test_cr_3_rev1,
+    #         path="",
+    #         filename="B2.py")
+    #
+    #     # B2 depends on C (Nested wrt B2)
+    #     self.test_cr_3_rev1.dependencies.create(
+    #         requirement=self.test_cr_4_rev1,
+    #         path="C_nested",
+    #         filename="C.py")
+    #
+    #     self.assertSetEqual(
+    #         set(self.test_cr_1_rev1.list_all_filepaths()),
+    #         {u'test_cr_1.py', u'B1_nested/B1.py', u'B2.py', u'C_nested/C.py'}
+    #     )
+    #
+    # def test_dependency_list_all_filepaths_with_metapackage(self):
+    #
+    #     # Define a code with a blank filename (metapackage)
+    #     # Give it dependencies
+    #     # Give one more dependency a nested dependency
+    #
+    #     # The following is for testing code resource dependencies
+    #     test_cr_6 = CodeResource(name="test_cr_6",
+    #                              filename="",
+    #                              description="CR6",
+    #                              user=self.myUser)
+    #     test_cr_6.save()
+    #
+    #     # The revision has no content_file because it's a metapackage
+    #     test_cr_6_rev1 = CodeResourceRevision(coderesource=test_cr_6,
+    #                                           revision_name="v1_metapackage",
+    #                                           revision_desc="CR6-rev1",
+    #                                           user=self.myUser)
+    #     test_cr_6_rev1.save()
+    #
+    #     # Current-folder dependencies
+    #     test_cr_6_rev1.dependencies.create(
+    #         requirement=self.test_cr_2_rev1,
+    #         path="",
+    #         filename="B.py")
+    #
+    #     # Sub-folder dependencies
+    #     test_cr_6_rev1.dependencies.create(
+    #         requirement=self.test_cr_3_rev1,
+    #         path="nestedFolder",
+    #         filename="C.py")
+    #
+    #     # Nested dependencies
+    #     self.test_cr_3_rev1.dependencies.create(
+    #         requirement=self.test_cr_4_rev1,
+    #         path="deeperNestedFolder",
+    #         filename="D.py")
+    #
+    #     self.assertSetEqual(
+    #         set(test_cr_6_rev1.list_all_filepaths()),
+    #         {u'B.py', u'nestedFolder/C.py', u'nestedFolder/deeperNestedFolder/D.py'}
+    #     )
+    #
+    #     # FIXME
+    #     # test_cr_6_rev1.content_file.delete()
+    #     # test_cr_6_rev1.delete()
+    #
+    # def test_dependency_list_all_filepaths_single_unnested_dep_blank_filename(self):
+    #     """List all filepaths when dependency has no filename set and is not nested.
+    #     """
+    #     self.test_cr_1_rev1.dependencies.create(
+    #             requirement=self.test_cr_2_rev1,
+    #             path="")
+    #     self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
+    #                      [u'test_cr_1.py', u'test_cr_2.py'])
+    #
+    # def test_dependency_list_all_filepaths_single_nested_dep_blank_filename(self):
+    #     """List all filepaths when dependency has no filename set and is nested.
+    #     """
+    #     self.test_cr_1_rev1.dependencies.create(
+    #             requirement=self.test_cr_2_rev1,
+    #             path="nest_folder")
+    #     self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
+    #                      [u'test_cr_1.py', u'nest_folder/test_cr_2.py'])
+
 
 class MethodFamilyTests(MethodTestCase):
 
@@ -2533,9 +2086,7 @@ class CodeResourceApiTests(BaseTestCases.ApiTestCase):
         for key in self.removal_plan:
             self.assertEquals(response.data[key], len(self.removal_plan[key]))
         self.assertEquals(response.data['CodeResources'], 1)
-
-        # Noop is a dependency of Pass Through, so:
-        self.assertEquals(response.data["CodeResourceRevisions"], 2)
+        self.assertEquals(response.data["CodeResourceRevisions"], 1)
 
     def test_removal(self):
         start_count = CodeResource.objects.count()
@@ -2549,7 +2100,6 @@ class CodeResourceApiTests(BaseTestCases.ApiTestCase):
         end_count = CodeResource.objects.count()
         end_crr_count = CodeResourceRevision.objects.count()
         self.assertEquals(end_count, start_count - len(self.removal_plan["CodeResources"]))
-        # Noop is a dependency of Pass Through, so it should also take out the other CodeResourceRevision.
         self.assertEquals(end_crr_count, start_crr_count - len(self.removal_plan["CodeResourceRevisions"]))
 
     def test_revisions(self):
@@ -2621,33 +2171,20 @@ echo "Hello World"
         case.crd.save()
         case.crd.grant_everyone_access()
 
-    case.crr_data_with_dep = copy.deepcopy(case.crr_data)
-    case.crr_data_with_dep["dependencies"] = [
-        {
-            "requirement": case.crd.pk,
-            "depFileName": "config.dat"
-        },
-        {
-            "requirement": case.crd.pk,
-            "depPath": "configuration.dat",
-            "depFileName": "config_2.dat"
-        }
-    ]
-
 
 class CodeResourceRevisionSerializerTests(TestCase):
     fixtures = ["removal"]
 
     def setUp(self):
         # This user is defined in the removal fixture.
-        self.remover = User.objects.get(pk=2)
+        self.remover = User.objects.get(username="Rem Over")
         crr_test_setup(self)
 
     def tearDown(self):
         tools.clean_up_all_files()
 
     # Note: all validation tests are redundant.  There is no customized validation code anymore.
-    def test_validate_nodep(self):
+    def test_validate(self):
         """
         Test validation of a CodeResourceRevision with no dependencies.
         """
@@ -2657,7 +2194,7 @@ class CodeResourceRevisionSerializerTests(TestCase):
         )
         self.assertTrue(crr_s.is_valid())
 
-    def test_create_nodep(self):
+    def test_create(self):
         """
         Test creation of a CodeResourceRevision with no dependencies.
         """
@@ -2673,44 +2210,9 @@ class CodeResourceRevisionSerializerTests(TestCase):
         # Inspect the revision we just added.
         new_crr = self.cr.revisions.get(revision_name="v1")
         self.assertEquals(new_crr.revision_desc, "First version")
-        self.assertEquals(new_crr.dependencies.count(), 0)
 
         # Make sure the staged file was removed.
         self.assertFalse(portal.models.StagedFile.objects.filter(pk=staged_file_pk).exists())
-
-    def test_validate_with_dep(self):
-        """
-        Test validation of a CodeResourceRevision with no dependencies.
-        """
-        crr_s = CodeResourceRevisionSerializer(
-            data=self.crr_data_with_dep,
-            context={"request": self.duck_request}
-        )
-        self.assertTrue(crr_s.is_valid())
-
-    def test_create_with_dep(self):
-        """
-        Test creation of a CodeResourceRevision with dependencies.
-        """
-        crr_s = CodeResourceRevisionSerializer(
-            data=self.crr_data_with_dep,
-            context={"request": self.duck_request}
-        )
-        crr_s.is_valid()
-        crr_s.save()
-
-        # Inspect the revision we just added.
-        new_crr = self.cr.revisions.get(revision_name="v1")
-        self.assertEquals(new_crr.revision_desc, "First version")
-        self.assertEquals(new_crr.dependencies.count(), 2)
-
-        new_dep = new_crr.dependencies.get(depFileName="config.dat")
-        self.assertEquals(new_dep.requirement, self.crd)
-        self.assertEquals(new_dep.depPath, "")
-
-        new_dep = new_crr.dependencies.get(depFileName="config_2.dat")
-        self.assertEquals(new_dep.requirement, self.crd)
-        self.assertEquals(new_dep.depPath, "configuration.dat")
 
     def test_validate_not_your_staged_file(self):
         """
@@ -2718,7 +2220,7 @@ class CodeResourceRevisionSerializerTests(TestCase):
         """
         self.duck_request.user = self.remover
         crr_s = CodeResourceRevisionSerializer(
-            data=self.crr_data_with_dep,
+            data=self.crr_data,
             context={"request": self.duck_request}
         )
         self.cr.grant_everyone_access()
@@ -2787,8 +2289,7 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
 
         for key in self.removal_plan:
             self.assertEquals(response.data[key], len(self.removal_plan[key]))
-        # This CRR is a dependency of another one, so:
-        self.assertEquals(response.data["CodeResourceRevisions"], 2)
+        self.assertEquals(response.data["CodeResourceRevisions"], 1)
 
     def test_removal(self):
         start_count = CodeResourceRevision.objects.count()
@@ -2799,7 +2300,7 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
 
         end_count = CodeResourceRevision.objects.count()
-        # In the above we confirmed this length is 2.
+        # In the above we confirmed this length is 1.
         self.assertEquals(end_count, start_count - len(self.removal_plan["CodeResourceRevisions"]))
 
     def test_create(self):
@@ -2823,13 +2324,8 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         """
         Test that clean is being called during creation.
         """
-        # Add a bad dependency to crr_data.
-        self.crr_data["dependencies"] = [
-            {
-                "requirement": self.crd.pk,
-                "depPath": "../../jailbroken"
-            }
-        ]
+        # Disallow everyone from accessing self.noop_cr, which will cause clean to fail.
+        self.noop_cr.groups_allowed.remove(everyone_group())
 
         request = self.factory.post(self.list_path, self.crr_data, format="json")
         force_authenticate(request, user=kive_user())
@@ -2837,7 +2333,8 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
 
         self.assertDictEqual(
             response.data,
-            {'non_field_errors': "depPath cannot reference ../"})
+            {'non_field_errors': "Group(s) everyone cannot be granted access"}
+        )
 
     def test_download(self):
         request = self.factory.get(self.download_path)
@@ -2899,6 +2396,21 @@ def method_test_setup(case):
         ]
     }
 
+    case.method_data_with_dep = copy.deepcopy(case.method_data)
+    case.method_data_with_dep["revision_name"] = "v2"
+    case.method_data_with_dep["revision_desc"] = "Has dependencies"
+    case.method_data_with_dep["dependencies"] = [
+        {
+            "requirement": case.crd.pk,
+            "filename": "config.dat"
+        },
+        {
+            "requirement": case.crd.pk,
+            "path": "configuration.dat",
+            "filename": "config_2.dat"
+        }
+    ]
+
 
 class MethodSerializerTests(TestCase):
     fixtures = ["removal"]
@@ -2910,6 +2422,9 @@ class MethodSerializerTests(TestCase):
         tools.clean_up_all_files()
 
     def test_create(self):
+        """
+        Test creation of a Method using the serializer.
+        """
         method_s = MethodSerializer(data=self.method_data, context=self.duck_context)
         self.assertTrue(method_s.is_valid())
         new_method = method_s.save()
@@ -2924,6 +2439,27 @@ class MethodSerializerTests(TestCase):
 
         self.assertEquals(new_method.outputs.count(), 1)
         self.assertEquals(new_method.outputs.first().dataset_name, "empty_output")
+
+    def test_create_with_dep(self):
+        """
+        Test creation of a Method with dependencies.
+        """
+        method_s = MethodSerializer(data=self.method_data_with_dep, context=self.duck_context)
+        self.assertTrue(method_s.is_valid())
+        new_method = method_s.save()
+
+        # Inspect the revision we just added.
+        self.assertEquals(new_method.revision_name, "v2")
+        self.assertEquals(new_method.revision_desc, "Has dependencies")
+        self.assertEquals(new_method.dependencies.count(), 2)
+
+        new_dep = new_method.dependencies.get(filename="config.dat")
+        self.assertEquals(new_dep.requirement, self.crd)
+        self.assertEquals(new_dep.path, "")
+
+        new_dep_2 = new_method.dependencies.get(filename="config_2.dat")
+        self.assertEquals(new_dep_2.requirement, self.crd)
+        self.assertEquals(new_dep_2.path, "configuration.dat")
 
 
 class MethodApiTests(BaseTestCases.ApiTestCase):

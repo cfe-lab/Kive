@@ -1120,6 +1120,8 @@ class RemovalTests(TestCase):
         self.noop_crr = self.noop_cr.revisions.get(revision_name="1")
         self.pass_through_cr = CodeResource.objects.get(name="Pass Through")
         self.pass_through_crr = self.pass_through_cr.revisions.get(revision_name="1")
+        self.raw_pass_through_mf = MethodFamily.objects.get(name="Pass-through (raw)")
+        self.raw_pass_through = self.raw_pass_through_mf.members.get(revision_name="v1")
         self.nuc_seq = Datatype.objects.get(name="Nucleotide sequence")
         self.one_col_nuc_seq = self.nuc_seq.CDTMs.get(column_name="sequence", column_idx=1).compounddatatype
 
@@ -1235,44 +1237,55 @@ class RemovalTests(TestCase):
 
     def test_method_build_removal_plan(self):
         """Removing a Method removes all Pipelines containing it and all of the associated stuff."""
-        self.removal_plan_tester(self.nuc_seq_noop, datasets=self.produced_data.union(
-            {self.two_step_intermediate_data, self.two_step_output_data}),
-                                 ERs=self.execrecords.union(self.two_step_execrecords),
-                                 runs={self.first_run, self.second_run, self.two_step_run},
-                                 pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
-                                 methods={self.nuc_seq_noop})
+        self.removal_plan_tester(
+            self.nuc_seq_noop,
+            datasets=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
+            ERs=self.execrecords.union(self.two_step_execrecords),
+            runs={self.first_run, self.second_run, self.two_step_run},
+            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
+            methods={self.nuc_seq_noop}
+        )
 
     def test_methodfamily_build_removal_plan(self):
         """Removing a MethodFamily."""
-        self.removal_plan_tester(self.nuc_seq_noop_mf, datasets=self.produced_data.union(
-            {self.two_step_intermediate_data, self.two_step_output_data}),
-                                 ERs=self.execrecords.union(self.two_step_execrecords),
-                                 runs={self.first_run, self.second_run, self.two_step_run},
-                                 pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
-                                 methods={self.nuc_seq_noop}, mfs={self.nuc_seq_noop_mf})
+        self.removal_plan_tester(
+            self.nuc_seq_noop_mf,
+            datasets=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
+            ERs=self.execrecords.union(self.two_step_execrecords),
+            runs={self.first_run, self.second_run, self.two_step_run},
+            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
+            methods={self.nuc_seq_noop},
+            mfs={self.nuc_seq_noop_mf}
+        )
 
     def test_crr_build_removal_plan(self):
         """Removing a CodeResourceRevision."""
-        self.removal_plan_tester(self.noop_crr, datasets=self.produced_data.union(
-            {self.two_step_intermediate_data, self.two_step_output_data}),
-                                 ERs=self.execrecords.union(self.two_step_execrecords),
-                                 runs={self.first_run, self.second_run, self.two_step_run},
-                                 pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
-                                 methods={self.nuc_seq_noop}, CRRs={self.noop_crr, self.pass_through_crr})
+        self.removal_plan_tester(
+            self.noop_crr,
+            datasets=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
+            ERs=self.execrecords.union(self.two_step_execrecords),
+            runs={self.first_run, self.second_run, self.two_step_run},
+            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
+            methods={self.nuc_seq_noop, self.raw_pass_through},
+            CRRs={self.noop_crr}
+        )
 
-    def test_crr_nodep_build_removal_plan(self):
-        """Removing a CodeResourceRevision that is dependent on another leaves the other alone."""
-        self.removal_plan_tester(self.pass_through_crr, CRRs={self.pass_through_crr})
+    def test_method_nodep_build_removal_plan(self):
+        """Removing a Method that has CodeResourceDependencies leaves it alone."""
+        self.removal_plan_tester(self.raw_pass_through, methods={self.raw_pass_through})
 
     def test_cr_build_removal_plan(self):
         """Removing a CodeResource removes its revisions."""
-        self.removal_plan_tester(self.noop_cr, datasets=self.produced_data.union(
-            {self.two_step_intermediate_data, self.two_step_output_data}),
-                                 ERs=self.execrecords.union(self.two_step_execrecords),
-                                 runs={self.first_run, self.second_run, self.two_step_run},
-                                 pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
-                                 methods={self.nuc_seq_noop}, CRRs={self.noop_crr, self.pass_through_crr},
-                                 CRs={self.noop_cr})
+        self.removal_plan_tester(
+            self.noop_cr,
+            datasets=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
+            ERs=self.execrecords.union(self.two_step_execrecords),
+            runs={self.first_run, self.second_run, self.two_step_run},
+            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
+            methods={self.nuc_seq_noop, self.raw_pass_through},
+            CRRs={self.noop_crr},
+            CRs={self.noop_cr}
+        )
 
     def test_cdt_build_removal_plan(self):
         """Removing a CompoundDatatype."""
@@ -1284,11 +1297,15 @@ class RemovalTests(TestCase):
                 self.two_step_output_data
             }
         )
-        self.removal_plan_tester(self.one_col_nuc_seq, datasets=all_data,
-                                 ERs=self.execrecords.union(self.two_step_execrecords),
-                                 runs={self.first_run, self.second_run, self.two_step_run},
-                                 pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
-                                 methods={self.nuc_seq_noop}, CDTs={self.one_col_nuc_seq})
+        self.removal_plan_tester(
+            self.one_col_nuc_seq,
+            datasets=all_data,
+            ERs=self.execrecords.union(self.two_step_execrecords),
+            runs={self.first_run, self.second_run, self.two_step_run},
+            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
+            methods={self.nuc_seq_noop},
+            CDTs={self.one_col_nuc_seq}
+        )
 
     def test_dt_build_removal_plan(self):
         """Removing a Datatype."""
@@ -1300,10 +1317,16 @@ class RemovalTests(TestCase):
                 self.two_step_output_data
             }
         )
-        self.removal_plan_tester(self.nuc_seq, datasets=all_data, ERs=self.execrecords.union(self.two_step_execrecords),
-                                 runs={self.first_run, self.second_run, self.two_step_run},
-                                 pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
-                                 methods={self.nuc_seq_noop}, CDTs={self.one_col_nuc_seq}, DTs={self.nuc_seq})
+        self.removal_plan_tester(
+            self.nuc_seq,
+            datasets=all_data,
+            ERs=self.execrecords.union(self.two_step_execrecords),
+            runs={self.first_run, self.second_run, self.two_step_run},
+            pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
+            methods={self.nuc_seq_noop},
+            CDTs={self.one_col_nuc_seq},
+            DTs={self.nuc_seq}
+        )
 
     def remove_tester(self, obj_to_remove):
         removal_plan = obj_to_remove.build_removal_plan()
@@ -1360,9 +1383,9 @@ class RemovalTests(TestCase):
         """Removing a CodeResourceRevision should remove the Methods using it, and its dependencies."""
         self.remove_tester(self.noop_crr)
 
-    def test_crr_nodep_remove(self):
-        """Removing a CodeResourceRevision that is dependent on another leaves the other alone."""
-        self.remove_tester(self.pass_through_crr)
+    def test_method_nodep_remove(self):
+        """Removing a Method that has dependencies leaves the dependencies alone."""
+        self.remove_tester(self.raw_pass_through)
 
     def test_cr_remove(self):
         """Removing a CodeResource should remove the CodeResourceRevisions using it."""

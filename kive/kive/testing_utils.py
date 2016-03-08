@@ -924,16 +924,6 @@ cat "$1" > "$2"
         grant_everyone_access=False
     )
 
-    pass_through = make_first_revision(
-        "Pass Through", "A script that does nothing to its input and passes it through untouched.",
-        "passthrough.bash",
-        """#!/bin/bash
-./noop.bash "$1" "$2"
-""",
-        remover,
-        grant_everyone_access=False
-    )
-
     # A toy Datatype.
     nucleotide_seq = new_datatype("Nucleotide sequence", "Sequences of A, C, G, and T",
                                   Datatype.objects.get(pk=datatypes.STR_PK),
@@ -971,6 +961,26 @@ CCCTCCTC
         grant_everyone_access=False
     )
     simple_method_io(nuc_seq_noop, one_col_nuc_seq, "nuc_seq_in", "nuc_seq_out")
+
+    # Define a method that uses noop as a dependency.
+    pass_through = make_first_revision(
+        "Pass Through", "A script that does nothing to its input and passes it through untouched.",
+        "passthrough.bash",
+        """#!/bin/bash
+./noop.bash "$1" "$2"
+""",
+        remover,
+        grant_everyone_access=False
+    )
+    raw_pass_through = make_first_method(
+        "Pass-through (raw)",
+        "A pass-through on raw data that uses noop as a dependency",
+        pass_through,
+        remover,
+        grant_everyone_access=False
+    )
+    simple_method_io(raw_pass_through, None, "nuc_seq_in", "nuc_seq_out")
+    raw_pass_through.dependencies.create(requirement=noop)
 
     noop_pl = make_first_pipeline(
         "Nucleotide Sequence Noop",
