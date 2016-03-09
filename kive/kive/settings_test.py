@@ -5,7 +5,8 @@ from settings import *  # @UnusedWildImport
 
 # Run with an in-memory database: about twice as fast as PostgreSQL
 DATABASES['default'] = {'ENGINE': 'django.db.backends.sqlite3',
-                        'NAME': ':memory:'}
+                        'TEST': {'NAME': ':memory:'},
+                        'NAME': 'kive.db'}
 
 # Disable logging to console so test output isn't polluted.
 LOGGING['handlers']['console']['level'] = 'CRITICAL'

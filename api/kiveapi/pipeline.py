@@ -17,6 +17,7 @@ class PipelineInput(object):
             self.dataset_name = obj['dataset_name']
             self.compounddatatype = CompoundDatatype(None) if obj['structure'] is None else \
                 CompoundDatatype(obj['structure']['compounddatatype'])
+            self.raw = obj
 
         except (ValueError, IndexError):
             raise KiveMalformedDataException(
@@ -87,7 +88,6 @@ class PipelineFamily(object):
                 self.published_version = [p for p in self.pipelines if p.published][0]
             except IndexError:
                 self.published_version = None
-
 
         except (ValueError, IndexError):
             raise KiveMalformedDataException(

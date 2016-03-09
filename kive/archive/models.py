@@ -170,7 +170,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     def outcables_in_order(self):
         return self.runoutputcables.order_by("pipelineoutputcable__output_idx")
 
-    def clean(self):
+    def clean(self, use_cache=False):
         """
         Checks coherence of the Run (possibly in an incomplete state).
 
@@ -209,8 +209,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             if runstep.pipelinestep.step_num != i:
                 raise ValidationError('RunSteps of Run "{}" are not consecutively numbered starting from 1'
                                       .format(self))
-            # RunStepInputCables are cleaned within RunStep.clean()
-            runstep.clean()
+            # RunStepInputCables are complete_cleaned within RunStep.clean(),
+            # which is why we specify use_cache here.
+            runstep.clean(use_cache=use_cache)
 
         # Can't have RunOutputCables from non-existent RunSteps.
         # TODO: Should this go in RunOutputCable.clean() ?
@@ -330,6 +331,10 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                         log_char = "."
                         step_status = "WAITING"
 
+            elif step.is_cancelled:
+                log_char = "x"
+                step_status = "CANCELLED"
+
             elif not step.is_successful(use_cache=True, dont_save=True):
                 log_char = "!"
                 step_status = "FAILURE"
@@ -366,6 +371,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                 if curr_roc.is_complete(use_cache=True, dont_save=True):
                     log_char = "*"
                     step_status = "CLEAR"
+                elif curr_roc.is_cancelled:
+                    log_char = "x"
+                    step_status = "CANCELLED"
                 else:
                     try:
                         curr_roc.log.id
@@ -492,7 +500,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         Checks completeness and coherence of a run.
         """
-        self.clean()
+        self.clean(use_cache=use_cache)
         if not self.is_complete(use_cache=use_cache):
             raise ValidationError('Run "{}" is not complete'.format(self))
 
@@ -733,7 +741,35 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                 outcable.mark_complete(save=True)
 
         if save:
-            self.save()
+            self.save(update_fields=["_complete"])
+
+    def cancel_unstarted(self):
+        for step in self.runsteps.all():
+            for rsic in step.RSICs.filter(start_time__isnull=True):
+                rsic.mark_cancelled()
+
+            if step.has_subrun():
+                step.child_run.cancel_unstarted()
+
+            if not step.has_started():
+                step.mark_cancelled()
+
+        for outcable in self.runoutputcables.filter(start_time__isnull=True):
+            outcable.mark_cancelled()
+
+    def cancel_unfinished(self):
+        for step in self.runsteps.all():
+            for rsic in step.RSICs.filter(start_time__isnull=False, end_time__isnull=True):
+                rsic.mark_cancelled()
+
+            if step.has_subrun():
+                step.child_run.cancel_unfinished()
+
+            if step.has_started() and not step.has_ended():
+                step.mark_cancelled()
+
+        for outcable in self.runoutputcables.filter(start_time__isnull=False, end_time__isnull=True):
+            outcable.mark_cancelled()
 
 
 class RunInput(models.Model):
@@ -1195,7 +1231,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         self.save(update_fields=["_successful"])
 
         if self.is_incable:
-            self.definite.runstep.mark_unsuccessful()
+            self.definite.dest_runstep.mark_unsuccessful()
         else:
             self.definite.run.mark_unsuccessful()
 
@@ -1238,10 +1274,10 @@ class RunComponent(stopwatch.models.Stopwatch):
             if not invoked_log.is_successful():
                 return False
             icls = invoked_log.integrity_checks.all()
-            if any([x.is_fail() for x in icls]):
+            if any(x.is_fail() for x in icls):
                 return False
             ccls = invoked_log.content_checks.all()
-            if any([x.is_fail() for x in ccls]):
+            if any(x.is_fail() for x in ccls):
                 return False
         return True
 
@@ -1272,6 +1308,17 @@ class RunComponent(stopwatch.models.Stopwatch):
         if self.execrecord is not None:
             return self.execrecord.generator
         return None
+
+    def mark_cancelled(self):
+        """
+        Cancel this RunComponent, stopping it and marking it as complete.
+        """
+        self.is_cancelled = True
+        if self.has_started():
+            self.stop(save=False)
+        self.mark_complete(save=False)
+        self.mark_unsuccessful()
+        self.save()
 
 
 @python_2_unicode_compatible
@@ -1419,7 +1466,7 @@ class RunStep(RunComponent):
         if self.execrecord is not None:
             raise ValidationError('{} so execrecord should not be set'.format(general_error))
 
-    def _clean_cables_in(self):
+    def _clean_cables_in(self, use_cache=False):
         """
         Perform coherence checks for this RunStep's associated
         RunSIC's, namely:
@@ -1438,7 +1485,7 @@ class RunStep(RunComponent):
         clean should return right away.
         """
         for rsic in self.RSICs.all():
-            rsic.complete_clean()
+            rsic.complete_clean(use_cache=use_cache)
 
         if self.pipelinestep.cables_in.count() != self.RSICs.count():
 
@@ -1576,7 +1623,7 @@ class RunStep(RunComponent):
                 raise ValidationError('RunStep "{}" generated Dataset "{}" but it is not in its ExecRecord'
                                       .format(self, out_data))
 
-    def clean(self):
+    def clean(self, use_cache=False):
         """
         Check coherence of this RunStep.
 
@@ -1650,7 +1697,7 @@ class RunStep(RunComponent):
         self._clean_execlogs()
 
         # If any inputs are not quenched, stop checking.
-        if not self._clean_cables_in():
+        if not self._clean_cables_in(use_cache=use_cache):
             return
 
         # From here on, RSICs are assumed to be quenched.
@@ -1705,6 +1752,10 @@ class RunStep(RunComponent):
 
         if use_cache and self._complete is not None:
             return self._complete
+
+        # Has this been cancelled before even being attempted?
+        if self.is_cancelled:
+            return True
 
         # Sub-Pipeline case:
         if self.pipelinestep.transformation.is_pipeline:
@@ -1765,9 +1816,8 @@ class RunStep(RunComponent):
         PRE: this RunStep is not reused.
         """
         input_cables = self.RSICs.all()
-        if input_cables.exists():
-            if any(not ic.is_successful() for ic in input_cables):
-                return False
+        if any(not ic.is_successful() for ic in input_cables):
+            return False
 
         # At this point we know that all the cables were successful;
         # we check for failure during recovery or during its own
@@ -1813,8 +1863,9 @@ class RunStep(RunComponent):
         if transformation.definite.reusable == Method.NON_REUSABLE:
             return
 
-        query = ExecRecord.objects.filter(
-            used_by_components__runstep__pipelinestep__transformation=transformation)
+        execrecord_ids = RunStep.objects.filter(
+            pipelinestep__transformation=transformation).values('execrecord_id')
+        query = ExecRecord.objects.filter(id__in=execrecord_ids)
         for dataset_idx, dataset in enumerate(input_datasets, 1):
             query = query.filter(
                 execrecordins__generic_input__transformationinput__dataset_idx=dataset_idx,

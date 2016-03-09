@@ -166,7 +166,7 @@ full test suite can take around half an hour.
 If you want to run your unit tests faster, you can run them against an
 in-memory SQLite database with this command:
 
-    ./manage.py test --settings kive.test_settings
+    ./manage.py test --settings kive.settings_test
     
 This also reduces the amount of console output produced by the testing.  
 Testing with a SQLite database may have slightly different behaviour from 
@@ -174,7 +174,7 @@ the PostgreSQL database, so you should occasionally run the tests with
 the default settings.  Alternatively, to run the tests with all the default
 settings but with reduced console output:
     
-    ./manage.py test --settings kive.test_settings_pg
+    ./manage.py test --settings kive.settings_test_pg
     
 See [the Django documentation][unit-tests] for details on running specific tests.
 
@@ -190,7 +190,7 @@ Then add these two lines to `settings.py`:
 
 Finally, run the unit tests and the script to summarize them.
 
-    ./manage.py test --settings kive.test_settings
+    ./manage.py test --settings kive.settings_test
     ./slow_test_report.py
 
 [unit-tests]: https://docs.djangoproject.com/en/dev/topics/testing/overview/#running-tests

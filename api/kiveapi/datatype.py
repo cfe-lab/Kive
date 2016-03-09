@@ -12,6 +12,7 @@ class CompoundDatatype:
 
     def __init__(self, cdt):
         try:
+            self.raw = cdt
             if cdt is None:
                 self.cdt_id = '__raw__'
                 self.name = 'Raw CDT'
@@ -21,6 +22,7 @@ class CompoundDatatype:
             else:
                 self.cdt_id = cdt
                 self.name = 'Compound Datatype id {}'.format(self.cdt_id)
+                self.raw = None
         except (ValueError, IndexError):
             raise KiveMalformedDataException(
                 'Server gave malformed CDT object:\n%s' % cdt
