@@ -426,42 +426,46 @@ $(function() {
         }
     };
 
-    var resize_timeout = false;
-    var documentResizeHandler = function() {
-        var shape, i, scale_x, scale_y;
+    var documentResizeHandler = (function() {
+        var resize_timeout = false,
+            endDocumentResize = function() {
+                canvasState.valid = false;
+                for (var i = 0, shape; (shape = canvasState.shapes[i]); i++) {
+                    shape.dx = shape.dy = 0;
+                    canvasState.detectCollisions(shape);
+                }
+                canvasState.outputZone.alignWithCanvas(canvas.width, canvas.height);
+            }
+        ;
 
-        canvasState.width  = canvas.width  = window.innerWidth;
-        canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
-        
-        scale_x = canvas.width  / canvasState.old_width;
-        scale_y = canvas.height / canvasState.old_height;
+        return function() {
+            var shape, i, scale_x, scale_y;
+
+            canvasState.width  = canvas.width  = window.innerWidth;
+            canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
             
-        if (scale_x == 1 && scale_y == 1) {
-            return;
-        }
-        
-        for (i = 0; (shape = canvasState.shapes[i]); i++) {
-            shape.x *= scale_x;
-            shape.y *= scale_y;
-            shape.dx *= scale_x;
-            shape.dy *= scale_y;
-        }
-        
-        canvasState.old_width = canvas.width;
-        canvasState.old_height = canvas.height;
-        canvasState.valid = false;
+            scale_x = canvas.width  / canvasState.old_width;
+            scale_y = canvas.height / canvasState.old_height;
+                
+            if (scale_x == 1 && scale_y == 1) {
+                return;
+            }
+            
+            for (i = 0; (shape = canvasState.shapes[i]); i++) {
+                shape.x *= scale_x;
+                shape.y *= scale_y;
+                shape.dx *= scale_x;
+                shape.dy *= scale_y;
+            }
+            
+            canvasState.old_width = canvas.width;
+            canvasState.old_height = canvas.height;
+            canvasState.valid = false;
 
-        clearTimeout(resize_timeout);
-        resize_timeout = setTimeout(endDocumentResize, 500);
-    };
-    var endDocumentResize = function() {
-        canvasState.valid = false;
-        for (var i = 0, shape; (shape = canvasState.shapes[i]); i++) {
-            shape.dx = shape.dy = 0;
-            canvasState.detectCollisions(shape);
-        }
-        canvasState.outputZone.alignWithCanvas(canvas.width, canvas.height);
-    };
+            clearTimeout(resize_timeout);
+            resize_timeout = setTimeout(endDocumentResize, 500);
+        };
+    })();
 
     var chooseContextMenuOption = function(e) {
         e.stopPropagation();
@@ -952,7 +956,11 @@ jQuery.fn.extend({
                 $drag = $(this).addClass('draggable');
             } else {
                 $drag = $(this).addClass('active-handle').parent().addClass('draggable');
-            }  
+            }
+
+            if (typeof opt.start == 'function') {
+                opt.start(this);
+            }
             
             $drag.data('z', $drag.data('z') || $drag.css('z-index'));
             
@@ -976,6 +984,9 @@ jQuery.fn.extend({
                 $(this).removeClass('draggable');
             } else {
                 $(this).removeClass('active-handle').parent().removeClass('draggable');
+            }
+            if (typeof opt.stop == 'function') {
+                opt.stop(this);
             }
         });
         
