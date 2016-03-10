@@ -268,9 +268,7 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
     # Implicit through inheritance: start_time, end_time.
 
     def __str__(self):
-        if self.is_fail():
-            return "OK"
-        return "MD5 conflict"
+        return "MD5 conflict" if self.is_fail() else "OK"
 
     def clean(self):
         """
