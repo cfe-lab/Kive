@@ -555,6 +555,13 @@ class ExecuteTests(ExecuteTestsBase):
         ccl_to_alter.start_time = None
         ccl_to_alter.save()
 
+        # Now we dummy it up to look like the RunStep never finished, so no RunOutputCable was run
+        # and rs is not marked complete.
+        roc = run.runoutputcables.first()
+        roc.delete()
+        rs._complete = False
+        rs.save()
+
         # Now execute the pipeline again.
         run2 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
         r2s = run2.runsteps.first()

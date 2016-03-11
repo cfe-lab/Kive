@@ -1790,6 +1790,8 @@ class Sandbox:
                     # one already.
                     if not check.is_fail() and not output_dataset.content_checks.filter(
                             end_time__isnull=False).exists():
+                        logger.debug("[%d] Output has no complete content check; performing content check",
+                                     worker_rank)
                         summary_path = "{}_summary".format(output_path)
                         check = output_dataset.check_file_contents(
                             output_path, summary_path, curr_output.get_min_row(),
