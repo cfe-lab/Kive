@@ -42,7 +42,9 @@ Once you have set up your production server, this is how to deploy a new release
     unit tests.
     
     ./manage.py test --settings kive.test_settings_pg
-    
+
+2. Check if the kiveapi package needs to update its version number by looking
+   for new commits in the `/api` folder.
 2. Check that all the issues in the current milestone are closed.
 3. [Create a release][release] on Github. Use "vX.Y" as the tag, where X.Y
     matches the version on the milestone. If you have to redo
