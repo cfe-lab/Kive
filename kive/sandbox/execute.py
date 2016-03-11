@@ -1467,7 +1467,7 @@ class Sandbox:
 
             # Did ER already exist, or is cable trivial, or recovering? No.
             else:
-                logger.debug("[%d] Performing content check for output generated for the first time", worker_rank)
+                logger.debug("[%d] Output has no complete content check; performing content check", worker_rank)
                 summary_path = "{}_summary".format(output_path)
                 # Perform content check.  Note: if this fails, it will notify all RunComponents using it.
                 check = output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
@@ -1786,8 +1786,12 @@ class Sandbox:
                                  worker_rank, output_dataset)
                     check = output_dataset.check_integrity(output_path, user, curr_log)
 
-                    # Update state variables.
-                    if not check.is_fail() and not output_dataset.content_checks.exists():
+                    # We may also need to perform a content check if there isn't a complete
+                    # one already.
+                    if not check.is_fail() and not output_dataset.content_checks.filter(
+                            end_time__isnull=False).exists():
+                        logger.debug("[%d] Output has no complete content check; performing content check",
+                                     worker_rank)
                         summary_path = "{}_summary".format(output_path)
                         check = output_dataset.check_file_contents(
                             output_path, summary_path, curr_output.get_min_row(),

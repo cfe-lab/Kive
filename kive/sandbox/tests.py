@@ -160,6 +160,7 @@ def execute_tests_environment_load(case):
     case.wire2 = case.cable_X1_A1.custom_wires.get(source_pin=case.pX_in_cdtm_3)
 
     case.X1_outcable = case.pX.outcables.get()
+    case.pX_raw = Pipeline.objects.get(revision_name="pX_raw")
 
 
 class ExecuteTestsBase(TestCase):
@@ -513,6 +514,62 @@ class ExecuteTests(ExecuteTestsBase):
 
         for cancelled_rs in run.runsteps.exclude(pk=rs.pk):
             self.assertTrue(cancelled_rs.is_cancelled)
+
+    # FIXME this test revealed issues #534 and #535; when we fix these, revisit this test.
+    # def test_filling_in_execrecord_with_incomplete_content_check(self):
+    #     """Execution that fills in an ExecRecord that doesn't have a complete content check."""
+    #
+    #     # Execute pipeline
+    #     pipeline = self.pX
+    #     inputs = [self.dataset]
+    #     run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+    #
+    #     # This was one step, so we go into that first step and fiddle with the ContentCheckLog.
+    #     rs = run.runsteps.first()
+    #     ccl_to_alter = rs.execrecord.execrecordouts.first().dataset.content_checks.first()
+    #     ccl_to_alter.end_time = None
+    #     ccl_to_alter.start_time = None
+    #     ccl_to_alter.save()
+    #
+    #     # Now execute the pipeline again.
+    #     run2 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+    #     r2s = run2.runsteps.first()
+    #     # It should have filled in the same execrecord.
+    #     self.assertEquals(r2s.execrecord, rs.execrecord)
+    #     # There should be an integrity check and a content check both associated to r2s' log.
+    #     self.assertEquals(r2s.log.integrity_check.count(), 1)
+    #     self.assertEquals(r2s.log.content_check.count(), 1)
+
+    def test_filling_in_execrecord_with_incomplete_content_check(self):
+        """Execution that fills in an ExecRecord that doesn't have a complete content check."""
+
+        # Execute pipeline
+        pipeline = self.pX_raw
+        inputs = [self.raw_dataset]
+        run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+
+        # This was one step, so we go into that first step and fiddle with the ContentCheckLog.
+        rs = run.runsteps.first()
+        ccl_to_alter = rs.execrecord.execrecordouts.first().dataset.content_checks.first()
+        ccl_to_alter.end_time = None
+        ccl_to_alter.start_time = None
+        ccl_to_alter.save()
+
+        # Now we dummy it up to look like the RunStep never finished, so no RunOutputCable was run
+        # and rs is not marked complete.
+        roc = run.runoutputcables.first()
+        roc.delete()
+        rs._complete = False
+        rs.save()
+
+        # Now execute the pipeline again.
+        run2 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        r2s = run2.runsteps.first()
+        # It should have filled in the same execrecord.
+        self.assertEquals(r2s.execrecord, rs.execrecord)
+        # There should be an integrity check and a content check both associated to r2s' log.
+        self.assertEquals(r2s.log.integrity_checks.count(), 1)
+        self.assertEquals(r2s.log.content_checks.count(), 1)
 
 
 class SandboxTests(ExecuteTestsBase):
