@@ -19,22 +19,6 @@ $(function() {
         redrawInterval = 50; // ms
     
     canvasState = new drydock.CanvasState(canvas, redrawInterval);
-
-    // TODO: Move this into a parameter for the submit method
-    //window.submit_to_url = '/pipeline_add';
-    var submitError = function(errors) {
-        var $errorDiv = $('#id_submit_error');
-        if (errors instanceof Array) {
-            $errorDiv.empty();
-            for (var i = 0; i < errors.length; i++) {
-                $errorDiv.append($('<p/>').text(errors[i]));
-            }
-        }
-        else {
-            $errorDiv.text(errors);
-        }
-        $errorDiv.show();
-    };
     
     var pipelineCheckReadiness = function() {
         var $btn = $('#id_submit_button');
@@ -46,10 +30,12 @@ $(function() {
     };
 
     var showMenu = function(e) {
-        e.stopPropagation();
+        e && e.stopPropagation();
         var $this = $(this),
             menu = $($this.data('rel')),
             inputs, input, preview_canvas, i;
+
+        console.log($this);
         $('#id_ctrl_nav li').not(this).removeClass('clicked');
         $this.addClass('clicked');
         $('.ctrl_menu', '#pipeline_ctrl').hide();
@@ -595,99 +581,102 @@ $(function() {
         $('.context_menu').hide();
     };
 
-    var submitPipeline = function(e) {
-        /*
-        Trigger AJAX transaction on submitting form.
-         */
+    var submitPipeline = (function() {
+        var $submit_error = $('#id_submit_error');
+        return function(e) {
+            /*
+            Trigger AJAX transaction on submitting form.
+             */
 
-        e.preventDefault(); // override form submit action
+            e.preventDefault(); // override form submit action
 
-        // Since a field contains its label on pageload, a field's label as its value is treated as blank
-        $('input, textarea', this).each(function() {
-            if (this.value == $(this).data('label')) {
-                this.value = '';
+            // Since a field contains its label on pageload, a field's label as its value is treated as blank
+            $('input, textarea', this).each(function() {
+                if (this.value == $(this).data('label')) {
+                    this.value = '';
+                }
+            });
+
+            $submit_error.empty();
+
+            var is_new = e.data.action == "new",
+                is_revision = e.data.action == "revise",
+                // arguments to initialize new Pipeline Family
+                family = {
+                    name: $('#id_family_name'),  // hidden input if revision
+                    desc: $('#id_family_desc')
+                },
+                revision = {
+                    name: $('#id_revision_name'),
+                    desc: $('#id_revision_desc')
+                },
+                users_allowed = [],
+                groups_allowed = [];
+
+            $("#id_permissions_0 option:selected").each(function() {
+                users_allowed.push($(this).text());
+            });
+            $("#id_permissions_1 option:selected").each(function() {
+                groups_allowed.push($(this).text());
+            });
+            
+            // Form validation
+            if (is_new) {
+                if (family.name.val() === '') {
+                    showMenu.apply( $('[data-rel="#id_family_ctrl"]', '#id_ctrl_nav')[0] );
+                    family.name.addClass('submit-error-missing').focus();
+                    submitError('Pipeline family must be named');
+                    return;
+                }
+                family.name.add(family.desc).removeClass('submit-error-missing');
             }
-        });
-        
-        /*
-        unused vars?
-        var shapes = canvasState.shapes,
-            this_shape,
-            magnets,
-            this_magnet,
-            this_connector,
-            i, j,
-            pipeline_inputs = [],  // collect data nodes
-            pipeline_outputs = [],
-            method_nodes = [],
-            num_connections;
-        */
 
-        document.getElementById('id_submit_error').innerHTML = '';
+            revision.desc.add(revision.name).removeClass('submit-error-missing');
 
-        var is_new = e.data.action == "new";
-        var is_revision = e.data.action == "revise";
+            // Now we're ready to start
+            // TODO: We should really push this into the Pipeline class
+            var form_data = {
+                users_allowed: users_allowed,
+                groups_allowed: groups_allowed,
 
-        // arguments to initialize new Pipeline Familyﬁ
-        var family_name = $('#id_family_name').val(),  // hidden input if revision
-            family_desc = $('#id_family_desc').val(),
-            family_pk = $('#id_family_pk').val(),
-            revision_name = $('#id_revision_name').val(),
-            revision_desc = $('#id_revision_desc').val(),
-            published = $('#published').prop('checked'),
-            users_allowed = [],
-            groups_allowed = [];
+                // There is no PipelineFamily yet; we're going to create one.
+                family: family.name.val(),
+                family_desc: family.desc.val(),
 
-        $("#id_permissions_0 option:selected").each(function() {
-            users_allowed.push($(this).text());
-        });
-        $("#id_permissions_1 option:selected").each(function() {
-            groups_allowed.push($(this).text());
-        });
-        
-        // Form validation
-        if (is_new) {
-            if (family_name === '') {
-                // FIXME: is there a better way to do this trigger?
-                $('li', 'ul#id_ctrl_nav')[0].click();
-                $('#id_family_name').css({'background-color': '#ffc'}).focus();
-                submitError('Pipeline family must be named');
+                // arguments to add first pipeline revision
+                revision_name: revision.name.val(),
+                revision_desc: revision.desc.val(),
+                revision_parent: is_revision ? JSON.parse($("#initial_data").text()).id : null,
+                published: $('#published').prop('checked'),
+
+                // Canvas information to store in the Pipeline object.
+                canvas_width: canvas.width,
+                canvas_height: canvas.height
+            };
+
+            try {
+                window.pipeline_revision = window.pipeline_revision || new Pipeline(canvasState);
+
+                // TODO: data cleaning should either be within pipeline_revision.serialize 
+                // or within this context but probably not both.
+                form_data = pipeline_revision.serialize(form_data);
+            } catch(error) {
+                submitError(error);
                 return;
             }
-            $('#id_family_name, #id_family_desc').css('background-color', '#fff');
-        }
 
-        $('#id_revision_name, #id_revision_desc').css('background-color', '#fff');
-
-        // Now we're ready to start
-        // TODO: We should really push this into the Pipeline class
-        var form_data = {
-            users_allowed: users_allowed || [],
-            groups_allowed: groups_allowed || [],
-
-            // There is no PipelineFamily yet; we're going to create one.
-            family: family_name,
-            family_desc: family_desc,
-
-            // arguments to add first pipeline revision
-            revision_name: revision_name,
-            revision_desc: revision_desc,
-            revision_parent: is_revision ? JSON.parse($("#initial_data").text()).id : null,
-            published: published,
-
-            // Canvas information to store in the Pipeline object.
-            canvas_width: canvas.width,
-            canvas_height: canvas.height,
-        };
-
-        try {
-            window.pipeline_revision = window.pipeline_revision || new Pipeline(canvasState);
-            form_data = pipeline_revision.serialize(form_data);
-        } catch(error) {
-            submitError(error);
-            return;
-        }
-        
+            if(!is_new) {
+                submitPipelineAjax($('#id_family_pk').val(), form_data);
+            } else { // Pushing a new family
+                submitPipelineFamilyAjax(JSON.stringify({
+                    users_allowed: users_allowed,
+                    groups_allowed: groups_allowed,
+                    name: family.name.val(),
+                    description: family.desc.val()
+                }));
+            }
+        };// end exposed function - everything that follows is closed over
+            
         function buildErrors(context, json, errors) {
             for (var field in json) {
                 var value = json[field],
@@ -701,77 +690,67 @@ $(function() {
                     var item = value[i];
                     if (typeof(item) === "string") {
                         errors.push(new_context + ": " + item);
-                    }
-                    else {
+                    } else {
                         buildErrors(new_context, item, errors);
                     }
                 }
             }
         }
-
-        function submit_pipeline(family_pk){
-            $.ajax({
-                type: 'POST',
+        function submitError(errors) {
+            if (errors instanceof Array) {
+                $submit_error.empty();
+                for (var i = 0; i < errors.length; i++) {
+                    $submit_error.append($('<p>').text(errors[i]));
+                }
+            } else {
+                $submit_error.text(errors);
+            }
+            $submit_error.show();
+        }
+        function submitPipelineAjax(family_pk, form_data) {
+            $.post({
                 url: '/api/pipelines/',
-                contentType: "application/json",
                 data: JSON.stringify(form_data),
-                dataType: 'json',
-                success: function(result) {
-                    $('#id_submit_error').html('').hide();
-                    $(window).off('beforeunload');
-                    window.location.href = '/pipelines/' + family_pk;
-                },
-                error: function(xhr, status, error) {
-                    var json = xhr.responseJSON;
-                    
-                    if (json) {
-                        if (json.non_field_errors) {
-                            submitError(json.non_field_errors);
-                        }
-                        else {
-                            var errors = [];
-                            buildErrors("", json, errors);
-                            submitError(errors);
-                        }
-                    }
-                    else {
-                        submitError(xhr.status + " - " + error);
-                    }
-                }
-            });
-        }
-
-        if(!is_new)
-            submit_pipeline(family_pk);
-
-        else {// Pushing a new family
-            $.ajax({
-                type: 'POST',
-                url: '/api/pipelinefamilies/',
-                data: JSON.stringify({
-                    users_allowed: users_allowed || [],
-                    groups_allowed: groups_allowed || [],
-                    name: family_name,
-                    description: family_desc
-                }),
-                contentType: "application/json",
-                dataType: 'json',
-                success: function(result) {
-                    submit_pipeline(result.id);
-                },
-                error: function(xhr, status, error) {
-                    var json = xhr.responseJSON,
-                        serverErrors = json && json.non_field_errors || [];
-                    
-                    if (serverErrors.length === 0) {
-                        submitError(xhr.status + " - " + error);
+                contentType: "application/json"// is this needed? jquery default is: application/x-www-form-urlencoded; charset=UTF-8
+            }).success(function() {
+                $('#id_submit_error').empty().hide();
+                $(window).off('beforeunload');
+                window.location.href = '/pipelines/' + family_pk;
+            }).error(function(xhr, status, error) {
+                var json = xhr.responseJSON,
+                    errors = [];
+                
+                if (json) {
+                    if (json.non_field_errors) {
+                        submitError(json.non_field_errors);
                     } else {
-                        submitError(serverErrors);
+                        buildErrors("", json, errors);
+                        submitError(errors);
                     }
+                } else {
+                    submitError(xhr.status + " - " + error);
                 }
             });
         }
-    };
+        function submitPipelineFamilyAjax(form_data) {
+            $.post({
+                url: '/api/pipelinefamilies/',
+                data: form_data,
+                contentType: "application/json"// is this needed? jquery default is: application/x-www-form-urlencoded; charset=UTF-8
+            }).success(function(result) {
+                submitPipelineAjax(result.id, form_data);
+            }).error(function(xhr, status, error) {
+                var json = xhr.responseJSON,
+                    serverErrors = json && json.non_field_errors || [];
+                
+                if (serverErrors.length === 0) {
+                    serverErrors = xhr.status + " - " + error;
+                }
+
+                submitError(serverErrors);
+            });
+        }
+    })();
 
     var changeExecOrderDisplayOption = function() {
         var $this = $(this),
@@ -814,6 +793,12 @@ $(function() {
             lbl.remove();
         }
     };
+
+    var checkForUnsavedChanges = function() {
+        if (canvasState.can_edit && canvasState.has_unsaved_changes) {
+            return 'You have unsaved changes.';
+        }
+    }
     
     pipelineCheckReadiness();
     
@@ -839,16 +824,21 @@ $(function() {
     /*
     EVENT BINDINGS TABLE
     ------------------------------------------------------------------------------------
-     ELEMENT                         EVENT                   FUNCTION CALLBACK
+     ELEMENT                         EVENT       (SELECTOR)  FUNCTION CALLBACK
     ------------------------------------------------------------------------------------
     */
     $(window)                    .on('resize',               documentResizeHandler)
-                                 .on('beforeunload',         function() { if (canvasState.can_edit && canvasState.has_unsaved_changes) return 'You have unsaved changes.'; });
+                                 .on('beforeunload',         checkForUnsavedChanges);
     $(document)                  .on('keydown',              documentKeyHandler)
                                  .on('mousedown',            documentClickHandler)
-                                 .on('cancel', '.context_menu, .modal_dialog, .ctrl_menu', function() { $(this).hide(); });
-    $('form', '#dialog_form')    .on('submit',               submitOutputNodeName)        // Handle jQuery-UI Dialog spawned for output cable
-                                 .on('cancel',               cancelOutputNode);           // Cancel is not a native event and can only be triggered via javascript
+                                 // this one is set separately so that it can be disabled separately
+                                 .on('cancel', '.ctrl_menu', function() { $(this).hide(); })
+                                 // do not combine this line with the previous
+                                 .on('cancel', '.context_menu, .modal_dialog', function() { $(this).hide(); });
+                                 // Handle jQuery-UI Dialog spawned for output cable
+    $('form', '#dialog_form')    .on('submit',               submitOutputNodeName)        
+                                 // Cancel is not a native event and can only be triggered via javascript
+                                 .on('cancel',               cancelOutputNode);           
     $('#id_select_cdt')          .on('change',               updateCDtPreviewCanvas);
     $('#id_select_method')       .on('change',               updateMethodPreviewCanvas);
     $('form','#id_input_ctrl')   .on('submit',               createNewInputNode);         // Handle 'Inputs' menu
@@ -859,7 +849,7 @@ $(function() {
     $('#id_pipeline_revise_form').submit({action: "revise"}, submitPipeline);
     $('li', 'ul#id_ctrl_nav')    .on('click',                showMenu);
     $('.context_menu')           .on('click', 'li',          chooseContextMenuOption);    // when a context menu option is clicked
-    $('#autolayout_btn')         .on('click',                function() { canvasState.autoLayout(); });
+    $('#autolayout_btn')         .on('click',                canvasState.autoLayout.bind(canvasState) );
     $('.align-btn')              .on('click',                function() { canvasState.alignSelection($(this).data('axis')); });
     $('.form-inline-opts')       .on('click', 'input',       changeExecOrderDisplayOption);
     $('#colour_picker_pick')     .on('click',                showColourPicker);
@@ -874,31 +864,43 @@ $(function() {
     
     $('.ctrl_menu').draggable();
     
-    $('#id_revision_desc').on('keydown', function() {
-        var getHappierEachXChars = 12,
-            happy = -Math.min(15, Math.floor(this.value.length / getHappierEachXChars)) * 32;
-        
-        $('.happy_indicator').css('background-position', happy + 'px 0px');
-    })
+    $('#id_revision_desc')
+        .on({
+            keydown: function() {
+                var chars_per_smile = 12,
+                    happy_mapped = -Math.min(15, Math.floor(this.value.length / chars_per_smile)) * 32;
+                
+                $('.happy_indicator').css(
+                    'background-position-x',
+                    happy_mapped + 'px'
+                );
+            },
+            'focus keyup': function() {
+                var desc_length = this.value.length,
+                    $this = $(this),
+                    indicator = $this.siblings('.happy_indicator'),
+                    label = $this.siblings('.happy_indicator_label')
+                ;
+                
+                if (desc_length === 0 || $this.hasClass('input-label')) {
+                    indicator.add(label).hide();
+                } else {
+                    indicator.show();
+                    label[ desc_length > 20 ? 'hide':'show' ]();
+                }
+            },
+            blur: function() {
+                $(this).siblings('.happy_indicator, .happy_indicator_label').hide();
+            }
+        })
         .trigger('keydown')
+        .trigger('blur')
         .wrap('<div id="description_wrap">')
         .after('<div class="happy_indicator">')
-        .after('<div class="happy_indicator_label">Keep typing to make me happy!</div>')
-        .on('focus keyup', function() {
-            var desc_length = this.value.length,
-                wrap = $(this).parent();
-            
-            if (desc_length === 0 || $(this).hasClass('input-label')) {
-                $('.happy_indicator, .happy_indicator_label', wrap).hide();
-            } else if (desc_length > 20) {
-                $('.happy_indicator', wrap).show();
-                $('.happy_indicator_label', wrap).hide();
-            } else {
-                $('.happy_indicator, .happy_indicator_label', wrap).show();
-            }
-        }).on('blur', function() {
-            $(this).siblings('.happy_indicator, .happy_indicator_label').hide();
-        }).blur()
+        .after(
+            $('<div class="happy_indicator_label">')
+                .text('Keep typing!')
+        )
     ;
 });// end of document.ready()
 

@@ -6,8 +6,7 @@
   padding-right: 0;
   padding-bottom: 0;
   width: 49em;
-  height: 50px;
-  overflow: hidden; }
+  height: 50px; }
   #above_box h2 {
     margin-top: 0; }
 
@@ -85,14 +84,78 @@
     bottom: 0;
     left: -7em;
     width: 4em;
-    padding: 0.25 1em;
-    font-size: 2em;
-    display: block;
-    clear: both;
-    cursor: pointer; }
+    cursor: pointer;
+    clear: both; }
     #insert_dataset:focus {
       outline: none;
       cursor: pointer; }
+  #insert_one_dataset {
+    text-indent: -999em;
+    overflow: hidden;
+    background-image: url("/static/sandbox/down32.png");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: transparent;
+    border: 1px solid transparent;
+    padding: 0.3em 0;
+    display: block;
+    font-size: 2em;
+    box-sizing: border-box;
+    width: calc(100% - 2em); }
+  #insert_many_dataset {
+    text-indent: -999em;
+    overflow: hidden;
+    background-image: url("/static/sandbox/menu_white32.png");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: transparent;
+    border: 1px solid transparent;
+    padding: 0.3em 0;
+    display: block;
+    font-size: 2em;
+    box-sizing: border-box;
+    float: right;
+    width: calc(2em);
+    border-left-color: white; }
+  #insert_many_dataset.active {
+    text-indent: -999em;
+    overflow: hidden;
+    background-image: url("/static/sandbox/menu_green32.png");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: transparent;
+    border: 1px solid transparent;
+    padding: 0.3em 0;
+    display: block;
+    font-size: 2em;
+    box-sizing: border-box;
+    background-color: #fff;
+    border-top-color: black;
+    border-right-color: black; }
+  #insert_many_menu {
+    display: none;
+    position: absolute;
+    z-index: 1;
+    right: 0;
+    top: 100%;
+    background: white;
+    color: black; }
+    #insert_many_menu ul {
+      font-size: 1rem;
+      text-indent: 0;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      border-color: black;
+      border-width: 1px;
+      border-style: solid;
+      border-top: 0; }
+    #insert_many_menu li {
+      display: block;
+      padding: 1em 1.25em; }
+      #insert_many_menu li:hover {
+        background-color: #238;
+        color: white; }
 
 .ctrl {
   cursor: pointer; }
@@ -140,7 +203,7 @@
     #dataset_input_table tfoot td label {
       font-size: 0.8em;
       font-style: italic; }
-    #dataset_input_table tfoot td button {
+    #dataset_input_table tfoot td green-button {
       width: 100%;
       font-size: 1.5em;
       box-sizing: border-box;
@@ -167,5 +230,8 @@
     background-color: #666; }
     #dataset_input_table .inactive button.receiving {
       background-color: #aaa; }
+
+button:focus {
+  outline: none; }
 
 /*# sourceMappingURL=choose_inputs.css.map */

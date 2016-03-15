@@ -4,7 +4,9 @@ $(function() {
     var is_user_admin = false, // Never show admin tools on this page
         dataset_input_table = $('#dataset_input_table tbody'),
         dataset_search_dialog = $('.dataset-search-dlg'),
-        input_set_dataset_btn = $('#insert_dataset'),
+        input_set_dataset_group = $('#insert_dataset'),
+        input_set_dataset_btn = $('#insert_one_dataset'),
+        input_set_dataset_menu = $('#insert_many_dataset'),
         above_box = $('#above_box'),
         dataset_search_table = new choose_inputs.DatasetsTable(
             dataset_search_dialog.find('table'),
@@ -13,7 +15,7 @@ $(function() {
             dataset_search_dialog.find('.active_filters'),
             dataset_search_dialog.find(".navigation_links")
         ),
-        cell_width = 100/dataset_input_table.find('tr').eq(0).find('td').length + '%'
+        cell_width = 100 / dataset_input_table.find('tr').eq(0).find('td').length + '%'
     ;
 
     dataset_input_table.find('td').css('width', cell_width);
@@ -66,11 +68,11 @@ $(function() {
             cellWidth;
 
         function moveInputSetDatasetButton() {
-            var insertBtnOffsetX = input_set_dataset_btn.offset().left -
-                    input_set_dataset_btn.position().left;
+            var insertBtnOffsetX = input_set_dataset_group.offset().left -
+                    input_set_dataset_group.position().left;
 
             // Animate green arrow button
-            input_set_dataset_btn
+            input_set_dataset_group
                 .animate({
                     width: cellWidth,
                     left: cellOffsetX - insertBtnOffsetX
@@ -424,10 +426,10 @@ $(function() {
         if ( $(e.target).is('.search_form') ) {
             $(this).find('input[type="text"]').trigger('focus');
         }
-    }
+    };
     var addNewRunRow = function() {
         dataset_input_table.append(uiFactory.pipelineInputRow());
-    }
+    };
     var removeLastRunRow = function() {
         var $tr = dataset_input_table.find('tr').eq(-1);
         if ($tr.length) {
@@ -438,33 +440,85 @@ $(function() {
         } else {
             dataset_input_table.error("Error: You must have at least 1 run.");
         }
-    }
+    };
+    var showFillOptions = function() {
+        $('#insert_many_menu').show();
+        input_set_dataset_menu.addClass('active');
+    };
+
+    var hideFillOptions = function() {
+        $('#insert_many_menu').hide();
+        input_set_dataset_menu.removeClass('active');
+    };
+    var fillMenuChoose = function(e) {
+        var action = $(this).data('action');
+
+        if (action == 'fill-column') {
+            // @todo: add pattern fill when multiple datasets are selected
+            var selected_val = dataset_search_dialog.find('.search_results .selected .primary').eq(0),
+                receiving_cell = $('button.receiving'),
+                receiving_cell_selector = 'td:nth-child(' +
+                    (receiving_cell.parent().index() + 1)
+                    + ')',// css pseudo-class is 1-indexed
+                column = receiving_cell
+                    .closest('tbody')
+                    .children('tr')
+                    .children(receiving_cell_selector),
+                inactive_buttons
+            ;
+
+            if (selected_val.length > 0) {
+                dataset_search_table.$table.removeClass('none-selected-error');
+                column.replaceWith(
+                    uiFactory.inputDatasetCell(
+                        selected_val.text(),
+                        selected_val.data('id'),
+                        receiving_cell.data()
+                    )
+                );
+                inactive_buttons = $('button:not(.receiving)', dataset_input_table);
+
+                // decide where to go next
+                if (inactive_buttons.length) {
+                    inactive_buttons.eq(0).trigger('click');
+                } else {
+                    dataset_search_dialog.fadeOut('fast');
+                    above_box.hide();
+                }
+            } else {
+                dataset_search_table.$table.addClass('none-selected-error');
+            }
+        }
+    };
 
     $.getJSON('/api/datasets/?format=json', initUsersList);
 
-    above_box             .on( 'click',    '.close.ctrl',           closeSearchDialog           )
-                          .on( 'click',                             stopProp                    );
-    input_set_dataset_btn .on( 'click',                             addSelectedDatasetsToInput  );
-    $('#run_pipeline')    .on( 'submit',                            mainSubmitHandler           )
-                          .on( 'click',    'input, textarea',       stopProp                    );
-    $('.permissions-widget').on('click',                            stopProp                    );
-    dataset_search_dialog .on( 'submit',   'form',                  submitDatasetSearch         )
-                          .on( 'change',   '#date_added',           dateAddedFilterHandler      )
-                          .on( 'change',   '#creator',              creatorFilterHandler        )
-    .find('.search_form') .on( 'click',                             focusSearchField            );
-    dataset_input_table   .on( 'click',    '.input-dataset',        toggleInputDatasetSelection )
-                          .on( 'click',    '.remove.ctrl',          removeDatasetFromInput      )
-                          .on( 'click',    'button[name="input"]',  showInputSearchDlg          );
-    $('.search_results')  .on( 'click',    'tbody tr',              selectSearchResult          )
-                          .on( 'dblclick', 'tbody tr',              function() { input_set_dataset_btn.click(); } );
-    $('body')             .on( 'click',                             deselectAll                 );
-    $('#run_controls')    .on( 'click',    '.add_run',              addNewRunRow                )
-                          .on( 'click',    '.remove_run',           removeLastRunRow            );
+    above_box               .on( 'click',    '.close.ctrl',           closeSearchDialog           )
+                            .on( 'click',                             stopProp                    );
+    input_set_dataset_btn   .on( 'click',                             addSelectedDatasetsToInput  );
+    $('#run_pipeline')      .on( 'submit',                            mainSubmitHandler           )
+                            .on( 'click',    'input, textarea',       stopProp                    );
+    $('.permissions-widget').on( 'click',                             stopProp                    );
+    dataset_search_dialog   .on( 'submit',   'form',                  submitDatasetSearch         )
+                            .on( 'change',   '#date_added',           dateAddedFilterHandler      )
+                            .on( 'change',   '#creator',              creatorFilterHandler        )
+    .find('.search_form')   .on( 'click',                             focusSearchField            );
+    dataset_input_table     .on( 'click',    '.input-dataset',        toggleInputDatasetSelection )
+                            .on( 'click',    '.remove.ctrl',          removeDatasetFromInput      )
+                            .on( 'click',    'button[name="input"]',  showInputSearchDlg          );
+    $('.search_results')    .on( 'click',    'tbody tr',              selectSearchResult          )
+                            .on( 'dblclick', 'tbody tr',              function() { input_set_dataset_btn.click(); } );
+    $('body')               .on( 'click',                             deselectAll                 );
+    $('#run_controls')      .on( 'click',    '.add_run',              addNewRunRow                )
+                            .on( 'click',    '.remove_run',           removeLastRunRow            );
+    input_set_dataset_menu  .on( 'click',                             showFillOptions             )
+                            .on( 'mouseleave',                        hideFillOptions             );
+    $('#insert_many_menu')  .on( 'click',    'li',                    fillMenuChoose             );
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
         var $this = $(this);
-        $this.wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
+        $this.wrapInner('<span class="fulltext">').prepend('<a rel="ctrl">?</a>');
     });
 
     $('a[rel="ctrl"]').on('click', function (e) {
