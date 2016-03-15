@@ -4,9 +4,12 @@ $(function() {
     var is_user_admin = false, // Never show admin tools on this page
         dataset_input_table = $('#dataset_input_table tbody'),
         dataset_search_dialog = $('.dataset-search-dlg'),
-        input_set_dataset_group = $('#insert_dataset'),
-        input_set_dataset_btn = $('#insert_one_dataset'),
-        input_set_dataset_menu = $('#insert_many_dataset'),
+        set_dataset = {
+            wrapper: $('#insert_dataset'),
+            btn: $('#insert_one_dataset'),
+            options_btn: $('#insert_many_dataset'),
+            options_menu: $('#insert_many_menu')
+        },
         above_box = $('#above_box'),
         dataset_search_table = new choose_inputs.DatasetsTable(
             dataset_search_dialog.find('table'),
@@ -47,7 +50,7 @@ $(function() {
 
         setTimeout(function() {
             $error_div.hide();
-        }, 5000)
+        }, 5000);
     };
 
     var deselectAll = function() {
@@ -68,17 +71,22 @@ $(function() {
             cellWidth;
 
         function moveInputSetDatasetButton() {
-            var insertBtnOffsetX = input_set_dataset_group.offset().left -
-                    input_set_dataset_group.position().left;
+            var insertBtnOffsetX = set_dataset.wrapper.offset().left -
+                    set_dataset.wrapper.position().left;
+
+            cellOffsetX = $('button.receiving').offset().left;
 
             // Animate green arrow button
-            input_set_dataset_group
+            set_dataset.wrapper
                 .animate({
                     width: cellWidth,
                     left: cellOffsetX - insertBtnOffsetX
                 }, 150, 'linear');
         }
 
+        // dialog_state will allow the dialog to have disjunct states according to which input is at hand.
+        // when a different input is selected, the old input's dialog is saved, and the new one is loaded
+        // from memory (or else cleared).
         // defining dialog_state's properties in this way makes them unenumerable and immutable.
         Object.defineProperties(dialog_state, {
             init: {
@@ -146,7 +154,6 @@ $(function() {
                 outgoing_input_name = dataset_search_dialog.fadeIn('fast').find('h2 em').text()
             ;
 
-            cellOffsetX = $empty_input.offset().left;
             cellWidth = $empty_input.outerWidth();
 
             // Save/load dialog state according to the input
@@ -160,12 +167,6 @@ $(function() {
                     $empty_input.data('dataset-idx')
                 );
             }
-
-            // Move green button before and also after revealing above_box.
-            // This allows it to start animating concurrently with above_box,
-            // but also moves with the correct final position of above_box.
-            moveInputSetDatasetButton();
-            above_box.showIfHidden(moveInputSetDatasetButton);
 
             // Corresponding cell in pipeline input matrix
             // Set CSS classes for buttons
@@ -181,6 +182,12 @@ $(function() {
 
             dataset_search_dialog.find('h2 em')
                 .text(input_name);
+
+            // Move green button before and also after revealing above_box.
+            // This allows it to start animating concurrently with above_box,
+            // but also moves with the correct final position of above_box.
+            moveInputSetDatasetButton();
+            above_box.showIfHidden(moveInputSetDatasetButton);
         };
     })();
     var uiFactory = (function() {
@@ -275,8 +282,8 @@ $(function() {
         var selected_vals = dataset_search_dialog.find('.search_results .selected .primary'),
             receiving_cell = $('button.receiving'),
             receiving_cell_selector = 'td:nth-child(' +
-                (receiving_cell.parent().index() + 1)
-                + ')',// css pseudo-class is 1-indexed
+                (receiving_cell.parent().index() + 1) +
+                ')',// css pseudo-class is 1-indexed
             receiving_row = receiving_cell.closest('tr'),
             blank_input_queue = receiving_row
                 .nextAll().addBack()
@@ -296,7 +303,7 @@ $(function() {
 
                 if (blank_input_queue.length === 0) {
                     new_row = uiFactory.pipelineInputRow();
-                    new_row.insertAfter(last_filled_input.closest('tr') || receiving_row)
+                    new_row.insertAfter(last_filled_input.closest('tr') || receiving_row);
 
                     // push new row's cell
                     blank_input_queue = blank_input_queue.add(
@@ -442,13 +449,12 @@ $(function() {
         }
     };
     var showFillOptions = function() {
-        $('#insert_many_menu').show();
-        input_set_dataset_menu.addClass('active');
+        set_dataset.options_menu.show();
+        set_dataset.options_btn.addClass('active');
     };
-
     var hideFillOptions = function() {
-        $('#insert_many_menu').hide();
-        input_set_dataset_menu.removeClass('active');
+        set_dataset.options_menu.hide();
+        set_dataset.options_btn.removeClass('active');
     };
     var fillMenuChoose = function(e) {
         var action = $(this).data('action');
@@ -458,8 +464,8 @@ $(function() {
             var selected_val = dataset_search_dialog.find('.search_results .selected .primary').eq(0),
                 receiving_cell = $('button.receiving'),
                 receiving_cell_selector = 'td:nth-child(' +
-                    (receiving_cell.parent().index() + 1)
-                    + ')',// css pseudo-class is 1-indexed
+                    (receiving_cell.parent().index() + 1) +
+                    ')',// css pseudo-class is 1-indexed
                 column = receiving_cell
                     .closest('tbody')
                     .children('tr')
@@ -493,27 +499,29 @@ $(function() {
 
     $.getJSON('/api/datasets/?format=json', initUsersList);
 
-    above_box               .on( 'click',    '.close.ctrl',           closeSearchDialog           )
-                            .on( 'click',                             stopProp                    );
-    input_set_dataset_btn   .on( 'click',                             addSelectedDatasetsToInput  );
-    $('#run_pipeline')      .on( 'submit',                            mainSubmitHandler           )
-                            .on( 'click',    'input, textarea',       stopProp                    );
-    $('.permissions-widget').on( 'click',                             stopProp                    );
-    dataset_search_dialog   .on( 'submit',   'form',                  submitDatasetSearch         )
-                            .on( 'change',   '#date_added',           dateAddedFilterHandler      )
-                            .on( 'change',   '#creator',              creatorFilterHandler        )
-    .find('.search_form')   .on( 'click',                             focusSearchField            );
-    dataset_input_table     .on( 'click',    '.input-dataset',        toggleInputDatasetSelection )
-                            .on( 'click',    '.remove.ctrl',          removeDatasetFromInput      )
-                            .on( 'click',    'button[name="input"]',  showInputSearchDlg          );
-    $('.search_results')    .on( 'click',    'tbody tr',              selectSearchResult          )
-                            .on( 'dblclick', 'tbody tr',              function() { input_set_dataset_btn.click(); } );
-    $('body')               .on( 'click',                             deselectAll                 );
-    $('#run_controls')      .on( 'click',    '.add_run',              addNewRunRow                )
-                            .on( 'click',    '.remove_run',           removeLastRunRow            );
-    input_set_dataset_menu  .on( 'click',                             showFillOptions             )
-                            .on( 'mouseleave',                        hideFillOptions             );
-    $('#insert_many_menu')  .on( 'click',    'li',                    fillMenuChoose             );
+    $('body')                  .click(   deselectAll  );
+    set_dataset.btn            .click(   addSelectedDatasetsToInput  );
+    set_dataset.options_btn    .click(   showFillOptions  )
+                          .mouseleave(   hideFillOptions  );
+    $('.permissions-widget')   .click(   stopProp  );
+    above_box                  .click(   stopProp  );
+    $('.close.ctrl', above_box).click(   closeSearchDialog  );
+    $('#date_added')          .change(   dateAddedFilterHandler  );
+    $('#creator')             .change(   creatorFilterHandler  );
+    $('#run_pipeline')        .submit(   mainSubmitHandler  )
+                            .on( 'click',  'input, textarea',      stopProp );
+    dataset_search_dialog   .on( 'submit', 'form',                 submitDatasetSearch )
+      .find('.search_form') .click(                                focusSearchField );
+    dataset_input_table     .on( 'click',  '.input-dataset',       toggleInputDatasetSelection )
+                            .on( 'click',  '.remove.ctrl',         removeDatasetFromInput )
+                            .on( 'click',  'button[name="input"]', showInputSearchDlg );
+    $('.search_results')    .on({ click:                           selectSearchResult,
+                                  dblclick:                        function() { set_dataset.btn.click(); }
+                            },             'tbody tr' );
+    $('#run_controls')      .on( 'click',  '.add_run',             addNewRunRow )
+                            .on( 'click',  '.remove_run',          removeLastRunRow );
+    set_dataset.options_menu.on( 'click',  'li',                   fillMenuChoose );
+
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
