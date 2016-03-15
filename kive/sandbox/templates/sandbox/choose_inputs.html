@@ -112,6 +112,7 @@
 
     <thead>
         <tr>
+            <th>Run Name</th>
         {% for input in inputs %}
             <th>{{ input.dataset_name }}</th>
         {% endfor %}
@@ -120,6 +121,7 @@
 
     <tbody>
         <tr>
+            <td><input type="text" name="run_name[0]" class="run-name"></td>
         {% for input in inputs %}
             <td class="pipeline-input"><button name="input" data-input-name="{{ input.dataset_name }}" data-dataset-idx="{{ input.dataset_idx }}" data-cdt="{{ input.compounddatatype.id }}" class="select_dataset">+</button></td>
         {% endfor %}

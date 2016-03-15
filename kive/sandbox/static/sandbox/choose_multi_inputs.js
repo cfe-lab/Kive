@@ -212,7 +212,9 @@ $(function() {
             plusButtonCell: function(data) {
                 return plus_button_cell.clone().children('button').data(data).end();
             },
-            pipelineInputRow: function() { return pipeline_original_row.clone(); },
+            pipelineInputRow: function() {
+                return pipeline_original_row.clone();
+            },
             removeCtrl: function() { return remove_ctrl.clone(); },
             hiddenInput: function(name, value) {
                 return hidden_input.clone().attr('name', name).val(value);
@@ -435,7 +437,18 @@ $(function() {
         }
     };
     var addNewRunRow = function() {
-        dataset_input_table.append(uiFactory.pipelineInputRow());
+        for (
+            var new_run_ix = $('tr', dataset_input_table).length;
+            $('.run-name[name="run_name[' + new_run_ix + ']"]').length > 0;
+            new_run_ix++
+        );
+        uiFactory.pipelineInputRow()
+            .find('.run-name')
+                .attr('name', 'run_name[' + new_run_ix + ']')
+            .end()
+            .appendTo(dataset_input_table)
+        ;
+        setRunNamesPrefix();
     };
     var removeLastRunRow = function() {
         var $tr = dataset_input_table.find('tr').eq(-1);
@@ -496,10 +509,56 @@ $(function() {
             }
         }
     };
+    var setRunNamesPrefix = (function() {
+        var old_prefix = '';
+        return function() {
+            var prefix = $('#id_name').val();
+            $('.run-name').each(function(ix) {
+                var $this = $(this);
+                var name_sans_prefix = $this.val().replace(old_prefix +'_', '');
+                if (prefix && name_sans_prefix) {
+                    $this.val(prefix +'_'+ name_sans_prefix);
+                } else if (prefix) {
+                    $this.val(prefix +'_'+ ix);
+                } else {
+                    $this.val(name_sans_prefix);
+                }
+            });
+            old_prefix = prefix;
+        };
+    })();
+
+    dataset_input_table.on('mouseup keyup select', '.run-name', function() {
+        var prefix = $('#id_name').val() + '_';
+        var input = this;
+
+        if (input.selectionStart < prefix.length) {
+            input.setSelectionRange(prefix.length, Math.max(prefix.length, input.selectionEnd) );
+        }
+    }).on('keydown', '.run-name', function(e) {
+        var prefix = $('#id_name').val() + '_';
+        var input = this;
+        if (input.selectionStart <= prefix.length && 
+                [ 8, 37, 38 ].indexOf(e.keyCode) > -1// backspace, left, up
+            ) {
+            e.preventDefault();
+        }
+    });
 
     $.getJSON('/api/datasets/?format=json', initUsersList);
 
     $('body')                  .click(   deselectAll  );
+    /* debug */
+    // $('body')               .on('keypress', function(e) {
+    //     console.log('keypress', e.keyCode);
+    //     if (e.keyCode == 101) { 
+    //         var ar = [];
+    //         $('.run-name', dataset_input_table).each(function() {
+    //             ar.push($(this).attr('name'));
+    //         }); 
+    //         console.log.apply(console, ar);
+    //     }
+    // });
     set_dataset.btn            .click(   addSelectedDatasetsToInput  );
     set_dataset.options_btn    .click(   showFillOptions  )
                           .mouseleave(   hideFillOptions  );
@@ -508,6 +567,7 @@ $(function() {
     $('.close.ctrl', above_box).click(   closeSearchDialog  );
     $('#date_added')          .change(   dateAddedFilterHandler  );
     $('#creator')             .change(   creatorFilterHandler  );
+    $('#id_name')              .keyup(   setRunNamesPrefix  );
     $('#run_pipeline')        .submit(   mainSubmitHandler  )
                             .on( 'click',  'input, textarea',      stopProp );
     dataset_search_dialog   .on( 'submit', 'form',                 submitDatasetSearch )
