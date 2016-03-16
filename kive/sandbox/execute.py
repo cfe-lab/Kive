@@ -1340,7 +1340,12 @@ class Sandbox:
         if not input_dataset_in_sdbx:
             logger.debug("[%d] Dataset is in the DB - writing it to the file system", worker_rank)
             try:
-                shutil.copyfile(input_dataset.dataset_file.path, input_dataset_path)
+                file_path = None
+                if bool(input_dataset):
+                    file_path = input_dataset.dataset_file.path
+                elif input_dataset.external_path:
+                    file_path = input_dataset.external_path
+                shutil.copyfile(file_path, input_dataset_path)
             except IOError:
                 logger.error("[%d] could not copy file %s to file %s.",
                              worker_rank, input_dataset.dataset_file.path, input_dataset_path)

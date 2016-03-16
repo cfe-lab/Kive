@@ -25,6 +25,8 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
     removal_plan = serializers.HyperlinkedIdentityField(view_name='dataset-removal-plan')
     redaction_plan = serializers.HyperlinkedIdentityField(view_name='dataset-redaction-plan')
 
+    save_in_db = serializers.BooleanField(default=False)
+
     class Meta():
         model = Dataset
         fields = (
@@ -32,7 +34,9 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             'url',
             'name',
             'description',
-            "dataset_file",
+            'dataset_file',
+            'external_path',
+            'save_in_db',
             'filename',
             'date_created',
             'download_url',
@@ -69,17 +73,20 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
         if "structure" in validated_data:
             cdt = validated_data["structure"].get("compounddatatype", None)
 
+        file_path = validated_data.get("external_path", None)
+
         dataset = Dataset.create_dataset(
-            file_path=None,
+            file_path=file_path,
             user=self.context["request"].user,
             users_allowed=validated_data["users_allowed"],
             groups_allowed=validated_data["groups_allowed"],
             cdt=cdt,
-            keep_file=True,
+            keep_file=validated_data["save_in_db"],
             name=validated_data["name"],
             description=validated_data["description"],
             file_source=None,
             check=True,
-            file_handle=validated_data["dataset_file"]
+            file_handle=validated_data["dataset_file"],
+            is_external="external_path" in validated_data
         )
         return dataset

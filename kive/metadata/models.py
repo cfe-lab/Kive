@@ -88,7 +88,7 @@ def remove_helper(removal_plan):
         if class_name in removal_plan:
             for obj_to_delete in removal_plan[class_name]:
                 try:
-                    refreshed_obj_to_delete = obj_to_delete.__class__.objects.get(pk=obj_to_delete.pk)
+                    refreshed_obj_to_delete = obj_to_delete.refresh_from_db()
                     refreshed_obj_to_delete.delete()
                 except ObjectDoesNotExist:
                     pass
@@ -111,6 +111,8 @@ def empty_removal_plan():
     removal_plan = {}
     for key in deletion_order:
         removal_plan[key] = set()
+    # Track any Datasets associated with external files.
+    removal_plan["ExternalFiles"] = set()
     return removal_plan
 
 

@@ -98,6 +98,15 @@ class Dataset(metadata.models.AccessControl):
                                     default='',
                                     max_length=maxlengths.MAX_FILENAME_LENGTH)
 
+    external_path = models.FilePathField(
+        path=settings.EXTERNAL_FILE_DIRECTORY,
+        recursive=True,
+        allow_files=True,
+        allow_folders=True,
+        blank=True,
+        max_length=maxlengths.MAX_EXTERNAL_FILENAME_LENGTH
+    )
+
     logger = logging.getLogger('librarian.Dataset')
 
     # For validation of Datasets when being reused, or when being
@@ -134,6 +143,19 @@ class Dataset(metadata.models.AccessControl):
 
         return "{} (created by {} on {})".format(display_name, self.user, self.date_created)
 
+    def get_file_handle(self):
+        """
+        Retrieves an open Django file with which to access the data.
+
+        This is self.dataset_file if possible, falls back to the external file if possible,
+        and otherwise returns None.
+        """
+        if self.dataset_file:
+            return self.dataset_file.open("rb")
+        elif self.external_path and os.path.exists(self.external_path) and os.access(self.external_path, os.R_OK):
+            return File(open(self.external_path, "rb"))
+        return None
+
     def all_rows(self, data_check=False, insert_at=None):
         """
         Returns an iterator over all rows of this Dataset.
@@ -141,11 +163,11 @@ class Dataset(metadata.models.AccessControl):
         If insert_at is specified, a blank field is inserted
         at each element of insert_at.
         """
-        self.dataset_file.open('rU')
+        data_handle = self.get_file_handle()
         cdt = self.compounddatatype
 
-        with self.dataset_file:
-            reader = csv.reader(self.dataset_file)
+        with data_handle:
+            reader = csv.reader(data_handle)
             for row in reader:
                 if insert_at is not None:
                     [row.insert(pos, "") for pos in insert_at]
@@ -299,27 +321,30 @@ class Dataset(metadata.models.AccessControl):
         """
         :return int: size of dataset_file in bytes
         """
-        return self.dataset_file and self.dataset_file.size or 0
+        data_handle = self.get_file_handle()
+        return data_handle and data_handle.size or 0
 
     def get_formatted_filesize(self):
-        if self.dataset_file.size >= 1099511627776:
-            return "{0:.2f}".format(self.dataset_file.size/1099511627776.0) + ' TB'
-        if self.dataset_file.size >= 1073741824:
-            return "{0:.2f}".format(self.dataset_file.size/1073741824.0) + ' GB'
-        elif self.dataset_file.size >= 1048576:
-            return "{0:.2f}".format(self.dataset_file.size/1048576.0) + ' MB'
-        elif self.dataset_file.size >= 1024:
-            return "{0:.2f}".format(self.dataset_file.size/1024.0) + ' KB'
+        data_handle = self.get_file_handle()
+        if data_handle.size >= 1099511627776:
+            return "{0:.2f}".format(data_handle.size/1099511627776.0) + ' TB'
+        if data_handle.size >= 1073741824:
+            return "{0:.2f}".format(data_handle.size/1073741824.0) + ' GB'
+        elif data_handle.size >= 1048576:
+            return "{0:.2f}".format(data_handle.size/1048576.0) + ' MB'
+        elif data_handle.size >= 1024:
+            return "{0:.2f}".format(data_handle.size/1024.0) + ' KB'
         else:
-            return str(self.dataset_file.size) + ' B'
+            return str(data_handle.size) + ' B'
 
     def compute_md5(self):
         """Computes the MD5 checksum of the Dataset."""
+        data_handle = self.get_file_handle()
         try:
-            self.dataset_file.open()
-            md5 = file_access_utils.compute_md5(self.dataset_file.file)
+            data_handle.open()
+            md5 = file_access_utils.compute_md5(data_handle.file)
         finally:
-            self.dataset_file.close()
+            data_handle.close()
 
         return md5
 
@@ -334,10 +359,15 @@ class Dataset(metadata.models.AccessControl):
         return self.MD5_checksum == self.compute_md5()
 
     def has_data(self):
-        """True if an actual dataset file exists; False otherwise."""
+        """
+        True if an actual dataset file exists; False otherwise.
+
+        This returns True if there is either a file registered in the database or if
+        there is a working pointer to an external file in settings.EXTERNAL_FILE_DIRECTORY.
+        """
         # Note: "self.dataset_file is not None" won't work here because self.dataset_file
         # is a FieldFile with no file, not None.
-        return bool(self.dataset_file)
+        return bool(self.dataset_file) or os.path.exists(self.external_path) and os.access(self.external_path, os.R_OK)
 
     def has_structure(self):
         """True if associated DatasetStructure exists; False otherwise."""
@@ -361,13 +391,13 @@ class Dataset(metadata.models.AccessControl):
 
         This returns None if the Dataset is raw.
         """
-        return (None if self.is_raw() else self.structure.num_rows)
+        return None if self.is_raw() else self.structure.num_rows
 
     def get_cdt(self):
         """
         Retrieve the CDT of this Dataset (none if it is raw).
         """
-        return (None if self.is_raw() else self.structure.compounddatatype)
+        return None if self.is_raw() else self.structure.compounddatatype
 
     def create_structure(self, compounddatatype, num_rows=-1):
         """Add a DatasetStructure to this Dataset."""
@@ -415,7 +445,8 @@ class Dataset(metadata.models.AccessControl):
 
     @transaction.atomic
     def register_file(self, file_path, file_handle=None):
-        """Save and register a new file for this Dataset.
+        """
+        Save and register a new file for this Dataset.
 
         Compute and set the MD5.
 
@@ -430,9 +461,9 @@ class Dataset(metadata.models.AccessControl):
                             If None, then opens the file in file_path.
 
         PRE
-        self must not have a Dataset already associated
+        self must not have a file already associated
         """
-        assert not self.has_data()
+        assert not bool(self.dataset_file)
 
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
             self.dataset_file.save(os.path.basename(f.name), File(f))
@@ -505,7 +536,7 @@ class Dataset(metadata.models.AccessControl):
     # FIXME what does it do for num_rows when file_path is unset?
     def create_dataset(cls, file_path, user=None, users_allowed=None, groups_allowed=None, cdt=None, keep_file=True,
                        name=None, description=None, file_source=None, check=True, file_handle=None,
-                       instance=None):
+                       instance=None, is_external=None):
         """
         Helper function to make defining SDs and Datasets faster.
 
@@ -552,6 +583,12 @@ class Dataset(metadata.models.AccessControl):
                 new_dataset.set_MD5(file_path, file_handle)
             else:
                 new_dataset.set_MD5_and_count_rows(file_path, file_handle)
+
+            if is_external:
+                # Check that file_path is in settings.EXTERNAL_FILE_DIRECTORY
+                # using the clean() functionality of the external_path field.
+                new_dataset.external_path = file_path
+                new_dataset.clean_external_path()  # ends the transaction if not
 
             if cdt is not None and check:
                 run_dir = tempfile.mkdtemp(
@@ -838,10 +875,10 @@ class Dataset(metadata.models.AccessControl):
 
     def is_OK(self):
         """
-        Check that this SD has passed a check for contents if not raw,
+        Check that this Dataset has passed a check for contents if not raw,
         and it has never failed any check for integrity or contents.
 
-        Redacted SDs are not considered OK.
+        Redacted Datasets are not considered OK.
         """
         if self.is_redacted():
             return False
@@ -859,7 +896,7 @@ class Dataset(metadata.models.AccessControl):
             if ccl.is_complete():
                 return True
 
-        self.logger.debug("SD '{}' may not be OK - no content check performed".format(self))
+        self.logger.debug("Dataset '{}' may not be OK - no content check performed".format(self))
         return False
 
     def any_failed_checks(self):
@@ -877,15 +914,17 @@ class Dataset(metadata.models.AccessControl):
     @transaction.atomic
     def build_redaction_plan(self, redaction_accumulator=None):
         """
-        Wipe out the contents of this Dataset.
-
-        If dry_run is True, then we only return information about what would be redacted.
+        Create a list of what will be affected when redacting this Dataset.
         """
         redaction_plan = redaction_accumulator or archive.models.empty_redaction_plan()
         assert self not in redaction_plan["Datasets"]
         if self.is_redacted():
             return redaction_plan
         redaction_plan["Datasets"].add(self)
+
+        # Make a special note if this Dataset is associated with an external file.
+        if self.external_path:
+            redaction_plan["ExternalFiles"].add(self)
 
         # Mark anything that was produced from this Dataset for redaction.
         for used_as_input in self.execrecordins.all().select_related("execrecord"):
@@ -906,9 +945,11 @@ class Dataset(metadata.models.AccessControl):
 
         self._redacted = True
         self.MD5_checksum = ""
-        self.save(update_fields=["_redacted", "MD5_checksum"])
+        if self.external_path:
+            self.external_path = ""
+        self.save(update_fields=["_redacted", "MD5_checksum", "external_path"])
 
-        if self.has_data():
+        if bool(self.dataset_file):
             self.dataset_file.delete(save=True)
         if self.has_structure():
             self.structure.delete()
@@ -929,6 +970,10 @@ class Dataset(metadata.models.AccessControl):
         removal_plan = removal_accumulator or metadata.models.empty_removal_plan()
         assert self not in removal_plan["Datasets"]
         removal_plan["Datasets"].add(self)
+
+        # Make a special note if this Dataset is associated with an external file.
+        if self.external_path:
+            removal_plan["ExternalFiles"].add(self)
 
         for er_xput in itertools.chain(self.execrecordins.all(), self.execrecordouts.all()):
             curr_ER = er_xput.execrecord

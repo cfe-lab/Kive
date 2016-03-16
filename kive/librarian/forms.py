@@ -57,15 +57,25 @@ class DatasetForm(forms.ModelForm):
         required=False
     )
 
-    dataset_file = forms.FileField(allow_empty_file="False",  max_length=maxlengths.MAX_FILENAME_LENGTH)
+    dataset_file = forms.FileField(allow_empty_file="True", max_length=maxlengths.MAX_FILENAME_LENGTH)
 
     RAW_CDT_CHOICE = (CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)
     compound_datatype_choices = [RAW_CDT_CHOICE]
     compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
+    save_in_db = forms.BooleanField(default=True)
+
     class Meta:
         model = Dataset
-        fields = ('name', 'description', 'dataset_file', "permissions", "compound_datatype")
+        fields = (
+            'name',
+            'description',
+            'dataset_file',
+            'external_path',
+            'save_in_db',
+            'permissions',
+            'compound_datatype'
+        )
 
     def __init__(self, data=None, files=None, users_allowed=None, groups_allowed=None, user=None, *args, **kwargs):
         super(DatasetForm, self).__init__(data, files, *args, **kwargs)
@@ -124,35 +134,6 @@ class BulkDatasetUpdateForm(forms.Form):
             dataset.save()
             return dataset
         return None
-
-
-# FIXME: This was modified to support users and groups, but is not called by any view.
-# If you get to implementing a view using this, beware that it was not tested!
-class BulkCSVDatasetForm (metadata.forms.AccessControlForm):
-    """
-    Creates multiple datasets from a CSV.
-    Expects that BulkDatasetForm.is_valid() has been called so that BulkDatasetForm.cleaned_data dict has been populated
-        with validated data.
-    """
-
-    datasets_csv = forms.FileField(allow_empty_file="False",  max_length=4096,
-                                   widget=ClearableFileInput(attrs={"multiple": "true"}))  # multiselect files
-
-    compound_datatype_choices = [DatasetForm.RAW_CDT_CHOICE]
-    compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
-
-    def create_datasets(self, user):
-
-        compound_datatype_obj = None
-        if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
-            compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
-
-        # FIXME this doesn't support PermissionsWidget.
-        Dataset.create_dataset_bulk(csv_file_path=None, user=user,
-                                    users_allowed=self.cleaned_data["users_allowed"],
-                                    groups_allowed=self.cleaned_data["groups_allowed"],
-                                    csv_file_handle=self.cleaned_data['datasets_csv'], cdt=compound_datatype_obj,
-                                    keep_files=True, file_source=None, check=True)
 
 
 class MultiFileField(forms.Field):

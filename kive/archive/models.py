@@ -37,7 +37,8 @@ def empty_redaction_plan():
         "ExecRecords": set(),
         "OutputLogs": set(),
         "ErrorLogs": set(),
-        "ReturnCodes": set()
+        "ReturnCodes": set(),
+        "ExternalFiles": set()
     }
 
 

@@ -125,4 +125,4 @@ class DatasetViewSet(RemovableModelViewSet,
         if not accessible_datasets.filter(pk=dataset.pk).exists():
             return Response(None, status=status.HTTP_404_NOT_FOUND)
 
-        return _build_download_response(dataset.dataset_file)
+        return _build_download_response(dataset.get_file_handle())

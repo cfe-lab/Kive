@@ -29,6 +29,13 @@
                     <td>{{ singleDataset.dataset_file }}</td>
                     <td class="errortext">{{ singleDataset.dataset_file.errors }}</td>
                 </tr>
+                <tr><td><label>{{ singleDataset.external_path.label }}</label></td>
+                    <td>{{ singleDataset.external_path }}</td>
+                    <td class="errortext">{{ singleDataset.external_path.errors }}</td>
+                    <td><label>{{ singleDataset.save_in_db.label }}</label></td>
+                    <td>{{ singleDataset.save_in_db }}</td>
+                    <td class="errortext">{{ singleDataset.save_in_db.errors }}</td>
+                </tr>
                 <tr><td><label>{{ singleDataset.name.label }}</label></td>
                     <td>{{ singleDataset.name }}</td>
                     <td class="errortext">{{ singleDataset.name.errors }}</td>

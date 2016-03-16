@@ -4,6 +4,6 @@
 
 {% block dataset_contents %}
 <pre>
-{{ dataset.dataset_file.read }}
+{{ dataset.get_file_handle.read }}
 </pre>
 {% endblock %}

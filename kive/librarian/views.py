@@ -63,7 +63,7 @@ def dataset_download(request, dataset_id):
     except Dataset.DoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
-    return _build_download_response(dataset.dataset_file)
+    return _build_download_response(dataset.get_file_handle())
 
 
 @login_required
@@ -201,17 +201,20 @@ def datasets_add(request):
                 if df.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
                     cdt = CompoundDatatype.objects.get(pk=df.cleaned_data['compound_datatype'])
 
+                file_path = df.cleaned_data.get("external_path", None)
+
                 with transaction.atomic():
                     ds = Dataset.create_dataset(
-                        file_path=None,
+                        file_path=file_path,
                         user=request.user,
                         cdt=cdt,
-                        keep_file=True,
+                        keep_file=df.cleaned_data["save_in_db"],
                         name=df.cleaned_data['name'],
                         description=df.cleaned_data['description'],
                         file_source=None,
                         check=True,
                         file_handle=df.cleaned_data['dataset_file'],
+                        is_external="external_path" in df.cleaned_data,
                         instance=ds
                     )
                     ds.grant_from_json(df.cleaned_data["permissions"])
