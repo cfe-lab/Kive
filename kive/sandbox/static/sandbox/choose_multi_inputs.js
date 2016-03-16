@@ -528,22 +528,127 @@ $(function() {
         };
     })();
 
-    dataset_input_table.on('mouseup keyup select', '.run-name', function() {
-        var prefix = $('#id_name').val() + '_';
-        var input = this;
+    $.fn.textWidth = function(text, font) {
+        var this_fn = $.fn.textWidth;
+        if (!this_fn.fake_el) {
+            this_fn.fake_el = $('<span>').hide().appendTo(document.body);
+        }
+        this_fn.fake_el
+            .text( text || this.val() || this.text() )
+            .css( 'font', font || this.css('font') )
+        ;
+        return this_fn.fake_el.width();
+    };
+    $.fn.caretTarget = function(offset, start) {
+        var position = 0;
+        var position_offset = [ 0 ];
+        var text = this.val() || this.text();
 
-        if (input.selectionStart < prefix.length) {
-            input.setSelectionRange(prefix.length, Math.max(prefix.length, input.selectionEnd) );
+        // currently just scrolls through until it finds that offset.
+        // a better algorithm would do midpoint, then quartiles, etc
+        while (position_offset[position] < offset && position < text.length + 1) {
+            position++;
+            position_offset[position] = this.textWidth(text.substr(0, position));
         }
-    }).on('keydown', '.run-name', function(e) {
-        var prefix = $('#id_name').val() + '_';
-        var input = this;
-        if (input.selectionStart <= prefix.length && 
-                [ 8, 37, 38 ].indexOf(e.keyCode) > -1// backspace, left, up
-            ) {
+
+        return position - 1;
+    };
+
+    +function() {
+        // override keyboard and mouse events for run name inputs
+        // in effect make the prefix portion "read-only" while
+        // allowing the user to edit the rest of the name.
+
+        // this block exists to close over these three variables.
+        var select_start, active_input, $active_input, input_height, input_offset;
+
+        var prefix_el = $('#id_name');
+
+        var selectText = function(e) {// mousemove event when dragging from input
+            var prefix_length = prefix_el.val().length + 1,
+                full_name_length = active_input.value.length,
+                mouse_is_before_input = e.pageY < input_offset.top || 
+                    e.pageY < input_height + input_offset.top && 
+                    e.pageX < input_offset.left,
+                end;
+
+            if (active_input == e.target) {
+                end = Math.max(
+                    prefix_length,
+                    $active_input.caretTarget(e.offsetX, prefix_length)
+                );
+            } else {
+                end = mouse_is_before_input ? prefix_length : full_name_length;
+            } 
+            if (select_start > end) {
+                active_input.setSelectionRange(end, select_start);
+            } else {
+                active_input.setSelectionRange(select_start, end);
+            }
             e.preventDefault();
+        };
+
+        $('body').on('mouseup', deactivateInput);
+
+        dataset_input_table.on({// delegate target is ".run-name"
+            /* 
+             * keydown and mousedown do not provide any information on
+             * what's GOING to happen, so we have to reason that ourself
+             * based on mouse coordinates and key codes.
+             */
+            keydown: function(e) {
+                var prefix_length = prefix_el.val().length + 1,
+                    // these are the keys/combinations we have to watch out for.
+                    carat_is_on_boundary = this.selectionStart <= prefix_length,
+                    key_is_back_or_left = [8,37].indexOf(e.keyCode) > -1,
+                    key_is_up_or_home = [36,38].indexOf(e.keyCode) > -1,
+                    select_all_cmd = e.keyCode == 65 && (e.metaKey || e.ctrlKey)
+                ;
+
+                if (carat_is_on_boundary && key_is_back_or_left ||
+                        key_is_up_or_home || select_all_cmd
+                    ) {
+                    if (key_is_up_or_home) {
+                        this.setSelectionRange(
+                            prefix_length, 
+                            e.shiftKey ? this.selectionStart : prefix_length
+                        );
+                    }
+                    if (select_all_cmd) {
+                        this.setSelectionRange(prefix_length, this.value.length);
+                    }
+                    e.preventDefault();
+                }
+            },
+            mousedown: function(e) {
+                var prefix = prefix_el.val() + '_',
+                    offset = e.offsetX,
+                    prefix_width = prefix_el.textWidth(prefix);
+
+                activateInput(this);
+                if (offset < prefix_width) {
+                    this.focus();
+                    this.setSelectionRange(prefix.length, prefix.length);
+                    e.preventDefault();
+                    select_start = prefix.length;
+                } else {
+                    select_start = $(this).caretTarget(offset, prefix.length);
+                }
+            }
+        }, '.run-name');
+
+        function activateInput(input) {
+            active_input = input;
+            $active_input = $(input);
+            input_offset = $active_input.offset();
+            input_height = $active_input.outerHeight();
+            $('body').on('mousemove', selectText);
         }
-    });
+        function deactivateInput() {
+            active_input = $active_input = input_offset = input_height = undefined;
+            $('body').off('mousemove', selectText);
+        }
+    }();
 
     $.getJSON('/api/datasets/?format=json', initUsersList);
 
