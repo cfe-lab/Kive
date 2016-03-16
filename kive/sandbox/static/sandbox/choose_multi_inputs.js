@@ -540,9 +540,13 @@ $(function() {
         return this_fn.fake_el.width();
     };
     $.fn.caretTarget = function(offset, start) {
+        if (!this.is('input')) return null;
         var position = 0;
         var position_offset = [ 0 ];
         var text = this.val() || this.text();
+
+        // @todo 
+        // use the "start" parameter to skip characters.
 
         // currently just scrolls through until it finds that offset.
         // a better algorithm would do midpoint, then quartiles, etc
@@ -559,7 +563,7 @@ $(function() {
         // in effect make the prefix portion "read-only" while
         // allowing the user to edit the rest of the name.
 
-        // this block exists to close over these three variables.
+        // this closure block exists to close over the following variables.
         var select_start, active_input, $active_input, input_height, input_offset;
 
         var prefix_el = $('#id_name');
@@ -652,28 +656,17 @@ $(function() {
 
     $.getJSON('/api/datasets/?format=json', initUsersList);
 
-    $('body')                  .click(   deselectAll  );
-    /* debug */
-    // $('body')               .on('keypress', function(e) {
-    //     console.log('keypress', e.keyCode);
-    //     if (e.keyCode == 101) { 
-    //         var ar = [];
-    //         $('.run-name', dataset_input_table).each(function() {
-    //             ar.push($(this).attr('name'));
-    //         }); 
-    //         console.log.apply(console, ar);
-    //     }
-    // });
-    set_dataset.btn            .click(   addSelectedDatasetsToInput  );
-    set_dataset.options_btn    .click(   showFillOptions  )
-                          .mouseleave(   hideFillOptions  );
-    $('.permissions-widget')   .click(   stopProp  );
-    above_box                  .click(   stopProp  );
-    $('.close.ctrl', above_box).click(   closeSearchDialog  );
-    $('#date_added')          .change(   dateAddedFilterHandler  );
-    $('#creator')             .change(   creatorFilterHandler  );
-    $('#id_name')              .keyup(   setRunNamesPrefix  );
-    $('#run_pipeline')        .submit(   mainSubmitHandler  )
+    $('body')                  .click(   deselectAll                                            );
+    set_dataset.btn            .click(   addSelectedDatasetsToInput                             );
+    set_dataset.options_btn    .click(   showFillOptions                                        )
+                          .mouseleave(   hideFillOptions                                        );
+    $('.permissions-widget')   .click(   stopProp                                               );
+    above_box                  .click(   stopProp                                               );
+    $('.close.ctrl', above_box).click(   closeSearchDialog                                      );
+    $('#date_added')          .change(   dateAddedFilterHandler                                 );
+    $('#creator')             .change(   creatorFilterHandler                                   );
+    $('#id_name')              .keyup(   setRunNamesPrefix                                      );
+    $('#run_pipeline')        .submit(   mainSubmitHandler                                      )
                             .on( 'click',  'input, textarea',      stopProp );
     dataset_search_dialog   .on( 'submit', 'form',                 submitDatasetSearch )
       .find('.search_form') .click(                                focusSearchField );
