@@ -40,7 +40,7 @@ class MaxLengths:
 
 maxlengths = MaxLengths()
 maxlengths.MAX_FILENAME_LENGTH = 260
-maxlengths.MAX_EXTERNAL_FILENAME_LENGTH = 4096  # this is PATH_MAX on Linux systems
+maxlengths.MAX_EXTERNAL_PATH_LENGTH = 4096  # this is PATH_MAX on Linux systems
 maxlengths.MAX_COLOUR_LENGTH = 100
 maxlengths.MAX_NAME_LENGTH = 60
 maxlengths.MAX_DESCRIPTION_LENGTH = 1000

@@ -58,6 +58,13 @@ def get_upload_path(instance, filename):
     return instance.UPLOAD_DIR + os.sep + time.strftime('%Y_%m') + os.sep + filename
 
 
+def get_external_file_directory():
+    """
+    A callable that retrieves settings.EXTERNAL_FILE_DIRECTORY.
+    """
+    return settings.EXTERNAL_FILE_DIRECTORY
+
+
 @python_2_unicode_compatible
 class Dataset(metadata.models.AccessControl):
     """
@@ -99,12 +106,12 @@ class Dataset(metadata.models.AccessControl):
                                     max_length=maxlengths.MAX_FILENAME_LENGTH)
 
     external_path = models.FilePathField(
-        path=settings.EXTERNAL_FILE_DIRECTORY,
+        path=get_external_file_directory,
         recursive=True,
         allow_files=True,
         allow_folders=True,
         blank=True,
-        max_length=maxlengths.MAX_EXTERNAL_FILENAME_LENGTH
+        max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH
     )
 
     logger = logging.getLogger('librarian.Dataset')

@@ -25,7 +25,7 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
     removal_plan = serializers.HyperlinkedIdentityField(view_name='dataset-removal-plan')
     redaction_plan = serializers.HyperlinkedIdentityField(view_name='dataset-redaction-plan')
 
-    save_in_db = serializers.BooleanField(default=False)
+    save_in_db = serializers.BooleanField(default=False, write_only=True)
 
     class Meta():
         model = Dataset

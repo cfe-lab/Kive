@@ -63,7 +63,7 @@ class DatasetForm(forms.ModelForm):
     compound_datatype_choices = [RAW_CDT_CHOICE]
     compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
-    save_in_db = forms.BooleanField(default=True)
+    save_in_db = forms.BooleanField(required=False)
 
     class Meta:
         model = Dataset
