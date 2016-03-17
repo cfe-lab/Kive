@@ -58,11 +58,17 @@ def get_upload_path(instance, filename):
     return instance.UPLOAD_DIR + os.sep + time.strftime('%Y_%m') + os.sep + filename
 
 
-def get_external_file_directory():
+class ExternalFileDirectory(models.Model):
     """
-    A callable that retrieves settings.EXTERNAL_FILE_DIRECTORY.
+    A database table storing directories whose contents we can make Datasets out of.
     """
-    return settings.EXTERNAL_FILE_DIRECTORY
+    name = models.CharField(help_text="Human-readable name for this external file directory",
+                            blank=True, max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH)
+    path = models.FilePathField(path="/", allow_files=False, allow_folders=True, recursive=True,
+                                max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH)
+
+    def display_name(self):
+        return self.name if self.name else self.path
 
 
 @python_2_unicode_compatible
@@ -105,11 +111,14 @@ class Dataset(metadata.models.AccessControl):
                                     default='',
                                     max_length=maxlengths.MAX_FILENAME_LENGTH)
 
-    external_path = models.FilePathField(
-        path=get_external_file_directory,
-        recursive=True,
-        allow_files=True,
-        allow_folders=True,
+    externalfiledirectory = models.ForeignKey(
+        ExternalFileDirectory,
+        help_text="External file directory containing the data file",
+        null=True,
+        blank=True
+    )
+    external_path = models.CharField(
+        help_text="Relative path of the file within the specified external file directory",
         blank=True,
         max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH
     )
@@ -160,7 +169,7 @@ class Dataset(metadata.models.AccessControl):
         if self.dataset_file:
             return self.dataset_file.open("rb")
         elif self.external_path and os.path.exists(self.external_path) and os.access(self.external_path, os.R_OK):
-            return File(open(self.external_path, "rb"))
+            return File(open(os.path.join(self.externalfiledirectory.path, self.external_path), "rb"))
         return None
 
     def all_rows(self, data_check=False, insert_at=None):
@@ -288,6 +297,15 @@ class Dataset(metadata.models.AccessControl):
         if self.file_source is not None:
             # Whatever run created this Dataset must have had access to the parent Dataset.
             self.file_source.definite.top_level_run.validate_restrict_access([self])
+
+        if not (self.externalfiledirectory and self.external_path
+                or not self.externalfiledirectory and not self.external_path):
+            raise ValidationError(
+                {
+                    "external_path": "Both externalfiledirectory and external_path should be set or "
+                                     "neither should be set"
+                }
+            )
 
         if self.has_data() and not self.check_md5():
             error_str = ('File integrity of "{}" lost. Current checksum "{}" does not equal expected checksum ' +

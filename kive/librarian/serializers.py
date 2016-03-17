@@ -3,10 +3,23 @@ import os
 from django.template.defaultfilters import filesizeformat
 from rest_framework import serializers
 
-from librarian.models import Dataset
+from librarian.models import Dataset, ExternalFileDirectory
 from metadata.models import CompoundDatatype
 
 from kive.serializers import AccessControlSerializer
+
+
+class ExternalFileDirectorySerializer(serializers.ModelSerializer):
+    class Meta():
+        model = ExternalFileDirectory
+        fields = (
+            'name',
+            'path',
+            'display_name'
+        )
+        extra_kwargs = {
+            'display_name': {'write_only': True}
+        }
 
 
 class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
@@ -35,6 +48,7 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             'name',
             'description',
             'dataset_file',
+            'externalfiledirectory',
             'external_path',
             'save_in_db',
             'filename',
@@ -65,6 +79,28 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
         if obj:
             return filesizeformat(obj.get_filesize())
 
+    def validate(self):
+        df_exists = "dataset_file" in validated_data
+        ep_exists = "external_path" in validated_data
+        efd_exists = "externalfiledirectory" in validated_data
+
+        if df_exists:
+            errors = []
+            if ep_exists:
+                errors.append("external_path should not be specified if dataset_file is")
+            if efd_exists:
+                errors.append(" externalfiledirectory should not be specified if dataset_file is")
+            if errors:
+                raise serializers.ValidationError(errors)
+
+        if ep_exists and not efd_exists:
+            raise serializers.ValidationError("externalfiledirectory must be specified")
+
+        elif efd_exists and not ep_exists:
+            raise serializers.ValidationError("external_path must be specified")
+
+
+
     def create(self, validated_data):
         """
         Create a Dataset object from deserialized and validated data.
@@ -73,6 +109,11 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
         if "structure" in validated_data:
             cdt = validated_data["structure"].get("compounddatatype", None)
 
+        file_path = None
+        efd = None
+        if "external_path" in validated_data:
+            # At this point, Dataset.clean has assured that externalfiledirectory is also specified.
+            file_path = ""
         file_path = validated_data.get("external_path", None)
 
         dataset = Dataset.create_dataset(

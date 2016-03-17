@@ -7,10 +7,12 @@ from django.utils.translation import ugettext_lazy as _, ungettext_lazy
 from django.contrib.auth.models import User, Group
 
 import logging
+import re
+import os
 from datetime import datetime
 
 from metadata.models import CompoundDatatype
-from librarian.models import Dataset
+from librarian.models import Dataset, ExternalFileDirectory
 import metadata.forms
 
 import zipfile
@@ -21,6 +23,78 @@ from zipfile import ZipFile
 from constants import maxlengths
 
 LOGGER = logging.getLogger(__name__)
+
+
+# class ExternalFileField(forms.ChoiceField):
+#     """
+#     Copied mostly from Django's FilePathField.
+#     """
+#     def __init__(self, match=None, recursive=False, allow_files=True,
+#                  allow_folders=False, required=True, widget=None, label=None,
+#                  initial=None, help_text='', *args, **kwargs):
+#         self.match, self.recursive = match, recursive
+#         self.allow_files, self.allow_folders = allow_files, allow_folders
+#
+#         super(ExternalFileField, self).__init__(
+#             choices=(),
+#             required=required,
+#             widget=widget,
+#             label=label,
+#             initial=initial,
+#             help_text=help_text,
+#             *args,
+#             **kwargs
+#         )
+#
+#         if self.required:
+#             self.choices = []
+#         else:
+#             self.choices = [("", "---------")]
+#
+#         if self.match is not None:
+#             self.match_re = re.compile(self.match)
+#
+#     def set_choices(self, external_file_directories=None):
+#         """
+#         Scans all specified paths for files that can be used as choices.
+#
+#         This must be done here and not in the constructor in order to avoid
+#         import-time database queries, as external_file_directories will
+#         typically be a QuerySet, i.e. the result of
+#         ExternalFileDirectory.objects.all().
+#
+#         external_file_directories is an iterable of ExternalFileDirectory
+#         objects.
+#         """
+#         for efd in external_file_directories:
+#             if self.recursive:
+#                 for root, dirs, files in sorted(os.walk(efd.path)):
+#                     if self.allow_files:
+#                         for f in files:
+#                             if self.match is None or self.match_re.search(f):
+#                                 f = os.path.join(root, f)
+#                                 self.choices.append((f, f.replace(efd.path, efd.display_name(), 1)))
+#                     if self.allow_folders:
+#                         for f in dirs:
+#                             if f == '__pycache__':
+#                                 continue
+#                             if self.match is None or self.match_re.search(f):
+#                                 f = os.path.join(root, f)
+#                                 self.choices.append((f, f.replace(efd.path, efd.display_name(), 1)))
+#             else:
+#                 try:
+#                     for f in sorted(os.listdir(efd.path)):
+#                         if f == '__pycache__':
+#                             continue
+#                         full_file = os.path.join(efd.path, f)
+#                         if (((self.allow_files and os.path.isfile(full_file)) or
+#                                 (self.allow_folders and os.path.isdir(full_file))) and
+#                                 (self.match is None or self.match_re.search(f))):
+#                             self.choices.append((full_file, "{}:{}".format(efd.display_name(), f)))
+#                 except OSError:
+#                     pass
+#
+#         self.widget.choices = self.choices
 
 
 class DatasetDetailsForm(forms.ModelForm):
@@ -65,12 +139,23 @@ class DatasetForm(forms.ModelForm):
 
     save_in_db = forms.BooleanField(required=False)
 
+    external_path = forms.CharField(
+        widget=forms.Select(
+            attrs={
+                "choices": [
+                    ("", "Choose an external file directory")
+                ]
+            }
+        )
+    )
+
     class Meta:
         model = Dataset
         fields = (
             'name',
             'description',
             'dataset_file',
+            'externalfiledirectory',
             'external_path',
             'save_in_db',
             'permissions',

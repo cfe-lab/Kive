@@ -266,7 +266,3 @@ KIVE_PROCESSING_GROUP = "kiveprocessing"
 
 # Number of rows to display on the View Dataset page.
 DATASET_DISPLAY_MAX = 100
-
-# If you want to create Datasets from files external to Kive without uploading them to
-# Kive, make sure they're accessible in this directory (specify with an absolute path).
-EXTERNAL_FILE_DIRECTORY = ""
