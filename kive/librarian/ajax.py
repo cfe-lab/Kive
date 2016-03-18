@@ -9,16 +9,59 @@ from rest_framework import permissions, status
 from rest_framework.decorators import detail_route
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
+from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from librarian.views import _build_download_response
-from librarian.serializers import DatasetSerializer
-from librarian.models import Dataset
+from librarian.serializers import DatasetSerializer, ExternalFileDirectorySerializer,\
+    ExternalFileDirectoryListFilesSerializer
+
+from librarian.models import Dataset, ExternalFileDirectory
 
 from kive.ajax import RemovableModelViewSet, RedactModelMixin, IsGrantedReadCreate,\
     StandardPagination, CleanCreateModelMixin, SearchableModelMixin,\
     convert_validation
 
 JSON_CONTENT_TYPE = 'application/json'
+
+
+class ExternalFileDirectoryViewSet(ReadOnlyModelViewSet,
+                                   SearchableModelMixin):
+    """
+    List, modify, and create ExternalFileDirectories.
+
+    POST to the list to register a new ExternalFileDirectory;
+    PATCH to modify one.
+    """
+    queryset = ExternalFileDirectory.objects.all()
+    serializer_class = ExternalFileDirectorySerializer
+    permission_classes = (permissions.IsAuthenticated, IsGrantedReadCreate)
+    pagination_class = StandardPagination
+
+    list_files_serializer_class = ExternalFileDirectoryListFilesSerializer
+
+    def filter_queryset(self, queryset):
+        queryset = super(ExternalFileDirectoryViewSet, self).filter_queryset(queryset)
+        return self.apply_filters(queryset)
+
+    def _add_filter(self, queryset, key, value):
+        if key == 'smart':
+            return queryset.filter(Q(name__icontains=value) |
+                                   Q(path__icontains=value))
+        if key == 'name':
+            return queryset.filter(name__icontains=value)
+        if key == 'path':
+            return queryset.filter(path__icontains=value)
+
+        raise APIException('Unknown filter key: {}'.format(key))
+
+    @detail_route(methods=['get'])
+    def list_files(self, request, pk=None):
+        """
+        Retrieves a list of choices for files in this directory.
+        """
+        efd = self.get_object()
+        list_files_serializer = self.list_files_serializer_class(efd, context={"request": request})
+        return Response(list_files_serializer.data)
 
 
 class DatasetViewSet(RemovableModelViewSet,

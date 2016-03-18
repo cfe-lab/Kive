@@ -70,6 +70,28 @@ class ExternalFileDirectory(models.Model):
     def display_name(self):
         return self.name if self.name else self.path
 
+    def list_files(self):
+        """
+        Return a list of tuples representing files under this directory.
+
+        The tuple looks like:
+        ([absolute file path], [file path with external file directory name substituted])
+        """
+        path_with_slash = self.path if self.path.endswith("/") else "{}/".format(self.path)
+        all_files = []
+        for root, dirs, files in sorted(os.walk(self.path)):
+            for f in files:
+                f = os.path.join(root, f)
+                all_files.append((f, f.replace(path_with_slash, "[{}]/".format(self.display_name()), 1)))
+        return all_files
+
+    def save(self, *args, **kwargs):
+        """
+        Normalize the path before saving.
+        """
+        self.path = os.path.normpath(self.path)
+        super(ExternalFileDirectory, self).save(*args, **kwargs)
+
 
 @python_2_unicode_compatible
 class Dataset(metadata.models.AccessControl):
@@ -561,7 +583,7 @@ class Dataset(metadata.models.AccessControl):
     # FIXME what does it do for num_rows when file_path is unset?
     def create_dataset(cls, file_path, user=None, users_allowed=None, groups_allowed=None, cdt=None, keep_file=True,
                        name=None, description=None, file_source=None, check=True, file_handle=None,
-                       instance=None, is_external=None):
+                       instance=None, externalfiledirectory=None):
         """
         Helper function to make defining SDs and Datasets faster.
 
@@ -570,7 +592,9 @@ class Dataset(metadata.models.AccessControl):
         with the SD. file_source can be a RunAtomic to register the
         Dataset with, or None if it was uploaded by the user (or if
         make_dataset=False). If check is True, do a ContentCheck on the
-        file.
+        file.  file_path is an absolute path; if externalfiledirectory
+        is specified, file_path will be checked to ensure that it's
+        inside the specified directory.
 
         Returns the Dataset created.
         """
@@ -594,26 +618,31 @@ class Dataset(metadata.models.AccessControl):
             LOGGER.debug("Creating Dataset from file {}".format(file_handle.name))
             file_name = file_handle.name
         else:
-            raise Exception("Must supply either the file path or file handle")
+            raise ValueError("Must supply either the file path or file handle")
 
         with transaction.atomic():
+            external_path = None
+            # We do this in the transaction because we're accessing ExternalFileDirectory.
+            if externalfiledirectory:
+                # Check that file_path is in the specified ExternalFileDirectory.
+                normalized_path = os.path.normpath(file_path)
+                normalized_efd_with_slash = "{}/".format(os.path.normpath(externalfiledirectory.path))
+                assert normalized_path.startswith(normalized_efd_with_slash)
+                external_path = normalized_path.replace(normalized_efd_with_slash, "", 1)
+
             new_dataset = cls.create_empty(user, cdt=cdt,
                                            users_allowed=users_allowed, groups_allowed=groups_allowed,
                                            instance=instance, file_source=file_source)
 
             new_dataset.name = name or ""
             new_dataset.description = description or ""
+            new_dataset.externalfiledirectory = externalfiledirectory
+            new_dataset.external_path = external_path
 
             if new_dataset.is_raw():
                 new_dataset.set_MD5(file_path, file_handle)
             else:
                 new_dataset.set_MD5_and_count_rows(file_path, file_handle)
-
-            if is_external:
-                # Check that file_path is in settings.EXTERNAL_FILE_DIRECTORY
-                # using the clean() functionality of the external_path field.
-                new_dataset.external_path = file_path
-                new_dataset.clean_external_path()  # ends the transaction if not
 
             if cdt is not None and check:
                 run_dir = tempfile.mkdtemp(

@@ -22,6 +22,27 @@ class ExternalFileDirectorySerializer(serializers.ModelSerializer):
         }
 
 
+class ExternalFileDirectoryListFilesSerializer(ExternalFileDirectorySerializer):
+    """
+    Gives a list of file choices within this ExternalFileDirectory.
+
+    This is intended to be used to look at a single ExternalFileDirectory
+    at a time, as the list_files field may be too slow and/or provide
+    too much output.
+    """
+    class Meta():
+        model = ExternalFileDirectory
+        fields = (
+            'name',
+            'path',
+            'display_name',
+            'list_files'
+        )
+        extra_kwargs = {
+            'display_name': {'write_only': True}
+        }
+
+
 class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
 
     compounddatatype = serializers.PrimaryKeyRelatedField(
@@ -79,17 +100,17 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
         if obj:
             return filesizeformat(obj.get_filesize())
 
-    def validate(self):
-        df_exists = "dataset_file" in validated_data
-        ep_exists = "external_path" in validated_data
-        efd_exists = "externalfiledirectory" in validated_data
+    def validate(self, data):
+        df_exists = "dataset_file" in data
+        ep_exists = "external_path" in data
+        efd_exists = "externalfiledirectory" in data
 
         if df_exists:
             errors = []
             if ep_exists:
                 errors.append("external_path should not be specified if dataset_file is")
             if efd_exists:
-                errors.append(" externalfiledirectory should not be specified if dataset_file is")
+                errors.append("externalfiledirectory should not be specified if dataset_file is")
             if errors:
                 raise serializers.ValidationError(errors)
 
@@ -99,8 +120,6 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
         elif efd_exists and not ep_exists:
             raise serializers.ValidationError("external_path must be specified")
 
-
-
     def create(self, validated_data):
         """
         Create a Dataset object from deserialized and validated data.
@@ -109,12 +128,8 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
         if "structure" in validated_data:
             cdt = validated_data["structure"].get("compounddatatype", None)
 
-        file_path = None
-        efd = None
-        if "external_path" in validated_data:
-            # At this point, Dataset.clean has assured that externalfiledirectory is also specified.
-            file_path = ""
         file_path = validated_data.get("external_path", None)
+        efd = validated_data.get("externalfiledirectory", None)
 
         dataset = Dataset.create_dataset(
             file_path=file_path,
@@ -128,6 +143,6 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             file_source=None,
             check=True,
             file_handle=validated_data["dataset_file"],
-            is_external="external_path" in validated_data
+            externalfiledirectory=efd
         )
         return dataset
