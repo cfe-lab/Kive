@@ -58,17 +58,23 @@ def get_upload_path(instance, filename):
     return instance.UPLOAD_DIR + os.sep + time.strftime('%Y_%m') + os.sep + filename
 
 
+@python_2_unicode_compatible
 class ExternalFileDirectory(models.Model):
     """
     A database table storing directories whose contents we can make Datasets out of.
     """
     name = models.CharField(help_text="Human-readable name for this external file directory",
                             blank=True, max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH)
-    path = models.FilePathField(path="/", allow_files=False, allow_folders=True, recursive=True,
-                                max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH)
+    path = models.CharField(
+        help_text="Absolute path",
+        max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH
+    )
 
     def display_name(self):
         return self.name if self.name else self.path
+
+    def __str__(self):
+        return self.display_name()
 
     def list_files(self):
         """
@@ -135,6 +141,7 @@ class Dataset(metadata.models.AccessControl):
 
     externalfiledirectory = models.ForeignKey(
         ExternalFileDirectory,
+        verbose_name="External file directory",
         help_text="External file directory containing the data file",
         null=True,
         blank=True
@@ -181,6 +188,11 @@ class Dataset(metadata.models.AccessControl):
 
         return "{} (created by {} on {})".format(display_name, self.user, self.date_created)
 
+    def external_absolute_path(self):
+        if not self.external_path:
+            return None
+        return os.path.normpath(os.path.join(self.externalfiledirectory.path, self.external_path))
+
     def get_file_handle(self):
         """
         Retrieves an open Django file with which to access the data.
@@ -189,9 +201,12 @@ class Dataset(metadata.models.AccessControl):
         and otherwise returns None.
         """
         if self.dataset_file:
-            return self.dataset_file.open("rb")
-        elif self.external_path and os.path.exists(self.external_path) and os.access(self.external_path, os.R_OK):
-            return File(open(os.path.join(self.externalfiledirectory.path, self.external_path), "rb"))
+            self.dataset_file.open("rb")
+            return self.dataset_file
+        else:
+            abs_path = self.external_absolute_path()
+            if os.path.exists(abs_path) and os.access(abs_path, os.R_OK):
+                return File(open(abs_path, "rb"))
         return None
 
     def all_rows(self, data_check=False, insert_at=None):
@@ -410,11 +425,19 @@ class Dataset(metadata.models.AccessControl):
         True if an actual dataset file exists; False otherwise.
 
         This returns True if there is either a file registered in the database or if
-        there is a working pointer to an external file in settings.EXTERNAL_FILE_DIRECTORY.
+        there is a working pointer to an external file.
         """
         # Note: "self.dataset_file is not None" won't work here because self.dataset_file
         # is a FieldFile with no file, not None.
-        return bool(self.dataset_file) or os.path.exists(self.external_path) and os.access(self.external_path, os.R_OK)
+        if bool(self.dataset_file):
+            return True
+
+        abs_path = self.external_absolute_path()
+        if abs_path is not None:
+            if os.path.exists(abs_path) and os.access(abs_path, os.R_OK):
+                return True
+
+        return False
 
     def has_structure(self):
         """True if associated DatasetStructure exists; False otherwise."""

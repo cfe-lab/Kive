@@ -130,20 +130,16 @@
 
 {{ dataset_form.non_field_errors }}
 
-<div class="dataset_contents">
-
-
 {% if dataset.external_path %}
     <table>
     <tr>
         <td>External file path:</td>
-        <td>
-            <span class="readonly">{{ dataset.externalfiledirectory.path }}/{{ dataset.external_path }}</span>
-        </td>
+        <td>{{ dataset.external_absolute_path }}</td>
     </tr>
     </table>
-
 {% endif %}
+
+<div class="dataset_contents">
 {% block dataset_contents %}
 {% endblock %}
 </div>

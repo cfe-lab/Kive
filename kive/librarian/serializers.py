@@ -17,9 +17,6 @@ class ExternalFileDirectorySerializer(serializers.ModelSerializer):
             'path',
             'display_name'
         )
-        extra_kwargs = {
-            'display_name': {'write_only': True}
-        }
 
 
 class ExternalFileDirectoryListFilesSerializer(ExternalFileDirectorySerializer):
@@ -38,9 +35,6 @@ class ExternalFileDirectoryListFilesSerializer(ExternalFileDirectorySerializer):
             'display_name',
             'list_files'
         )
-        extra_kwargs = {
-            'display_name': {'write_only': True}
-        }
 
 
 class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):

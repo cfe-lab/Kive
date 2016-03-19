@@ -153,6 +153,17 @@ def dataset_view(request, dataset_id):
     }
     if dataset.is_raw():
         t = loader.get_template("librarian/raw_dataset_view.html")
+
+        # Read 1000 characters.
+        data_handle = dataset.get_file_handle()
+        sample_content = data_handle.read(1000)
+        data_handle.close()
+
+        c.update(
+            {
+                "sample_content": sample_content
+            }
+        )
     else:
         # If we have a mismatched output, we do an alignment
         # over the columns.
@@ -214,7 +225,7 @@ def datasets_add(request):
                         file_source=None,
                         check=True,
                         file_handle=df.cleaned_data['dataset_file'],
-                        is_external="external_path" in df.cleaned_data,
+                        externalfiledirectory=df.cleaned_data['externalfiledirectory'],
                         instance=ds
                     )
                     ds.grant_from_json(df.cleaned_data["permissions"])

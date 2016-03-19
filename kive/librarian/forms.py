@@ -59,21 +59,26 @@ class DatasetForm(forms.ModelForm):
         required=False
     )
 
-    dataset_file = forms.FileField(allow_empty_file="True", max_length=maxlengths.MAX_FILENAME_LENGTH)
+    dataset_file = forms.FileField(
+        required=False,
+        allow_empty_file=True,
+        max_length=maxlengths.MAX_FILENAME_LENGTH
+    )
 
     RAW_CDT_CHOICE = (CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)
     compound_datatype_choices = [RAW_CDT_CHOICE]
     compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
-    save_in_db = forms.BooleanField(required=False)
+    save_in_db = forms.BooleanField(
+        label="Keep a copy in Kive",
+        required=False
+    )
 
     external_path = forms.CharField(
         widget=forms.Select(
-            attrs={
-                "choices": [
-                    ("", "Choose an external file directory")
-                ]
-            }
+            choices=[
+                ('', '--- choose an external file directory ---')
+            ]
         )
     )
 

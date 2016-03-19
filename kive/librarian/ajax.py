@@ -27,10 +27,7 @@ JSON_CONTENT_TYPE = 'application/json'
 class ExternalFileDirectoryViewSet(ReadOnlyModelViewSet,
                                    SearchableModelMixin):
     """
-    List, modify, and create ExternalFileDirectories.
-
-    POST to the list to register a new ExternalFileDirectory;
-    PATCH to modify one.
+    List ExternalFileDirectories and their contents.
     """
     queryset = ExternalFileDirectory.objects.all()
     serializer_class = ExternalFileDirectorySerializer

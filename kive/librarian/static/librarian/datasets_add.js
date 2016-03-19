@@ -7,22 +7,33 @@ $(function() {
         $("#id_single-name").val(filename);
     });
 
-    $("#id_externalfiledirectory").on("change", function () {
-        efd_id = this.value;
+    $("#id_single-externalfiledirectory").on("change", function () {
+        var efd_id = this.value;
+        var options = [];
 
-        $("#id_external_path").empty();
-        if (efd_id !== "") {
+        $("#id_single-external_path").empty();
+        if (efd_id === "") {
+            options.push(
+                // FIXME this is a bit of a hack -- stash the original value somewhere in the form
+                $('<option>').attr('value', "").text("--- choose an external file directory ---")
+            );
+            $("#id_single-external_path").append(options);
+
+        }
+        else {
             $.getJSON(
                 "/api/externalfiledirectories/" + efd_id + "/list_files/",
                 {}, // specify data as an object
                 function(result) {
-                    var options = [];
-                    $.each(result, function(index, value) {
-                        options.push(
-                            $('<option>').attr('value', value.path).text(value.display_name)
-                        );
-                    });
-                    $("#id_external_path").empty().append(options);
+                    $.each(result.list_files,
+                        function(index, value) {
+                            options.push(
+                                $('<option>').attr('value', value[0]).text(value[1])
+                            );
+                        }
+                    );
+
+                    $("#id_single-external_path").append(options);
                 }
             );
         }
