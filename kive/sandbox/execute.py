@@ -91,6 +91,8 @@ class Sandbox:
         my_pipeline = run.pipeline
         inputs = [x.dataset for x in run.inputs.order_by("index")]
         sandbox_path = run.sandbox_path
+        # FIXME we should probably loosen this or at least make the Manager more tolerant
+        # of it.
         assert all([i.has_data() for i in inputs])
 
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -1332,6 +1334,7 @@ class Sandbox:
         # Preconditions to test.
         # assert curr_record is not None
         input_dataset_in_sdbx = file_access_utils.file_exists(input_dataset_path)
+        # FIXME we gotta loosen this now.
         assert input_dataset_in_sdbx or input_dataset.has_data()
 
         cable = curr_record.definite.component
@@ -1373,8 +1376,8 @@ class Sandbox:
                 # Perform an integrity check since we've just copied this file to the sandbox for the
                 # first time.
                 logger.error("[%d] Checking file just copied to sandbox for integrity.",
-                             worker_rank, file_path, input_dataset_path)
-                check = input_dataset.check_integrity(output_path, user, execlog=None, runsic=curr_record)
+                             worker_rank)
+                check = input_dataset.check_integrity(input_dataset_path, user, execlog=None, runsic=curr_record)
 
                 fail_now = check.is_fail()
 
@@ -1570,6 +1573,7 @@ class Sandbox:
         # done by reuse_or_prepare_cable.
         inputs_after_cable = []
         input_paths = []
+        completed_cable_pks = []
         for curr_execute_dict in cable_info_dicts:
             # Update the cable execution information with the recovering record if applicable.
             if recover:
@@ -1577,15 +1581,22 @@ class Sandbox:
 
             curr_RSIC = Sandbox.finish_cable(curr_execute_dict, worker_rank)
             # Refresh invoking_record.
-            invoking_record = invoking_record.__class__.objects.get(pk=invoking_record.pk)
+            invoking_record.refresh_from_db()
 
             # Cable failed, return incomplete RunStep.
             curr_RSIC.refresh_from_db()
             if not curr_RSIC.is_successful(use_cache=True):
                 logger.error("[%d] PipelineStepInputCable %s failed.", worker_rank, curr_RSIC)
 
+                # Cancel the other RunSICs for this step.
+                for rsic in curr_RS.RSICs.exclude(pk__in=completed_cable_pks):
+                    rsic.mark_cancelled()
+
                 # Update state variables.
                 assert not invoking_record.is_successful(use_cache=True)
+                # We need to refresh curr_RS because this version hasn't had its
+                # _successful flag changed.
+                curr_RS.refresh_from_db()
                 if not recover:
                     curr_RS.mark_complete()
                     curr_RS.stop(save=True, clean=False)
@@ -1594,6 +1605,7 @@ class Sandbox:
                 return curr_RS
 
             # Cable succeeded.
+            completed_cable_pks.append(curr_RSIC.pk)
             inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
             input_paths.append(curr_execute_dict["output_path"])
 

@@ -1050,9 +1050,9 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         # If log exists and there are invoked_logs, log should be among
         # the invoked logs.  If log exists, any preceding logs should
-        # be complete and all tests should have passed (since they were
-        # recoveries happening before we could carry out the execution
-        # that log represents).
+        # be complete and all non-trivial cables' outputs' checks should
+        # have passed (since they were recoveries happening before we could
+        # carry out the execution that log represents).
         if self.invoked_logs.exists() and self.has_log:
             if not self.invoked_logs.filter(pk=self.log.pk).exists():
                 raise ValidationError(
@@ -1177,7 +1177,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         # From here on we know we are not reusing and ExecRecord is
         # set -- therefore log is set and complete.
 
-        # Check that either every output has been successfully checked
+        # Check that either every non-trivial output has been successfully checked
         # or one+ has failed and the rest are complete.
         if self.log.all_checks_passed():
             return True
@@ -2785,19 +2785,25 @@ class ExecLog(stopwatch.models.Stopwatch):
 
     def all_checks_passed(self):
         """
-        True if every output of this ExecLog has passed its check.
+        True if every non-trivial output of this ExecLog has passed its check.
 
         First check that all of the tests have passed. Then check that all
         checks have been performed.
+
+        An exception is made for an ExecLog of a trivial cable.  Such cables
+        don't check their outputs.
         """
+        is_trivial_cable = self.record.is_cable and self.record.component.is_trivial()
+        if is_trivial_cable:
+            return True
+
         if self.record.execrecord is None:
             return False
-        is_trivial_cable = self.record.is_cable and self.record.component.is_trivial()
         is_original_run = self.record.execrecord.generator == self
         missing_content_checks = set()
         missing_integrity_checks = set()
         for ero in self.record.execrecord.execrecordouts.all():
-            if is_trivial_cable or not is_original_run:
+            if not is_original_run:
                 missing_integrity_checks.add(ero.dataset_id)
             elif not ero.dataset.is_raw():
                 missing_content_checks.add(ero.dataset_id)
