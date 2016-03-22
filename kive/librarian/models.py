@@ -703,11 +703,6 @@ class Dataset(metadata.models.AccessControl):
 
             if keep_file:
                 new_dataset.register_file(file_path=file_path, file_handle=file_handle)
-            else:
-                if new_dataset.is_raw():
-                    new_dataset.set_MD5(file_name, file_handle)
-                else:
-                    new_dataset.set_MD5_and_count_rows(file_name, file_handle)
 
             new_dataset.clean()
             if not new_dataset.is_raw():
@@ -900,7 +895,8 @@ class Dataset(metadata.models.AccessControl):
         ccl.stop(save=True, clean=True)
         return ccl
 
-    def check_integrity(self, new_file_path, checking_user, execlog, newly_computed_MD5=None):
+    def check_integrity(self, new_file_path, checking_user, execlog=None, runsic=None,
+                        newly_computed_MD5=None, notify_all=True):
         """
         Checks integrity of SD against the md5 provided (newly_computed_MD5),
         or in it's absence, the MD5 computed from new_file_path.
@@ -913,7 +909,7 @@ class Dataset(metadata.models.AccessControl):
         # end time of an integrity check?  Is the check just the comparison
         # of the MD5s or is it the time that you finish computing the MD5 or
         # is it the time that you start computing the MD5?
-        icl = self.integrity_checks.create(execlog=execlog, user=checking_user)
+        icl = self.integrity_checks.create(execlog=execlog, runsic=runsic, user=checking_user)
         icl.start(save=False)
 
         if newly_computed_MD5 is None:
@@ -932,7 +928,8 @@ class Dataset(metadata.models.AccessControl):
             note_of_usurping = datachecking.models.MD5Conflict(integritychecklog=icl, conflicting_dataset=evil_twin)
             note_of_usurping.save()
 
-            self._notify_runcomponents_of_failure()
+            if notify_all:
+                self._notify_runcomponents_of_failure()
 
         icl.stop(save=True, clean=True)
         return icl

@@ -20,6 +20,7 @@ import file_access_utils
 import librarian.models
 import pipeline.models
 from method.models import Method
+from datachecking.models import IntegrityCheckLog
 from fleet.exceptions import StopExecution
 
 
@@ -1344,12 +1345,40 @@ class Sandbox:
                 file_path = input_dataset.dataset_file.path
             elif input_dataset.external_path:
                 file_path = input_dataset.external_absolute_path()
+
+            copy_start = timezone.now()
+            fail_now = False
             try:
                 shutil.copyfile(file_path, input_dataset_path)
             except IOError:
+                copy_end = timezone.now()
                 logger.error("[%d] could not copy file %s to file %s.",
                              worker_rank, file_path, input_dataset_path)
 
+                with transaction.atomic():
+                    # Create a failed IntegrityCheckLog.
+                    iic = IntegrityCheckLog(
+                        dataset=input_dataset,
+                        runsic=curr_record,
+                        copy_error=True,
+                        start_time=copy_start,
+                        end_time=copy_end,
+                        user=user
+                    )
+                    iic.clean()
+                    iic.save()
+                    fail_now = True
+
+            if not fail_now:
+                # Perform an integrity check since we've just copied this file to the sandbox for the
+                # first time.
+                logger.error("[%d] Checking file just copied to sandbox for integrity.",
+                             worker_rank, file_path, input_dataset_path)
+                check = input_dataset.check_integrity(output_path, user, execlog=None, runsic=curr_record)
+
+                fail_now = check.is_fail()
+
+            if fail_now:
                 curr_record.mark_unsuccessful()
                 if recover:
                     recovering_record.mark_unsuccessful()
@@ -1371,7 +1400,7 @@ class Sandbox:
 
         curr_log = archive.models.ExecLog.create(curr_record, invoking_record)
 
-        # Run cable (this completes EL).
+        # Run cable (this completes the ExecLog).
         cable.run_cable(input_dataset_path, output_path, curr_record, curr_log)
 
         # Here, we're authoring/modifying an ExecRecord, so we use a transaction.
@@ -1462,26 +1491,35 @@ class Sandbox:
         # Check outputs
         ####
         if not missing_output:
-            # Did ER already exist (with vetted output), or is cable trivial, or recovering? Yes.
-            if ((preexisting_ER and (output_dataset.is_OK() or
-                                     output_dataset.any_failed_checks())) or
-                    cable.is_trivial() or recover):
-                logger.debug("[%d] Performing integrity check of trivial or previously generated output", worker_rank)
-                # Perform integrity check.  Note: if this fails, it will notify all RunComponents using it.
-                check = output_dataset.check_integrity(output_path, user, curr_log, output_dataset.MD5_checksum)
+            # Case 1: the cable is trivial.  Don't check the integrity, it was already checked
+            # when it was first written to the sandbox.
+            if cable.is_trivial():
+                logger.debug("[%d] Cable is trivial; skipping integrity check", worker_rank)
 
-            # Did ER already exist, or is cable trivial, or recovering? No.
             else:
-                logger.debug("[%d] Output has no complete content check; performing content check", worker_rank)
-                summary_path = "{}_summary".format(output_path)
-                # Perform content check.  Note: if this fails, it will notify all RunComponents using it.
-                check = output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
-                                                           cable.max_rows_out, curr_log, user)
+                # Case 2a: ExecRecord already existed and its output had been properly vetted.
+                # Case 2b: this was a recovery.
+                # Check the integrity of the output.
+                if ((preexisting_ER and (output_dataset.is_OK() or
+                                         output_dataset.any_failed_checks())) or
+                        cable.is_trivial() or recover):
+                    logger.debug("[%d] Performing integrity check of trivial or previously generated output",
+                                 worker_rank)
+                    # Perform integrity check.  Note: if this fails, it will notify all RunComponents using it.
+                    check = output_dataset.check_integrity(output_path, user, curr_log)
 
-            if check.is_fail():
-                curr_record.mark_unsuccessful()
-                if recover:
-                    recovering_record.mark_unsuccessful()
+                # Case 3: the Dataset, one way or another, is not properly vetted.
+                else:
+                    logger.debug("[%d] Output has no complete content check; performing content check", worker_rank)
+                    summary_path = "{}_summary".format(output_path)
+                    # Perform content check.  Note: if this fails, it will notify all RunComponents using it.
+                    check = output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
+                                                               cable.max_rows_out, curr_log, user)
+
+                if check.is_fail():
+                    curr_record.mark_unsuccessful()
+                    if recover:
+                        recovering_record.mark_unsuccessful()
 
         logger.debug("[%d] DONE EXECUTING %s '%s'", worker_rank, type(cable).__name__, cable)
 

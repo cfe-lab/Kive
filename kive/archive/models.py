@@ -2347,7 +2347,6 @@ class RunSIC(RunCable):
     Related to :model:`librarian.models.ExecRecord`
     Related to :model:`pipeline.models.PipelineStepInputCable`
     """
-    # FIXME need to rename this because it conflicts with the runstep field of RunComponent
     dest_runstep = models.ForeignKey(RunStep, related_name="RSICs")
     PSIC = models.ForeignKey("pipeline.PipelineStepInputCable", related_name="psic_instances")
 
@@ -2464,6 +2463,54 @@ class RunSIC(RunCable):
 
         # No other RunSICs of our RunStep were running, so we can propagate upward.
         self.dest_runstep.failed_mark_complete(tasks_outside_this_runstep)
+
+    @update_field("_complete")
+    def is_complete(self, use_cache=False, **kwargs):
+        """
+        True if this RunSIC is complete; false otherwise.
+
+        In addition to the checks done by RunComponent's is_complete, check
+        whether the integrity check on the input (if it exists) is complete.
+        """
+        if use_cache and self._complete is not None:
+            return self._complete
+
+        try:
+            if not self.input_integrity_check.is_complete():
+                return False
+        except IntegrityCheckLog.DoesNotExist:
+            pass
+
+        return super(RunSIC, self).is_complete(use_cache=use_cache, **kwargs)
+
+    def successful_execution(self):
+        """
+        True if this RunSIC is successful; False otherwise.
+
+        In addition to the checks that go along with RunComponent, it also checks
+        whether there is a failed integrity check on its input.
+        """
+        try:
+            if self.input_integrity_check.is_fail():
+                return False
+        except IntegrityCheckLog.DoesNotExist:
+            pass
+
+        return super(RunSIC, self).successful_execution()
+
+    def clean(self):
+        """
+        Check data integrity of this RunSIC.
+
+        In addition to RunCable.clean(), also clean the input integrity check
+        if it exists.
+        """
+        super(RunSIC, self).clean()
+
+        try:
+            self.input_integrity_check.clean()
+        except IntegrityCheckLog.DoesNotExist:
+            pass
 
 
 class RunOutputCable(RunCable):
