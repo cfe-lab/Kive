@@ -3365,7 +3365,7 @@ year,month,day,hour,minute,second,microsecond
 
     def test_long_output(self):
         """Should handle lots of output to stdout or stderr without deadlocking."""
-        iteration_count = 1000
+        iteration_count = 100000
         python_code = """\
 #! /usr/bin/env python
 import sys

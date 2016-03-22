@@ -805,22 +805,20 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         is_terminated = False
         # Successful execution.
         if return_code is None:
+            err_thread = threading.Thread(
+                target=self._poll_stream,
+                args=(method_popen.stderr, 'stderr', error_streams))
+            err_thread.start()
+            out_thread = threading.Thread(
+                target=self._poll_stream,
+                args=(method_popen.stdout, 'stdout', output_streams))
+            out_thread.start()
+
             if stop_execution_callback is None:
-                self.logger.debug("Polling Popen + displaying stdout/stderr to console")
-
-                err_thread = threading.Thread(
-                    target=self._poll_stream,
-                    args=(method_popen.stderr, 'stderr', error_streams))
-                err_thread.start()
-                self._poll_stream(method_popen.stdout, 'stdout', output_streams)
-                err_thread.join()
-
                 return_code = method_popen.wait()
-
             else:
                 # While periodically checking for a STOP message, we
-                # monitor the progress of method_popen and update the
-                # streams.
+                # monitor the progress of method_popen.
                 while method_popen.returncode is None:
                     if stop_execution_callback() is not None:
                         # We have received a STOP message.  Terminate method_popen.
@@ -831,12 +829,12 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
                     time.sleep(settings.SLEEP_SECONDS)
                     method_popen.poll()
-
-                # Having stopped one way or another, make sure we capture the rest of the output.
-                self._capture_stream(method_popen.stderr, error_streams)
-                self._capture_stream(method_popen.stdout, output_streams)
                 if not is_terminated:
                     return_code = method_popen.returncode
+
+            # Having stopped one way or another, make sure we capture the rest of the output.
+            err_thread.join()
+            out_thread.join()
 
         for stream in output_streams + error_streams:
             stream.flush()
