@@ -29,7 +29,7 @@ LOGGER = logging.getLogger(__name__)
 
 def _build_download_response(source_file):
     file_chunker = FileWrapper(source_file)  # Stream file in chunks to avoid overloading memory.
-    mimetype = mimetypes.guess_type(source_file.url)[0]
+    mimetype = mimetypes.guess_type(source_file.name)[0]
     response = HttpResponse(file_chunker, content_type=mimetype)
     response['Content-Length'] = source_file.size
     response['Content-Disposition'] = 'attachment; filename="{}"'.format(os.path.basename(source_file.name))
@@ -151,7 +151,18 @@ def dataset_view(request, dataset_id):
         "return": return_url,
         "dataset_form": dataset_form
     }
-    if dataset.is_raw():
+
+    if not dataset.has_data():
+        t = loader.get_template("librarian/missing_dataset_view.html")
+        if dataset.external_path:
+            c["missing_data_message"] = "This dataset's external file is missing.  " \
+                                        "Consult your system administrator if this was unexpected."
+        elif dataset.is_redacted():
+            c["missing_data_message"] = "Data has been redacted."
+        else:
+            c["missing_data_message"] = "Data was not retained or has been purged."
+
+    elif dataset.is_raw():
         t = loader.get_template("librarian/raw_dataset_view.html")
 
         # Read 1000 characters.

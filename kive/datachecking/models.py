@@ -343,8 +343,7 @@ class VerificationLog(stopwatch.models.Stopwatch):
         """
         self.clean()
         if self.return_code is None or self.end_time is None:
-            raise ValidationError('VerificationLog "{}" is not complete.'.
-                    format(self))
+            raise ValidationError('VerificationLog "{}" is not complete.'.format(self))
 
 
 class MD5Conflict(models.Model):

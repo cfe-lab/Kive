@@ -134,7 +134,7 @@ class MPIManagerInterface(MPIFleetInterface):
     def shut_down_fleet(self):
         for rank in range(self.get_size()):
             if rank != self.get_rank():
-                self.comm.send(dest=rank, tag=Worker.SHUTDOWN)
+                self.comm.send(None, dest=rank, tag=Worker.SHUTDOWN)
         self.comm.Disconnect()
 
 

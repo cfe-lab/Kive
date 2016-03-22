@@ -71,7 +71,7 @@ class _RunDataset(object):
     def set_dataset(self, dataset, request):
         data_handle = dataset.get_file_handle()
         self.id = dataset.id
-        self.size = data_handle.size
+        self.size = dataset.get_formatted_filesize()
         self.date = dataset.date_created
         self.url = reverse('dataset-detail',
                            kwargs={'pk': dataset.id},

@@ -1339,16 +1339,16 @@ class Sandbox:
         # FIXME at some point in the future this will have to be updated to mean "write to the local sandbox".
         if not input_dataset_in_sdbx:
             logger.debug("[%d] Dataset is in the DB - writing it to the file system", worker_rank)
+            file_path = None
+            if bool(input_dataset.dataset_file):
+                file_path = input_dataset.dataset_file.path
+            elif input_dataset.external_path:
+                file_path = input_dataset.external_absolute_path()
             try:
-                file_path = None
-                if bool(input_dataset):
-                    file_path = input_dataset.dataset_file.path
-                elif input_dataset.external_path:
-                    file_path = input_dataset.external_path
                 shutil.copyfile(file_path, input_dataset_path)
             except IOError:
                 logger.error("[%d] could not copy file %s to file %s.",
-                             worker_rank, input_dataset.dataset_file.path, input_dataset_path)
+                             worker_rank, file_path, input_dataset_path)
 
                 curr_record.mark_unsuccessful()
                 if recover:
@@ -1542,7 +1542,8 @@ class Sandbox:
             invoking_record = invoking_record.__class__.objects.get(pk=invoking_record.pk)
 
             # Cable failed, return incomplete RunStep.
-            if not curr_RSIC.is_successful():
+            curr_RSIC.refresh_from_db()
+            if not curr_RSIC.is_successful(use_cache=True):
                 logger.error("[%d] PipelineStepInputCable %s failed.", worker_rank, curr_RSIC)
 
                 # Update state variables.

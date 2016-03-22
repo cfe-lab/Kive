@@ -13,6 +13,8 @@ class ExternalFileDirectorySerializer(serializers.ModelSerializer):
     class Meta():
         model = ExternalFileDirectory
         fields = (
+            'pk',
+            'url',
             'name',
             'path',
             'display_name'
@@ -30,6 +32,8 @@ class ExternalFileDirectoryListFilesSerializer(ExternalFileDirectorySerializer):
     class Meta():
         model = ExternalFileDirectory
         fields = (
+            'pk',
+            'url',
             'name',
             'path',
             'display_name',
@@ -73,6 +77,8 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             'filesize',
             'filesize_display',
             'MD5_checksum',
+            'has_data',
+            'is_redacted',
 
             'user',  # inherited
             'users_allowed',

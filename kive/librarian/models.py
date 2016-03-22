@@ -203,7 +203,7 @@ class Dataset(metadata.models.AccessControl):
         if self.dataset_file:
             self.dataset_file.open("rb")
             return self.dataset_file
-        else:
+        elif self.external_path:
             abs_path = self.external_absolute_path()
             if os.path.exists(abs_path) and os.access(abs_path, os.R_OK):
                 return File(open(abs_path, "rb"))
@@ -384,20 +384,15 @@ class Dataset(metadata.models.AccessControl):
         :return int: size of dataset_file in bytes
         """
         data_handle = self.get_file_handle()
-        return data_handle and data_handle.size or 0
+        if data_handle is None:
+            return None
+        return data_handle.size
 
     def get_formatted_filesize(self):
-        data_handle = self.get_file_handle()
-        if data_handle.size >= 1099511627776:
-            return "{0:.2f}".format(data_handle.size/1099511627776.0) + ' TB'
-        if data_handle.size >= 1073741824:
-            return "{0:.2f}".format(data_handle.size/1073741824.0) + ' GB'
-        elif data_handle.size >= 1048576:
-            return "{0:.2f}".format(data_handle.size/1048576.0) + ' MB'
-        elif data_handle.size >= 1024:
-            return "{0:.2f}".format(data_handle.size/1024.0) + ' KB'
-        else:
-            return str(data_handle.size) + ' B'
+        unformatted_size = self.get_filesize()
+        if unformatted_size is None:
+            return None
+        return filesizeformat(unformatted_size)
 
     def compute_md5(self):
         """Computes the MD5 checksum of the Dataset."""
@@ -644,7 +639,7 @@ class Dataset(metadata.models.AccessControl):
             raise ValueError("Must supply either the file path or file handle")
 
         with transaction.atomic():
-            external_path = None
+            external_path = ""
             # We do this in the transaction because we're accessing ExternalFileDirectory.
             if externalfiledirectory:
                 # Check that file_path is in the specified ExternalFileDirectory.

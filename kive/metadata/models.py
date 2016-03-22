@@ -88,8 +88,8 @@ def remove_helper(removal_plan):
         if class_name in removal_plan:
             for obj_to_delete in removal_plan[class_name]:
                 try:
-                    refreshed_obj_to_delete = obj_to_delete.refresh_from_db()
-                    refreshed_obj_to_delete.delete()
+                    obj_to_delete.refresh_from_db()
+                    obj_to_delete.delete()
                 except ObjectDoesNotExist:
                     pass
 

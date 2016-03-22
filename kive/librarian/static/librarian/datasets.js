@@ -5,9 +5,23 @@ var datasets = (function() {
     function buildDateCreated($td, row) {
         $td.text(permissions.formatDate(row.date_created));
     }
-    
+
     function buildDownload($td, dataset) {
-        $td.append($('<a/>').text('Download').attr('href', dataset.download_url));
+        if (dataset.has_data) {
+            $td.append($('<a/>').text('Download').attr('href', dataset.download_url));
+        }
+    }
+
+    function buildFileSize($td, dataset) {
+        if (dataset.has_data) {
+            $td.append(dataset.filesize_display);
+        }
+        else if (dataset.is_redacted) {
+            $td.append("<em>redacted</em>");
+        }
+        else {
+            $td.append("<em>missing</em>");
+        }
     }
     
     function buildDescription($td, dataset) {
@@ -36,7 +50,7 @@ var datasets = (function() {
         });
         this.registerColumn("Description", buildDescription);
         this.registerColumn("Created", buildDateCreated);
-        this.registerColumn("File Size", "filesize_display");
+        this.registerColumn("File Size", buildFileSize);
         this.registerColumn("", buildDownload);
 
         this.registerStandardColumn("user");
