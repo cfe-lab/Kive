@@ -81,7 +81,6 @@ class PipelineStepSerializer(serializers.ModelSerializer):
         required=False
     )
 
-
     class Meta:
         model = PipelineStep
         fields = (
@@ -220,6 +219,7 @@ def _source_transf_finder(step_num, dataset_name, step_data_dicts):
 
 class PipelineSummarySerializer(AccessControlSerializer, serializers.ModelSerializer):
     inputs = TransformationInputSerializer(many=True)
+
     class Meta:
         model = Pipeline
         fields = ("id", "display_name", "url", "published", 'revision_number', 'inputs')
@@ -490,8 +490,7 @@ class PipelineFamilySerializer(AccessControlSerializer,
                   "removal_plan",
                   "num_revisions",
                   "members",
-                  "members_url"
-        )
+                  "members_url")
         read_only_fields = (
             "members"
         )
@@ -527,8 +526,7 @@ class AnalysisSerializer(PipelineFamilySerializer):
                   'removal_plan',
                   "num_revisions",
                   'members',
-                  'members_url'
-        )
+                  'members_url')
         read_only_fields = (
             "members"
         )
