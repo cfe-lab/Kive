@@ -776,8 +776,6 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 class RunInput(models.Model):
     """
     Represents an input to a run.
-
-    This won't exist in single-process execution.
     """
     run = models.ForeignKey(Run, related_name="inputs")
     dataset = models.ForeignKey(Dataset, related_name="runinputs")
@@ -1256,6 +1254,15 @@ class RunComponent(stopwatch.models.Stopwatch):
         assert(self.reused)
         if self.execrecord is not None:
             return self.execrecord.outputs_OK() and not self.execrecord.has_ever_failed()
+
+        # Check for failure on recovery, i.e. if there's an ExecLog which was
+        # not successful.
+        try:
+            if not self.log.is_successful():
+                return False
+        except ExecLog.DoesNotExist:
+            pass
+
         # If there is no ExecRecord yet then this is trivially true.
         return True
 
@@ -2485,11 +2492,14 @@ class RunSIC(RunCable):
 
     def successful_execution(self):
         """
-        True if this RunSIC is successful; False otherwise.
+        True if this RunSIC is/was executed successfully; False otherwise.
 
         In addition to the checks that go along with RunComponent, it also checks
         whether there is a failed integrity check on its input.
         """
+        # Note that this is called assuming that this RunSIC was not reused,
+        # so if the input integrity check failed, then a reused RunSIC will
+        # not care when you call is_successful.
         try:
             if self.input_integrity_check.is_fail():
                 return False
@@ -2778,6 +2788,14 @@ class ExecLog(stopwatch.models.Stopwatch):
                 return False
         except ObjectDoesNotExist:
             pass
+
+        # If this ExecLog represents a RunSIC, check if it's got a failed input integrity check.
+        if self.record.is_incable:
+            try:
+                if self.record.definite.input_integrity_check.is_fail():
+                    return False
+            except IntegrityCheckLog.DoesNotExist:
+                pass
 
         # Having reached here, we are comfortable with the execution --
         # note that it may still be in progress!

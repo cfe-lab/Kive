@@ -267,8 +267,8 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
     # The user performing the check.
     user = models.ForeignKey(User)
 
-    # Flag indicating that a Dataset file could not be copied into place.
-    copy_error = models.BooleanField(default=False)
+    # Flag indicating a failed attempt to read (or otherwise access) the file.
+    read_failed = models.BooleanField(default=False)
 
     # Implicit through inheritance: start_time, end_time.
 
@@ -276,8 +276,8 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
         status = "OK"
         if self.is_md5_conflict():
             status = "MD5 conflict"
-        elif self.copy_error:
-            status = "Copy error"
+        elif self.read_failed:
+            status = "Read failed"
         return status
 
     def clean(self):
@@ -314,7 +314,7 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
 
     def is_fail(self):
         """True if this integrity check is a failure."""
-        return self.copy_error or self.is_md5_conflict()
+        return self.read_failed or self.is_md5_conflict()
 
 
 class VerificationLog(stopwatch.models.Stopwatch):

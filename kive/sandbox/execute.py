@@ -93,7 +93,7 @@ class Sandbox:
         sandbox_path = run.sandbox_path
         # FIXME we should probably loosen this or at least make the Manager more tolerant
         # of it.
-        assert all([i.has_data() for i in inputs])
+        # assert all([i.has_data() for i in inputs])
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.user = user
@@ -154,6 +154,12 @@ class Sandbox:
 
         # For each sub-pipeline, we track how many of their input cables have completed.
         self.sub_pipeline_cable_tracker = {}
+
+    class RunInputEmptyException(Exception):
+        """
+        An exception raised when a cable encounters a Run input that has no data.
+        """
+        pass
 
     def step_xput_path(self, runstep, transformationxput, step_run_dir):
         """Path in Sandbox for PipelineStep TransformationXput."""
@@ -890,7 +896,19 @@ class Sandbox:
 
         # Check the availability of input_dataset; recover if necessary.  Queue for execution
         # if cable is an outcable or an incable that feeds a sub-Pipeline.
-        exec_info.ready_to_go = self.enqueue_cable(exec_info, force=False)
+        try:
+            exec_info.ready_to_go = self.enqueue_cable(exec_info, force=False)
+        except Sandbox.RunInputEmptyException:
+            self.logger.debug("Cancelling cable with pk=%d.", curr_record.pk)
+
+            # Update state variables.
+            curr_record.mark_cancelled()
+            curr_record.stop(save=True, clean=False)
+            curr_record.complete_clean()
+
+            # Mark exec_info as cancelled.
+            exec_info.cancel()
+
         return exec_info
 
     # We'd call this when we need to prepare a cable for recovery.  This is essentially a "force" version of
@@ -900,6 +918,10 @@ class Sandbox:
     def enqueue_cable(self, cable_info, force=False):
         """
         Recursive helper for recover that handles recovery of a cable.
+
+        RAISES:
+        If this encounters a Run input that cannot be recovered, it raises
+        Sandbox.RunInputEmptyException.
         """
         # Unpack info from cable_info.
         cable_record = cable_info.cable_record
@@ -923,7 +945,36 @@ class Sandbox:
         # perform.
         queue_cable = (cable_record.component.is_outcable or cable_record.dest_runstep.pipelinestep.is_subpipeline or
                        (force and by_step is None))
+        file_access_start = timezone.now()
         if dataset_path is None and not input_dataset.has_data():
+            file_access_end = timezone.now()
+
+            # Bail out here if the input dataset is a Pipeline input and cannot be recovered
+            # (at this point we are probably in the case where an external file was removed).
+            if (cable_record.component.is_incable and
+                    cable_record.top_level_run == cable_record.parent_run and
+                    cable_record.component.definite.source_step == 0):
+                self.logger.debug("Cannot recover cable input: it is a Run input")
+
+                with transaction.atomic():
+                    # Create a failed IntegrityCheckLog.
+                    iic = IntegrityCheckLog(
+                        dataset=input_dataset,
+                        runsic=cable_record,
+                        read_failed=True,
+                        start_time=file_access_start,
+                        end_time=file_access_end,
+                        user=self.user
+                    )
+                    iic.clean()
+                    iic.save()
+
+                cable_record.mark_unsuccessful()
+                # Making sure the invoking record (either cable_record or something else
+                # that's recovering) is handled by the calling function.
+
+                raise Sandbox.RunInputEmptyException()
+
             self.logger.debug("Cable input requires non-trivial recovery")
             self.queue_recovery(input_dataset, recovering_record=recovering_record)
 
@@ -983,7 +1034,7 @@ class Sandbox:
             cable_exec_info = self.reuse_or_prepare_cable(corresp_cable, curr_RS, inputs[i], cable_path)
 
             # Refresh curr_RS.
-            curr_RS = RunStep.objects.get(pk=curr_RS.pk)
+            curr_RS.refresh_from_db()
 
             cable_info_list.append(cable_exec_info)
 
@@ -1011,6 +1062,7 @@ class Sandbox:
 
                 curr_RS.stop(save=True, clean=False)
                 curr_RS.complete_clean()
+                return curr_RS
 
         # Bundle up the information required to process this step.
         _in_dir, _out_dir, log_dir = self._setup_step_paths(step_run_dir, False)
@@ -1096,7 +1148,17 @@ class Sandbox:
         # this step as waiting for them.
         if len(symbolically_okay_datasets) > 0:
             for missing_data in symbolically_okay_datasets:
-                self.queue_recovery(missing_data, invoking_record=curr_RS)
+                try:
+                    self.queue_recovery(missing_data, invoking_record=curr_RS)
+                except Sandbox.RunInputEmptyException:
+                    self.logger.debug("Cancelling RunStep with pk=%d.", curr_RS.pk)
+
+                    # Update state variables.
+                    curr_RS.mark_cancelled()
+                    curr_RS.complete_clean()
+                    execute_info.cancel()
+                    return curr_RS
+
                 self.tasks_waiting[missing_data].append(curr_RS)
             self.waiting_for[curr_RS] = symbolically_okay_datasets
         else:
@@ -1108,6 +1170,9 @@ class Sandbox:
     def step_recover_h(self, execute_info):
         """
         Helper for recover that's responsible for forcing recovery of a step.
+
+        RAISES:
+        Sandbox.RunInputEmptyException if it encounters an empty Run input.
         """
         # Break out execute_info.
         runstep = execute_info.runstep
@@ -1155,6 +1220,9 @@ class Sandbox:
         @param dataset_to_recover: dataset that needs to be recovered
         @param invoking_record: the run component that needs the
             dataset as an input
+
+        RAISES:
+        Sandbox.RunInputEmptyException if it encounters an empty Run input.
 
         PRE
         dataset_to_recover is in the maps but no corresponding file is on the file system.
@@ -1335,7 +1403,7 @@ class Sandbox:
         # assert curr_record is not None
         input_dataset_in_sdbx = file_access_utils.file_exists(input_dataset_path)
         # FIXME we gotta loosen this now.
-        assert input_dataset_in_sdbx or input_dataset.has_data()
+        # assert input_dataset_in_sdbx or input_dataset.has_data()
 
         cable = curr_record.definite.component
 
@@ -1363,7 +1431,7 @@ class Sandbox:
                     iic = IntegrityCheckLog(
                         dataset=input_dataset,
                         runsic=curr_record,
-                        copy_error=True,
+                        read_failed=True,
                         start_time=copy_start,
                         end_time=copy_end,
                         user=user
@@ -1964,7 +2032,7 @@ class RunPlan(object):
 
     def create_run_steps(self, subrun=None):
         """
-        Find or create the RunSteps in the Run.  Subrun RunPlans are also assigned Runs at this point.
+        Find or create the RunSteps in the Run.  Sub-run RunPlans are also assigned Runs at this point.
         """
         if subrun:
             self.run = subrun
@@ -2036,7 +2104,8 @@ class RunPlan(object):
             is_changed = self.walk_backward() or self.walk_forward()
 
     def walk_backward(self):
-        """ Walk backward through the steps, flagging needed runs.
+        """
+        Walk backward through the steps, flagging steps that need to be run.
 
         @return: True if any new steps were flagged for running.
         """
@@ -2047,14 +2116,15 @@ class RunPlan(object):
 
             elif not step_plan.execrecord:
                 for input_plan in step_plan.inputs:
-                    if not input_plan.has_data():
+                    if not input_plan.has_data() and input_plan.step_num is not None:
                         source_plan = self.step_plans[input_plan.step_num-1]
                         is_changed = source_plan.check_rerun(input_plan.output_num) or is_changed
 
         return is_changed
 
     def walk_forward(self):
-        """ Walk forward through the steps, flagging needed runs.
+        """
+        Walk forward through the steps, flagging steps that need to be run.
 
         @return: True if any new steps were flagged for running.
         """
@@ -2065,7 +2135,7 @@ class RunPlan(object):
 
             else:
                 for input_plan in step_plan.inputs:
-                    if not input_plan.dataset and step_plan.execrecord:
+                    if not input_plan.has_data() and step_plan.execrecord:
                         step_plan.execrecord = None
                         for output_plan in step_plan.outputs:
                             output_plan.dataset = None
