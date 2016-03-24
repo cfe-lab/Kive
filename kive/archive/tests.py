@@ -109,7 +109,7 @@ class ArchiveTestCaseHelpers:
 
         self.E03_11_RSIC = self.E03_11.psic_instances.create(dest_runstep=self.step_E1_RS)
         self.make_complete_non_reused(self.E03_11_RSIC, [self.raw_dataset], [self.raw_dataset])
-        self.raw_dataset.integrity_checks.create(execlog=self.E03_11_RSIC.log, user=self.myUser)
+        # self.raw_dataset.integrity_checks.create(execlog=self.E03_11_RSIC.log, user=self.myUser)
         if bp == "first_rsic":
             return
 
@@ -746,12 +746,9 @@ class RunStepTests(ArchiveTestCase):
         """
         A RunStep with an incomplete RunSIC is not clean.
         """
-        self.step_through_runstep_creation("first_rsic")
-
-        # Make this RunSIC incomplete by removing the ICL.
-        icl_to_remove = self.raw_dataset.integrity_checks.filter(execlog=self.E03_11_RSIC.log).first()
-        icl_to_remove.execlog = None
-        icl_to_remove.save()
+        self.step_through_runstep_creation("first_runstep")
+        # Follow through step_through_runstep_creation, stopping short of completing the input cable.
+        self.E03_11_RSIC = self.E03_11.psic_instances.create(dest_runstep=self.step_E1_RS)
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('{} "{}" is not complete'.format("RunSIC", self.E03_11_RSIC)),
@@ -2913,15 +2910,18 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         self.assertTrue(incomplete_cable.is_complete())
         self.assertTrue(incomplete_cable.successful_reuse())
 
-    def test_runcomponent_successful_checks_not_passed(self):
-        """Testing of a RunComponent (RunSIC) that is successful but has no ExecRecord yet."""
-        self.step_through_run_creation("first_cable_created")
+    def test_nontrivial_rsic_successful_checks_not_passed(self):
+        """Testing of a RunComponent (non-trivial RunSIC) that is successful but has no data checks yet."""
+        self.step_through_runstep_creation("second_runstep")
+        # Follow the procedure in step_through_runstep_creation but stopping short of the checks.
+        self.complete_RSICs(self.step_E2_RS,
+                            [self.triplet_dataset, self.singlet_dataset],
+                            [self.D1_in_dataset, self.singlet_dataset])
+        # This is a non-trivial cable, so data checks must be part of its completion.
+        self.E01_21_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E01_21).first()
 
-        incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
-        self.make_complete_non_reused(incomplete_cable, [self.raw_dataset], [self.raw_dataset])
-
-        self.assertFalse(incomplete_cable.is_complete())
-        self.assertTrue(incomplete_cable.successful_execution())
+        self.assertFalse(self.E01_21_RSIC.is_complete())
+        self.assertTrue(self.E01_21_RSIC.successful_execution())
 
     def test_runcomponent_successful_checks_passed(self):
         """Testing of a RunComponent (RunSIC) that is successful and all checks pass."""
@@ -3032,6 +3032,15 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
 
         self.assertTrue(self.step_E1_RS.is_complete())
         self.assertFalse(self.step_E1_RS.successful_execution())
+
+    def test_runstep_successful_checks_not_passed(self):
+        """Testing of a RunComponent (RunStep) that is successful but has no data checks yet."""
+        self.step_through_run_creation("first_cable")
+        # Follow the procedure in step_through_run_creation but stopping short of the checks.
+        self.make_complete_non_reused(self.step_E1_RS, [self.raw_dataset], [self.doublet_dataset])
+
+        self.assertFalse(self.step_E1_RS.is_complete())
+        self.assertTrue(self.step_E1_RS.successful_execution())
 
     def test_runstep_failed_subrun(self):
         """Testing on a RunStep with a child_run that fails."""

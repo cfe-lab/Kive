@@ -1106,6 +1106,7 @@ class Sandbox:
                     with transaction.atomic():
                         curr_ER = step_plan.execrecord
                         can_reuse = curr_ER and curr_RS.check_ER_usable(curr_ER)
+
                         if curr_ER is not None:
                             # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now,
                             # we can return.
@@ -2079,6 +2080,7 @@ class RunPlan(object):
                     if method.reusable == Method.NON_REUSABLE:
                         continue
                     execrecord, summary = step_plan.run_step.get_suitable_ER(input_datasets)
+
                     if not summary:
                         # no exec record, have to run
                         continue
@@ -2117,6 +2119,9 @@ class RunPlan(object):
             elif not step_plan.execrecord:
                 for input_plan in step_plan.inputs:
                     if not input_plan.has_data() and input_plan.step_num is not None:
+                        # Note: if input_plan.step_num is None (i.e. this is an input to the Run)
+                        # then we leave it -- it will be caught later in the execution.
+
                         source_plan = self.step_plans[input_plan.step_num-1]
                         is_changed = source_plan.check_rerun(input_plan.output_num) or is_changed
 
@@ -2135,11 +2140,12 @@ class RunPlan(object):
 
             else:
                 for input_plan in step_plan.inputs:
-                    if not input_plan.has_data() and step_plan.execrecord:
+                    if not input_plan.dataset and step_plan.execrecord:
                         step_plan.execrecord = None
                         for output_plan in step_plan.outputs:
                             output_plan.dataset = None
                         is_changed = True
+
         return is_changed
 
 

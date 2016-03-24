@@ -93,8 +93,13 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
         self.fields["compounddatatype"].queryset = CompoundDatatype.filter_by_user(self.context["request"].user)
 
     def get_filename(self, obj):
-        if obj:
+        if not obj:
+            return
+
+        if obj.dataset_file:
             return os.path.basename(obj.dataset_file.name)
+        elif obj.external_path:
+            return os.path.basename(obj.external_path)
 
     def get_filesize_display(self, obj):
         if obj:
@@ -119,6 +124,8 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
 
         elif efd_exists and not ep_exists:
             raise serializers.ValidationError("external_path must be specified")
+
+        return super(DatasetSerializer, self).validate(data)
 
     def create(self, validated_data):
         """

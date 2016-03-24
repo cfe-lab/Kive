@@ -469,37 +469,10 @@ class RestoreReusableDatasetTest(TestCase):
     def tearDown(self):
         restore_production_files()
 
-    def create_run_to_process(self, pipeline):
-        dataset = Dataset.objects.get(name='pairs')
-        run_to_process = Run(pipeline=pipeline, user=pipeline.user)
-        run_to_process.save()
-        run_to_process.clean()
-        run_to_process.inputs.create(dataset=dataset, index=1)
-        return run_to_process
-
     def execute_pipeline(self, pipeline):
-        run_to_process = self.create_run_to_process(pipeline)
-
-        manager = Manager(0)
-        manager.max_host_cpus = 1
-        manager.worker_status = {}
-        manager.find_new_runs()
-        while manager.task_queue:
-            tasks = manager.task_queue
-            manager.task_queue = []
-            for sandbox, task in tasks:
-                task_info = sandbox.get_task_info(task)
-                task_info_dict = task_info.dict_repr()
-                worker_rank = 1
-                manager.tasks_in_progress[worker_rank] = {"task": task,
-                                                          "vassals": []}
-                if type(task) == RunStep:
-                    sandbox_result = Sandbox.finish_step(task_info_dict, worker_rank)
-                else:
-                    sandbox_result = Sandbox.finish_cable(task_info_dict, worker_rank)
-                manager.note_progress(worker_rank, sandbox_result)
-
-        return Run.objects.get(id=run_to_process.id)
+        dataset = Dataset.objects.get(name="pairs")
+        mgr = Manager.execute_pipeline(pipeline.user, pipeline, [dataset])
+        return mgr.get_last_run()
 
     def test_run_new_pipeline(self):
         pipeline = Pipeline.objects.get(revision_name='sums and products')
