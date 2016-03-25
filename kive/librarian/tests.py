@@ -9,6 +9,7 @@ import tempfile
 import time
 import logging
 import json
+import shutil
 
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -23,7 +24,7 @@ from rest_framework import status
 
 from archive.models import ExecLog, MethodOutput, Run, RunStep
 from constants import datatypes, groups
-from librarian.models import Dataset, ExecRecord
+from librarian.models import Dataset, ExecRecord, ExternalFileDirectory
 from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, \
     MethodFamily
@@ -2023,3 +2024,79 @@ baz
 
             self.assertListEqual(list(dataset.groups_allowed.all()),
                                  [everyone_group()])
+
+
+class ExternalFileTests(TestCase):
+
+    def setUp(self):
+        tools.create_metadata_test_environment(self)
+
+        self.working_dir = tempfile.mkdtemp()
+        self.efd = ExternalFileDirectory(
+            name="WorkingDirectory",
+            path=self.working_dir
+        )
+        self.efd.save()
+
+        self.ext1_path = "ext1.txt"
+        self.ext1_contents = "First test file"
+        with open(os.path.join(self.working_dir, self.ext1_path), "wb") as f:
+            f.write(self.ext1_contents)
+
+        with open(os.path.join(self.working_dir, "ext2.txt"), "wb") as f:
+            f.write("Second test file")
+
+        os.makedirs(os.path.join(self.working_dir, "ext_subdir"))
+        os.makedirs(os.path.join(self.working_dir, "ext_subdir2"))
+
+        with open(os.path.join(self.working_dir, "ext_subdir", "ext_sub1.txt"), "wb") as f:
+            f.write("Test file in subdirectory")
+
+    def tearDown(self):
+        shutil.rmtree(self.working_dir)
+
+    def test_display_name(self):
+        self.assertEquals(self.efd.display_name(), "WorkingDirectory")
+
+        new_working_dir = tempfile.mkdtemp()
+        unnamed_efd = ExternalFileDirectory(path=new_working_dir)
+        self.assertEquals(unnamed_efd.path, new_working_dir)
+        shutil.rmtree(new_working_dir)
+
+    def test_save(self):
+        """Calling save() normalizes the path."""
+        new_working_dir = tempfile.mkdtemp()
+        unnamed_efd = ExternalFileDirectory(path="{}/./".format(new_working_dir))
+        unnamed_efd.save()
+        self.assertEquals(unnamed_efd.path, os.path.normpath(new_working_dir))
+        shutil.rmtree(new_working_dir)
+
+    def test_list_files(self):
+        expected_list = [
+            (os.path.join(self.working_dir, self.ext1_path), "[WorkingDirectory]/{}".format(self.ext1_path)),
+            (os.path.join(self.working_dir, "ext2.txt"), "[WorkingDirectory]/ext2.txt"),
+            (os.path.join(self.working_dir, "ext_subdir", "ext_sub1.txt"),
+             "[WorkingDirectory]/ext_subdir/ext_sub1.txt")
+        ]
+        self.assertSetEqual(set(expected_list), set(self.efd.list_files()))
+
+    def test_create_dataset_external_file(self):
+        """
+        Create a Dataset from an external file, making a copy in the database.
+        """
+        external_file_ds = Dataset.create_dataset(
+            os.path.join(self.working_dir, self.ext1_path),
+            user=self.myUser,
+            externalfiledirectory=self.efd
+        )
+
+        self.assertEquals(external_file_ds.external_path, self.ext1_path)
+
+        try:
+            external_file_ds.dataset_file.open()
+            self.assertEquals(external_file_ds.dataset_file.read(), self.ext1_contents)
+        finally:
+            external_file_ds.dataset_file.close()
+            
+        with open(os.path.join(self.working_dir, self.ext1_path, "rb")) as f:
+            self.assertEquals(file_access_utils.compute_md5(f), external_file_ds.MD5_checksum)
