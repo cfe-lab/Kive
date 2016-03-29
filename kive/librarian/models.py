@@ -1014,9 +1014,10 @@ class Dataset(metadata.models.AccessControl):
 
         self._redacted = True
         self.MD5_checksum = ""
+        self.externalfiledirectory = None
         if self.external_path:
             self.external_path = ""
-        self.save(update_fields=["_redacted", "MD5_checksum", "external_path"])
+        self.save(update_fields=["_redacted", "MD5_checksum", "externalfiledirectory", "external_path"])
 
         if bool(self.dataset_file):
             self.dataset_file.delete(save=True)
