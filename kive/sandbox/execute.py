@@ -91,9 +91,6 @@ class Sandbox:
         my_pipeline = run.pipeline
         inputs = [x.dataset for x in run.inputs.order_by("index")]
         sandbox_path = run.sandbox_path
-        # FIXME we should probably loosen this or at least make the Manager more tolerant
-        # of it.
-        # assert all([i.has_data() for i in inputs])
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.user = user
@@ -1403,8 +1400,6 @@ class Sandbox:
         # Preconditions to test.
         # assert curr_record is not None
         input_dataset_in_sdbx = file_access_utils.file_exists(input_dataset_path)
-        # FIXME we gotta loosen this now.
-        # assert input_dataset_in_sdbx or input_dataset.has_data()
 
         cable = curr_record.definite.component
 

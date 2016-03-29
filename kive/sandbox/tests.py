@@ -13,7 +13,7 @@ from constants import datatypes
 from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
 from kive.testing_utils import clean_up_all_files
 from kive.tests import install_fixture_files, restore_production_files
-from librarian.models import Dataset, DatasetStructure
+from librarian.models import Dataset, DatasetStructure, ExternalFileDirectory
 from metadata.models import Datatype, CompoundDatatype, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from method.tests import samplecode_path
@@ -836,3 +836,75 @@ class RestoreReusableDatasetTest(TestCase):
         step_plans = run_plan.step_plans
 
         self.assertIsNotNone(step_plans[0].execrecord)
+
+
+class ExecuteExternalInputTests(ExecuteTestsBase):
+    # FIXME finish this post-bat-evacuation
+
+    def setUp(self):
+        self.working_dir = tempfile.mkdtemp()
+        self.efd = ExternalFileDirectory(
+            name="ExecuteTestsEFD",
+            path=self.working_dir
+        )
+        self.efd.save()
+
+    def test_pipeline_external_file_input(self):
+        """Execution of a pipeline whose input is externally-backed."""
+
+        working_dir = tempfile.mkdtemp()
+        efd = ExternalFileDirectory(
+            name="ExecuteTestsEFD",
+            path=working_dir
+        )
+        efd.save()
+
+        # Copy the contents of self.dataset to an external file and link the Dataset.
+        ext_path = "ext.txt"
+        self.dataset.dataset_file.open()
+        with self.dataset.dataset_file:
+            with open(os.path.join(working_dir, ext_path), "wb") as f:
+                f.write(self.dataset.dataset_file.read())
+
+        # Mark the input dataset as externally-backed.
+        self.dataset.externalfiledirectory = efd
+        self.dataset.external_path = ext_path
+        self.dataset.save()
+        self.dataset.dataset_file.delete()
+
+        # Execute pipeline
+        pipeline = self.pX
+        inputs = [self.dataset]
+        run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+
+        self.check_run_OK(run)
+
+    def test_pipeline_external_file_input_deleted(self):
+        """Execution of a pipeline whose input is externally-backed."""
+
+        working_dir = tempfile.mkdtemp()
+        efd = ExternalFileDirectory(
+            name="ExecuteTestsEFD",
+            path=working_dir
+        )
+        efd.save()
+
+        # Copy the contents of self.dataset to an external file and link the Dataset.
+        ext_path = "ext.txt"
+        self.dataset.dataset_file.open()
+        with self.dataset.dataset_file:
+            with open(os.path.join(working_dir, ext_path), "wb") as f:
+                f.write(self.dataset.dataset_file.read())
+
+        # Mark the input dataset as externally-backed.
+        self.dataset.externalfiledirectory = efd
+        self.dataset.external_path = ext_path
+        self.dataset.save()
+        self.dataset.dataset_file.delete()
+
+        # Execute pipeline
+        pipeline = self.pX
+        inputs = [self.dataset]
+        run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+
+        self.check_run_OK(run)
