@@ -31,7 +31,7 @@
             "execrecord": 4, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:05Z"
+            "start_time": "2000-01-01T00:00:04Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 2
@@ -59,7 +59,7 @@
             "execrecord": 3, 
             "is_cancelled": false, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:05Z"
+            "start_time": "2000-01-01T00:00:04Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 4
@@ -697,8 +697,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 1, 
-            "dataset_name": "total_sums", 
+            "dataset_idx": 2, 
+            "dataset_name": "total_products", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -706,8 +706,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 2, 
-            "dataset_name": "total_products", 
+            "dataset_idx": 1, 
+            "dataset_name": "total_sums", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -725,10 +725,10 @@
             "paused_by": null, 
             "pipeline": 4, 
             "purged": true, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userkive_run1_i0ibQ1", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userkive_run1_j2N_RX", 
             "start_time": "2000-01-01T00:00:03Z", 
             "stopped_by": null, 
-            "time_queued": "2016-03-30T21:04:30.772Z", 
+            "time_queued": "2016-03-31T18:41:55.111Z", 
             "user": 1, 
             "users_allowed": []
         }, 
@@ -757,11 +757,11 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "eaff67caa1c98033123a16c8105fb188", 
+            "MD5_checksum": "fc42c52b4291e33c7264dbb4a0e1d6f2", 
             "_redacted": false, 
             "dataset_file": "", 
             "date_created": "2000-01-01T00:00:04Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-03-30 21:04:32.899863+00:00 by kive\nrun: 1\nuser: kive\nstep: 1\noutput: sums_and_products", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-03-31 18:41:57.220513+00:00 by kive\nrun: 1\nuser: kive\nstep: 1\noutput: sums_and_products", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 1, 
@@ -775,11 +775,11 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "e237ca8bb33ea0dd3f8d6bb8d1ede977", 
+            "MD5_checksum": "6dc476f01f77ab2aa13e3e5a6291edf1", 
             "_redacted": false, 
             "dataset_file": "Datasets/2016_03/step2_total_sums.raw", 
             "date_created": "2000-01-01T00:00:05Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-03-30 21:04:32.899863+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-03-31 18:41:57.220513+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 2, 
@@ -1105,9 +1105,9 @@
     {
         "fields": {
             "dataset": 3, 
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:05Z", 
             "execlog": 4, 
-            "start_time": "2000-01-01T00:00:06Z", 
+            "start_time": "2000-01-01T00:00:05Z", 
             "user": 1
         }, 
         "model": "datachecking.contentchecklog", 
