@@ -2052,8 +2052,8 @@ baz
             context=self.duck_context
         )
         self.assertFalse(ds.is_valid())
-        self.assertSetEqual(set(ds.errors["non_field_errors"]),
-                            set("externalfiledirectory must be specified"))
+        self.assertListEqual(ds.errors["non_field_errors"],
+                             ["externalfiledirectory must be specified"])
 
     def test_validate_externally_backed_no_external_path(self):
         """
@@ -2065,8 +2065,8 @@ baz
             context=self.duck_context
         )
         self.assertFalse(ds.is_valid())
-        self.assertSetEqual(set(ds.errors["non_field_errors"]),
-                            set("external_path must be specified"))
+        self.assertListEqual(ds.errors["non_field_errors"],
+                             ["external_path must be specified"])
 
     def test_validate_dataset_file_specified(self):
         """
@@ -2205,7 +2205,7 @@ baz
 
     def test_create_externally_backed_internal_copy(self):
         """
-        Test creating a Dataset from external data.
+        Test creating a Dataset from external data and keeping an internal copy.
         """
 
         self.data_to_serialize["externalfiledirectory"] = self.efd.pk
