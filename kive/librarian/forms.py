@@ -74,13 +74,13 @@ class DatasetForm(forms.ModelForm):
         required=False
     )
 
-    external_path = forms.CharField(
-        widget=forms.Select(
-            choices=[
-                ('', '--- choose an external file directory ---')
-            ]
-        )
-    )
+    # external_path = forms.CharField(
+    #     widget=forms.Select(
+    #         choices=[
+    #             ('', '--- choose an external file directory ---')
+    #         ]
+    #     )
+    # )
 
     class Meta:
         model = Dataset
@@ -104,6 +104,33 @@ class DatasetForm(forms.ModelForm):
         user_specific_choices = ([DatasetForm.RAW_CDT_CHOICE] +
                                  CompoundDatatype.choices(user))
         self.fields["compound_datatype"].choices = user_specific_choices
+
+    def clean(self):
+        """
+        Some quick sanity checks on the input.
+
+        Note: external_path and externalfiledirectory must both or neither be specified,
+        which is handled by model validation *but* because we have overridden _post_clean
+        we need to do it here explicitly.
+        """
+        cleaned_data = super(DatasetForm, self).clean()
+        dataset_file = cleaned_data.get("dataset_file")
+        externalfiledirectory = cleaned_data.get("externalfiledirectory")
+        external_path = cleaned_data.get("external_path")
+
+        errors = []
+        if dataset_file and external_path:
+            errors.append("A file and an external path should not both be specified.")
+        if dataset_file and externalfiledirectory:
+            errors.append("A file and an external file directory should not both be specified.")
+
+        if not (externalfiledirectory and external_path
+                or not externalfiledirectory and not external_path):
+            errors.append("Both external file directory and external path should be set or "
+                          "neither should be set.")
+
+        if errors:
+            raise forms.ValidationError(errors)
 
     def _post_clean(self):
         """

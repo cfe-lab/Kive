@@ -137,6 +137,9 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
 
         file_path = validated_data.get("external_path", None)
         efd = validated_data.get("externalfiledirectory", None)
+        # Both or neither are specified (this is enforced in serializer validation).
+        if file_path is not None:
+            file_path = os.path.join(efd.path, file_path)
 
         dataset = Dataset.create_dataset(
             file_path=file_path,
@@ -149,7 +152,7 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             description=validated_data["description"],
             file_source=None,
             check=True,
-            file_handle=validated_data["dataset_file"],
+            file_handle=validated_data.get("dataset_file", None),
             externalfiledirectory=efd
         )
         return dataset

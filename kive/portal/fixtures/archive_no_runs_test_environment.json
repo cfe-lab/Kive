@@ -1392,7 +1392,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$jOLA1D4R7Kqa$VLCY82syhV+6Xnw+Jzc7JsoG5s9tpeenyRYmxbSHQGM=", 
+            "password": "pbkdf2_sha256$24000$p80VZNxA2UVv$0LrfurgUaR/SHA8EdvbOYKAJMAIqq2ikqaHj8js4O1o=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -1410,7 +1410,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$3w3wWJkdXfA1$G4cIqb5tLjnjtk+iLGneoPr56NWK4FUzevfeVvxt6Ic=", 
+            "password": "pbkdf2_sha256$24000$ySOAiXXo3BNd$ZgUfsjW3Wx8JhUmlEK7Y2l0t7QDPXLdkg46w3cSn3Fc=", 
             "user_permissions": [], 
             "username": "ringo"
         }, 
@@ -1430,7 +1430,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$1DaILWp1tyHH$aChbi/aTM+PwWvhb83GpX0efs0X7OfQ9YnMgN3eXdpE=", 
+            "password": "pbkdf2_sha256$24000$O61syAJgsCOV$Br3k2KDDZS+YDtwRVf4Dldlwj2Q5hifdOWGdH2ituZ8=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -1855,7 +1855,7 @@
         "fields": {
             "MD5_checksum": "00fd50bfe7ac63e2165a442f4101e05c", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_03/step_0_singlet_a3mpLj1.csv", 
+            "dataset_file": "Datasets/2016_03/step_0_singlet_BHUCaDZ.csv", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "external_path": "", 
@@ -1875,7 +1875,7 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_03/step_0_raw_ydwzzu4.fasta", 
+            "dataset_file": "Datasets/2016_03/step_0_raw_QF3nyEy.fasta", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "external_path": "", 
@@ -1895,7 +1895,7 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_03/step_0_raw_JvE9Ws5.fasta", 
+            "dataset_file": "Datasets/2016_03/step_0_raw_JHE8Cp0.fasta", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "external_path": "", 
@@ -2333,7 +2333,7 @@
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:01Z", 
+            "revision_DateTime": "2000-01-01T00:00:00Z", 
             "revision_desc": "E", 
             "revision_name": "pE_name", 
             "user": 2, 

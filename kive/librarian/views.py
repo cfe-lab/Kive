@@ -224,6 +224,10 @@ def datasets_add(request):
                     cdt = CompoundDatatype.objects.get(pk=df.cleaned_data['compound_datatype'])
 
                 file_path = df.cleaned_data.get("external_path", None)
+                efd = df.cleaned_data.get("externalfiledirectory", None)
+                # Both or neither are specified (this is enforced in form validation).
+                if file_path is not None:
+                    file_path = os.path.join(efd.path, file_path)
 
                 with transaction.atomic():
                     ds = Dataset.create_dataset(
@@ -236,7 +240,7 @@ def datasets_add(request):
                         file_source=None,
                         check=True,
                         file_handle=df.cleaned_data['dataset_file'],
-                        externalfiledirectory=df.cleaned_data['externalfiledirectory'],
+                        externalfiledirectory=efd,
                         instance=ds
                     )
                     ds.grant_from_json(df.cleaned_data["permissions"])
@@ -245,7 +249,7 @@ def datasets_add(request):
             else:
                 success = False
 
-        except (AttributeError, ValidationError, ValueError) as e:
+        except (AttributeError, ValidationError, ValueError, IOError) as e:
             LOGGER.exception(e.message)
             success = False
             df.add_error(None, e)

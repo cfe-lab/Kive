@@ -700,7 +700,7 @@ class Sandbox:
             curr_RS = self.reuse_or_prepare_step(step, run_to_resume, step_inputs, run_dir)
 
             # Refresh run_to_resume.
-            run_to_resume = Run.objects.get(pk=run_to_resume.pk)
+            run_to_resume.refresh_from_db()
 
             if not curr_RS.is_complete(use_cache=True):
                 all_complete = False
@@ -715,8 +715,12 @@ class Sandbox:
             elif curr_RS.reused and not curr_RS.is_successful(use_cache=True):
                 self.logger.debug("Step %d (%s) failed on reuse", step.step_num, step)
                 return_because_fail = True
+            elif not curr_RS.is_successful(use_cache=True):
+                self.logger.debug("Step %d (%s) failed to execute", step.step_num, step)
+                return_because_fail = True
             elif curr_RS.is_complete(use_cache=True):
                 step_nums_completed.append(step.step_num)
+
             if return_because_fail:
                 assert not run_to_resume.is_successful(use_cache=True)
                 return incables_completed, steps_completed, outcables_completed
@@ -799,7 +803,6 @@ class Sandbox:
 
         return incables_completed, steps_completed, outcables_completed
 
-    # Modified from execute_cable.
     def reuse_or_prepare_cable(self, cable, parent_record, input_dataset, output_path):
         """
         Attempt to reuse the cable; prepare it for finishing if unable.

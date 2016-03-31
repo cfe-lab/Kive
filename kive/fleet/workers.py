@@ -263,7 +263,7 @@ class Manager(object):
         new_sdbx.advance_pipeline()
 
         # Refresh run_to_start.
-        run_to_start = Run.objects.get(pk=run_to_start.pk)
+        run_to_start.refresh_from_db()
 
         # If we were able to reuse throughout, then we're totally done.  Otherwise we
         # need to do some bookkeeping.
@@ -274,9 +274,9 @@ class Manager(object):
             finished_already = True
 
         elif not run_to_start.is_successful(use_cache=True):
-            # The run failed somewhere in reuse.  This hasn't affected any of our maps yet, so we
+            # The run failed somewhere in preparation.  This hasn't affected any of our maps yet, so we
             # just report it and discard it.
-            mgr_logger.info('Run "%s" (pk=%d) (Pipeline: %s, User: %s) failed on reuse',
+            mgr_logger.info('Run "%s" (pk=%d) (Pipeline: %s, User: %s) failed before execution',
                             run_to_start, run_to_start.pk, run_to_start.pipeline, run_to_start.user)
             run_to_start.mark_complete(save=True)
             finished_already = True

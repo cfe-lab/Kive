@@ -174,6 +174,33 @@ class ExecuteTestsBase(TestCase):
         clean_up_all_files()
         restore_production_files()
 
+    def check_run_OK(self, run):
+        for step in run.runsteps.all():
+            for rsic in step.RSICs.all():
+                self.assertTrue(rsic._complete is not None)
+                self.assertTrue(rsic._successful is not None)
+                self.assertTrue(rsic.is_complete(use_cache=True))
+                self.assertTrue(rsic.is_successful(use_cache=True))
+
+            if step.has_subrun():
+                self.check_run_OK(step.child_run)
+
+            self.assertTrue(step._complete is not None)
+            self.assertTrue(step._successful is not None)
+            self.assertTrue(step.is_complete(use_cache=True))
+            self.assertTrue(step.is_successful(use_cache=True))
+
+        for outcable in run.runoutputcables.all():
+            self.assertTrue(outcable._complete is not None)
+            self.assertTrue(outcable._successful is not None)
+            self.assertTrue(outcable.is_complete(use_cache=True))
+            self.assertTrue(outcable.is_successful(use_cache=True))
+
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
+        self.assertTrue(run.is_complete(use_cache=True))
+        self.assertTrue(run.is_successful(use_cache=True))
+
 
 class ExecuteTests(ExecuteTestsBase):
 
@@ -219,33 +246,6 @@ class ExecuteTests(ExecuteTestsBase):
                     dataset = None
             input_datasets.append(dataset)
         return input_datasets
-
-    def check_run_OK(self, run):
-        for step in run.runsteps.all():
-            for rsic in step.RSICs.all():
-                self.assertTrue(rsic._complete is not None)
-                self.assertTrue(rsic._successful is not None)
-                self.assertTrue(rsic.is_complete(use_cache=True))
-                self.assertTrue(rsic.is_successful(use_cache=True))
-
-            if step.has_subrun():
-                self.check_run_OK(step.child_run)
-
-            self.assertTrue(step._complete is not None)
-            self.assertTrue(step._successful is not None)
-            self.assertTrue(step.is_complete(use_cache=True))
-            self.assertTrue(step.is_successful(use_cache=True))
-
-        for outcable in run.runoutputcables.all():
-            self.assertTrue(outcable._complete is not None)
-            self.assertTrue(outcable._successful is not None)
-            self.assertTrue(outcable.is_complete(use_cache=True))
-            self.assertTrue(outcable.is_successful(use_cache=True))
-
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_successful(use_cache=True))
 
     def test_pipeline_execute_A_simple_onestep_pipeline(self):
         """Execution of a one-step pipeline."""
@@ -839,72 +839,102 @@ class RestoreReusableDatasetTest(TestCase):
 
 
 class ExecuteExternalInputTests(ExecuteTestsBase):
-    # FIXME finish this post-bat-evacuation
 
     def setUp(self):
+        super(ExecuteExternalInputTests, self).setUp()
+
         self.working_dir = tempfile.mkdtemp()
         self.efd = ExternalFileDirectory(
             name="ExecuteTestsEFD",
             path=self.working_dir
         )
         self.efd.save()
+        self.ext_path = "ext.txt"
+        self.full_ext_path = os.path.join(self.working_dir, self.ext_path)
 
     def test_pipeline_external_file_input(self):
         """Execution of a pipeline whose input is externally-backed."""
 
-        working_dir = tempfile.mkdtemp()
-        efd = ExternalFileDirectory(
-            name="ExecuteTestsEFD",
-            path=working_dir
-        )
-        efd.save()
-
         # Copy the contents of self.dataset to an external file and link the Dataset.
-        ext_path = "ext.txt"
-        self.dataset.dataset_file.open()
-        with self.dataset.dataset_file:
-            with open(os.path.join(working_dir, ext_path), "wb") as f:
-                f.write(self.dataset.dataset_file.read())
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
 
-        # Mark the input dataset as externally-backed.
-        self.dataset.externalfiledirectory = efd
-        self.dataset.external_path = ext_path
-        self.dataset.save()
-        self.dataset.dataset_file.delete()
+        # Create a new externally-backed Dataset.
+        external_ds = Dataset.create_dataset(
+            self.full_ext_path,
+            user=self.myUser,
+            keep_file=False,
+            name="ExternalDS",
+            description="Dataset with external data and no internal data",
+            externalfiledirectory=self.efd
+        )
 
         # Execute pipeline
-        pipeline = self.pX
-        inputs = [self.dataset]
-        run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        run = Manager.execute_pipeline(self.myUser, self.pX_raw, [external_ds]).get_last_run()
 
         self.check_run_OK(run)
 
     def test_pipeline_external_file_input_deleted(self):
-        """Execution of a pipeline whose input is externally-backed."""
-
-        working_dir = tempfile.mkdtemp()
-        efd = ExternalFileDirectory(
-            name="ExecuteTestsEFD",
-            path=working_dir
-        )
-        efd.save()
+        """Execution of a pipeline whose input is missing."""
 
         # Copy the contents of self.dataset to an external file and link the Dataset.
-        ext_path = "ext.txt"
-        self.dataset.dataset_file.open()
-        with self.dataset.dataset_file:
-            with open(os.path.join(working_dir, ext_path), "wb") as f:
-                f.write(self.dataset.dataset_file.read())
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
 
-        # Mark the input dataset as externally-backed.
-        self.dataset.externalfiledirectory = efd
-        self.dataset.external_path = ext_path
-        self.dataset.save()
-        self.dataset.dataset_file.delete()
+        # Create a new externally-backed Dataset.
+        external_missing_ds = Dataset.create_dataset(
+            self.full_ext_path,
+            user=self.myUser,
+            keep_file=False,
+            name="ExternalMissingDS",
+            description="Dataset with missing external data and no internal data",
+            externalfiledirectory=self.efd
+        )
+        # Remove the external file.
+        os.remove(self.full_ext_path)
 
         # Execute pipeline
-        pipeline = self.pX
-        inputs = [self.dataset]
-        run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        run = Manager.execute_pipeline(self.myUser, self.pX_raw, [external_missing_ds]).get_last_run()
 
-        self.check_run_OK(run)
+        # The run should fail on the first cable.
+        self.assertFalse(run.is_successful(use_cache=True))
+        rsic = run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
+        self.assertFalse(rsic.is_successful(use_cache=True))
+        self.assertTrue(hasattr(rsic, "input_integrity_check"))
+        self.assertTrue(rsic.input_integrity_check.read_failed)
+
+    def test_pipeline_external_file_input_corrupted(self):
+        """Execution of a pipeline whose input is corrupted."""
+
+        # Copy the contents of self.dataset to an external file and link the Dataset.
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
+
+        # Create a new externally-backed Dataset.
+        external_corrupted_ds = Dataset.create_dataset(
+            self.full_ext_path,
+            user=self.myUser,
+            keep_file=False,
+            name="ExternalCorruptedDS",
+            description="Dataset with corrupted external data and no internal data",
+            externalfiledirectory=self.efd
+        )
+        # Tamper with the external file.
+        with open(self.full_ext_path, "wb") as f:
+            f.write("Corrupted")
+
+        # Execute pipeline
+        run = Manager.execute_pipeline(self.myUser, self.pX_raw, [external_corrupted_ds]).get_last_run()
+
+        # The run should fail on the first cable.
+        self.assertFalse(run.is_successful(use_cache=True))
+        rsic = run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
+        self.assertFalse(rsic.is_successful(use_cache=True))
+        self.assertTrue(hasattr(rsic, "input_integrity_check"))
+        self.assertTrue(rsic.input_integrity_check.is_md5_conflict())

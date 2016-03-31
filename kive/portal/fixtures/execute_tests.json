@@ -406,7 +406,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$FN5rwgitVQ47$7k4PwIqqZ+s50qoBW/XOPnqaQ7JIVlUzIfGOTnpTiRs=", 
+            "password": "pbkdf2_sha256$24000$zolB40eeWifm$IxWjeBXYZyVrcx/iagd71m+LJD3fLnsoVXhWsCWx1sI=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -465,7 +465,7 @@
         "fields": {
             "MD5_checksum": "4ce50c714420255e82dd3965ccec07ec", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_03/input_for_test_C_twostep_with_subpipeline_ag57TPR.csv", 
+            "dataset_file": "Datasets/2016_03/input_for_test_C_twostep_with_subpipeline_6W6gPcw.csv", 
             "date_created": "2000-01-01T00:00:00Z", 
             "description": "input to pipeline pX", 
             "external_path": "", 

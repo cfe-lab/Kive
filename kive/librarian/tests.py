@@ -1929,6 +1929,22 @@ baz
             "groups_allowed": []
         }
 
+        # An external file directory.
+        self.working_dir = tempfile.mkdtemp()
+        self.efd = ExternalFileDirectory(
+            name="WorkingDirectory",
+            path=self.working_dir
+        )
+        self.efd.save()
+
+        # An external file.
+        _, self.ext_fn = tempfile.mkstemp(dir=self.working_dir)
+        with open(self.ext_fn, "wb") as f:
+            f.write(self.raw_file_contents)
+
+    def tearDown(self):
+        shutil.rmtree(self.working_dir)
+
     def test_validate(self):
         """
         Test validating a new Dataset.
@@ -2013,6 +2029,70 @@ baz
             )
             self.assertFalse(ds.is_valid())
             self.assertEquals(len(ds.errors["compounddatatype"]), 1)
+
+    def test_validate_externally_backed(self):
+        """
+        Test validating a new Dataset with external backing.
+        """
+        self.data_to_serialize["externalfiledirectory"] = self.efd.pk
+        self.data_to_serialize["external_path"] = self.ext_fn
+        ds = DatasetSerializer(
+            data=self.data_to_serialize,
+            context=self.duck_context
+        )
+        self.assertTrue(ds.is_valid())
+
+    def test_validate_externally_backed_no_efd(self):
+        """
+        If external_path is present, externalfiledirectory should be also.
+        """
+        self.data_to_serialize["external_path"] = self.ext_fn
+        ds = DatasetSerializer(
+            data=self.data_to_serialize,
+            context=self.duck_context
+        )
+        self.assertFalse(ds.is_valid())
+        self.assertSetEqual(set(ds.errors["non_field_errors"]),
+                            set("externalfiledirectory must be specified"))
+
+    def test_validate_externally_backed_no_external_path(self):
+        """
+        If externalfiledirectory is present, external_path should be also.
+        """
+        self.data_to_serialize["externalfiledirectory"] = self.efd.pk
+        ds = DatasetSerializer(
+            data=self.data_to_serialize,
+            context=self.duck_context
+        )
+        self.assertFalse(ds.is_valid())
+        self.assertSetEqual(set(ds.errors["non_field_errors"]),
+                            set("external_path must be specified"))
+
+    def test_validate_dataset_file_specified(self):
+        """
+        If dataset_file is specified, external_path and externalfiledirectory should not be.
+        """
+        self.data_to_serialize["externalfiledirectory"] = self.efd.pk
+        self.data_to_serialize["external_path"] = self.ext_fn
+
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            self.assertFalse(ds.is_valid())
+            self.assertSetEqual(
+                set(ds.errors["non_field_errors"]),
+                {
+                    "external_path should not be specified if dataset_file is",
+                    "externalfiledirectory should not be specified if dataset_file is"
+                }
+            )
 
     def test_create(self):
         """
@@ -2100,6 +2180,57 @@ baz
             self.assertListEqual(list(dataset.groups_allowed.all()),
                                  [everyone_group()])
 
+    def test_create_externally_backed(self):
+        """
+        Test creating a Dataset from external data.
+        """
+        self.data_to_serialize["externalfiledirectory"] = self.efd.pk
+        self.data_to_serialize["external_path"] = os.path.basename(self.ext_fn)
+
+        ds = DatasetSerializer(
+            data=self.data_to_serialize,
+            context=self.duck_context
+        )
+        ds.is_valid()
+        dataset = ds.save()
+
+        # Probe the Dataset to make sure everything looks fine.
+        self.assertEquals(dataset.name, self.data_to_serialize["name"])
+        self.assertEquals(dataset.description, self.data_to_serialize["description"])
+        self.assertIsNone(dataset.compounddatatype)
+        self.assertEquals(dataset.user, self.kive_user)
+        self.assertEquals(dataset.external_path, os.path.basename(self.ext_fn))
+        self.assertEquals(dataset.externalfiledirectory, self.efd)
+        self.assertFalse(bool(dataset.dataset_file))
+
+    def test_create_externally_backed_internal_copy(self):
+        """
+        Test creating a Dataset from external data.
+        """
+
+        self.data_to_serialize["externalfiledirectory"] = self.efd.pk
+        self.data_to_serialize["external_path"] = os.path.basename(self.ext_fn)
+        self.data_to_serialize["save_in_db"] = True
+
+        ds = DatasetSerializer(
+            data=self.data_to_serialize,
+            context=self.duck_context
+        )
+        ds.is_valid()
+        dataset = ds.save()
+
+        # Probe the Dataset to make sure everything looks fine.
+        self.assertEquals(dataset.name, self.data_to_serialize["name"])
+        self.assertEquals(dataset.description, self.data_to_serialize["description"])
+        self.assertIsNone(dataset.compounddatatype)
+        self.assertEquals(dataset.user, self.kive_user)
+        self.assertEquals(dataset.external_path, os.path.basename(self.ext_fn))
+        self.assertEquals(dataset.externalfiledirectory, self.efd)
+        self.assertTrue(bool(dataset.dataset_file))
+        dataset.dataset_file.open("rb")
+        with dataset.dataset_file:
+            self.assertEquals(dataset.dataset_file.read(), self.raw_file_contents)
+
 
 class ExternalFileTests(TestCase):
 
@@ -2126,8 +2257,10 @@ class ExternalFileTests(TestCase):
         os.makedirs(os.path.join(self.working_dir, "ext_subdir"))
         os.makedirs(os.path.join(self.working_dir, "ext_subdir2"))
 
-        with open(os.path.join(self.working_dir, "ext_subdir", "ext_sub1.txt"), "wb") as f:
-            f.write("Test file in subdirectory")
+        self.ext_sub1_path = os.path.join("ext_subdir", "ext_sub1.txt")
+        self.ext_sub1_contents = "Test file in subdirectory"
+        with open(os.path.join(self.working_dir, self.ext_sub1_path), "wb") as f:
+            f.write(self.ext_sub1_contents)
 
         self.external_file_ds = Dataset.create_dataset(
             os.path.join(self.working_dir, self.ext1_path),
@@ -2222,19 +2355,19 @@ class ExternalFileTests(TestCase):
         Create a Dataset from an external file in a subdirectory of the external file directory.
         """
         external_file_ds = Dataset.create_dataset(
-            os.path.join(self.working_dir, "ext_subdir", "ext_sub1.txt"),
+            os.path.join(self.working_dir, self.ext_sub1_path),
             user=self.myUser,
             externalfiledirectory=self.efd
         )
 
         self.assertEquals(external_file_ds.externalfiledirectory, self.efd)
-        self.assertEquals(external_file_ds.external_path, os.path.join("ext_subdir", "ext_sub1.txt"))
+        self.assertEquals(external_file_ds.external_path, self.ext_sub1_path)
 
         external_file_ds.dataset_file.open("rb")
         with external_file_ds.dataset_file:
-            self.assertEquals(external_file_ds.dataset_file.read(), self.ext1_contents)
+            self.assertEquals(external_file_ds.dataset_file.read(), self.ext_sub1_contents)
 
-        with open(os.path.join(self.working_dir, self.ext1_path), "rb") as f:
+        with open(os.path.join(self.working_dir, self.ext_sub1_path), "rb") as f:
             self.assertEquals(file_access_utils.compute_md5(f), external_file_ds.MD5_checksum)
 
     def test_get_file_handle(self):
@@ -2249,7 +2382,7 @@ class ExternalFileTests(TestCase):
         )
 
         # Where possible get_file_handle uses the internal copy.
-        self.assertEquals(external_file_ds.get_file_handle(), self.external_file_ds.dataset_file)
+        self.assertEquals(external_file_ds.get_file_handle(), external_file_ds.dataset_file)
 
         # It falls back on the external copy.
         external_file_ds.dataset_file.delete()
@@ -2275,7 +2408,7 @@ class ExternalFileTests(TestCase):
         Retrieve the external absolute path of an externally-backed Dataset.
         """
         ext1_path = os.path.join(self.working_dir, self.ext1_path)
-        ext_sub1_path = os.path.join(self.working_dir, "ext_subdir", "ext_sub1.txt")
+        ext_sub1_path = os.path.join(self.working_dir, self.ext_sub1_path)
 
         self.assertEquals(self.external_file_ds.external_absolute_path(), ext1_path)
         self.assertEquals(self.external_file_ds_no_internal.external_absolute_path(), ext1_path)

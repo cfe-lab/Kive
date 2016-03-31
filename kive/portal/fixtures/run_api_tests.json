@@ -123,7 +123,7 @@
             "_complete": true, 
             "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:04Z", 
+            "end_time": "2000-01-01T00:00:05Z", 
             "execrecord": 2, 
             "is_cancelled": false, 
             "reused": false, 
@@ -137,7 +137,7 @@
             "_complete": true, 
             "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:07Z", 
             "execrecord": 3, 
             "is_cancelled": false, 
             "reused": false, 
@@ -165,7 +165,7 @@
             "_complete": true, 
             "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:05Z", 
+            "end_time": "2000-01-01T00:00:06Z", 
             "execrecord": 1, 
             "is_cancelled": false, 
             "reused": false, 
@@ -179,7 +179,7 @@
             "_complete": true, 
             "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:07Z", 
+            "end_time": "2000-01-01T00:00:08Z", 
             "execrecord": 4, 
             "is_cancelled": false, 
             "reused": false, 
@@ -193,7 +193,7 @@
             "_complete": true, 
             "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:08Z", 
+            "end_time": "2000-01-01T00:00:09Z", 
             "execrecord": 5, 
             "is_cancelled": false, 
             "reused": false, 
@@ -265,7 +265,7 @@
             "end_time": "2000-01-01T00:00:04Z", 
             "invoking_record": 1, 
             "record": 1, 
-            "start_time": "2000-01-01T00:00:03Z"
+            "start_time": "2000-01-01T00:00:04Z"
         }, 
         "model": "archive.execlog", 
         "pk": 2
@@ -292,10 +292,10 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:07Z", 
+            "end_time": "2000-01-01T00:00:08Z", 
             "invoking_record": 5, 
             "record": 5, 
-            "start_time": "2000-01-01T00:00:07Z"
+            "start_time": "2000-01-01T00:00:08Z"
         }, 
         "model": "archive.execlog", 
         "pk": 5
@@ -1067,7 +1067,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$h3fZGE1MWbko$ZemXJ+GUHHTKWaSMlGu17E/sHJ9hDzWldW4YP8FGq/Y=", 
+            "password": "pbkdf2_sha256$24000$Z3R73JsMHVzS$OOLE3ZP+DsOjS9UF/CpUSJDHyBTrB0foSit45qVE/yY=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -1126,10 +1126,10 @@
             "paused_by": null, 
             "pipeline": 5, 
             "purged": false, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userjohn_run1_iGC9UC", 
-            "start_time": "2000-01-01T00:00:02Z", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userjohn_run1_leZloq", 
+            "start_time": "2000-01-01T00:00:03Z", 
             "stopped_by": null, 
-            "time_queued": "2016-03-24T22:24:31.194Z", 
+            "time_queued": "2016-03-30T21:01:40.598Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1158,7 +1158,7 @@
         "fields": {
             "MD5_checksum": "4ce50c714420255e82dd3965ccec07ec", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_03/input_for_test_C_twostep_with_subpipeline_rl0uNtJ.csv", 
+            "dataset_file": "Datasets/2016_03/input_for_test_C_twostep_with_subpipeline_rWrfkNZ.csv", 
             "date_created": "2000-01-01T00:00:00Z", 
             "description": "input to pipeline pX", 
             "external_path": "", 
@@ -1178,7 +1178,7 @@
             "_redacted": false, 
             "dataset_file": "", 
             "date_created": "2000-01-01T00:00:03Z", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-03-24 22:24:33.301713+00:00 by john\nrun: 1\nuser: john\nstep: 1\ninput: mA_in", 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-03-30 21:01:42.759950+00:00 by john\nrun: 1\nuser: john\nstep: 1\ninput: mA_in", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 3, 
@@ -1196,7 +1196,7 @@
             "_redacted": false, 
             "dataset_file": "Datasets/2016_03/step1_mA_out.csv", 
             "date_created": "2000-01-01T00:00:04Z", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-03-24 22:24:33.301713+00:00 by john\nrun: 1\nuser: john\nstep: 1\noutput: mA_out", 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-03-30 21:01:42.759950+00:00 by john\nrun: 1\nuser: john\nstep: 1\noutput: mA_out", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 1, 
@@ -1214,7 +1214,7 @@
             "_redacted": false, 
             "dataset_file": "Datasets/2016_03/step2_mA_out.csv", 
             "date_created": "2000-01-01T00:00:06Z", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-03-24 22:24:33.301713+00:00 by john\nrun: 1\nuser: john\nstep: 2\noutput: mA_out", 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-03-30 21:01:42.759950+00:00 by john\nrun: 1\nuser: john\nstep: 2\noutput: mA_out", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 2, 
@@ -1232,7 +1232,7 @@
             "_redacted": false, 
             "dataset_file": "Datasets/2016_03/run1_pX_out_2.csv", 
             "date_created": "2000-01-01T00:00:08Z", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-03-24 22:24:33.301713+00:00 by john\nrun: 1\nuser: john\noutput: pX_out_2", 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-03-30 21:01:42.759950+00:00 by john\nrun: 1\nuser: john\noutput: pX_out_2", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 6, 
@@ -1446,7 +1446,7 @@
     {
         "fields": {
             "dataset": 4, 
-            "end_time": "2000-01-01T00:00:04Z", 
+            "end_time": "2000-01-01T00:00:05Z", 
             "execlog": 2, 
             "start_time": "2000-01-01T00:00:04Z", 
             "user": 2
@@ -1457,9 +1457,9 @@
     {
         "fields": {
             "dataset": 5, 
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:07Z", 
             "execlog": 4, 
-            "start_time": "2000-01-01T00:00:06Z", 
+            "start_time": "2000-01-01T00:00:07Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1468,9 +1468,9 @@
     {
         "fields": {
             "dataset": 6, 
-            "end_time": "2000-01-01T00:00:08Z", 
+            "end_time": "2000-01-01T00:00:09Z", 
             "execlog": 6, 
-            "start_time": "2000-01-01T00:00:08Z", 
+            "start_time": "2000-01-01T00:00:09Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1492,11 +1492,11 @@
     {
         "fields": {
             "dataset": 3, 
-            "end_time": "2000-01-01T00:00:05Z", 
+            "end_time": "2000-01-01T00:00:06Z", 
             "execlog": 3, 
             "read_failed": false, 
             "runsic": null, 
-            "start_time": "2000-01-01T00:00:05Z", 
+            "start_time": "2000-01-01T00:00:06Z", 
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
