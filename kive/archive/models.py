@@ -301,7 +301,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             return result
 
         status = ""
-        step_progress = {}
+        step_progress = []
         cable_progress = {}
         input_list = {}
 
@@ -345,9 +345,11 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
             status += log_char
             if detailed:
-                step_progress[step.pipelinestep.transformation.pk] = {'status': step_status, 'log_id': None}
+                step_progress.append({'status': step_status,
+                                      'name': str(step.pipelinestep),
+                                      'log_id': None})
                 try:
-                    step_progress[step.pipelinestep.transformation.pk]['log_id'] = step.execrecord.generator.\
+                    step_progress[-1]['log_id'] = step.execrecord.generator.\
                         methodoutput.id
                 except:
                     pass
