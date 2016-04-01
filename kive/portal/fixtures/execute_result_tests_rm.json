@@ -147,7 +147,7 @@
             "execrecord": 3, 
             "is_cancelled": false, 
             "reused": true, 
-            "start_time": "2000-01-01T00:00:12Z"
+            "start_time": "2000-01-01T00:00:11Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 6
@@ -185,7 +185,7 @@
             "_complete": true, 
             "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:16Z", 
+            "end_time": "2000-01-01T00:00:17Z", 
             "execrecord": 5, 
             "is_cancelled": false, 
             "reused": false, 
@@ -227,7 +227,7 @@
             "_complete": true, 
             "_redacted": null, 
             "_successful": null, 
-            "end_time": "2000-01-01T00:00:19Z", 
+            "end_time": "2000-01-01T00:00:20Z", 
             "execrecord": 1, 
             "is_cancelled": false, 
             "reused": true, 
@@ -241,7 +241,7 @@
             "_complete": true, 
             "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:20Z", 
+            "end_time": "2000-01-01T00:00:21Z", 
             "execrecord": 5, 
             "is_cancelled": false, 
             "reused": false, 
@@ -391,7 +391,7 @@
             "end_time": "2000-01-01T00:00:07Z", 
             "invoking_record": 1, 
             "record": 1, 
-            "start_time": "2000-01-01T00:00:07Z"
+            "start_time": "2000-01-01T00:00:06Z"
         }, 
         "model": "archive.execlog", 
         "pk": 2
@@ -451,7 +451,7 @@
             "end_time": "2000-01-01T00:00:21Z", 
             "invoking_record": 11, 
             "record": 11, 
-            "start_time": "2000-01-01T00:00:20Z"
+            "start_time": "2000-01-01T00:00:21Z"
         }, 
         "model": "archive.execlog", 
         "pk": 8
@@ -484,10 +484,10 @@
         "fields": {
             "are_checksums_OK": true, 
             "code_redacted": false, 
-            "error_log": "Logs/step1_stderr_JjY2Txv.txt", 
+            "error_log": "Logs/step1_stderr_MmaUfCM.txt", 
             "error_redacted": false, 
             "execlog": 5, 
-            "output_log": "Logs/step1_stdout_h3ieDje.txt", 
+            "output_log": "Logs/step1_stdout_7skQElT.txt", 
             "output_redacted": false, 
             "return_code": 0
         }, 
@@ -1783,7 +1783,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$YNPC59xMEBr7$UONwHCE6pJN3D5lmFU1p0QFaGJ822SgTZXpVBK74S6A=", 
+            "password": "pbkdf2_sha256$24000$WPkbpRAAq42e$g3yv/PhuW/BAQV82zN9RRc2m9Qc0Kgg+2ObIdFXr0FU=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -1803,7 +1803,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$TjRltOz8pcUK$JGG5+GNV+b7kQ4MxCNA0mu6QTTiGJZKMXvccCAZ/o/Y=", 
+            "password": "pbkdf2_sha256$24000$m4hziqjphUXP$wn7tFXZukIiqZbC3F837+50jYc1y0lOLw8mQz22MjhU=", 
             "user_permissions": [], 
             "username": "alice"
         }, 
@@ -1882,10 +1882,10 @@
             "paused_by": null, 
             "pipeline": 4, 
             "purged": false, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/useralice_run1_YtVt2L", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/useralice_run1_BwULeI", 
             "start_time": "2000-01-01T00:00:06Z", 
             "stopped_by": null, 
-            "time_queued": "2016-03-31T18:40:49.278Z", 
+            "time_queued": "2016-04-01T17:37:51.174Z", 
             "user": 3, 
             "users_allowed": []
         }, 
@@ -1904,10 +1904,10 @@
             "paused_by": null, 
             "pipeline": 4, 
             "purged": false, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/useralice_run2_lCEb7c", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/useralice_run2_E7rzzV", 
             "start_time": "2000-01-01T00:00:11Z", 
             "stopped_by": null, 
-            "time_queued": "2016-03-31T18:40:54.295Z", 
+            "time_queued": "2016-04-01T17:37:56.087Z", 
             "user": 3, 
             "users_allowed": []
         }, 
@@ -1919,17 +1919,17 @@
             "_complete": true, 
             "_successful": true, 
             "description": "", 
-            "end_time": "2000-01-01T00:00:16Z", 
+            "end_time": "2000-01-01T00:00:17Z", 
             "groups_allowed": [], 
             "name": "", 
             "parent_runstep": null, 
             "paused_by": null, 
             "pipeline": 5, 
             "purged": false, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/useralice_run3__Y4KCe", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/useralice_run3_VpqQez", 
             "start_time": "2000-01-01T00:00:14Z", 
             "stopped_by": null, 
-            "time_queued": "2016-03-31T18:40:57.649Z", 
+            "time_queued": "2016-04-01T17:37:59.501Z", 
             "user": 3, 
             "users_allowed": []
         }, 
@@ -1941,17 +1941,17 @@
             "_complete": true, 
             "_successful": true, 
             "description": "", 
-            "end_time": "2000-01-01T00:00:22Z", 
+            "end_time": "2000-01-01T00:00:23Z", 
             "groups_allowed": [], 
             "name": "", 
             "parent_runstep": null, 
             "paused_by": null, 
             "pipeline": 6, 
             "purged": false, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/useralice_run4_V8zCOe", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/useralice_run4_QvmEQA", 
             "start_time": "2000-01-01T00:00:19Z", 
             "stopped_by": null, 
-            "time_queued": "2016-03-31T18:41:02.460Z", 
+            "time_queued": "2016-04-01T17:38:04.633Z", 
             "user": 3, 
             "users_allowed": []
         }, 
@@ -1962,7 +1962,7 @@
         "fields": {
             "MD5_checksum": "0082bc75b97d81a1b92adaa894fef1bd", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_03/tmpzWBuvD", 
+            "dataset_file": "Datasets/2016_04/tmpmuakco", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "data from the lab", 
             "external_path": "", 
@@ -1980,9 +1980,9 @@
         "fields": {
             "MD5_checksum": "c0d4cb49470a30a88ea5d4cf0c3324c9", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_03/step1_complemented_DNA.csv", 
+            "dataset_file": "Datasets/2016_04/step1_complemented_DNA.csv", 
             "date_created": "2000-01-01T00:00:07Z", 
-            "description": "Generated data from a run of pipeline \"DNA complement:1 (v1)\" started at 2016-03-31 18:40:51.429576+00:00 by alice\nrun: 1\nuser: alice\nstep: 1\noutput: complemented_DNA", 
+            "description": "Generated data from a run of pipeline \"DNA complement:1 (v1)\" started at 2016-04-01 17:37:53.339085+00:00 by alice\nrun: 1\nuser: alice\nstep: 1\noutput: complemented_DNA", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 1, 
@@ -1998,9 +1998,9 @@
         "fields": {
             "MD5_checksum": "c0d4cb49470a30a88ea5d4cf0c3324c9", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_03/step1_reversed_DNA.csv", 
+            "dataset_file": "Datasets/2016_04/step1_reversed_DNA.csv", 
             "date_created": "2000-01-01T00:00:15Z", 
-            "description": "Generated data from a run of pipeline \"DNA reverse:1 (v1)\" started at 2016-03-31 18:40:59.747496+00:00 by alice\nrun: 3\nuser: alice\nstep: 1\noutput: reversed_DNA", 
+            "description": "Generated data from a run of pipeline \"DNA reverse:1 (v1)\" started at 2016-04-01 17:38:01.657645+00:00 by alice\nrun: 3\nuser: alice\nstep: 1\noutput: reversed_DNA", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 7, 
@@ -2016,9 +2016,9 @@
         "fields": {
             "MD5_checksum": "0082bc75b97d81a1b92adaa894fef1bd", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_03/step2_complemented_DNA.csv", 
+            "dataset_file": "Datasets/2016_04/step2_complemented_DNA.csv", 
             "date_created": "2000-01-01T00:00:21Z", 
-            "description": "Generated data from a run of pipeline \"DNA revcomp:1 (v1)\" started at 2016-03-31 18:41:04.581820+00:00 by alice\nrun: 4\nuser: alice\nstep: 2\noutput: complemented_DNA", 
+            "description": "Generated data from a run of pipeline \"DNA revcomp:1 (v1)\" started at 2016-04-01 17:38:06.743940+00:00 by alice\nrun: 4\nuser: alice\nstep: 2\noutput: complemented_DNA", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 11, 
@@ -2109,7 +2109,7 @@
         "fields": {
             "MD5_checksum": "5699120b018a7932c07be0412483c622", 
             "coderesource": 2, 
-            "content_file": "CodeResources/fdopen_yzJi3zD", 
+            "content_file": "CodeResources/fdopen_znVudeW", 
             "groups_allowed": [
                 1
             ], 
@@ -2128,11 +2128,11 @@
         "fields": {
             "MD5_checksum": "196144423c5bb98d59d78c729ce842f4", 
             "coderesource": 3, 
-            "content_file": "CodeResources/fdopen_uLQMiIl", 
+            "content_file": "CodeResources/fdopen_2vuI6ZN", 
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:00Z", 
+            "revision_DateTime": "2000-01-01T00:00:01Z", 
             "revision_desc": "first version", 
             "revision_name": "1", 
             "revision_number": 1, 
@@ -2147,7 +2147,7 @@
         "fields": {
             "MD5_checksum": "30e9a1ac1dad0c134d41bf826a53ba68", 
             "coderesource": 4, 
-            "content_file": "CodeResources/fdopen_LmAo5vB", 
+            "content_file": "CodeResources/fdopen_AzZr93P", 
             "groups_allowed": [
                 1
             ], 
@@ -2687,7 +2687,7 @@
     {
         "fields": {
             "dataset": 3, 
-            "end_time": "2000-01-01T00:00:15Z", 
+            "end_time": "2000-01-01T00:00:16Z", 
             "execlog": 5, 
             "start_time": "2000-01-01T00:00:15Z", 
             "user": 3
