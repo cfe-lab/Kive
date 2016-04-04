@@ -3,6 +3,8 @@ $(function() {
 
     if ($("#id_single-externalfiledirectory").val() === "") {
         $("#id_single-external_path").prop("disabled", true);
+        $("#id_single-save_in_db").prop("disabled", true);
+        $("#id_single-save_in_db").prop("checked", true);
     }
 
     function setName(path) {
@@ -27,11 +29,15 @@ $(function() {
             $("#id_single-external_path").val("");
             $("#id_single-external_path").prop("disabled", true);
             $("#id_single-dataset_file").prop("disabled", false);
+            $("#id_single-save_in_db").prop("disabled", true);
+            $("#id_single-save_in_db").prop("checked", true);
         }
         else {
             $("#id_single-external_path").prop("disabled", false);
             $("#id_single-dataset_file").val("");
             $("#id_single-dataset_file").prop("disabled", true);
+            $("#id_single-save_in_db").prop("disabled", false);
+            $("#id_single-save_in_db").prop("checked", false);
         }
     });
 

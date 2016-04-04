@@ -2034,7 +2034,7 @@ baz
         """
         Test validating a new Dataset with external backing.
         """
-        self.data_to_serialize["externalfiledirectory"] = self.efd.pk
+        self.data_to_serialize["externalfiledirectory"] = self.efd.name
         self.data_to_serialize["external_path"] = self.ext_fn
         ds = DatasetSerializer(
             data=self.data_to_serialize,
@@ -2059,7 +2059,7 @@ baz
         """
         If externalfiledirectory is present, external_path should be also.
         """
-        self.data_to_serialize["externalfiledirectory"] = self.efd.pk
+        self.data_to_serialize["externalfiledirectory"] = self.efd.name
         ds = DatasetSerializer(
             data=self.data_to_serialize,
             context=self.duck_context
@@ -2072,7 +2072,7 @@ baz
         """
         If dataset_file is specified, external_path and externalfiledirectory should not be.
         """
-        self.data_to_serialize["externalfiledirectory"] = self.efd.pk
+        self.data_to_serialize["externalfiledirectory"] = self.efd.name
         self.data_to_serialize["external_path"] = self.ext_fn
 
         with tempfile.TemporaryFile() as f:
@@ -2116,6 +2116,32 @@ baz
             self.assertEquals(dataset.description, self.data_to_serialize["description"])
             self.assertIsNone(dataset.compounddatatype)
             self.assertEquals(dataset.user, self.kive_user)
+            self.assertTrue(bool(dataset.dataset_file))
+
+    def test_create_do_not_retain(self):
+        """
+        Test creating a Dataset but without retaining a file in the DB.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["save_in_db"] = False
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            ds.is_valid()
+            dataset = ds.save()
+
+            # Probe the Dataset to make sure everything looks fine.
+            self.assertEquals(dataset.name, self.data_to_serialize["name"])
+            self.assertEquals(dataset.description, self.data_to_serialize["description"])
+            self.assertIsNone(dataset.compounddatatype)
+            self.assertEquals(dataset.user, self.kive_user)
+            self.assertFalse(bool(dataset.dataset_file))
 
     def test_create_with_CDT(self):
         """
@@ -2184,7 +2210,7 @@ baz
         """
         Test creating a Dataset from external data.
         """
-        self.data_to_serialize["externalfiledirectory"] = self.efd.pk
+        self.data_to_serialize["externalfiledirectory"] = self.efd.name
         self.data_to_serialize["external_path"] = os.path.basename(self.ext_fn)
 
         ds = DatasetSerializer(
@@ -2208,7 +2234,7 @@ baz
         Test creating a Dataset from external data and keeping an internal copy.
         """
 
-        self.data_to_serialize["externalfiledirectory"] = self.efd.pk
+        self.data_to_serialize["externalfiledirectory"] = self.efd.name
         self.data_to_serialize["external_path"] = os.path.basename(self.ext_fn)
         self.data_to_serialize["save_in_db"] = True
 
@@ -2289,18 +2315,10 @@ class ExternalFileTests(TestCase):
     def tearDown(self):
         shutil.rmtree(self.working_dir)
 
-    def test_display_name(self):
-        self.assertEquals(self.efd.display_name(), "WorkingDirectory")
-
-        new_working_dir = tempfile.mkdtemp()
-        unnamed_efd = ExternalFileDirectory(path=new_working_dir)
-        self.assertEquals(unnamed_efd.path, new_working_dir)
-        shutil.rmtree(new_working_dir)
-
     def test_save(self):
         """Calling save() normalizes the path."""
         new_working_dir = tempfile.mkdtemp()
-        unnamed_efd = ExternalFileDirectory(path="{}/./".format(new_working_dir))
+        unnamed_efd = ExternalFileDirectory(name="TestSaveDir", path="{}/./".format(new_working_dir))
         unnamed_efd.save()
         self.assertEquals(unnamed_efd.path, os.path.normpath(new_working_dir))
         shutil.rmtree(new_working_dir)

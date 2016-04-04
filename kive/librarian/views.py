@@ -206,7 +206,6 @@ def datasets_add(request):
     c = {}
     if request.method == 'POST':
         # The new Dataset; we need it here for validation purposes.
-
         ds = Dataset(user=request.user)
         df = DatasetForm(request.POST, request.FILES, instance=ds, user=request.user,
                          prefix="single")
@@ -223,18 +222,20 @@ def datasets_add(request):
                 if df.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
                     cdt = CompoundDatatype.objects.get(pk=df.cleaned_data['compound_datatype'])
 
-                file_path = df.cleaned_data.get("external_path", None)
+                keep_file = True
+                file_path = df.cleaned_data.get("external_path", "")
                 efd = df.cleaned_data.get("externalfiledirectory", None)
                 # Both or neither are specified (this is enforced in form validation).
-                if file_path is not None:
+                if file_path:
                     file_path = os.path.join(efd.path, file_path)
+                    keep_file = df.cleaned_data["save_in_db"]
 
                 with transaction.atomic():
                     ds = Dataset.create_dataset(
                         file_path=file_path,
                         user=request.user,
                         cdt=cdt,
-                        keep_file=df.cleaned_data["save_in_db"],
+                        keep_file=keep_file,
                         name=df.cleaned_data['name'],
                         description=df.cleaned_data['description'],
                         file_source=None,

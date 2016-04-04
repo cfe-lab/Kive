@@ -63,18 +63,18 @@ class ExternalFileDirectory(models.Model):
     """
     A database table storing directories whose contents we can make Datasets out of.
     """
-    name = models.CharField(help_text="Human-readable name for this external file directory",
-                            blank=True, max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH)
+    name = models.CharField(
+        help_text="Human-readable name for this external file directory",
+        unique=True,
+        max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH
+    )
     path = models.CharField(
         help_text="Absolute path",
         max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH
     )
 
-    def display_name(self):
-        return self.name if self.name else self.path
-
     def __str__(self):
-        return self.display_name()
+        return self.name
 
     def list_files(self):
         """
@@ -88,7 +88,7 @@ class ExternalFileDirectory(models.Model):
         for root, dirs, files in sorted(os.walk(self.path)):
             for f in files:
                 f = os.path.join(root, f)
-                all_files.append((f, f.replace(path_with_slash, "[{}]/".format(self.display_name()), 1)))
+                all_files.append((f, f.replace(path_with_slash, "[{}]/".format(self.name), 1)))
         return all_files
 
     def save(self, *args, **kwargs):

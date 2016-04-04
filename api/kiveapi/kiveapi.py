@@ -254,7 +254,8 @@ class KiveAPI(Session):
         data = self.get('@api_get_cdt', context={'cdt-id': cdt_id}).json()
         return CompoundDatatype(data)
 
-    def add_dataset(self, name, description, handle, cdt=None, users=None, groups=None):
+    def add_dataset(self, name, description, handle, cdt=None, users=None, groups=None,
+                    externalfiledirectory=None, external_path=None):
         """
         Adds a dataset to kive under the user associated
         with the token.
@@ -264,15 +265,32 @@ class KiveAPI(Session):
         users_allowed = users or []
         groups_allowed = groups or []
 
-        dataset = self.post('@api_dataset_add', {
+        metadata_dict = {
             'name': name,
             'description': description,
             'users_allowed': users_allowed,
             'groups_allowed': groups_allowed,
             'compounddatatype': cdt and cdt.cdt_id
-        }, files={
-            'dataset_file': handle,
-        }).json()
+        }
+
+        if not external_path:
+            dataset = self.post(
+                '@api_dataset_add',
+                metadata_dict,
+                files={'dataset_file': handle}
+            ).json()
+        else:
+            metadata_dict.update(
+                {
+                    'externalfiledirectory': externalfiledirectory,
+                    'external_path': external_path
+                }
+            )
+            dataset = self.post(
+                '@api_dataset_add',
+                metadata_dict
+            ).json()
+
         return Dataset(dataset, self)
 
     def run_pipeline(self,

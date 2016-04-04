@@ -16,8 +16,7 @@ class ExternalFileDirectorySerializer(serializers.ModelSerializer):
             'pk',
             'url',
             'name',
-            'path',
-            'display_name'
+            'path'
         )
 
 
@@ -35,8 +34,7 @@ class ExternalFileDirectoryListFilesSerializer(ExternalFileDirectorySerializer):
             'pk',
             'url',
             'name',
-            'path',
-            'display_name',
+            'path'
             'list_files'
         )
 
@@ -57,7 +55,13 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
     removal_plan = serializers.HyperlinkedIdentityField(view_name='dataset-removal-plan')
     redaction_plan = serializers.HyperlinkedIdentityField(view_name='dataset-redaction-plan')
 
-    save_in_db = serializers.BooleanField(default=False, write_only=True)
+    save_in_db = serializers.NullBooleanField(write_only=True, required=False)
+    externalfiledirectory = serializers.SlugRelatedField(
+        slug_field="name",
+        queryset=ExternalFileDirectory.objects.all(),
+        allow_null=True,
+        required=False
+    )
 
     class Meta():
         model = Dataset
@@ -135,11 +139,17 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
         if "structure" in validated_data:
             cdt = validated_data["structure"].get("compounddatatype", None)
 
-        file_path = validated_data.get("external_path", None)
+        # The default behaviour for keep_file depends on the mode of creation.
+        keep_file = True
+        file_path = validated_data.get("external_path", "")
         efd = validated_data.get("externalfiledirectory", None)
         # Both or neither are specified (this is enforced in serializer validation).
-        if file_path is not None:
+        if file_path:
             file_path = os.path.join(efd.path, file_path)
+            keep_file = False  # don't retain a copy by default
+
+        # Override the default if specified.
+        keep_file = validated_data.get("save_in_db", keep_file)
 
         dataset = Dataset.create_dataset(
             file_path=file_path,
@@ -147,7 +157,7 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             users_allowed=validated_data["users_allowed"],
             groups_allowed=validated_data["groups_allowed"],
             cdt=cdt,
-            keep_file=validated_data["save_in_db"],
+            keep_file=keep_file,
             name=validated_data["name"],
             description=validated_data["description"],
             file_source=None,
