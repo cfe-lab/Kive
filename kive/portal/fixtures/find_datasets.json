@@ -899,7 +899,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$yINrQbMr8nBo$93E7zrDH+wysIYY79ZabyPEWSZVCdzZYbGjoU5gsIyw=", 
+            "password": "pbkdf2_sha256$24000$O2vRkS52xkhO$AJG998ze5XL92gV4fT7qZ/xw4G1eKm6eo7EEILAXXMg=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -964,7 +964,7 @@
         "fields": {
             "MD5_checksum": "092ef90fe0201f4b002cd200f7754d45", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_04/tmp9OP1vY", 
+            "dataset_file": "Datasets/2016_04/tmpvr37gO", 
             "date_created": "2000-01-01T00:00:01Z", 
             "description": "blahblahblah", 
             "external_path": "", 
@@ -984,7 +984,7 @@
         "fields": {
             "MD5_checksum": "1772221e5facf83f44d7077ed6dd416f", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_04/tmpKfVLq1", 
+            "dataset_file": "Datasets/2016_04/tmpov4jAp", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "random reversed words", 
             "external_path": "", 
@@ -1004,7 +1004,7 @@
         "fields": {
             "MD5_checksum": "33e4aca01ee5dd9a4a456d0a107be50c", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_04/tmp5GpJVt", 
+            "dataset_file": "Datasets/2016_04/tmpyCU3XN", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "random reversed words", 
             "external_path": "", 
@@ -1071,7 +1071,7 @@
         "fields": {
             "MD5_checksum": "55d9a706ac81b733f851a279d27d8cf2", 
             "coderesource": 2, 
-            "content_file": "CodeResources/fdopen_k98IVxk", 
+            "content_file": "CodeResources/fdopen_CiKEXMF", 
             "groups_allowed": [
                 1
             ], 
@@ -1452,7 +1452,7 @@
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:01Z", 
+            "revision_DateTime": "2000-01-01T00:00:00Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
             "user": 2, 

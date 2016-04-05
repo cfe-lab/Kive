@@ -1419,7 +1419,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$6IrDGfltPXfS$jFaQr/zT2pMY9h0wBkrfG6FzcKaNnDBwMYoToK3GV/o=", 
+            "password": "pbkdf2_sha256$24000$YuQsA8cqDw9U$sJrXtsBcqu1DHkH8NqcpuMhPlXdAtjQpKXYaetBDyBU=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -1437,7 +1437,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$meuUoQSdVHLG$GKtjWoCZp2PKxwzbn1wCWQUZaWSkw7+oTRlPB8AeJ3Q=", 
+            "password": "pbkdf2_sha256$24000$CrUNVAb23QBA$njIuleNMHejGFzlV086BS0TOldMek+LjWHHRlhzr5X8=", 
             "user_permissions": [], 
             "username": "ringo"
         }, 
@@ -1457,7 +1457,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$0XdHbTnLtIBb$8Uloi9Y99+g2xMcXd6Nf7EEnaJEs+1cYzNNhgmqVsFY=", 
+            "password": "pbkdf2_sha256$24000$utRx6ccOzlBC$rU1+OUj/5ZdOvpYr8xmNWAsX6pxYMfHnITsRsYTk3YQ=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -1715,7 +1715,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2016-04-01T17:33:19.502Z", 
+            "time_queued": "2016-04-05T17:45:57.402Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1827,7 +1827,7 @@
             "MD5_checksum": "542676b23e121d16db8d41ccdae65fd1", 
             "_redacted": false, 
             "dataset_file": "", 
-            "date_created": "2000-01-01T00:00:01Z", 
+            "date_created": "2000-01-01T00:00:02Z", 
             "description": "", 
             "external_path": "", 
             "externalfiledirectory": null, 
@@ -1906,7 +1906,7 @@
         "fields": {
             "MD5_checksum": "00fd50bfe7ac63e2165a442f4101e05c", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_04/step_0_singlet_92R9tdh.csv", 
+            "dataset_file": "Datasets/2016_04/step_0_singlet_RFhPNrE.csv", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "external_path": "", 
@@ -1926,7 +1926,7 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_04/step_0_raw_NCe2G47.fasta", 
+            "dataset_file": "Datasets/2016_04/step_0_raw_ZUE8fDJ.fasta", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "external_path": "", 
@@ -1946,7 +1946,7 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_04/step_0_raw_kVAQs70.fasta", 
+            "dataset_file": "Datasets/2016_04/step_0_raw_c3zWrYr.fasta", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "external_path": "", 
@@ -2426,7 +2426,7 @@
             "groups_allowed": [
                 1
             ], 
-            "revision_DateTime": "2000-01-01T00:00:03Z", 
+            "revision_DateTime": "2000-01-01T00:00:04Z", 
             "revision_desc": "first version", 
             "revision_name": "v1", 
             "user": 4, 
@@ -2482,9 +2482,9 @@
     {
         "fields": {
             "dataset": 6, 
-            "end_time": "2000-01-01T00:00:01Z", 
+            "end_time": "2000-01-01T00:00:02Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:01Z", 
+            "start_time": "2000-01-01T00:00:02Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
