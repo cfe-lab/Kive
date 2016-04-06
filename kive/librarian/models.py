@@ -7,7 +7,6 @@ Dataset, etc.
 from __future__ import unicode_literals
 
 from django.db import models, transaction
-from django.db.models import Q
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import MinValueValidator, RegexValidator
 from django.core.files import File
@@ -1079,6 +1078,20 @@ class Dataset(metadata.models.AccessControl):
             cls.logger.info('Dataset purge triggered at %s over %d files.',
                             filesizeformat(total_size),
                             len(files))
+            active_runs = archive.models.Run.objects.filter(end_time=None)
+
+            def active_datasets(active_runs):
+                for run in active_runs:
+                    for component in run.get_all_atomic_runcomponents():
+                        execrecord = component.execrecord
+                        if execrecord is not None:
+                            for eri in execrecord.execrecordins.all():
+                                yield eri.dataset
+                            for ero in execrecord.execrecordouts.all():
+                                yield ero.dataset
+            active_dataset_ids = set(d.id for d in active_datasets(active_runs))
+            cls.logger.debug('Found %d active datasets.',
+                             len(active_dataset_ids))
             while total_size > target and files:
                 filedate, relpath, filesize = heapq.heappop(files)
                 dataset = Dataset.objects.filter(dataset_file=relpath).first()
@@ -1098,13 +1111,7 @@ class Dataset(metadata.models.AccessControl):
                         is_skipped = True  # it was uploaded, not created
                     else:
                         # Check to see if it's being used by an active run.
-                        producers = ExecRecord.objects.filter(execrecordouts__dataset=dataset)
-                        consumers = ExecRecord.objects.filter(execrecordouts__dataset=dataset)
-                        related_components = archive.models.RunComponent.objects.filter(
-                            Q(execrecord__in=producers) | Q(execrecord__in=consumers))
-                        related_runs = {component.top_level_run
-                                        for component in related_components}
-                        is_skipped = any((not run.has_ended() for run in related_runs))
+                        is_skipped = dataset.id in active_dataset_ids
 
                     if is_skipped:
                         skipped_count += 1

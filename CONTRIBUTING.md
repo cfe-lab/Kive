@@ -29,7 +29,7 @@ Another option is to install the gprof2dot package with pip. Then you can
 generate a call graph with timing information:
 
     python -m cProfile -o timing.dat manage.py test --settings=kive.test_settings \
-    && python -m pstats timing.dat <timing_commands.txt >timing.txt \
+    && (echo strip ; echo "sort cumtime" ; echo "stats 500") | python -m pstats timing.dat >timing.txt \
     && gprof2dot -f pstats timing.dat -o timing.dot
 
 ## Deploying a Release ##
