@@ -55,7 +55,7 @@
             "_complete": true, 
             "_redacted": null, 
             "_successful": true, 
-            "end_time": "2000-01-01T00:00:05Z", 
+            "end_time": "2000-01-01T00:00:04Z", 
             "execrecord": 3, 
             "is_cancelled": false, 
             "reused": false, 
@@ -725,10 +725,10 @@
             "paused_by": null, 
             "pipeline": 4, 
             "purged": true, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userkive_run1_3u5jBl", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userkive_run1_Oid7WR", 
             "start_time": "2000-01-01T00:00:03Z", 
             "stopped_by": null, 
-            "time_queued": "2016-04-05T17:51:43.392Z", 
+            "time_queued": "2016-04-06T17:38:03.065Z", 
             "user": 1, 
             "users_allowed": []
         }, 
@@ -757,11 +757,11 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "48e87f023b60ac5c9bb7873a318bfa99", 
+            "MD5_checksum": "465375f09833a8e7340c6c7774560c7f", 
             "_redacted": false, 
             "dataset_file": "", 
             "date_created": "2000-01-01T00:00:03Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-04-05 17:51:45.511232+00:00 by kive\nrun: 1\nuser: kive\nstep: 1\noutput: sums_and_products", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-04-06 17:38:05.184657+00:00 by kive\nrun: 1\nuser: kive\nstep: 1\noutput: sums_and_products", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 1, 
@@ -775,11 +775,11 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "e237ca8bb33ea0dd3f8d6bb8d1ede977", 
+            "MD5_checksum": "ba9d3a9e10d9f54046b7f0199a284b86", 
             "_redacted": false, 
             "dataset_file": "Datasets/2016_04/step2_total_sums.raw", 
             "date_created": "2000-01-01T00:00:05Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-04-05 17:51:45.511232+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-04-06 17:38:05.184657+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 2, 
@@ -1112,18 +1112,5 @@
         }, 
         "model": "datachecking.contentchecklog", 
         "pk": 2
-    }, 
-    {
-        "fields": {
-            "dataset": 1, 
-            "end_time": "2000-01-01T00:00:03Z", 
-            "execlog": null, 
-            "read_failed": false, 
-            "runsic": 3, 
-            "start_time": "2000-01-01T00:00:03Z", 
-            "user": 1
-        }, 
-        "model": "datachecking.integritychecklog", 
-        "pk": 1
     }
 ]

@@ -1416,39 +1416,40 @@ class Sandbox:
             elif input_dataset.external_path:
                 file_path = input_dataset.external_absolute_path()
 
-            copy_start = timezone.now()
-            fail_now = False
+            # FIXME removing chunks here for v0.7.3 due to issue #550.
+            # copy_start = timezone.now()
+            # fail_now = False
             try:
                 shutil.copyfile(file_path, input_dataset_path)
             except IOError:
-                copy_end = timezone.now()
+                # copy_end = timezone.now()
                 logger.error("[%d] could not copy file %s to file %s.",
                              worker_rank, file_path, input_dataset_path)
 
-                with transaction.atomic():
-                    # Create a failed IntegrityCheckLog.
-                    iic = IntegrityCheckLog(
-                        dataset=input_dataset,
-                        runsic=curr_record,
-                        read_failed=True,
-                        start_time=copy_start,
-                        end_time=copy_end,
-                        user=user
-                    )
-                    iic.clean()
-                    iic.save()
-                    fail_now = True
-
-            if not fail_now:
-                # Perform an integrity check since we've just copied this file to the sandbox for the
-                # first time.
-                logger.error("[%d] Checking file just copied to sandbox for integrity.",
-                             worker_rank)
-                check = input_dataset.check_integrity(input_dataset_path, user, execlog=None, runsic=curr_record)
-
-                fail_now = check.is_fail()
-
-            if fail_now:
+            #     with transaction.atomic():
+            #         # Create a failed IntegrityCheckLog.
+            #         iic = IntegrityCheckLog(
+            #             dataset=input_dataset,
+            #             runsic=curr_record,
+            #             read_failed=True,
+            #             start_time=copy_start,
+            #             end_time=copy_end,
+            #             user=user
+            #         )
+            #         iic.clean()
+            #         iic.save()
+            #         fail_now = True
+            #
+            # if not fail_now:
+            #     # Perform an integrity check since we've just copied this file to the sandbox for the
+            #     # first time.
+            #     logger.error("[%d] Checking file just copied to sandbox for integrity.",
+            #                  worker_rank)
+            #     check = input_dataset.check_integrity(input_dataset_path, user, execlog=None, runsic=curr_record)
+            #
+            #     fail_now = check.is_fail()
+            #
+            # if fail_now:
                 curr_record.mark_unsuccessful()
                 if recover:
                     recovering_record.mark_unsuccessful()

@@ -1067,7 +1067,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$17JMv4fazvzB$eXSXKxrj20640QP380aeprNtyPMdQYewOGC43g5FUP0=", 
+            "password": "pbkdf2_sha256$24000$FCDvDEm36V84$BqQz5xE75g7lThavLbtC5UiUNhkuFey+Q2bbMlzljmE=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -1126,10 +1126,10 @@
             "paused_by": null, 
             "pipeline": 5, 
             "purged": false, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userjohn_run1_3QQ4JP", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userjohn_run1_INgr_W", 
             "start_time": "2000-01-01T00:00:03Z", 
             "stopped_by": null, 
-            "time_queued": "2016-04-05T17:48:57.221Z", 
+            "time_queued": "2016-04-06T17:35:15.897Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1158,7 +1158,7 @@
         "fields": {
             "MD5_checksum": "4ce50c714420255e82dd3965ccec07ec", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_04/input_for_test_C_twostep_with_subpipeline_7da3bVM.csv", 
+            "dataset_file": "Datasets/2016_04/input_for_test_C_twostep_with_subpipeline_EjNOBbY.csv", 
             "date_created": "2000-01-01T00:00:00Z", 
             "description": "input to pipeline pX", 
             "external_path": "", 
@@ -1178,7 +1178,7 @@
             "_redacted": false, 
             "dataset_file": "", 
             "date_created": "2000-01-01T00:00:03Z", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-04-05 17:48:59.339000+00:00 by john\nrun: 1\nuser: john\nstep: 1\ninput: mA_in", 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-04-06 17:35:18.025304+00:00 by john\nrun: 1\nuser: john\nstep: 1\ninput: mA_in", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 3, 
@@ -1196,7 +1196,7 @@
             "_redacted": false, 
             "dataset_file": "Datasets/2016_04/step1_mA_out.csv", 
             "date_created": "2000-01-01T00:00:04Z", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-04-05 17:48:59.339000+00:00 by john\nrun: 1\nuser: john\nstep: 1\noutput: mA_out", 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-04-06 17:35:18.025304+00:00 by john\nrun: 1\nuser: john\nstep: 1\noutput: mA_out", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 1, 
@@ -1214,7 +1214,7 @@
             "_redacted": false, 
             "dataset_file": "Datasets/2016_04/step2_mA_out.csv", 
             "date_created": "2000-01-01T00:00:06Z", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-04-05 17:48:59.339000+00:00 by john\nrun: 1\nuser: john\nstep: 2\noutput: mA_out", 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-04-06 17:35:18.025304+00:00 by john\nrun: 1\nuser: john\nstep: 2\noutput: mA_out", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 2, 
@@ -1232,7 +1232,7 @@
             "_redacted": false, 
             "dataset_file": "Datasets/2016_04/run1_pX_out_2.csv", 
             "date_created": "2000-01-01T00:00:08Z", 
-            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-04-05 17:48:59.339000+00:00 by john\nrun: 1\nuser: john\noutput: pX_out_2", 
+            "description": "Generated data from a run of pipeline \"self.pf:3 (pX_revision_2)\" started at 2016-04-06 17:35:18.025304+00:00 by john\nrun: 1\nuser: john\noutput: pX_out_2", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 6, 
@@ -1446,7 +1446,7 @@
     {
         "fields": {
             "dataset": 4, 
-            "end_time": "2000-01-01T00:00:05Z", 
+            "end_time": "2000-01-01T00:00:04Z", 
             "execlog": 2, 
             "start_time": "2000-01-01T00:00:04Z", 
             "user": 2
@@ -1478,19 +1478,6 @@
     }, 
     {
         "fields": {
-            "dataset": 1, 
-            "end_time": "2000-01-01T00:00:03Z", 
-            "execlog": null, 
-            "read_failed": false, 
-            "runsic": 3, 
-            "start_time": "2000-01-01T00:00:03Z", 
-            "user": 2
-        }, 
-        "model": "datachecking.integritychecklog", 
-        "pk": 1
-    }, 
-    {
-        "fields": {
             "dataset": 3, 
             "end_time": "2000-01-01T00:00:06Z", 
             "execlog": 3, 
@@ -1500,6 +1487,6 @@
             "user": 2
         }, 
         "model": "datachecking.integritychecklog", 
-        "pk": 2
+        "pk": 1
     }
 ]
