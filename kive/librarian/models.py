@@ -137,6 +137,7 @@ class Dataset(metadata.models.AccessControl):
                                     help_text="Physical path where datasets are stored",
                                     blank=True,
                                     default='',
+                                    db_index=True,
                                     max_length=maxlengths.MAX_FILENAME_LENGTH)
 
     externalfiledirectory = models.ForeignKey(
@@ -1062,7 +1063,7 @@ class Dataset(metadata.models.AccessControl):
               max_storage=settings.DATASET_MAX_STORAGE,
               target=settings.DATASET_TARGET_STORAGE):
 
-        files = []  # [(date, path)]
+        files = []  # [(date, path, filesize)]
         start_path = os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR)
         total_size = 0
         skipped_count = 0
@@ -1097,17 +1098,14 @@ class Dataset(metadata.models.AccessControl):
                         is_skipped = True  # it was uploaded, not created
                     else:
                         # Check to see if it's being used by an active run.
-                        producers = dataset.execrecordouts.all()
-                        consumers = dataset.execrecordins.all()
-                        related_execrecords = ExecRecord.objects.filter(
-                            Q(execrecordouts__in=producers) |
-                            Q(execrecordins__in=consumers))
+                        producers = ExecRecord.objects.filter(execrecordouts__dataset=dataset)
+                        consumers = ExecRecord.objects.filter(execrecordouts__dataset=dataset)
                         related_components = archive.models.RunComponent.objects.filter(
-                            execrecord__in=related_execrecords)
+                            Q(execrecord__in=producers) | Q(execrecord__in=consumers))
                         related_runs = {component.top_level_run
                                         for component in related_components}
-                        is_skipped = any((not run.has_ended()
-                                          for run in related_runs))
+                        is_skipped = any((not run.has_ended() for run in related_runs))
+
                     if is_skipped:
                         skipped_count += 1
                     else:
