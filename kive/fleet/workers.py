@@ -568,7 +568,7 @@ class Manager(object):
         while len(self.task_queue) > 0 and time.time() < time_to_poll:
             # task_queue entries are (sandbox, run_step)
             self.task_queue.sort(key=lambda entry: entry[0].run.start_time)
-            curr_task = self.task_queue[0]  # looks like (sandbox, task)
+            curr_task = self.task_queue.pop(0)  # looks like (sandbox, task)
             task_sdbx = self.active_sandboxes[curr_task[1].top_level_run]
             # We assign this task to a worker, and do not proceed until the task
             # is assigned.
@@ -577,7 +577,7 @@ class Manager(object):
             except WorkerFailedException as e:
                 mgr_logger.error(e.error_msg)
                 return False
-            self.task_queue = self.task_queue[1:]
+
         return True
 
     def wait_for_polling(self, time_to_poll):
