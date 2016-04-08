@@ -3571,6 +3571,7 @@ class RunStepReuseFailedExecRecordTests(TestCase):
 
         failing_pipeline = tools.make_first_pipeline("failing pipeline", "a pipeline which always fails",
                                                      self.user_grandpa)
+        # self.method_fubar always exits with exit code 1, and creates no output.
         tools.create_linear_pipeline(
             failing_pipeline,
             [self.method_fubar, self.method_noop], "indata", "outdata"
@@ -3596,8 +3597,22 @@ class RunStepReuseFailedExecRecordTests(TestCase):
         run_2 = Manager.execute_pipeline(self.user_grandpa, failing_pl_2, [self.dataset_words],
                                          groups_allowed=[everyone_group()]).get_last_run()
 
-        self.assertEquals(run_1.runsteps.get(pipelinestep__step_num=1).execrecord,
+        failing_er = run_1.runsteps.get(pipelinestep__step_num=1).execrecord
+        self.assertEquals(failing_er,
                           run_2.runsteps.get(pipelinestep__step_num=1).execrecord)
+
+        self.assertEquals(failing_er.generator.methodoutput.return_code, 1)
+        self.assertFalse(failing_er.outputs_OK())
+
+        self.assertEquals(failing_er.execrecordouts.count(), 1)
+        produced_dataset = failing_er.execrecordouts.first().dataset
+        self.assertEquals(produced_dataset.content_checks.count(), 1)
+        self.assertFalse(produced_dataset.integrity_checks.exists())
+
+        bad_ccl = produced_dataset.content_checks.first()
+        self.assertEquals(bad_ccl, failing_er.generator.content_checks.first())
+
+        self.assertTrue(bad_ccl.baddata.missing_output)
 
 
 class MethodOutputApiTests(BaseTestCases.ApiTestCase):
