@@ -63,7 +63,8 @@ def dataset_download(request, dataset_id):
     except Dataset.DoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
-    return _build_download_response(dataset.get_file_handle())
+    with dataset.get_open_file_handle() as data_handle:
+        return _build_download_response(data_handle)
 
 
 @login_required
@@ -166,9 +167,8 @@ def dataset_view(request, dataset_id):
         t = loader.get_template("librarian/raw_dataset_view.html")
 
         # Read 1000 characters.
-        data_handle = dataset.get_file_handle()
-        sample_content = data_handle.read(1000)
-        data_handle.close()
+        with dataset.get_open_file_handle() as data_handle:
+            sample_content = data_handle.read(1000)
 
         c.update(
             {

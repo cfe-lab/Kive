@@ -2400,26 +2400,28 @@ class ExternalFileTests(TestCase):
         )
 
         # Where possible get_file_handle uses the internal copy.
-        self.assertEquals(external_file_ds.get_file_handle(), external_file_ds.dataset_file)
+        with external_file_ds.get_open_file_handle() as data_handle:
+            self.assertEquals(data_handle, external_file_ds.dataset_file)
 
         # It falls back on the external copy.
         external_file_ds.dataset_file.delete()
-        external_file_handle = external_file_ds.get_file_handle()
-        self.assertEquals(os.path.abspath(external_file_handle.name), ext_sub1_path)
+        with external_file_ds.get_open_file_handle() as external_file_handle:
+            self.assertEquals(os.path.abspath(external_file_handle.name), ext_sub1_path)
 
     def test_get_file_handle_subdirectory(self):
         """
         Test retrieving a file handle on a Dataset with a file in a subdirectory.
         """
         # Where possible get_file_handle uses the internal copy.
-        self.assertEquals(self.external_file_ds.get_file_handle(), self.external_file_ds.dataset_file)
+        with self.external_file_ds.get_open_file_handle() as data_handle:
+            self.assertEquals(data_handle, self.external_file_ds.dataset_file)
 
         # It falls back on the external copy.
-        external_file_handle = self.external_file_ds_no_internal.get_file_handle()
-        self.assertEquals(
-            os.path.abspath(external_file_handle.name),
-            os.path.abspath(os.path.join(self.working_dir, self.ext1_path))
-        )
+        with self.external_file_ds_no_internal.get_open_file_handle() as external_file_handle:
+            self.assertEquals(
+                os.path.abspath(external_file_handle.name),
+                os.path.abspath(os.path.join(self.working_dir, self.ext1_path))
+            )
 
     def test_external_absolute_path(self):
         """

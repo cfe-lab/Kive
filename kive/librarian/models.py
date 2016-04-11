@@ -193,7 +193,7 @@ class Dataset(metadata.models.AccessControl):
             return None
         return os.path.normpath(os.path.join(self.externalfiledirectory.path, self.external_path))
 
-    def get_file_handle(self):
+    def get_open_file_handle(self, mode="rb"):
         """
         Retrieves an open Django file with which to access the data.
 
@@ -201,12 +201,12 @@ class Dataset(metadata.models.AccessControl):
         and otherwise returns None.
         """
         if self.dataset_file:
-            self.dataset_file.open("rb")
+            self.dataset_file.open(mode)
             return self.dataset_file
         elif self.external_path:
             abs_path = self.external_absolute_path()
             if os.path.exists(abs_path) and os.access(abs_path, os.R_OK):
-                return File(open(abs_path, "rb"))
+                return File(open(abs_path, mode))
         return None
 
     def all_rows(self, data_check=False, insert_at=None):
@@ -216,10 +216,9 @@ class Dataset(metadata.models.AccessControl):
         If insert_at is specified, a blank field is inserted
         at each element of insert_at.
         """
-        data_handle = self.get_file_handle()
         cdt = self.compounddatatype
 
-        with data_handle:
+        with self.get_open_file_handle() as data_handle:
             reader = csv.reader(data_handle)
             for row in reader:
                 if insert_at is not None:
@@ -383,10 +382,14 @@ class Dataset(metadata.models.AccessControl):
         """
         :return int: size of dataset_file in bytes
         """
-        data_handle = self.get_file_handle()
-        if data_handle is None:
-            return None
-        return data_handle.size
+        try:
+            data_handle = self.get_open_file_handle()
+            if data_handle is None:
+                return None
+            return data_handle.size
+        finally:
+            if data_handle is not None:
+                data_handle.close()
 
     def get_formatted_filesize(self):
         unformatted_size = self.get_filesize()
@@ -396,14 +399,8 @@ class Dataset(metadata.models.AccessControl):
 
     def compute_md5(self):
         """Computes the MD5 checksum of the Dataset."""
-        data_handle = self.get_file_handle()
-        try:
-            data_handle.open()
-            md5 = file_access_utils.compute_md5(data_handle.file)
-        finally:
-            data_handle.close()
-
-        return md5
+        with self.get_open_file_handle() as data_handle:
+            return file_access_utils.compute_md5(data_handle.file)
 
     def check_md5(self):
         """

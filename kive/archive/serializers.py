@@ -69,7 +69,6 @@ class _RunDataset(object):
         self.filename = filename
 
     def set_dataset(self, dataset, request):
-        data_handle = dataset.get_file_handle()
         self.id = dataset.id
         self.size = dataset.get_formatted_filesize()
         self.date = dataset.date_created
@@ -79,7 +78,8 @@ class _RunDataset(object):
         self.redaction_plan = reverse('dataset-redaction-plan',
                                       kwargs={'pk': dataset.id},
                                       request=request)
-        self.filename = os.path.basename(data_handle.name)
+        with dataset.get_open_file_handle() as data_handle:
+            self.filename = os.path.basename(data_handle.name)
 
     def set_redacted(self):
         self.size = self.date = 'redacted'
