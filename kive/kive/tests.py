@@ -1,10 +1,13 @@
+from contextlib import contextmanager
+import os
+import shutil
+
 from django.conf import settings
 from django.test import TestCase
 
-from rest_framework.test import APIRequestFactory, force_authenticate
+from mock import Mock
 
-import os
-import shutil
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from metadata.models import kive_user
 
@@ -23,6 +26,8 @@ class DuckRequest(object):
     def __init__(self, user=None):
         self.user = user or kive_user()
         self.GET = {}
+        self.META = {}
+        self.method = 'GET'
 
     def build_absolute_uri(self, url):
         return url
@@ -70,6 +75,34 @@ class BaseTestCases:
             force_authenticate(request, user=self.kive_user)
             response = self.list_view(request)
             self.assertNotIn('detail', response.data)
+
+
+@contextmanager
+def mock_relations(model):
+    """ Mock all related field managers to make pure unit tests possible.
+
+    with mock_relations(Dataset):
+        dataset = Dataset()
+        check = dataset.content_checks.create()  # returns mock object
+    """
+    model_name = model._meta.object_name
+    model.old_relations = {}
+    model.old_objects = model.objects
+    try:
+        for related_object in model._meta.related_objects:
+            name = related_object.name
+            model.old_relations[name] = getattr(model, name)
+            setattr(model, name, Mock(name='{}.{}'.format(model_name, name)))
+        setattr(model, 'objects', Mock(name=model_name + '.objects'))
+
+        yield
+
+    finally:
+        model.objects = model.old_objects
+        for name, relation in model.old_relations.iteritems():
+            setattr(model, name, relation)
+        del model.old_objects
+        del model.old_relations
 
 
 def install_fixture_files(fixture_name):

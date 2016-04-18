@@ -1880,7 +1880,7 @@ class CompoundDatatype(AccessControl):
             return summary
 
         # Check the constraints using the module helper.
-        summary.update(summarize_CSV(self.members.all().order_by("column_idx"), data_csv,
+        summary.update(summarize_CSV(self.members.order_by("column_idx"), data_csv,
                                      summary_path, content_check_log))
         return summary
 

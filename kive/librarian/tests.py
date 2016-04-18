@@ -11,6 +11,7 @@ import logging
 import json
 import shutil
 import stat
+from StringIO import StringIO
 
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -25,17 +26,18 @@ from rest_framework import status
 
 from archive.models import ExecLog, MethodOutput, Run, RunStep
 from constants import datatypes, groups
+from datachecking.models import MD5Conflict, BadData
 from librarian.models import Dataset, ExecRecord, ExternalFileDirectory
+from librarian.serializers import DatasetSerializer
 from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, \
     MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
-from librarian.serializers import DatasetSerializer
-from datachecking.models import MD5Conflict
 
 import file_access_utils
 import kive.testing_utils as tools
-from kive.tests import BaseTestCases, DuckContext, install_fixture_files, restore_production_files
+from kive.tests import BaseTestCases, DuckContext, install_fixture_files, restore_production_files,\
+    mock_relations
 
 
 def ER_from_record(record):
@@ -247,10 +249,6 @@ foo,bar
                                    description="right columns", name="good data")
 
     def test_invalid_integer_field(self):
-        """
-        Dataset creation fails if the data file has too many
-        columns.
-        """
         compound_datatype = CompoundDatatype(user=self.myUser)
         compound_datatype.save()
         compound_datatype.members.create(datatype=self.STR,
@@ -261,20 +259,58 @@ foo,bar
                                          column_idx=2)
         compound_datatype.clean()
 
-        with tempfile.NamedTemporaryFile() as data_file:
-            data_file.write("""\
+        data_file = StringIO("""\
 name,count
 Bob,tw3nty
 """)
-            data_file.flush()
-            file_path = data_file.name
+        data_file.name = 'test_file.csv'
 
-            self.assertRaisesRegexp(
-                ValueError,
-                re.escape('The entry at row 1, column 2 of file "{}" did not pass the constraints of Datatype "integer"'
-                          .format(file_path)),
-                lambda: Dataset.create_dataset(file_path=file_path, user=self.myUser, cdt=compound_datatype,
-                                               name="bad data", description="bad integer field"))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('The entry at row 1, column 2 of file "{}" did not pass the constraints of Datatype "integer"'
+                      .format(data_file.name)),
+            lambda: Dataset.create_dataset(file_path=None,
+                                           file_handle=data_file,
+                                           user=self.myUser,
+                                           cdt=compound_datatype,
+                                           name="bad data",
+                                           description="bad integer field"))
+
+    def test_check_file_contents(self):
+        compound_datatype = CompoundDatatype(user=self.myUser)
+        compound_datatype.save()
+        compound_datatype.members.create(datatype=self.STR,
+                                         column_name="name",
+                                         column_idx=1)
+        count_column = compound_datatype.members.create(datatype=self.INT,
+                                                        column_name="count",
+                                                        column_idx=2)
+        compound_datatype.clean()
+
+        data_file = StringIO("""\
+name,count
+Bob,tw3nty
+""")
+        data_file.name = 'test_file.csv'
+
+        with mock_relations(Dataset), mock_relations(BadData):
+            expected_bad_data = BadData.objects.create.return_value  # @UndefinedVariable
+            expected_check = Dataset.content_checks.create.return_value  # @UndefinedVariable
+            Dataset.structure.compounddatatype = compound_datatype
+            dataset = Dataset()
+
+            check = dataset.check_file_contents(file_path_to_check=None,
+                                                summary_path=None,
+                                                min_row=None,
+                                                max_row=None,
+                                                execlog=None,
+                                                checking_user=None,
+                                                file_handle=data_file)
+
+            self.assertIs(expected_check, check)
+            expected_bad_data.cell_errors.create.assert_called_once_with(
+                column=count_column,
+                row_num=1)
 
     def test_dataset_creation(self):
         """

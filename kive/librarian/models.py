@@ -40,6 +40,7 @@ import archive.exceptions
 import librarian.signals
 import file_access_utils
 from constants import maxlengths
+from datachecking.models import BadData
 
 LOGGER = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class ExternalFileDirectory(models.Model):
         """
         path_with_slash = self.path if self.path.endswith("/") else "{}/".format(self.path)
         all_files = []
-        for root, dirs, files in sorted(os.walk(self.path)):
+        for root, _dirs, files in sorted(os.walk(self.path)):
             for f in files:
                 f = os.path.join(root, f)
                 all_files.append((f, f.replace(path_with_slash, "[{}]/".format(self.name), 1)))
@@ -217,6 +218,9 @@ class Dataset(metadata.models.AccessControl):
         at each element of insert_at.
         """
         cdt = self.compounddatatype
+        data_handle = self.get_file_handle()
+        if data_handle is None:
+            raise RuntimeError('Dataset file has been removed.')
 
         with self.get_open_file_handle() as data_handle:
             reader = csv.reader(data_handle)
@@ -334,8 +338,8 @@ class Dataset(metadata.models.AccessControl):
             # Whatever run created this Dataset must have had access to the parent Dataset.
             self.file_source.definite.top_level_run.validate_restrict_access([self])
 
-        if not (self.externalfiledirectory and self.external_path
-                or not self.externalfiledirectory and not self.external_path):
+        if not (self.externalfiledirectory and self.external_path or
+                not self.externalfiledirectory and not self.external_path):
             raise ValidationError(
                 {
                     "external_path": "Both externalfiledirectory and external_path should be set or "
@@ -861,14 +865,15 @@ class Dataset(metadata.models.AccessControl):
             self.logger.warn("cells failed datatype check")
 
             if not csv_baddata:
-                datachecking.models.BadData(contentchecklog=ccl).save()
+                bad_data = BadData.objects.create(contentchecklog=ccl)
                 csv_baddata = True
 
             for row, col in csv_summary["failing_cells"]:
                 fails = csv_summary["failing_cells"][(row, col)]
                 for failed_constr in fails:
-                    new_cell_error = ccl.baddata.cell_errors.create(row_num=row,
-                                                                    column=my_CDT.members.get(column_idx=col))
+                    new_cell_error = bad_data.cell_errors.create(
+                        row_num=row,
+                        column=my_CDT.members.get(column_idx=col))
 
                     if failed_constr == metadata.models.CompoundDatatypeMember.BLANK_ENTRY:
                         blank_cell = datachecking.models.BlankCell(cellerror=new_cell_error)
