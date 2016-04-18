@@ -210,25 +210,46 @@ class Dataset(metadata.models.AccessControl):
                 return File(open(abs_path, mode))
         return None
 
-    def all_rows(self, data_check=False, insert_at=None):
+    def all_rows(self, data_check=False, insert_at=None, limit=None):
         """
         Returns an iterator over all rows of this Dataset.
 
         If insert_at is specified, a blank field is inserted
         at each element of insert_at.
         """
-        cdt = self.compounddatatype
         data_handle = self.get_file_handle()
         if data_handle is None:
             raise RuntimeError('Dataset file has been removed.')
 
         with self.get_open_file_handle() as data_handle:
             reader = csv.reader(data_handle)
-            for row in reader:
+            if data_check:
+                try:
+                    baddata = self.content_checks.first().baddata
+                    cell_errors = baddata.cell_errors.order_by('row_num', 'column')
+                    if limit is not None:
+                        cell_errors.filter(row_num__lte=limit)
+                    failed_columns = {
+                        (error.row_num, error.column.column_idx): error.column
+                        for error in cell_errors
+                    }
+                except BadData.DoesNotExist:
+                    failed_columns = {}
+            for row_num, row in enumerate(reader):
                 if insert_at is not None:
                     [row.insert(pos, "") for pos in insert_at]
                 if data_check:
-                    row = map(None, row, cdt.check_constraints(row))
+                    new_row = []
+                    for column_num, value in enumerate(row, 1):
+                        failed_column = failed_columns.get((row_num, column_num),
+                                                           None)
+                        if failed_column is None:
+                            new_errors = []
+                        else:
+                            new_errors = failed_column.check_basic_constraints(value)
+                        new_row.append((value, new_errors))
+
+                    row = new_row
                 yield row
 
     def header(self):
@@ -236,7 +257,7 @@ class Dataset(metadata.models.AccessControl):
         return next(rows)
 
     def rows(self, data_check=False, insert_at=None, limit=None):
-        rows = self.all_rows(data_check, insert_at)
+        rows = self.all_rows(data_check, insert_at, limit=limit)
         for i, row in enumerate(rows):
             if i == 0:
                 pass  # skip header

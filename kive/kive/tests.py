@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 import os
 import shutil
+from StringIO import StringIO
 
 from django.conf import settings
 from django.test import TestCase
@@ -109,6 +110,21 @@ def mock_relations(*models):
                 for name, relation in old_relations.iteritems():
                     setattr(model, name, relation)
                 del model.old_relations
+
+
+def dummy_file(content, name='dummy_file'):
+    """ Create an in-memory, file-like object.
+
+    :param str content: the contents of the file
+    :param str name: a name for the file
+    :return: an object that looks like an open file handle.
+    """
+
+    data_file = StringIO(content)
+    data_file.name = name
+    data_file.__enter__ = lambda: None
+    data_file.__exit__ = lambda type, value, traceback: None
+    return data_file
 
 
 def install_fixture_files(fixture_name):
