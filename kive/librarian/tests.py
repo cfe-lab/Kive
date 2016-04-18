@@ -29,7 +29,8 @@ from constants import datatypes, groups
 from datachecking.models import MD5Conflict, BadData
 from librarian.models import Dataset, ExecRecord, ExternalFileDirectory
 from librarian.serializers import DatasetSerializer
-from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
+from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group,\
+    CompoundDatatypeMember
 from method.models import CodeResource, CodeResourceRevision, Method, \
     MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
@@ -277,40 +278,38 @@ Bob,tw3nty
                                            description="bad integer field"))
 
     def test_check_file_contents(self):
-        compound_datatype = CompoundDatatype(user=self.myUser)
-        compound_datatype.save()
-        compound_datatype.members.create(datatype=self.STR,
-                                         column_name="name",
-                                         column_idx=1)
-        count_column = compound_datatype.members.create(datatype=self.INT,
-                                                        column_name="count",
-                                                        column_idx=2)
-        compound_datatype.clean()
-
-        data_file = StringIO("""\
-name,count
-Bob,tw3nty
-""")
-        data_file.name = 'test_file.csv'
-
-        with mock_relations(Dataset), mock_relations(BadData):
+        file_path = os.devnull
+        with mock_relations(Dataset, BadData):
             expected_bad_data = BadData.objects.create.return_value  # @UndefinedVariable
             expected_check = Dataset.content_checks.create.return_value  # @UndefinedVariable
-            Dataset.structure.compounddatatype = compound_datatype
+            expected_bad_row = 42
+            expected_bad_column = 2
+            count_column = CompoundDatatypeMember(datatype=self.INT,
+                                                  column_name="count",
+                                                  column_idx=expected_bad_column)
+            compound_datatype = Dataset.structure.compounddatatype  # @UndefinedVariable
+            compound_datatype.members.get.return_value = count_column
+            compound_datatype.summarize_CSV.return_value = {
+                u'num_rows': expected_bad_row * 2,
+                u'header': ['name', 'count'],
+                u'failing_cells': {(expected_bad_row,
+                                    expected_bad_column): [u'Was not integer']}
+            }
             dataset = Dataset()
 
-            check = dataset.check_file_contents(file_path_to_check=None,
+            check = dataset.check_file_contents(file_path_to_check=file_path,
                                                 summary_path=None,
                                                 min_row=None,
                                                 max_row=None,
                                                 execlog=None,
-                                                checking_user=None,
-                                                file_handle=data_file)
+                                                checking_user=None)
 
             self.assertIs(expected_check, check)
+            compound_datatype.members.get.assert_called_once_with(
+                column_idx=expected_bad_column)
             expected_bad_data.cell_errors.create.assert_called_once_with(
                 column=count_column,
-                row_num=1)
+                row_num=expected_bad_row)
 
     def test_dataset_creation(self):
         """
