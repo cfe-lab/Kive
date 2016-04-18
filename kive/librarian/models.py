@@ -217,11 +217,11 @@ class Dataset(metadata.models.AccessControl):
         If insert_at is specified, a blank field is inserted
         at each element of insert_at.
         """
-        data_handle = self.get_file_handle()
+        data_handle = self.get_open_file_handle()
         if data_handle is None:
             raise RuntimeError('Dataset file has been removed.')
 
-        with self.get_open_file_handle() as data_handle:
+        with data_handle:
             reader = csv.reader(data_handle)
             if data_check:
                 try:

@@ -387,7 +387,7 @@ Dave,40
 
         with mock_relations(Dataset):
             dataset = Dataset()
-            dataset.get_file_handle = lambda: data_file
+            dataset.get_open_file_handle = lambda: data_file
             expected_check = Dataset.content_checks.first.return_value  # @UndefinedVariable
             type(expected_check).baddata = PropertyMock(side_effect=BadData.DoesNotExist)
 
@@ -411,7 +411,7 @@ Dave,40
                                                   datatype=int_datatype)
             cell_error = CellError(column=count_column, row_num=bad_row)
             dataset = Dataset()
-            dataset.get_file_handle = lambda: data_file
+            dataset.get_open_file_handle = lambda: data_file
             expected_check = Dataset.content_checks.first.return_value  # @UndefinedVariable
             expected_check.baddata.cell_errors.order_by.return_value = [cell_error]
 
@@ -430,7 +430,7 @@ Dave,40
 
         with mock_relations(Dataset):
             dataset = Dataset()
-            dataset.get_file_handle = lambda: data_file
+            dataset.get_open_file_handle = lambda: data_file
 
             rows = list(dataset.rows(data_check=False))
 
