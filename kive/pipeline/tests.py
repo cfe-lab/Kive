@@ -6,7 +6,6 @@ import os.path
 import re
 import shutil
 import tempfile
-import json
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -24,8 +23,8 @@ from constants import datatypes
 from kive.tests import BaseTestCases, DuckContext
 from metadata.models import CompoundDatatype, CompoundDatatypeMember, \
     Datatype, kive_user, everyone_group
-from method.models import Method, MethodFamily, CodeResource,\
-    CodeResourceRevision, CodeResourceDependency
+from method.models import Method, MethodFamily, MethodDependency, \
+    CodeResource, CodeResourceRevision
 from pipeline.models import Pipeline, PipelineFamily, \
     PipelineStep, PipelineStepInputCable, \
     PipelineOutputCable
@@ -2806,10 +2805,7 @@ class PipelineUpdateTests(PipelineTestCase):
         Add a second revision for it.
         """
         used_methods = Method.objects.filter(pipelinesteps__isnull=False)
-        used_code_resource_revisions = CodeResourceRevision.objects.filter(
-            methods__in=used_methods)
-        dependencies = CodeResourceDependency.objects.filter(
-            coderesourcerevision__in=used_code_resource_revisions)
+        dependencies = MethodDependency.objects.filter(method__in=used_methods)
         dependency = dependencies.earliest('id') # dependency used in a pipeline
         code_resource_revision = dependency.requirement
         fn = "GoodRNANucSeq.csv"
@@ -2817,7 +2813,7 @@ class PipelineUpdateTests(PipelineTestCase):
             new_revision = CodeResourceRevision(
                 coderesource=code_resource_revision.coderesource, 
                 revision_name="rna", 
-                revision_desc="Switch to RNA", 
+                revision_desc="Switch to RNA",
                 revision_parent=code_resource_revision, 
                 content_file=File(f),
                 user=self.myUser)
@@ -4766,12 +4762,17 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
         self.assertEqual(step.transformation.display_name, method.display_name)
 
     def test_create_with_new_method_for_dependency(self):
+        """
+        Create a new Pipeline revision to suit a newly-updated step dependency.
+        """
         create_pipeline_deserialization_environment(self)
+
+        # Add a dependency to self.method_noop.
         dependency_revision = CodeResourceRevision.objects.exclude(
             coderesource=self.coderesource_noop).earliest('id')
         new_dependency_revision = self.create_new_code_revision(
             dependency_revision.coderesource)
-        self.coderev_noop.dependencies.create(requirement=dependency_revision)
+        self.method_noop.dependencies.create(requirement=dependency_revision)
         
         step_dict = self.pipeline_dict['steps'][0]
         step_dict['new_dependency_ids'] = [new_dependency_revision.id]
@@ -4786,10 +4787,9 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
         # Probe the new object.
         new_pipeline = self.test_pf.members.get(
             revision_name=self.pipeline_dict["revision_name"])
-        noop_revision_dependency = new_dependency_revision.needed_by.first()
+        noop_revision_dependency = new_dependency_revision.used_by.first()
         self.assertIsNotNone(noop_revision_dependency, 'noop_revision expected for new dependency')
-        noop_revision = noop_revision_dependency.coderesourcerevision
-        method = noop_revision.methods.first()
+        method = noop_revision_dependency.method
         self.assertIsNotNone(method, 'method expected for noop_revision')
         step = new_pipeline.steps.get(step_num=1)
         self.assertEqual(step.transformation.display_name, method.display_name)

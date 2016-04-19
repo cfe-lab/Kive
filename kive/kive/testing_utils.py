@@ -1152,7 +1152,6 @@ def create_method_test_environment(case):
             revision_desc="First version",
             content_file=File(f),
             user=case.myUser)
-        # case.compv1_crRev.content_file.save(fn, File(f))
         case.compv1_crRev.full_clean()
         case.compv1_crRev.save()
     case.compv1_crRev.grant_everyone_access()
@@ -1167,7 +1166,6 @@ def create_method_test_environment(case):
             revision_parent=case.compv1_crRev,
             content_file=File(f),
             user=case.myUser)
-        # case.compv2_crRev.content_file.save(fn, File(f))
         case.compv2_crRev.full_clean()
         case.compv2_crRev.save()
     case.compv2_crRev.grant_everyone_access()
@@ -1188,13 +1186,9 @@ def create_method_test_environment(case):
             revision_desc="Reference DNA sequences",
             content_file=File(f),
             user=case.myUser)
-        # case.compv2_crRev.content_file.save(fn, File(f))
         dna_resource_revision.full_clean()
         dna_resource_revision.save()
     dna_resource_revision.grant_everyone_access()
-
-    case.compv2_crRev.dependencies.create(
-        requirement=dna_resource_revision)
 
     # The following is for testing code resource dependencies.
     case.test_cr_1 = CodeResource(name="test_cr_1",
@@ -1303,6 +1297,8 @@ def create_method_test_environment(case):
     case.DNAcompv2_m.save()
     case.DNAcompv2_m.grant_everyone_access()
     case.DNAcompv2_m.copy_io_from_parent()
+    # case.compv2_crRev requires this to work:
+    case.DNAcompv2_m.dependencies.create(requirement=dna_resource_revision)
 
     # Define second family, RNAcomp_mf
     case.RNAcomp_mf = MethodFamily(
@@ -1349,6 +1345,8 @@ def create_method_test_environment(case):
     case.RNAcompv2_m.save()
     case.RNAcompv2_m.copy_io_from_parent()
     case.RNAcompv2_m.grant_everyone_access()
+    # case.compv2_crRev requires this to work:
+    case.RNAcompv2_m.dependencies.create(requirement=dna_resource_revision)
 
     # Create method family for script_1_method / script_2_method / script_3_method
     case.test_mf = MethodFamily(name="Test method family",
@@ -1521,6 +1519,8 @@ def create_method_test_environment(case):
         driver=case.compv2_crRev,
         user=case.myUser)
     case.DNArecomp_m.grant_everyone_access()
+    # case.compv2_crRev requires this to work:
+    case.DNArecomp_m.dependencies.create(requirement=dna_resource_revision)
 
     # To this method revision, add inputs with CDT DNAoutput_cdt
     case.DNArecomp_m.create_input(

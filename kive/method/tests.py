@@ -336,7 +336,6 @@ class CodeResourceRevisionTests(MethodTestCase):
         self.assertEqual(update, self.compv2_crRev)
 
 
-# FIXME gotta fix this after we address the problem with tests not running.
 class MethodDependencyTests(MethodTestCase):
     def setUp(self):
         super(MethodDependencyTests, self).setUp()
@@ -472,38 +471,53 @@ class MethodDependencyTests(MethodTestCase):
         self.assertEqual(good_md.clean(), None)
 
 
-class CodeResourceRevisionInstallTests(MethodTestCase):
-    """Tests of the install function of CodeResourceRevision."""
+class MethodInstallTests(MethodTestCase):
+    """Tests of the install function of Method."""
+    def setUp(self):
+        super(MethodInstallTests, self).setUp()
+
+        # This method is defined in testing_utils.create_method_test_environment.
+        # It has self.compv1_crRev as its driver, and no dependencies.
+        self.independent_method = self.DNAcompv1_m
+
+        # This method is defined in testing_utils.create_method_test_environment.
+        # It has self.compv2_crRev as its driver and dna_resource_revision (not
+        # bound to self) as a dependency.
+        self.dependant_method = self.DNAcompv2_m
+
     def test_base_case(self):
         """
-        Test of base case -- installing a CRR with no dependencies.
+        Test of base case -- installing a Method with no dependencies.
         """
         test_path = tempfile.mkdtemp(prefix="test_base_case")
 
-        self.compv1_crRev.install(test_path)
+        self.independent_method.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
 
         shutil.rmtree(test_path)
 
     def test_second_revision(self):
         """
-        Test of base case -- installing a CRR that is a second revision.
+        Test of base case -- installing a Method that is a second revision.
+
+        This Method does have a dependency.
         """
         test_path = tempfile.mkdtemp(prefix="test_base_case")
 
-        self.compv2_crRev.install(test_path)
+        self.dependant_method.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
+        self.assertTrue(os.path.exists(os.path.join(test_path, "good_dna.csv")))
 
         shutil.rmtree(test_path)
 
     def test_dependency_same_dir_dot(self):
         """
-        Test of installing a CRR with a dependency in the same directory, specified using a dot.
+        Test of installing a Method with a dependency in the same directory, specified using a dot.
         """
         test_path = tempfile.mkdtemp(prefix="test_dependency_same_dir_dot")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path=".")
-        self.compv1_crRev.install(test_path)
+        self.independent_method.dependencies.create(requirement=self.test_cr_1_rev1, path=".")
+        self.independent_method.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.exists(os.path.join(test_path, "test_cr_1.py")))
 
@@ -511,12 +525,12 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
 
     def test_dependency_same_dir_blank(self):
         """
-        Test of installing a CRR with a dependency in the same directory, specified using a blank.
+        Test of installing a Method with a dependency in the same directory, specified using a blank.
         """
         test_path = tempfile.mkdtemp(prefix="test_dependency_same_dir_blank")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="")
-        self.compv1_crRev.install(test_path)
+        self.independent_method.dependencies.create(requirement=self.test_cr_1_rev1, path="")
+        self.independent_method.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.exists(os.path.join(test_path, "test_cr_1.py")))
 
@@ -524,13 +538,13 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
 
     def test_dependency_override_dep_filename(self):
         """
-        Test of installing a CRR with a dependency whose filename is overridden.
+        Test of installing a Method with a dependency whose filename is overridden.
         """
         test_path = tempfile.mkdtemp(prefix="test_dependency_override_dep_filename")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="",
-                                              filename="foo.py")
-        self.compv1_crRev.install(test_path)
+        self.independent_method.dependencies.create(requirement=self.test_cr_1_rev1, path="",
+                                                    filename="foo.py")
+        self.independent_method.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.exists(os.path.join(test_path, "foo.py")))
         self.assertFalse(os.path.exists(os.path.join(test_path, "test_cr_1.py")))
@@ -539,12 +553,12 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
 
     def test_dependency_in_subdirectory(self):
         """
-        Test of installing a CRR with a dependency in a subdirectory.
+        Test of installing a Method with a dependency in a subdirectory.
         """
         test_path = tempfile.mkdtemp(prefix="test_dependency_in_subdirectory")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="modules")
-        self.compv1_crRev.install(test_path)
+        self.independent_method.dependencies.create(requirement=self.test_cr_1_rev1, path="modules")
+        self.independent_method.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.isdir(os.path.join(test_path, "modules")))
         self.assertTrue(os.path.exists(os.path.join(test_path, "modules", "test_cr_1.py")))
@@ -553,13 +567,13 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
 
     def test_dependencies_in_same_subdirectory(self):
         """
-        Test of installing a CRR with several dependencies in the same subdirectory.
+        Test of installing a Method with several dependencies in the same subdirectory.
         """
         test_path = tempfile.mkdtemp(prefix="test_dependencies_in_same_subdirectory")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="modules")
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, path="modules")
-        self.compv1_crRev.install(test_path)
+        self.independent_method.dependencies.create(requirement=self.test_cr_1_rev1, path="modules")
+        self.independent_method.dependencies.create(requirement=self.test_cr_2_rev1, path="modules")
+        self.independent_method.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.isdir(os.path.join(test_path, "modules")))
         self.assertTrue(os.path.exists(os.path.join(test_path, "modules", "test_cr_1.py")))
@@ -569,13 +583,13 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
 
     def test_dependencies_in_same_directory(self):
         """
-        Test of installing a CRR with several dependencies in the base directory.
+        Test of installing a Method with several dependencies in the base directory.
         """
         test_path = tempfile.mkdtemp(prefix="test_dependencies_in_same_directory")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="")
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, path="")
-        self.compv1_crRev.install(test_path)
+        self.independent_method.dependencies.create(requirement=self.test_cr_1_rev1, path="")
+        self.independent_method.dependencies.create(requirement=self.test_cr_2_rev1, path="")
+        self.independent_method.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.exists(os.path.join(test_path, "test_cr_1.py")))
         self.assertTrue(os.path.exists(os.path.join(test_path, "test_cr_2.py")))
@@ -584,13 +598,13 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
 
     def test_dependencies_in_subsub_directory(self):
         """
-        Test of installing a CRR with dependencies in sub-sub-directories.
+        Test of installing a Method with dependencies in sub-sub-directories.
         """
         test_path = tempfile.mkdtemp(prefix="test_dependencies_in_subsub_directory")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="modules/foo1")
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, path="modules/foo2")
-        self.compv1_crRev.install(test_path)
+        self.independent_method.dependencies.create(requirement=self.test_cr_1_rev1, path="modules/foo1")
+        self.independent_method.dependencies.create(requirement=self.test_cr_2_rev1, path="modules/foo2")
+        self.independent_method.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.isdir(os.path.join(test_path, "modules/foo1")))
         self.assertTrue(os.path.isdir(os.path.join(test_path, "modules/foo2")))
@@ -601,12 +615,12 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
 
     def test_dependencies_from_same_coderesource_same_dir(self):
         """
-        Test of installing a CRR with a dependency having the same CodeResource in the same directory.
+        Test of installing a Method with a dependency having the same CodeResource in the same directory.
         """
         test_path = tempfile.mkdtemp(prefix="test_dependencies_from_same_coderesource_same_dir")
 
-        self.compv1_crRev.dependencies.create(requirement=self.compv2_crRev, path="", filename="foo.py")
-        self.compv1_crRev.install(test_path)
+        self.independent_method.dependencies.create(requirement=self.compv2_crRev, path="", filename="foo.py")
+        self.independent_method.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.exists(os.path.join(test_path, "foo.py")))
         # Test that the right files are in the right places.
@@ -623,14 +637,14 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
 
     def test_dependencies_in_various_places(self):
         """
-        Test of installing a CRR with dependencies in several places.
+        Test of installing a Method with dependencies in several places.
         """
         test_path = tempfile.mkdtemp(prefix="test_dependencies_in_various_places")
 
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="modules")
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, path="moremodules")
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_3_rev1, path="modules/foo")
-        self.compv1_crRev.install(test_path)
+        self.independent_method.dependencies.create(requirement=self.test_cr_1_rev1, path="modules")
+        self.independent_method.dependencies.create(requirement=self.test_cr_2_rev1, path="moremodules")
+        self.independent_method.dependencies.create(requirement=self.test_cr_3_rev1, path="modules/foo")
+        self.independent_method.install(test_path)
         self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
         self.assertTrue(os.path.isdir(os.path.join(test_path, "modules")))
         self.assertTrue(os.path.isdir(os.path.join(test_path, "moremodules")))
@@ -641,108 +655,11 @@ class CodeResourceRevisionInstallTests(MethodTestCase):
 
         shutil.rmtree(test_path)
 
-    def test_nested_dependencies(self):
-        """
-        Test of installing a CRR with dependencies that have their own dependencies.
-        """
-        test_path = tempfile.mkdtemp(prefix="test_nested_dependencies")
-
-        # Make test_cr_1_rev1 have its own dependencies.
-        self.test_cr_1_rev1.dependencies.create(requirement=self.script_1_crRev, path=".")
-        self.test_cr_1_rev1.dependencies.create(requirement=self.script_2_crRev, path="cr1mods")
-
-        self.test_cr_2_rev1.dependencies.create(requirement=self.script_3_crRev, path="cr2mods")
-        self.test_cr_2_rev1.dependencies.create(requirement=self.script_4_1_CRR, path="cr2mods/foo")
-
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_1_rev1, path="")
-        self.compv1_crRev.dependencies.create(requirement=self.test_cr_2_rev1, path="basemods")
-        self.compv1_crRev.install(test_path)
-
-        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
-        self.assertTrue(os.path.exists(os.path.join(test_path, "test_cr_1.py")))
-        self.assertTrue(os.path.exists(os.path.join(test_path, "script_1_sum_and_products.py")))
-        self.assertTrue(os.path.isdir(os.path.join(test_path, "cr1mods")))
-        self.assertTrue(os.path.exists(os.path.join(test_path, "cr1mods", "script_2_square_and_means.py")))
-
-        self.assertTrue(os.path.isdir(os.path.join(test_path, "basemods")))
-        self.assertTrue(os.path.exists(os.path.join(test_path, "basemods", "test_cr_2.py")))
-        self.assertTrue(os.path.isdir(os.path.join(test_path, "basemods", "cr2mods")))
-        self.assertTrue(os.path.exists(os.path.join(test_path, "basemods", "cr2mods", "script_3_product.py")))
-        self.assertTrue(os.path.isdir(os.path.join(test_path, "basemods", "cr2mods", "foo")))
-        self.assertTrue(
-            os.path.exists(os.path.join(test_path, "basemods", "cr2mods", "foo",
-                                        "script_4_raw_in_CSV_out.py")))
-
-        shutil.rmtree(test_path)
-
-    def _setup_metapackage(self):
-        """Helper that sets up a metapackage."""
-        # Define comp_cr
-        self.metapackage = CodeResource(
-            name="metapackage",
-            description="Collection of modules",
-            filename="",
-            user=self.myUser)
-        self.metapackage.save()
-
-        self.metapackage_r1 = CodeResourceRevision(
-            coderesource=self.metapackage,
-            revision_name="v1",
-            revision_desc="First version",
-            user=self.myUser
-        )
-        self.metapackage_r1.save()
-
-        # Add dependencies.
-        self.metapackage_r1.dependencies.create(requirement=self.script_1_crRev, path=".")
-        self.metapackage_r1.dependencies.create(requirement=self.script_2_crRev, path=".")
-        self.metapackage_r1.dependencies.create(requirement=self.script_3_crRev, path="metamodules")
-        self.metapackage_r1.dependencies.create(requirement=self.script_4_1_CRR, path="metamodules/foo")
-
-    def test_metapackage(self):
-        """
-        Test of installing a metapackage CRR.
-        """
-        test_path = tempfile.mkdtemp(prefix="test_install_metapackage")
-        self._setup_metapackage()
-
-        self.metapackage_r1.install(test_path)
-        self.assertTrue(os.path.exists(os.path.join(test_path, "script_1_sum_and_products.py")))
-        self.assertTrue(os.path.exists(os.path.join(test_path, "script_2_square_and_means.py")))
-        self.assertTrue(os.path.isdir(os.path.join(test_path, "metamodules")))
-        self.assertTrue(os.path.exists(os.path.join(test_path, "metamodules", "script_3_product.py")))
-        self.assertTrue(os.path.isdir(os.path.join(test_path, "metamodules", "foo")))
-        self.assertTrue(os.path.exists(os.path.join(test_path, "metamodules", "foo", "script_4_raw_in_CSV_out.py")))
-
-        shutil.rmtree(test_path)
-
-    def test_dependency_is_metapackage(self):
-        """
-        Test of installing a CRR with a metapackage dependency.
-        """
-        test_path = tempfile.mkdtemp(prefix="test_dependency_is_metapackage")
-        self._setup_metapackage()
-
-        self.compv1_crRev.dependencies.create(requirement=self.metapackage_r1, path="modules")
-
-        self.compv1_crRev.install(test_path)
-        self.assertTrue(os.path.exists(os.path.join(test_path, "complement.py")))
-
-        metapackage_path = os.path.join(test_path, "modules")
-        self.assertTrue(os.path.isdir(metapackage_path))
-        self.assertTrue(os.path.exists(os.path.join(metapackage_path, "script_1_sum_and_products.py")))
-        self.assertTrue(os.path.exists(os.path.join(metapackage_path, "script_2_square_and_means.py")))
-        self.assertTrue(os.path.isdir(os.path.join(metapackage_path, "metamodules")))
-        self.assertTrue(os.path.exists(os.path.join(metapackage_path, "metamodules", "script_3_product.py")))
-        self.assertTrue(os.path.isdir(os.path.join(metapackage_path, "metamodules", "foo")))
-        self.assertTrue(os.path.exists(os.path.join(metapackage_path, "metamodules", "foo",
-                                                    "script_4_raw_in_CSV_out.py")))
-        shutil.rmtree(test_path)
-
 
 class MethodTests(MethodTestCase):
 
     def setUp(self):
+        super(MethodTests, self).setUp()
         self.test_dep_method = tools.make_first_method(
             "TestMethodDependencies",
             "Methods with dependencies",
@@ -1214,28 +1131,6 @@ class MethodTests(MethodTestCase):
         self.assertEqual(curr_out_2.get_min_row(), None)
         self.assertEqual(curr_out_2.get_max_row(), None)
 
-    def test_driver_is_metapackage(self):
-        """
-        A metapackage cannot be a driver for a Method.
-        """
-        # Create a CodeResourceRevision with no content file (ie. a Metapackage).
-        res = CodeResource(user=self.myUser)
-        res.save()
-        rev = CodeResourceRevision(coderesource=res, content_file=None, user=self.myUser)
-        rev.clean()
-        rev.save()
-        f = MethodFamily(user=self.myUser)
-        f.save()
-        m = Method(family=f, driver=rev, user=self.myUser)
-        m.save()
-        m.create_input(compounddatatype=self.singlet_cdt,
-                       dataset_name="input",
-                       dataset_idx=1)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('Method "{}" cannot have CodeResourceRevision "{}" as a driver, because it '
-                                          'has no content file.'.format(m, rev)),
-                                m.clean)
-
     def test_invoke_code_nooutput(self):
         """
         Invoke a no-output method (which just prints to stdout).
@@ -1467,7 +1362,7 @@ class MethodTests(MethodTestCase):
 
     def test_dependency_A_depends_BC_B_in_same_folder_no_conflicts_clean_good(self):
         """
-        BC in same folder as A, B conflicts with A
+        A depends on B, A depends on C
         B in same folder, C in different folder, nothing conflicts
         """
         self.test_dep_method.dependencies.create(
@@ -1482,286 +1377,107 @@ class MethodTests(MethodTestCase):
 
         self.assertEqual(self.test_dep_method.clean(), None)
 
-    # def test_dependency_A_depends_BC_B_in_same_folder_B_conflicts_A_clean_bad(self):
-    #     """
-    #     A depends on B, A depends on C
-    #     B in same folder, C in different folder, B conflicts with A
-    #     """
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_2_rev1,
-    #         path="",
-    #         filename=self.test_cr_1.filename)
-    #
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_3_rev1,
-    #         path="diffFolder",
-    #         filename="differentName.py")
-    #
-    #     self.assertRaisesRegexp(
-    #         ValidationError,
-    #         "Conflicting dependencies",
-    #         self.test_cr_1_rev1.clean)
+    def test_dependency_A_depends_BC_B_in_same_folder_B_conflicts_A_clean_bad(self):
+        """
+        A depends on B, A depends on C
+        B in same folder, C in different folder, B conflicts with A
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="",
+            filename=self.test_cr_1.filename)
 
-    # def test_dependency_A_depends_BC_C_in_same_folder_no_conflict_clean_good(self):
-    #     """
-    #     A depends on B, A depends on C
-    #     B in different folder, C in same folder, nothing conflicts
-    #     """
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_2_rev1,
-    #         path="diffFolder",
-    #         filename=self.test_cr_1.filename)
-    #
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_3_rev1,
-    #         path="",
-    #         filename="differentName.py")
-    #
-    #     self.assertEqual(self.test_cr_1_rev1.clean(), None)
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            path="diffFolder",
+            filename="differentName.py")
 
-    # def test_dependency_A_depends_BC_C_in_same_folder_C_conflicts_with_A_clean_bad(self):
-    #     """
-    #     A depends on B, A depends on C
-    #     B in different folder, C in same folder, C conflicts with A
-    #     """
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_2_rev1,
-    #         path="diffFolder",
-    #         filename=self.test_cr_1.filename)
-    #
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_3_rev1,
-    #         path="",
-    #         filename=self.test_cr_1.filename)
-    #
-    #     self.assertRaisesRegexp(
-    #         ValidationError,
-    #         "Conflicting dependencies",
-    #         self.test_cr_1_rev1.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_dep_method.clean)
 
+    def test_dependency_A_depends_BC_C_in_same_folder_no_conflict_clean_good(self):
+        """
+        A depends on B, A depends on C
+        B in different folder, C in same folder, nothing conflicts
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="diffFolder",
+            filename=self.test_cr_1.filename)
 
-    # MODIFY
-    # def test_dependency_A_depends_B1B2B3_B1_depends_C_all_same_folder_no_conflicts_clean_good(self):
-    #     """
-    #     A depends on B1/B2/B3, B1 depends on C
-    #     A/B1B2B3/C in same folder - no conflicts
-    #     """
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_2_rev1,
-    #         path="",
-    #         filename="1.py")
-    #
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_3_rev1,
-    #         path="",
-    #         filename="2.py")
-    #
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_3_rev1,
-    #         path="",
-    #         filename="3.py")
-    #
-    #     self.test_cr_2_rev1.dependencies.create(
-    #         requirement=self.test_cr_4_rev1,
-    #         path="",
-    #         filename="4.py")
-    #
-    #     self.assertEqual(self.test_cr_1_rev1.clean(), None)
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            path="",
+            filename="differentName.py")
 
-    # MODIFY?
-    # def test_dependency_A_depends_B1B2B3_B2_depends_C_B1B2B3C_in_nested_B3_conflicts_C_clean_bad(self):
-    #     """
-    #     A depends on B1/B2/B3, B2 depends on C
-    #     B1B2B3C in nested folder - B3 conflicts with C
-    #     """
-    #
-    #     # A depends on B1
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_2_rev1,
-    #         path="nested",
-    #         filename="1.py")
-    #
-    #     # A depends on B2
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_2_rev1,
-    #         path="nested",
-    #         filename="2.py")
-    #
-    #     # A depends on B3***
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_3_rev1,
-    #         path="nested",
-    #         filename="conflict.py")
-    #
-    #     # B2 depends on C
-    #     self.test_cr_3_rev1.dependencies.create(
-    #         requirement=self.test_cr_4_rev1,
-    #         path="",
-    #         filename="conflict.py")
-    #
-    #     self.assertRaisesRegexp(
-    #         ValidationError,
-    #         "Conflicting dependencies",
-    #         self.test_cr_1_rev1.clean)
+        self.assertEqual(self.test_dep_method.clean(), None)
 
-    # def test_dependency_A_depends_B1B2B3_B3_depends_C_B2B3C_in_nested_B2_conflicts_B3_clean_bad(self):
-    #     """
-    #     A depends on B1/B2/B3, B3 depends on C
-    #     B2B3 in nested folder - B2 conflicts with B3
-    #     """
-    #
-    #     # A depends on B1
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_2_rev1,
-    #         path="",
-    #         filename="1.py")
-    #
-    #     # A depends on B2
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_2_rev1,
-    #         path="nested",
-    #         filename="conflict.py")
-    #
-    #     # A depends on B3
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_3_rev1,
-    #         path="nested",
-    #         filename="conflict.py")
-    #
-    #     # B3 depends on C
-    #     self.test_cr_3_rev1.dependencies.create(
-    #         requirement=self.test_cr_4_rev1,
-    #         path="",
-    #         filename="4.py")
-    #
-    #     self.assertRaisesRegexp(
-    #         ValidationError,
-    #         "Conflicting dependencies",
-    #         self.test_cr_1_rev1.clean)
-    #
-    # def test_dependency_list_all_filepaths_recursive_case_1(self):
-    #     """
-    #     Ensure list_all_filepaths generates the correct list
-    #     A depends on B1/B2, B1 depends on C
-    #     B1 is nested, B2 is not nested, C is nested wrt B1
-    #     """
-    #
-    #     # A depends on B1 (Which is nested)
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_2_rev1,
-    #         path="B1_nested",
-    #         filename="B1.py")
-    #
-    #     # A depends on B2 (Which is not nested)
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_3_rev1,
-    #         path="",
-    #         filename="B2.py")
-    #
-    #     # B1 depends on C (Nested wrt B1)
-    #     self.test_cr_2_rev1.dependencies.create(
-    #         requirement=self.test_cr_4_rev1,
-    #         path="C_nested",
-    #         filename="C.py")
-    #
-    #     self.assertSetEqual(
-    #         set(self.test_cr_1_rev1.list_all_filepaths()),
-    #         {u'test_cr_1.py', u'B1_nested/B1.py', u'B1_nested/C_nested/C.py', u'B2.py'}
-    #     )
-    #
-    # def test_dependency_list_all_filepaths_recursive_case_2(self):
-    #     """
-    #     Ensure list_all_filepaths generates the correct list
-    #     A depends on B1/B2, B2 depends on C
-    #     B1 is nested, B2 is not nested, C is nested wrt B2
-    #     """
-    #     # A depends on B1 (Which is nested)
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_2_rev1,
-    #         path="B1_nested",
-    #         filename="B1.py")
-    #
-    #     # A depends on B2 (Which is not nested)
-    #     self.test_cr_1_rev1.dependencies.create(
-    #         requirement=self.test_cr_3_rev1,
-    #         path="",
-    #         filename="B2.py")
-    #
-    #     # B2 depends on C (Nested wrt B2)
-    #     self.test_cr_3_rev1.dependencies.create(
-    #         requirement=self.test_cr_4_rev1,
-    #         path="C_nested",
-    #         filename="C.py")
-    #
-    #     self.assertSetEqual(
-    #         set(self.test_cr_1_rev1.list_all_filepaths()),
-    #         {u'test_cr_1.py', u'B1_nested/B1.py', u'B2.py', u'C_nested/C.py'}
-    #     )
-    #
-    # def test_dependency_list_all_filepaths_with_metapackage(self):
-    #
-    #     # Define a code with a blank filename (metapackage)
-    #     # Give it dependencies
-    #     # Give one more dependency a nested dependency
-    #
-    #     # The following is for testing code resource dependencies
-    #     test_cr_6 = CodeResource(name="test_cr_6",
-    #                              filename="",
-    #                              description="CR6",
-    #                              user=self.myUser)
-    #     test_cr_6.save()
-    #
-    #     # The revision has no content_file because it's a metapackage
-    #     test_cr_6_rev1 = CodeResourceRevision(coderesource=test_cr_6,
-    #                                           revision_name="v1_metapackage",
-    #                                           revision_desc="CR6-rev1",
-    #                                           user=self.myUser)
-    #     test_cr_6_rev1.save()
-    #
-    #     # Current-folder dependencies
-    #     test_cr_6_rev1.dependencies.create(
-    #         requirement=self.test_cr_2_rev1,
-    #         path="",
-    #         filename="B.py")
-    #
-    #     # Sub-folder dependencies
-    #     test_cr_6_rev1.dependencies.create(
-    #         requirement=self.test_cr_3_rev1,
-    #         path="nestedFolder",
-    #         filename="C.py")
-    #
-    #     # Nested dependencies
-    #     self.test_cr_3_rev1.dependencies.create(
-    #         requirement=self.test_cr_4_rev1,
-    #         path="deeperNestedFolder",
-    #         filename="D.py")
-    #
-    #     self.assertSetEqual(
-    #         set(test_cr_6_rev1.list_all_filepaths()),
-    #         {u'B.py', u'nestedFolder/C.py', u'nestedFolder/deeperNestedFolder/D.py'}
-    #     )
-    #
-    #     # FIXME
-    #     # test_cr_6_rev1.content_file.delete()
-    #     # test_cr_6_rev1.delete()
-    #
-    # def test_dependency_list_all_filepaths_single_unnested_dep_blank_filename(self):
-    #     """List all filepaths when dependency has no filename set and is not nested.
-    #     """
-    #     self.test_cr_1_rev1.dependencies.create(
-    #             requirement=self.test_cr_2_rev1,
-    #             path="")
-    #     self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
-    #                      [u'test_cr_1.py', u'test_cr_2.py'])
-    #
-    # def test_dependency_list_all_filepaths_single_nested_dep_blank_filename(self):
-    #     """List all filepaths when dependency has no filename set and is nested.
-    #     """
-    #     self.test_cr_1_rev1.dependencies.create(
-    #             requirement=self.test_cr_2_rev1,
-    #             path="nest_folder")
-    #     self.assertEqual(self.test_cr_1_rev1.list_all_filepaths(),
-    #                      [u'test_cr_1.py', u'nest_folder/test_cr_2.py'])
+    def test_dependency_A_depends_BC_C_in_same_folder_C_conflicts_with_A_clean_bad(self):
+        """
+        A depends on B, A depends on C
+        B in different folder, C in same folder, C conflicts with A
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="diffFolder",
+            filename=self.test_cr_1.filename)
+
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_3_rev1,
+            path="",
+            filename=self.test_cr_1.filename)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.test_dep_method.clean)
+
+    def test_list_all_filepaths_unnested_dep_blank_filename(self):
+        """
+        List all filepaths when dependency has no filename set and is not in a subdirectory.
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path=""
+        )
+        self.assertEqual(self.test_dep_method.list_all_filepaths(),
+                         [u'test_cr_1.py', u'test_cr_2.py'])
+
+    def test_list_all_filepaths_nested_dep_blank_filename(self):
+        """
+        List all filepaths when dependency has no filename set and is in a subdirectory.
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="nest_folder"
+        )
+        self.assertEqual(self.test_dep_method.list_all_filepaths(),
+                         [u'test_cr_1.py', u'nest_folder/test_cr_2.py'])
+
+    def test_list_all_filepaths_unnested_dep_specified_filename(self):
+        """List all filepaths when dependency has a custom filename and is not in a subdirectory.
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="",
+            filename="foo.py"
+        )
+        self.assertEqual(self.test_dep_method.list_all_filepaths(),
+                         [u'test_cr_1.py', u'foo.py'])
+
+    def test_list_all_filepaths_nested_dep_specified_filename(self):
+        """
+        List all filepaths when dependency has a custom filename and is in a subdirectory.
+        """
+        self.test_dep_method.dependencies.create(
+            requirement=self.test_cr_2_rev1,
+            path="nest_folder",
+            filename="foo.py"
+        )
+        self.assertEqual(self.test_dep_method.list_all_filepaths(),
+                         [u'test_cr_1.py', u'nest_folder/foo.py'])
 
 
 class MethodFamilyTests(MethodTestCase):
@@ -2315,7 +2031,6 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         # Inspect the revision we just added.
         new_crr = self.cr.revisions.get(revision_name="v1")
         self.assertEquals(new_crr.revision_desc, "First version")
-        self.assertEquals(new_crr.dependencies.count(), 0)
 
         # Make sure the staged file was removed.
         self.assertFalse(portal.models.StagedFile.objects.filter(pk=staged_file_pk).exists())
@@ -2324,8 +2039,8 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         """
         Test that clean is being called during creation.
         """
-        # Disallow everyone from accessing self.noop_cr, which will cause clean to fail.
-        self.noop_cr.groups_allowed.remove(everyone_group())
+        # Disallow everyone from accessing self.cr, which will cause clean to fail.
+        self.cr.groups_allowed.remove(everyone_group())
 
         request = self.factory.post(self.list_path, self.crr_data, format="json")
         force_authenticate(request, user=kive_user())
@@ -2333,7 +2048,7 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
 
         self.assertDictEqual(
             response.data,
-            {'non_field_errors': "Group(s) everyone cannot be granted access"}
+            {'non_field_errors': "Group(s) Everyone cannot be granted access"}
         )
 
     def test_download(self):

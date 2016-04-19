@@ -1730,7 +1730,7 @@ class Sandbox:
         stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
 
         # Check the integrity of the code before we run.
-        if not pipelinestep.transformation.definite.driver.check_md5():
+        if not pipelinestep.transformation.definite.check_md5():  # this checks the driver and dependencies
             logger.error("[%d] Method code has gone corrupt for %s or its " +
                          "dependencies; stopping step",
                          worker_rank,

@@ -234,7 +234,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
     def check_md5(self):
         """
-        Checks the MD5s of the CodeResourceRevision and its dependencies against their stored values.
+        Checks the MD5 of the CodeResourceRevision against its stored value.
         """
         # Recompute the MD5, see if it equals what is already stored.
         new_md5 = self.compute_md5()
@@ -244,10 +244,10 @@ class CodeResourceRevision(metadata.models.AccessControl):
                              self.MD5_checksum,
                              new_md5)
             return False
-
-        for dep in self.dependencies.all():
-            if not dep.requirement.check_md5():
-                return False
+        #
+        # for dep in self.dependencies.all():
+        #     if not dep.requirement.check_md5():
+        #         return False
 
         return True
 
@@ -537,6 +537,19 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         for dest_stream in dest_streams:
             dest_stream.write(source_contents)
 
+    def check_md5(self):
+        """
+        Checks the MD5 of the driver and its dependencies against their stored values.
+        """
+        if not self.driver.check_md5():
+            return False
+
+        for dep in self.dependencies.all():
+            if not dep.requirement.check_md5():
+                return False
+
+        return True
+
     def list_all_filepaths(self):
         """
         Return all file paths associated with this Method, with the driver coming first.
@@ -559,9 +572,9 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
         destination_path = os.path.join(install_path, base_name)
         with open(destination_path, "w") as f:
-            self.content_file.open()
-            with self.content_file:
-                shutil.copyfileobj(self.content_file, f)
+            self.driver.content_file.open()
+            with self.driver.content_file:
+                shutil.copyfileobj(self.driver.content_file, f)
         # Make sure this is written with read, write, and execute
         # permission.
         os.chmod(destination_path, stat.S_IRWXU)
@@ -580,7 +593,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 pass
 
             # Write the dependency.
-            dep_path = os.path.join(dep_dir, dep.filename)
+            dep_path = os.path.join(dep_dir, dep.get_filename())
             with open(dep_path, "wb") as f:
                 dep.requirement.content_file.open()
                 with dep.requirement.content_file:
