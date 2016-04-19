@@ -18,6 +18,16 @@ function setupRunView(run_id, pipeline_id, md5) {
     self.pipeline = new Pipeline(canvasState);
 
     // Methods
+    function setMsg ($el, msg_text, use_link, use_loading_anim) {
+        if (use_link) {
+            $el.html('<a href="/view_results/' + run_id +'?back_to_view=true">'+ msg_text +'</a>');
+        } else {
+            $el.text(msg_text);
+        }
+        if (use_loading_anim) {
+            $el.prepend('<img src="/static/sandbox/preload.gif"/> &nbsp;');
+        }
+    }
     function grabStatus() {
         if(self.timer === null)
             self.timer = setInterval(grabStatus, self.timerInterval);
@@ -26,30 +36,21 @@ function setupRunView(run_id, pipeline_id, md5) {
         $.getJSON("/api/runs/" + run_id + "/run_status/", {}, function(run){
             var stat = run.status,
                 $msg = $('<span class="status-message">');
-            $msg.append($('<a>Complete</a>').attr(
-                    'href',
-                    '/view_results/' + run_id +'?back_to_view=true'));
+
+            setMsg($msg, 'Complete', true);
 
             // TODO: Use a better system of reporting overall run status
             if(stat.indexOf('?') >= 0) {
-                $msg.empty().text('Waiting for run to start').append(
-                        $('<img src="/static/sandbox/preload.gif"/>'));
-            }
-            else if (stat.indexOf('Too') >= 0) {
-                $msg.empty().text(stat);
+                setMsg($msg, 'Waiting for run to start', false, true);
+            } else if (stat.indexOf('Too') >= 0) {
+                setMsg($msg, stat);
                 clearInterval(self.timer);
-            }
-            else {
-                if(stat.indexOf('!') >= 0) {
-                    $msg.empty().append($('<a>Failed!</a>').attr(
-                            'href',
-                            '/view_results/' + run_id + '?back_to_view=true'));
+            } else {
+                if (stat.indexOf('!') >= 0) {
+                    setMsg($msg, 'Failed!', true);
                     clearInterval(self.timer);
-                } else if(stat.indexOf('.') >= 0 || stat.indexOf('+') >= 0 || stat.indexOf(':') >= 0) {
-                    $msg.empty().append($('<a>In progress </a> &nbsp;').attr(
-                            'href',
-                            '/view_results/' + run_id +'?back_to_view=true')).append(
-                            $('<img src="/static/sandbox/preload.gif"/>'));
+                } else if (stat.indexOf('.') >= 0 || stat.indexOf('+') >= 0 || stat.indexOf(':') >= 0) {
+                    setMsg($msg, 'In progress', true, true);
                 } else {
                     clearInterval(self.timer);
                 }

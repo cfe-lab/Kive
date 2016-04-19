@@ -9,6 +9,9 @@ import tempfile
 import time
 import logging
 import json
+import shutil
+import stat
+from StringIO import StringIO
 
 from django.core.exceptions import ValidationError
 from django.utils import timezone
@@ -18,22 +21,26 @@ from django.core.urlresolvers import reverse, resolve
 from django.core.files import File
 from django.core.files.base import ContentFile
 
+from mock import PropertyMock
+
 from rest_framework.test import force_authenticate, APIRequestFactory
 from rest_framework import status
 
 from archive.models import ExecLog, MethodOutput, Run, RunStep
 from constants import datatypes, groups
-from librarian.models import Dataset, ExecRecord
-from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
+from datachecking.models import MD5Conflict, BadData, CellError
+from librarian.models import Dataset, ExecRecord, ExternalFileDirectory
+from librarian.serializers import DatasetSerializer
+from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group,\
+    CompoundDatatypeMember
 from method.models import CodeResource, CodeResourceRevision, Method, \
     MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
-from librarian.serializers import DatasetSerializer
-from datachecking.models import MD5Conflict
 
 import file_access_utils
 import kive.testing_utils as tools
-from kive.tests import BaseTestCases, DuckContext
+from kive.tests import BaseTestCases, DuckContext, install_fixture_files, restore_production_files,\
+    mock_relations, dummy_file
 
 
 def ER_from_record(record):
@@ -245,10 +252,6 @@ foo,bar
                                    description="right columns", name="good data")
 
     def test_invalid_integer_field(self):
-        """
-        Dataset creation fails if the data file has too many
-        columns.
-        """
         compound_datatype = CompoundDatatype(user=self.myUser)
         compound_datatype.save()
         compound_datatype.members.create(datatype=self.STR,
@@ -259,20 +262,22 @@ foo,bar
                                          column_idx=2)
         compound_datatype.clean()
 
-        with tempfile.NamedTemporaryFile() as data_file:
-            data_file.write("""\
+        data_file = StringIO("""\
 name,count
 Bob,tw3nty
 """)
-            data_file.flush()
-            file_path = data_file.name
+        data_file.name = 'test_file.csv'
 
-            self.assertRaisesRegexp(
-                ValueError,
-                re.escape('The entry at row 1, column 2 of file "{}" did not pass the constraints of Datatype "integer"'
-                          .format(file_path)),
-                lambda: Dataset.create_dataset(file_path=file_path, user=self.myUser, cdt=compound_datatype,
-                                               name="bad data", description="bad integer field"))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('The entry at row 1, column 2 of file "{}" did not pass the constraints of Datatype "integer"'
+                      .format(data_file.name)),
+            lambda: Dataset.create_dataset(file_path=None,
+                                           file_handle=data_file,
+                                           user=self.myUser,
+                                           cdt=compound_datatype,
+                                           name="bad data",
+                                           description="bad integer field"))
 
     def test_dataset_creation(self):
         """
@@ -368,6 +373,100 @@ Bob,tw3nty
 
         self.assertTrue(self.singlet_dataset.groups_allowed.filter(pk=groups.DEVELOPERS_PK).exists())
         self.assertTrue(usurping_ds.groups_allowed.filter(pk=groups.DEVELOPERS_PK).exists())
+
+
+class DatasetMockTests(TestCase):
+    def test_rows_with_no_errors(self):
+        data_file = dummy_file("""\
+name,count
+Bob,20
+Dave,40
+""")
+        expected_rows = [[('Bob', []), ('20', [])],
+                         [('Dave', []), ('40', [])]]
+
+        with mock_relations(Dataset):
+            dataset = Dataset()
+            dataset.get_open_file_handle = lambda: data_file
+            expected_check = Dataset.content_checks.first.return_value  # @UndefinedVariable
+            type(expected_check).baddata = PropertyMock(side_effect=BadData.DoesNotExist)
+
+            rows = list(dataset.rows(data_check=True))
+
+            self.assertEqual(expected_rows, rows)
+
+    def test_rows_with_errors(self):
+        data_file = dummy_file("""\
+name,count
+Bob,tw3nty
+Dave,40
+""")
+        bad_row, bad_column = 1, 2
+        expected_rows = [[('Bob', []), ('tw3nty', [u'Was not integer'])],
+                         [('Dave', []), ('40', [])]]
+
+        with mock_relations(Dataset):
+            int_datatype = Datatype.objects.get(pk=datatypes.INT_PK)
+            count_column = CompoundDatatypeMember(column_idx=bad_column,
+                                                  datatype=int_datatype)
+            cell_error = CellError(column=count_column, row_num=bad_row)
+            dataset = Dataset()
+            dataset.get_open_file_handle = lambda: data_file
+            expected_check = Dataset.content_checks.first.return_value  # @UndefinedVariable
+            expected_check.baddata.cell_errors.order_by.return_value = [cell_error]
+
+            rows = list(dataset.rows(data_check=True))
+
+            self.assertEqual(expected_rows, rows)
+
+    def test_rows_with_no_data_check(self):
+        data_file = dummy_file("""\
+name,count
+Bob,tw3nty
+Dave,40
+""")
+        expected_rows = [['Bob', 'tw3nty'],
+                         ['Dave', '40']]
+
+        with mock_relations(Dataset):
+            dataset = Dataset()
+            dataset.get_open_file_handle = lambda: data_file
+
+            rows = list(dataset.rows(data_check=False))
+
+            self.assertEqual(expected_rows, rows)
+
+    def test_check_file_contents(self):
+        file_path = os.devnull
+        with mock_relations(Dataset, BadData):
+            expected_bad_data = BadData.objects.create.return_value  # @UndefinedVariable
+            expected_check = Dataset.content_checks.create.return_value  # @UndefinedVariable
+            expected_bad_row = 42
+            expected_bad_column = 2
+            count_column = CompoundDatatypeMember()
+            compound_datatype = Dataset.structure.compounddatatype  # @UndefinedVariable
+            compound_datatype.members.get.return_value = count_column
+            compound_datatype.summarize_CSV.return_value = {
+                u'num_rows': expected_bad_row * 2,
+                u'header': ['name', 'count'],
+                u'failing_cells': {(expected_bad_row,
+                                    expected_bad_column): [u'Was not integer']}
+            }
+            dataset = Dataset()
+
+            check = dataset.check_file_contents(file_path_to_check=file_path,
+                                                summary_path=None,
+                                                min_row=None,
+                                                max_row=None,
+                                                execlog=None,
+                                                checking_user=None)
+
+            self.assertIs(expected_check, check)
+            compound_datatype.members.get.assert_called_once_with(
+                column_idx=expected_bad_column)
+            expected_bad_data.cell_errors.create.assert_called_once_with(
+                column=count_column,
+                row_num=expected_bad_row)
 
 
 class DatasetStructureTests(LibrarianTestCase):
@@ -1106,6 +1205,8 @@ class RemovalTests(TestCase):
     fixtures = ["removal"]
 
     def setUp(self):
+        install_fixture_files("removal")
+
         self.remover = User.objects.get(username="Rem Over")
         self.noop_plf = PipelineFamily.objects.get(name="Nucleotide Sequence Noop")
         self.noop_pl = self.noop_plf.members.get(revision_name="v1")
@@ -1159,9 +1260,11 @@ class RemovalTests(TestCase):
 
     def tearDown(self):
         tools.clean_up_all_files()
+        restore_production_files()
 
     def removal_plan_tester(self, obj_to_remove, datasets=None, ERs=None, runs=None, pipelines=None, pfs=None,
-                            methods=None, mfs=None, CDTs=None, DTs=None, CRRs=None, CRs=None):
+                            methods=None, mfs=None, CDTs=None, DTs=None, CRRs=None, CRs=None,
+                            external_files=None):
         removal_plan = obj_to_remove.build_removal_plan()
         self.assertSetEqual(removal_plan["Datasets"], set(datasets) if datasets is not None else set())
         self.assertSetEqual(removal_plan["ExecRecords"], set(ERs) if ERs is not None else set())
@@ -1174,6 +1277,7 @@ class RemovalTests(TestCase):
         self.assertSetEqual(removal_plan["Datatypes"], set(DTs) if DTs is not None else set())
         self.assertSetEqual(removal_plan["CodeResourceRevisions"], set(CRRs) if CRRs is not None else set())
         self.assertSetEqual(removal_plan["CodeResources"], set(CRs) if CRs is not None else set())
+        self.assertSetEqual(removal_plan["ExternalFiles"], set(external_files) if external_files is not None else set())
 
     def test_run_build_removal_plan(self):
         """Removing a Run should remove all intermediate/output data and ExecRecords, and all Runs that reused it."""
@@ -1186,11 +1290,43 @@ class RemovalTests(TestCase):
 
     def test_input_data_build_removal_plan(self):
         """Removing input data to a Run should remove any Run started from it."""
+        self.removal_plan_tester(
+            self.input_DS,
+            datasets=self.produced_data.union({self.input_DS}),
+            ERs=self.execrecords,
+            runs={self.first_run, self.second_run}
+        )
+
+    def test_external_input_build_removal_plan(self):
+        """Removing an input dataset that is externally-backed."""
+        working_dir = tempfile.mkdtemp()
+        efd = ExternalFileDirectory(
+            name="TestBuildRemovalPlanEFD",
+            path=working_dir
+        )
+        efd.save()
+
+        ext_path = "ext.txt"
+        self.input_DS.dataset_file.open()
+        with self.input_DS.dataset_file:
+            with open(os.path.join(working_dir, ext_path), "wb") as f:
+                f.write(self.input_DS.dataset_file.read())
+
+        # Mark the input dataset as externally-backed.
+        self.input_DS.externalfiledirectory = efd
+        self.input_DS.external_path = ext_path
+        self.input_DS.save()
+
         all_data = self.produced_data
         all_data.add(self.input_DS)
 
-        self.removal_plan_tester(self.input_DS, datasets=all_data, ERs=self.execrecords,
-                                 runs={self.first_run, self.second_run})
+        self.removal_plan_tester(
+            self.input_DS,
+            datasets=self.produced_data.union({self.input_DS}),
+            ERs=self.execrecords,
+            runs={self.first_run, self.second_run},
+            external_files={self.input_DS}
+        )
 
     def test_produced_data_build_removal_plan(self):
         """Removing data produced by the Run should have the same effect as removing the Run itself."""
@@ -1250,7 +1386,9 @@ class RemovalTests(TestCase):
         """Removing a MethodFamily."""
         self.removal_plan_tester(
             self.nuc_seq_noop_mf,
-            datasets=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
+            datasets=self.produced_data.union(
+                {self.two_step_intermediate_data, self.two_step_output_data}
+            ),
             ERs=self.execrecords.union(self.two_step_execrecords),
             runs={self.first_run, self.second_run, self.two_step_run},
             pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
@@ -1432,7 +1570,7 @@ class RemovalTests(TestCase):
         self.remove_tester(first_ROC_ER)
 
     def dataset_redaction_plan_tester(self, dataset_to_redact, datasets=None, output_logs=None, error_logs=None,
-                                      return_codes=None):
+                                      return_codes=None, external_files=None):
         redaction_plan = dataset_to_redact.build_redaction_plan()
 
         # The following ExecRecords should also be in the redaction plan.
@@ -1447,6 +1585,8 @@ class RemovalTests(TestCase):
         self.assertSetEqual(redaction_plan["ErrorLogs"], set(error_logs) if error_logs is not None else set())
         self.assertSetEqual(redaction_plan["ReturnCodes"], set(return_codes) if return_codes is not None else set())
         self.assertSetEqual(redaction_plan["ExecRecords"], redaction_plan_execrecords)
+        self.assertSetEqual(redaction_plan["ExternalFiles"],
+                            set(external_files) if external_files is not None else set())
 
     def dataset_redaction_tester(self, dataset_to_redact):
         redaction_plan = dataset_to_redact.build_redaction_plan()
@@ -1520,6 +1660,37 @@ class RemovalTests(TestCase):
             output_logs=logs_to_redact,
             error_logs=logs_to_redact,
             return_codes=logs_to_redact
+        )
+
+    def test_external_input_build_redaction_plan(self):
+        """Redacting an input dataset that is externally-backed."""
+        working_dir = tempfile.mkdtemp()
+        efd = ExternalFileDirectory(
+            name="TestBuildRemovalPlanEFD",
+            path=working_dir
+        )
+        efd.save()
+
+        ext_path = "ext.txt"
+        self.input_DS.dataset_file.open()
+        with self.input_DS.dataset_file:
+            with open(os.path.join(working_dir, ext_path), "wb") as f:
+                f.write(self.input_DS.dataset_file.read())
+
+        # Mark the input dataset as externally-backed.
+        self.input_DS.externalfiledirectory = efd
+        self.input_DS.external_path = ext_path
+        self.input_DS.save()
+
+        logs_to_redact = {self.step_log}
+
+        self.dataset_redaction_plan_tester(
+            self.input_DS,
+            datasets=self.produced_data.union({self.input_DS}),
+            output_logs=logs_to_redact,
+            error_logs=logs_to_redact,
+            return_codes=logs_to_redact,
+            external_files={self.input_DS}
         )
 
     def test_input_dataset_redact(self):
@@ -1876,6 +2047,22 @@ baz
             "groups_allowed": []
         }
 
+        # An external file directory.
+        self.working_dir = tempfile.mkdtemp()
+        self.efd = ExternalFileDirectory(
+            name="WorkingDirectory",
+            path=self.working_dir
+        )
+        self.efd.save()
+
+        # An external file.
+        _, self.ext_fn = tempfile.mkstemp(dir=self.working_dir)
+        with open(self.ext_fn, "wb") as f:
+            f.write(self.raw_file_contents)
+
+    def tearDown(self):
+        shutil.rmtree(self.working_dir)
+
     def test_validate(self):
         """
         Test validating a new Dataset.
@@ -1961,6 +2148,70 @@ baz
             self.assertFalse(ds.is_valid())
             self.assertEquals(len(ds.errors["compounddatatype"]), 1)
 
+    def test_validate_externally_backed(self):
+        """
+        Test validating a new Dataset with external backing.
+        """
+        self.data_to_serialize["externalfiledirectory"] = self.efd.name
+        self.data_to_serialize["external_path"] = self.ext_fn
+        ds = DatasetSerializer(
+            data=self.data_to_serialize,
+            context=self.duck_context
+        )
+        self.assertTrue(ds.is_valid())
+
+    def test_validate_externally_backed_no_efd(self):
+        """
+        If external_path is present, externalfiledirectory should be also.
+        """
+        self.data_to_serialize["external_path"] = self.ext_fn
+        ds = DatasetSerializer(
+            data=self.data_to_serialize,
+            context=self.duck_context
+        )
+        self.assertFalse(ds.is_valid())
+        self.assertListEqual(ds.errors["non_field_errors"],
+                             ["externalfiledirectory must be specified"])
+
+    def test_validate_externally_backed_no_external_path(self):
+        """
+        If externalfiledirectory is present, external_path should be also.
+        """
+        self.data_to_serialize["externalfiledirectory"] = self.efd.name
+        ds = DatasetSerializer(
+            data=self.data_to_serialize,
+            context=self.duck_context
+        )
+        self.assertFalse(ds.is_valid())
+        self.assertListEqual(ds.errors["non_field_errors"],
+                             ["external_path must be specified"])
+
+    def test_validate_dataset_file_specified(self):
+        """
+        If dataset_file is specified, external_path and externalfiledirectory should not be.
+        """
+        self.data_to_serialize["externalfiledirectory"] = self.efd.name
+        self.data_to_serialize["external_path"] = self.ext_fn
+
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            self.assertFalse(ds.is_valid())
+            self.assertSetEqual(
+                set(ds.errors["non_field_errors"]),
+                {
+                    "external_path should not be specified if dataset_file is",
+                    "externalfiledirectory should not be specified if dataset_file is"
+                }
+            )
+
     def test_create(self):
         """
         Test creating a Dataset.
@@ -1983,6 +2234,32 @@ baz
             self.assertEquals(dataset.description, self.data_to_serialize["description"])
             self.assertIsNone(dataset.compounddatatype)
             self.assertEquals(dataset.user, self.kive_user)
+            self.assertTrue(bool(dataset.dataset_file))
+
+    def test_create_do_not_retain(self):
+        """
+        Test creating a Dataset but without retaining a file in the DB.
+        """
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+
+            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["save_in_db"] = False
+
+            ds = DatasetSerializer(
+                data=self.data_to_serialize,
+                context=self.duck_context
+            )
+            ds.is_valid()
+            dataset = ds.save()
+
+            # Probe the Dataset to make sure everything looks fine.
+            self.assertEquals(dataset.name, self.data_to_serialize["name"])
+            self.assertEquals(dataset.description, self.data_to_serialize["description"])
+            self.assertIsNone(dataset.compounddatatype)
+            self.assertEquals(dataset.user, self.kive_user)
+            self.assertFalse(bool(dataset.dataset_file))
 
     def test_create_with_CDT(self):
         """
@@ -2046,3 +2323,298 @@ baz
 
             self.assertListEqual(list(dataset.groups_allowed.all()),
                                  [everyone_group()])
+
+    def test_create_externally_backed(self):
+        """
+        Test creating a Dataset from external data.
+        """
+        self.data_to_serialize["externalfiledirectory"] = self.efd.name
+        self.data_to_serialize["external_path"] = os.path.basename(self.ext_fn)
+
+        ds = DatasetSerializer(
+            data=self.data_to_serialize,
+            context=self.duck_context
+        )
+        ds.is_valid()
+        dataset = ds.save()
+
+        # Probe the Dataset to make sure everything looks fine.
+        self.assertEquals(dataset.name, self.data_to_serialize["name"])
+        self.assertEquals(dataset.description, self.data_to_serialize["description"])
+        self.assertIsNone(dataset.compounddatatype)
+        self.assertEquals(dataset.user, self.kive_user)
+        self.assertEquals(dataset.external_path, os.path.basename(self.ext_fn))
+        self.assertEquals(dataset.externalfiledirectory, self.efd)
+        self.assertFalse(bool(dataset.dataset_file))
+
+    def test_create_externally_backed_internal_copy(self):
+        """
+        Test creating a Dataset from external data and keeping an internal copy.
+        """
+
+        self.data_to_serialize["externalfiledirectory"] = self.efd.name
+        self.data_to_serialize["external_path"] = os.path.basename(self.ext_fn)
+        self.data_to_serialize["save_in_db"] = True
+
+        ds = DatasetSerializer(
+            data=self.data_to_serialize,
+            context=self.duck_context
+        )
+        ds.is_valid()
+        dataset = ds.save()
+
+        # Probe the Dataset to make sure everything looks fine.
+        self.assertEquals(dataset.name, self.data_to_serialize["name"])
+        self.assertEquals(dataset.description, self.data_to_serialize["description"])
+        self.assertIsNone(dataset.compounddatatype)
+        self.assertEquals(dataset.user, self.kive_user)
+        self.assertEquals(dataset.external_path, os.path.basename(self.ext_fn))
+        self.assertEquals(dataset.externalfiledirectory, self.efd)
+        self.assertTrue(bool(dataset.dataset_file))
+        dataset.dataset_file.open("rb")
+        with dataset.dataset_file:
+            self.assertEquals(dataset.dataset_file.read(), self.raw_file_contents)
+
+
+class ExternalFileTests(TestCase):
+
+    def setUp(self):
+        tools.create_metadata_test_environment(self)
+
+        self.working_dir = tempfile.mkdtemp()
+        self.efd = ExternalFileDirectory(
+            name="WorkingDirectory",
+            path=self.working_dir
+        )
+        self.efd.save()
+
+        self.ext1_path = "ext1.txt"
+        self.ext1_contents = "First test file"
+        with open(os.path.join(self.working_dir, self.ext1_path), "wb") as f:
+            f.write(self.ext1_contents)
+
+        self.ext2_path = "ext2.txt"
+        self.ext2_contents = "Second test file"
+        with open(os.path.join(self.working_dir, self.ext2_path), "wb") as f:
+            f.write(self.ext2_contents)
+
+        os.makedirs(os.path.join(self.working_dir, "ext_subdir"))
+        os.makedirs(os.path.join(self.working_dir, "ext_subdir2"))
+
+        self.ext_sub1_path = os.path.join("ext_subdir", "ext_sub1.txt")
+        self.ext_sub1_contents = "Test file in subdirectory"
+        with open(os.path.join(self.working_dir, self.ext_sub1_path), "wb") as f:
+            f.write(self.ext_sub1_contents)
+
+        self.external_file_ds = Dataset.create_dataset(
+            os.path.join(self.working_dir, self.ext1_path),
+            user=self.myUser,
+            externalfiledirectory=self.efd
+        )
+        self.external_file_ds_no_internal = Dataset.create_dataset(
+            os.path.join(self.working_dir, self.ext1_path),
+            user=self.myUser,
+            keep_file=False,
+            externalfiledirectory=self.efd
+        )
+        self.external_file_ds_subdir = Dataset.create_dataset(
+            os.path.join(self.working_dir, "ext_subdir", "ext_sub1.txt"),
+            user=self.myUser,
+            externalfiledirectory=self.efd
+        )
+        self.non_external_dataset = Dataset(
+            user=self.myUser,
+            name="foo",
+            description="Foo",
+            dataset_file=ContentFile("Foo")
+        )
+        self.non_external_dataset.save()
+
+    def tearDown(self):
+        shutil.rmtree(self.working_dir)
+
+    def test_save(self):
+        """Calling save() normalizes the path."""
+        new_working_dir = tempfile.mkdtemp()
+        unnamed_efd = ExternalFileDirectory(name="TestSaveDir", path="{}/./".format(new_working_dir))
+        unnamed_efd.save()
+        self.assertEquals(unnamed_efd.path, os.path.normpath(new_working_dir))
+        shutil.rmtree(new_working_dir)
+
+    def test_list_files(self):
+        expected_list = [
+            (os.path.join(self.working_dir, self.ext1_path), "[WorkingDirectory]/{}".format(self.ext1_path)),
+            (os.path.join(self.working_dir, "ext2.txt"), "[WorkingDirectory]/ext2.txt"),
+            (os.path.join(self.working_dir, "ext_subdir", "ext_sub1.txt"),
+             "[WorkingDirectory]/ext_subdir/ext_sub1.txt")
+        ]
+        self.assertSetEqual(set(expected_list), set(self.efd.list_files()))
+
+    def test_create_dataset_external_file(self):
+        """
+        Create a Dataset from an external file, making a copy in the database.
+        """
+        external_file_ds = Dataset.create_dataset(
+            os.path.join(self.working_dir, self.ext1_path),
+            user=self.myUser,
+            externalfiledirectory=self.efd
+        )
+
+        self.assertEquals(external_file_ds.external_path, self.ext1_path)
+
+        external_file_ds.dataset_file.open("rb")
+        with external_file_ds.dataset_file:
+            self.assertEquals(external_file_ds.dataset_file.read(), self.ext1_contents)
+
+        with open(os.path.join(self.working_dir, self.ext1_path), "rb") as f:
+            self.assertEquals(file_access_utils.compute_md5(f), external_file_ds.MD5_checksum)
+
+    def test_create_dataset_external_file_no_internal_copy(self):
+        """
+        Create a Dataset from an external file without making a copy in the database.
+        """
+        external_file_ds = Dataset.create_dataset(
+            os.path.join(self.working_dir, self.ext1_path),
+            user=self.myUser,
+            keep_file=False,
+            externalfiledirectory=self.efd
+        )
+
+        self.assertEquals(external_file_ds.external_path, self.ext1_path)
+        self.assertFalse(bool(external_file_ds.dataset_file))
+
+        with open(os.path.join(self.working_dir, self.ext1_path), "rb") as f:
+            self.assertEquals(file_access_utils.compute_md5(f), external_file_ds.MD5_checksum)
+
+    def test_create_dataset_external_file_subdirectory(self):
+        """
+        Create a Dataset from an external file in a subdirectory of the external file directory.
+        """
+        external_file_ds = Dataset.create_dataset(
+            os.path.join(self.working_dir, self.ext_sub1_path),
+            user=self.myUser,
+            externalfiledirectory=self.efd
+        )
+
+        self.assertEquals(external_file_ds.externalfiledirectory, self.efd)
+        self.assertEquals(external_file_ds.external_path, self.ext_sub1_path)
+
+        external_file_ds.dataset_file.open("rb")
+        with external_file_ds.dataset_file:
+            self.assertEquals(external_file_ds.dataset_file.read(), self.ext_sub1_contents)
+
+        with open(os.path.join(self.working_dir, self.ext_sub1_path), "rb") as f:
+            self.assertEquals(file_access_utils.compute_md5(f), external_file_ds.MD5_checksum)
+
+    def test_get_file_handle(self):
+        """
+        Test retrieving a file handle.
+        """
+        ext_sub1_path = os.path.join(self.working_dir, "ext_subdir", "ext_sub1.txt")
+        external_file_ds = Dataset.create_dataset(
+            ext_sub1_path,
+            user=self.myUser,
+            externalfiledirectory=self.efd
+        )
+
+        # Where possible get_file_handle uses the internal copy.
+        with external_file_ds.get_open_file_handle() as data_handle:
+            self.assertEquals(data_handle, external_file_ds.dataset_file)
+
+        # It falls back on the external copy.
+        external_file_ds.dataset_file.delete()
+        with external_file_ds.get_open_file_handle() as external_file_handle:
+            self.assertEquals(os.path.abspath(external_file_handle.name), ext_sub1_path)
+
+    def test_get_file_handle_subdirectory(self):
+        """
+        Test retrieving a file handle on a Dataset with a file in a subdirectory.
+        """
+        # Where possible get_file_handle uses the internal copy.
+        with self.external_file_ds.get_open_file_handle() as data_handle:
+            self.assertEquals(data_handle, self.external_file_ds.dataset_file)
+
+        # It falls back on the external copy.
+        with self.external_file_ds_no_internal.get_open_file_handle() as external_file_handle:
+            self.assertEquals(
+                os.path.abspath(external_file_handle.name),
+                os.path.abspath(os.path.join(self.working_dir, self.ext1_path))
+            )
+
+    def test_external_absolute_path(self):
+        """
+        Retrieve the external absolute path of an externally-backed Dataset.
+        """
+        ext1_path = os.path.join(self.working_dir, self.ext1_path)
+        ext_sub1_path = os.path.join(self.working_dir, self.ext_sub1_path)
+
+        self.assertEquals(self.external_file_ds.external_absolute_path(), ext1_path)
+        self.assertEquals(self.external_file_ds_no_internal.external_absolute_path(), ext1_path)
+        self.assertEquals(self.external_file_ds_subdir.external_absolute_path(), ext_sub1_path)
+        self.assertIsNone(self.non_external_dataset.external_absolute_path())
+
+    def test_has_data(self):
+        """
+        Dataset factors in presence/absence of external files when checking for data.
+        """
+        self.assertTrue(self.external_file_ds.has_data())
+        self.assertTrue(self.external_file_ds_no_internal.has_data())
+        self.assertTrue(self.external_file_ds_subdir.has_data())
+
+        # We make an externally-backed Dataset to mess with.
+        ext_path = "ext_test_has_data.txt"
+        ext_contents = "File has data"
+        with open(os.path.join(self.working_dir, ext_path), "wb") as f:
+            f.write(ext_contents)
+
+        external_path = os.path.join(self.working_dir, ext_path)
+        external_file_ds_no_internal = Dataset.create_dataset(
+            external_path,
+            user=self.myUser,
+            keep_file=False,
+            externalfiledirectory=self.efd
+        )
+        # Delete this file.
+        os.remove(external_path)
+        self.assertFalse(external_file_ds_no_internal.has_data())
+
+        # Now test when the file exists but is unreadable.
+        with open(os.path.join(self.working_dir, ext_path), "wb") as f:
+            f.write(ext_contents)
+        self.assertTrue(external_file_ds_no_internal.has_data())
+        os.chmod(external_path, stat.S_IWUSR | stat.S_IXUSR)
+        self.assertFalse(external_file_ds_no_internal.has_data())
+
+    def test_clean_efd_external_path_both_set(self):
+        """
+        Both or neither of externalfiledirectory and external_path are set.
+        """
+        self.external_file_ds.clean()
+
+        self.external_file_ds.externalfiledirectory = None
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Both externalfiledirectory and external_path should be set or neither should be set",
+            self.external_file_ds.clean
+        )
+
+        self.external_file_ds.externalfiledirectory = self.efd
+        self.external_file_ds.external_path = ""
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Both externalfiledirectory and external_path should be set or neither should be set",
+            self.external_file_ds.clean
+        )
+
+        # Reduce this to a purely internal Dataset.
+        self.external_file_ds.externalfiledirectory = None
+        self.external_file_ds.clean()
+
+    def test_external_file_redact_this(self):
+        """
+        Externally-backed Datasets should have external_path and externalfiledirectory cleared on redaction.
+        """
+        self.external_file_ds.redact_this()
+        self.external_file_ds.refresh_from_db()
+        self.assertEquals(self.external_file_ds.external_path, "")
+        self.assertIsNone(self.external_file_ds.externalfiledirectory)

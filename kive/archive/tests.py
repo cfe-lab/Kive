@@ -109,7 +109,7 @@ class ArchiveTestCaseHelpers:
 
         self.E03_11_RSIC = self.E03_11.psic_instances.create(dest_runstep=self.step_E1_RS)
         self.make_complete_non_reused(self.E03_11_RSIC, [self.raw_dataset], [self.raw_dataset])
-        self.raw_dataset.integrity_checks.create(execlog=self.E03_11_RSIC.log, user=self.myUser)
+        # self.raw_dataset.integrity_checks.create(execlog=self.E03_11_RSIC.log, user=self.myUser)
         if bp == "first_rsic":
             return
 
@@ -746,12 +746,9 @@ class RunStepTests(ArchiveTestCase):
         """
         A RunStep with an incomplete RunSIC is not clean.
         """
-        self.step_through_runstep_creation("first_rsic")
-
-        # Make this RunSIC incomplete by removing the ICL.
-        icl_to_remove = self.raw_dataset.integrity_checks.filter(execlog=self.E03_11_RSIC.log).first()
-        icl_to_remove.execlog = None
-        icl_to_remove.save()
+        self.step_through_runstep_creation("first_runstep")
+        # Follow through step_through_runstep_creation, stopping short of completing the input cable.
+        self.E03_11_RSIC = self.E03_11.psic_instances.create(dest_runstep=self.step_E1_RS)
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('{} "{}" is not complete'.format("RunSIC", self.E03_11_RSIC)),
@@ -2913,15 +2910,18 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         self.assertTrue(incomplete_cable.is_complete())
         self.assertTrue(incomplete_cable.successful_reuse())
 
-    def test_runcomponent_successful_checks_not_passed(self):
-        """Testing of a RunComponent (RunSIC) that is successful but has no ExecRecord yet."""
-        self.step_through_run_creation("first_cable_created")
+    def test_nontrivial_rsic_successful_checks_not_passed(self):
+        """Testing of a RunComponent (non-trivial RunSIC) that is successful but has no data checks yet."""
+        self.step_through_runstep_creation("second_runstep")
+        # Follow the procedure in step_through_runstep_creation but stopping short of the checks.
+        self.complete_RSICs(self.step_E2_RS,
+                            [self.triplet_dataset, self.singlet_dataset],
+                            [self.D1_in_dataset, self.singlet_dataset])
+        # This is a non-trivial cable, so data checks must be part of its completion.
+        self.E01_21_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E01_21).first()
 
-        incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
-        self.make_complete_non_reused(incomplete_cable, [self.raw_dataset], [self.raw_dataset])
-
-        self.assertFalse(incomplete_cable.is_complete())
-        self.assertTrue(incomplete_cable.successful_execution())
+        self.assertFalse(self.E01_21_RSIC.is_complete())
+        self.assertTrue(self.E01_21_RSIC.successful_execution())
 
     def test_runcomponent_successful_checks_passed(self):
         """Testing of a RunComponent (RunSIC) that is successful and all checks pass."""
@@ -3032,6 +3032,15 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
 
         self.assertTrue(self.step_E1_RS.is_complete())
         self.assertFalse(self.step_E1_RS.successful_execution())
+
+    def test_runstep_successful_checks_not_passed(self):
+        """Testing of a RunComponent (RunStep) that is successful but has no data checks yet."""
+        self.step_through_run_creation("first_cable")
+        # Follow the procedure in step_through_run_creation but stopping short of the checks.
+        self.make_complete_non_reused(self.step_E1_RS, [self.raw_dataset], [self.doublet_dataset])
+
+        self.assertFalse(self.step_E1_RS.is_complete())
+        self.assertTrue(self.step_E1_RS.successful_execution())
 
     def test_runstep_failed_subrun(self):
         """Testing on a RunStep with a child_run that fails."""
@@ -3365,7 +3374,7 @@ year,month,day,hour,minute,second,microsecond
 
     def test_long_output(self):
         """Should handle lots of output to stdout or stderr without deadlocking."""
-        iteration_count = 1000
+        iteration_count = 100000
         python_code = """\
 #! /usr/bin/env python
 import sys
@@ -3562,6 +3571,7 @@ class RunStepReuseFailedExecRecordTests(TestCase):
 
         failing_pipeline = tools.make_first_pipeline("failing pipeline", "a pipeline which always fails",
                                                      self.user_grandpa)
+        # self.method_fubar always exits with exit code 1, and creates no output.
         tools.create_linear_pipeline(
             failing_pipeline,
             [self.method_fubar, self.method_noop], "indata", "outdata"
@@ -3587,8 +3597,22 @@ class RunStepReuseFailedExecRecordTests(TestCase):
         run_2 = Manager.execute_pipeline(self.user_grandpa, failing_pl_2, [self.dataset_words],
                                          groups_allowed=[everyone_group()]).get_last_run()
 
-        self.assertEquals(run_1.runsteps.get(pipelinestep__step_num=1).execrecord,
+        failing_er = run_1.runsteps.get(pipelinestep__step_num=1).execrecord
+        self.assertEquals(failing_er,
                           run_2.runsteps.get(pipelinestep__step_num=1).execrecord)
+
+        self.assertEquals(failing_er.generator.methodoutput.return_code, 1)
+        self.assertFalse(failing_er.outputs_OK())
+
+        self.assertEquals(failing_er.execrecordouts.count(), 1)
+        produced_dataset = failing_er.execrecordouts.first().dataset
+        self.assertEquals(produced_dataset.content_checks.count(), 1)
+        self.assertFalse(produced_dataset.integrity_checks.exists())
+
+        bad_ccl = produced_dataset.content_checks.first()
+        self.assertEquals(bad_ccl, failing_er.generator.content_checks.first())
+
+        self.assertTrue(bad_ccl.baddata.missing_output)
 
 
 class MethodOutputApiTests(BaseTestCases.ApiTestCase):

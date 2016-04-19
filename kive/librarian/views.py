@@ -29,7 +29,7 @@ LOGGER = logging.getLogger(__name__)
 
 def _build_download_response(source_file):
     file_chunker = FileWrapper(source_file)  # Stream file in chunks to avoid overloading memory.
-    mimetype = mimetypes.guess_type(source_file.url)[0]
+    mimetype = mimetypes.guess_type(source_file.name)[0]
     response = HttpResponse(file_chunker, content_type=mimetype)
     response['Content-Length'] = source_file.size
     response['Content-Disposition'] = 'attachment; filename="{}"'.format(os.path.basename(source_file.name))
@@ -63,7 +63,8 @@ def dataset_download(request, dataset_id):
     except Dataset.DoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
-    return _build_download_response(dataset.dataset_file)
+    with dataset.get_open_file_handle() as data_handle:
+        return _build_download_response(data_handle)
 
 
 @login_required
@@ -151,8 +152,29 @@ def dataset_view(request, dataset_id):
         "return": return_url,
         "dataset_form": dataset_form
     }
-    if dataset.is_raw():
+
+    if not dataset.has_data():
+        t = loader.get_template("librarian/missing_dataset_view.html")
+        if dataset.external_path:
+            c["missing_data_message"] = "This dataset's external file is missing.  " \
+                                        "Consult your system administrator if this was unexpected."
+        elif dataset.is_redacted():
+            c["missing_data_message"] = "Data has been redacted."
+        else:
+            c["missing_data_message"] = "Data was not retained or has been purged."
+
+    elif dataset.is_raw():
         t = loader.get_template("librarian/raw_dataset_view.html")
+
+        # Read 1000 characters.
+        with dataset.get_open_file_handle() as data_handle:
+            sample_content = data_handle.read(1000)
+
+        c.update(
+            {
+                "sample_content": sample_content
+            }
+        )
     else:
         # If we have a mismatched output, we do an alignment
         # over the columns.
@@ -184,7 +206,6 @@ def datasets_add(request):
     c = {}
     if request.method == 'POST':
         # The new Dataset; we need it here for validation purposes.
-
         ds = Dataset(user=request.user)
         df = DatasetForm(request.POST, request.FILES, instance=ds, user=request.user,
                          prefix="single")
@@ -201,17 +222,26 @@ def datasets_add(request):
                 if df.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
                     cdt = CompoundDatatype.objects.get(pk=df.cleaned_data['compound_datatype'])
 
+                keep_file = True
+                file_path = df.cleaned_data.get("external_path", "")
+                efd = df.cleaned_data.get("externalfiledirectory", None)
+                # Both or neither are specified (this is enforced in form validation).
+                if file_path:
+                    file_path = os.path.join(efd.path, file_path)
+                    keep_file = df.cleaned_data["save_in_db"]
+
                 with transaction.atomic():
                     ds = Dataset.create_dataset(
-                        file_path=None,
+                        file_path=file_path,
                         user=request.user,
                         cdt=cdt,
-                        keep_file=True,
+                        keep_file=keep_file,
                         name=df.cleaned_data['name'],
                         description=df.cleaned_data['description'],
                         file_source=None,
                         check=True,
                         file_handle=df.cleaned_data['dataset_file'],
+                        externalfiledirectory=efd,
                         instance=ds
                     )
                     ds.grant_from_json(df.cleaned_data["permissions"])
@@ -220,7 +250,7 @@ def datasets_add(request):
             else:
                 success = False
 
-        except (AttributeError, ValidationError, ValueError) as e:
+        except (AttributeError, ValidationError, ValueError, IOError) as e:
             LOGGER.exception(e.message)
             success = False
             df.add_error(None, e)

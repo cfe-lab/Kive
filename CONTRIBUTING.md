@@ -29,7 +29,7 @@ Another option is to install the gprof2dot package with pip. Then you can
 generate a call graph with timing information:
 
     python -m cProfile -o timing.dat manage.py test --settings=kive.test_settings \
-    && python -m pstats timing.dat <timing_commands.txt >timing.txt \
+    && (echo strip ; echo "sort cumtime" ; echo "stats 500") | python -m pstats timing.dat >timing.txt \
     && gprof2dot -f pstats timing.dat -o timing.dot
 
 ## Deploying a Release ##
@@ -42,7 +42,9 @@ Once you have set up your production server, this is how to deploy a new release
     unit tests.
     
     ./manage.py test --settings kive.test_settings_pg
-    
+
+2. Check if the kiveapi package needs to update its version number by looking
+   for new commits in the `/api` folder.
 2. Check that all the issues in the current milestone are closed.
 3. [Create a release][release] on Github. Use "vX.Y" as the tag, where X.Y
     matches the version on the milestone. If you have to redo
@@ -166,7 +168,7 @@ full test suite can take around half an hour.
 If you want to run your unit tests faster, you can run them against an
 in-memory SQLite database with this command:
 
-    ./manage.py test --settings kive.test_settings
+    ./manage.py test --settings kive.settings_test
     
 This also reduces the amount of console output produced by the testing.  
 Testing with a SQLite database may have slightly different behaviour from 
@@ -174,7 +176,7 @@ the PostgreSQL database, so you should occasionally run the tests with
 the default settings.  Alternatively, to run the tests with all the default
 settings but with reduced console output:
     
-    ./manage.py test --settings kive.test_settings_pg
+    ./manage.py test --settings kive.settings_test_pg
     
 See [the Django documentation][unit-tests] for details on running specific tests.
 
@@ -190,7 +192,7 @@ Then add these two lines to `settings.py`:
 
 Finally, run the unit tests and the script to summarize them.
 
-    ./manage.py test --settings kive.test_settings
+    ./manage.py test --settings kive.settings_test
     ./slow_test_report.py
 
 [unit-tests]: https://docs.djangoproject.com/en/dev/topics/testing/overview/#running-tests

@@ -17,9 +17,11 @@ class Dataset(object):
                 self.dataset_id = obj['id']
                 self.filename = obj['filename']
                 self.name = obj['name'] if 'name' in obj else obj['output_name']
-                self.cdt = CompoundDatatype(obj['compounddatatype']) if 'compounddatatype' in obj else None
+                self.cdt = CompoundDatatype(obj.get('compounddatatype'))
                 self.groups_allowed = obj.get('groups_allowed')
                 self.users_allowed = obj.get('users_allowed')
+                self.externalfiledirectory = obj.get('externalfiledirectory')
+                self.external_path = obj.get('external_path')
                 self.raw = obj
 
         except (ValueError, IndexError, KeyError):

@@ -262,15 +262,23 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
     # The execution during which this check occurred, if applicable.
     execlog = models.ForeignKey("archive.ExecLog", null=True, related_name="integrity_checks")
 
+    runsic = models.OneToOneField("archive.RunSIC", null=True, related_name="input_integrity_check")
+
     # The user performing the check.
     user = models.ForeignKey(User)
+
+    # Flag indicating a failed attempt to read (or otherwise access) the file.
+    read_failed = models.BooleanField(default=False)
 
     # Implicit through inheritance: start_time, end_time.
 
     def __str__(self):
-        if self.is_fail():
-            return "OK"
-        return "MD5 conflict"
+        status = "OK"
+        if self.is_md5_conflict():
+            status = "MD5 conflict"
+        elif self.read_failed:
+            status = "Read failed"
+        return status
 
     def clean(self):
         """
@@ -279,7 +287,7 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
         Calls clean on its child MD5Conflict, if it exists.  Checks if
         end_time is later than start_time.
         """
-        if self.is_fail():
+        if self.is_md5_conflict():
             self.usurper.clean()
 
         stopwatch.models.Stopwatch.clean(self)
@@ -294,13 +302,19 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
         """
         return self.end_time is not None
 
-    def is_fail(self):
-        """True if this integrity check is a failure."""
+    def is_md5_conflict(self):
+        """
+        True if this integrity check represents an MD5 conflict.
+        """
         try:
             self.usurper
         except ObjectDoesNotExist:
             return False
         return self.usurper.pk is not None
+
+    def is_fail(self):
+        """True if this integrity check is a failure."""
+        return self.read_failed or self.is_md5_conflict()
 
 
 class VerificationLog(stopwatch.models.Stopwatch):
@@ -345,8 +359,7 @@ class VerificationLog(stopwatch.models.Stopwatch):
         """
         self.clean()
         if self.return_code is None or self.end_time is None:
-            raise ValidationError('VerificationLog "{}" is not complete.'.
-                    format(self))
+            raise ValidationError('VerificationLog "{}" is not complete.'.format(self))
 
 
 class MD5Conflict(models.Model):

@@ -5,18 +5,21 @@ import re
 from django.core.management.base import BaseCommand
 from django.core.urlresolvers import reverse, resolve
 from django.db import connection
+from django.db.models import Count
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from archive.models import Run, RunStep
-from metadata.models import kive_user
-from librarian.models import ExecRecord
+from metadata.models import kive_user, CompoundDatatype
+from librarian.models import ExecRecord, Dataset
+from librarian.views import dataset_view
+from kive.tests import DuckRequest
 
 
 class Command(BaseCommand):
     help = "Exercise the Run.is_complete() method for performance testing. "
 
     def handle(self, *args, **options):
-        self.count_queries(self.test_many_execrecords)
+        self.count_queries(self.test_dataset_rows)
 
     def check_many_runs(self):
         RUN_COUNT = 100
@@ -24,6 +27,15 @@ class Command(BaseCommand):
         complete_count = sum(1 for run in runs if run.is_complete())
         print('Found {} complete in {} most recent runs.'.format(complete_count,
                                                                  RUN_COUNT))
+
+    def test_dataset_view(self):
+        dataset_id = self.find_big_dataset().id
+        request = DuckRequest()
+        return dataset_view(request, dataset_id)
+
+    def test_dataset_rows(self):
+        dataset = self.find_big_dataset()
+        return len(list(dataset.rows(data_check=True, limit=7)))
 
     def test_many_runsteps(self):
         COUNT = 100
@@ -41,6 +53,17 @@ class Command(BaseCommand):
         fail_count = sum(1 for r in execrecords if r.has_ever_failed())
         print('Found {} failed in {} most recent runs.'.format(fail_count,
                                                                len(execrecords)))
+
+    def find_big_dataset(self):
+        compound_datatypes = CompoundDatatype.objects.annotate(
+            Count('members')).order_by('-members__count')
+        for compound_datatype in compound_datatypes:
+            datasets = Dataset.objects.filter(
+                structure__compounddatatype=compound_datatype).exclude(
+                    dataset_file='').order_by('-structure__num_rows')
+            for dataset in datasets:
+                return dataset
+        raise RuntimeError('No structured datasets found.')
 
     def count_queries(self, task):
         """ Count the queries triggered by task, and print a summary.

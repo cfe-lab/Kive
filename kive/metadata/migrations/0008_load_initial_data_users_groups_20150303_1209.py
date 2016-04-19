@@ -22,12 +22,10 @@ def load_initial_groups(apps, schema_editor):
     call_command("loaddata", "initial_groups", app_label="metadata")
 
 
-@transaction.atomic
 def load_initial_user(apps, schema_editor):
     call_command("loaddata", "initial_user", app_label="metadata")
 
 
-@transaction.atomic
 def load_initial_data(apps, schema_editor):
     """
     Defines some system built-in Datatypes and CompoundDatatypes.

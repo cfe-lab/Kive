@@ -157,6 +157,7 @@ a.remove:hover {
     vertical-align: middle;
     font-size: .9em;
     white-space: nowrap;
+    max-width: none;
 }
 .results tr:hover td {
     background-color: #ebf6fd;

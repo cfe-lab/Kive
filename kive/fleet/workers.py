@@ -134,7 +134,7 @@ class MPIManagerInterface(MPIFleetInterface):
     def shut_down_fleet(self):
         for rank in range(self.get_size()):
             if rank != self.get_rank():
-                self.comm.send(dest=rank, tag=Worker.SHUTDOWN)
+                self.comm.send(None, dest=rank, tag=Worker.SHUTDOWN)
         self.comm.Disconnect()
 
 
@@ -219,6 +219,8 @@ class Manager(object):
         self.task_queue = []
         # A table of currently running sandboxes, indexed by the Run.
         self.active_sandboxes = {}
+        # A table of sandboxes that are in the process of shutting down/being cancelled.
+        self.sandboxes_shutting_down = set()
 
         # roster will be a dictionary keyed by hostnames whose values are
         # the sets of ranks of processes running on that host.  This will be
@@ -263,7 +265,7 @@ class Manager(object):
         new_sdbx.advance_pipeline()
 
         # Refresh run_to_start.
-        run_to_start = Run.objects.get(pk=run_to_start.pk)
+        run_to_start.refresh_from_db()
 
         # If we were able to reuse throughout, then we're totally done.  Otherwise we
         # need to do some bookkeeping.
@@ -274,9 +276,9 @@ class Manager(object):
             finished_already = True
 
         elif not run_to_start.is_successful(use_cache=True):
-            # The run failed somewhere in reuse.  This hasn't affected any of our maps yet, so we
+            # The run failed somewhere in preparation.  This hasn't affected any of our maps yet, so we
             # just report it and discard it.
-            mgr_logger.info('Run "%s" (pk=%d) (Pipeline: %s, User: %s) failed on reuse',
+            mgr_logger.info('Run "%s" (pk=%d) (Pipeline: %s, User: %s) failed before execution',
                             run_to_start, run_to_start.pk, run_to_start.pipeline, run_to_start.user)
             run_to_start.mark_complete(save=True)
             finished_already = True
@@ -299,6 +301,8 @@ class Manager(object):
         Remove all tasks coming from the specified sandbox from the work queue
         and mark them as cancelled.
         """
+        # Mark this sandbox as in the process of shutting down.
+        self.sandboxes_shutting_down.add(sandbox)
         new_task_queue = []
         for task_sdbx, task in self.task_queue:
             if task_sdbx != sandbox:
@@ -373,8 +377,12 @@ class Manager(object):
 
             # The task that returned may have belonged to the same sandbox, and
             # failed.  If so, we should cancel this task.
-            if sandbox.run not in self.active_sandboxes:
-                mgr_logger.debug("Run has been terminated; abandoning this task.")
+            if sandbox.run not in self.active_sandboxes or sandbox in self.sandboxes_shutting_down:
+                mgr_logger.debug(
+                    "Abandoning task %s (pk=%d) because its run has been terminated.",
+                    task,
+                    task.pk
+                )
                 return
 
     def note_progress(self, lord_rank, task_finished):
@@ -410,11 +418,23 @@ class Manager(object):
         clean_up_now = False
         curr_sdbx.run = Run.objects.get(pk=curr_sdbx.run.pk)
         if not curr_sdbx.run.is_successful(use_cache=True):
-            self.mop_up_terminated_sandbox(curr_sdbx)
-            if not task_finished.is_successful(use_cache=True):
+
+            if task_finished.is_successful(use_cache=True):
+                mgr_logger.debug(
+                    'Task %s (pk=%d) was successful but run "%s" (pk=%d) (Pipeline: %s, User: %s) failed.',
+                    task_finished,
+                    task_finished.pk,
+                    curr_sdbx.run,
+                    curr_sdbx.run.pk,
+                    curr_sdbx.pipeline,
+                    curr_sdbx.user
+                )
+            else:
                 mgr_logger.info('Task %s (pk=%d) of run "%s" (pk=%d) (Pipeline: %s, User: %s) failed.',
                                 task_finished, task_finished.pk, curr_sdbx.run, curr_sdbx.run.pk,
                                 curr_sdbx.pipeline, curr_sdbx.user)
+
+            self.mop_up_terminated_sandbox(curr_sdbx)
 
             task_finished.failed_mark_complete(curr_run_tasks)
 
@@ -450,6 +470,16 @@ class Manager(object):
 
                 elif not curr_sdbx.run.is_successful(use_cache=False):
                     # The task that just finished was unsuccessful.  We mop up the sandbox.
+                    mgr_logger.debug(
+                        'Run "%s" (pk=%d) failed to advance after finishing task %s (pk=%d)'
+                        ' (Pipeline: %s, User: %s)',
+                        curr_sdbx.run,
+                        curr_sdbx.run.pk,
+                        task_finished,
+                        task_finished.pk,
+                        curr_sdbx.pipeline,
+                        curr_sdbx.user
+                    )
                     self.mop_up_terminated_sandbox(curr_sdbx)
                     if not tasks_currently_running:
                         clean_up_now = True
@@ -465,6 +495,8 @@ class Manager(object):
                                 curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
 
             finished_sandbox = self.active_sandboxes.pop(curr_sdbx.run)
+            # If this was already in the process of shutting down, remove the annotation.
+            self.sandboxes_shutting_down.discard(finished_sandbox)
             if self.history_queue.maxlen > 0:
                 self.history_queue.append(finished_sandbox)
 
@@ -536,7 +568,7 @@ class Manager(object):
         while len(self.task_queue) > 0 and time.time() < time_to_poll:
             # task_queue entries are (sandbox, run_step)
             self.task_queue.sort(key=lambda entry: entry[0].run.start_time)
-            curr_task = self.task_queue[0]  # looks like (sandbox, task)
+            curr_task = self.task_queue.pop(0)  # looks like (sandbox, task)
             task_sdbx = self.active_sandboxes[curr_task[1].top_level_run]
             # We assign this task to a worker, and do not proceed until the task
             # is assigned.
@@ -545,7 +577,7 @@ class Manager(object):
             except WorkerFailedException as e:
                 mgr_logger.error(e.error_msg)
                 return False
-            self.task_queue = self.task_queue[1:]
+
         return True
 
     def wait_for_polling(self, time_to_poll):

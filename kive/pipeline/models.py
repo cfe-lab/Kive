@@ -825,8 +825,6 @@ class PipelineCable(models.Model):
 
             try:
                 os.link(source, output_path)
-                curr_log.stop(save=True, clean=True)
-                return
             except OSError:
                 logger.warning(
                     "OSError occurred while linking %s to %s",
@@ -840,9 +838,10 @@ class PipelineCable(models.Model):
                     output_stat = os.stat(output_path)
                     if source_stat.st_ino == output_stat.st_ino:
                         logger.debug("Link was actually successful; moving on")
-                        return
                     else:
                         raise
+            curr_log.stop(save=True, clean=True)
+            return
 
         # Make a dict encapsulating the mapping required: keyed by the output column name, with value
         # being the input column name.

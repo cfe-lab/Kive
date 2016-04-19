@@ -13,7 +13,7 @@ from constants import datatypes
 from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
 from kive.testing_utils import clean_up_all_files
 from kive.tests import install_fixture_files, restore_production_files
-from librarian.models import Dataset, DatasetStructure
+from librarian.models import Dataset, DatasetStructure, ExternalFileDirectory
 from metadata.models import Datatype, CompoundDatatype, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from method.tests import samplecode_path
@@ -160,6 +160,7 @@ def execute_tests_environment_load(case):
     case.wire2 = case.cable_X1_A1.custom_wires.get(source_pin=case.pX_in_cdtm_3)
 
     case.X1_outcable = case.pX.outcables.get()
+    case.pX_raw = Pipeline.objects.get(revision_name="pX_raw")
 
 
 class ExecuteTestsBase(TestCase):
@@ -172,6 +173,33 @@ class ExecuteTestsBase(TestCase):
     def tearDown(self):
         clean_up_all_files()
         restore_production_files()
+
+    def check_run_OK(self, run):
+        for step in run.runsteps.all():
+            for rsic in step.RSICs.all():
+                self.assertTrue(rsic._complete is not None)
+                self.assertTrue(rsic._successful is not None)
+                self.assertTrue(rsic.is_complete(use_cache=True))
+                self.assertTrue(rsic.is_successful(use_cache=True))
+
+            if step.has_subrun():
+                self.check_run_OK(step.child_run)
+
+            self.assertTrue(step._complete is not None)
+            self.assertTrue(step._successful is not None)
+            self.assertTrue(step.is_complete(use_cache=True))
+            self.assertTrue(step.is_successful(use_cache=True))
+
+        for outcable in run.runoutputcables.all():
+            self.assertTrue(outcable._complete is not None)
+            self.assertTrue(outcable._successful is not None)
+            self.assertTrue(outcable.is_complete(use_cache=True))
+            self.assertTrue(outcable.is_successful(use_cache=True))
+
+        self.assertTrue(run._complete is not None)
+        self.assertTrue(run._successful is not None)
+        self.assertTrue(run.is_complete(use_cache=True))
+        self.assertTrue(run.is_successful(use_cache=True))
 
 
 class ExecuteTests(ExecuteTestsBase):
@@ -218,33 +246,6 @@ class ExecuteTests(ExecuteTestsBase):
                     dataset = None
             input_datasets.append(dataset)
         return input_datasets
-
-    def check_run_OK(self, run):
-        for step in run.runsteps.all():
-            for rsic in step.RSICs.all():
-                self.assertTrue(rsic._complete is not None)
-                self.assertTrue(rsic._successful is not None)
-                self.assertTrue(rsic.is_complete(use_cache=True))
-                self.assertTrue(rsic.is_successful(use_cache=True))
-
-            if step.has_subrun():
-                self.check_run_OK(step.child_run)
-
-            self.assertTrue(step._complete is not None)
-            self.assertTrue(step._successful is not None)
-            self.assertTrue(step.is_complete(use_cache=True))
-            self.assertTrue(step.is_successful(use_cache=True))
-
-        for outcable in run.runoutputcables.all():
-            self.assertTrue(outcable._complete is not None)
-            self.assertTrue(outcable._successful is not None)
-            self.assertTrue(outcable.is_complete(use_cache=True))
-            self.assertTrue(outcable.is_successful(use_cache=True))
-
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_successful(use_cache=True))
 
     def test_pipeline_execute_A_simple_onestep_pipeline(self):
         """Execution of a one-step pipeline."""
@@ -514,6 +515,62 @@ class ExecuteTests(ExecuteTestsBase):
         for cancelled_rs in run.runsteps.exclude(pk=rs.pk):
             self.assertTrue(cancelled_rs.is_cancelled)
 
+    # FIXME this test revealed issues #534 and #535; when we fix these, revisit this test.
+    # def test_filling_in_execrecord_with_incomplete_content_check(self):
+    #     """Execution that fills in an ExecRecord that doesn't have a complete content check."""
+    #
+    #     # Execute pipeline
+    #     pipeline = self.pX
+    #     inputs = [self.dataset]
+    #     run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+    #
+    #     # This was one step, so we go into that first step and fiddle with the ContentCheckLog.
+    #     rs = run.runsteps.first()
+    #     ccl_to_alter = rs.execrecord.execrecordouts.first().dataset.content_checks.first()
+    #     ccl_to_alter.end_time = None
+    #     ccl_to_alter.start_time = None
+    #     ccl_to_alter.save()
+    #
+    #     # Now execute the pipeline again.
+    #     run2 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+    #     r2s = run2.runsteps.first()
+    #     # It should have filled in the same execrecord.
+    #     self.assertEquals(r2s.execrecord, rs.execrecord)
+    #     # There should be an integrity check and a content check both associated to r2s' log.
+    #     self.assertEquals(r2s.log.integrity_check.count(), 1)
+    #     self.assertEquals(r2s.log.content_check.count(), 1)
+
+    def test_filling_in_execrecord_with_incomplete_content_check(self):
+        """Execution that fills in an ExecRecord that doesn't have a complete content check."""
+
+        # Execute pipeline
+        pipeline = self.pX_raw
+        inputs = [self.raw_dataset]
+        run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+
+        # This was one step, so we go into that first step and fiddle with the ContentCheckLog.
+        rs = run.runsteps.first()
+        ccl_to_alter = rs.execrecord.execrecordouts.first().dataset.content_checks.first()
+        ccl_to_alter.end_time = None
+        ccl_to_alter.start_time = None
+        ccl_to_alter.save()
+
+        # Now we dummy it up to look like the RunStep never finished, so no RunOutputCable was run
+        # and rs is not marked complete.
+        roc = run.runoutputcables.first()
+        roc.delete()
+        rs._complete = False
+        rs.save()
+
+        # Now execute the pipeline again.
+        run2 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        r2s = run2.runsteps.first()
+        # It should have filled in the same execrecord.
+        self.assertEquals(r2s.execrecord, rs.execrecord)
+        # There should be an integrity check and a content check both associated to r2s' log.
+        self.assertEquals(r2s.log.integrity_checks.count(), 1)
+        self.assertEquals(r2s.log.content_checks.count(), 1)
+
 
 class SandboxTests(ExecuteTestsBase):
 
@@ -779,3 +836,106 @@ class RestoreReusableDatasetTest(TestCase):
         step_plans = run_plan.step_plans
 
         self.assertIsNotNone(step_plans[0].execrecord)
+
+
+class ExecuteExternalInputTests(ExecuteTestsBase):
+
+    def setUp(self):
+        super(ExecuteExternalInputTests, self).setUp()
+
+        self.working_dir = tempfile.mkdtemp()
+        self.efd = ExternalFileDirectory(
+            name="ExecuteTestsEFD",
+            path=self.working_dir
+        )
+        self.efd.save()
+        self.ext_path = "ext.txt"
+        self.full_ext_path = os.path.join(self.working_dir, self.ext_path)
+
+    def test_pipeline_external_file_input(self):
+        """Execution of a pipeline whose input is externally-backed."""
+
+        # Copy the contents of self.dataset to an external file and link the Dataset.
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
+
+        # Create a new externally-backed Dataset.
+        external_ds = Dataset.create_dataset(
+            self.full_ext_path,
+            user=self.myUser,
+            keep_file=False,
+            name="ExternalDS",
+            description="Dataset with external data and no internal data",
+            externalfiledirectory=self.efd
+        )
+
+        # Execute pipeline
+        run = Manager.execute_pipeline(self.myUser, self.pX_raw, [external_ds]).get_last_run()
+
+        self.check_run_OK(run)
+
+    def test_pipeline_external_file_input_deleted(self):
+        """Execution of a pipeline whose input is missing."""
+
+        # Copy the contents of self.dataset to an external file and link the Dataset.
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
+
+        # Create a new externally-backed Dataset.
+        external_missing_ds = Dataset.create_dataset(
+            self.full_ext_path,
+            user=self.myUser,
+            keep_file=False,
+            name="ExternalMissingDS",
+            description="Dataset with missing external data and no internal data",
+            externalfiledirectory=self.efd
+        )
+        # Remove the external file.
+        os.remove(self.full_ext_path)
+
+        # Execute pipeline
+        run = Manager.execute_pipeline(self.myUser, self.pX_raw, [external_missing_ds]).get_last_run()
+
+        # The run should fail on the first cable.
+        self.assertFalse(run.is_successful(use_cache=True))
+        rsic = run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
+        self.assertFalse(rsic.is_successful(use_cache=True))
+        self.assertTrue(hasattr(rsic, "input_integrity_check"))
+        self.assertTrue(rsic.input_integrity_check.read_failed)
+
+    # FIXME disabled for v0.7.3; fix as part of #550.
+    # def test_pipeline_external_file_input_corrupted(self):
+    #     """Execution of a pipeline whose input is corrupted."""
+    #
+    #     # Copy the contents of self.dataset to an external file and link the Dataset.
+    #     self.raw_dataset.dataset_file.open()
+    #     with self.raw_dataset.dataset_file:
+    #         with open(self.full_ext_path, "wb") as f:
+    #             f.write(self.raw_dataset.dataset_file.read())
+    #
+    #     # Create a new externally-backed Dataset.
+    #     external_corrupted_ds = Dataset.create_dataset(
+    #         self.full_ext_path,
+    #         user=self.myUser,
+    #         keep_file=False,
+    #         name="ExternalCorruptedDS",
+    #         description="Dataset with corrupted external data and no internal data",
+    #         externalfiledirectory=self.efd
+    #     )
+    #     # Tamper with the external file.
+    #     with open(self.full_ext_path, "wb") as f:
+    #         f.write("Corrupted")
+    #
+    #     # Execute pipeline
+    #     run = Manager.execute_pipeline(self.myUser, self.pX_raw, [external_corrupted_ds]).get_last_run()
+    #
+    #     # The run should fail on the first cable.
+    #     self.assertFalse(run.is_successful(use_cache=True))
+    #     rsic = run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
+    #     self.assertFalse(rsic.is_successful(use_cache=True))
+    #     self.assertTrue(hasattr(rsic, "input_integrity_check"))
+    #     self.assertTrue(rsic.input_integrity_check.is_md5_conflict())

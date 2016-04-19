@@ -9,7 +9,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "-w",
-            "--worker_interfaces",
+            "--workers",
             dest="worker_interfaces",
             type=int,
             default=1

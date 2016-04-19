@@ -20,6 +20,7 @@ import file_access_utils
 import librarian.models
 import pipeline.models
 from method.models import Method
+from datachecking.models import IntegrityCheckLog
 from fleet.exceptions import StopExecution
 
 
@@ -90,7 +91,6 @@ class Sandbox:
         my_pipeline = run.pipeline
         inputs = [x.dataset for x in run.inputs.order_by("index")]
         sandbox_path = run.sandbox_path
-        assert all([i.has_data() for i in inputs])
 
         self.logger = logging.getLogger(self.__class__.__name__)
         self.user = user
@@ -151,6 +151,12 @@ class Sandbox:
 
         # For each sub-pipeline, we track how many of their input cables have completed.
         self.sub_pipeline_cable_tracker = {}
+
+    class RunInputEmptyException(Exception):
+        """
+        An exception raised when a cable encounters a Run input that has no data.
+        """
+        pass
 
     def step_xput_path(self, runstep, transformationxput, step_run_dir):
         """Path in Sandbox for PipelineStep TransformationXput."""
@@ -694,7 +700,7 @@ class Sandbox:
             curr_RS = self.reuse_or_prepare_step(step, run_to_resume, step_inputs, run_dir)
 
             # Refresh run_to_resume.
-            run_to_resume = Run.objects.get(pk=run_to_resume.pk)
+            run_to_resume.refresh_from_db()
 
             if not curr_RS.is_complete(use_cache=True):
                 all_complete = False
@@ -709,8 +715,12 @@ class Sandbox:
             elif curr_RS.reused and not curr_RS.is_successful(use_cache=True):
                 self.logger.debug("Step %d (%s) failed on reuse", step.step_num, step)
                 return_because_fail = True
+            elif not curr_RS.is_successful(use_cache=True):
+                self.logger.debug("Step %d (%s) failed to execute", step.step_num, step)
+                return_because_fail = True
             elif curr_RS.is_complete(use_cache=True):
                 step_nums_completed.append(step.step_num)
+
             if return_because_fail:
                 assert not run_to_resume.is_successful(use_cache=True)
                 return incables_completed, steps_completed, outcables_completed
@@ -793,7 +803,6 @@ class Sandbox:
 
         return incables_completed, steps_completed, outcables_completed
 
-    # Modified from execute_cable.
     def reuse_or_prepare_cable(self, cable, parent_record, input_dataset, output_path):
         """
         Attempt to reuse the cable; prepare it for finishing if unable.
@@ -887,7 +896,19 @@ class Sandbox:
 
         # Check the availability of input_dataset; recover if necessary.  Queue for execution
         # if cable is an outcable or an incable that feeds a sub-Pipeline.
-        exec_info.ready_to_go = self.enqueue_cable(exec_info, force=False)
+        try:
+            exec_info.ready_to_go = self.enqueue_cable(exec_info, force=False)
+        except Sandbox.RunInputEmptyException:
+            self.logger.debug("Cancelling cable with pk=%d.", curr_record.pk)
+
+            # Update state variables.
+            curr_record.mark_cancelled()
+            curr_record.stop(save=True, clean=False)
+            curr_record.complete_clean()
+
+            # Mark exec_info as cancelled.
+            exec_info.cancel()
+
         return exec_info
 
     # We'd call this when we need to prepare a cable for recovery.  This is essentially a "force" version of
@@ -897,6 +918,10 @@ class Sandbox:
     def enqueue_cable(self, cable_info, force=False):
         """
         Recursive helper for recover that handles recovery of a cable.
+
+        RAISES:
+        If this encounters a Run input that cannot be recovered, it raises
+        Sandbox.RunInputEmptyException.
         """
         # Unpack info from cable_info.
         cable_record = cable_info.cable_record
@@ -920,7 +945,36 @@ class Sandbox:
         # perform.
         queue_cable = (cable_record.component.is_outcable or cable_record.dest_runstep.pipelinestep.is_subpipeline or
                        (force and by_step is None))
+        file_access_start = timezone.now()
         if dataset_path is None and not input_dataset.has_data():
+            file_access_end = timezone.now()
+
+            # Bail out here if the input dataset is a Pipeline input and cannot be recovered
+            # (at this point we are probably in the case where an external file was removed).
+            if (cable_record.component.is_incable and
+                    cable_record.top_level_run == cable_record.parent_run and
+                    cable_record.component.definite.source_step == 0):
+                self.logger.debug("Cannot recover cable input: it is a Run input")
+
+                with transaction.atomic():
+                    # Create a failed IntegrityCheckLog.
+                    iic = IntegrityCheckLog(
+                        dataset=input_dataset,
+                        runsic=cable_record,
+                        read_failed=True,
+                        start_time=file_access_start,
+                        end_time=file_access_end,
+                        user=self.user
+                    )
+                    iic.clean()
+                    iic.save()
+
+                cable_record.mark_unsuccessful()
+                # Making sure the invoking record (either cable_record or something else
+                # that's recovering) is handled by the calling function.
+
+                raise Sandbox.RunInputEmptyException()
+
             self.logger.debug("Cable input requires non-trivial recovery")
             self.queue_recovery(input_dataset, recovering_record=recovering_record)
 
@@ -980,7 +1034,7 @@ class Sandbox:
             cable_exec_info = self.reuse_or_prepare_cable(corresp_cable, curr_RS, inputs[i], cable_path)
 
             # Refresh curr_RS.
-            curr_RS = RunStep.objects.get(pk=curr_RS.pk)
+            curr_RS.refresh_from_db()
 
             cable_info_list.append(cable_exec_info)
 
@@ -1008,6 +1062,7 @@ class Sandbox:
 
                 curr_RS.stop(save=True, clean=False)
                 curr_RS.complete_clean()
+                return curr_RS
 
         # Bundle up the information required to process this step.
         _in_dir, _out_dir, log_dir = self._setup_step_paths(step_run_dir, False)
@@ -1051,6 +1106,7 @@ class Sandbox:
                     with transaction.atomic():
                         curr_ER = step_plan.execrecord
                         can_reuse = curr_ER and curr_RS.check_ER_usable(curr_ER)
+
                         if curr_ER is not None:
                             # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now,
                             # we can return.
@@ -1093,7 +1149,17 @@ class Sandbox:
         # this step as waiting for them.
         if len(symbolically_okay_datasets) > 0:
             for missing_data in symbolically_okay_datasets:
-                self.queue_recovery(missing_data, invoking_record=curr_RS)
+                try:
+                    self.queue_recovery(missing_data, invoking_record=curr_RS)
+                except Sandbox.RunInputEmptyException:
+                    self.logger.debug("Cancelling RunStep with pk=%d.", curr_RS.pk)
+
+                    # Update state variables.
+                    curr_RS.mark_cancelled()
+                    curr_RS.complete_clean()
+                    execute_info.cancel()
+                    return curr_RS
+
                 self.tasks_waiting[missing_data].append(curr_RS)
             self.waiting_for[curr_RS] = symbolically_okay_datasets
         else:
@@ -1105,6 +1171,9 @@ class Sandbox:
     def step_recover_h(self, execute_info):
         """
         Helper for recover that's responsible for forcing recovery of a step.
+
+        RAISES:
+        Sandbox.RunInputEmptyException if it encounters an empty Run input.
         """
         # Break out execute_info.
         runstep = execute_info.runstep
@@ -1152,6 +1221,9 @@ class Sandbox:
         @param dataset_to_recover: dataset that needs to be recovered
         @param invoking_record: the run component that needs the
             dataset as an input
+
+        RAISES:
+        Sandbox.RunInputEmptyException if it encounters an empty Run input.
 
         PRE
         dataset_to_recover is in the maps but no corresponding file is on the file system.
@@ -1331,7 +1403,6 @@ class Sandbox:
         # Preconditions to test.
         # assert curr_record is not None
         input_dataset_in_sdbx = file_access_utils.file_exists(input_dataset_path)
-        assert input_dataset_in_sdbx or input_dataset.has_data()
 
         cable = curr_record.definite.component
 
@@ -1339,12 +1410,46 @@ class Sandbox:
         # FIXME at some point in the future this will have to be updated to mean "write to the local sandbox".
         if not input_dataset_in_sdbx:
             logger.debug("[%d] Dataset is in the DB - writing it to the file system", worker_rank)
-            try:
-                shutil.copyfile(input_dataset.dataset_file.path, input_dataset_path)
-            except IOError:
-                logger.error("[%d] could not copy file %s to file %s.",
-                             worker_rank, input_dataset.dataset_file.path, input_dataset_path)
+            file_path = None
+            if bool(input_dataset.dataset_file):
+                file_path = input_dataset.dataset_file.path
+            elif input_dataset.external_path:
+                file_path = input_dataset.external_absolute_path()
 
+            # FIXME removing chunks here for v0.7.3 due to issue #550.
+            # copy_start = timezone.now()
+            # fail_now = False
+            try:
+                shutil.copyfile(file_path, input_dataset_path)
+            except IOError:
+                # copy_end = timezone.now()
+                logger.error("[%d] could not copy file %s to file %s.",
+                             worker_rank, file_path, input_dataset_path)
+
+            #     with transaction.atomic():
+            #         # Create a failed IntegrityCheckLog.
+            #         iic = IntegrityCheckLog(
+            #             dataset=input_dataset,
+            #             runsic=curr_record,
+            #             read_failed=True,
+            #             start_time=copy_start,
+            #             end_time=copy_end,
+            #             user=user
+            #         )
+            #         iic.clean()
+            #         iic.save()
+            #         fail_now = True
+            #
+            # if not fail_now:
+            #     # Perform an integrity check since we've just copied this file to the sandbox for the
+            #     # first time.
+            #     logger.error("[%d] Checking file just copied to sandbox for integrity.",
+            #                  worker_rank)
+            #     check = input_dataset.check_integrity(input_dataset_path, user, execlog=None, runsic=curr_record)
+            #
+            #     fail_now = check.is_fail()
+            #
+            # if fail_now:
                 curr_record.mark_unsuccessful()
                 if recover:
                     recovering_record.mark_unsuccessful()
@@ -1366,7 +1471,7 @@ class Sandbox:
 
         curr_log = archive.models.ExecLog.create(curr_record, invoking_record)
 
-        # Run cable (this completes EL).
+        # Run cable (this completes the ExecLog).
         cable.run_cable(input_dataset_path, output_path, curr_record, curr_log)
 
         # Here, we're authoring/modifying an ExecRecord, so we use a transaction.
@@ -1457,26 +1562,35 @@ class Sandbox:
         # Check outputs
         ####
         if not missing_output:
-            # Did ER already exist (with vetted output), or is cable trivial, or recovering? Yes.
-            if ((preexisting_ER and (output_dataset.is_OK() or
-                                     output_dataset.any_failed_checks())) or
-                    cable.is_trivial() or recover):
-                logger.debug("[%d] Performing integrity check of trivial or previously generated output", worker_rank)
-                # Perform integrity check.  Note: if this fails, it will notify all RunComponents using it.
-                check = output_dataset.check_integrity(output_path, user, curr_log, output_dataset.MD5_checksum)
+            # Case 1: the cable is trivial.  Don't check the integrity, it was already checked
+            # when it was first written to the sandbox.
+            if cable.is_trivial():
+                logger.debug("[%d] Cable is trivial; skipping integrity check", worker_rank)
 
-            # Did ER already exist, or is cable trivial, or recovering? No.
             else:
-                logger.debug("[%d] Performing content check for output generated for the first time", worker_rank)
-                summary_path = "{}_summary".format(output_path)
-                # Perform content check.  Note: if this fails, it will notify all RunComponents using it.
-                check = output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
-                                                           cable.max_rows_out, curr_log, user)
+                # Case 2a: ExecRecord already existed and its output had been properly vetted.
+                # Case 2b: this was a recovery.
+                # Check the integrity of the output.
+                if ((preexisting_ER and (output_dataset.is_OK() or
+                                         output_dataset.any_failed_checks())) or
+                        cable.is_trivial() or recover):
+                    logger.debug("[%d] Performing integrity check of trivial or previously generated output",
+                                 worker_rank)
+                    # Perform integrity check.  Note: if this fails, it will notify all RunComponents using it.
+                    check = output_dataset.check_integrity(output_path, user, curr_log)
 
-            if check.is_fail():
-                curr_record.mark_unsuccessful()
-                if recover:
-                    recovering_record.mark_unsuccessful()
+                # Case 3: the Dataset, one way or another, is not properly vetted.
+                else:
+                    logger.debug("[%d] Output has no complete content check; performing content check", worker_rank)
+                    summary_path = "{}_summary".format(output_path)
+                    # Perform content check.  Note: if this fails, it will notify all RunComponents using it.
+                    check = output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
+                                                               cable.max_rows_out, curr_log, user)
+
+                if check.is_fail():
+                    curr_record.mark_unsuccessful()
+                    if recover:
+                        recovering_record.mark_unsuccessful()
 
         logger.debug("[%d] DONE EXECUTING %s '%s'", worker_rank, type(cable).__name__, cable)
 
@@ -1527,6 +1641,7 @@ class Sandbox:
         # done by reuse_or_prepare_cable.
         inputs_after_cable = []
         input_paths = []
+        completed_cable_pks = []
         for curr_execute_dict in cable_info_dicts:
             # Update the cable execution information with the recovering record if applicable.
             if recover:
@@ -1534,14 +1649,22 @@ class Sandbox:
 
             curr_RSIC = Sandbox.finish_cable(curr_execute_dict, worker_rank)
             # Refresh invoking_record.
-            invoking_record = invoking_record.__class__.objects.get(pk=invoking_record.pk)
+            invoking_record.refresh_from_db()
 
             # Cable failed, return incomplete RunStep.
-            if not curr_RSIC.is_successful():
+            curr_RSIC.refresh_from_db()
+            if not curr_RSIC.is_successful(use_cache=True):
                 logger.error("[%d] PipelineStepInputCable %s failed.", worker_rank, curr_RSIC)
+
+                # Cancel the other RunSICs for this step.
+                for rsic in curr_RS.RSICs.exclude(pk__in=completed_cable_pks):
+                    rsic.mark_cancelled()
 
                 # Update state variables.
                 assert not invoking_record.is_successful(use_cache=True)
+                # We need to refresh curr_RS because this version hasn't had its
+                # _successful flag changed.
+                curr_RS.refresh_from_db()
                 if not recover:
                     curr_RS.mark_complete()
                     curr_RS.stop(save=True, clean=False)
@@ -1550,6 +1673,7 @@ class Sandbox:
                 return curr_RS
 
             # Cable succeeded.
+            completed_cable_pks.append(curr_RSIC.pk)
             inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
             input_paths.append(curr_execute_dict["output_path"])
 
@@ -1786,8 +1910,12 @@ class Sandbox:
                                  worker_rank, output_dataset)
                     check = output_dataset.check_integrity(output_path, user, curr_log)
 
-                    # Update state variables.
-                    if not check.is_fail() and not output_dataset.content_checks.exists():
+                    # We may also need to perform a content check if there isn't a complete
+                    # one already.
+                    if not check.is_fail() and not output_dataset.content_checks.filter(
+                            end_time__isnull=False).exists():
+                        logger.debug("[%d] Output has no complete content check; performing content check",
+                                     worker_rank)
                         summary_path = "{}_summary".format(output_path)
                         check = output_dataset.check_file_contents(
                             output_path, summary_path, curr_output.get_min_row(),
@@ -1904,7 +2032,7 @@ class RunPlan(object):
 
     def create_run_steps(self, subrun=None):
         """
-        Find or create the RunSteps in the Run.  Subrun RunPlans are also assigned Runs at this point.
+        Find or create the RunSteps in the Run.  Sub-run RunPlans are also assigned Runs at this point.
         """
         if subrun:
             self.run = subrun
@@ -1951,6 +2079,7 @@ class RunPlan(object):
                     if method.reusable == Method.NON_REUSABLE:
                         continue
                     execrecord, summary = step_plan.run_step.get_suitable_ER(input_datasets)
+
                     if not summary:
                         # no exec record, have to run
                         continue
@@ -1976,7 +2105,8 @@ class RunPlan(object):
             is_changed = self.walk_backward() or self.walk_forward()
 
     def walk_backward(self):
-        """ Walk backward through the steps, flagging needed runs.
+        """
+        Walk backward through the steps, flagging steps that need to be run.
 
         @return: True if any new steps were flagged for running.
         """
@@ -1987,14 +2117,18 @@ class RunPlan(object):
 
             elif not step_plan.execrecord:
                 for input_plan in step_plan.inputs:
-                    if not input_plan.has_data():
+                    if not input_plan.has_data() and input_plan.step_num is not None:
+                        # Note: if input_plan.step_num is None (i.e. this is an input to the Run)
+                        # then we leave it -- it will be caught later in the execution.
+
                         source_plan = self.step_plans[input_plan.step_num-1]
                         is_changed = source_plan.check_rerun(input_plan.output_num) or is_changed
 
         return is_changed
 
     def walk_forward(self):
-        """ Walk forward through the steps, flagging needed runs.
+        """
+        Walk forward through the steps, flagging steps that need to be run.
 
         @return: True if any new steps were flagged for running.
         """
@@ -2010,6 +2144,7 @@ class RunPlan(object):
                         for output_plan in step_plan.outputs:
                             output_plan.dataset = None
                         is_changed = True
+
         return is_changed
 
 

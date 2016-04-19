@@ -17,7 +17,20 @@
     <script src="/static/pipeline/pipeline_load.js"></script>
     <script src="/static/sandbox/view_run.js"></script>
     <script type="text/javascript">
-        $(function(){ setupRunView('{{run.id}}', {{run.pipeline.id}}, '{{ md5 }}'); });
+        $(function() {
+            setupRunView('{{run.id}}', {{run.pipeline.id}}, '{{ md5 }}');
+            var ro_ctrl = $('.pipeline_rdonly_ctrl')
+            ro_ctrl.draggable({
+                start: function() { 
+                    ro_ctrl.css({
+                        top: ro_ctrl.position().top + 'px',
+                        bottom: 'auto'
+                    });
+                }
+            });
+            // 
+            $(document).off('cancel');
+        });
     </script>
 
 {% endblock %}
@@ -25,9 +38,30 @@
 {% block stylesheets %}
     <link rel="stylesheet" href="/static/pipeline/drydock.css"/>
     <style>
-        #canvas{}
-        .status-message img{
-              vertical-align: middle;
+        #canvas {  }
+        .status-message img {
+            vertical-align: middle;
+        }
+        .pipeline_rdonly_ctrl {
+            position: absolute;
+            left: 1em;
+            top: auto;
+            bottom: 1em;
+            width: 20%;
+            min-width: 150px;
+            border: 1px solid #aaa;
+            padding: 1em;
+            background-color: #fff;
+        }
+        .pipeline_rdonly_ctrl ul {
+            padding: 0;
+        }
+        .pipeline_rdonly_ctrl li {
+            display: block;
+        }
+        .pipeline_rdonly_ctrl h4 {
+            margin-top: 0;
+            font-size: 1.3em;
         }
     </style>
 {% endblock %}
@@ -39,23 +73,19 @@
         <a href="/runs" rel="prev"> Back to runs </a>
     {% endif %}
 
-    <div class="pipeline_rdonly_ctrl">
-        <ul class="desc_topleft">
-            <li>
-                {% if run.description != "" %}
-                <span title="{{ run.description }}">
-                {% endif %}
-                {{ run.display_name }}
-                {% if run.description != "" %}
-                </span>
-                {% endif %}
-            </li>
+    <div class="pipeline_rdonly_ctrl ctrl_menu">
+        <h4>
+            {% if run.description != "" %}<span title="{{ run.description }}">{% endif %}
+            {{ run.display_name }}
+            {% if run.description != "" %}</span>{% endif %}
+        </h4>
+        <ul>
             {% if run.pipeline.revision_name|length <= 0 %}
-                <li> Pipeline family: {{ run.pipeline.family }} </li>
+                <li> <h5>Pipeline family:</h5> {{ run.pipeline.family }} </li>
             {% else %}
-                <li> Pipeline: {{ run.pipeline.revision_name }} ({{ run.pipeline.family }})</li>
+                <li> <h5>Pipeline:</h5> {{ run.pipeline.revision_name }} ({{ run.pipeline.family }})</li>
             {% endif %}
-            <li class="new_ctrl">Revision #: {{ run.pipeline.revision_number }}</li>
+            <li class="new_ctrl"><h5>Revision #:</h5> {{ run.pipeline.revision_number }}</li>
 
             {% if run.pipeline.revision_desc|length <= 0 %}
                 {% if run.pipeline.family.description|length > 0 %}
@@ -64,7 +94,7 @@
             {% else %}
                     <li class="new_ctrl">{{ run.pipeline.revision_desc }}</li>
             {% endif %}
-            <li> Run status: <span id="run_status">Checking...</span> </li>
+            <li> <h5>Run status:</h5> <span id="run_status">Checking...</span> </li>
         </ul>
     </div>
 

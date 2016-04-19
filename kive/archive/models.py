@@ -37,7 +37,8 @@ def empty_redaction_plan():
         "ExecRecords": set(),
         "OutputLogs": set(),
         "ErrorLogs": set(),
-        "ReturnCodes": set()
+        "ReturnCodes": set(),
+        "ExternalFiles": set()
     }
 
 
@@ -300,7 +301,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             return result
 
         status = ""
-        step_progress = {}
+        step_progress = []
         cable_progress = {}
         input_list = {}
 
@@ -344,9 +345,11 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
             status += log_char
             if detailed:
-                step_progress[step.pipelinestep.transformation.pk] = {'status': step_status, 'log_id': None}
+                step_progress.append({'status': step_status,
+                                      'name': str(step.pipelinestep),
+                                      'log_id': None})
                 try:
-                    step_progress[step.pipelinestep.transformation.pk]['log_id'] = step.execrecord.generator.\
+                    step_progress[-1]['log_id'] = step.execrecord.generator.\
                         methodoutput.id
                 except:
                     pass
@@ -775,8 +778,6 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 class RunInput(models.Model):
     """
     Represents an input to a run.
-
-    This won't exist in single-process execution.
     """
     run = models.ForeignKey(Run, related_name="inputs")
     dataset = models.ForeignKey(Dataset, related_name="runinputs")
@@ -1049,9 +1050,9 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         # If log exists and there are invoked_logs, log should be among
         # the invoked logs.  If log exists, any preceding logs should
-        # be complete and all tests should have passed (since they were
-        # recoveries happening before we could carry out the execution
-        # that log represents).
+        # be complete and all non-trivial cables' outputs' checks should
+        # have passed (since they were recoveries happening before we could
+        # carry out the execution that log represents).
         if self.invoked_logs.exists() and self.has_log:
             if not self.invoked_logs.filter(pk=self.log.pk).exists():
                 raise ValidationError(
@@ -1176,7 +1177,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         # From here on we know we are not reusing and ExecRecord is
         # set -- therefore log is set and complete.
 
-        # Check that either every output has been successfully checked
+        # Check that either every non-trivial output has been successfully checked
         # or one+ has failed and the rest are complete.
         if self.log.all_checks_passed():
             return True
@@ -1255,6 +1256,15 @@ class RunComponent(stopwatch.models.Stopwatch):
         assert(self.reused)
         if self.execrecord is not None:
             return self.execrecord.outputs_OK() and not self.execrecord.has_ever_failed()
+
+        # Check for failure on recovery, i.e. if there's an ExecLog which was
+        # not successful.
+        try:
+            if not self.log.is_successful():
+                return False
+        except ExecLog.DoesNotExist:
+            pass
+
         # If there is no ExecRecord yet then this is trivially true.
         return True
 
@@ -2346,7 +2356,6 @@ class RunSIC(RunCable):
     Related to :model:`librarian.models.ExecRecord`
     Related to :model:`pipeline.models.PipelineStepInputCable`
     """
-    # FIXME need to rename this because it conflicts with the runstep field of RunComponent
     dest_runstep = models.ForeignKey(RunStep, related_name="RSICs")
     PSIC = models.ForeignKey("pipeline.PipelineStepInputCable", related_name="psic_instances")
 
@@ -2463,6 +2472,57 @@ class RunSIC(RunCable):
 
         # No other RunSICs of our RunStep were running, so we can propagate upward.
         self.dest_runstep.failed_mark_complete(tasks_outside_this_runstep)
+
+    @update_field("_complete")
+    def is_complete(self, use_cache=False, **kwargs):
+        """
+        True if this RunSIC is complete; false otherwise.
+
+        In addition to the checks done by RunComponent's is_complete, check
+        whether the integrity check on the input (if it exists) is complete.
+        """
+        if use_cache and self._complete is not None:
+            return self._complete
+
+        try:
+            if not self.input_integrity_check.is_complete():
+                return False
+        except IntegrityCheckLog.DoesNotExist:
+            pass
+
+        return super(RunSIC, self).is_complete(use_cache=use_cache, **kwargs)
+
+    def successful_execution(self):
+        """
+        True if this RunSIC is/was executed successfully; False otherwise.
+
+        In addition to the checks that go along with RunComponent, it also checks
+        whether there is a failed integrity check on its input.
+        """
+        # Note that this is called assuming that this RunSIC was not reused,
+        # so if the input integrity check failed, then a reused RunSIC will
+        # not care when you call is_successful.
+        try:
+            if self.input_integrity_check.is_fail():
+                return False
+        except IntegrityCheckLog.DoesNotExist:
+            pass
+
+        return super(RunSIC, self).successful_execution()
+
+    def clean(self):
+        """
+        Check data integrity of this RunSIC.
+
+        In addition to RunCable.clean(), also clean the input integrity check
+        if it exists.
+        """
+        super(RunSIC, self).clean()
+
+        try:
+            self.input_integrity_check.clean()
+        except IntegrityCheckLog.DoesNotExist:
+            pass
 
 
 class RunOutputCable(RunCable):
@@ -2731,25 +2791,39 @@ class ExecLog(stopwatch.models.Stopwatch):
         except ObjectDoesNotExist:
             pass
 
+        # If this ExecLog represents a RunSIC, check if it's got a failed input integrity check.
+        if self.record.is_incable:
+            try:
+                if self.record.definite.input_integrity_check.is_fail():
+                    return False
+            except IntegrityCheckLog.DoesNotExist:
+                pass
+
         # Having reached here, we are comfortable with the execution --
         # note that it may still be in progress!
         return True
 
     def all_checks_passed(self):
         """
-        True if every output of this ExecLog has passed its check.
+        True if every non-trivial output of this ExecLog has passed its check.
 
         First check that all of the tests have passed. Then check that all
         checks have been performed.
+
+        An exception is made for an ExecLog of a trivial cable.  Such cables
+        don't check their outputs.
         """
+        is_trivial_cable = self.record.is_cable and self.record.component.is_trivial()
+        if is_trivial_cable:
+            return True
+
         if self.record.execrecord is None:
             return False
-        is_trivial_cable = self.record.is_cable and self.record.component.is_trivial()
         is_original_run = self.record.execrecord.generator == self
         missing_content_checks = set()
         missing_integrity_checks = set()
         for ero in self.record.execrecord.execrecordouts.all():
-            if is_trivial_cable or not is_original_run:
+            if not is_original_run:
                 missing_integrity_checks.add(ero.dataset_id)
             elif not ero.dataset.is_raw():
                 missing_content_checks.add(ero.dataset_id)

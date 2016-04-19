@@ -9,7 +9,7 @@ html body {
     margin-left: -4em;
     margin-top: -2.5em;
 }
-#pipeline_ctrl, .pipeline_rdonly_ctrl {
+#pipeline_ctrl {
     position: absolute;
     top: 46px; left: 0;
     width: 100%;
@@ -32,11 +32,7 @@ html body {
     margin: .5em;
 }
 #pipeline_ctrl h3 { display: none; }
-ul#id_ctrl_nav, ul.desc_topleft { padding: 0; margin: 0 0 0 3.5em; }
-ul.desc_topleft li {
-    display: inline;
-    padding: .2em 1em;
-}
+ul#id_ctrl_nav { padding: 0; margin: 0 0 0 3.5em; }
 ul#id_ctrl_nav li {
     display: inline;
     padding: .2em 1em;

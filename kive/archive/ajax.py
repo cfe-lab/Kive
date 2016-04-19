@@ -139,7 +139,6 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
     Parameter for a PATCH:
     * is_stop_requested(=true) - the Run is marked for stopping.
     """
-
     queryset = Run.objects.all()
     serializer_class = RunSerializer
     permission_classes = (permissions.IsAuthenticated, RunPermission)

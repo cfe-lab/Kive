@@ -1,4 +1,3 @@
-import json
 import logging
 
 from django.contrib.auth.decorators import login_required
@@ -8,6 +7,8 @@ from django.http import HttpResponse, Http404, HttpResponseRedirect
 from django.template import loader
 from django.views.decorators.http import require_GET, require_POST
 from django.contrib.auth.models import User, Group
+
+from rest_framework.renderers import JSONRenderer
 
 from archive.models import Dataset, Run
 from archive.serializers import RunOutputsSerializer
@@ -229,9 +230,10 @@ def view_results(request, run_id):
         )
 
     template = loader.get_template("sandbox/view_results.html")
+
     context = {
         "run": run,
-        "outputs": json.dumps(RunOutputsSerializer(run, context={'request': request}).data),
+        "outputs": JSONRenderer().render(RunOutputsSerializer(run, context={'request': request}).data),
         "run_form": run_form,
         "is_complete": run_complete,
         "is_owner": run.user == request.user,
