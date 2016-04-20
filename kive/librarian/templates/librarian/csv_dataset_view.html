@@ -23,10 +23,10 @@
 {% endblock %}
 
 {% block dataset_contents %}
+<div class="dataset_contents">
 <table>
 <thead>
     <tr>
-
     {% if dataset.content_matches_header %}
        {% for column in dataset.header %}
             <th>{{ column }}</th>
@@ -80,7 +80,6 @@
     {% endif %}
 </tbody>
 </table>
-
-{{ dataset_form.errors }}
+</div>
 
 {% endblock %}

@@ -5,6 +5,7 @@ import hashlib
 import logging
 import mimetypes
 import os
+from binaryornot.check import is_binary
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -166,15 +167,27 @@ def dataset_view(request, dataset_id):
     elif dataset.is_raw():
         t = loader.get_template("librarian/raw_dataset_view.html")
 
-        # Read 1000 characters.
-        with dataset.get_open_file_handle() as data_handle:
-            sample_content = data_handle.read(1000)
+        # Test whether this is a binary file or not.
+        file_path = None
+        if dataset.dataset_file:
+            file_path = dataset.dataset_file.path
+        elif dataset.external_path:
+            file_path = dataset.external_absolute_path()
 
-        c.update(
-            {
-                "sample_content": sample_content
-            }
-        )
+        if is_binary(file_path):
+            c["is_binary"] = True
+
+        else:
+            c["is_binary"] = False
+
+            # Read 1000 characters.
+            with dataset.get_open_file_handle() as data_handle:
+                sample_content = data_handle.read(1000)
+            c.update(
+                {
+                    "sample_content": sample_content
+                }
+            )
     else:
         # If we have a mismatched output, we do an alignment
         # over the columns.
