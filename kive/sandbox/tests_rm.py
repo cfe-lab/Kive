@@ -91,12 +91,12 @@ class ExecuteResultTestsRM(TestCase):
         runstep = run.runsteps.first()
 
         self.assertEqual(runstep.run, run)
-        self.assertEqual(runstep.start_time < timezone.now(), True)
-        self.assertEqual(runstep.reused, False)
-        self.assertEqual(runstep.is_complete(), True)
+        self.assertTrue(runstep.start_time < timezone.now())
+        self.assertFalse(runstep.reused)
+        self.assertTrue(runstep.is_complete())
         self.assertEqual(runstep.complete_clean(), None)
-        self.assertEqual(hasattr(runstep, "child_run"), False)
-        self.assertEqual(runstep.successful_execution(), True)
+        self.assertFalse(hasattr(runstep, "child_run"))
+        self.assertTrue(runstep.is_successful())
         self.assertEqual(runstep.outputs.count(), 1)
 
     def test_execute_pipeline_dataset_contents(self):
@@ -398,7 +398,7 @@ class BadRunTests(TestCase):
         self.assertTrue(runstep1.is_complete(use_cache=True))
         self.assertTrue(runstep1.is_successful(use_cache=True))
         self.assertIsNone(runstep1.complete_clean())
-        self.assertTrue(runstep1.successful_execution())
+        self.assertTrue(runstep1.is_successful())
 
         runstep2 = run.runsteps.get(pipelinestep__step_num=2)
         self.cable_tester(runstep2)
@@ -407,7 +407,7 @@ class BadRunTests(TestCase):
         self.assertTrue(runstep2.is_complete(use_cache=True))
         self.assertFalse(runstep2.is_successful(use_cache=True))
         self.assertIsNone(runstep2.complete_clean())
-        self.assertFalse(runstep2.successful_execution())
+        self.assertFalse(runstep2.is_successful())
 
         log = runstep2.log
 

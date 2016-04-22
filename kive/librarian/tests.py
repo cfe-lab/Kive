@@ -1070,7 +1070,7 @@ class ExecRecordTests(LibrarianTestCase):
         runstep.execrecord = execrecord
         runstep.save()
 
-        self.assertFalse(runstep.successful_execution())
+        self.assertFalse(runstep.is_successful())
         self.assertEqual(execrecord.used_by_components.count(), 1)
         self.assertTrue(execrecord.has_ever_failed())
 
@@ -1097,8 +1097,8 @@ class ExecRecordTests(LibrarianTestCase):
             runstep.save()
 
         self.assertEqual(execrecord.used_by_components.count(), 2)
-        self.assertEqual(execrecord.used_by_components.first().definite.successful_execution(), True)
-        self.assertEqual(execrecord.used_by_components.last().definite.successful_execution(), False)
+        self.assertEqual(execrecord.used_by_components.first().definite.is_successful(), True)
+        self.assertEqual(execrecord.used_by_components.last().definite.is_successful(), False)
         self.assertTrue(execrecord.has_ever_failed())
 
 

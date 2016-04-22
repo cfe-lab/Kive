@@ -1427,13 +1427,13 @@ class ExecRecord(models.Model):
         """
         return any([ero.dataset.any_failed_checks() for ero in self.execrecordouts.all()])
 
-    def has_ever_failed(self):
+    def has_ever_failed(self, use_cache=True):
         """Has any execution of this ExecRecord ever failed?"""
         # Go through all RunSteps using this ExecRecord.
         run_components = self.used_by_components.exclude(
             reused=True).filter(runstep__isnull=False)
         for component_using_this in run_components:
-            if not component_using_this.runstep.successful_execution():
+            if not component_using_this.runstep.is_successful(use_cache=use_cache):
                 return True
         return False
 

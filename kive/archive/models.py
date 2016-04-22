@@ -538,9 +538,6 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         # So far so good.
         return True
 
-    # def successful_execution(self):
-    #     return self.is_successful()
-
     def get_coordinates(self):
         """
         Retrieves a tuple of pipeline coordinates of this Run.
@@ -1237,7 +1234,10 @@ class RunComponent(stopwatch.models.Stopwatch):
             self.definite.run.mark_unsuccessful()
 
     @update_field("_successful")
-    def is_successful(self, use_cache=False, **kwargs):
+    def is_successful(self, use_cache=False):
+        """
+        True if RunComponent is successful; False otherwise.
+        """
         if use_cache and self._successful is not None:
             return self._successful
 
@@ -1245,11 +1245,11 @@ class RunComponent(stopwatch.models.Stopwatch):
             return False
         if self.reused:
             return self.successful_reuse()
-        return self.successful_execution()
+        return self.successful_execution(use_cache=use_cache)
 
     def successful_reuse(self):
         """
-        True if RunComponent is successful on reuse; False otherwise.
+        Helper for is_successful used when this RunComponent is reused.
 
         PRE: this RunComponent is reused.
         """
@@ -1268,8 +1268,9 @@ class RunComponent(stopwatch.models.Stopwatch):
         # If there is no ExecRecord yet then this is trivially true.
         return True
 
-    def successful_execution(self):
-        """True if RunComponent is successful; False otherwise.
+    def successful_execution(self, **kwargs):
+        """
+        Helper for is_successful used when this RunComponent is not reused.
 
         Any RunComponent is failed if any of its invoked ExecLogs have
         failed, or if any CCLs/ICLs have failed.
@@ -1804,7 +1805,21 @@ class RunStep(RunComponent):
         return RunComponent.is_complete(self, use_cache=use_cache, **kwargs)
 
     @update_field("_successful")
-    def is_successful(self, **kwargs):
+    def is_successful(self, use_cache=False):
+        """
+        True if RunStep is successful; False otherwise.
+
+        This extends RunComponent's method with the added wrinkle
+        that it must check on input cables and on the log, to see that
+        the code checksums were OK.
+        """
+        if use_cache and self._successful is not None:
+            return self._successful
+
+        input_cables = self.RSICs.all()
+        if any(not ic.is_successful(use_cache=use_cache) for ic in input_cables):
+            return False
+
         if self.has_log:
             try:
                 if not self.log.methodoutput.are_checksums_OK:
@@ -1812,34 +1827,31 @@ class RunStep(RunComponent):
             except MethodOutput.DoesNotExist:
                 pass
 
-        return super(RunStep, self).is_successful(**kwargs)
+        return super(RunStep, self).is_successful(use_cache=use_cache)
 
-    def successful_execution(self):
+    def successful_execution(self, **kwargs):
         """
-        True if RunStep is successful; False otherwise.
+        True if RunStep is successful; False otherwise (only used when RunStep is not reused).
 
         This inherits from RunComponent's method, with the additional
-        wrinkle that a RunStep fails if any of its cables fails, or if
-        its child_run has failed.
+        wrinkle that a RunStep fails if its child_run has failed,
+        or if its code's checksums were bad.
 
         PRE: this RunStep is clean.
         PRE: this RunStep is not reused.
         """
-        input_cables = self.RSICs.all()
-        if any(not ic.is_successful() for ic in input_cables):
-            return False
-
         # At this point we know that all the cables were successful;
         # we check for failure during recovery or during its own
         # execution.
-        if not RunComponent.successful_execution(self):
+        # This does an assert on self.reused == False.
+        if not RunComponent.successful_execution(self, **kwargs):
             return False
 
         # In the case that this is a sub-Pipeline, check if child_run
         # is successful.
         try:
             self.child_run
-            return self.child_run.is_successful()
+            return self.child_run.is_successful(**kwargs)
         except ObjectDoesNotExist:
             pass
 
@@ -2492,23 +2504,24 @@ class RunSIC(RunCable):
 
         return super(RunSIC, self).is_complete(use_cache=use_cache, **kwargs)
 
-    def successful_execution(self):
+    @update_field("_successful")
+    def is_successful(self, use_cache=False):
         """
         True if this RunSIC is/was executed successfully; False otherwise.
 
         In addition to the checks that go along with RunComponent, it also checks
         whether there is a failed integrity check on its input.
         """
-        # Note that this is called assuming that this RunSIC was not reused,
-        # so if the input integrity check failed, then a reused RunSIC will
-        # not care when you call is_successful.
+        if not super(RunSIC, self).is_successful(use_cache=use_cache):
+            return False
+
         try:
             if self.input_integrity_check.is_fail():
                 return False
         except IntegrityCheckLog.DoesNotExist:
             pass
 
-        return super(RunSIC, self).successful_execution()
+        return True
 
     def clean(self):
         """

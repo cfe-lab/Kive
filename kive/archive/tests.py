@@ -2790,9 +2790,9 @@ class GetCoordinatesOnDeepNestedRunTests(TestCase):
                     self.assertEqual(basic_roc.get_coordinates(), (first_lvl_step_num, second_lvl_step_num))
 
 
-class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
+class IsCompleteIsSuccessfulTests(ArchiveTestCase):
     """
-    Tests the is_complete/successful_execution functions of Run, RunComponent, RunStep, ExecLog.
+    Tests the is_complete/is_successful functions of Run, RunComponent, RunStep, ExecLog.
 
     These functions are heavily dependent on each other, so we share the setups and test
     both functions at the same time.
@@ -2888,7 +2888,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
 
         self.make_execlog_and_mark_non_reused_runcomponent(incomplete_cable)
         self.assertFalse(incomplete_cable.is_complete())
-        self.assertTrue(incomplete_cable.successful_execution())
+        self.assertTrue(incomplete_cable.is_successful())
 
     def test_runcomponent_successful_has_execrecord_reused(self):
         """Testing of a RunComponent which has an ExecRecord and is reused (so is done)"""
@@ -2908,7 +2908,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         icl.save()
 
         self.assertTrue(incomplete_cable.is_complete())
-        self.assertTrue(incomplete_cable.successful_reuse())
+        self.assertTrue(incomplete_cable.is_successful())  # calls successful_reuse
 
     def test_nontrivial_rsic_successful_checks_not_passed(self):
         """Testing of a RunComponent (non-trivial RunSIC) that is successful but has no data checks yet."""
@@ -2921,7 +2921,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         self.E01_21_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E01_21).first()
 
         self.assertFalse(self.E01_21_RSIC.is_complete())
-        self.assertTrue(self.E01_21_RSIC.successful_execution())
+        self.assertTrue(self.E01_21_RSIC.is_successful())
 
     def test_runcomponent_successful_checks_passed(self):
         """Testing of a RunComponent (RunSIC) that is successful and all checks pass."""
@@ -2936,7 +2936,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         icl.save()
 
         self.assertTrue(incomplete_cable.is_complete())
-        self.assertTrue(incomplete_cable.successful_execution())
+        self.assertTrue(incomplete_cable.is_successful())
 
     def test_runcomponent_unsuccessful_failed_execlog(self):
         """Testing of a RunComponent (RunStep) which fails at the ExecLog stage."""
@@ -2953,7 +2953,8 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         mo_to_change.save()
 
         self.assertTrue(self.step_E1_RS.is_complete())
-        self.assertFalse(self.step_E1_RS.successful_execution())
+        # This is a test that is_successful properly calls successful_execution.
+        self.assertFalse(self.step_E1_RS.is_successful())
 
     def test_runcomponent_unsuccessful_failed_content_check(self):
         """Testing of a RunComponent (RunStep) which failed at the content check stage."""
@@ -2965,7 +2966,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         ccl_to_fail.add_bad_header()
 
         self.assertTrue(self.step_E1_RS.is_complete())
-        self.assertFalse(self.step_E1_RS.successful_execution())
+        self.assertFalse(self.step_E1_RS.is_successful())
 
     def test_runcomponent_unsuccessful_failed_integrity_check(self):
         """Testing of a RunComponent (RunSIC) which failed at the integrity check stage."""
@@ -2980,38 +2981,39 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         # The output of this first cable is self.raw_dataset.  This creates a bad ICL.
         self.raw_dataset.check_integrity(conflicting_datafile.name, self.pE_run.user, step_E1_RSIC.log)
         self.assertTrue(step_E1_RSIC.is_complete())
-        self.assertFalse(step_E1_RSIC.successful_execution())
+        # This tests that is_successful properly calls successful_execution.
+        self.assertFalse(step_E1_RSIC.is_successful())
         conflicting_datafile.close()
 
     def test_runstep_subpipeline_not_complete(self):
         """Testing on a RunStep containing a sub-pipeline that is not complete."""
         self.step_through_run_creation("sub_pipeline")
         self.assertFalse(self.step_E2_RS.is_complete())
-        self.assertTrue(self.step_E2_RS.successful_execution())
+        self.assertTrue(self.step_E2_RS.is_successful())
 
     def test_runstep_subpipeline_complete(self):
         """Testing on a RunStep containing a sub-pipeline that is complete."""
         self.step_through_run_creation("sub_pipeline_complete")
         self.assertTrue(self.step_E2_RS.is_complete())
-        self.assertTrue(self.step_E2_RS.successful_execution())
+        self.assertTrue(self.step_E2_RS.is_successful())
 
     def test_runstep_no_cables_yet(self):
         """Testing on a RunStep with no RSICs yet."""
         self.step_through_run_creation("first_step")
         self.assertFalse(self.step_E1_RS.is_complete())
-        self.assertTrue(self.step_E1_RS.successful_execution())
+        self.assertTrue(self.step_E1_RS.is_successful())
 
     def test_runstep_cable_just_started(self):
         """Testing on a RunStep with a just-started RSIC."""
         self.step_through_run_creation("first_cable_created")
         self.assertFalse(self.step_E1_RS.is_complete())
-        self.assertTrue(self.step_E1_RS.successful_execution())
+        self.assertTrue(self.step_E1_RS.is_successful())
 
     def test_runstep_cable_complete(self):
         """Testing on a RunStep with a RSIC that has run but has not done data checking yet."""
         self.step_through_run_creation("first_cable")
         self.assertFalse(self.step_E1_RS.is_complete())
-        self.assertTrue(self.step_E1_RS.successful_execution())
+        self.assertTrue(self.step_E1_RS.is_successful())
 
     def test_runstep_cable_failed(self):
         """Testing on a RunStep with a RSIC that has run and failed in data checking."""
@@ -3031,7 +3033,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
             self.raw_dataset.check_integrity(f.name, self.myUser, step_E1_RSIC.log)
 
         self.assertTrue(self.step_E1_RS.is_complete())
-        self.assertFalse(self.step_E1_RS.successful_execution())
+        self.assertFalse(self.step_E1_RS.is_successful())
 
     def test_runstep_successful_checks_not_passed(self):
         """Testing of a RunComponent (RunStep) that is successful but has no data checks yet."""
@@ -3040,7 +3042,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         self.make_complete_non_reused(self.step_E1_RS, [self.raw_dataset], [self.doublet_dataset])
 
         self.assertFalse(self.step_E1_RS.is_complete())
-        self.assertTrue(self.step_E1_RS.successful_execution())
+        self.assertTrue(self.step_E1_RS.is_successful())
 
     def test_runstep_failed_subrun(self):
         """Testing on a RunStep with a child_run that fails."""
@@ -3068,10 +3070,10 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         step_D1_mo.save()
 
         self.assertTrue(self.step_D1_RS.is_complete())
-        self.assertFalse(self.step_D1_RS.successful_execution())
+        self.assertFalse(self.step_D1_RS.is_successful())  # calls successful_execution
 
         self.assertTrue(self.step_E2_RS.is_complete())
-        self.assertFalse(self.step_E2_RS.successful_execution())
+        self.assertFalse(self.step_E2_RS.is_successful())  # calls successful_execution
 
     def test_run_no_steps_yet(self):
         """Test on a Run with nothing started yet."""
@@ -3188,7 +3190,7 @@ class IsCompleteSuccessfulExecutionTests(ArchiveTestCase):
         self.assertTrue(self.pE_run.is_successful())
 
 
-class IsCompleteSuccessfulExecutionActualExecutionTests(TestCase):
+class IsCompleteIsSuccessfulActualExecutionTests(TestCase):
     fixtures = ["archive_no_runs_test_environment"]
 
     def setUp(self):
@@ -3360,7 +3362,6 @@ year,month,day,hour,minute,second,microsecond
         self.assertTrue(run2_step2.is_complete(use_cache=True))
         self.assertFalse(run2_step2.is_successful(use_cache=True))
         self.assertTrue(run2_step2.is_complete())
-        self.assertFalse(run2_step2.successful_execution())
         self.assertFalse(run2_step2.is_successful())
 
         self.assertFalse(run2_step2.has_log)
@@ -3369,8 +3370,6 @@ year,month,day,hour,minute,second,microsecond
 
         self.assertTrue(run2_step1_RSIC.log.is_successful())
         self.assertFalse(run2_step1.log.is_successful())
-        self.assertTrue(run2_step2.is_complete())
-        self.assertFalse(run2_step2.successful_execution())
 
     def test_long_output(self):
         """Should handle lots of output to stdout or stderr without deadlocking."""
@@ -3490,7 +3489,6 @@ with open(sys.argv[2], "wb") as f:
         self.assertTrue(run2_step2.is_complete(use_cache=True))
         self.assertFalse(run2_step2.is_successful(use_cache=True))
         self.assertTrue(run2_step2.is_complete())
-        self.assertFalse(run2_step2.successful_execution())
         self.assertFalse(run2_step2.is_successful())
 
         self.assertFalse(run2_step2.has_log)

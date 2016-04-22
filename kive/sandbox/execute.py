@@ -444,7 +444,7 @@ class Sandbox:
                 if roc.is_cancelled:
                     self.logger.debug("Cable %s cancelled", roc.pipelineoutputcable)
                     sub_run_successful = False
-                elif roc.reused and not roc.successful_reuse():
+                elif roc.reused and not roc.is_successful(use_cache=True):
                     self.logger.debug("Cable %s failed on reuse", roc.pipelineoutputcable)
                     sub_run_successful = False
                 elif roc.is_complete():
@@ -649,7 +649,8 @@ class Sandbox:
                                           cable_exec_info.cable_record,
                                           curr_RS)
                         return_because_fail = True
-                    elif cable_exec_info.cable_record.reused and not cable_exec_info.cable_record.successful_reuse():
+                    elif (cable_exec_info.cable_record.reused
+                          and not cable_exec_info.cable_record.is_successful(use_cache=True)):
                         self.logger.debug("Input cable %s to sub-pipeline step %s failed on reuse",
                                           cable_exec_info.cable_record,
                                           curr_RS)
@@ -787,7 +788,7 @@ class Sandbox:
             if cr.is_cancelled:
                 self.logger.debug("Cable %s cancelled", cr.pipelineoutputcable)
                 return_because_fail = True
-            elif cr.reused and not cr.successful_reuse():
+            elif cr.reused and not cr.is_successful(use_cache=True):
                 self.logger.debug("Cable %s failed on reuse", cr.pipelineoutputcable)
                 return_because_fail = True
 
@@ -1044,7 +1045,8 @@ class Sandbox:
                 self.logger.debug("Input cable %s to step %s was cancelled", cable_exec_info.cable_record,
                                   curr_RS)
                 return_because_fail = True
-            elif cable_exec_info.cable_record.reused and not cable_exec_info.cable_record.successful_reuse():
+            elif (cable_exec_info.cable_record.reused
+                  and not cable_exec_info.cable_record.is_successful(use_cache=True)):
                 self.logger.debug("Input cable %s to step %s failed on reuse", cable_exec_info.cable_record,
                                   curr_RS)
                 return_because_fail = True

@@ -43,7 +43,7 @@ class Command(BaseCommand):
             reused=False).prefetch_related('RSICs').order_by('-id')[:COUNT])
         success_count = sum(1
                             for step in run_steps
-                            if step.successful_execution())
+                            if step.is_successful())
         print('Found {} successful in {} most recent runs.'.format(success_count,
                                                                    len(run_steps)))
 
