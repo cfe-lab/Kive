@@ -313,11 +313,8 @@ def _check_basic_constraints(columns, data_reader, out_handles={}):
     failing_cells = {}
     rownum = 0
     for rownum, row in enumerate(data_reader, start=1):
-        # FIXME this is a hack to work around the Python CSV module's inability to handle blank lines.
-        if len(row) == 0:
-            row = [""]
         for colnum, col in enumerate(columns, start=1):
-            curr_cell_value = row[colnum-1]
+            curr_cell_value = row[colnum-1] if colnum <= len(row) else ''
             test_result = col.check_basic_constraints(curr_cell_value)
 
             if test_result:

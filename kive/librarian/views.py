@@ -176,22 +176,28 @@ def dataset_view(request, dataset_id):
             }
         )
     else:
+        extra_errors = []
         # If we have a mismatched output, we do an alignment
         # over the columns.
         if dataset.content_matches_header:
-            col_matching, processed_rows = None, dataset.rows(True, limit=settings.DATASET_DISPLAY_MAX)
+            col_matching, processed_rows = None, dataset.rows(
+                True,
+                limit=settings.DATASET_DISPLAY_MAX,
+                extra_errors=extra_errors)
         else:
             col_matching, insert = dataset.column_alignment()
             processed_rows = dataset.rows(data_check=True,
                                           insert_at=insert,
-                                          limit=settings.DATASET_DISPLAY_MAX)
-
+                                          limit=settings.DATASET_DISPLAY_MAX,
+                                          extra_errors=extra_errors)
         t = loader.get_template("librarian/csv_dataset_view.html")
+        processed_rows = list(processed_rows)
         c.update(
             {
                 'column_matching': col_matching,
                 'processed_rows': processed_rows,
-                "DATASET_DISPLAY_MAX": settings.DATASET_DISPLAY_MAX
+                'extra_errors': extra_errors,
+                "are_rows_truncated": len(processed_rows) >= settings.DATASET_DISPLAY_MAX
             }
         )
     return HttpResponse(t.render(c, request))
