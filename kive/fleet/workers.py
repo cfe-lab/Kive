@@ -310,9 +310,9 @@ class Manager(object):
             else:
                 if isinstance(task, archive.models.RunStep):
                     for rsic in task.RSICs.filter(_complete=False):
-                        rsic.mark_cancelled()  # this saves rsic
+                        rsic.cancel(save=True)  # this saves rsic
 
-                task.mark_cancelled()  # this saves task
+                task.cancel(save=True)  # this saves task
 
         # Cancel all components in the run that haven't started yet.
         sandbox.run.cancel_unstarted()
