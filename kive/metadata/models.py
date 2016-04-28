@@ -49,18 +49,18 @@ def any_runs_in_progress(plan_of_attack):
 
     for sd in plan_of_attack["Datasets"]:
         for rtp_input in sd.runinputs.all():
-            if rtp_input.run.running:
+            if not rtp_input.run.is_complete():
                 return True
 
     for er in plan_of_attack["ExecRecords"]:
         for affected_rc in er.used_by_components.all():
-            if affected_rc.top_level_run.running:
+            if not affected_rc.top_level_run.is_complete():
                 return True
 
     if "Pipelines" in plan_of_attack:  # Redaction plans don't have this key
         for pipeline in plan_of_attack["Pipelines"]:
             for run in pipeline.pipeline_instances.all():
-                if run.running:
+                if not run.is_complete():
                     return True
 
     return False

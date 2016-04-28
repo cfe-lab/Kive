@@ -490,8 +490,9 @@ class Sandbox:
                     run_to_resume.cancel(save=True)
                     return incables_completed, steps_completed, outcables_completed
                 elif curr_RS.child_run.is_failed():
-                    curr_RS.finish_failure(save=True)
-                    run_to_resume.mark_failure(save=True)
+                    assert curr_RS.is_failed()
+                    run_to_resume.refresh_from_db()
+                    assert run_to_resume.is_failing()
                     return incables_completed, steps_completed, outcables_completed
                 elif curr_RS.child_run.is_successful():
                     curr_RS.finish_successfully(save=True)
@@ -679,8 +680,10 @@ class Sandbox:
                         run_to_resume.cancel(save=True)
                         return incables_completed, steps_completed, outcables_completed
                     elif curr_RS.child_run.is_failed():
-                        curr_RS.finish_failure(save=True)
-                        run_to_resume.mark_failure(save=True)
+                        curr_RS.refresh_from_db()
+                        assert curr_RS.is_failed()
+                        run_to_resume.refresh_from_db()
+                        assert run_to_resume.is_failing()
                         return incables_completed, steps_completed, outcables_completed
                     elif curr_RS.child_run.is_successful():
                         curr_RS.finish_successfully(save=True)
@@ -854,7 +857,7 @@ class Sandbox:
                             if can_reuse["successful"]:  # and therefore fully reusable
                                 curr_record.finish_successfully(save=True)
                             else:
-                                curr_record.finish_failure(save=True)
+                                curr_record.finish_failure(save=True, recurse_upward=True)
                             curr_record.complete_clean()
 
                             self.update_cable_maps(curr_record, output_dataset, output_path)
@@ -1105,7 +1108,7 @@ class Sandbox:
                                 if can_reuse["successful"]:
                                     curr_RS.finish_successfully(save=True)
                                 else:
-                                    curr_RS.finish_failure(save=True)
+                                    curr_RS.finish_failure(save=True, recurse_upward=True)
 
                                 curr_RS.complete_clean(use_cache=True)
                                 self.update_step_maps(curr_RS, step_run_dir, output_paths)
@@ -1368,7 +1371,7 @@ class Sandbox:
                                 curr_record.finish_successfully(save=True)
                             else:
                                 # Mark both curr_record and invoking_record as failed (if they're different).
-                                curr_record.finish_failure(save=True)
+                                curr_record.finish_failure(save=True, recurse_upward=True)
                                 if recover:
                                     recovering_record.cancel_running(save=True)
 
@@ -1521,7 +1524,7 @@ class Sandbox:
                         missing_output = True
 
                         # Update state variables.
-                        curr_record.finish_failure(save=True)
+                        curr_record.finish_failure(save=True, recurse_upward=True)
                         if recover:
                             recovering_record.cancel_running(save=True)
                         if preexisting_ER:
@@ -1609,7 +1612,7 @@ class Sandbox:
                                                                cable.max_rows_out, curr_log, user)
 
                 if check.is_fail():
-                    curr_record.finish_failure(save=True)
+                    curr_record.finish_failure(save=True, recurse_upward=True)
                     if recover:
                         recovering_record.cancel_running(save=True)
 
@@ -1687,7 +1690,7 @@ class Sandbox:
                 # We need to refresh curr_RS because this version hasn't had its
                 # _successful flag changed.
                 curr_RS.refresh_from_db()
-                curr_RS.finish_failure(save=True)  # Transition: Running->Failed
+                curr_RS.finish_failure(save=True, recurse_upward=True)  # Transition: Running->Failed
 
                 curr_RS.complete_clean(use_cache=True)
                 return curr_RS
@@ -1762,7 +1765,7 @@ class Sandbox:
             curr_log.stop(save=True, clean=False)
 
             # Update state variables:
-            curr_RS.finish_failure(save=True)
+            curr_RS.finish_failure(save=True, recurse_upward=True)
             if recover:
                 recovering_record.cancel_running(save=True)
             curr_RS.complete_clean()
@@ -1830,7 +1833,7 @@ class Sandbox:
 
                                 # Update state.  We're not recovering so we don't update
                                 # recovering_record.
-                                curr_RS.finish_failure()
+                                curr_RS.finish_failure(save=True, recurse_upward=True)
                                 curr_RS_method = curr_RS.pipelinestep.transformation.definite
                                 if preexisting_ER and curr_RS_method.reusable == Method.DETERMINISTIC:
                                     curr_ER.notify_runcomponents_of_failure()
@@ -1884,7 +1887,7 @@ class Sandbox:
                 time.sleep(wait_time)
 
         if bad_output_found:
-            curr_RS.finish_failure(save=True)
+            curr_RS.finish_failure(save=True, recurse_upward=True)
             if recover:
                 recovering_record.cancel_running(save=True)
 
@@ -1951,7 +1954,7 @@ class Sandbox:
             if check and check.is_fail():
                 logger.warn("[%d] %s failed for %s", worker_rank, check.__class__.__name__, output_path)
                 bad_output_found = True
-                curr_RS.finish_failure(save=True)
+                curr_RS.finish_failure(save=True, recurse_upward=True)
                 if recover:
                     recovering_record.cancel_running(save=True)
 
