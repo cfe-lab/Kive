@@ -131,6 +131,9 @@ class MPIManagerInterface(MPIFleetInterface):
         # finished the task.
         self.comm.recv(source=foreman, tag=Worker.FINISHED)
 
+    def record_exception(self):
+        mgr_logger.error("Manager failed.", exc_info=True)
+
     def shut_down_fleet(self):
         for rank in range(self.get_size()):
             if rank != self.get_rank():
@@ -193,6 +196,10 @@ class SingleThreadedManagerInterface(SingleThreadedFleetInterface):
         # Either the foreman got the message and ended the task, or it
         # finished the task.  Either way, we wait for a message from this Worker.
         self.finished_queues[foreman.rank-1].get(block=True)
+
+    def record_exception(self):
+        # Just report the exception immediately by raising it again
+        raise
 
     def shut_down_fleet(self):
         pass
@@ -516,7 +523,7 @@ class Manager(object):
             self.main_loop()
             mgr_logger.info("Manager shutting down.")
         except:
-            mgr_logger.error("Manager failed.", exc_info=True)
+            self.interface.record_exception()
         self.interface.shut_down_fleet()
 
     def worker_finished(self, lord_rank, result_pk):
@@ -833,6 +840,9 @@ class MPIWorkerInterface(MPIFleetInterface):
     def send_finished_task(self, message):
         return self.comm.send(message, dest=0, tag=Worker.FINISHED)
 
+    def record_exception(self, rank, task):
+        worker_logger.error("[%d] Task %s failed.", self.rank, task, exc_info=True)
+
     def close(self):
         self.comm.Disconnect()
 
@@ -873,6 +883,10 @@ class SingleThreadedWorkerInterface(SingleThreadedFleetInterface):
 
     def send_finished_task(self, message):
         self.manager_interface.finished_queues[self.get_rank()-1].put(message)
+
+    def record_exception(self, rank, task):
+        # Just report the exception immediately by raising it again
+        raise
 
     def close(self):
         pass
@@ -955,7 +969,7 @@ class Worker(object):
                 result = Worker.STOP
         except:
             result = Worker.FAILURE  # bogus return value
-            worker_logger.error("[%d] Task %s failed.", self.rank, task, exc_info=True)
+            self.interface.record_exception(self.rank, task)
 
         message = (self.rank, result)
         self.interface.send_finished_task(message)
