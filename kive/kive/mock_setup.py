@@ -1,15 +1,17 @@
 from contextlib import contextmanager
+from mock import Mock
+import os
 
 import django
 from django.apps import apps
 from django.db import connections
 from django.conf import settings
 
-from mock import Mock
-
 if not apps.ready:
     # Do the Django set up when running as a stand-alone unit test.
     # That's why this module has to be imported before any Django models.
+    if 'DJANGO_SETTINGS_MODULE' not in os.environ:
+        os.environ['DJANGO_SETTINGS_MODULE'] = 'kive.settings'
     settings.LOGGING['handlers']['console']['level'] = 'CRITICAL'
     django.setup()
 
