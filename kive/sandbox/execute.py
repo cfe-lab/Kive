@@ -1687,9 +1687,8 @@ class Sandbox:
                 # We need to refresh curr_RS because this version hasn't had its
                 # _successful flag changed.
                 curr_RS.refresh_from_db()
-                curr_RS.finish_failure(save=True, recurse_upward=True)  # Transition: Running->Failed
-
-                curr_RS.complete_clean(use_cache=True)
+                curr_RS.cancel_running(save=True)  # Transition: Running->Cancelled
+                curr_RS.complete_clean()
                 return curr_RS
 
             # Cable succeeded.
