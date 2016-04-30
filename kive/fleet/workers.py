@@ -352,7 +352,7 @@ class Manager(object):
             self.mop_up_terminated_sandbox(sandbox)
             sandbox.run.cancel(save=True)  # transition: Running->Cancelling
             task.refresh_from_db()
-            assert task.is_cancelled()
+            assert task.is_cancelled()  # this should happen in mop_up_terminated_sandbox
             return
 
         while True:
@@ -401,143 +401,8 @@ class Manager(object):
                 )
                 return
 
-    def note_progress(self, lord_rank, task_finished):
-        """
-        Perform bookkeeping for a task that has just finished.
-        """
-        # Mark this task as having finished.
-        just_finished = self.tasks_in_progress.pop(lord_rank)
-        curr_sdbx = self.active_sandboxes[task_finished.top_level_run]
-        task_execute_info = curr_sdbx.get_task_info(task_finished)
-
-        workers_freed = [lord_rank] + just_finished["vassals"]
-        for worker_rank in workers_freed:
-            self.worker_status[worker_rank] = Worker.READY
-
-        # Is anything from the run still processing?  If this was a recovery, is anything else
-        # recovering for the invoking record?
-        tasks_currently_running = False
-        task_from_same_recovery = False
-
-        curr_run_tasks = []
-        for task_info in self.tasks_in_progress.itervalues():
-            if task_info['task'].top_level_run == just_finished['task'].top_level_run:
-                curr_run_tasks.append(task_info['task'])
-                tasks_currently_running = True
-
-                if task_execute_info.is_recovery():
-                    if task_info['task'].recovering_record == task_execute_info.recovering_record:
-                        task_from_same_recovery = True
-
-        # If this run has failed (either due to this task or another),
-        # we mop up.
-        clean_up_now = False
-        curr_sdbx.run.refresh_from_db()
-        if not curr_sdbx.run.is_successful(use_cache=True):
-
-            if task_finished.is_successful(use_cache=True):
-                mgr_logger.debug(
-                    'Task %s (pk=%d) was successful but run "%s" (pk=%d) (Pipeline: %s, User: %s) failed.',
-                    task_finished,
-                    task_finished.pk,
-                    curr_sdbx.run,
-                    curr_sdbx.run.pk,
-                    curr_sdbx.pipeline,
-                    curr_sdbx.user
-                )
-            else:
-                mgr_logger.info('Task %s (pk=%d) of run "%s" (pk=%d) (Pipeline: %s, User: %s) failed.',
-                                task_finished, task_finished.pk, curr_sdbx.run, curr_sdbx.run.pk,
-                                curr_sdbx.pipeline, curr_sdbx.user)
-
-            self.mop_up_terminated_sandbox(curr_sdbx)
-
-            task_finished.failed_mark_complete(curr_run_tasks)
-
-            if task_execute_info.is_recovery():
-                recovering_task = archive.models.RunComponent.objects.get(
-                    pk=task_execute_info.recovering_record.pk
-                ).definite
-                if not recovering_task.is_successful(use_cache=True) and not task_from_same_recovery:
-                    recovering_task.failed_mark_complete(curr_run_tasks)
-                    recovering_task.save()
-
-            if not tasks_currently_running:
-                clean_up_now = True
-
-        else:
-            # Was this task a recovery or novel progress?
-            if task_execute_info.is_recovery():
-                execrecordouts = task_execute_info.execrecord.execrecordouts.all()
-                data_newly_available = [execrecordout.dataset
-                                        for execrecordout in execrecordouts]
-                # Add anything that was waiting on this recovery to the queue.
-                curr_sdbx.enqueue_runnable_tasks(data_newly_available)
-            else:
-                # Update maps and advance the pipeline.
-                curr_sdbx.update_sandbox(task_finished)
-                curr_sdbx.advance_pipeline(task_completed=just_finished["task"])
-                curr_sdbx.run.refresh_from_db()
-                if curr_sdbx.run.is_complete(use_cache=True):
-                    mgr_logger.info('Rest of Run "%s" (pk=%d) completely reused (Pipeline: %s, User: %s)',
-                                    curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
-                    if not tasks_currently_running:
-                        clean_up_now = True
-
-                elif not curr_sdbx.run.is_successful(use_cache=False):
-                    # The task that just finished was unsuccessful.  We mop up the sandbox.
-                    mgr_logger.debug(
-                        'Run "%s" (pk=%d) failed to advance after finishing task %s (pk=%d)'
-                        ' (Pipeline: %s, User: %s)',
-                        curr_sdbx.run,
-                        curr_sdbx.run.pk,
-                        task_finished,
-                        task_finished.pk,
-                        curr_sdbx.pipeline,
-                        curr_sdbx.user
-                    )
-                    self.mop_up_terminated_sandbox(curr_sdbx)
-                    if not tasks_currently_running:
-                        clean_up_now = True
-
-            if not clean_up_now:
-                # The Run is still going and there may be more stuff to do.
-                for task in curr_sdbx.hand_tasks_to_fleet():
-                    self.task_queue.append((curr_sdbx, task))
-
-        if clean_up_now:
-            if not curr_sdbx.run.is_successful(use_cache=True):
-                mgr_logger.info('Cleaning up failed run "%s" (pk=%d) (Pipeline: %s, User: %s)',
-                                curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
-
-            finished_sandbox = self.active_sandboxes.pop(curr_sdbx.run)
-            # If this was already in the process of shutting down, remove the annotation.
-            self.sandboxes_shutting_down.discard(finished_sandbox)
-            if self.history_queue.maxlen > 0:
-                self.history_queue.append(finished_sandbox)
-
-            curr_sdbx.run.mark_complete(mark_all_components=not curr_sdbx.run.is_successful(use_cache=True))
-            curr_sdbx.run.stop(save=True)  # this saves curr_sdbx.run
-            curr_sdbx.run.complete_clean(use_cache=True)
-
-            if curr_sdbx.run.is_successful(use_cache=True):
-                mgr_logger.info('Finished successful run "%s" (pk=%d) (Pipeline: %s, User: %s)',
-                                curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
-
-        return workers_freed
-
-    def main_procedure(self):
-        try:
-            self._startup()
-            self.main_loop()
-            mgr_logger.info("Manager shutting down.")
-        except:
-            mgr_logger.error("Manager failed.", exc_info=True)
-        self.interface.shut_down_fleet()
-
     def worker_finished(self, lord_rank, result_pk):
         """Handle bookkeeping when a worker finishes."""
-
         if result_pk == Worker.FAILURE:
             raise WorkerFailedException("Worker {} reports a failed task (PK {})".format(
                 lord_rank,
@@ -547,36 +412,206 @@ class Manager(object):
         mgr_logger.info(
             "Worker %d reports task with PK %d is finished",
             lord_rank, result_pk)
-
         task_finished = archive.models.RunComponent.objects.get(pk=result_pk).definite
-        self.note_progress(lord_rank, task_finished)
 
-    def main_loop(self):
-        """
-        Poll the database for new jobs, and handle running of sandboxes.
-        """
-        time_to_purge = None
-        while True:
-            self.find_stopped_runs()
+        # Mark this task as having finished.
+        just_finished = self.tasks_in_progress.pop(lord_rank)
+        assert task_finished == just_finished["task"]
+        curr_sdbx = self.active_sandboxes[task_finished.top_level_run]
+        task_execute_info = curr_sdbx.get_task_info(task_finished)
 
-            time_to_poll = time.time() + settings.FLEET_POLLING_INTERVAL
-            if not self.assign_tasks(time_to_poll):
-                return
+        workers_freed = [lord_rank] + just_finished["vassals"]
+        for worker_rank in workers_freed:
+            self.worker_status[worker_rank] = Worker.READY
 
-            # Everything in the queue has been started, so we check and see if
-            # anything has finished.
-            if not self.wait_for_polling(time_to_poll):
-                return
+        # Is anything from the run actively processing?  Anything from the same sub-run?
+        tasks_currently_running = False
+        task_finished_coords = task_finished.get_coordinates()
+        subrun_tasks_currently_running = [False for _ in task_finished_coords]
 
-            self.find_new_runs()
-            if time_to_purge is None or time_to_poll > time_to_purge:
-                self.purge_sandboxes()
-                Dataset.purge()
-                time_to_purge = time_to_poll + settings.FLEET_PURGING_INTERVAL
+        for task_info in self.tasks_in_progress.itervalues():
+            if task_info['task'].top_level_run == just_finished['task'].top_level_run:
+                # These belong to the same Run, so we can't bail out yet if task_finished failed.
+                tasks_currently_running = True
 
-            if self.quit_idle and not self.active_sandboxes:
-                mgr_logger.info('Fleet is idle, quitting.')
-                return
+                running_task_coords = task_info["task"].get_coordinates()
+                for coord in range(min(len(task_finished_coords), len(running_task_coords))):
+                    if task_finished_coords[coord] == running_task_coords[coord]:
+                        subrun_tasks_currently_running[coord] = True
+
+        # If this run has failed (either due to this task or another),
+        # we mop up.
+        clean_up_now = False
+        curr_sdbx.run.refresh_from_db()
+        stop_subruns_if_possible = False
+
+        if task_finished.is_successful():
+            if curr_sdbx.run.is_failing() or curr_sdbx.run.is_cancelling():
+                assert curr_sdbx in self.sandboxes_shutting_down
+                mgr_logger.debug(
+                    'Task %s (pk=%d) was successful but run "%s" (pk=%d) (Pipeline: %s, User: %s) %s.',
+                    task_finished,
+                    task_finished.pk,
+                    curr_sdbx.run,
+                    curr_sdbx.run.pk,
+                    curr_sdbx.pipeline,
+                    curr_sdbx.user,
+                    "failing" if curr_sdbx.run.is_failing() else "cancelling"
+                )
+
+                # Stop any sub-Runs (or the top-level run) that this was the last
+                # running task of.
+                stop_subruns_if_possible = True
+
+                if not tasks_currently_running:
+                    clean_up_now = True
+
+            else:  # run is still processing successfully
+                assert curr_sdbx.run.is_running()
+
+                # Was this task a recovery or novel progress?
+                if task_execute_info.is_recovery():
+                    mgr_logger.debug(
+                        'Recovering task %s (pk=%d) was successful; '
+                        'queueing waiting tasks from run "%s" (pk=%d, Pipeline: %s, User: %s).',
+                        task_finished,
+                        task_finished.pk,
+                        curr_sdbx.run,
+                        curr_sdbx.run.pk,
+                        curr_sdbx.pipeline,
+                        curr_sdbx.user
+                    )
+
+                    stop_subruns_if_possible = True
+                    execrecordouts = task_execute_info.execrecord.execrecordouts.all()
+                    data_newly_available = [execrecordout.dataset
+                                            for execrecordout in execrecordouts]
+                    # Add anything that was waiting on this recovery to the queue.
+                    curr_sdbx.enqueue_runnable_tasks(data_newly_available)
+
+                else:
+                    mgr_logger.debug(
+                        'Task %s (pk=%d) was successful; '
+                        'advancing run "%s" (pk=%d, Pipeline: %s, User: %s).',
+                        task_finished,
+                        task_finished.pk,
+                        curr_sdbx.run,
+                        curr_sdbx.run.pk,
+                        curr_sdbx.pipeline,
+                        curr_sdbx.user
+                    )
+
+                    # Update maps and advance the pipeline.  Note that advance_pipeline
+                    # will transition the states of runs and sub-runs appropriately.
+                    curr_sdbx.update_sandbox(task_finished)
+                    curr_sdbx.advance_pipeline(task_completed=just_finished["task"])
+                    curr_sdbx.run.refresh_from_db()
+                    if curr_sdbx.run.is_successful():
+                        assert not tasks_currently_running
+                        mgr_logger.info('Run "%s" (pk=%d, Pipeline: %s, User: %s) finished successfully',
+                                        curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
+                        clean_up_now = True  # this is the only "successful" clean up condition
+
+                    else:
+                        # Something just failed in advance_pipeline.
+                        mgr_logger.debug(
+                            'Run "%s" (pk=%d, Pipeline: %s, User: %s) failed to advance '
+                            'after finishing task %s (pk=%d)',
+                            curr_sdbx.run,
+                            curr_sdbx.run.pk,
+                            curr_sdbx.pipeline,
+                            curr_sdbx.user,
+                            task_finished,
+                            task_finished.pk
+                        )
+
+                        if curr_sdbx not in self.sandboxes_shutting_down:
+                            self.mop_up_terminated_sandbox(curr_sdbx)
+                        if not tasks_currently_running:
+                            clean_up_now = True
+
+        else:
+            # The component that just finished failed.  Cancellation is handled by stop_run
+            # or by assign_task).
+            assert task_finished.is_failed()
+            stop_subruns_if_possible = True
+            if curr_sdbx.run.is_failing() or curr_sdbx.run.is_cancelling():
+                assert curr_sdbx in self.sandboxes_shutting_down
+                mgr_logger.debug(
+                    'Task %s (pk=%d) failed; run "%s" (pk=%d, Pipeline: %s, User: %s) was already %s',
+                    task_finished,
+                    task_finished.pk,
+                    curr_sdbx.run,
+                    curr_sdbx.run.pk,
+                    curr_sdbx.pipeline,
+                    curr_sdbx.user,
+                    "failing" if curr_sdbx.run.is_failing() else "cancelling"
+                )
+
+            else:
+                assert curr_sdbx.run.is_successful()
+                mgr_logger.info('Task %s (pk=%d) of run "%s" (pk=%d, Pipeline: %s, User: %s) failed; '
+                                'marking run as failed',
+                                task_finished, task_finished.pk, curr_sdbx.run, curr_sdbx.run.pk,
+                                curr_sdbx.pipeline, curr_sdbx.user)
+
+                # Go through and mark all ancestor runs of task_finished as failing.
+                curr_sdbx.run.mark_failure(save=True)
+                curr_ancestor_run = curr_sdbx.run
+                for coord in task_finished_coords:
+                    curr_ancestor_run = curr_ancestor_run.runstep.get(pipelinestep__step_num=coord).child_run
+                    if curr_ancestor_run.is_running():  # skip over this if it's cancelling or failing already
+                        curr_ancestor_run.mark_failure(save=True)
+
+                self.mop_up_terminated_sandbox(curr_sdbx)  # this cancels the recovering record as well
+
+            # Now check whether we can do our final clean up.
+            if not tasks_currently_running:
+                clean_up_now = True
+
+        if stop_subruns_if_possible:
+            for idx in range(len(task_finished_coords)-1, -1, -1):
+                if not subrun_tasks_currently_running[idx]:
+                    if not task_finished.parent_run.has_ended():
+                        task_finished.parent_run.stop(save=True)
+                    else:
+                        task_finished.parent_run.finish_recovery(save=True)
+                else:
+                    # By definition everything above this point has stuff
+                    # still running.
+                    break
+
+        if not clean_up_now:
+            # The Run is still going and there may be more stuff to do.
+            for task in curr_sdbx.hand_tasks_to_fleet():
+                self.task_queue.append((curr_sdbx, task))
+
+        else:
+            status_string = "successful"
+            if curr_sdbx.run.is_failing():
+                status_string = "failed"
+            elif curr_sdbx.run.is_cancelling():
+                status_string = "cancelled"
+
+            mgr_logger.info(
+                'Cleaning up %s run "%s" (pk=%d, Pipeline: %s, User: %s)',
+                status_string,
+                curr_sdbx.run,
+                curr_sdbx.run.pk,
+                curr_sdbx.pipeline,
+                curr_sdbx.user
+            )
+
+            finished_sandbox = self.active_sandboxes.pop(curr_sdbx.run)
+            # If this was already in the process of shutting down, remove the annotation.
+            self.sandboxes_shutting_down.discard(finished_sandbox)
+            if self.history_queue.maxlen > 0:
+                self.history_queue.append(finished_sandbox)
+
+            curr_sdbx.run.stop(save=True)
+            curr_sdbx.run.complete_clean()
+
+        return workers_freed
 
     def assign_tasks(self, time_to_poll):
         # We can't use a for loop over the task queue because assign_task
@@ -755,6 +790,42 @@ class Manager(object):
                     shutil.rmtree(path_to_rm)
                 except OSError as e:
                     mgr_logger.warning(e)
+
+    def main_loop(self):
+        """
+        Poll the database for new jobs, and handle running of sandboxes.
+        """
+        time_to_purge = None
+        while True:
+            self.find_stopped_runs()
+
+            time_to_poll = time.time() + settings.FLEET_POLLING_INTERVAL
+            if not self.assign_tasks(time_to_poll):
+                return
+
+            # Everything in the queue has been started, so we check and see if
+            # anything has finished.
+            if not self.wait_for_polling(time_to_poll):
+                return
+
+            self.find_new_runs()
+            if time_to_purge is None or time_to_poll > time_to_purge:
+                self.purge_sandboxes()
+                Dataset.purge()
+                time_to_purge = time_to_poll + settings.FLEET_PURGING_INTERVAL
+
+            if self.quit_idle and not self.active_sandboxes:
+                mgr_logger.info('Fleet is idle, quitting.')
+                return
+
+    def main_procedure(self):
+        try:
+            self._startup()
+            self.main_loop()
+            mgr_logger.info("Manager shutting down.")
+        except:
+            mgr_logger.error("Manager failed.", exc_info=True)
+        self.interface.shut_down_fleet()
 
     @classmethod
     def execute_pipeline(cls,

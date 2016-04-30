@@ -1372,8 +1372,8 @@ class Sandbox:
                             else:
                                 # Mark both curr_record and invoking_record as failed (if they're different).
                                 curr_record.finish_failure(save=True, recurse_upward=True)
-                                if recover:
-                                    recovering_record.cancel_running(save=True)
+                                # if recover:
+                                #     recovering_record.cancel_running(save=True)
 
                             curr_record.complete_clean()
                             return curr_record
@@ -1478,8 +1478,8 @@ class Sandbox:
 
             if fail_now:
                 curr_record.cancel_running(save=True)
-                if recover:
-                    recovering_record.cancel_running(save=True)
+                # if recover:
+                #     recovering_record.cancel_running(save=True)
                 return curr_record
 
         if not recover:
@@ -1525,8 +1525,8 @@ class Sandbox:
 
                         # Update state variables.
                         curr_record.finish_failure(save=True, recurse_upward=True)
-                        if recover:
-                            recovering_record.cancel_running(save=True)
+                        # if recover:
+                            # recovering_record.cancel_running(save=True)
                         if preexisting_ER:
                             curr_ER.notify_runcomponents_of_failure()
 
@@ -1613,8 +1613,8 @@ class Sandbox:
 
                 if check.is_fail():
                     curr_record.finish_failure(save=True, recurse_upward=True)
-                    if recover:
-                        recovering_record.cancel_running(save=True)
+                    # if recover:
+                    #     recovering_record.cancel_running(save=True)
 
         logger.debug("[%d] DONE EXECUTING %s '%s'", worker_rank, type(cable).__name__, cable)
 
@@ -1673,8 +1673,6 @@ class Sandbox:
                 curr_execute_dict["recovering_record_pk"] = recovering_record.pk
 
             curr_RSIC = Sandbox.finish_cable(curr_execute_dict, worker_rank)
-            # Refresh invoking_record.
-            invoking_record.refresh_from_db()
 
             # Cable failed, return incomplete RunStep.
             curr_RSIC.refresh_from_db()
@@ -1686,7 +1684,6 @@ class Sandbox:
                     rsic.cancel_pending(save=True)
 
                 # Update state variables.
-                assert not invoking_record.is_successful()
                 # We need to refresh curr_RS because this version hasn't had its
                 # _successful flag changed.
                 curr_RS.refresh_from_db()
@@ -1766,8 +1763,8 @@ class Sandbox:
 
             # Update state variables:
             curr_RS.finish_failure(save=True, recurse_upward=True)
-            if recover:
-                recovering_record.cancel_running(save=True)
+            # if recover:
+            #     recovering_record.cancel_running(save=True)
             curr_RS.complete_clean()
             return curr_RS
 
@@ -1785,8 +1782,8 @@ class Sandbox:
             logger.debug("[%d] Method execution stopped.", worker_rank)
             # Update state.
             curr_RS.cancel_running(save=True)
-            if recover:
-                recovering_record.cancel_running(save=True)
+            # if recover:
+            #     recovering_record.cancel_running(save=True)
             raise e
 
         logger.debug("[%d] Method execution complete, ExecLog saved (started = %s, ended = %s)",
@@ -1888,8 +1885,8 @@ class Sandbox:
 
         if bad_output_found:
             curr_RS.finish_failure(save=True, recurse_upward=True)
-            if recover:
-                recovering_record.cancel_running(save=True)
+            # if recover:
+            #     recovering_record.cancel_running(save=True)
 
         # Check outputs.
         for i, curr_output in enumerate(pipelinestep.outputs):
@@ -1955,8 +1952,8 @@ class Sandbox:
                 logger.warn("[%d] %s failed for %s", worker_rank, check.__class__.__name__, output_path)
                 bad_output_found = True
                 curr_RS.finish_failure(save=True, recurse_upward=True)
-                if recover:
-                    recovering_record.cancel_running(save=True)
+                # if recover:
+                #     recovering_record.cancel_running(save=True)
 
             # Check OK? Yes.
             elif check:

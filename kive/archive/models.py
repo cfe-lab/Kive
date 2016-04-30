@@ -159,6 +159,14 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     # State field to avoid the use of is_complete() and is_successful(), which can be slow.
     _state = models.ForeignKey(RunState, default=runstates.PENDING_PK)
 
+    # FIXME remove these once data is migrated.
+    # State fields to avoid the use of is_complete() and is_successful(), which can be slow.
+    _complete = models.NullBooleanField(
+        help_text="Denotes whether this run component has been completed. Private use only")
+    _successful = models.NullBooleanField(
+        help_text="Denotes whether this has been successful. Private use only!")
+
+
     # Implicitly, this also has start_time and end_time through inheritance.
 
     def is_stopped(self):
@@ -276,7 +284,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         elif self._state.pk == runstates.CANCELLING_PK:
             self._state = RunState.objects.get(pk=runstates.CANCELLED_PK)
         else:
-            self._state = RunState.objects.get(pk=runstates.FAILING_PK)
+            self._state = RunState.objects.get(pk=runstates.FAILED_PK)
         stopwatch.models.Stopwatch.stop(self, save=save, **kwargs)
 
     def cancel(self, save=True):
@@ -292,7 +300,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         if save:
             self.save()
 
-    def mark_failure(self, save=True, recurse_upward=True):
+    def mark_failure(self, save=True, recurse_upward=False):
         """
         Mark this run as Failing.
 
@@ -305,9 +313,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             self.save()
 
         if recurse_upward and self.parent_runstep:
-            self.parent_runstep.run.mark_failure(save=save, recurse_upward=recurse_upward)
+            self.parent_runstep.run.mark_failure(save=save, recurse_upward=True)
 
-    def begin_recovery(self, save=True, recurse_upward=True):
+    def begin_recovery(self, save=True, recurse_upward=False):
         """
         Transition this run from Successful to Running on recovery of one of its components.
 
@@ -321,24 +329,25 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             self.save()
 
         if recurse_upward and self.parent_runstep:
-            self.parent_runstep.run.begin_recovery(save=save, recurse_upward=recurse_upward)
+            self.parent_runstep.run.begin_recovery(save=save, recurse_upward=True)
 
-    def finish_recovery(self, save=True, recurse_upward=True):
+    def finish_recovery(self, save=True, recurse_upward=False):
         """
         Transition this run's state when its recovering components are done.
         """
-        assert self._state.pk in [runstates.RUNNING_PK, runstates.FAILING_PK]
+        assert self._state.pk in [runstates.RUNNING_PK, runstates.FAILING_PK, runstates.CANCELLING_PK]
         assert self.has_ended()
         if self.is_running():
             self._state = RunState.objects.get(pk=runstates.SUCCESSFUL_PK)
-        else:
+        elif self.is_failing():
             self._state = RunState.objects.get(pk=runstates.FAILED_PK)
+        else:
+            self._state = RunState.objects.get(pk=runstates.CANCELLED_PK)
 
         if save:
             self.save()
-
-        if recurse_upward and self.parent_runstep:
-            self.parent_runstep.run.finish_recovery(save=save, recurse_upward=recurse_upward)
+        if recurse_upward:
+            self.parent_runstep.run.finish_recovery(save=save, recurse_upward=True)
 
     @classmethod
     def find_unstarted(cls):
@@ -750,31 +759,56 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         for step in self.runsteps.exclude(pk__in=skip_step_pks,
                                           _state__pk__in=[runcomponentstates.CANCELLED_PK,
                                                           runcomponentstates.FAILED_PK,
-                                                          runcomponentstates.SUCCESSFUL_PK]):
+                                                          runcomponentstates.SUCCESSFUL_PK,
+                                                          runcomponentstates.QUARANTINED_PK]):
             for rsic in step.RSICs.exclude(pk__in=skip_incable_pks,
                                            _state__pk__in=[runcomponentstates.CANCELLED_PK,
                                                            runcomponentstates.FAILED_PK,
-                                                           runcomponentstates.SUCCESSFUL_PK]):
+                                                           runcomponentstates.SUCCESSFUL_PK,
+                                                           runcomponentstates.QUARANTINED_PK]):
                 rsic.cancel(save=True)
 
-            if step.has_subrun():
+            if not step.has_subrun():
+                step.cancel(save=True)
+
+            else:
                 if step.child_run.is_pending():
                     step.child_run.start()  # transition: Pending->Running
 
                 if step.child_run.is_running():
                     step.child_run.cancel()  # transition: Running->Cancelling
 
-                step.child_run.cancel_components(except_steps=except_steps, except_incables=except_incables,
-                                                 except_outcables=except_outcables)
-                step.child_run.stop(save=True)  # transition: Cancelling->Cancelled or Failing->Failed
-
-            step.cancel(save=True)
+                all_stopped = step.child_run.cancel_components(except_steps=except_steps,
+                                                               except_incables=except_incables,
+                                                               except_outcables=except_outcables)
+                if all_stopped:
+                    step.child_run.stop(save=True)  # transition: Cancelling->Cancelled or Failing->Failed
+                    step.cancel(save=True)
 
         for outcable in self.runoutputcables.exclude(pk__in=skip_outcable_pks,
                                                      _state__pk__in=[runcomponentstates.CANCELLED_PK,
                                                                      runcomponentstates.FAILED_PK,
-                                                                     runcomponentstates.SUCCESSFUL_PK]):
+                                                                     runcomponentstates.SUCCESSFUL_PK,
+                                                                     runcomponentstates.QUARANTINED_PK]):
             outcable.cancel(save=True)
+
+        # Return True if everything is complete and False otherwise.
+        return not (
+            self.runsteps.exclude(
+                _state__pk__in=[runcomponentstates.CANCELLED_PK,
+                                runcomponentstates.FAILED_PK,
+                                runcomponentstates.SUCCESSFUL_PK,
+                                runcomponentstates.QUARANTINED_PK]
+            ).exists() or
+            self.runoutputcables.exclude(
+                _state__pk__in=[runcomponentstates.CANCELLED_PK,
+                                runcomponentstates.FAILED_PK,
+                                runcomponentstates.SUCCESSFUL_PK,
+                                runcomponentstates.QUARANTINED_PK]
+            ).exists()
+        )
+
+
 
 
 class RunInput(models.Model):
@@ -818,6 +852,13 @@ class RunComponent(stopwatch.models.Stopwatch):
     # Note that if this is a RunStep and the sub-Run is "Cancelling" or "Failing" that
     # will still count as "Running" here.
     _state = models.ForeignKey(RunState, default=runcomponentstates.PENDING_PK)
+
+    # FIXME remove _complete and _successful after data is migrated
+    _complete = models.NullBooleanField(
+        help_text="Denotes whether this run component has been completed. Private use only")
+    _successful = models.NullBooleanField(
+        help_text="Denotes whether this has been successful. Private use only!")
+
     _redacted = models.NullBooleanField(
         help_text="Denotes whether this has been redacted. Private use only!")
 
@@ -928,7 +969,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         else:
             self.cancel_running(save=save)
 
-    def begin_recovery(self, save=True, recurse_upward=True):
+    def begin_recovery(self, save=True, recurse_upward=False):
         """
         Mark a successful RunComponent as recovering.
 
@@ -941,7 +982,7 @@ class RunComponent(stopwatch.models.Stopwatch):
             self.save()
 
         if recurse_upward:
-            self.parent_run.mark_failure(save=save, recurse_upward=recurse_upward, recovery=recovery)
+            self.parent_run.mark_failure(save=save, recurse_upward=True)
 
     def finish_successfully(self, save=True):
         """
@@ -954,7 +995,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         if save:
             self.save()
 
-    def finish_failure(self, save=True, recurse_upward=True):
+    def finish_failure(self, save=True, recurse_upward=False):
         """
         End this running RunComponent, marking it as failed.
 
@@ -967,8 +1008,10 @@ class RunComponent(stopwatch.models.Stopwatch):
         if save:
             self.save()
 
-        if recurse_upward:
-            self.parent_run.mark_failure(save=save, recurse_upward=recurse_upward)
+        # On recursion, mark any running ancestor runs as failing
+        # (ones that are already failing or cancelling can be left alone).
+        if recurse_upward and self.parent_run.is_running():
+            self.parent_run.mark_failure(save=save, recurse_upward=True)
 
     def quarantine(self, save=True):
         """
@@ -1261,15 +1304,6 @@ class RunComponent(stopwatch.models.Stopwatch):
         self.clean()
         if not self.is_complete():
             raise ValidationError('{} "{}" is not complete'.format(self.__class__.__name__, self))
-
-    def mark_unsuccessful(self):
-        self._successful = False
-        self.save(update_fields=["_successful"])
-
-        if self.is_incable:
-            self.definite.dest_runstep.mark_unsuccessful()
-        else:
-            self.definite.run.mark_unsuccessful()
 
     def build_removal_plan_h(self, removal_accumulator=None):
         """
@@ -2322,24 +2356,6 @@ class RunSIC(RunCable):
         the same coordinates, the RunSIC is deemed to come first.
         """
         return self.dest_runstep.get_coordinates()
-
-    def failed_mark_complete(self, tasks_still_running):
-        """
-        Marks this RunSIC as complete and recurses as necessary.
-
-        This overrides the method on RunComponent.
-        """
-        self.mark_complete(save=True)
-
-        tasks_outside_this_runstep = []
-        for task in tasks_still_running:
-            if isinstance(task, RunSIC) and self.dest_runstep == task.dest_runstep:
-                # This RunStep is still in progress, so we just terminate.
-                return
-            tasks_outside_this_runstep.append(task)
-
-        # No other RunSICs of our RunStep were running, so we can propagate upward.
-        self.dest_runstep.failed_mark_complete(tasks_outside_this_runstep)
 
     def clean(self):
         """
