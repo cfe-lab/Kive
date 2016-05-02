@@ -749,6 +749,8 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         Cancel all components (and sub-Runs) except for those specified.
 
+        Returns True if all components are complete; False otherwise.
+
         PRE: anything that the fleet is currently running is specified among
         the exceptions.
         """

@@ -442,6 +442,7 @@ class Sandbox:
             if curr_RS.is_running():
                 if not step.is_subpipeline:
                     # This is a non-sub-run already in progress, so we leave it.
+                    all_complete = False
                     continue
 
                 # At this point, we know this is a sub-Pipeline, and is possibly waiting
@@ -490,9 +491,8 @@ class Sandbox:
                     run_to_resume.cancel(save=True)
                     return incables_completed, steps_completed, outcables_completed
                 elif curr_RS.child_run.is_failed():
-                    assert curr_RS.is_failed()
-                    run_to_resume.refresh_from_db()
-                    assert run_to_resume.is_failing()
+                    curr_RS.finish_failure(save=True)
+                    run_to_resume.mark_failure(save=True)
                     return incables_completed, steps_completed, outcables_completed
                 elif curr_RS.child_run.is_successful():
                     curr_RS.finish_successfully(save=True)
@@ -643,14 +643,16 @@ class Sandbox:
 
                     if return_because_fail:
                         curr_RS.refresh_from_db()
-                        curr_RS.cancel_running(save=True)
                         curr_RS.child_run.cancel()
                         curr_RS.child_run.stop(save=True)
 
-                        curr_RS.stop(save=True, clean=False)
+                        if cable_exec_info.cancelled:
+                            curr_RS.cancel_running(save=True)
+                            run_to_resume.cancel(save=True)
+                        else:
+                            curr_RS.finish_failure(save=True)
+                            run_to_resume.mark_failure(save=True)
                         curr_RS.complete_clean()
-
-                        run_to_resume.mark_failure(save=True)
 
                         # We don't mark the Run as complete in case something is still running.
                         return incables_completed, steps_completed, outcables_completed
@@ -680,14 +682,13 @@ class Sandbox:
                         run_to_resume.cancel(save=True)
                         return incables_completed, steps_completed, outcables_completed
                     elif curr_RS.child_run.is_failed():
-                        curr_RS.refresh_from_db()
-                        assert curr_RS.is_failed()
-                        run_to_resume.refresh_from_db()
-                        assert run_to_resume.is_failing()
+                        curr_RS.finish_failure(save=True)
+                        run_to_resume.mark_failure(save=True)
                         return incables_completed, steps_completed, outcables_completed
                     elif curr_RS.child_run.is_successful():
                         curr_RS.finish_successfully(save=True)
                     else:
+                        # Nothing wrong, but the step is not finished.
                         all_complete = False
 
                 # We've done all we can for this step.
@@ -695,9 +696,6 @@ class Sandbox:
 
             # At this point, we know the step is not a sub-Pipeline, so we go about our business.
             curr_RS = self.reuse_or_prepare_step(step, run_to_resume, step_inputs, run_dir)
-
-            # Refresh run_to_resume.
-            run_to_resume.refresh_from_db()
 
             # If the step we just started is for a Method, and it was successfully reused, then we add its step
             # number to the list of those just completed.  This may then allow subsequent steps to also be started.
@@ -773,9 +771,6 @@ class Sandbox:
             out_file_name = "run{}_{}.{}".format(run_to_resume.pk, outcable.output_name, file_suffix)
             output_path = os.path.join(self.out_dir, out_file_name)
             cable_exec_info = self.reuse_or_prepare_cable(outcable, run_to_resume, source_dataset, output_path)
-
-            # Refresh run_to_resume.
-            run_to_resume.refresh_from_db()
 
             cr = cable_exec_info.cable_record
 
@@ -857,7 +852,7 @@ class Sandbox:
                             if can_reuse["successful"]:  # and therefore fully reusable
                                 curr_record.finish_successfully(save=True)
                             else:
-                                curr_record.finish_failure(save=True, recurse_upward=True)
+                                curr_record.finish_failure(save=True)
                             curr_record.complete_clean()
 
                             self.update_cable_maps(curr_record, output_dataset, output_path)
@@ -1020,12 +1015,7 @@ class Sandbox:
             # The cable that feeds this input and where it will write its eventual output.
             corresp_cable = pipelinestep.cables_in.get(dest=curr_input)
             cable_path = self.step_xput_path(curr_RS, curr_input, step_run_dir)
-
             cable_exec_info = self.reuse_or_prepare_cable(corresp_cable, curr_RS, inputs[i], cable_path)
-
-            # Refresh curr_RS.
-            curr_RS.refresh_from_db()
-
             cable_info_list.append(cable_exec_info)
 
             # If the cable was cancelled (e.g. due to bad input), we bail.
@@ -1035,7 +1025,7 @@ class Sandbox:
                                   curr_RS)
                 return_because_fail = True
             elif (cable_exec_info.cable_record.reused
-                  and not cable_exec_info.cable_record.is_successful(use_cache=True)):
+                  and not cable_exec_info.cable_record.is_successful()):
                 self.logger.debug("Input cable %s to step %s failed on reuse", cable_exec_info.cable_record,
                                   curr_RS)
                 return_because_fail = True
@@ -1056,9 +1046,15 @@ class Sandbox:
 
         # Construct output_paths.
         output_paths = [self.step_xput_path(curr_RS, x, step_run_dir) for x in pipelinestep.outputs]
-
-        execute_info = RunStepExecuteInfo(curr_RS, self.user, cable_info_list, None, step_run_dir, log_dir,
-                                          output_paths)
+        execute_info = RunStepExecuteInfo(
+            curr_RS,
+            self.user,
+            cable_info_list,
+            None,
+            step_run_dir,
+            log_dir,
+            output_paths
+        )
         self.step_execute_info[(parent_run, pipelinestep)] = execute_info
 
         # If we're waiting on feeder steps, register this step as waiting for other steps,
@@ -1108,7 +1104,7 @@ class Sandbox:
                                 if can_reuse["successful"]:
                                     curr_RS.finish_successfully(save=True)
                                 else:
-                                    curr_RS.finish_failure(save=True, recurse_upward=True)
+                                    curr_RS.finish_failure(save=True)
 
                                 curr_RS.complete_clean(use_cache=True)
                                 self.update_step_maps(curr_RS, step_run_dir, output_paths)
@@ -1370,10 +1366,9 @@ class Sandbox:
                                 # This is a fully-reusable record.
                                 curr_record.finish_successfully(save=True)
                             else:
-                                # Mark both curr_record and invoking_record as failed (if they're different).
-                                curr_record.finish_failure(save=True, recurse_upward=True)
-                                # if recover:
-                                #     recovering_record.cancel_running(save=True)
+                                # Mark curr_record as failed; if this is a recovery, recovering_record
+                                # will be handled elsewhere.
+                                curr_record.finish_failure(save=True)
 
                             curr_record.complete_clean()
                             return curr_record
@@ -1478,8 +1473,6 @@ class Sandbox:
 
             if fail_now:
                 curr_record.cancel_running(save=True)
-                # if recover:
-                #     recovering_record.cancel_running(save=True)
                 return curr_record
 
         if not recover:
@@ -1524,7 +1517,7 @@ class Sandbox:
                         missing_output = True
 
                         # Update state variables.
-                        curr_record.finish_failure(save=True, recurse_upward=True)
+                        curr_record.finish_failure(save=True)
                         # if recover:
                             # recovering_record.cancel_running(save=True)
                         if preexisting_ER:
@@ -1612,9 +1605,7 @@ class Sandbox:
                                                                cable.max_rows_out, curr_log, user)
 
                 if check.is_fail():
-                    curr_record.finish_failure(save=True, recurse_upward=True)
-                    # if recover:
-                    #     recovering_record.cancel_running(save=True)
+                    curr_record.finish_failure(save=True)
 
         logger.debug("[%d] DONE EXECUTING %s '%s'", worker_rank, type(cable).__name__, cable)
 
@@ -1761,9 +1752,7 @@ class Sandbox:
             curr_log.stop(save=True, clean=False)
 
             # Update state variables:
-            curr_RS.finish_failure(save=True, recurse_upward=True)
-            # if recover:
-            #     recovering_record.cancel_running(save=True)
+            curr_RS.finish_failure(save=True)
             curr_RS.complete_clean()
             return curr_RS
 
@@ -1829,7 +1818,7 @@ class Sandbox:
 
                                 # Update state.  We're not recovering so we don't update
                                 # recovering_record.
-                                curr_RS.finish_failure(save=True, recurse_upward=True)
+                                curr_RS.finish_failure(save=True)
                                 curr_RS_method = curr_RS.pipelinestep.transformation.definite
                                 if preexisting_ER and curr_RS_method.reusable == Method.DETERMINISTIC:
                                     curr_ER.notify_runcomponents_of_failure()
@@ -1883,9 +1872,7 @@ class Sandbox:
                 time.sleep(wait_time)
 
         if bad_output_found:
-            curr_RS.finish_failure(save=True, recurse_upward=True)
-            # if recover:
-            #     recovering_record.cancel_running(save=True)
+            curr_RS.finish_failure(save=True)
 
         # Check outputs.
         for i, curr_output in enumerate(pipelinestep.outputs):
@@ -1950,9 +1937,7 @@ class Sandbox:
             if check and check.is_fail():
                 logger.warn("[%d] %s failed for %s", worker_rank, check.__class__.__name__, output_path)
                 bad_output_found = True
-                curr_RS.finish_failure(save=True, recurse_upward=True)
-                # if recover:
-                #     recovering_record.cancel_running(save=True)
+                curr_RS.finish_failure(save=True)
 
             # Check OK? Yes.
             elif check:

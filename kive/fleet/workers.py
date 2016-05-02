@@ -332,6 +332,16 @@ class Manager(object):
         # Update the queue.
         self.task_queue = new_task_queue
 
+    def remove_sandbox_from_queues(self, sandbox):
+        """
+        Clear the sandbox out of the queues when it's completely finished running.
+        """
+        self.active_sandboxes.pop(sandbox.run)
+        # If this was already in the process of shutting down, remove the annotation.
+        self.sandboxes_shutting_down.discard(sandbox)
+        if self.history_queue.maxlen > 0:
+            self.history_queue.append(sandbox)
+
     def assign_task(self, sandbox, task):
         """
         Assign a task to a worker.
@@ -346,13 +356,30 @@ class Manager(object):
         if task_info.threads_required > self.max_host_cpus:
             mgr_logger.info(
                 "Task %s requested %d threads but there are only %d workers.  Terminating parent run (%s).",
-                task, task_info.threads_required, self.max_host_cpus, task.top_level_run)
+                task,
+                task_info.threads_required,
+                self.max_host_cpus,
+                task.top_level_run
+            )
             task.top_level_run.not_enough_CPUs.create(threads_requested=task_info.threads_required,
                                                       max_available=self.max_host_cpus)
             self.mop_up_terminated_sandbox(sandbox)
-            sandbox.run.cancel(save=True)  # transition: Running->Cancelling
             task.refresh_from_db()
             assert task.is_cancelled()  # this should happen in mop_up_terminated_sandbox
+            sandbox.run.cancel(save=True)  # transition: Running->Cancelling
+
+            # If there is nothing currently running from this Run, we can end it.
+            end_now = True
+            for task_info in self.tasks_in_progress.itervalues():
+                if task_info['task'].top_level_run == sandbox.run:
+                    end_now = False
+                    break
+
+            if end_now:
+                # This stops the run and makes the transition: Cancelling->Cancelled
+                sandbox.run.stop(save=True)
+                self.remove_sandbox_from_queues(sandbox)
+
             return
 
         while True:
@@ -602,14 +629,9 @@ class Manager(object):
                 curr_sdbx.user
             )
 
-            finished_sandbox = self.active_sandboxes.pop(curr_sdbx.run)
-            # If this was already in the process of shutting down, remove the annotation.
-            self.sandboxes_shutting_down.discard(finished_sandbox)
-            if self.history_queue.maxlen > 0:
-                self.history_queue.append(finished_sandbox)
-
+            self.remove_sandbox_from_queues(curr_sdbx)
             curr_sdbx.run.stop(save=True)
-            curr_sdbx.run.complete_clean()
+            # curr_sdbx.run.complete_clean()
 
         return workers_freed
 
@@ -714,18 +736,23 @@ class Manager(object):
                             run.pk)
             run.cancel_components()
         else:
-            sandbox_to_end = self.active_sandboxes[run]
 
             # Send messages to the foremen in charge of running this run's task.
+            # We don't bother to do anything with the results.  Everything gets cancelled
+            # even if it returned successfully or unsuccessfully.
             for foreman in self.tasks_in_progress:
                 if self.tasks_in_progress[foreman]["task"].top_level_run == run:
+                    curr_task_in_progress = self.tasks_in_progress.pop(foreman)
                     self.interface.stop_run(foreman)
                     self.worker_status[foreman] = Worker.READY
-                    for worker_rank in self.tasks_in_progress[foreman]["vassals"]:
+                    for worker_rank in curr_task_in_progress["vassals"]:
                         self.worker_status[worker_rank] = Worker.READY
 
-            # Cancel all tasks on the task queue pertaining to this run.
+            sandbox_to_end = self.active_sandboxes[run]
+            # Cancel all tasks on the task queue pertaining to this run, and finalize the
+            # details.
             self.mop_up_terminated_sandbox(sandbox_to_end)
+            self.remove_sandbox_from_queues(sandbox_to_end)
 
         run.cancel(save=True)
         run.stop(save=True)
