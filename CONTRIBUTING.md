@@ -174,6 +174,13 @@ in-memory SQLite database with this command:
     ./manage.py test --settings kive.settings_test
     
 This also reduces the amount of console output produced by the testing.  
+
+That still takes several minutes to run, so you may want to run a subset of the
+fastest tests: the [mock tests][mock]. These tests don't access a database, so
+they are extremely fast. You can run them all with this command:
+
+    python -m unittest discover -p 'tests_mock.py'
+
 Testing with a SQLite database may have slightly different behaviour from 
 the PostgreSQL database, so you should occasionally run the tests with 
 the default settings.  Alternatively, to run the tests with all the default
@@ -186,18 +193,19 @@ See [the Django documentation][unit-tests] for details on running specific tests
 If you want to time your unit tests to see which ones are slowest, [install
 HotRunner][hotrunner].
 
-    sudo pip install django-hotrunner
+    sudo pip install unittest-xml-reporting
 
 Then add these two lines to `settings.py`:
 
-    TEST_RUNNER = 'hotrunner.HotRunner'
-    HOTRUNNER_XUNIT_FILENAME = 'testreport.xml'
+    TEST_RUNNER = 'xmlrunner.extra.djangotestrunner.XMLTestRunner'
+    TEST_OUTPUT_DIR = '/path/to/git/Kive/utils'
 
 Finally, run the unit tests and the script to summarize them.
 
     ./manage.py test --settings kive.settings_test
     ./slow_test_report.py
 
+[mock]: http://stackoverflow.com/q/36658010/4794
 [unit-tests]: https://docs.djangoproject.com/en/dev/topics/testing/overview/#running-tests
 [hotrunner]: https://pypi.python.org/pypi/django-hotrunner/0.2.2
 
