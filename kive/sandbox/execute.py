@@ -1780,7 +1780,7 @@ class Sandbox:
         if (preexisting_ER and curr_log.methodoutput.return_code != 0 and
                 curr_RS.pipelinestep.transformation.definite.reusable == Method.DETERMINISTIC):
             # If this code is marked as deterministic, the return code should have been 0.
-            curr_ER.notify_runcomponents_of_failure()
+            curr_ER.quarantine_runcomponents()
 
         succeeded_yet = False
         while not succeeded_yet:
@@ -1821,7 +1821,7 @@ class Sandbox:
                                 curr_RS.finish_failure(save=True)
                                 curr_RS_method = curr_RS.pipelinestep.transformation.definite
                                 if preexisting_ER and curr_RS_method.reusable == Method.DETERMINISTIC:
-                                    curr_ER.notify_runcomponents_of_failure()
+                                    curr_ER.quarantine_runcomponents()
 
                             else:
                                 # If necessary, create new Dataset for output, and create the Dataset

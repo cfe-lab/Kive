@@ -39,7 +39,7 @@ import metadata.models
 import archive.exceptions
 import librarian.signals
 import file_access_utils
-from constants import maxlengths
+from constants import maxlengths, runcomponentstates
 from datachecking.models import BadData
 
 LOGGER = logging.getLogger(__name__)
@@ -910,7 +910,7 @@ class Dataset(metadata.models.AccessControl):
             self.logger.debug(
                 "Content check failed - file {} does not conform to Dataset {}".
                 format(file_path_to_check, self))
-            self._notify_runcomponents_of_failure()
+            self._quarantine_runcomponents()
         else:
             self.logger.debug(
                 "Content check passed - file {} conforms to Dataset {}".
@@ -952,18 +952,18 @@ class Dataset(metadata.models.AccessControl):
             note_of_usurping.save()
 
             if notify_all:
-                self._notify_runcomponents_of_failure()
+                self._quarantine_runcomponents()
 
         icl.stop(save=True, clean=True)
         return icl
 
-    def _notify_runcomponents_of_failure(self):
+    def _quarantine_runcomponents(self):
         """
         Mark RunComponents that use this as an output as failed.
         """
         # if self.has_data() and self.file_source is not None:
         if self.file_source is not None:
-            self.file_source.execrecord.notify_runcomponents_of_failure()
+            self.file_source.execrecord.quarantine_runcomponents()
 
     def is_OK(self):
         """
@@ -1527,12 +1527,12 @@ class ExecRecord(models.Model):
         removal_plan = self.build_removal_plan()
         metadata.models.remove_helper(removal_plan)
 
-    def notify_runcomponents_of_failure(self):
+    def quarantine_runcomponents(self):
         """
-        Mark RunComponents that use this ExecRecord as failed.
+        Quarantine RunComponents that used this ExecRecord.
         """
-        for rc in self.used_by_components.all():
-            rc.mark_unsuccessful()
+        for rc in self.used_by_components.filter(_state__pk=runcomponentstates.SUCCESSFUL_PK):
+            rc.quarantine()
 
 
 @python_2_unicode_compatible
