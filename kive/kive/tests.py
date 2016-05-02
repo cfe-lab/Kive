@@ -1,12 +1,9 @@
-from contextlib import contextmanager
 import os
 import shutil
 from StringIO import StringIO
 
 from django.conf import settings
 from django.test import TestCase
-
-from mock import Mock
 
 from rest_framework.test import APIRequestFactory, force_authenticate
 
@@ -76,40 +73,6 @@ class BaseTestCases:
             force_authenticate(request, user=self.kive_user)
             response = self.list_view(request)
             self.assertNotIn('detail', response.data)
-
-
-@contextmanager
-def mock_relations(*models):
-    """ Mock all related field managers to make pure unit tests possible.
-
-    with mock_relations(Dataset):
-        dataset = Dataset()
-        check = dataset.content_checks.create()  # returns mock object
-    """
-    try:
-        for model in models:
-            model_name = model._meta.object_name
-            model.old_relations = {}
-            model.old_objects = model.objects
-            for related_object in model._meta.related_objects:
-                name = related_object.name
-                model.old_relations[name] = getattr(model, name)
-                setattr(model, name, Mock(name='{}.{}'.format(model_name, name)))
-            model.objects = Mock(name=model_name + '.objects')
-
-        yield
-
-    finally:
-        for model in models:
-            old_objects = getattr(model, 'old_objects', None)
-            if old_objects is not None:
-                model.objects = old_objects
-                del model.old_objects
-            old_relations = getattr(model, 'old_relations', None)
-            if old_relations is not None:
-                for name, relation in old_relations.iteritems():
-                    setattr(model, name, relation)
-                del model.old_relations
 
 
 def dummy_file(content, name='dummy_file'):

@@ -6,6 +6,20 @@ Dataset, etc.
 """
 from __future__ import unicode_literals
 
+from collections import defaultdict
+import csv
+from datetime import datetime, timedelta
+import hashlib
+import heapq
+import itertools
+import logging
+import os
+import re
+import shutil
+import sys
+import tempfile
+import time
+
 from django.db import models, transaction
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import MinValueValidator, RegexValidator
@@ -14,22 +28,9 @@ from django.utils.encoding import python_2_unicode_compatible
 from django.utils import timezone
 from django.conf import settings
 from django.template.defaultfilters import filesizeformat
+from django.db.models import Min
 from django.db.models.signals import post_delete
-
 from django.core.urlresolvers import reverse
-
-import sys
-import csv
-import re
-import logging
-import tempfile
-import hashlib
-import shutil
-import os
-import itertools
-import time
-import heapq
-from datetime import datetime, timedelta
 
 import method.models
 import pipeline.models
@@ -210,12 +211,18 @@ class Dataset(metadata.models.AccessControl):
                 return File(open(abs_path, mode))
         return None
 
-    def all_rows(self, data_check=False, insert_at=None, limit=None):
-        """
-        Returns an iterator over all rows of this Dataset.
+    def all_rows(self, data_check=False, insert_at=None, limit=None, extra_errors=None):
+        """ Returns an iterator over all rows of this Dataset.
 
-        If insert_at is specified, a blank field is inserted
-        at each element of insert_at.
+        :param bool data_check: each field becomes a tuple: (value, [error])
+        :param list insert_at: [column_index] add blank columns at each
+        zero-based index
+        :param int limit: maximum row number returned (header is not counted)
+        :param list extra_errors: this will have extra rows added to it that
+        contain the first error in each column, if they appear after the row
+        limit. [(row_num, [(field_value, [error])])] row_num is 1-based.
+        :return: an iterator over the rows, each row is either [field_value] or
+        [(field_value, [error])], depending on data_check.
         """
         data_handle = self.get_open_file_handle()
         if data_handle is None:
@@ -225,24 +232,46 @@ class Dataset(metadata.models.AccessControl):
             reader = csv.reader(data_handle)
             if data_check:
                 try:
-                    baddata = self.content_checks.first().baddata
+                    content_check = self.content_checks.first()
+                    if content_check is None:
+                        raise BadData.DoesNotExist('Dataset has no content checks')
+                    baddata = content_check.baddata
                     cell_errors = baddata.cell_errors.order_by('row_num', 'column')
                     if limit is not None:
-                        cell_errors.filter(row_num__lte=limit)
-                    failed_columns = {
-                        (error.row_num, error.column.column_idx): error.column
-                        for error in cell_errors
-                    }
+                        cell_errors = cell_errors.filter(row_num__lte=limit)
+                    row_errors = defaultdict(dict)  # {row_num: {col_num: column}}
+                    for error in cell_errors:
+                        row_error = row_errors[error.row_num]
+                        row_error[error.column.column_idx] = error.column
+                    if extra_errors is not None:
+                        first_errors = baddata.cell_errors.values(
+                            'column_id').annotate(Min('row_num')).order_by(
+                                'row_num__min')
+                        columns = None
+                        for error in first_errors:
+                            if columns is None:
+                                members = self.structure.compounddatatype.members.all()
+                                columns = {col.id: col for col in members}
+                            failed_column = columns[error['column_id']]
+                            row_error = row_errors[error['row_num__min']]
+                            row_error[failed_column.column_idx] = failed_column
                 except BadData.DoesNotExist:
-                    failed_columns = {}
+                    row_errors = {}
             for row_num, row in enumerate(reader):
-                if insert_at is not None:
-                    [row.insert(pos, "") for pos in insert_at]
-                if data_check:
+                if not data_check:
+                    if limit is not None and row_num > limit:
+                        break
+                else:
+                    row_error = row_errors.pop(row_num, {})
+                    if limit is not None and row_num > limit and not row_error:
+                        if row_errors:
+                            # Still have errors on later rows
+                            continue
+                        # No more errors
+                        break
                     new_row = []
                     for column_num, value in enumerate(row, 1):
-                        failed_column = failed_columns.get((row_num, column_num),
-                                                           None)
+                        failed_column = row_error.get(column_num)
                         if failed_column is None:
                             new_errors = []
                         else:
@@ -250,21 +279,28 @@ class Dataset(metadata.models.AccessControl):
                         new_row.append((value, new_errors))
 
                     row = new_row
-                yield row
+                if insert_at is not None:
+                    dummy = ('', []) if data_check else ''
+                    [row.insert(pos, dummy) for pos in insert_at]
+                if limit is None or row_num <= limit:
+                    yield row
+                else:
+                    extra_errors.append((row_num, row))
 
     def header(self):
         rows = self.all_rows()
         return next(rows)
 
-    def rows(self, data_check=False, insert_at=None, limit=None):
-        rows = self.all_rows(data_check, insert_at, limit=limit)
+    def rows(self, data_check=False, insert_at=None, limit=None, extra_errors=None):
+        rows = self.all_rows(data_check,
+                             insert_at,
+                             limit=limit,
+                             extra_errors=extra_errors)
         for i, row in enumerate(rows):
             if i == 0:
                 pass  # skip header
             else:
                 yield row
-            if limit is not None and i >= limit:
-                break
 
     def expected_header(self):
         header = []
