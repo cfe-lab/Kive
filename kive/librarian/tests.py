@@ -21,26 +21,22 @@ from django.core.urlresolvers import reverse, resolve
 from django.core.files import File
 from django.core.files.base import ContentFile
 
-from mock import PropertyMock
-
 from rest_framework.test import force_authenticate, APIRequestFactory
 from rest_framework import status
 
 from archive.models import ExecLog, MethodOutput, Run, RunStep
 from constants import datatypes, groups
-from datachecking.models import MD5Conflict, BadData, CellError
+from datachecking.models import MD5Conflict
 from librarian.models import Dataset, ExecRecord, ExternalFileDirectory
 from librarian.serializers import DatasetSerializer
-from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group,\
-    CompoundDatatypeMember
+from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, \
     MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
 
 import file_access_utils
 import kive.testing_utils as tools
-from kive.tests import BaseTestCases, DuckContext, install_fixture_files, restore_production_files,\
-    mock_relations, dummy_file
+from kive.tests import BaseTestCases, DuckContext, install_fixture_files, restore_production_files
 
 
 def ER_from_record(record):
@@ -373,100 +369,6 @@ Bob,tw3nty
 
         self.assertTrue(self.singlet_dataset.groups_allowed.filter(pk=groups.DEVELOPERS_PK).exists())
         self.assertTrue(usurping_ds.groups_allowed.filter(pk=groups.DEVELOPERS_PK).exists())
-
-
-class DatasetMockTests(TestCase):
-    def test_rows_with_no_errors(self):
-        data_file = dummy_file("""\
-name,count
-Bob,20
-Dave,40
-""")
-        expected_rows = [[('Bob', []), ('20', [])],
-                         [('Dave', []), ('40', [])]]
-
-        with mock_relations(Dataset):
-            dataset = Dataset()
-            dataset.get_open_file_handle = lambda: data_file
-            expected_check = Dataset.content_checks.first.return_value  # @UndefinedVariable
-            type(expected_check).baddata = PropertyMock(side_effect=BadData.DoesNotExist)
-
-            rows = list(dataset.rows(data_check=True))
-
-            self.assertEqual(expected_rows, rows)
-
-    def test_rows_with_errors(self):
-        data_file = dummy_file("""\
-name,count
-Bob,tw3nty
-Dave,40
-""")
-        bad_row, bad_column = 1, 2
-        expected_rows = [[('Bob', []), ('tw3nty', [u'Was not integer'])],
-                         [('Dave', []), ('40', [])]]
-
-        with mock_relations(Dataset):
-            int_datatype = Datatype.objects.get(pk=datatypes.INT_PK)
-            count_column = CompoundDatatypeMember(column_idx=bad_column,
-                                                  datatype=int_datatype)
-            cell_error = CellError(column=count_column, row_num=bad_row)
-            dataset = Dataset()
-            dataset.get_open_file_handle = lambda: data_file
-            expected_check = Dataset.content_checks.first.return_value  # @UndefinedVariable
-            expected_check.baddata.cell_errors.order_by.return_value = [cell_error]
-
-            rows = list(dataset.rows(data_check=True))
-
-            self.assertEqual(expected_rows, rows)
-
-    def test_rows_with_no_data_check(self):
-        data_file = dummy_file("""\
-name,count
-Bob,tw3nty
-Dave,40
-""")
-        expected_rows = [['Bob', 'tw3nty'],
-                         ['Dave', '40']]
-
-        with mock_relations(Dataset):
-            dataset = Dataset()
-            dataset.get_open_file_handle = lambda: data_file
-
-            rows = list(dataset.rows(data_check=False))
-
-            self.assertEqual(expected_rows, rows)
-
-    def test_check_file_contents(self):
-        file_path = os.devnull
-        with mock_relations(Dataset, BadData):
-            expected_bad_data = BadData.objects.create.return_value  # @UndefinedVariable
-            expected_check = Dataset.content_checks.create.return_value  # @UndefinedVariable
-            expected_bad_row = 42
-            expected_bad_column = 2
-            count_column = CompoundDatatypeMember()
-            compound_datatype = Dataset.structure.compounddatatype  # @UndefinedVariable
-            compound_datatype.members.get.return_value = count_column
-            compound_datatype.summarize_CSV.return_value = {
-                u'num_rows': expected_bad_row * 2,
-                u'header': ['name', 'count'],
-                u'failing_cells': {(expected_bad_row,
-                                    expected_bad_column): [u'Was not integer']}
-            }
-            dataset = Dataset()
-
-            check = dataset.check_file_contents(file_path_to_check=file_path,
-                                                summary_path=None,
-                                                min_row=None,
-                                                max_row=None,
-                                                execlog=None,
-                                                checking_user=None)
-
-            self.assertIs(expected_check, check)
-            compound_datatype.members.get.assert_called_once_with(
-                column_idx=expected_bad_column)
-            expected_bad_data.cell_errors.create.assert_called_once_with(
-                column=count_column,
-                row_num=expected_bad_row)
 
 
 class DatasetStructureTests(LibrarianTestCase):

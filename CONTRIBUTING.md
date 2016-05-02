@@ -13,7 +13,10 @@ you planning to submit your own fix in a pull request?
 
 ## Development ##
 You will need to follow all the installation instructions in the INSTALL file,
-then open the source code in a Python IDE.
+then open the source code in a Python IDE. You will also need to install the
+mock package.
+
+    pip install mock
 
 If you want to see what's currently being worked on, check out the [waffle board][waffle].
 

@@ -350,6 +350,8 @@ class Pipeline(transformation.models.Transformation):
                                  .format(self, i, minrows, maxrows, supplied_input.num_rows()))
 
     def threads_needed(self):
+        if not self.steps.all():
+            return 0
         return max(x.threads_needed() for x in self.steps.all())
 
     @transaction.atomic

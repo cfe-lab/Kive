@@ -313,11 +313,8 @@ def _check_basic_constraints(columns, data_reader, out_handles={}):
     failing_cells = {}
     rownum = 0
     for rownum, row in enumerate(data_reader, start=1):
-        # FIXME this is a hack to work around the Python CSV module's inability to handle blank lines.
-        if len(row) == 0:
-            row = [""]
         for colnum, col in enumerate(columns, start=1):
-            curr_cell_value = row[colnum-1]
+            curr_cell_value = row[colnum-1] if colnum <= len(row) else ''
             test_result = col.check_basic_constraints(curr_cell_value)
 
             if test_result:
@@ -843,20 +840,19 @@ class Datatype(AccessControl):
         if hasattr(self, "builtin_type"):
             return self.builtin_type
 
-        # The Shipyard builtins.
-        STR = Datatype.objects.get(pk=datatypes.STR_PK)
-        INT = Datatype.objects.get(pk=datatypes.INT_PK)
-        FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
-        BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
+        builtin_type_ids = (datatypes.BOOL_PK,
+                            datatypes.INT_PK,
+                            datatypes.FLOAT_PK,
+                            datatypes.STR_PK)
 
-        builtin_type = STR
-        if self.is_restriction(BOOL):
-            builtin_type = BOOL
-        elif self.is_restriction(INT):
-            builtin_type = INT
-        elif self.is_restriction(FLOAT):
-            builtin_type = FLOAT
+        if self.id in builtin_type_ids:
+            self.builtin_type = self
+            return self
 
+        for builtin_type_id in builtin_type_ids:
+            builtin_type = Datatype.objects.get(id=builtin_type_id)
+            if self.is_restriction(builtin_type):
+                break
         self.builtin_type = builtin_type
         return builtin_type
 
