@@ -2036,6 +2036,7 @@
             var table = new pipeline_families.PipelineFamiliesTable(
                 this.$table, this.is_user_admin, this.$navigation_links
             );
+            table.image_path = "portal/static/portal/img";
             table.buildTable(this.initial_data);
             
             var $rows = this.$table.find('tr');
@@ -2051,6 +2052,7 @@
             var table = new pipeline_families.PipelineFamiliesTable(
                 this.$table, this.is_user_admin, this.$navigation_links
             );
+            table.image_path = "portal/static/portal/img";
             table.buildTable(this.initial_data);
             
             var $rows = this.$table.find('tr');
