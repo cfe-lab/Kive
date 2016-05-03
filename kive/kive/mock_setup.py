@@ -7,7 +7,6 @@ import django
 from django.apps import apps
 from django.db import connections
 from django.conf import settings
-from django_mock_queries.query import MockSet
 
 if not apps.ready:
     # Do the Django set up when running as a stand-alone unit test.
@@ -31,6 +30,7 @@ def mock_relations(*models):
         dataset = Dataset()
         check = dataset.content_checks.create()  # returns mock object
     """
+    from django_mock_queries.query import MockSet  # fails if imported before setup
     try:
         for model in models:
             model_name = model._meta.object_name
@@ -39,8 +39,13 @@ def mock_relations(*models):
             for related_object in chain(model._meta.related_objects,
                                         model._meta.many_to_many):
                 name = related_object.name
-                model.old_relations[name] = getattr(model, name)
-                setattr(model, name, MockSet())
+                old_relation = getattr(model, name)
+                model.old_relations[name] = old_relation
+                if related_object.one_to_one:
+                    new_relation = Mock(name='{}.{}'.format(model_name, name))
+                else:
+                    new_relation = MockSet(cls=old_relation.field.model)
+                setattr(model, name, new_relation)
             model.objects = Mock(name=model_name + '.objects')
 
         yield
