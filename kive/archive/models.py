@@ -1234,7 +1234,7 @@ class RunComponent(stopwatch.models.Stopwatch):
             self.definite.run.mark_unsuccessful()
 
     @update_field("_successful")
-    def is_successful(self, use_cache=False):
+    def is_successful(self, use_cache=False, **kwargs):
         """
         True if RunComponent is successful; False otherwise.
         """
@@ -1805,7 +1805,7 @@ class RunStep(RunComponent):
         return RunComponent.is_complete(self, use_cache=use_cache, **kwargs)
 
     @update_field("_successful")
-    def is_successful(self, use_cache=False):
+    def is_successful(self, use_cache=False, **kwargs):
         """
         True if RunStep is successful; False otherwise.
 
@@ -2505,7 +2505,7 @@ class RunSIC(RunCable):
         return super(RunSIC, self).is_complete(use_cache=use_cache, **kwargs)
 
     @update_field("_successful")
-    def is_successful(self, use_cache=False):
+    def is_successful(self, use_cache=False, **kwargs):
         """
         True if this RunSIC is/was executed successfully; False otherwise.
 
