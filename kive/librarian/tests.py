@@ -1059,6 +1059,8 @@ class FindCompatibleERTests(TestCase):
         methodoutput = runstep.log.methodoutput
         methodoutput.return_code = 1  # make this a failure
         methodoutput.save()
+        runstep._successful = False
+        runstep.save()
 
         input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.dataset)
                                     for eri in execrecord.execrecordins.all()]
