@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from itertools import chain
 from mock import Mock
 import os
 
@@ -6,6 +7,7 @@ import django
 from django.apps import apps
 from django.db import connections
 from django.conf import settings
+from django_mock_queries.query import MockSet
 
 if not apps.ready:
     # Do the Django set up when running as a stand-alone unit test.
@@ -34,10 +36,11 @@ def mock_relations(*models):
             model_name = model._meta.object_name
             model.old_relations = {}
             model.old_objects = model.objects
-            for related_object in model._meta.related_objects:
+            for related_object in chain(model._meta.related_objects,
+                                        model._meta.many_to_many):
                 name = related_object.name
                 model.old_relations[name] = getattr(model, name)
-                setattr(model, name, Mock(name='{}.{}'.format(model_name, name)))
+                setattr(model, name, MockSet())
             model.objects = Mock(name=model_name + '.objects')
 
         yield
