@@ -370,7 +370,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
     def attempt_decontamination(self, save=True, recurse_upward=False):
         """
-        Mark this quarantined RunComponent as fixed.
+        Mark this quarantined Run as fixed.
 
         Optionally, attempt to decontaminate ancestor runs that are quarantined.
         """
@@ -1814,7 +1814,8 @@ class RunStep(RunComponent):
         return run_coords + (self.pipelinestep.step_num,)
 
     def find_compatible_ERs(self, input_datasets):
-        """ Find all ExecRecords that are compatible with this RunStep.
+        """
+        Find all ExecRecords that are compatible with this RunStep.
 
         Exclude redacted ones. Permissions of old run must include all
         permissions of new run.
@@ -1864,7 +1865,7 @@ class RunStep(RunComponent):
         return result
 
     @transaction.atomic
-    def get_suitable_ER(self, input_SDs):
+    def get_suitable_ER(self, input_datasets):
         """
         Retrieve a suitable ExecRecord for this RunStep.
 
@@ -1876,7 +1877,7 @@ class RunStep(RunComponent):
         Return a tuple containing the ExecRecord along with its summary (as
         produced by check_ER_usable), or None if no appropriate ExecRecord is found.
         """
-        execrecords = self.find_compatible_ERs(input_SDs)
+        execrecords = self.find_compatible_ERs(input_datasets)
         failed = []
         fully_reusable = []
         other = []

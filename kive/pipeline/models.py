@@ -819,7 +819,7 @@ class PipelineCable(models.Model):
         # Set the ExecLog's start time.
         self.logger.debug("Filling in ExecLog of record {} and running cable (source='{}', output_path='{}')"
                           .format(cable_record, source, output_path))
-        curr_log.start(save=False)
+        curr_log.start(save=True)
 
         if self.is_trivial():
             self.logger.debug("Trivial cable, making sym link: os.link({},{})".format(source, output_path))

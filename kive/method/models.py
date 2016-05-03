@@ -643,7 +643,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         are handles to regular files, open for reading and writing.
         """
         if log:
-            log.start(save=False)
+            log.start(save=True)
 
         return_code = None
         try:

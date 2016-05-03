@@ -730,7 +730,7 @@ class Manager(object):
                          run.stopped_by)
 
         if not run.has_started():
-            run.start(save=False)
+            run.start(save=True)
 
         if run.is_complete():
             # This run already completed, so we ignore this call.

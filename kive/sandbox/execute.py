@@ -840,11 +840,20 @@ class Sandbox:
 
                     if curr_ER is not None:
                         output_dataset = curr_ER.execrecordouts.first().dataset
-                        # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
-                        # execute it for a parent step, we can return.
-                        if not can_reuse["successful"] or can_reuse["fully reusable"]:
+
+                        if curr_ER.generator.record.is_quarantined():
+                            # We will re-attempt; if it's fixed, then we un-quarantine the ExecRecord.
                             self.logger.debug(
-                                "ExecRecord {} is reusable (successful = {})".format(curr_ER, can_reuse["successful"])
+                                "Found quarantined ExecRecord %s; will decontaminate if successful",
+                                curr_ER
+                            )
+
+                        elif not can_reuse["successful"] or can_reuse["fully reusable"]:
+                            # In this case, we can return now (either successfully or not).
+                            self.logger.debug(
+                                "ExecRecord %s is reusable (successful = %s)",
+                                curr_ER,
+                                can_reuse["successful"]
                             )
                             curr_record.reused = True
                             curr_record.execrecord = curr_ER
@@ -863,7 +872,8 @@ class Sandbox:
                 self.logger.debug("Database conflict.  Waiting for %f seconds before retrying.", wait_time)
                 time.sleep(wait_time)
 
-        # Bundle up execution info in case this needs to be run, either by recovery or as a first execution.
+        # Bundle up execution info in case this needs to be run, either by recovery, as a first execution,
+        # or as a "filling-in".
         exec_info = RunCableExecuteInfo(curr_record,
                                         self.user,
                                         curr_ER,
@@ -1091,9 +1101,19 @@ class Sandbox:
                         can_reuse = curr_ER and curr_RS.check_ER_usable(curr_ER)
 
                         if curr_ER is not None:
-                            # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now,
-                            # we can return.
-                            if not can_reuse["successful"] or can_reuse["fully reusable"]:
+                            execute_info.execrecord = curr_ER
+
+                            if curr_ER.generator.record.is_quarantined():
+                                # We will re-attempt; if it's fixed, then we un-quarantine the ExecRecord.
+                                self.logger.debug(
+                                    "Found quarantined ExecRecord %s; will decontaminate if successful",
+                                    curr_ER
+                                )
+                            elif can_reuse["successful"] and not can_reuse["fully reusable"]:
+                                self.logger.debug("Filling in ExecRecord {}".format(curr_ER))
+
+                            else:
+                                # This is either unsuccessful or fully reusable, so we can return.
                                 self.logger.debug(
                                     "ExecRecord {} is reusable (successful = {})".format(
                                         curr_ER, can_reuse["successful"])
@@ -1108,12 +1128,7 @@ class Sandbox:
 
                                 curr_RS.complete_clean(use_cache=True)
                                 self.update_step_maps(curr_RS, step_run_dir, output_paths)
-                                execute_info.execrecord = curr_ER
                                 return curr_RS
-
-                            else:
-                                self.logger.debug("Filling in ExecRecord {}".format(curr_ER))
-                                execute_info.execrecord = curr_ER
 
                         else:
                             self.logger.debug("No compatible ExecRecord found yet")
@@ -1353,6 +1368,13 @@ class Sandbox:
                         curr_ER, can_reuse = curr_record.get_suitable_ER(input_dataset)
 
                     if curr_ER is not None:
+                        if curr_ER.generator.record.is_quarantined():
+                            # We will re-attempt; if it's fixed, then we un-quarantine the ExecRecord.
+                            logger.debug(
+                                "Found quarantined ExecRecord %s; will decontaminate if successful",
+                                curr_ER
+                            )
+
                         # If it was unsuccessful, we bail.  Alternately, if we can fully reuse it now and don't need to
                         # execute it for a parent step, we can return.
                         if (not can_reuse["successful"] or
@@ -1518,10 +1540,8 @@ class Sandbox:
 
                         # Update state variables.
                         curr_record.finish_failure(save=True)
-                        # if recover:
-                            # recovering_record.cancel_running(save=True)
                         if preexisting_ER:
-                            curr_ER.notify_runcomponents_of_failure()
+                            curr_ER.quarantine_runcomponents()
 
                     elif cable.is_trivial():
                         output_dataset = input_dataset
@@ -1625,14 +1645,10 @@ class Sandbox:
         it should not have been run previously.  This should not be a RunStep representing a Pipeline.
         """
         # Break out the execution info.
-        curr_RS = archive.models.RunStep.objects.get(pk=step_execute_dict["runstep_pk"])
-        # This was already started when we called reuse_or_prepare_step.
-        # curr_RS.start()
+        curr_RS = archive.models.RunStep.objects.get(pk=step_execute_dict["runstep_pk"])  # already start()ed
         step_run_dir = step_execute_dict["step_run_dir"]
         curr_ER = None
-        if step_execute_dict["execrecord_pk"] is not None:
-            curr_ER = librarian.models.ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
-        preexisting_ER = curr_ER is not None
+        preexisting_ER = step_execute_dict["execrecord_pk"] is not None
         cable_info_dicts = step_execute_dict["cable_info_dicts"]
         output_paths = step_execute_dict["output_paths"]
         user = User.objects.get(pk=step_execute_dict["user_pk"])
@@ -1687,39 +1703,47 @@ class Sandbox:
             inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
             input_paths.append(curr_execute_dict["output_path"])
 
-        # Check again to see if a compatible ER was completed while this task
+        # Check again to see if the ExecRecord was completed while this task
         # waited on the queue.  If this isn't a recovery, we can just stop.
         if recover:
             assert preexisting_ER
+            curr_ER = librarian.models.ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
         else:
             succeeded_yet = False
             while not succeeded_yet:
                 try:
                     with transaction.atomic():
                         if preexisting_ER:
-                            can_reuse = curr_RS.check_ER_usable(curr_ER)
-                            # If it was unsuccessful, we bail.
-                            # Alternately, if we can fully reuse it now, we can return.
-                            if not can_reuse["successful"] or can_reuse["fully reusable"]:
-                                logger.debug("[%d] ExecRecord %s is reusable (successful = %s)",
-                                             worker_rank, curr_ER, can_reuse["successful"])
-                                curr_RS.reused = True
-                                curr_RS.execrecord = curr_ER
+                            curr_ER = librarian.models.ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
 
-                                if can_reuse["successful"]:
-                                    curr_RS.finish_successfully(save=True)  # calls stop()
-                                else:
-                                    curr_RS.cancel_running(save=True)  # also calls stop()
-                                    # We don't need to mark the recovering_record, as here, it isn't recovering.
-
-                                curr_RS.complete_clean()
-                                return curr_RS
+                            if curr_ER.generator.record.is_quarantined():
+                                logger.debug(
+                                    "[%d] ExecRecord %s is quarantined; "
+                                    "will decontaminate on success",
+                                    worker_rank,
+                                    curr_ER
+                                )
 
                             else:
-                                logger.debug("[%d] ExecRecord not fully reusable -- filling it in %s",
-                                             worker_rank, curr_ER)
-                                # curr_ER = None
+                                can_reuse = curr_RS.check_ER_usable(curr_ER)
+                                if can_reuse["successful"] and not can_reuse["fully_reusable"]:
+                                    logger.debug("[%d] ExecRecord not fully reusable -- filling it in %s",
+                                                 worker_rank, curr_ER)
 
+                                else:
+                                    # We can fully reuse this (either successfully or unsuccessfully).
+                                    logger.debug("[%d] ExecRecord %s is reusable (successful = %s)",
+                                                 worker_rank, curr_ER, can_reuse["successful"])
+                                    curr_RS.reused = True
+                                    curr_RS.execrecord = curr_ER
+
+                                    if can_reuse["successful"]:
+                                        curr_RS.finish_successfully(save=True)  # calls stop()
+                                    else:
+                                        curr_RS.cancel_running(save=True)  # also calls stop()
+
+                                    curr_RS.complete_clean()
+                                    return curr_RS
                         else:
                             logger.debug("[%d] No compatible ExecRecord found yet", worker_rank)
 
@@ -1768,10 +1792,7 @@ class Sandbox:
         except StopExecution as e:
             # Immediately end, marking the RunStep as cancelled, and re-raise e.
             logger.debug("[%d] Method execution stopped.", worker_rank)
-            # Update state.
             curr_RS.cancel_running(save=True)
-            # if recover:
-            #     recovering_record.cancel_running(save=True)
             raise e
 
         logger.debug("[%d] Method execution complete, ExecLog saved (started = %s, ended = %s)",

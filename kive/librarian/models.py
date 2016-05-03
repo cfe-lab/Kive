@@ -881,7 +881,7 @@ class Dataset(metadata.models.AccessControl):
         self.logger.debug("Creating clean ContentCheckLog for file {} and linking to ExecLog"
                           .format(file_path_to_check))
         ccl = self.content_checks.create(execlog=execlog, user=checking_user)
-        ccl.start(save=False)
+        ccl.start(save=True)
 
         if self.is_raw():
             ccl.stop(save=True, clean=False)
@@ -946,7 +946,8 @@ class Dataset(metadata.models.AccessControl):
             self.logger.debug(
                 "Content check failed - file {} does not conform to Dataset {}".
                 format(file_path_to_check, self))
-            self._quarantine_runcomponents()
+            if self.file_source is not None:
+                self.file_source.execrecord.quarantine_runcomponents()
         else:
             self.logger.debug(
                 "Content check passed - file {} conforms to Dataset {}".
@@ -960,6 +961,10 @@ class Dataset(metadata.models.AccessControl):
         Checks integrity of SD against the md5 provided (newly_computed_MD5),
         or in it's absence, the MD5 computed from new_file_path.
 
+        If this is the output of a RunComponent, it will quarantine or
+        attempt to decontaminate all RunComponents using the same ExecRecord
+        depending on the result of the check by default.
+
         OUTPUT
         Returns the ICL.
         """
@@ -969,7 +974,7 @@ class Dataset(metadata.models.AccessControl):
         # of the MD5s or is it the time that you finish computing the MD5 or
         # is it the time that you start computing the MD5?
         icl = self.integrity_checks.create(execlog=execlog, runsic=runsic, user=checking_user)
-        icl.start(save=False)
+        icl.start(save=True)
 
         if newly_computed_MD5 is None:
             with open(new_file_path, "rb") as f:
@@ -987,45 +992,48 @@ class Dataset(metadata.models.AccessControl):
             note_of_usurping = datachecking.models.MD5Conflict(integritychecklog=icl, conflicting_dataset=evil_twin)
             note_of_usurping.save()
 
-            if notify_all:
-                self._quarantine_runcomponents()
-
         icl.stop(save=True, clean=True)
-        return icl
 
-    def _quarantine_runcomponents(self):
-        """
-        Mark RunComponents that use this as an output as failed.
-        """
-        # if self.has_data() and self.file_source is not None:
-        if self.file_source is not None:
-            self.file_source.execrecord.quarantine_runcomponents()
+        if notify_all and self.file_source is not None:
+            if newly_computed_MD5 != self.MD5_checksum:
+                self.file_source.execrecord.quarantine_runcomponents()
+            else:
+                self.file_source.execrecord.attempt_decontamination(self)
+
+        return icl
 
     def is_OK(self):
         """
-        Check that this Dataset has passed a check for contents if not raw,
-        and it has never failed any check for integrity or contents.
+        Check that this Dataset is fit for consumption.
+
+        We check this by making sure that the Dataset has passed a content
+        check (unless it's raw), and that if any more recent content or
+        integrity checks have failed, the Dataset has subsequently been
+        re-validated with a successful integrity check, i.e. there is an
+        integrity check more recent than any failed data check.
 
         Redacted Datasets are not considered OK.
         """
         if self.is_redacted():
             return False
 
-        # Check for any failures.
-        if self.any_failed_checks():
-            return False
-
         # If this is not raw, check that there is at least one content check completed and
         # successful.
-        if self.is_raw():
-            return True
+        if not self.is_raw() and not self.content_checks.filter(
+                baddata__isnull=True, end_time__isnull=False).exists():
+            return False
 
-        for ccl in self.content_checks.all():
-            if ccl.is_complete():
-                return True
+        # If there are any failures, check that the most recent integrity check is good.
+        if self.any_failed_checks():
+            last_icl = self.integrity_checks.order_by("-end_time").last()
+            if last_icl.is_failed():
+                return False
 
-        self.logger.debug("Dataset '{}' may not be OK - no content check performed".format(self))
-        return False
+            last_bad_ccl = self.content_checks.filter(baddata__isnull=False).order_by("-end_time").last()
+            if last_bad_ccl is not None and last_icl.start_time <= last_bad_ccl.end_time:
+                return False
+
+        return True
 
     def any_failed_checks(self):
         """ Checks if any integrity or content checks failed. """
@@ -1463,13 +1471,13 @@ class ExecRecord(models.Model):
         """
         return any([ero.dataset.any_failed_checks() for ero in self.execrecordouts.all()])
 
-    def has_ever_failed(self, use_cache=True):
+    def has_ever_failed(self):
         """Has any execution of this ExecRecord ever failed?"""
         # Go through all RunSteps using this ExecRecord.
         run_components = self.used_by_components.exclude(
             reused=True).filter(runstep__isnull=False)
         for component_using_this in run_components:
-            if not component_using_this.runstep.is_successful(use_cache=use_cache):
+            if not component_using_this.runstep.is_successful():
                 return True
         return False
 
@@ -1563,12 +1571,29 @@ class ExecRecord(models.Model):
         removal_plan = self.build_removal_plan()
         metadata.models.remove_helper(removal_plan)
 
+    @transaction.atomic
     def quarantine_runcomponents(self):
         """
         Quarantine RunComponents that used this ExecRecord.
         """
         for rc in self.used_by_components.filter(_state__pk=runcomponentstates.SUCCESSFUL_PK):
-            rc.quarantine()
+            rc.quarantine(save=True, recurse_upward=True)
+
+    @transaction.atomic
+    def attempt_decontamination(self, decontaminated_dataset):
+        """
+        Attempt to decontaminate all RunComponents that used this ExecRecord.
+
+        It goes ahead and does so if the specified Dataset was the last
+        contaminated one.
+        """
+        for ero in self.execrecordouts.exclude(dataset=decontaminated_dataset):
+            if not ero.is_OK():
+                return
+
+        # Having reached here, we now know that the ExecRecord can be decontaminated.
+        for rc in self.used_by_components.filter(_state__pk=runcomponentstates.QUARANTINED_PK):
+            rc.decontaminate(save=True, recurse_upward=True)
 
 
 @python_2_unicode_compatible
