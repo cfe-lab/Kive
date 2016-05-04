@@ -103,7 +103,7 @@ class update_field(object):
 
 
 class RunState(models.Model):
-    name = models.CharField()
+    name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH)
     description = models.TextField()
 
     def __unicode__(self):
@@ -111,7 +111,7 @@ class RunState(models.Model):
 
 
 class RunComponentState(models.Model):
-    name = models.CharField()
+    name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH)
     description = models.TextField()
 
     def __unicode__(self):
@@ -250,12 +250,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         By "ended" we mean Successful, Cancelled, Failed, or Quarantined.
         """
-        return self._state.pk in [
-            runstates.SUCCESSFUL_PK,
-            runstates.CANCELLED_PK,
-            runstates.FAILED_PK,
-            runstates.QUARANTINED_PK
-        ]
+        return self._state.pk in runstates.COMPLETE_STATE_PKS
 
     def is_running(self):
         return self._state.pk == runstates.RUNNING_PK
@@ -272,6 +267,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         return self._state.pk == runstates.QUARANTINED_PK
 
+    @transaction.atomic
     def start(self, save=True, **kwargs):
         """
         Start this run, changing its state from Pending to Running.
@@ -280,6 +276,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         self._state = RunState.objects.get(pk=runstates.RUNNING_PK)
         stopwatch.models.Stopwatch.start(self, save=save, **kwargs)
 
+    @transaction.atomic
     def stop(self, save=True, **kwargs):
         """
         Stop this run, changing its state appropriately.
@@ -293,6 +290,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             self._state = RunState.objects.get(pk=runstates.FAILED_PK)
         stopwatch.models.Stopwatch.stop(self, save=save, **kwargs)
 
+    @transaction.atomic
     def cancel(self, save=True):
         """
         Mark this run as Cancelling.
@@ -306,6 +304,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         if save:
             self.save()
 
+    @transaction.atomic
     def mark_failure(self, save=True, recurse_upward=False):
         """
         Mark this run as Failing.
@@ -321,6 +320,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         if recurse_upward and self.parent_runstep:
             self.parent_runstep.run.mark_failure(save=save, recurse_upward=True)
 
+    @transaction.atomic
     def begin_recovery(self, save=True, recurse_upward=False):
         """
         Transition this run from Successful to Running on recovery of one of its components.
@@ -337,6 +337,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         if recurse_upward and self.parent_runstep:
             self.parent_runstep.run.begin_recovery(save=save, recurse_upward=True)
 
+    @transaction.atomic
     def finish_recovery(self, save=True, recurse_upward=False):
         """
         Transition this run's state when its recovering components are done.
@@ -355,6 +356,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         if recurse_upward:
             self.parent_runstep.run.finish_recovery(save=save, recurse_upward=True)
 
+    @transaction.atomic
     def quarantine(self, save=True, recurse_upward=False):
         """
         Transition this Run to a quarantined state.
@@ -368,6 +370,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         if recurse_upward and self.parent_runstep is not None and self.parent_runstep.run.is_successful():
             self.parent_run.quarantine(save=save, recurse_upward=True)
 
+    @transaction.atomic
     def attempt_decontamination(self, save=True, recurse_upward=False):
         """
         Mark this quarantined Run as fixed.
@@ -959,14 +962,10 @@ class RunComponent(stopwatch.models.Stopwatch):
         """
         True if this RunComponent is complete; false otherwise.
         """
-        return self._state.pk in [
-            runcomponentstates.SUCCESSFUL_PK,
-            runcomponentstates.CANCELLED_PK,
-            runcomponentstates.FAILED_PK,
-            runcomponentstates.QUARANTINED_PK
-        ]
+        return self._state.pk in runcomponentstates.COMPLETE_STATE_PKS
 
     # State transition methods.
+    @transaction.atomic
     def start(self, save=True, **kwargs):
         """
         Start this RunComponent, changing its state from Pending to Running.
@@ -977,6 +976,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         if save:
             self.save()
 
+    @transaction.atomic
     def cancel_pending(self, save=True):
         """
         Cancel this pending RunComponent.
@@ -989,6 +989,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         if save:
             self.save()
 
+    @transaction.atomic
     def cancel_running(self, save=True):
         """
         Cancel this running RunComponent.
@@ -1000,6 +1001,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         self._state = RunComponentState.objects.get(pk=runcomponentstates.CANCELLED_PK)
         self.stop(save=save)
 
+    @transaction.atomic
     def cancel(self, save=True):
         """
         Cancel this pending/running RunComponent.
@@ -1010,6 +1012,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         else:
             self.cancel_running(save=save)
 
+    @transaction.atomic
     def begin_recovery(self, save=True, recurse_upward=False):
         """
         Mark a successful RunComponent as recovering.
@@ -1025,6 +1028,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         if recurse_upward:
             self.parent_run.mark_failure(save=save, recurse_upward=True)
 
+    @transaction.atomic
     def finish_successfully(self, save=True):
         """
         End this running RunComponent successfully.
@@ -1036,6 +1040,12 @@ class RunComponent(stopwatch.models.Stopwatch):
         if save:
             self.save()
 
+        if self.execrecord and self.execrecord.generator.record.is_quarantined():
+            # This has to have been an execution that used a quarantined ExecRecord,
+            # and it was successful, so we can decontaminate RunComponents.
+            self.execrecord.decontaminate_runcomponents()
+
+    @transaction.atomic
     def finish_failure(self, save=True, recurse_upward=False):
         """
         End this running RunComponent, marking it as failed.
@@ -1054,6 +1064,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         if recurse_upward and self.parent_run.is_running():
             self.parent_run.mark_failure(save=save, recurse_upward=True)
 
+    @transaction.atomic
     def quarantine(self, save=True, recurse_upward=False):
         """
         Transition this component to a quarantined state.
@@ -1069,6 +1080,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         if recurse_upward and self.parent_run.is_successful():
             self.parent_run.quarantine(save=save, recurse_upward=True)
 
+    @transaction.atomic
     def decontaminate(self, save=True, recurse_upward=False):
         """
         Mark this quarantined RunComponent as fixed.
@@ -1090,7 +1102,7 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         This is abstract and must be overridden.
         """
-        pass
+        raise NotImplementedError()
 
     @property
     def component(self):
@@ -1307,12 +1319,12 @@ class RunComponent(stopwatch.models.Stopwatch):
                    'ExecLog of {} "{}" is set before all invoked ExecLogs are complete'.format(
                        self.__class__.__name__, self)
                 )
-
-            if not all([x.all_checks_passed() for x in preceding_logs]):
-                raise ValidationError(
-                   'Invoked ExecLogs preceding log of {} "{}" did not successfully pass all of their checks'.format(
-                       self.__class__.__name__, self)
-                )
+            #
+            # if not all([x.all_checks_passed() for x in preceding_logs]):
+            #     raise ValidationError(
+            #        'Invoked ExecLogs preceding log of {} "{}" did not successfully pass all of their checks'.format(
+            #            self.__class__.__name__, self)
+            #     )
 
     def _clean_has_execlog_no_execrecord_yet(self):
         """

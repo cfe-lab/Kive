@@ -851,7 +851,7 @@ class Dataset(metadata.models.AccessControl):
     # FIXME: use a transaction!
     # TODO: clean this up, end_time is set in too many places
     def check_file_contents(self, file_path_to_check, summary_path, min_row, max_row, execlog,
-                            checking_user, file_handle=None):
+                            checking_user, file_handle=None, notify_all=True):
         """
         Performs content check on a file, generates a CCL, and sets this
         SD's num_rows.
@@ -946,8 +946,8 @@ class Dataset(metadata.models.AccessControl):
             self.logger.debug(
                 "Content check failed - file {} does not conform to Dataset {}".
                 format(file_path_to_check, self))
-            if self.file_source is not None:
-                self.file_source.execrecord.quarantine_runcomponents()
+            if notify_all:
+                self.quarantine_runcomponents_using_as_output()
         else:
             self.logger.debug(
                 "Content check passed - file {} conforms to Dataset {}".
@@ -994,13 +994,29 @@ class Dataset(metadata.models.AccessControl):
 
         icl.stop(save=True, clean=True)
 
-        if notify_all and self.file_source is not None:
+        if notify_all:
             if newly_computed_MD5 != self.MD5_checksum:
-                self.file_source.execrecord.quarantine_runcomponents()
+                self.quarantine_runcomponents_using_as_output()
             else:
-                self.file_source.execrecord.attempt_decontamination(self)
+                self.attempt_to_decontaminate_runcomponents_using_as_output()
 
         return icl
+
+    @transaction.atomic
+    def quarantine_runcomponents_using_as_output(self):
+        """
+        Quarantine all RunComponents that use an ExecRecord that outputs this Dataset.
+        """
+        for er in ExecRecord.objects.filter(execrecordouts__dataset=self):
+            er.quarantine_runcomponents()
+
+    @transaction.atomic
+    def attempt_to_decontaminate_runcomponents_using_as_output(self):
+        """
+        Decontaminate all RunComponents that use an ExecRecord that outputs this Dataset.
+        """
+        for er in ExecRecord.objects.filter(execrecordouts__dataset=self):
+            er.attempt_decontamination(self)
 
     def is_OK(self):
         """
@@ -1580,16 +1596,32 @@ class ExecRecord(models.Model):
             rc.quarantine(save=True, recurse_upward=True)
 
     @transaction.atomic
+    def decontaminate_runcomponents(self):
+        """
+        Decontaminate RunComponents that used this ExecRecord.
+        """
+        for rc in self.used_by_components.filter(_state__pk=runcomponentstates.QUARANTINED_PK):
+            rc.decontaminate(save=True, recurse_upward=True)
+
+    @transaction.atomic
     def attempt_decontamination(self, decontaminated_dataset):
         """
         Attempt to decontaminate all RunComponents that used this ExecRecord.
 
         It goes ahead and does so if the specified Dataset was the last
-        contaminated one.
+        contaminated one, and if the last complete RunComponent to use it did
+        not have a failing ExecLog.
         """
         for ero in self.execrecordouts.exclude(dataset=decontaminated_dataset):
             if not ero.is_OK():
                 return
+
+        last_rc = self.used_by_components.filter(
+            log__isnull=False,
+            _state__pk__in=runcomponentstates.COMPLETE_STATE_PKS
+        ).order_by("-end_time").first()
+        if not last_rc.log.is_successful():
+            return
 
         # Having reached here, we now know that the ExecRecord can be decontaminated.
         for rc in self.used_by_components.filter(_state__pk=runcomponentstates.QUARANTINED_PK):

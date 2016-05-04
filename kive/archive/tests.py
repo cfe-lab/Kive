@@ -37,7 +37,7 @@ from metadata.models import kive_user, everyone_group, CompoundDatatype
 from constants import groups
 
 
-class ArchiveTestCaseHelpers:
+class ArchiveTestCaseHelpers(object):
     def __init__(self):
         pass
 
@@ -52,7 +52,7 @@ class ArchiveTestCaseHelpers:
 
         execrecord = ExecRecord.create(record.log, record.component, input_SDs, output_SDs)
         record.execrecord = execrecord
-        record.save()
+        record.stop(save=True)
 
     def make_execlog_and_mark_non_reused_runcomponent(self, record):
         """Attaches a good ExecLog to a RunComponent."""
@@ -83,7 +83,7 @@ class ArchiveTestCaseHelpers:
 
         record.execrecord = execrecord
         record.reused = True
-        record.save()
+        record.stop(save=True)
 
     def complete_RSICs(self, runstep, input_SDs, output_SDs):
         """
@@ -377,6 +377,8 @@ class ArchiveTestCaseHelpers:
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
+
+        self.pE_run.stop(save=True)
 
         if bp == "outcables_done":
             return
@@ -2797,7 +2799,6 @@ class IsCompleteIsSuccessfulTests(ArchiveTestCase):
     These functions are heavily dependent on each other, so we share the setups and test
     both functions at the same time.
     """
-
     def test_execlog_good_cases(self):
         """
         Testing that all ExecLogs are complete and successful after a (simulated) good run.

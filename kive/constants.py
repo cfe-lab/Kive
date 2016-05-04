@@ -82,6 +82,12 @@ runstates.CANCELLED_PK = 5
 runstates.FAILING_PK = 6
 runstates.FAILED_PK = 7
 runstates.QUARANTINED_PK = 8
+runstates.COMPLETE_STATE_PKS = [
+    runstates.SUCCESSFUL_PK,
+    runstates.CANCELLED_PK,
+    runstates.FAILED_PK,
+    runstates.QUARANTINED_PK
+]
 
 
 class RunComponentStates:
@@ -94,3 +100,9 @@ runcomponentstates.SUCCESSFUL_PK = 3
 runcomponentstates.CANCELLED_PK = 4
 runcomponentstates.FAILED_PK = 5
 runcomponentstates.QUARANTINED_PK = 6
+runcomponentstates.COMPLETE_STATE_PKS = [
+    runcomponentstates.SUCCESSFUL_PK,
+    runcomponentstates.CANCELLED_PK,
+    runcomponentstates.FAILED_PK,
+    runcomponentstates.QUARANTINED_PK
+]

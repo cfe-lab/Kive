@@ -1126,7 +1126,7 @@ class Sandbox:
                                 else:
                                     curr_RS.finish_failure(save=True)
 
-                                curr_RS.complete_clean(use_cache=True)
+                                curr_RS.complete_clean()
                                 self.update_step_maps(curr_RS, step_run_dir, output_paths)
                                 return curr_RS
 
@@ -1719,7 +1719,7 @@ class Sandbox:
                             if curr_ER.generator.record.is_quarantined():
                                 logger.debug(
                                     "[%d] ExecRecord %s is quarantined; "
-                                    "will decontaminate on success",
+                                    "will try again and decontaminate if successful",
                                     worker_rank,
                                     curr_ER
                                 )
