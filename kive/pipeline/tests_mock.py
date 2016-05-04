@@ -1,7 +1,9 @@
+from contextlib import contextmanager
 import re
 from unittest import TestCase
 
 from django.core.exceptions import ValidationError
+from mock import PropertyMock, call
 
 from kive.mock_setup import mock_relations  # Import before any Django models
 from django_mock_queries.query import MockSet
@@ -12,7 +14,6 @@ from pipeline.models import Pipeline, PipelineFamily, PipelineStep,\
     PipelineStepInputCable, PipelineOutputCable
 from transformation.models import TransformationInput, XputStructure,\
     TransformationOutput
-from contextlib import contextmanager
 
 
 class PipelineMockTests(TestCase):
@@ -150,10 +151,12 @@ class PipelineMockTests(TestCase):
         with self.create_valid_pipeline() as p:
             step1 = p.steps.all()[0]
             cable = step1.cables_in.all()[0]
+            outcable = p.outcables.all()[0]
 
             cable.clean()
             step1.clean()
             step1.complete_clean()
+            outcable.clean()
             p.clean()
             p.complete_clean()
 
@@ -365,21 +368,10 @@ class PipelineMockTests(TestCase):
         """Test good step cabling, chained-step pipeline."""
         with self.create_valid_pipeline() as p:
             step1 = p.steps.all()[0]
-            m = step1.transformation
             cable1 = step1.cables_in.all()[0]
 
-            step2 = PipelineStep(pipeline=p, transformation=m, step_num=2)
-            p.steps.add(step2)
-
-            cable2 = PipelineStepInputCable(pipelinestep=step2,
-                                            source_step=1,
-                                            source=m.outputs.all()[0],
-                                            dest=m.inputs.all()[0])
-            cable2.pipelinestepinputcable = cable2
-            step2.cables_in = MockSet()
-            step2.cables_in.add(cable2)
-            outcable = p.outcables[0]
-            outcable.source_step = 2
+            step2 = self.add_step(p)
+            cable2 = step2.cables_in.first()
 
             cable1.clean()
             cable2.clean()
@@ -392,27 +384,16 @@ class PipelineMockTests(TestCase):
     def test_pipeline_manySteps_cabling_references_invalid_output_clean(self):
         """Bad cabling: later step requests invalid input from previous."""
         with self.create_valid_pipeline() as p:
-            step1 = p.steps.all()[0]
-            m = step1.transformation
-
-            step2 = PipelineStep(pipeline=p, transformation=m, step_num=2)
-            p.steps.add(step2)
+            step2 = self.add_step(p)
+            cable = step2.cables_in.all()[0]
 
             unrelated_input = self.create_input(datatypes.STR_PK, dataset_idx=3)
-            cable2 = PipelineStepInputCable(pipelinestep=step2,
-                                            source_step=1,
-                                            source=unrelated_input,
-                                            dest=m.inputs.all()[0])
-            cable2.pipelinestepinputcable = cable2
-            step2.cables_in = MockSet()
-            step2.cables_in.add(cable2)
-            outcable = p.outcables[0]
-            outcable.source_step = 2
+            cable.source = unrelated_input
 
             self.assertRaisesRegexp(
                 ValidationError,
                 'Transformation at step 1 does not produce output ".*"',
-                cable2.clean)
+                cable.clean)
 
             # Check propagation of error.
             self.assertRaisesRegexp(
@@ -423,6 +404,334 @@ class PipelineMockTests(TestCase):
                 ValidationError,
                 'Transformation at step 1 does not produce output ".*"',
                 p.clean)
+
+    def test_pipeline_manySteps_cabling_references_deleted_input_clean(self):
+        """Cabling: later step requests input deleted by producing step (OK)."""
+        with self.create_valid_pipeline() as p:
+            step1 = p.steps.all()[0]
+            step1.outputs_to_delete.add(step1.outputs[0])
+
+            step2 = self.add_step(p)
+            cable2 = step2.cables_in.all()[0]
+
+            cable2.clean()
+            step2.clean()
+            p.clean()
+
+    def test_pipeline_manySteps_cabling_references_incorrect_cdt_clean(self):
+        """Bad cabling: later step requests input of wrong CompoundDatatype."""
+        with self.create_valid_pipeline() as p:
+            step2 = self.add_step(p)
+            cable2 = step2.cables_in.all()[0]
+            input_column = cable2.source.get_cdt().members.all()[0]
+            input_column.datatype.id = datatypes.INT_PK  # should be STR_PK
+
+            cable2.clean()
+            error_msg = 'Custom wiring required for cable "{}"'.format(str(cable2))
+            self.assertRaisesRegexp(ValidationError,
+                                    error_msg,
+                                    cable2.clean_and_completely_wired)
+            self.assertRaisesRegexp(ValidationError,
+                                    error_msg,
+                                    step2.clean)
+            self.assertRaisesRegexp(ValidationError,
+                                    error_msg,
+                                    p.clean)
+
+    def test_pipeline_manySteps_minRow_constraint_may_be_breached_clean(self):
+        """ Unverifiable cabling
+
+        Later step requests input with possibly too few rows (min_row unset for
+        providing step).
+        """
+        with self.create_valid_pipeline() as p:
+            step2 = self.add_step(p)
+            cable = step2.cables_in.all()[0]
+            method_input = step2.transformation.inputs[0]
+            method_input.structure.min_row = 10
+            method_input.dataset_name = "input"
+
+            self.assertRaisesRegexp(
+                    ValidationError,
+                    "Data fed to input \"input\" of step 2 may have too few rows",
+                    cable.clean)
+            self.assertRaisesRegexp(
+                    ValidationError,
+                    "Data fed to input \"input\" of step 2 may have too few rows",
+                    p.clean)
+
+    def test_pipeline_manySteps_minrow_constraints_may_breach_each_other_clean(self):
+        """ Bad cabling: later step requests input with possibly too few rows.
+
+        (providing step min_row is set)
+        """
+        with self.create_valid_pipeline() as p:
+            step1 = p.steps.all()[0]
+            step2 = self.add_step(p)
+            cable = step2.cables_in.all()[0]
+            prev_output = step1.transformation.outputs[0]
+            prev_output.structure.min_row = 5
+            method_input = step2.transformation.inputs[0]
+            method_input.structure.min_row = 10
+            method_input.dataset_name = "input"
+
+            self.assertRaisesRegexp(
+                    ValidationError,
+                    "Data fed to input \"input\" of step 2 may have too few rows",
+                    cable.clean)
+            self.assertRaisesRegexp(
+                    ValidationError,
+                    "Data fed to input \"input\" of step 2 may have too few rows",
+                    p.clean)
+
+    def test_pipeline_manySteps_maxRow_constraint_may_be_breached_clean(self):
+        """ Bad cabling: later step requests input with possibly too many rows.
+
+        (max_row unset for providing step)
+        """
+        with self.create_valid_pipeline() as p:
+            step2 = self.add_step(p)
+            cable = step2.cables_in.all()[0]
+            method_input = step2.transformation.inputs[0]
+            method_input.structure.max_row = 100
+            method_input.dataset_name = "input"
+
+            self.assertRaisesRegexp(
+                ValidationError,
+                "Data fed to input \"input\" of step 2 may have too many rows",
+                cable.clean)
+            self.assertRaisesRegexp(
+                ValidationError,
+                "Data fed to input \"input\" of step 2 may have too many rows",
+                p.clean)
+
+    def test_pipeline_manySteps_cabling_maxRow_constraints_may_breach_each_other_clean(self):
+        """ Bad cabling: later step requests input with possibly too many rows.
+
+        (max_row for providing step is set)
+        """
+        with self.create_valid_pipeline() as p:
+            step1 = p.steps.all()[0]
+            step2 = self.add_step(p)
+            cable = step2.cables_in.all()[0]
+            prev_output = step1.transformation.outputs[0]
+            prev_output.structure.max_row = 100
+            method_input = step2.transformation.inputs[0]
+            method_input.structure.max_row = 50
+            method_input.dataset_name = "input"
+            self.assertRaisesRegexp(
+                ValidationError,
+                "Data fed to input \"input\" of step 2 may have too many rows",
+                cable.clean)
+            self.assertRaisesRegexp(
+                ValidationError,
+                "Data fed to input \"input\" of step 2 may have too many rows",
+                p.clean)
+
+    def test_pipeline_manySteps_valid_outcable_clean(self):
+        """Good output cabling, chained-step pipeline."""
+        with self.create_valid_pipeline() as p:
+            self.add_step(p)
+
+            outcable1, outcable2 = p.outcables.all()
+
+            outcable1.clean()
+            outcable2.clean()
+            p.clean()
+
+    def test_pipeline_manySteps_outcable_references_nonexistent_step_clean(self):
+        """Bad output cabling, chained-step pipeline: request from nonexistent step"""
+        with self.create_valid_pipeline() as p:
+            self.add_step(p)
+
+            outcable1, outcable2 = p.outcables.all()
+            outcable1.source_step = 5
+
+            self.assertRaisesRegexp(
+                ValidationError,
+                "Output requested from a non-existent step",
+                outcable1.clean)
+            outcable2.clean()
+            self.assertRaisesRegexp(
+                ValidationError,
+                "Output requested from a non-existent step",
+                p.clean)
+
+    def test_pipeline_manySteps_outcable_references_invalid_output_clean(self):
+        """Bad output cabling, chained-step pipeline: request output not belonging to requested step"""
+        with self.create_valid_pipeline() as p:
+            self.add_step(p)
+
+            outcable1, outcable2 = p.outcables.all()
+            unrelated_output = self.create_output(datatypes.STR_PK, dataset_idx=3)
+            m3 = Method()
+            m3.method = m3
+            unrelated_output.transformation = m3
+            outcable2.source = unrelated_output
+
+            self.assertEquals(outcable1.clean(), None)
+            self.assertRaisesRegexp(
+                ValidationError,
+                'Transformation at step 2 does not produce output ".*"',
+                outcable2.clean)
+            self.assertRaisesRegexp(
+                ValidationError,
+                'Transformation at step 2 does not produce output ".*"',
+                p.clean)
+
+    def test_pipeline_manySteps_outcable_references_deleted_output_clean(self):
+        """Output cabling, chained-step pipeline: request deleted step output (OK)"""
+        with self.create_valid_pipeline() as p:
+            step2 = self.add_step(p)
+            step2.outputs_to_delete.add(step2.outputs[0])
+
+            outcable1, outcable2 = p.outcables.all()
+
+            outcable1.clean()
+            outcable2.clean()
+            p.clean()
+
+    def test_pipeline_manySteps_outcable_references_invalid_output_index_clean(self):
+        """Bad output cabling, chain-step pipeline: outputs not consecutively numbered starting from 1"""
+        with self.create_valid_pipeline() as p:
+            self.add_step(p)
+
+            outcable1, outcable2 = p.outcables.all()
+            outcable2.output_idx = 5
+
+            outcable1.clean()
+            outcable2.clean()
+            self.assertRaisesRegexp(
+                ValidationError,
+                "Outputs are not consecutively numbered starting from 1",
+                p.clean)
+
+    def test_pipeline_with_1_step_and_2_inputs_both_cabled_good(self):
+        """ Pipeline with 1 step with 2 inputs / 1 output
+
+        Both inputs are cabled (good)
+        """
+        with self.create_valid_pipeline() as p:
+            step1 = p.steps.all()[0]
+            m = step1.transformation
+            cable1 = step1.cables_in.all()[0]
+            source = self.create_input(datatypes.STR_PK, dataset_idx=2)
+            self.add_inputs(p, source)
+            dest = self.create_input(datatypes.STR_PK, dataset_idx=2)
+            self.add_inputs(m, dest)
+            cable2 = PipelineStepInputCable(pipelinestep=step1,
+                                            source_step=0,
+                                            source=source,
+                                            dest=dest)
+            cable2.pipelinestepinputcable = cable2
+            step1.cables_in.add(cable2)
+
+            cable1.clean()
+            cable2.clean()
+            step1.clean()
+            step1.complete_clean()
+            p.clean()
+
+    def test_pipeline_with_1_step_and_2_inputs_cabled_more_than_once_bad(self):
+        """ Pipeline with 1 step with 2 inputs / 1 output
+
+        input 2 is cabled twice (bad)
+        """
+        with self.create_valid_pipeline() as p:
+            step1 = p.steps.all()[0]
+            m = step1.transformation
+            cable1 = step1.cables_in.all()[0]
+            source = self.create_input(datatypes.STR_PK, dataset_idx=2)
+            self.add_inputs(p, source)
+            dest = self.create_input(datatypes.STR_PK,
+                                     dataset_idx=2,
+                                     dataset_name="r")
+            self.add_inputs(m, dest)
+            cable2 = PipelineStepInputCable(pipelinestep=step1,
+                                            source_step=0,
+                                            source=source,
+                                            dest=dest)
+            cable2.pipelinestepinputcable = cable2
+            step1.cables_in.add(cable2)
+            cable3 = PipelineStepInputCable(pipelinestep=step1,
+                                            source_step=0,
+                                            source=source,
+                                            dest=dest)
+            cable3.pipelinestepinputcable = cable3
+            step1.cables_in.add(cable3)
+
+            cable1.clean()
+            cable2.clean()
+            cable3.clean()
+
+            self.assertRaisesRegexp(
+                ValidationError,
+                "Input \"r\" to transformation at step 1 is cabled more than once",
+                step1.clean)
+            self.assertRaisesRegexp(
+                ValidationError,
+                "Input \"r\" to transformation at step 1 is cabled more than once",
+                step1.complete_clean)
+            self.assertRaisesRegexp(
+                ValidationError,
+                "Input \"r\" to transformation at step 1 is cabled more than once",
+                p.clean)
+
+    def test_pipeline_with_1_step_and_2_inputs_but_only_first_input_is_cabled_in_step_1_bad(self):
+        """ Pipeline with 1 step with 2 inputs / 1 output
+
+        Only the first input is cabled (bad)
+        """
+        with self.create_valid_pipeline() as p:
+            step1 = p.steps.all()[0]
+            m = step1.transformation
+            source = self.create_input(datatypes.STR_PK, dataset_idx=2)
+            self.add_inputs(p, source)
+            dest = self.create_input(datatypes.STR_PK,
+                                     dataset_idx=2,
+                                     dataset_name="r")
+            self.add_inputs(m, dest)
+
+            # Step is clean (cables are OK) but not complete (inputs not quenched).
+            step1.clean()
+            self.assertRaisesRegexp(
+                ValidationError,
+                "Input \"r\" to transformation at step 1 is not cabled",
+                step1.complete_clean)
+
+    def test_create_outputs(self):
+        """
+        Create outputs from output cablings; also change the output cablings
+        and recreate the outputs to see if they're correct.
+        """
+        with mock_relations(XputStructure), self.create_valid_pipeline() as p:
+            p.outcables.all()[0].output_name = 'step1_out'
+            Pipeline.outputs = PropertyMock('Pipeline.outputs')
+            Pipeline.outputs.create.return_value = TransformationOutput()
+
+            p.create_outputs()
+
+            self.assertEqual(
+                [call(y=0, x=0, dataset_idx=1, dataset_name='step1_out')],
+                p.outputs.create.call_args_list)
+            self.assertEqual(1, XputStructure.save.call_count)  # @UndefinedVariable
+
+    def test_create_outputs_multi_step(self):
+        """Testing create_outputs with a multi-step pipeline."""
+        with mock_relations(XputStructure), self.create_valid_pipeline() as p:
+            self.add_step(p)
+            p.outcables.all()[0].output_name = 'step1_out'
+            p.outcables.all()[1].output_name = 'step2_out'
+            Pipeline.outputs = PropertyMock('Pipeline.outputs')
+            Pipeline.outputs.create.return_value = TransformationOutput()
+
+            p.create_outputs()
+
+            self.assertEqual(
+                [call(y=0, x=0, dataset_idx=1, dataset_name='step1_out'),
+                 call(y=0, x=0, dataset_idx=2, dataset_name='step2_out')],
+                p.outputs.create.call_args_list)
+            self.assertEqual(2, XputStructure.save.call_count)  # @UndefinedVariable
 
     @contextmanager
     def create_valid_pipeline(self):
@@ -460,6 +769,37 @@ class PipelineMockTests(TestCase):
 
             yield p
 
+    def add_step(self, pipeline):
+        prev_step = pipeline.steps[-1]
+        m = Method()
+        m.method = m
+        m.inputs = MockSet()
+        m.outputs = MockSet()
+        self.add_inputs(m, self.create_input(datatypes.STR_PK, dataset_idx=1))
+        self.add_outputs(m, self.create_output(datatypes.STR_PK, dataset_idx=1))
+        step = PipelineStep(pipeline=pipeline,
+                            transformation=m,
+                            step_num=prev_step.step_num + 1)
+        pipeline.steps.add(step)
+
+        cable = PipelineStepInputCable(
+            pipelinestep=step,
+            source_step=prev_step.step_num,
+            source=prev_step.transformation.outputs[0],
+            dest=m.inputs[0])
+        cable.pipelinestepinputcable = cable
+        step.cables_in = MockSet()
+        step.cables_in.add(cable)
+        outcable = PipelineOutputCable(
+            pipeline=pipeline,
+            output_idx=step.step_num,
+            source_step=step.step_num,
+            source=m.outputs[0],
+            output_cdt=m.outputs[0].get_cdt())
+        pipeline.outcables.add(outcable)
+
+        return step
+
     def create_input(self, *column_datatype_ids, **kwargs):
         new_input = TransformationInput(**kwargs)
         new_input.transformationinput = new_input
@@ -491,7 +831,7 @@ class PipelineMockTests(TestCase):
             t_input.transformationinput = t_input
             t_input.transformation = transformation
             transformation.inputs.add(t_input)
-        transformation.inputs.order_by.return_value = inputs
+        transformation.inputs.order_by.return_value = transformation.inputs.all()
 
     def add_outputs(self, transformation, *outputs):
         """ Wire up the outputs to a mocked transformation.
@@ -502,7 +842,7 @@ class PipelineMockTests(TestCase):
             t_output.transformationoutput = t_output
             t_output.transformation = transformation
             transformation.outputs.add(t_output)
-        transformation.outputs.order_by.return_value = outputs
+        transformation.outputs.order_by.return_value = transformation.outputs.all()
 
 
 class PipelineUpdateMockTests(TestCase):

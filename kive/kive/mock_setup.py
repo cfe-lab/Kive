@@ -36,6 +36,7 @@ def mock_relations(*models):
             model_name = model._meta.object_name
             model.old_relations = {}
             model.old_objects = model.objects
+            model.old_save = model.save
             for related_object in chain(model._meta.related_objects,
                                         model._meta.many_to_many):
                 name = related_object.name
@@ -47,11 +48,16 @@ def mock_relations(*models):
                     new_relation = MockSet(cls=old_relation.field.model)
                 setattr(model, name, new_relation)
             model.objects = Mock(name=model_name + '.objects')
+            model.save = Mock(name=model_name + '.save')
 
         yield
 
     finally:
         for model in models:
+            old_save = getattr(model, 'old_save', None)
+            if old_save is not None:
+                model.save = old_save
+                del model.old_save
             old_objects = getattr(model, 'old_objects', None)
             if old_objects is not None:
                 model.objects = old_objects
