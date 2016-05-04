@@ -897,11 +897,13 @@ class RunComponent(stopwatch.models.Stopwatch):
     # will still count as "Running" here.
     _state = models.ForeignKey(RunState, default=runcomponentstates.PENDING_PK)
 
-    # FIXME remove _complete and _successful after data is migrated
+    # FIXME remove _complete, _successful, is_cancelled after data is migrated
     _complete = models.NullBooleanField(
         help_text="Denotes whether this run component has been completed. Private use only")
     _successful = models.NullBooleanField(
         help_text="Denotes whether this has been successful. Private use only!")
+    is_cancelled = models.BooleanField(help_text="Denotes whether this has been cancelled",
+                                       default=False)
 
     _redacted = models.NullBooleanField(
         help_text="Denotes whether this has been redacted. Private use only!")
