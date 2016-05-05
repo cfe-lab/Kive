@@ -57,7 +57,7 @@ class CodeResourcePrototypeForm(AccessControlForm):
     )
 
     resource_desc = forms.CharField(
-        widget=forms.Textarea(attrs={'rows':5}),
+        widget=forms.Textarea(attrs={'rows': 5}),
         label='Resource description',
         help_text='A brief description of what this CodeResource (this and all subsequent versions) is supposed to do',
         required=False
@@ -148,7 +148,8 @@ class MethodDependencyForm(forms.Form):
     )
 
     # We override this field so that it doesn't try to validate.
-    revisions = forms.IntegerField(widget=forms.Select(choices=[('', '--- select a CodeResource first ---')]))
+    revisions = forms.IntegerField(
+        widget=forms.Select(choices=[('', '--- select a CodeResource first ---')]))
 
     path = forms.CharField(
         label="Dependency path",
@@ -186,11 +187,12 @@ class MethodDependencyForm(forms.Form):
                         populator["coderesource"]))
 
             rev = CodeResourceRevision.filter_by_user(user).filter(coderesource__pk=cr_pk)
-            self.fields['revisions'].widget.choices = [(x.pk, x.revision_name) for x in rev]
+            self.fields['revisions'].widget.choices = [
+                (x.pk, x.revision_name) for x in rev]
             if "revisions" in populator:
                 try:
                     assert "coderesource" in populator
-                    assert int(populator["revisions"]) in [x.pk for x in rev]
+                    assert int(populator["revisions"]) in (x.pk for x in rev)
                 except AssertionError as e:
                     raise Http404(e)
 
@@ -199,7 +201,8 @@ class MethodDependencyForm(forms.Form):
 class MethodReviseForm(AccessControlForm):
     """Revise an existing method.  No need to specify the CodeResource."""
     # This is populated by the calling view.
-    revisions = forms.IntegerField(
+    driver_revisions = forms.IntegerField(
+        label='Revisions',
         widget=forms.Select(choices=[('', '--- select a CodeResource first ---')])
     )
 

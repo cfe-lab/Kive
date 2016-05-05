@@ -16,12 +16,12 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                                 value.revision_number + ': ' +
                                 value.revision_name));
                     });
-                    $("#id_revisions").empty().append(options);
+                    $("#id_driver_revisions").empty().append(options);
                 }
             );
         }
         else {
-            $("#id_revisions").html('<option value="">--- select a CodeResource first ---</option>');
+            $("#id_driver_revisions").html('<option value="">--- select a CodeResource first ---</option>');
         }
     }).change(); // trigger on load
 
