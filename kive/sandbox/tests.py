@@ -513,7 +513,7 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertFalse(run.is_successful())
 
         for cancelled_rs in run.runsteps.exclude(pk=rs.pk):
-            self.assertTrue(cancelled_rs.is_cancelled)
+            self.assertTrue(cancelled_rs.is_cancelled_FIXME)
 
     # FIXME this test revealed issues #534 and #535; when we fix these, revisit this test.
     # def test_filling_in_execrecord_with_incomplete_content_check(self):

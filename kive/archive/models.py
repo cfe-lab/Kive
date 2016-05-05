@@ -481,7 +481,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                     log_char = ":"
                     step_status = "READY"
 
-            elif step.is_cancelled():
+            elif step.is_cancelled_FIXME():
                 log_char = "x"
                 step_status = "CANCELLED"
 
@@ -535,7 +535,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                         log_char = ":"
                         step_status = "READY"
 
-                elif curr_roc.is_cancelled():
+                elif curr_roc.is_cancelled_FIXME():
                     log_char = "x"
                     step_status = "CANCELLED"
 
@@ -891,6 +891,8 @@ class RunComponent(stopwatch.models.Stopwatch):
     """
     execrecord = models.ForeignKey("librarian.ExecRecord", null=True, blank=True, related_name="used_by_components")
     reused = models.NullBooleanField(help_text="Denotes whether this reuses an ExecRecord", default=None)
+    is_cancelled = models.BooleanField(help_text="Denotes whether this has been cancelled",
+                                       default=False)
 
     # State field to avoid the use of is_complete() and is_successful(), which can be slow.
     # Note that if this is a RunStep and the sub-Run is "Cancelling" or "Failing" that
@@ -902,8 +904,6 @@ class RunComponent(stopwatch.models.Stopwatch):
         help_text="Denotes whether this run component has been completed. Private use only")
     _successful = models.NullBooleanField(
         help_text="Denotes whether this has been successful. Private use only!")
-    is_cancelled = models.BooleanField(help_text="Denotes whether this has been cancelled",
-                                       default=False)
 
     _redacted = models.NullBooleanField(
         help_text="Denotes whether this has been redacted. Private use only!")
@@ -942,7 +942,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         """
         return self._state.pk == runcomponentstates.SUCCESSFUL_PK
 
-    def is_cancelled(self):
+    def is_cancelled_FIXME(self):
         """
         True if RunComponent is cancelled; False otherwise.
         """

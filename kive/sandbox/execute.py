@@ -486,7 +486,7 @@ class Sandbox:
                 )
 
                 curr_RS.refresh_from_db()
-                if curr_RS.child_run.is_cancelled():
+                if curr_RS.child_run.is_cancelled_FIXME():
                     curr_RS.cancel_running(save=True)
                     run_to_resume.cancel(save=True)
                     return incables_completed, steps_completed, outcables_completed
@@ -677,7 +677,7 @@ class Sandbox:
 
                     # Update states for curr_RS and run_to_resume if necessary.
                     curr_RS.refresh_from_db()
-                    if curr_RS.child_run.is_cancelled():
+                    if curr_RS.child_run.is_cancelled_FIXME():
                         curr_RS.cancel_running(save=True)
                         run_to_resume.cancel(save=True)
                         return incables_completed, steps_completed, outcables_completed
@@ -699,7 +699,7 @@ class Sandbox:
 
             # If the step we just started is for a Method, and it was successfully reused, then we add its step
             # number to the list of those just completed.  This may then allow subsequent steps to also be started.
-            if curr_RS.is_cancelled():
+            if curr_RS.is_cancelled_FIXME():
                 # If the RunStep is cancelled after reuse, that means that one of
                 # its input cables failed on reuse.
                 failing_cables = curr_RS.RSICs.filter(_state__pk=runcomponentstates.FAILED_PK)
@@ -897,7 +897,7 @@ class Sandbox:
         except Sandbox.RunInputEmptyException:
             # This should have been cancelled already.
             curr_record.refresh_from_db()
-            assert curr_record.is_cancelled()
+            assert curr_record.is_cancelled_FIXME()
             curr_record.complete_clean()
 
             # Mark exec_info as cancelled.

@@ -4321,7 +4321,7 @@ class CancelUnstartedUnfinishedTests(TestCase):
 
         for rc in self.unfinished:
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled)
+            self.assertTrue(rc.is_cancelled_FIXME)
             self.assertTrue(rc.has_started())
             self.assertTrue(rc.has_ended())
             self.assertTrue(rc._complete)
@@ -4329,7 +4329,7 @@ class CancelUnstartedUnfinishedTests(TestCase):
 
         for rc in self.unstarted:
             rc.refresh_from_db()
-            self.assertFalse(rc.is_cancelled)
+            self.assertFalse(rc.is_cancelled_FIXME)
             self.assertFalse(rc.has_started())
             self.assertFalse(rc.has_ended())
             self.assertFalse(rc._complete)
@@ -4337,7 +4337,7 @@ class CancelUnstartedUnfinishedTests(TestCase):
 
         for rc in self.finished:
             rc.refresh_from_db()
-            self.assertFalse(rc.is_cancelled)
+            self.assertFalse(rc.is_cancelled_FIXME)
             self.assertTrue(rc.has_started())
             self.assertTrue(rc.has_ended())
             self.assertTrue(rc._complete)
@@ -4351,7 +4351,7 @@ class CancelUnstartedUnfinishedTests(TestCase):
 
         for rc in self.unfinished:
             rc.refresh_from_db()
-            self.assertFalse(rc.is_cancelled)
+            self.assertFalse(rc.is_cancelled_FIXME)
             self.assertTrue(rc.has_started())
             self.assertFalse(rc.has_ended())
             self.assertFalse(rc._complete)
@@ -4365,7 +4365,7 @@ class CancelUnstartedUnfinishedTests(TestCase):
         for rc in self.unstarted:
             # These will have been cancelled without ever starting or stopping them.
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled)
+            self.assertTrue(rc.is_cancelled_FIXME)
             self.assertFalse(rc.has_started())
             self.assertFalse(rc.has_ended())
             self.assertTrue(rc._complete)
@@ -4373,7 +4373,7 @@ class CancelUnstartedUnfinishedTests(TestCase):
 
         for rc in self.finished:
             rc.refresh_from_db()
-            self.assertFalse(rc.is_cancelled)
+            self.assertFalse(rc.is_cancelled_FIXME)
             self.assertTrue(rc.has_started())
             self.assertTrue(rc.has_ended())
             self.assertTrue(rc._complete)
