@@ -3,7 +3,6 @@
 from __future__ import unicode_literals
 
 from django.db import migrations, models
-import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
@@ -28,15 +27,5 @@ class Migration(migrations.Migration):
                 ('name', models.CharField(max_length=60)),
                 ('description', models.TextField()),
             ],
-        ),
-        migrations.AddField(
-            model_name='run',
-            name='_state',
-            field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE, to='archive.RunState'),
-        ),
-        migrations.AddField(
-            model_name='runcomponent',
-            name='_state',
-            field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE, to='archive.RunState'),
         ),
     ]
