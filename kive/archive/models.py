@@ -157,7 +157,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                                           help_text="Step of parent run initiating this one as a sub-run")
 
     # State field to avoid the use of is_complete() and is_successful(), which can be slow.
-    _state = models.ForeignKey(RunState, default=runstates.PENDING_PK)
+    _runstate = models.ForeignKey(RunState, default=runstates.PENDING_PK)
 
     # FIXME remove these once data is migrated.
     # State fields to avoid the use of is_complete() and is_successful(), which can be slow.
@@ -250,30 +250,36 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         By "ended" we mean Successful, Cancelled, Failed, or Quarantined.
         """
-        return self._state.pk in runstates.COMPLETE_STATE_PKS
+        return self._runstate.pk in runstates.COMPLETE_STATE_PKS
 
     def is_running(self):
-        return self._state.pk == runstates.RUNNING_PK
+        return self._runstate.pk == runstates.RUNNING_PK
 
     def is_successful(self):
         """
         Checks if this Run is successful.
         """
-        return self._state.pk == runstates.SUCCESSFUL_PK
+        return self._runstate.pk == runstates.SUCCESSFUL_PK
 
     def is_quarantined(self):
         """
         Checks if this Run is quarantined.
         """
-        return self._state.pk == runstates.QUARANTINED_PK
+        return self._runstate.pk == runstates.QUARANTINED_PK
+
+    def is_failing(self):
+        return self._runstate.pk == runstates.FAILING_PK
+
+    def is_cancelling(self):
+        return self._runstate.pk == runstates.CANCELLING_PK
 
     @transaction.atomic
     def start(self, save=True, **kwargs):
         """
         Start this run, changing its state from Pending to Running.
         """
-        assert self._state.pk == runstates.PENDING_PK
-        self._state = RunState.objects.get(pk=runstates.RUNNING_PK)
+        assert self._runstate.pk == runstates.PENDING_PK
+        self._runstate = RunState.objects.get(pk=runstates.RUNNING_PK)
         stopwatch.models.Stopwatch.start(self, save=save, **kwargs)
 
     @transaction.atomic
@@ -281,13 +287,13 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         Stop this run, changing its state appropriately.
         """
-        assert self._state.pk in [runstates.RUNNING_PK, runstates.CANCELLING_PK, runstates.FAILING_PK]
-        if self._state.pk == runstates.RUNNING_PK:
-            self._state = RunState.objects.get(pk=runstates.SUCCESSFUL_PK)
-        elif self._state.pk == runstates.CANCELLING_PK:
-            self._state = RunState.objects.get(pk=runstates.CANCELLED_PK)
+        assert self._runstate.pk in [runstates.RUNNING_PK, runstates.CANCELLING_PK, runstates.FAILING_PK]
+        if self._runstate.pk == runstates.RUNNING_PK:
+            self._runstate = RunState.objects.get(pk=runstates.SUCCESSFUL_PK)
+        elif self._runstate.pk == runstates.CANCELLING_PK:
+            self._runstate = RunState.objects.get(pk=runstates.CANCELLED_PK)
         else:
-            self._state = RunState.objects.get(pk=runstates.FAILED_PK)
+            self._runstate = RunState.objects.get(pk=runstates.FAILED_PK)
         stopwatch.models.Stopwatch.stop(self, save=save, **kwargs)
 
     @transaction.atomic
@@ -297,10 +303,10 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         This does not affect the RunComponents.
         """
-        assert self._state in RunState.objects.filter(
+        assert self._runstate in RunState.objects.filter(
             pk__in=[runstates.PENDING_PK, runstates.RUNNING_PK]
         )
-        self._state = RunState.objects.get(pk=runstates.CANCELLING_PK)
+        self._runstate = RunState.objects.get(pk=runstates.CANCELLING_PK)
         if save:
             self.save()
 
@@ -312,8 +318,8 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         This does not affect the RunComponents, but it optionally affects
         the parent Run, if this is a sub-Run.
         """
-        assert self._state.pk == runstates.RUNNING_PK
-        self._state = RunState.objects.get(pk=runstates.FAILING_PK)
+        assert self._runstate.pk == runstates.RUNNING_PK
+        self._runstate = RunState.objects.get(pk=runstates.FAILING_PK)
         if save:
             self.save()
 
@@ -328,9 +334,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         This does not affect the RunComponents, but it optionally affects
         the parent Run, if this is a sub-Run.
         """
-        assert self._state.pk == runstates.SUCCESSFUL_PK
+        assert self._runstate.pk == runstates.SUCCESSFUL_PK
         assert self.has_ended()
-        self._state = RunState.objects.get(pk=runstates.RUNNING_PK)
+        self._runstate = RunState.objects.get(pk=runstates.RUNNING_PK)
         if save:
             self.save()
 
@@ -342,14 +348,14 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         Transition this run's state when its recovering components are done.
         """
-        assert self._state.pk in [runstates.RUNNING_PK, runstates.FAILING_PK, runstates.CANCELLING_PK]
+        assert self._runstate.pk in [runstates.RUNNING_PK, runstates.FAILING_PK, runstates.CANCELLING_PK]
         assert self.has_ended()
         if self.is_running():
-            self._state = RunState.objects.get(pk=runstates.SUCCESSFUL_PK)
+            self._runstate = RunState.objects.get(pk=runstates.SUCCESSFUL_PK)
         elif self.is_failing():
-            self._state = RunState.objects.get(pk=runstates.FAILED_PK)
+            self._runstate = RunState.objects.get(pk=runstates.FAILED_PK)
         else:
-            self._state = RunState.objects.get(pk=runstates.CANCELLED_PK)
+            self._runstate = RunState.objects.get(pk=runstates.CANCELLED_PK)
 
         if save:
             self.save()
@@ -362,7 +368,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         Transition this Run to a quarantined state.
         """
         assert self.is_successful()
-        self._state = RunState.objects.get(pk=runstates.QUARANTINED_PK)
+        self._runstate = RunState.objects.get(pk=runstates.QUARANTINED_PK)
         if save:
             self.save()
 
@@ -377,15 +383,15 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         Optionally, attempt to decontaminate ancestor runs that are quarantined.
         """
-        assert self._state.pk == runstates.QUARANTINED_PK
+        assert self._runstate.pk == runstates.QUARANTINED_PK
 
         # Look for components that are quarantined.
-        if self.runsteps.filter(_state__pk=runcomponentstates.QUARANTINED_PK).exists():
+        if self.runsteps.filter(_runcomponentstate__pk=runcomponentstates.QUARANTINED_PK).exists():
             return
-        elif self.runoutputcables.filter(_state__pk=runcomponentstates.QUARANTINED_PK).exists():
+        elif self.runoutputcables.filter(_runcomponentstate__pk=runcomponentstates.QUARANTINED_PK).exists():
             return
 
-        self._state = RunState.objects.get(pk=runcomponentstates.SUCCESSFUL_PK)
+        self._runstate = RunState.objects.get(pk=runstates.SUCCESSFUL_PK)
         if save:
             self.save()
 
@@ -395,7 +401,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
     @classmethod
     def find_unstarted(cls):
-        return cls.objects.filter(_state__pk=runstates.PENDING_PK)
+        return cls.objects.filter(_runstate__pk=runstates.PENDING_PK)
 
     @property
     def display_name(self):
@@ -803,15 +809,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         skip_outcable_pks = (x.pk for x in except_outcables if x.parent_run == self)
 
         for step in self.runsteps.exclude(pk__in=skip_step_pks,
-                                          _state__pk__in=[runcomponentstates.CANCELLED_PK,
-                                                          runcomponentstates.FAILED_PK,
-                                                          runcomponentstates.SUCCESSFUL_PK,
-                                                          runcomponentstates.QUARANTINED_PK]):
+                                          _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS):
             for rsic in step.RSICs.exclude(pk__in=skip_incable_pks,
-                                           _state__pk__in=[runcomponentstates.CANCELLED_PK,
-                                                           runcomponentstates.FAILED_PK,
-                                                           runcomponentstates.SUCCESSFUL_PK,
-                                                           runcomponentstates.QUARANTINED_PK]):
+                                           _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS):
                 rsic.cancel(save=True)
 
             if not step.has_subrun():
@@ -831,26 +831,18 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                     step.child_run.stop(save=True)  # transition: Cancelling->Cancelled or Failing->Failed
                     step.cancel(save=True)
 
-        for outcable in self.runoutputcables.exclude(pk__in=skip_outcable_pks,
-                                                     _state__pk__in=[runcomponentstates.CANCELLED_PK,
-                                                                     runcomponentstates.FAILED_PK,
-                                                                     runcomponentstates.SUCCESSFUL_PK,
-                                                                     runcomponentstates.QUARANTINED_PK]):
+        for outcable in self.runoutputcables.exclude(
+                pk__in=skip_outcable_pks,
+                _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS):
             outcable.cancel(save=True)
 
         # Return True if everything is complete and False otherwise.
         return not (
             self.runsteps.exclude(
-                _state__pk__in=[runcomponentstates.CANCELLED_PK,
-                                runcomponentstates.FAILED_PK,
-                                runcomponentstates.SUCCESSFUL_PK,
-                                runcomponentstates.QUARANTINED_PK]
+                _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
             ).exists() or
             self.runoutputcables.exclude(
-                _state__pk__in=[runcomponentstates.CANCELLED_PK,
-                                runcomponentstates.FAILED_PK,
-                                runcomponentstates.SUCCESSFUL_PK,
-                                runcomponentstates.QUARANTINED_PK]
+                _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
             ).exists()
         )
 
@@ -897,7 +889,7 @@ class RunComponent(stopwatch.models.Stopwatch):
     # State field to avoid the use of is_complete() and is_successful(), which can be slow.
     # Note that if this is a RunStep and the sub-Run is "Cancelling" or "Failing" that
     # will still count as "Running" here.
-    _state = models.ForeignKey(RunState, default=runcomponentstates.PENDING_PK)
+    _runcomponentstate = models.ForeignKey(RunComponentState, default=runcomponentstates.PENDING_PK)
 
     # FIXME remove _complete, _successful, is_cancelled after data is migrated
     _complete = models.NullBooleanField(
@@ -928,43 +920,43 @@ class RunComponent(stopwatch.models.Stopwatch):
         """
         True if RunComponent is pending; False otherwise.
         """
-        return self._state.pk == runcomponentstates.PENDING_PK
+        return self._runcomponentstate.pk == runcomponentstates.PENDING_PK
 
     def is_running(self):
         """
         True if RunComponent is running; False otherwise.
         """
-        return self._state.pk == runcomponentstates.RUNNING_PK
+        return self._runcomponentstate.pk == runcomponentstates.RUNNING_PK
 
     def is_successful(self):
         """
         True if RunComponent is successful; False otherwise.
         """
-        return self._state.pk == runcomponentstates.SUCCESSFUL_PK
+        return self._runcomponentstate.pk == runcomponentstates.SUCCESSFUL_PK
 
     def is_cancelled_FIXME(self):
         """
         True if RunComponent is cancelled; False otherwise.
         """
-        return self._state.pk == runcomponentstates.CANCELLED_PK
+        return self._runcomponentstate.pk == runcomponentstates.CANCELLED_PK
 
     def is_failed(self):
         """
         True if RunComponent is failed; False otherwise.
         """
-        return self._state.pk == runcomponentstates.FAILED_PK
+        return self._runcomponentstate.pk == runcomponentstates.FAILED_PK
 
     def is_quarantined(self):
         """
         True if RunComponent is quarantined; False otherwise.
         """
-        return self._state.pk == runcomponentstates.QUARANTINED_PK
+        return self._runcomponentstate.pk == runcomponentstates.QUARANTINED_PK
 
     def is_complete(self):
         """
         True if this RunComponent is complete; false otherwise.
         """
-        return self._state.pk in runcomponentstates.COMPLETE_STATE_PKS
+        return self._runcomponentstate.pk in runcomponentstates.COMPLETE_STATE_PKS
 
     # State transition methods.
     @transaction.atomic
@@ -972,9 +964,9 @@ class RunComponent(stopwatch.models.Stopwatch):
         """
         Start this RunComponent, changing its state from Pending to Running.
         """
-        assert self._state.pk == runcomponentstates.PENDING_PK
+        assert self._runcomponentstate.pk == runcomponentstates.PENDING_PK
         stopwatch.models.Stopwatch.start(self, save=False, **kwargs)  # we save below if necessary
-        self._state = RunComponentState.objects.get(pk=runcomponentstates.RUNNING_PK)
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.RUNNING_PK)
         if save:
             self.save()
 
@@ -986,8 +978,8 @@ class RunComponent(stopwatch.models.Stopwatch):
         This is to be used to terminate RunComponents that are still pending, not
         ones that are running.
         """
-        assert self._state.pk == runcomponentstates.PENDING_PK
-        self._state = RunComponentState.objects.get(pk=runcomponentstates.CANCELLED_PK)
+        assert self._runcomponentstate.pk == runcomponentstates.PENDING_PK
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.CANCELLED_PK)
         if save:
             self.save()
 
@@ -999,8 +991,8 @@ class RunComponent(stopwatch.models.Stopwatch):
         This is to be used to terminate RunComponents that are running, not ones
         that are still pending.
         """
-        assert self._state.pk == runcomponentstates.RUNNING_PK
-        self._state = RunComponentState.objects.get(pk=runcomponentstates.CANCELLED_PK)
+        assert self._runcomponentstate.pk == runcomponentstates.RUNNING_PK
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.CANCELLED_PK)
         self.stop(save=save)
 
     @transaction.atomic
@@ -1008,7 +1000,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         """
         Cancel this pending/running RunComponent.
         """
-        assert self._state.pk in [runcomponentstates.PENDING_PK, runcomponentstates.RUNNING_PK]
+        assert self._runcomponentstate.pk in [runcomponentstates.PENDING_PK, runcomponentstates.RUNNING_PK]
         if self.is_pending():
             self.cancel_pending(save=save)
         else:
@@ -1021,9 +1013,9 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         Optionally this will mark all parent Runs as running.
         """
-        assert self._state.pk == runcomponentstates.SUCCESSFUL_PK
+        assert self._runcomponentstate.pk == runcomponentstates.SUCCESSFUL_PK
         assert self.has_ended()
-        self._state = RunComponentState.objects.get(pk=runcomponentstates.RUNNING_PK)
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.RUNNING_PK)
         if save:
             self.save()
 
@@ -1035,8 +1027,8 @@ class RunComponent(stopwatch.models.Stopwatch):
         """
         End this running RunComponent successfully.
         """
-        assert self._state.pk == runcomponentstates.RUNNING_PK
-        self._state = RunComponentState.objects.get(pk=runcomponentstates.SUCCESSFUL_PK)
+        assert self._runcomponentstate.pk == runcomponentstates.RUNNING_PK
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.SUCCESSFUL_PK)
         if not self.has_ended():
             self.stop(save=False)
         if save:
@@ -1054,8 +1046,8 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         Optionally this will mark all parent Runs as failed too.
         """
-        assert self._state.pk == runcomponentstates.RUNNING_PK
-        self._state = RunComponentState.objects.get(pk=runcomponentstates.FAILED_PK)
+        assert self._runcomponentstate.pk == runcomponentstates.RUNNING_PK
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.FAILED_PK)
         if not self.has_ended():
             self.stop(save=False)
         if save:
@@ -1073,8 +1065,8 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         Optionally, quarantine ancestor runs that are still marked as Successful.
         """
-        assert self._state.pk == runcomponentstates.SUCCESSFUL_PK
-        self._state = RunComponentState.objects.get(pk=runcomponentstates.QUARANTINED_PK)
+        assert self._runcomponentstate.pk == runcomponentstates.SUCCESSFUL_PK
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.QUARANTINED_PK)
         if save:
             self.save()
 
@@ -1089,8 +1081,8 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         Optionally, attempt to decontaminate ancestor runs that are quarantined.
         """
-        assert self._state.pk == runcomponentstates.QUARANTINED_PK
-        self._state = RunComponentState.objects.get(pk=runcomponentstates.SUCCESSFUL_PK)
+        assert self._runcomponentstate.pk == runcomponentstates.QUARANTINED_PK
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.SUCCESSFUL_PK)
         if save:
             self.save()
 
@@ -1959,9 +1951,6 @@ class RunCable(RunComponent):
             runcable = RunSIC.create(cable, parent_record)
         else:
             runcable = RunOutputCable.create(cable, parent_record)
-        runcable.clean()
-        runcable.save()
-        runcable.start()
         return runcable
 
     def has_data(self):

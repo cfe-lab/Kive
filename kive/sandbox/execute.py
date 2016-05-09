@@ -702,7 +702,7 @@ class Sandbox:
             if curr_RS.is_cancelled_FIXME():
                 # If the RunStep is cancelled after reuse, that means that one of
                 # its input cables failed on reuse.
-                failing_cables = curr_RS.RSICs.filter(_state__pk=runcomponentstates.FAILED_PK)
+                failing_cables = curr_RS.RSICs.filter(_runcomponentstate__pk=runcomponentstates.FAILED_PK)
                 assert failing_cables.exists()
                 self.logger.debug("Input cable(s) %s to step %d (%s) failed",
                                   failing_cables, step.step_num, step)

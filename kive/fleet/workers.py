@@ -316,8 +316,10 @@ class Manager(object):
                 new_task_queue.append((task_sdbx, task))
             else:
                 if isinstance(task, archive.models.RunStep):
-                    for rsic in task.RSICs.filter(_state__pk__in=[runcomponentstates.PENDING_PK,
-                                                                  runcomponentstates.RUNNING_PK]):
+                    for rsic in task.RSICs.filter(
+                            _runcomponentstate__pk__in=[runcomponentstates.PENDING_PK,
+                                                        runcomponentstates.RUNNING_PK]
+                    ):
                         rsic.cancel(save=True)  # this saves rsic
                 task.cancel(save=True)  # this saves task
 

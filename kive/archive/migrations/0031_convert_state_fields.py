@@ -611,7 +611,7 @@ def any_failed_checks(self):
 @transaction.atomic
 def transition_state_fields(apps, schema_editor):
     """
-    Update Runs and RunComponents to use the _state field.
+    Update Runs and RunComponents to use the _runstate and _runcomponentstate fields.
     """
     Run = apps.get_model("archive", "Run")
     RunState = apps.get_model("archive", "RunState")
@@ -624,16 +624,16 @@ def transition_state_fields(apps, schema_editor):
 
         if not rc_complete:
             if rc.start_time is None:
-                rc._state = RunComponentState.objects.get(name="Pending")
+                rc._runcomponentstate = RunComponentState.objects.get(name="Pending")
             else:
-                rc._state = RunComponentState.objects.get(name="Running")
+                rc._runcomponentstate = RunComponentState.objects.get(name="Running")
         else:
             if rc_successful:
-                rc._state = RunComponentState.objects.get(name="Successful")
+                rc._runcomponentstate = RunComponentState.objects.get(name="Successful")
             elif rc.is_cancelled:
-                rc._state = RunComponentState.objects.get(name="Cancelled")
+                rc._runcomponentstate = RunComponentState.objects.get(name="Cancelled")
             else:
-                rc._state = RunComponentState.objects.get(name="Failed")
+                rc._runcomponentstate = RunComponentState.objects.get(name="Failed")
         rc.save()
 
     for run in Run.objects.all():
@@ -643,16 +643,16 @@ def transition_state_fields(apps, schema_editor):
         if not run_complete:
             if run.start_time is None:
                 if run.stopped_by is None:
-                    run._state = RunState.objects.get(name="Cancelling")
+                    run._runstate = RunState.objects.get(name="Cancelling")
                 else:
-                    run._state = RunState.objects.get(name="Pending")
+                    run._runstate = RunState.objects.get(name="Pending")
             else:
                 if not run_successful:
-                    run._state = RunState.objects.get(name="Failing")  # Failing takes precedence over Cancelling
+                    run._runstate = RunState.objects.get(name="Failing")  # Failing takes precedence over Cancelling
                 elif run.stopped_by is not None:
-                    run._state = RunState.objects.get(name="Cancelling")
+                    run._runstate = RunState.objects.get(name="Cancelling")
                 else:
-                    run._state = RunState.objects.get(name="Running")
+                    run._runstate = RunState.objects.get(name="Running")
 
         else:
             try:
@@ -662,11 +662,11 @@ def transition_state_fields(apps, schema_editor):
                 exceeds_system_capabilities = False
 
             if run_successful:
-                run._state = RunState.objects.get(name="Successful")
+                run._runstate = RunState.objects.get(name="Successful")
             elif run.stopped_by is not None or exceeds_system_capabilities:
-                run._state = RunState.objects.get(name="Cancelled")
+                run._runstate = RunState.objects.get(name="Cancelled")
             else:
-                run._state = RunState.objects.get(name="Failed")
+                run._runstate = RunState.objects.get(name="Failed")
         run.save()
 
 
@@ -679,35 +679,35 @@ def revert_state_fields(apps, schema_editor):
     RunComponent = apps.get_model("archive", "RunComponent")
 
     for rc in RunComponent.objects.all():
-        if rc._state.name in ("Pending", "Running"):
+        if rc._runcomponentstate.name in ("Pending", "Running"):
             rc._complete = False
             rc._successful = True
             rc.is_cancelled = False
-        elif rc._state.name == "Successful":
+        elif rc._runcomponentstate.name == "Successful":
             rc._complete = True
             rc._successful = True
             rc.is_cancelled = False
-        elif rc._state.name == "Cancelled":
+        elif rc._runcomponentstate.name == "Cancelled":
             rc._complete = True
             rc._successful = False
             rc.is_cancelled = True
-        elif rc._state.name in ("Failed", "Quarantined"):
+        elif rc._runcomponentstate.name in ("Failed", "Quarantined"):
             rc._complete = True
             rc._successful = False
             rc.is_cancelled = False
         rc.save()
 
     for run in Run.objects.all():
-        if run._state.name in ("Pending", "Running"):
+        if run._runstate.name in ("Pending", "Running"):
             run._complete = False
             run._successful = True
-        elif run._state.name in ("Cancelling", "Failing"):
+        elif run._runstate.name in ("Cancelling", "Failing"):
             run._complete = False
             run._successful = False
-        elif run._state.name == "Successful":
+        elif run._runstate.name == "Successful":
             run._complete = True
             run._successful = True
-        elif run._state.name in ("Cancelled", "Failed", "Quarantined"):
+        elif run._runstate.name in ("Cancelled", "Failed", "Quarantined"):
             run._complete = True
             run._successful = False
         run.save()
