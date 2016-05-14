@@ -282,11 +282,13 @@ class Manager(object):
                             run_to_start, run_to_start.pipeline, run_to_start.user)
             finished_already = True
 
-        elif run_to_start.is_failing():
+        elif run_to_start.is_failing() or run_to_start.is_cancelling():
             # The run failed somewhere in preparation.  This hasn't affected any of our maps yet, so we
             # just report it and discard it.
-            mgr_logger.info('Run "%s" (pk=%d, Pipeline: %s, User: %s) failed before execution',
-                            run_to_start, run_to_start.pk, run_to_start.pipeline, run_to_start.user)
+            status_str = "failed" if run_to_start.is_failing() else "cancelled"
+            mgr_logger.info('Run "%s" (pk=%d, Pipeline: %s, User: %s) %s before execution',
+                            run_to_start, run_to_start.pk, run_to_start.pipeline, run_to_start.user,
+                            status_str)
             run_to_start.cancel_components()
             run_to_start.stop(save=True)
             finished_already = True
@@ -518,7 +520,6 @@ class Manager(object):
                         curr_sdbx.user
                     )
 
-                    stop_subruns_if_possible = True
                     execrecordouts = task_execute_info.execrecord.execrecordouts.all()
                     data_newly_available = [execrecordout.dataset
                                             for execrecordout in execrecordouts]
@@ -548,7 +549,7 @@ class Manager(object):
                                         curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
                         clean_up_now = True  # this is the only "successful" clean up condition
 
-                    else:
+                    elif curr_sdbx.run.is_failing() or curr_sdbx.run.is_cancelling():
                         # Something just failed in advance_pipeline.
                         mgr_logger.debug(
                             'Run "%s" (pk=%d, Pipeline: %s, User: %s) failed to advance '
@@ -585,17 +586,19 @@ class Manager(object):
                 )
 
             else:
-                assert curr_sdbx.run.is_successful()
+                assert curr_sdbx.run.is_running(), "{} != Running".format(curr_sdbx.run.get_state_name())
                 mgr_logger.info('Task %s (pk=%d) of run "%s" (pk=%d, Pipeline: %s, User: %s) failed; '
-                                'marking run as failed',
+                                'marking run as failing',
                                 task_finished, task_finished.pk, curr_sdbx.run, curr_sdbx.run.pk,
                                 curr_sdbx.pipeline, curr_sdbx.user)
 
                 # Go through and mark all ancestor runs of task_finished as failing.
                 curr_sdbx.run.mark_failure(save=True)
                 curr_ancestor_run = curr_sdbx.run
-                for coord in task_finished_coords:
-                    curr_ancestor_run = curr_ancestor_run.runstep.get(pipelinestep__step_num=coord).child_run
+                # This does nothing if task_finished_coords is of length 1; i.e. if it's a component belonging
+                # to the top-level run.
+                for coord in task_finished_coords[:-1]:
+                    curr_ancestor_run = curr_ancestor_run.runsteps.get(pipelinestep__step_num=coord).child_run
                     if curr_ancestor_run.is_running():  # skip over this if it's cancelling or failing already
                         curr_ancestor_run.mark_failure(save=True)
 
@@ -639,7 +642,8 @@ class Manager(object):
             )
 
             self.remove_sandbox_from_queues(curr_sdbx)
-            curr_sdbx.run.stop(save=True)
+            if not curr_sdbx.run.is_successful():
+                curr_sdbx.run.stop(save=True)
             # curr_sdbx.run.complete_clean()
 
         return workers_freed

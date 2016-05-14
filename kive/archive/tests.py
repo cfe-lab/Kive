@@ -48,6 +48,8 @@ class ArchiveTestCaseHelpers(object):
         reused an ExecRecord (ie. make a new ExecRecord).
 
         """
+        if not record.has_started():
+            record.start(save=False)
         self.make_execlog_and_mark_non_reused_runcomponent(record)
 
         execrecord = ExecRecord.create(record.log, record.component, input_SDs, output_SDs)
@@ -68,11 +70,13 @@ class ArchiveTestCaseHelpers(object):
         """
         Helper function to do everything necessary to make a RunStep,
         RunOutputCable, or RunStepInputCable complete, when it _has_
-        reused an ExecRecord (ie. make an ExecRecord for it to resue).
+        reused an ExecRecord (ie. make an ExecRecord for it to reuse).
         """
+        if not record.has_started():
+            record.start(save=False)
         record_type = record.__class__.__name__
 
-        new_record = record.__class__.create(record.component, other_parent)
+        new_record = record.__class__.create(record.component, other_parent)  # this start()s it
 
         execlog = ExecLog(record=new_record, invoking_record=new_record, start_time=timezone.now(),
                           end_time=timezone.now())
@@ -104,6 +108,7 @@ class ArchiveTestCaseHelpers(object):
             return
 
         self.step_E1_RS = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
+        self.step_E1_RS.start(save=True)
         if bp == "first_runstep":
             return
 
@@ -123,6 +128,7 @@ class ArchiveTestCaseHelpers(object):
             return
 
         self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run)
+        self.step_E2_RS.start(save=True)
         if bp == "second_runstep":
             return
 
@@ -137,7 +143,7 @@ class ArchiveTestCaseHelpers(object):
         D1_in_ccl.save()
 
         self.singlet_dataset.integrity_checks.create(execlog=self.E02_22_RSIC.log, user=self.myUser)
-        if bp == "second_runstep_complete":
+        if bp == "second_runstep_cables_complete":
             return
 
         # Associate and complete sub-Pipeline.
@@ -227,6 +233,7 @@ class ArchiveTestCaseHelpers(object):
 
         # First RunStep associated.
         self.step_E1_RS = self.step_E1.pipelinestep_instances.create(run=self.pE_run)
+        self.step_E1_RS.start()
         if bp == "first_step":
             return
 
@@ -259,8 +266,10 @@ class ArchiveTestCaseHelpers(object):
             return
 
         # Sub-pipeline for step 2 - reset step_E2_RS.
-        self.step_E2_RS.delete()
-        self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run, reused=None)
+        # self.step_E2_RS.delete()
+        # self.step_E2_RS = self.step_E2.pipelinestep_instances.create(run=self.pE_run, reused=None)
+        self.step_E2_RS.reused = None
+        self.step_E2_RS.start(save=True)
         self.complete_RSICs(self.step_E2_RS, [self.triplet_dataset, self.singlet_dataset],
                                              [self.D1_in_dataset, self.singlet_dataset])
 
@@ -277,12 +286,13 @@ class ArchiveTestCaseHelpers(object):
         icl.save()
 
         self.pD_run.parent_runstep = self.step_E2_RS
-        self.pD_run.save()
+        self.pD_run.start(save=True)
         if bp == "sub_pipeline":
             return
 
         # Complete sub-Pipeline.
         self.step_D1_RS = self.step_D1.pipelinestep_instances.create(run=self.pD_run)
+        self.step_D1_RS.start()
         self.complete_RSICs(self.step_D1_RS, [self.D1_in_dataset, self.singlet_dataset],
                                              [self.D1_in_dataset, self.singlet_dataset])
 
@@ -310,11 +320,14 @@ class ArchiveTestCaseHelpers(object):
         icl.start(save=False)
         icl.stop(save=False)
         icl.save()
+
+        self.pD_run.stop(save=True)
         if bp == "sub_pipeline_complete":
             return
 
         # Third RunStep associated.
         self.step_E3_RS = self.step_E3.pipelinestep_instances.create(run=self.pE_run)
+        self.step_E3_RS.start()
         if bp == "third_step":
             return
 
@@ -389,11 +402,13 @@ class ArchiveTestCaseHelpers(object):
         certain point (see the code).
         """
         self.step_E3_RS = self.step_E3.pipelinestep_instances.create(run=self.pE_run)
-        if bp == "runstep":
+        self.step_E3_RS.start(save=True)
+        if bp == "runstep_started":
             return
 
         self.E11_32_RSIC = self.E11_32.psic_instances.create(dest_runstep=self.step_E3_RS)
-        if bp == "rsic_created":
+        self.E11_32_RSIC.start()
+        if bp == "rsic_started":
             return
 
         self.make_complete_non_reused(self.E11_32_RSIC, [self.doublet_dataset], [self.C2_in_dataset])
@@ -421,8 +436,10 @@ class ArchiveTestCaseHelpers(object):
     def step_through_roc_creation(self, bp):
         """Break at an intermediate stage of ROC creation."""
         self.E31_42_ROC = self.E31_42.poc_instances.create(run=self.pE_run)
+        self.E31_42_ROC.start()
         self.E21_41_ROC = self.E21_41.poc_instances.create(run=self.pE_run)
-        if bp == "roc_created":
+        self.E21_41_ROC.start()
+        if bp == "roc_started":
             return
 
         self.make_complete_non_reused(self.E31_42_ROC, [self.singlet_dataset], [self.singlet_dataset])
@@ -439,6 +456,7 @@ class ArchiveTestCaseHelpers(object):
         self.step_E2_RS.start(save=True)
         self.step_E2_RS.save()
         self.pD_run = self.pD.pipeline_instances.create(user=self.myUser)
+        self.pD_run.start(save=False)
         self.pD_run.parent_runstep = self.step_E2_RS
         self.pD_run.grant_everyone_access()
         self.pD_run.save()
@@ -849,7 +867,7 @@ class RunStepTests(ArchiveTestCase):
         """
         A RunStep with all its inputs quenched is clean.
         """
-        self.step_through_runstep_creation("second_runstep_complete")
+        self.step_through_runstep_creation("second_runstep_cables_complete")
         self.assertIsNone(self.step_E2_RS.clean())
 
     def test_RunStep_clean_undecided_reused_with_execrecord(self):
@@ -941,7 +959,7 @@ class RunStepTests(ArchiveTestCase):
         A RunStep which has a child run should have no associated output
         Datasets.
         """
-        self.step_through_runstep_creation("second_runstep_complete")
+        self.step_through_runstep_creation("second_runstep_cables_complete")
         self.step_E2_RS.outputs.add(self.singlet_dataset)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" represents a sub-pipeline and should not have generated any '
@@ -952,7 +970,7 @@ class RunStepTests(ArchiveTestCase):
         """
         A RunStep which has a child run should not have set reused.
         """
-        self.step_through_runstep_creation("second_runstep_complete")
+        self.step_through_runstep_creation("second_runstep_cables_complete")
         self.step_E2_RS.reused = True
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('RunStep "{}" represents a sub-pipeline so reused should not be set'
@@ -963,7 +981,7 @@ class RunStepTests(ArchiveTestCase):
         """
         A RunStep which has a child run should not have an execrecord.
         """
-        self.step_through_runstep_creation("second_runstep_complete")
+        self.step_through_runstep_creation("second_runstep_cables_complete")
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_run.grant_everyone_access()
         other_runstep = self.step_E2.pipelinestep_instances.create(run=other_run)
@@ -1508,7 +1526,7 @@ class RunSICTests(ArchiveTestCase):
         A RunSIC whose PipelineStepInputCable does not belong to its
         RunStep's PipelineStep, is not clean.
         """
-        self.step_through_runsic_creation("runstep")
+        self.step_through_runsic_creation("runstep_started")
         rsic = self.E01_21.psic_instances.create(dest_runstep=self.step_E3_RS)
         self.assertRaisesRegexp(ValidationError,
                                 re.escape('PSIC "{}" does not belong to PipelineStep "{}"'
@@ -1520,7 +1538,7 @@ class RunSICTests(ArchiveTestCase):
         A RunSIC whose PipelineStepInputCable and RunStep are
         consistent, but which has not set reused yet, is clean.
         """
-        self.step_through_runsic_creation("rsic_created")
+        self.step_through_runsic_creation("rsic_started")
         self.assertIsNone(self.E11_32_RSIC.clean())
 
     def test_RunSIC_clean_unset_reused_with_data(self):
@@ -1528,7 +1546,7 @@ class RunSICTests(ArchiveTestCase):
         A RunSIC which has not decided whether to reuse an ExecRecord,
         but which has associated data, is not clean.
         """
-        self.step_through_runsic_creation("rsic_created")
+        self.step_through_runsic_creation("rsic_started")
         self.doublet_dataset.file_source = self.E11_32_RSIC
         self.doublet_dataset.save()
         self.assertRaisesRegexp(ValidationError,
@@ -1541,7 +1559,7 @@ class RunSICTests(ArchiveTestCase):
         A RunSIC which has not decided whether to reuse an ExecRecord,
         but which has one associated, is not clean.
         """
-        self.step_through_runsic_creation("rsic_created")
+        self.step_through_runsic_creation("rsic_started")
         self.E11_32_RSIC.reused = None
 
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
@@ -1574,7 +1592,7 @@ class RunSICTests(ArchiveTestCase):
         """
         A RunSIC whose ExecRecord is not clean, is not itself clean.
         """
-        self.step_through_runsic_creation("rsic_created")
+        self.step_through_runsic_creation("rsic_started")
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_run.grant_everyone_access()
         other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
@@ -1593,7 +1611,7 @@ class RunSICTests(ArchiveTestCase):
         A RunSIC which is reusing an ExecRecord for an incompatible
         PipelineStepInputCable is not clean.
         """
-        self.step_through_runsic_creation("rsic_created")
+        self.step_through_runsic_creation("rsic_started")
 
         # Create an incompatible RunSIC.
         runsic = self.E21_31.psic_instances.create(dest_runstep=self.step_E3_RS)
@@ -1616,7 +1634,7 @@ class RunSICTests(ArchiveTestCase):
         A RunSIC's ExecRecord must be for a PipelineStepInputCable and
         not some other pipeline component (reused case).
         """
-        self.step_through_runsic_creation("rsic_created")
+        self.step_through_runsic_creation("rsic_started")
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_run.grant_everyone_access()
         other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
@@ -1644,7 +1662,7 @@ class RunSICTests(ArchiveTestCase):
         A RunSIC reusing an ExecRecord, whose PipelineStepInputCable
         keeps its output, should have data in its ExecRecordOut.
         """
-        self.step_through_runsic_creation("rsic_created")
+        self.step_through_runsic_creation("rsic_started")
         run = self.pE.pipeline_instances.create(user=self.myUser)
         run.grant_everyone_access()
         runstep = self.step_E3.pipelinestep_instances.create(run=run)
@@ -1667,7 +1685,7 @@ class RunSICTests(ArchiveTestCase):
         A RunSIC reusing an ExecRecord, whose PipelineStepInputCable
         keeps its output, should have data in its ExecRecordOut.
         """
-        self.step_through_runsic_creation("rsic_created")
+        self.step_through_runsic_creation("rsic_started")
 
         # Make another RSIC which is reused by E11_32_RSIC.
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
@@ -1685,7 +1703,7 @@ class RunSICTests(ArchiveTestCase):
         keeps its output, having data in its ExecRecordOut, is complete
         and clean.
         """
-        self.step_through_runsic_creation("rsic_created")
+        self.step_through_runsic_creation("rsic_started")
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_run.grant_everyone_access()
         other_runstep = self.step_E3.pipelinestep_instances.create(run=other_run)
@@ -1702,7 +1720,7 @@ class RunSICTests(ArchiveTestCase):
         A RunSIC reusing an ExecRecord, which doesn't have one
         associated, is not complete.
         """
-        self.step_through_runsic_creation("rsic_created")
+        self.step_through_runsic_creation("rsic_started")
 
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
         other_run.grant_everyone_access()
@@ -1723,7 +1741,7 @@ class RunSICTests(ArchiveTestCase):
         A RunSIC which has decided not to reuse an ExecRecord, but
         which doesn't have one yet, is clean.
         """
-        self.step_through_runsic_creation("rsic_created")
+        self.step_through_runsic_creation("rsic_started")
         self.E11_32_RSIC.reused = False
         self.assertIsNone(self.E11_32_RSIC.clean())
 
@@ -1980,7 +1998,7 @@ class RunOutputCableTests(ArchiveTestCase):
         A RunOutputCable's PipelineOutputCable must belong to the
         Pipeline of its parent Run.
         """
-        self.step_through_roc_creation("roc_created")
+        self.step_through_roc_creation("roc_started")
         self.assertIsNone(self.E31_42_ROC.clean())
 
     def test_ROC_clean_wrong_parent_run(self):
@@ -1989,7 +2007,7 @@ class RunOutputCableTests(ArchiveTestCase):
         A RunOutputCable's PipelineOutputCable must belong to the
         Pipeline of its parent Run.
         """
-        self.step_through_roc_creation("roc_created")
+        self.step_through_roc_creation("roc_started")
         pD_run = self.pD.pipeline_instances.create(user=self.myUser)
         self.E31_42_ROC.run = pD_run
         self.assertRaisesRegexp(ValidationError,
@@ -2002,7 +2020,7 @@ class RunOutputCableTests(ArchiveTestCase):
         A RunOutputCable which has not decided whether to reuse an
         ExecRecord should not have generated any data.
         """
-        self.step_through_roc_creation("roc_created")
+        self.step_through_roc_creation("roc_started")
         self.C1_out_dataset.file_source = self.E31_42_ROC
         self.C1_out_dataset.save()
         self.assertRaisesRegexp(ValidationError,
@@ -2016,7 +2034,7 @@ class RunOutputCableTests(ArchiveTestCase):
         A RunOutputCable which has not decided whether to reuse an
         ExecRecord should not have one associated.
         """
-        self.step_through_roc_creation("roc_created")
+        self.step_through_roc_creation("roc_started")
 
         # Create a compatible ExecRecord to associate.
         other_run = self.pE.pipeline_instances.create(user=self.myUser)
@@ -2036,7 +2054,7 @@ class RunOutputCableTests(ArchiveTestCase):
         A RunOutputCable which is reusing an ExecRecord should not have
         generated any Datasets.
         """
-        self.step_through_roc_creation("roc_created")
+        self.step_through_roc_creation("roc_started")
         self.E31_42_ROC.reused = True
         self.singlet_dataset.file_source = self.E31_42_ROC
         self.singlet_dataset.save()
@@ -2051,7 +2069,7 @@ class RunOutputCableTests(ArchiveTestCase):
         A RunOutputCable which is not reusing an ExecRecord, but which
         is trivial, should not have generated any Datasets.
         """
-        self.step_through_roc_creation("roc_created")
+        self.step_through_roc_creation("roc_started")
         self.E31_42_ROC.reused = False
         self.assertIsNone(self.E31_42_ROC.clean())
 
@@ -2061,7 +2079,7 @@ class RunOutputCableTests(ArchiveTestCase):
         A RunOutputCable which is not reusing an ExecRecord, but which
         is trivial, should not have generated any Datasets.
         """
-        self.step_through_roc_creation("roc_created")
+        self.step_through_roc_creation("roc_started")
         self.E31_42_ROC.reused = False
 
         cable_log = ExecLog(record=self.E31_42_ROC, invoking_record=self.E31_42_ROC,
@@ -2376,14 +2394,14 @@ class RunOutputCableTests(ArchiveTestCase):
         """
         A top-level trivial incomplete RunSIC should have keeps_output() return False.
         """
-        self.step_through_roc_creation("roc_created")
+        self.step_through_roc_creation("roc_started")
         self.assertFalse(self.E31_42_ROC.keeps_output())
 
     def test_ROC_keeps_output_top_level_custom_incomplete(self):
         """
         A top-level custom incomplete RunSIC should have keeps_output() return True.
         """
-        self.step_through_roc_creation("roc_created")
+        self.step_through_roc_creation("roc_started")
         self.assertTrue(self.E21_41_ROC.keeps_output())
 
     def test_ROC_keeps_output_subrun_trivial_true(self):
@@ -2886,6 +2904,7 @@ class IsCompleteIsSuccessfulTests(ArchiveTestCase):
         self.step_through_run_creation("first_cable_created")
 
         incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
+        incomplete_cable.start()
 
         self.make_execlog_and_mark_non_reused_runcomponent(incomplete_cable)
         self.assertFalse(incomplete_cable.is_complete())
@@ -3007,6 +3026,9 @@ class IsCompleteIsSuccessfulTests(ArchiveTestCase):
     def test_runstep_cable_just_started(self):
         """Testing on a RunStep with a just-started RSIC."""
         self.step_through_run_creation("first_cable_created")
+        step_E1_RSIC = self.step_E1_RS.RSICs.first()
+        step_E1_RSIC.start(save=True)
+
         self.assertFalse(self.step_E1_RS.is_complete())
         self.assertTrue(self.step_E1_RS.is_successful())
 
@@ -4018,7 +4040,7 @@ class EligiblePermissionsTests(TestCase):
         )
 
 
-class CancelUnstartedUnfinishedTests(TestCase):
+class CancelComponentsTests(TestCase):
     """
     Tests of Run.cancel_unfinished and Run.cancel_unstarted.
 
@@ -4043,241 +4065,170 @@ class CancelUnstartedUnfinishedTests(TestCase):
             name="FakeRun",
             description="Dummy run used for testing cancel_unfinished and cancel_unstarted."
         )
+        self.nested_run.start(save=True)
         self.nested_run.inputs.create(dataset=self.words, index=1)
 
         # Dummy up some RunComponents that are finished, in progress, and not started.
         self.step_1 = self.nested_run.runsteps.create(
-            pipelinestep=self.p_top.steps.get(step_num=1),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_top.steps.get(step_num=1)
         )
         self.step_1.start()
         self.step_1_ic = self.step_1.RSICs.create(
-            PSIC=self.step_1.pipelinestep.cables_in.first(),
-            _complete=True,
-            _successful=True,
+            PSIC=self.step_1.pipelinestep.cables_in.first()
         )
         self.step_1_ic.start()
-        self.step_1_ic.stop()
+        self.step_1_ic.finish_successfully()
         self.step_1_subrun = self.p_sub.pipeline_instances.create(
             user=self.user,
-            _complete=False,
-            _successful=True,
             parent_runstep=self.step_1
         )
         self.step_1_subrun.start()
         self.step_11 = self.step_1_subrun.runsteps.create(
-            pipelinestep=self.p_sub.steps.get(step_num=1),
-            _complete=True,
-            _successful=True,
+            pipelinestep=self.p_sub.steps.get(step_num=1)
         )
         self.step_11.start()
         self.step_11_ic = self.step_11.RSICs.create(
-            PSIC=self.step_11.pipelinestep.cables_in.first(),
-            _complete=True,
-            _successful=True,
+            PSIC=self.step_11.pipelinestep.cables_in.first()
         )
         self.step_11_ic.start()
-        self.step_11_ic.stop()
+        self.step_11_ic.finish_successfully()
         self.step_11_subrun = self.p_basic.pipeline_instances.create(
             user=self.user,
-            _complete=False,
-            _successful=True,
             parent_runstep=self.step_11
         )
         self.step_11_subrun.start()
 
         self.step_111 = self.step_11_subrun.runsteps.create(
-            pipelinestep=self.p_basic.steps.get(step_num=1),
-            _complete=True,
-            _successful=True,
+            pipelinestep=self.p_basic.steps.get(step_num=1)
         )
         self.step_111.start()
         self.step_111_ic = self.step_111.RSICs.create(
-            PSIC=self.step_111.pipelinestep.cables_in.first(),
-            _complete=True,
-            _successful=True,
+            PSIC=self.step_111.pipelinestep.cables_in.first()
         )
         self.step_111_ic.start()
-        self.step_111_ic.stop()
-        self.step_111.stop()
+        self.step_111_ic.finish_successfully()
+        self.step_111.finish_successfully()
         self.step_112 = self.step_11_subrun.runsteps.create(
-            pipelinestep=self.p_basic.steps.get(step_num=2),
-            _complete=True,
-            _successful=True,
+            pipelinestep=self.p_basic.steps.get(step_num=2)
         )
         self.step_112.start()
         self.step_112_ic = self.step_112.RSICs.create(
-            PSIC=self.step_112.pipelinestep.cables_in.first(),
-            _complete=True,
-            _successful=True,
+            PSIC=self.step_112.pipelinestep.cables_in.first()
         )
         self.step_112_ic.start()
-        self.step_112_ic.stop()
-        self.step_112.stop()
+        self.step_112_ic.finish_successfully()
+        self.step_112.finish_successfully()
         self.outcable_11 = self.step_11_subrun.runoutputcables.create(
-            pipelineoutputcable=self.p_basic.outcables.first(),
-            _complete=True,
-            _successful=True,
+            pipelineoutputcable=self.p_basic.outcables.first()
         )
         self.outcable_11.start()
-        self.outcable_11.stop()
+        self.outcable_11.finish_successfully()
         self.step_11_subrun.stop()
-        self.step_11.stop()
+        self.step_11.finish_successfully()
 
         self.step_12 = self.step_1_subrun.runsteps.create(
-            pipelinestep=self.p_sub.steps.get(step_num=2),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_sub.steps.get(step_num=2)
         )
         self.step_12.start()
         self.step_12_subrun = self.p_basic.pipeline_instances.create(
             user=self.user,
-            _complete=False,
-            _successful=True,
             parent_runstep=self.step_12
         )
         self.step_12_subrun.start()
         self.step_121 = self.step_12_subrun.runsteps.create(
-            pipelinestep=self.p_basic.steps.get(step_num=1),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_basic.steps.get(step_num=1)
         )
         self.step_121.start()
         self.step_122 = self.step_12_subrun.runsteps.create(
-            pipelinestep=self.p_basic.steps.get(step_num=2),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_basic.steps.get(step_num=2)
         )
         self.step_122.start()
         self.outcable_12 = self.step_12_subrun.runoutputcables.create(
-            pipelineoutputcable=self.p_basic.outcables.first(),
-            _complete=False,
-            _successful=True,
+            pipelineoutputcable=self.p_basic.outcables.first()
         )
         self.outcable_12.start()
 
         # Step 2 has parts that are started and parts that are not.
         self.step_2 = self.nested_run.runsteps.create(
-            pipelinestep=self.p_top.steps.get(step_num=2),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_top.steps.get(step_num=2)
         )
         self.step_2.start()
         self.step_2_subrun = self.p_sub.pipeline_instances.create(
             user=self.user,
-            _complete=False,
-            _successful=True,
             parent_runstep=self.step_2
         )
         self.step_2_subrun.start()
         self.step_21 = self.step_2_subrun.runsteps.create(
-            pipelinestep=self.p_sub.steps.get(step_num=1),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_sub.steps.get(step_num=1)
         )
         self.step_21.start()
         self.step_21_subrun = self.p_basic.pipeline_instances.create(
             user=self.user,
-            _complete=False,
-            _successful=True,
             parent_runstep=self.step_21
         )
         self.step_21_subrun.start()
 
         self.step_211 = self.step_21_subrun.runsteps.create(
-            pipelinestep=self.p_basic.steps.get(step_num=1),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_basic.steps.get(step_num=1)
         )
         self.step_211.start()
         self.step_212 = self.step_21_subrun.runsteps.create(
-            pipelinestep=self.p_basic.steps.get(step_num=2),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_basic.steps.get(step_num=2)
         )
         self.step_212.start()
 
         self.step_22 = self.step_2_subrun.runsteps.create(
-            pipelinestep=self.p_sub.steps.get(step_num=2),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_sub.steps.get(step_num=2)
         )
         self.step_22_subrun = self.p_basic.pipeline_instances.create(
             user=self.user,
-            _complete=False,
-            _successful=True,
             parent_runstep=self.step_22
         )
         self.step_221 = self.step_22_subrun.runsteps.create(
-            pipelinestep=self.p_basic.steps.get(step_num=1),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_basic.steps.get(step_num=1)
         )
         self.step_222 = self.step_22_subrun.runsteps.create(
-            pipelinestep=self.p_basic.steps.get(step_num=2),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_basic.steps.get(step_num=2)
         )
 
         # Step 3 has not been started at all.
         self.step_3 = self.nested_run.runsteps.create(
-            pipelinestep=self.p_top.steps.get(step_num=3),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_top.steps.get(step_num=3)
         )
         self.step_3_subrun = self.p_sub.pipeline_instances.create(
             user=self.user,
-            _complete=False,
-            _successful=True,
             parent_runstep=self.step_3
         )
         self.step_31 = self.step_3_subrun.runsteps.create(
-            pipelinestep=self.p_sub.steps.get(step_num=1),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_sub.steps.get(step_num=1)
         )
         self.step_31_subrun = self.p_basic.pipeline_instances.create(
             user=self.user,
-            _complete=False,
-            _successful=True,
             parent_runstep=self.step_31
         )
 
         self.step_311 = self.step_31_subrun.runsteps.create(
-            pipelinestep=self.p_basic.steps.get(step_num=1),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_basic.steps.get(step_num=1)
         )
         self.step_312 = self.step_31_subrun.runsteps.create(
-            pipelinestep=self.p_basic.steps.get(step_num=2),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_basic.steps.get(step_num=2)
         )
 
         self.step_32 = self.step_3_subrun.runsteps.create(
-            pipelinestep=self.p_sub.steps.get(step_num=2),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_sub.steps.get(step_num=2)
         )
         self.step_32_subrun = self.p_basic.pipeline_instances.create(
             user=self.user,
-            _complete=False,
-            _successful=True,
             parent_runstep=self.step_32
         )
         self.step_321 = self.step_32_subrun.runsteps.create(
-            pipelinestep=self.p_basic.steps.get(step_num=1),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_basic.steps.get(step_num=1)
         )
         self.step_322 = self.step_32_subrun.runsteps.create(
-            pipelinestep=self.p_basic.steps.get(step_num=2),
-            _complete=False,
-            _successful=True,
+            pipelinestep=self.p_basic.steps.get(step_num=2)
         )
 
-        self.finished = [
+        self.successful = [
             self.step_1_ic,
             self.step_11_ic,
             self.step_111_ic,
@@ -4288,7 +4239,11 @@ class CancelUnstartedUnfinishedTests(TestCase):
             self.step_11
         ]
 
-        self.unfinished = [
+        self.successful_runs = [
+            self.step_11_subrun
+        ]
+
+        self.running = [
             self.step_1,
             self.step_12,
             self.step_121,
@@ -4300,7 +4255,14 @@ class CancelUnstartedUnfinishedTests(TestCase):
             self.step_212,
         ]
 
-        self.unstarted = [
+        self.running_runs = [
+            self.step_1_subrun,
+            self.step_12_subrun,
+            self.step_2_subrun,
+            self.step_21_subrun
+        ]
+
+        self.pending = [
             self.step_22,
             self.step_221,
             self.step_222,
@@ -4313,68 +4275,167 @@ class CancelUnstartedUnfinishedTests(TestCase):
             self.step_322,
         ]
 
-    def test_cancel_unfinished(self):
+        self.pending_runs = [
+            self.step_22_subrun,
+            self.step_3_subrun,
+            self.step_31_subrun,
+            self.step_32_subrun
+        ]
+
+    def test_cancel_everything(self):
         """
-        Any started RunComponents should be cancelled; others should be unaffected.
+        Any unfinished RunComponents should be cancelled; others should be unaffected.
         """
-        self.nested_run.cancel_unfinished()
+        self.nested_run.cancel_components()
 
-        for rc in self.unfinished:
+        for rc in self.running:
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME)
-            self.assertTrue(rc.has_started())
-            self.assertTrue(rc.has_ended())
-            self.assertTrue(rc._complete)
-            self.assertFalse(rc._successful)
+            self.assertTrue(rc.is_cancelled_FIXME())
 
-        for rc in self.unstarted:
+        for run in self.running_runs:
+            run.refresh_from_db()
+            self.assertTrue(run.is_cancelled())
+
+        for rc in self.pending:
             rc.refresh_from_db()
-            self.assertFalse(rc.is_cancelled_FIXME)
-            self.assertFalse(rc.has_started())
-            self.assertFalse(rc.has_ended())
-            self.assertFalse(rc._complete)
-            self.assertTrue(rc._successful)
+            self.assertTrue(rc.is_cancelled_FIXME())
 
-        for rc in self.finished:
+        for run in self.pending_runs:
+            run.refresh_from_db()
+            self.assertTrue(run.is_cancelled())
+
+        for rc in self.successful:
             rc.refresh_from_db()
-            self.assertFalse(rc.is_cancelled_FIXME)
-            self.assertTrue(rc.has_started())
-            self.assertTrue(rc.has_ended())
-            self.assertTrue(rc._complete)
-            self.assertTrue(rc._successful)
+            self.assertTrue(rc.is_successful())
 
-    def test_cancel_unstarted(self):
+        for run in self.successful_runs:
+            run.refresh_from_db()
+            self.assertTrue(run.is_successful())
+
+    def test_cancel_except_step_122(self):
         """
-        Any unstarted RunComponents should be cancelled; others should be unaffected.
+        Everything should be cancelled except for step_1, step_12, and step_122.
         """
-        self.nested_run.cancel_unstarted()
+        self.nested_run.cancel_components(except_steps=[self.step_122])
 
-        for rc in self.unfinished:
+        exempted = [self.step_1, self.step_12, self.step_122]
+        exempted_subruns = [self.step_1_subrun, self.step_12_subrun]
+
+        for rc in set(self.running) - set(exempted):
             rc.refresh_from_db()
-            self.assertFalse(rc.is_cancelled_FIXME)
-            self.assertTrue(rc.has_started())
-            self.assertFalse(rc.has_ended())
-            self.assertFalse(rc._complete)
+            self.assertTrue(rc.is_cancelled_FIXME())
 
-            # self.step_2 is marked unsuccessful by cancelling self.step_22 and its children.
-            if rc == self.step_2:
-                self.assertFalse(rc._successful)
-            else:
-                self.assertTrue(rc._successful)
-
-        for rc in self.unstarted:
-            # These will have been cancelled without ever starting or stopping them.
+        for rc in exempted:
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME)
-            self.assertFalse(rc.has_started())
-            self.assertFalse(rc.has_ended())
-            self.assertTrue(rc._complete)
-            self.assertFalse(rc._successful)
+            self.assertTrue(rc.is_running())
 
-        for rc in self.finished:
+        for run in set(self.running_runs) - set(exempted_subruns):
+            run.refresh_from_db()
+            self.assertTrue(run.is_cancelled())
+
+        for run in exempted_subruns:
+            run.refresh_from_db()
+            self.assertTrue(run.is_cancelling())
+
+        for rc in self.pending:
             rc.refresh_from_db()
-            self.assertFalse(rc.is_cancelled_FIXME)
-            self.assertTrue(rc.has_started())
-            self.assertTrue(rc.has_ended())
-            self.assertTrue(rc._complete)
-            self.assertTrue(rc._successful)
+            self.assertTrue(rc.is_cancelled_FIXME())
+
+        for run in self.pending_runs:
+            run.refresh_from_db()
+            self.assertTrue(run.is_cancelled())
+
+        for rc in self.successful:
+            rc.refresh_from_db()
+            self.assertTrue(rc.is_successful())
+
+        for run in self.successful_runs:
+            run.refresh_from_db()
+            self.assertTrue(run.is_successful())
+
+    def test_cancel_except_outcable_12(self):
+        """
+        Everything should be cancelled except for step_1, step_12, and outcable_12.
+        """
+        self.nested_run.cancel_components(except_outcables=[self.outcable_12])
+
+        exempted = [self.step_1, self.step_12, self.outcable_12]
+        exempted_subruns = [self.step_1_subrun, self.step_12_subrun]
+
+        for rc in set(self.running) - set(exempted):
+            rc.refresh_from_db()
+            self.assertTrue(rc.is_cancelled_FIXME())
+
+        for rc in exempted:
+            rc.refresh_from_db()
+            self.assertTrue(rc.is_running())
+
+        for run in set(self.running_runs) - set(exempted_subruns):
+            run.refresh_from_db()
+            self.assertTrue(run.is_cancelled())
+
+        for run in exempted_subruns:
+            run.refresh_from_db()
+            self.assertTrue(run.is_cancelling())
+
+        for rc in self.pending:
+            rc.refresh_from_db()
+            self.assertTrue(rc.is_cancelled_FIXME())
+
+        for run in self.pending_runs:
+            run.refresh_from_db()
+            self.assertTrue(run.is_cancelled())
+
+        for rc in self.successful:
+            rc.refresh_from_db()
+            self.assertTrue(rc.is_successful())
+
+        for run in self.successful_runs:
+            run.refresh_from_db()
+            self.assertTrue(run.is_successful())
+
+    def test_cancel_except_step_12_ic(self):
+        """
+        Everything should be cancelled except for step_1 and the input cable to step_12.
+        """
+        step_12_ic = self.step_12.RSICs.create(
+            PSIC=self.step_12.pipelinestep.cables_in.first()
+        )
+        step_12_ic.start()
+
+        self.nested_run.cancel_components(except_incables=[step_12_ic])
+
+        exempted = [self.step_1, step_12_ic]
+        exempted_subruns = [self.step_1_subrun]
+
+        for rc in set(self.running) - set(exempted):
+            rc.refresh_from_db()
+            self.assertTrue(rc.is_cancelled_FIXME())
+
+        for rc in exempted:
+            rc.refresh_from_db()
+            self.assertTrue(rc.is_running())
+
+        for run in set(self.running_runs) - set(exempted_subruns):
+            run.refresh_from_db()
+            self.assertTrue(run.is_cancelled())
+
+        for run in exempted_subruns:
+            run.refresh_from_db()
+            self.assertTrue(run.is_cancelling())
+
+        for rc in self.pending:
+            rc.refresh_from_db()
+            self.assertTrue(rc.is_cancelled_FIXME())
+
+        for run in self.pending_runs:
+            run.refresh_from_db()
+            self.assertTrue(run.is_cancelled())
+
+        for rc in self.successful:
+            rc.refresh_from_db()
+            self.assertTrue(rc.is_successful())
+
+        for run in self.successful_runs:
+            run.refresh_from_db()
+            self.assertTrue(run.is_successful())

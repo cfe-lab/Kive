@@ -1042,7 +1042,7 @@ class Dataset(metadata.models.AccessControl):
         # If there are any failures, check that the most recent integrity check is good.
         if self.any_failed_checks():
             last_icl = self.integrity_checks.order_by("-end_time").last()
-            if last_icl.is_failed():
+            if last_icl is None or last_icl.is_fail():
                 return False
 
             last_bad_ccl = self.content_checks.filter(baddata__isnull=False).order_by("-end_time").last()
@@ -1618,7 +1618,7 @@ class ExecRecord(models.Model):
 
         last_rc = self.used_by_components.filter(
             log__isnull=False,
-            _runcomponentstate__pk=runcomponentstates.COMPLETE_STATE_PKS
+            _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
         ).order_by("-end_time").first()
         if not last_rc.log.is_successful():
             return

@@ -252,6 +252,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         return self._runstate.pk in runstates.COMPLETE_STATE_PKS
 
+    def is_pending(self):
+        return self._runstate.pk == runstates.PENDING_PK
+
     def is_running(self):
         return self._runstate.pk == runstates.RUNNING_PK
 
@@ -260,6 +263,12 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         Checks if this Run is successful.
         """
         return self._runstate.pk == runstates.SUCCESSFUL_PK
+
+    def is_failed(self):
+        """
+        Checks if this Run is failed.
+        """
+        return self._runstate.pk == runstates.FAILED_PK
 
     def is_quarantined(self):
         """
@@ -272,6 +281,12 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
     def is_cancelling(self):
         return self._runstate.pk == runstates.CANCELLING_PK
+
+    def is_cancelled(self):
+        return self._runstate.pk == runstates.CANCELLED_PK
+
+    def get_state_name(self):
+        return self._runstate.name
 
     @transaction.atomic
     def start(self, save=True, **kwargs):
@@ -804,14 +819,23 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         PRE: anything that the fleet is currently running is specified among
         the exceptions.
         """
+        except_steps = except_steps or []
+        except_incables = except_incables or []
+        except_outcables = except_outcables or []
+
         skip_step_pks = (x.pk for x in except_steps if x.parent_run == self)
         skip_incable_pks = (x.pk for x in except_incables if x.parent_run == self)
         skip_outcable_pks = (x.pk for x in except_outcables if x.parent_run == self)
 
-        for step in self.runsteps.exclude(pk__in=skip_step_pks,
-                                          _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS):
-            for rsic in step.RSICs.exclude(pk__in=skip_incable_pks,
-                                           _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS):
+        # In addition to the steps and outcables, we also need to check that all
+        # incables are complete.
+        incables_still_running = False
+        for step in self.runsteps.exclude(pk__in=skip_step_pks).exclude(
+                _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
+        ):
+            for rsic in step.RSICs.exclude(pk__in=skip_incable_pks).exclude(
+                    _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
+            ):
                 rsic.cancel(save=True)
 
             if not step.has_subrun():
@@ -831,13 +855,19 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                     step.child_run.stop(save=True)  # transition: Cancelling->Cancelled or Failing->Failed
                     step.cancel(save=True)
 
-        for outcable in self.runoutputcables.exclude(
-                pk__in=skip_outcable_pks,
-                _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS):
+        for outcable in self.runoutputcables.exclude(pk__in=skip_outcable_pks).exclude(
+                _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
+        ):
             outcable.cancel(save=True)
+
+        if RunSIC.objects.filter(dest_runstep__in=self.runsteps.all()).exclude(
+                _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
+        ):
+            incables_still_running = True
 
         # Return True if everything is complete and False otherwise.
         return not (
+            incables_still_running or
             self.runsteps.exclude(
                 _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
             ).exists() or
@@ -1046,7 +1076,9 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         Optionally this will mark all parent Runs as failed too.
         """
-        assert self._runcomponentstate.pk == runcomponentstates.RUNNING_PK
+        assert self._runcomponentstate.pk == runcomponentstates.RUNNING_PK, (
+            "RunComponentState {} != Running".format(self._runcomponentstate)
+        )
         self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.FAILED_PK)
         if not self.has_ended():
             self.stop(save=False)

@@ -177,29 +177,17 @@ class ExecuteTestsBase(TestCase):
     def check_run_OK(self, run):
         for step in run.runsteps.all():
             for rsic in step.RSICs.all():
-                self.assertTrue(rsic._complete is not None)
-                self.assertTrue(rsic._successful is not None)
-                self.assertTrue(rsic.is_complete(use_cache=True))
-                self.assertTrue(rsic.is_successful(use_cache=True))
+                self.assertTrue(rsic.is_successful())
 
             if step.has_subrun():
                 self.check_run_OK(step.child_run)
 
-            self.assertTrue(step._complete is not None)
-            self.assertTrue(step._successful is not None)
-            self.assertTrue(step.is_complete(use_cache=True))
-            self.assertTrue(step.is_successful(use_cache=True))
+            self.assertTrue(step.is_successful())
 
         for outcable in run.runoutputcables.all():
-            self.assertTrue(outcable._complete is not None)
-            self.assertTrue(outcable._successful is not None)
-            self.assertTrue(outcable.is_complete(use_cache=True))
-            self.assertTrue(outcable.is_successful(use_cache=True))
+            self.assertTrue(outcable.is_successful())
 
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_successful(use_cache=True))
+        self.assertTrue(run.is_successful())
 
 
 class ExecuteTests(ExecuteTestsBase):
@@ -498,22 +486,12 @@ class ExecuteTests(ExecuteTestsBase):
 
         self.assertFalse(rs.log.methodoutput.are_checksums_OK)
 
-        self.assertTrue(rs._complete is not None)
-        self.assertTrue(rs._successful is not None)
-        self.assertTrue(rs.is_complete(use_cache=True))
-        self.assertFalse(rs.is_successful(use_cache=True))
-        self.assertTrue(rs.is_complete())
-        self.assertFalse(rs.is_successful())
+        self.assertTrue(rs.is_failed())
 
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_complete())
-        self.assertFalse(run.is_successful(use_cache=True))
-        self.assertFalse(run.is_successful())
+        self.assertTrue(run.is_failed())
 
         for cancelled_rs in run.runsteps.exclude(pk=rs.pk):
-            self.assertTrue(cancelled_rs.is_cancelled_FIXME)
+            self.assertTrue(cancelled_rs.is_cancelled_FIXME())
 
     # FIXME this test revealed issues #534 and #535; when we fix these, revisit this test.
     # def test_filling_in_execrecord_with_incomplete_content_check(self):
@@ -900,10 +878,10 @@ class ExecuteExternalInputTests(ExecuteTestsBase):
         # Execute pipeline
         run = Manager.execute_pipeline(self.myUser, self.pX_raw, [external_missing_ds]).get_last_run()
 
-        # The run should fail on the first cable.
-        self.assertFalse(run.is_successful(use_cache=True))
+        # The run should be cancelled by the first cable.
+        self.assertTrue(run.is_cancelled())
         rsic = run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
-        self.assertFalse(rsic.is_successful(use_cache=True))
+        self.assertTrue(rsic.is_cancelled_FIXME())
         self.assertTrue(hasattr(rsic, "input_integrity_check"))
         self.assertTrue(rsic.input_integrity_check.read_failed)
 

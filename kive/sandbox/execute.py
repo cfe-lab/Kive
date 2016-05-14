@@ -478,7 +478,7 @@ class Sandbox:
                 #  - a task belonging to the sub-Run,
                 # so we can advance the sub-Run and update the lists of components
                 # completed.
-                steps_completed, outcables_completed, incables_completed = self.advance_pipeline(
+                incables_completed, steps_completed, outcables_completed = self.advance_pipeline(
                     run_to_advance=curr_RS.child_run,
                     incables_completed=incables_completed,
                     steps_completed=steps_completed,
@@ -486,7 +486,7 @@ class Sandbox:
                 )
 
                 curr_RS.refresh_from_db()
-                if curr_RS.child_run.is_cancelled_FIXME():
+                if curr_RS.child_run.is_cancelled():
                     curr_RS.cancel_running(save=True)
                     run_to_resume.cancel(save=True)
                     return incables_completed, steps_completed, outcables_completed
@@ -668,7 +668,7 @@ class Sandbox:
                 if not all_RSICs_done:
                     all_complete = False
                 else:
-                    steps_completed, outcables_completed, incables_completed = self.advance_pipeline(
+                    incables_completed, steps_completed, outcables_completed = self.advance_pipeline(
                         run_to_advance=curr_RS.child_run,
                         incables_completed=incables_completed,
                         steps_completed=steps_completed,
@@ -677,7 +677,7 @@ class Sandbox:
 
                     # Update states for curr_RS and run_to_resume if necessary.
                     curr_RS.refresh_from_db()
-                    if curr_RS.child_run.is_cancelled_FIXME():
+                    if curr_RS.child_run.is_cancelled():
                         curr_RS.cancel_running(save=True)
                         run_to_resume.cancel(save=True)
                         return incables_completed, steps_completed, outcables_completed
@@ -701,12 +701,22 @@ class Sandbox:
             # number to the list of those just completed.  This may then allow subsequent steps to also be started.
             if curr_RS.is_cancelled_FIXME():
                 # If the RunStep is cancelled after reuse, that means that one of
-                # its input cables failed on reuse.
-                failing_cables = curr_RS.RSICs.filter(_runcomponentstate__pk=runcomponentstates.FAILED_PK)
-                assert failing_cables.exists()
-                self.logger.debug("Input cable(s) %s to step %d (%s) failed",
-                                  failing_cables, step.step_num, step)
-                run_to_resume.mark_failure(save=True)
+                # its input cables failed on reuse, or a cable cancelled because it
+                # was unable to copy a file into the sandbox.
+                failed_cables = curr_RS.RSICs.filter(_runcomponentstate__pk=runcomponentstates.FAILED_PK)
+                cancelled_cables = curr_RS.RSICs.filter(_runcomponentstate__pk=runcomponentstates.CANCELLED_PK)
+                assert failed_cables.exists() or cancelled_cables.exists()
+
+                if failed_cables.exists():
+                    self.logger.debug("Input cable(s) %s to step %d (%s) failed",
+                                      failed_cables, step.step_num, step)
+                    run_to_resume.mark_failure(save=True)
+                if cancelled_cables.exists():
+                    self.logger.debug("Input cable(s) %s to step %d (%s) cancelled",
+                                      cancelled_cables, step.step_num, step)
+                    if not failed_cables.exists():
+                        run_to_resume.cancel(save=True)
+
                 return incables_completed, steps_completed, outcables_completed
 
             elif curr_RS.reused and not curr_RS.is_successful():
@@ -726,9 +736,10 @@ class Sandbox:
         for outcable in pipeline_to_resume.outcables.order_by("output_idx"):
             curr_cable = run_to_resume.runoutputcables.filter(pipelineoutputcable=outcable).first()
 
-            # First, if this is already running, we skip it.
-            if curr_cable is not None and curr_cable.is_running():
-                all_complete = False
+            # First, if this is already running or complete, we skip it.
+            if curr_cable is not None and not curr_cable.is_pending():
+                if curr_cable.is_running():
+                    all_complete = False
                 continue
 
             # At this point we know this cable has not already been run; i.e. either
@@ -800,8 +811,6 @@ class Sandbox:
         """
         assert input_dataset in self.dataset_fs_map
 
-        self.logger.debug("Checking whether cable can be reused")
-
         # Create new RSIC/ROC.
         curr_record = archive.models.RunCable.create(cable, parent_record)  # this start()s it
         self.logger.debug("Not recovering - created {}".format(curr_record.__class__.__name__))
@@ -833,6 +842,7 @@ class Sandbox:
         return_now = False
 
         succeeded_yet = False
+        self.logger.debug("Checking whether cable can be reused")
         while not succeeded_yet:
             try:
                 with transaction.atomic():
@@ -1726,7 +1736,7 @@ class Sandbox:
 
                             else:
                                 can_reuse = curr_RS.check_ER_usable(curr_ER)
-                                if can_reuse["successful"] and not can_reuse["fully_reusable"]:
+                                if can_reuse["successful"] and not can_reuse["fully reusable"]:
                                     logger.debug("[%d] ExecRecord not fully reusable -- filling it in %s",
                                                  worker_rank, curr_ER)
 
@@ -1798,20 +1808,16 @@ class Sandbox:
         logger.debug("[%d] Method execution complete, ExecLog saved (started = %s, ended = %s)",
                      worker_rank, curr_log.start_time, curr_log.end_time)
 
-        if (preexisting_ER and curr_log.methodoutput.return_code != 0 and
-                curr_RS.pipelinestep.transformation.definite.reusable == Method.DETERMINISTIC):
-            # If this code is marked as deterministic, the return code should have been 0.
-            curr_ER.quarantine_runcomponents()
-
         succeeded_yet = False
         while not succeeded_yet:
             try:
                 with transaction.atomic():
                     # Create outputs.
                     # bad_output_found indicates we have detected problems with the output.
-                    bad_output_found = not curr_log.is_successful()
+                    bad_output_found = False
+                    bad_execution = not curr_log.is_successful()
                     output_datasets = []
-                    logger.debug("[%d] ExecLog.is_successful() == %s", worker_rank, curr_log.is_successful())
+                    logger.debug("[%d] ExecLog.is_successful() == %s", worker_rank, not bad_execution)
 
                     if not recover:
                         if preexisting_ER:
@@ -1836,13 +1842,6 @@ class Sandbox:
                                 output_dataset.mark_missing(start_time, end_time, curr_log, user)
 
                                 bad_output_found = True
-
-                                # Update state.  We're not recovering so we don't update
-                                # recovering_record.
-                                curr_RS.finish_failure(save=True)
-                                curr_RS_method = curr_RS.pipelinestep.transformation.definite
-                                if preexisting_ER and curr_RS_method.reusable == Method.DETERMINISTIC:
-                                    curr_ER.quarantine_runcomponents()
 
                             else:
                                 # If necessary, create new Dataset for output, and create the Dataset
@@ -1892,16 +1891,15 @@ class Sandbox:
                 logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.", worker_rank, wait_time)
                 time.sleep(wait_time)
 
-        if bad_output_found:
-            curr_RS.finish_failure(save=True)
-
         # Check outputs.
         for i, curr_output in enumerate(pipelinestep.outputs):
             output_path = output_paths[i]
             output_dataset = curr_ER.get_execrecordout(curr_output).dataset
             check = None
 
-            if bad_output_found:
+            if bad_execution:
+                logger.debug("[%d] Execution was unsuccessful; no check on %s was done", worker_rank, output_path)
+            elif bad_output_found:
                 logger.debug("[%d] Bad output found; no check on %s was done", worker_rank, output_path)
 
             # Recovering or filling in old ER? Yes.
@@ -1916,12 +1914,6 @@ class Sandbox:
                         check = output_dataset.mark_missing(start_time, end_time, curr_log, user)
                         logger.debug("[%d] During recovery, output (%s) is missing", worker_rank, output_path)
                         file_is_present = False
-
-                        # FIXME confirm that we don't need this chunk since it will get
-                        # taken care of in the "Check OK? No." block.
-                        # # Update states.
-                        # curr_RS.finish_failure(save=True)
-                        # recovering_record.cancel_running(save=True)
 
                 if file_is_present:
                     # Perform integrity check.
@@ -1958,7 +1950,6 @@ class Sandbox:
             if check and check.is_fail():
                 logger.warn("[%d] %s failed for %s", worker_rank, check.__class__.__name__, output_path)
                 bad_output_found = True
-                curr_RS.finish_failure(save=True)
 
             # Check OK? Yes.
             elif check:
@@ -1967,8 +1958,13 @@ class Sandbox:
         curr_ER.complete_clean()
 
         # End.  Return curr_RS.  Update the state.
-        if not bad_output_found:
+        if not bad_output_found and not bad_execution:
             curr_RS.finish_successfully(save=True)
+        else:
+            curr_RS.finish_failure(save=True)
+            logger.debug("[%d] Quarantining any other RunComponents using the same ExecRecord", worker_rank)
+            curr_ER.quarantine_runcomponents()  # this is transaction'd
+
         curr_RS.complete_clean()
         return curr_RS
 

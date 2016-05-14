@@ -345,10 +345,7 @@ class BadRunTests(TestCase):
 
     def cable_tester(self, runstep):
         for rsic in runstep.RSICs.all():
-            self.assertTrue(rsic._complete is not None)
-            self.assertTrue(rsic._successful is not None)
-            self.assertTrue(rsic.is_complete(use_cache=True))
-            self.assertTrue(rsic.is_successful(use_cache=True))
+            self.assertTrue(rsic.is_successful())
 
     @unittest.skipIf(
         settings.KIVE_SANDBOX_WORKER_ACCOUNT,
@@ -366,15 +363,9 @@ class BadRunTests(TestCase):
         interm_dataset = runstep1.execrecord.execrecordouts.first().dataset
 
         self.cable_tester(runstep1)
-        self.assertTrue(runstep1._complete is not None)
-        self.assertTrue(runstep1._successful is not None)
-        self.assertTrue(runstep1.is_complete(use_cache=True))
-        self.assertFalse(runstep1.is_successful(use_cache=True))
+        self.assertTrue(runstep1.is_failed())
 
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertFalse(run.is_successful(use_cache=True))
+        self.assertTrue(run.is_failed())
 
         self.assertEqual(log.is_successful(), False)
         self.assertEqual(log.methodoutput.return_code, -1)
@@ -384,30 +375,18 @@ class BadRunTests(TestCase):
         """Properly handle a failed method in a pipeline."""
         run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_fubar, [self.dataset_grandpa]).get_last_run()
 
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertFalse(run.is_successful(use_cache=True))
+        self.assertTrue(run.is_failed())
         self.assertIsNone(run.complete_clean())
-        self.assertFalse(run.is_successful())
 
         runstep1 = run.runsteps.get(pipelinestep__step_num=1)
         self.cable_tester(runstep1)
-        self.assertTrue(runstep1._complete is not None)
-        self.assertTrue(runstep1._successful is not None)
-        self.assertTrue(runstep1.is_complete(use_cache=True))
-        self.assertTrue(runstep1.is_successful(use_cache=True))
         self.assertIsNone(runstep1.complete_clean())
         self.assertTrue(runstep1.is_successful())
 
         runstep2 = run.runsteps.get(pipelinestep__step_num=2)
         self.cable_tester(runstep2)
-        self.assertTrue(runstep2._complete is not None)
-        self.assertTrue(runstep2._successful is not None)
-        self.assertTrue(runstep2.is_complete(use_cache=True))
-        self.assertFalse(runstep2.is_successful(use_cache=True))
         self.assertIsNone(runstep2.complete_clean())
-        self.assertFalse(runstep2.is_successful())
+        self.assertTrue(runstep2.is_failed())
 
         log = runstep2.log
 
