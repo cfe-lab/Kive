@@ -1788,6 +1788,11 @@ class Sandbox:
             # Update state variables:
             curr_RS.finish_failure(save=True)
             curr_RS.complete_clean()
+
+            logger.debug("[%d] Quarantining any other RunComponents using the same ExecRecord", worker_rank)
+            if preexisting_ER:
+                curr_ER.quarantine_runcomponents()  # this is transaction'd
+
             return curr_RS
 
         # From here on the code is assumed to not be corrupted.

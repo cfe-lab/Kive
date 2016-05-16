@@ -24,8 +24,8 @@ from django.core.files.base import ContentFile
 from rest_framework.test import force_authenticate, APIRequestFactory
 from rest_framework import status
 
-from archive.models import ExecLog, MethodOutput, Run, RunStep
-from constants import datatypes, groups
+from archive.models import ExecLog, MethodOutput, Run, RunStep, RunComponentState
+from constants import datatypes, groups, runcomponentstates
 from datachecking.models import MD5Conflict
 from librarian.models import Dataset, ExecRecord, ExternalFileDirectory
 from librarian.serializers import DatasetSerializer
@@ -917,14 +917,15 @@ class ExecRecordTests(LibrarianTestCase):
         for run in pipeline.pipeline_instances.all():
             run.delete()
         run = Run(pipeline=pipeline, user=user)
-        run.save()
+        run.start(save=True)
         runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
+        runstep.start(save=True)
         execlog = ExecLog(record=runstep, invoking_record=runstep)
         execlog.save()
         execrecord = ExecRecord(generator=execlog)
         execrecord.save()
         runstep.execrecord = execrecord
-        runstep.save()
+        runstep.finish_successfully(save=True)
 
         self.assertEqual(execrecord.used_by_components.count(), 1)
         self.assertFalse(execrecord.has_ever_failed())
@@ -943,13 +944,14 @@ class ExecRecordTests(LibrarianTestCase):
             run = Run(pipeline=pipeline, user=user)
             run.save()
             runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
+            runstep.start(save=True)
             execlog = ExecLog(record=runstep, invoking_record=runstep)
             execlog.save()
             if i == 0:
                 execrecord = ExecRecord(generator=execlog)
                 execrecord.save()
             runstep.execrecord = execrecord
-            runstep.save()
+            runstep.finish_successfully(save=True)
 
         self.assertEqual(execrecord.used_by_components.count(), 2)
         self.assertFalse(execrecord.has_ever_failed())
@@ -988,6 +990,7 @@ class ExecRecordTests(LibrarianTestCase):
             run = Run(pipeline=pipeline, user=user)
             run.save()
             runstep = run.runsteps.create(pipelinestep=pipeline.steps.first(), run=run)
+            runstep.start(save=True)
             execlog = ExecLog(record=runstep, invoking_record=runstep)
             execlog.save()
             if i == 1:
@@ -996,11 +999,14 @@ class ExecRecordTests(LibrarianTestCase):
                 execrecord = ExecRecord(generator=execlog)
                 execrecord.save()
             runstep.execrecord = execrecord
-            runstep.save()
+            if i == 0:
+                runstep.finish_successfully(save=True)
+            else:
+                runstep.finish_failure(save=True)
 
         self.assertEqual(execrecord.used_by_components.count(), 2)
-        self.assertEqual(execrecord.used_by_components.first().definite.is_successful(), True)
-        self.assertEqual(execrecord.used_by_components.last().definite.is_successful(), False)
+        self.assertTrue(execrecord.used_by_components.first().definite.is_successful())
+        self.assertTrue(execrecord.used_by_components.last().definite.is_failed())
         self.assertTrue(execrecord.has_ever_failed())
 
 
@@ -1059,7 +1065,7 @@ class FindCompatibleERTests(TestCase):
         methodoutput = runstep.log.methodoutput
         methodoutput.return_code = 1  # make this a failure
         methodoutput.save()
-        runstep._successful = False
+        runstep._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.FAILED_PK)
         runstep.save()
 
         input_datasets_decorated = [(eri.generic_input.definite.dataset_idx, eri.dataset)

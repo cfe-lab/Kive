@@ -327,10 +327,7 @@ class ExecuteDiscardedIntermediateTests(TestCase):
             [self.dataset_labdata]
         ).get_last_run()
 
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_successful(use_cache=True))
+        self.assertTrue(run.is_successful())
 
 
 class BadRunTests(TestCase):
@@ -525,26 +522,17 @@ class RawTests(SandboxRMTestCase):
         """Execute a raw Pipeline."""
         run = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
         run = Run.objects.get(pk=run.pk)
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_successful(use_cache=True))
+        self.assertTrue(run.is_successful())
 
     def test_execute_pipeline_raw_twice(self):
         """Execute a raw Pipeline and reuse an ExecRecord."""
         run = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
         run = Run.objects.get(pk=run.pk)
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_successful(use_cache=True))
+        self.assertTrue(run.is_successful())
 
         run2 = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
         run2 = Run.objects.get(pk=run2.pk)
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run2.is_complete(use_cache=True))
-        self.assertTrue(run2.is_successful(use_cache=True))
+        self.assertTrue(run2.is_successful())
 
     def tearDown(self):
         super(RawTests, self).tearDown()

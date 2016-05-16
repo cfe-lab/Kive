@@ -49,18 +49,20 @@ def any_runs_in_progress(plan_of_attack):
 
     for sd in plan_of_attack["Datasets"]:
         for rtp_input in sd.runinputs.all():
-            if not rtp_input.run.is_complete():
+            curr_run = rtp_input.run
+            if not curr_run.is_complete() and not curr_run.is_pending():
                 return True
 
     for er in plan_of_attack["ExecRecords"]:
         for affected_rc in er.used_by_components.all():
-            if not affected_rc.top_level_run.is_complete():
+            curr_run = affected_rc.top_level_run
+            if not curr_run.is_complete() and not curr_run.is_pending():
                 return True
 
     if "Pipelines" in plan_of_attack:  # Redaction plans don't have this key
         for pipeline in plan_of_attack["Pipelines"]:
             for run in pipeline.pipeline_instances.all():
-                if not run.is_complete():
+                if not run.is_complete() and not run.is_pending():
                     return True
 
     return False

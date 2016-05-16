@@ -49,6 +49,16 @@ class QueuedRunTest(TestCase):
 
         self.assertSequenceEqual(expected_username, progress['user'])
 
+    def create_unstarted_pipeline(self):
+        pipeline = Pipeline.objects.get(pk=2)
+        user = User.objects.first()
+        run = Run(pipeline=pipeline, user=user)
+        run.save()
+
+        progress = run.get_run_progress()
+        self.assertSequenceEqual("?", progress["status"])
+        return run
+
     def create_with_empty_pipeline(self):
         pipeline = Pipeline(family=self.converter_pf, user=kive_user())
         pipeline.save()
@@ -97,9 +107,8 @@ class QueuedRunTest(TestCase):
         run = self.create_with_pipeline_step()
         pipeline_step = run.pipeline.steps.first()
         run_step = RunStep(run=run,
-                           pipelinestep=pipeline_step,
-                           start_time=timezone.now())
-        run_step.save()
+                           pipelinestep=pipeline_step)
+        run_step.start(save=True)
         run_step_input_cable = RunSIC(PSIC=pipeline_step.cables_in.first(),
                                       dest_runstep=run_step).save()
 
@@ -112,7 +121,7 @@ class QueuedRunTest(TestCase):
 
         self.assertSequenceEqual(':-.', progress['status'])
 
-    def create_with_started_run_step(self):
+    def create_with_run_step_with_log(self):
         run = self.create_with_run_step()
         run_step = run.runsteps.first()
         run_step_input_cable = run_step.RSICs.first()
@@ -122,15 +131,16 @@ class QueuedRunTest(TestCase):
         return run
 
     def create_with_completed_run_step(self):
-        run = self.create_with_started_run_step()
+        run = self.create_with_run_step_with_log()
         run_step = run.runsteps.first()
         exec_record = self.add_exec_record(run_step)
         exec_record.generator.methodoutput.return_code = 0
         exec_record.generator.methodoutput.save()
+        run_step.finish_successfully(save=True)
         return run
 
     def test_run_progress_started_steps(self):
-        run = self.create_with_started_run_step()
+        run = self.create_with_run_step_with_log()
 
         progress = run.get_run_progress()
 
@@ -144,12 +154,12 @@ class QueuedRunTest(TestCase):
         self.assertSequenceEqual('*-.', progress['status'])
 
     def test_run_progress_failed_steps(self):
-        run = self.create_with_completed_run_step()
+        run = self.create_with_run_step_with_log()
         run_step = run.runsteps.first()
         exec_log = run_step.invoked_logs.first()
         exec_log.methodoutput.return_code = 5
         exec_log.methodoutput.save()
-        run_step.save()
+        run_step.finish_failure(save=True)
 
         progress = run.get_run_progress()
 
@@ -159,7 +169,7 @@ class QueuedRunTest(TestCase):
         run = self.create_with_completed_run_step()
         pipeline_output_cable = run.pipeline.outcables.first()
         roc = RunOutputCable(pipelineoutputcable=pipeline_output_cable, run=run)
-        roc.save()
+        roc.start(save=True)
 
         progress = run.get_run_progress()
 
@@ -172,7 +182,7 @@ class QueuedRunTest(TestCase):
             pipelineoutputcable=pipeline_output_cable,
             run=run
         )
-        run_output_cable.save()
+        run_output_cable.start(save=True)
         self.add_exec_log(run_output_cable)
 
         progress = run.get_run_progress()
@@ -186,9 +196,10 @@ class QueuedRunTest(TestCase):
             pipelineoutputcable=pipeline_output_cable,
             run=run
         )
-        run_output_cable.save()
+        run_output_cable.start(save=True)
         self.add_exec_log(run_output_cable)
         self.add_exec_record(run_output_cable)
+        run_output_cable.finish_successfully(save=True)
 
         progress = run.get_run_progress()
 

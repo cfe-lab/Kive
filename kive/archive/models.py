@@ -988,6 +988,9 @@ class RunComponent(stopwatch.models.Stopwatch):
         """
         return self._runcomponentstate.pk in runcomponentstates.COMPLETE_STATE_PKS
 
+    def get_state_name(self):
+        return self._runcomponentstate.name
+
     # State transition methods.
     @transaction.atomic
     def start(self, save=True, **kwargs):
