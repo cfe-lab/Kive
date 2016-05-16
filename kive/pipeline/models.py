@@ -1429,7 +1429,7 @@ class PipelineOutputCable(PipelineCable):
         source_ps = self.pipeline.steps.get(step_num=self.source_step)
 
         # Try to find a matching output hole
-        if not source_ps.transformation.outputs.filter(pk=self.source.pk).exists():
+        if self.source.transformation.definite != source_ps.transformation.definite:
             raise ValidationError(
                 "Transformation at step {} does not produce output \"{}\"".
                 format(self.source_step, self.source))

@@ -1,7 +1,7 @@
 import os
 from unittest.case import TestCase
 
-from mock import PropertyMock
+from mock import PropertyMock, Mock
 
 from kive.mock_setup import mock_relations  # Import before any Django models
 from constants import datatypes
@@ -183,6 +183,7 @@ Dave,40
         file_path = os.devnull
         with mock_relations(Dataset, BadData):
             expected_bad_data = BadData.objects.create.return_value  # @UndefinedVariable
+            Dataset.content_checks = Mock(name='Dataset.content_checks')
             expected_check = Dataset.content_checks.create.return_value  # @UndefinedVariable
             expected_bad_row = 42
             expected_bad_column = 2

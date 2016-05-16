@@ -6,6 +6,13 @@
             this.$table = $('<table>');
             this.$navigation_links = $("<div/>");
             this.is_user_admin = false;
+            this.table = new choose_pipeline.PipelineFamiliesTable(
+                    this.$table,
+                    this.is_user_admin,
+                    this.$navigation_links
+            );
+            this.table.drawThumbnails = function() {}; // disable AJAX call
+            this.table.image_path = "portal/static/portal/img";
             this.rows = [{
                 name: "Example",
                 members: [],
@@ -15,13 +22,7 @@
         });
         
         it('should build table', function() {
-            var table = new choose_pipeline.PipelineFamiliesTable(
-                    this.$table,
-                    this.is_user_admin,
-                    this.$navigation_links
-            );
-            table.drawThumbnails = function() {}; // disable AJAX call
-            table.buildTable(this.rows);
+            this.table.buildTable(this.rows);
             
             var $rows = this.$table.find('tr'),
                 $cells = $rows.eq(1).find('td');
@@ -34,11 +35,7 @@
         
         it('should build list of members', function() {
             this.rows[0].members = [{ id: 17, display_name: 'first' }];
-            var table = new choose_pipeline.PipelineFamiliesTable(
-                    this.$table,
-                    this.is_user_admin);
-            table.drawThumbnails = function() {};
-            table.buildTable(this.rows);
+            this.table.buildTable(this.rows);
             
             var $rows = this.$table.find('tr'),
                 $cells = $rows.eq(1).find('td');
@@ -49,11 +46,7 @@
         it('should select published version by default', function() {
             this.rows[0].members = [{ id: 23, display_name: 'second', published: false },
                                     { id: 17, display_name: 'first', published: true}];
-            var table = new choose_pipeline.PipelineFamiliesTable(
-                    this.$table,
-                    this.is_user_admin);
-            table.drawThumbnails = function() {};
-            table.buildTable(this.rows);
+            this.table.buildTable(this.rows);
             
             var $rows = this.$table.find('tr'),
                 $cells = $rows.eq(1).find('td'),
@@ -65,11 +58,7 @@
         it('should select most recent published version by default', function() {
             this.rows[0].members = [{ id: 23, display_name: 'second', published: true },
                                     { id: 17, display_name: 'first', published: true}];
-            var table = new choose_pipeline.PipelineFamiliesTable(
-                    this.$table,
-                    this.is_user_admin);
-            table.drawThumbnails = function() {};
-            table.buildTable(this.rows);
+            this.table.buildTable(this.rows);
 
             var $rows = this.$table.find('tr'),
                 $cells = $rows.eq(1).find('td'),
@@ -88,6 +77,7 @@
             this.compounddatatype_id = 17;
             this.rows = [{
                 name: "some_dataset.csv",
+                has_data: true,
                 users_allowed: [],
                 groups_allowed: []
             }];
@@ -102,6 +92,7 @@
                     undefined,
                     this.$navigation_links
             );
+            table.image_path = "portal/static/portal/img";
             table.buildTable(this.rows);
             
             var $rows = this.$table.find('tr'),
@@ -117,6 +108,7 @@
                     this.is_user_admin,
                     this.input_index,
                     this.compounddatatype_id);
+            table.image_path = "portal/static/portal/img";
             table.buildTable(this.rows);
             
             var $row = this.$table.find('tr').eq(1),

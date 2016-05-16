@@ -16,12 +16,12 @@ $(document).ready(function(){ // wait for page to finish loading before executin
                                 value.revision_number + ': ' +
                                 value.revision_name));
                     });
-                    $("#id_revisions").empty().append(options);
+                    $("#id_driver_revisions").empty().append(options);
                 }
             );
         }
         else {
-            $("#id_revisions").html('<option value="">--- select a CodeResource first ---</option>');
+            $("#id_driver_revisions").html('<option value="">--- select a CodeResource first ---</option>');
         }
     }).change(); // trigger on load
 
@@ -109,7 +109,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     var io_cdt_options = document.getElementById("id_compounddatatype_in_0").options;
 
     // modify name attributes for extra input forms received from server
-    for (var i = 0; i < numberOfInputForms; i++) {
+    for (i = 0; i < numberOfInputForms; i++) {
         $('#id_dataset_name_in_'+i).attr('name', 'dataset_name_in_'+i);
         $('#id_compounddatatype_in_'+i).attr('name', 'compounddatatype_in_'+i);
         $('#id_min_row_in_'+i).attr('name', 'min_row_in_'+i);

@@ -219,7 +219,7 @@ def resource_add(request):
                 _make_crv(request.FILES.get("content_file", None),
                           creating_user,
                           resource_form)
-                
+
                 # Success -- return to the resources root page.
                 return HttpResponseRedirect('/resources')
             except ValidationError:
@@ -281,7 +281,7 @@ def resource_revision_add(request, id):
                     'parent_revision': parent_revision,
                     'coderesource': coderesource
                 })
-            return HttpResponse(t.render(c)) # CodeResourceRevision object required for next steps
+            return HttpResponse(t.render(c))  # CodeResourceRevision object required for next steps
 
         # Success; return to the resources page.
         return HttpResponseRedirect('/resources')
@@ -539,9 +539,9 @@ def create_method_from_forms(family_form, method_form, dep_forms, input_forms, o
 
     # Retrieve the CodeResource revision as driver.
     try:
-        coderesource_revision = CodeResourceRevision.objects.get(pk=method_form.cleaned_data['revisions'])
+        coderesource_revision = CodeResourceRevision.objects.get(pk=method_form.cleaned_data['driver_revisions'])
     except (ValueError, CodeResourceRevision.DoesNotExist) as e:
-        method_form.add_error("revisions", e)
+        method_form.add_error("driver_revisions", e)
         return None
 
     new_method = None
@@ -578,7 +578,8 @@ def create_method_from_forms(family_form, method_form, dep_forms, input_forms, o
                 if dep_forms[i] is None:
                     continue
                 try:
-                    on_revision = CodeResourceRevision.objects.get(pk=dep_forms[i].cleaned_data["revisions"])
+                    on_revision = CodeResourceRevision.objects.get(
+                        pk=dep_forms[i].cleaned_data["revisions"])
                     dependency = MethodDependency(
                         method=new_method,
                         requirement=on_revision,
@@ -918,7 +919,7 @@ def method_revise(request, id):
         method_revise_form = MethodReviseForm(
             initial={
                 "revision_desc": parent_method.revision_desc,
-                "revisions": parent_revision.pk,
+                "driver_revisions": parent_revision.pk,
                 "reusable": parent_method.reusable,
                 "threads": parent_method.threads,
                 "permissions": [parent_users_allowed, parent_groups_allowed]
@@ -975,7 +976,7 @@ def method_revise(request, id):
             xs_form = XputStructureForm(user=creating_user, auto_id='id_%s_in_0')
             input_form_tuples.append((tx_form, xs_form))
 
-    method_revise_form.fields['revisions'].widget.choices = [
+    method_revise_form.fields['driver_revisions'].widget.choices = [
         (str(x.id), '{}: {}'.format(x.revision_number, x.revision_name)) for x in all_revisions
     ]
     c.update(

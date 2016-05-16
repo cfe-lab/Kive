@@ -248,6 +248,7 @@ $(function() {
         
         var node_label = $('#id_datatype_name', this).val(),
             pos,
+            shape,
             dlg = $(this).closest('.modal_dialog'),
             preview_canvas = dlg.find('canvas'),
             dt_error = $('#id_dt_error', this)[0];
@@ -276,8 +277,7 @@ $(function() {
             dt_error.innerHTML = "Label is required";
         } else {
             dt_error.innerHTML = "";
-            var this_pk = $('#id_select_cdt', this).val(), // primary key
-                shape;
+            var this_pk = $('#id_select_cdt', this).val(); // primary key
             
             if (this_pk === ""){
                 shape = new drydock_objects.RawNode(pos.left, pos.top, node_label);
