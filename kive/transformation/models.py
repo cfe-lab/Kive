@@ -116,7 +116,7 @@ class Transformation(metadata.models.AccessControl):
             return self.pipeline
         else:
             return self.method
-    
+
     @property
     def display_name(self):
         return self.definite.display_name
@@ -145,7 +145,7 @@ class Transformation(metadata.models.AccessControl):
         for i, curr_input in enumerate(self.inputs.order_by("dataset_idx"), start=1):
             if i != curr_input.dataset_idx:
                 raise ValidationError("Inputs are not consecutively numbered starting from 1")
-        
+
     def check_output_indices(self):
         """Check that output indices are numbered consecutively from 1."""
         for i, curr_output in enumerate(self.outputs.order_by("dataset_idx"), start=1):
@@ -211,7 +211,7 @@ class Transformation(metadata.models.AccessControl):
                 compounddatatype=compounddatatypes[i],
                 row_limits=row_limits[i],
                 coords=coords[i],
-                input=i<num_inputs
+                input=i < num_inputs
             )
 
         # Hack: complete_clean() for Methods only (Pipelines can be
@@ -224,8 +224,14 @@ class Transformation(metadata.models.AccessControl):
         return transformation
 
     @transaction.atomic
-    def create_xput(self, dataset_name, dataset_idx=None, compounddatatype=None, row_limits=None, coords=None, 
-                    input=True, clean=True):
+    def create_xput(self,
+                    dataset_name,
+                    dataset_idx=None,
+                    compounddatatype=None,
+                    row_limits=None,
+                    coords=None,
+                    input=True,
+                    clean=True):
         """Create a TransformationXput for this Transformation.
 
         Decides whether the created TransformationXput should have a
@@ -262,9 +268,16 @@ class Transformation(metadata.models.AccessControl):
         """Create a TransformationInput for this Transformation."""
         return self.create_xput(dataset_name, dataset_idx, compounddatatype, (min_row, max_row), (x, y), True,
                                 clean=clean)
-    
-    def create_output(self, dataset_name, dataset_idx=None, compounddatatype=None,
-                     min_row=None, max_row=None, x=0, y=0, clean=True):
+
+    def create_output(self,
+                      dataset_name,
+                      dataset_idx=None,
+                      compounddatatype=None,
+                      min_row=None,
+                      max_row=None,
+                      x=0,
+                      y=0,
+                      clean=True):
         """Create a TransformationOutput for this Transformation."""
         return self.create_xput(dataset_name, dataset_idx, compounddatatype, (min_row, max_row), (x, y), False,
                                 clean=clean)
@@ -378,7 +391,8 @@ class TransformationXput(models.Model):
         assert not self.has_structure
         assert compounddatatype is not None
 
-        new_structure = XputStructure(transf_xput=self,
+        new_structure = XputStructure(
+                transf_xput=self,
                 compounddatatype=compounddatatype,
                 min_row=min_row, max_row=max_row)
         if clean:
@@ -397,7 +411,7 @@ class XputStructure(models.Model):
 
     # The expected compounddatatype of the input/output
     compounddatatype = models.ForeignKey("metadata.CompoundDatatype", related_name="xput_structures")
-    
+
     # Nullable fields indicating that this dataset has
     # restrictions on how many rows it can have
     min_row = models.PositiveIntegerField(
