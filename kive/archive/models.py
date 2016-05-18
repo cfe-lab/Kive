@@ -157,7 +157,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                                           help_text="Step of parent run initiating this one as a sub-run")
 
     # State field to avoid the use of is_complete() and is_successful(), which can be slow.
-    _runstate = models.ForeignKey(RunState, default=runstates.PENDING_PK)
+    _runstate = models.ForeignKey(RunState, default=runstates.PENDING_PK, related_name="runs")
 
     # FIXME remove these once data is migrated.
     # State fields to avoid the use of is_complete() and is_successful(), which can be slow.
@@ -302,10 +302,10 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         Stop this run, changing its state appropriately.
         """
-        assert self._runstate.pk in [runstates.RUNNING_PK, runstates.CANCELLING_PK, runstates.FAILING_PK]
-        if self._runstate.pk == runstates.RUNNING_PK:
+        assert self._runstate_id in [runstates.RUNNING_PK, runstates.CANCELLING_PK, runstates.FAILING_PK]
+        if self._runstate_id == runstates.RUNNING_PK:
             self._runstate = RunState.objects.get(pk=runstates.SUCCESSFUL_PK)
-        elif self._runstate.pk == runstates.CANCELLING_PK:
+        elif self._runstate_id == runstates.CANCELLING_PK:
             self._runstate = RunState.objects.get(pk=runstates.CANCELLED_PK)
         else:
             self._runstate = RunState.objects.get(pk=runstates.FAILED_PK)

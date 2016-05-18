@@ -6,6 +6,7 @@ import os
 import django
 from django.apps import apps
 from django.db import connections
+from django.db.utils import ConnectionHandler, NotSupportedError
 from django.conf import settings
 
 if not apps.ready:
@@ -20,6 +21,10 @@ if not apps.ready:
     db = connections.databases['default']
     db['PASSWORD'] = '****'
     db['USER'] = '**Database disabled for unit tests**'
+    ConnectionHandler.__getitem__ = Mock(name='mock_connection')
+    mock_ops = ConnectionHandler.__getitem__.return_value.ops  # @UndefinedVariable
+    mock_execute = mock_ops.compiler.return_value.return_value.execute_sql
+    mock_execute.side_effect = NotSupportedError("Mock database can't execute sql.")
 
 
 @contextmanager
