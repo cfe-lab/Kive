@@ -490,12 +490,12 @@ class PipelineStep(models.Model):
     @property
     def inputs(self):
         """Inputs to this PipelineStep, ordered by index."""
-        return self.transformation.inputs.order_by("dataset_idx")
+        return self.transformation.inputs.all()
 
     @property
     def outputs(self):
         """Outputs from this PipelineStep, ordered by index."""
-        return self.transformation.outputs.order_by("dataset_idx")
+        return self.transformation.outputs.all()
 
     @property
     def is_cable(self):

@@ -465,6 +465,7 @@ class TransformationInput(TransformationXput):
         # A transformation cannot have multiple definitions for column name or column index
         unique_together = (("transformation", "dataset_name"),
                            ("transformation", "dataset_idx"))
+        ordering = ('dataset_idx', )
 
 
 class TransformationOutput(TransformationXput):
@@ -490,3 +491,4 @@ class TransformationOutput(TransformationXput):
         # A transformation cannot have multiple definitions for column name or column index
         unique_together = (("transformation", "dataset_name"),
                            ("transformation", "dataset_idx"))
+        ordering = ('dataset_idx', )
