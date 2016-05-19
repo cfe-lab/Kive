@@ -448,7 +448,6 @@ def _make_dep_forms(query_dict, user):
         this_cr = query_dict['coderesource_'+str(i)]  # PK of the Method
         if this_cr == '':
             # Ignore blank CR dependency forms.
-            dep_forms.append(None)
             continue
 
         dep_forms.append(
