@@ -126,14 +126,13 @@ $(function() {
         // Update preview picture of node to show a CDtNode or RawNode appropriately
         var preview_canvas = $(this).closest('.modal_dialog').find('canvas'),
             val = this.value,
-            ctx, filename, colour;
+            ctx,
+            colour;
         
         if (preview_canvas.length) {
             preview_canvas = preview_canvas[0];
             ctx = preview_canvas.getContext('2d');
-            filename = $(this).find('option:selected').attr('title');
             colour = $(this).closest('.modal_dialog').find('#id_select_colour').val();
-            $('#id_method_name').val_(filename);
             
             // use AJAX to retrieve Revision inputs and outputs
             $.getJSON("/api/methods/" + val + "/").done(function(result) {
