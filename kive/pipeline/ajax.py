@@ -111,8 +111,8 @@ class PipelineViewSet(CleanCreateModelMixin,
         prefetchd = Pipeline.objects.prefetch_related(
             'steps__transformation__method__family',
             'steps__transformation__pipeline__family',
-            'steps__transformation__method__inputs__structure__compounddatatype__members__datatype',
-            'steps__transformation__method__outputs__structure__compounddatatype__members__datatype',
+            'steps__transformation__inputs__structure',
+            'steps__transformation__outputs__structure',
             'steps__transformation__method__family',
             'steps__cables_in__custom_wires',
             'steps__cables_in__dest__transformationinput',
@@ -128,8 +128,8 @@ class PipelineViewSet(CleanCreateModelMixin,
             'outcables__custom_wires__source_pin',
             'outcables__custom_wires__dest_pin',
             'outcables__pipeline',
-            'outcables__output_cdt'
-        )
+            'outcables__output_cdt',
+            'outputs__structure')
         # .select_related(
         #     'steps__transformation__pipeline',
         #     'steps__transformation__method',
