@@ -189,7 +189,8 @@ class PipelineMockTests(TestCase):
                             PipelineStep,
                             Method,
                             CompoundDatatype,
-                            Datatype):
+                            Datatype,
+                            PipelineStepInputCable):
             p = Pipeline(family=PipelineFamily())
             self.add_inputs(p, self.create_input(datatypes.INT_PK, dataset_idx=1))
             m = Method()
@@ -739,7 +740,9 @@ class PipelineMockTests(TestCase):
                             PipelineStep,
                             Method,
                             CompoundDatatype,
-                            Datatype):
+                            Datatype,
+                            PipelineStepInputCable,
+                            PipelineOutputCable):
             p = Pipeline(family=PipelineFamily())
             self.add_inputs(p, self.create_input(datatypes.STR_PK, dataset_idx=1))
             m = Method()

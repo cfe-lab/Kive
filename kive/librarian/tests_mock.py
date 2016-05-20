@@ -7,7 +7,7 @@ from kive.mock_setup import mock_relations  # Import before any Django models
 from constants import datatypes
 from datachecking.models import BadData, CellError
 from kive.tests import dummy_file
-from librarian.models import Dataset
+from librarian.models import Dataset, ExecRecord
 from metadata.models import Datatype, CompoundDatatypeMember
 
 
@@ -203,7 +203,8 @@ Dave,40
                                                 min_row=None,
                                                 max_row=None,
                                                 execlog=None,
-                                                checking_user=None)
+                                                checking_user=None,
+                                                notify_all=False)
 
             self.assertIs(expected_check, check)
             compound_datatype.members.get.assert_called_once_with(

@@ -329,7 +329,8 @@ class Manager(object):
         steps_processing = []
         incables_processing = []
         outcables_processing = []
-        for task in self.tasks_in_progress:
+        for foreman in self.tasks_in_progress:
+            task = self.tasks_in_progress[foreman]["task"]
             if task.top_level_run == sandbox.run:
                 if isinstance(task, archive.models.RunStep):
                     steps_processing.append(task)
@@ -462,20 +463,41 @@ class Manager(object):
         for worker_rank in workers_freed:
             self.worker_status[worker_rank] = Worker.READY
 
-        # Is anything from the run actively processing?  Anything from the same sub-run?
+        # Is anything from the run actively processing?
         tasks_currently_running = False
+        # Recall:
+        # a RunStep gives you the step coordinates
+        # a RunSIC gives you its parent step coordinates
+        # a RunOutputCable gives you the parent run coordinates
+        # task_finished_coords[idx] is the component coordinate in
+        # the subrun idx levels deep (0 means top-level run).
         task_finished_coords = task_finished.get_coordinates()
+        if task_finished.is_outcable:
+            # Add a dummy entry at the end so that the 0th to 2nd-last coordinates
+            # give the sub-run coordinates in all cases.
+            task_finished_coords = task_finished_coords + (None,)
+
+        # At position i, this list denotes whether any other tasks from the sub-run
+        # i levels deep (0 means top level run) are currently running.
         subrun_tasks_currently_running = [False for _ in task_finished_coords]
 
         for task_info in self.tasks_in_progress.itervalues():
             if task_info['task'].top_level_run == just_finished['task'].top_level_run:
+                running_task_coords = task_info["task"].get_coordinates()
+                if task_info["task"].is_outcable:
+                    running_task_coords = running_task_coords + (None,)
+
                 # These belong to the same Run, so we can't bail out yet if task_finished failed.
                 tasks_currently_running = True
-
-                running_task_coords = task_info["task"].get_coordinates()
-                for coord in range(min(len(task_finished_coords), len(running_task_coords))):
+                subrun_tasks_currently_running[0] = True
+                # If either task_finished_coords and running_task_coords are length 1 (i.e. one
+                # directly belongs to the top-level run), this does nothing.
+                for coord in range(1, min(len(task_finished_coords), len(running_task_coords))):
                     if task_finished_coords[coord] == running_task_coords[coord]:
                         subrun_tasks_currently_running[coord] = True
+                    else:
+                        # Nothing nested deeper can belong to the same sub-run.
+                        break
 
         # If this run has failed (either due to this task or another),
         # we mop up.
@@ -505,7 +527,7 @@ class Manager(object):
                     clean_up_now = True
 
             else:  # run is still processing successfully
-                assert curr_sdbx.run.is_running()
+                assert curr_sdbx.run.is_running(), "{} != Running".format(curr_sdbx.run.get_state_name())
 
                 # Was this task a recovery or novel progress?
                 if task_execute_info.is_recovery():
@@ -569,8 +591,8 @@ class Manager(object):
 
         else:
             # The component that just finished failed.  Cancellation is handled by stop_run
-            # or by assign_task).
-            assert task_finished.is_failed()
+            # (or assign_task).
+            assert task_finished.is_failed(), "{} != Failed".format(task_finished.get_state_name())
             stop_subruns_if_possible = True
             if curr_sdbx.run.is_failing() or curr_sdbx.run.is_cancelling():
                 assert curr_sdbx in self.sandboxes_shutting_down
@@ -609,16 +631,23 @@ class Manager(object):
                 clean_up_now = True
 
         if stop_subruns_if_possible:
+
+            curr_run = task_finished.parent_run
             for idx in range(len(task_finished_coords)-1, -1, -1):
+                # task_finished_coords[idx] is the component coordinate in
+                # the subrun idx levels deep (0 means top-level run).
+                # curr_run is this subrun.
                 if not subrun_tasks_currently_running[idx]:
-                    if not task_finished.parent_run.has_ended():
-                        task_finished.parent_run.stop(save=True)
+                    if not curr_run.has_ended():
+                        curr_run.stop(save=True)
                     else:
-                        task_finished.parent_run.finish_recovery(save=True)
+                        curr_run.finish_recovery(save=True)
                 else:
                     # By definition everything above this point has stuff
                     # still running.
                     break
+                if idx > 0:
+                    curr_run = curr_run.parent_runstep.parent_run
 
         if not clean_up_now:
             # The Run is still going and there may be more stuff to do.
