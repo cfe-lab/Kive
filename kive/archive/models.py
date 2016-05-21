@@ -293,7 +293,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         Start this run, changing its state from Pending to Running.
         """
-        assert self._runstate.pk == runstates.PENDING_PK
+        assert self._runstate_id == runstates.PENDING_PK
         self._runstate = RunState.objects.get(pk=runstates.RUNNING_PK)
         stopwatch.models.Stopwatch.start(self, save=save, **kwargs)
 
@@ -318,9 +318,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         This does not affect the RunComponents.
         """
-        assert self._runstate in RunState.objects.filter(
-            pk__in=[runstates.PENDING_PK, runstates.RUNNING_PK]
-        )
+        assert self._runstate_id in [runstates.PENDING_PK, runstates.RUNNING_PK]
         self._runstate = RunState.objects.get(pk=runstates.CANCELLING_PK)
         if save:
             self.save()
@@ -333,7 +331,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         This does not affect the RunComponents, but it optionally affects
         the parent Run, if this is a sub-Run.
         """
-        assert self._runstate.pk == runstates.RUNNING_PK
+        assert self._runstate_id == runstates.RUNNING_PK
         self._runstate = RunState.objects.get(pk=runstates.FAILING_PK)
         if save:
             self.save()
@@ -349,7 +347,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         This does not affect the RunComponents, but it optionally affects
         the parent Run, if this is a sub-Run.
         """
-        assert self._runstate.pk == runstates.SUCCESSFUL_PK
+        assert self._runstate_id == runstates.SUCCESSFUL_PK
         assert self.has_ended()
         self._runstate = RunState.objects.get(pk=runstates.RUNNING_PK)
         if save:
@@ -363,7 +361,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         Transition this run's state when its recovering components are done.
         """
-        assert self._runstate.pk in [runstates.RUNNING_PK, runstates.FAILING_PK, runstates.CANCELLING_PK]
+        assert self._runstate_id in [runstates.RUNNING_PK, runstates.FAILING_PK, runstates.CANCELLING_PK]
         assert self.has_ended()
         if self.is_running():
             self._runstate = RunState.objects.get(pk=runstates.SUCCESSFUL_PK)
@@ -374,7 +372,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         if save:
             self.save()
-        if recurse_upward:
+        if recurse_upward and self.parent_runstep:
             self.parent_runstep.run.finish_recovery(save=save, recurse_upward=True)
 
     @transaction.atomic
