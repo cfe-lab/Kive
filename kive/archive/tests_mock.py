@@ -1,6 +1,6 @@
 from unittest.case import TestCase
 
-from mock import PropertyMock, Mock, patch
+from mock import Mock
 
 from kive.mock_setup import mock_relations  # Import before any Django models
 from django_mock_queries.query import MockSet
@@ -9,19 +9,19 @@ from django.utils import timezone
 
 from archive.models import Run, RunState, RunStep, RunOutputCable
 from constants import runstates, runcomponentstates
+from kive.mock_setup import mocked_relations
 
 
 class RunStateMockTests(TestCase):
-
+    @mocked_relations(Run, RunState)
     def test_stop_running(self):
         """
         Test that a Run properly transitions from Running to Successful when stopped.
         """
-        with mock_relations(Run, RunState):
-            RunState.objects = MockSet(RunState(id=runstates.RUNNING_PK), RunState(id=runstates.SUCCESSFUL_PK))
-            run = Run(_runstate_id=runstates.RUNNING_PK)
-            run.stop()
-            self.assertEqual(runstates.SUCCESSFUL_PK, run._runstate_id)
+        RunState.objects = MockSet(RunState(id=runstates.RUNNING_PK), RunState(id=runstates.SUCCESSFUL_PK))
+        run = Run(_runstate_id=runstates.RUNNING_PK)
+        run.stop()
+        self.assertEqual(runstates.SUCCESSFUL_PK, run._runstate_id)
 
     def test_stop_running_quarantined_step(self):
         """
@@ -439,7 +439,7 @@ class RunStateMockTests(TestCase):
             self.assertEqual(runstates.SUCCESSFUL_PK, run._runstate_id)
             run.parent_runstep.run.attempt_decontamination.assert_not_called()
 
-    def test_attempt_decontamination_recurse_upward_parent_run_not_quarantined(self):
+    def test_attempt_decontamination_recurse_upward_parent_run_not_quarantined2(self):
         """
         Test that decontamination recurses upward properly.
         """
