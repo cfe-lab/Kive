@@ -166,7 +166,6 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     _successful = models.NullBooleanField(
         help_text="Denotes whether this has been successful. Private use only!")
 
-
     # Implicitly, this also has start_time and end_time through inheritance.
 
     def is_stopped(self):
@@ -304,7 +303,21 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         assert self._runstate_id in [runstates.RUNNING_PK, runstates.CANCELLING_PK, runstates.FAILING_PK]
         if self._runstate_id == runstates.RUNNING_PK:
-            self._runstate = RunState.objects.get(pk=runstates.SUCCESSFUL_PK)
+            # Check that there are no quarantined components.  We don't need to
+            # recurse down into sub-run, because the cases where a sub-component gets
+            # quarantined are:
+            # - while the sub-Run is still in progress;
+            #   then it will be quarantined/failed/cancelled on its call to stop().
+            # - when the sub-Run is finished and successful;
+            #   then it will have already been quarantined.
+            # - when the sub-Run is failed/cancelled;
+            #   then any ancestor runs (including this one) should already be
+            #   Cancelling or Failing.
+            if (self.runsteps.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK).exists() or
+                    self.runoutputcables.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK).exists()):
+                self._runstate = RunState.objects.get(pk=runstates.QUARANTINED_PK)
+            else:
+                self._runstate = RunState.objects.get(pk=runstates.SUCCESSFUL_PK)
         elif self._runstate_id == runstates.CANCELLING_PK:
             self._runstate = RunState.objects.get(pk=runstates.CANCELLED_PK)
         else:
@@ -387,7 +400,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         # Quarantine all ancestor runs.
         if recurse_upward and self.parent_runstep is not None and self.parent_runstep.run.is_successful():
-            self.parent_run.quarantine(save=save, recurse_upward=True)
+            self.parent_runstep.run.quarantine(save=save, recurse_upward=True)
 
     @transaction.atomic
     def attempt_decontamination(self, save=True, recurse_upward=False):
@@ -396,12 +409,12 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         Optionally, attempt to decontaminate ancestor runs that are quarantined.
         """
-        assert self._runstate.pk == runstates.QUARANTINED_PK
+        assert self.is_quarantined()
 
         # Look for components that are quarantined.
-        if self.runsteps.filter(_runcomponentstate__pk=runcomponentstates.QUARANTINED_PK).exists():
+        if self.runsteps.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK).exists():
             return
-        elif self.runoutputcables.filter(_runcomponentstate__pk=runcomponentstates.QUARANTINED_PK).exists():
+        elif self.runoutputcables.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK).exists():
             return
 
         self._runstate = RunState.objects.get(pk=runstates.SUCCESSFUL_PK)
@@ -409,8 +422,8 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             self.save()
 
         # Quarantine all ancestor runs.
-        if recurse_upward and self.parent_run.is_quarantined():
-            self.parent_run.attempt_decontamination(save=save, recurse_upward=True)
+        if recurse_upward and self.parent_runstep and self.parent_runstep.run.is_quarantined():
+            self.parent_runstep.run.attempt_decontamination(save=save, recurse_upward=True)
 
     @classmethod
     def find_unstarted(cls):
