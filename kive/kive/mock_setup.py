@@ -74,20 +74,22 @@ def mock_relations(*models):
                 del model.old_relations
 
 
-def mocked_relations(target, *models):
+def mocked_relations(*models):
     """ A decorator version of mock_relations.
 
     This can decorate a method or a class. Decorating a class is equivalent to
     decorating all the methods whose names start with "test_".
     """
-    if isinstance(target, type):
-        for attr in dir(target):
-            if attr.startswith('test_'):
-                original_method = getattr(target, attr)
-                setattr(target, attr, mocked_relations(original_method, *models))
-        return target
+    def decorator(target):
+        if isinstance(target, type):
+            for attr in dir(target):
+                if attr.startswith('test_'):
+                    original_method = getattr(target, attr)
+                    setattr(target, attr, mocked_relations(original_method, *models))
+            return target
 
-    def wrapped(*args, **kwargs):
-        with mock_relations(*models):
-            return target(*args, **kwargs)
-    return wrapped
+        def wrapped(*args, **kwargs):
+            with mock_relations(*models):
+                return target(*args, **kwargs)
+        return wrapped
+    return decorator
