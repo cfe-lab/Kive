@@ -101,8 +101,7 @@ Tom,15
 
             self.assertEqual(expected_rows, rows)
 
-    @patch('librarian.models.Dataset.structure')
-    def test_rows_with_error_after_limit(self, mock_structure):
+    def test_rows_with_error_after_limit(self):
         data_file = dummy_file("""\
 name,count
 Bob,20
@@ -119,6 +118,8 @@ Jim,th1rty
             (bad_row, [('Jim', []), ('th1rty', [u'Was not integer'])])]
 
         with mock_relations(Dataset):
+            mock_structure = Mock(name='Dataset.structure')
+            Dataset.structure = mock_structure
             int_datatype = Datatype(id=datatypes.INT_PK)
             count_column = CompoundDatatypeMember(id=count_column_id,
                                                   column_idx=bad_column,
@@ -180,10 +181,11 @@ Dave,40
 
             self.assertEqual(expected_rows, rows)
 
-    @patch('librarian.models.Dataset.structure')
-    def test_check_file_contents(self, mock_structure):
+    def test_check_file_contents(self):
         file_path = os.devnull
         with mock_relations(Dataset, BadData):
+            mock_structure = Mock(name='Dataset.structure')
+            Dataset.structure = mock_structure
             expected_bad_data = BadData.objects.create.return_value  # @UndefinedVariable
             Dataset.content_checks = Mock(name='Dataset.content_checks')
             expected_check = Dataset.content_checks.create.return_value  # @UndefinedVariable

@@ -97,7 +97,7 @@ class Transformation(metadata.models.AccessControl):
         """Is this a Pipeline, as opposed to a Method?"""
         try:
             self.pipeline
-        except Transformation.DoesNotExist:
+        except ObjectDoesNotExist:
             return False
         return True
 

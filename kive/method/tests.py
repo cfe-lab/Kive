@@ -34,7 +34,6 @@ from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
 import portal.models
 import kive.testing_utils as tools
 from fleet.workers import Manager
-from transformation.models import Transformation
 from portal.utils import update_all_contenttypes
 
 
@@ -704,22 +703,6 @@ class MethodTests(MethodTestCase):
         driver = CodeResourceRevision.objects.first()
         m = Method.create(names, compounddatatypes=cdts, num_inputs=1, family=family, driver=driver, user=self.myUser)
         self.assertIsNone(m.complete_clean())
-
-    def test_find_update_not_found(self):
-        update = self.RNAcompv2_m.find_update()
-
-        self.assertEqual(update, None)
-
-    def test_find_update(self):
-        update = self.RNAcompv1_m.find_update()
-
-        self.assertEqual(update, self.RNAcompv2_m)
-
-    def test_find_update_not_found_from_transformation(self):
-        transformation = Transformation.objects.get(pk=self.RNAcompv2_m.pk)
-        update = transformation.find_update()
-
-        self.assertEqual(update, None)
 
     def test_dependency_depends_on_nothing_clean_good(self):
         self.test_dep_method.clean()

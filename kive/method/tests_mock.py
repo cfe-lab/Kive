@@ -10,6 +10,7 @@ from method.models import Method, MethodFamily, CodeResourceRevision,\
 from transformation.models import TransformationInput, TransformationOutput,\
     XputStructure, Transformation
 from django.contrib.auth.models import User
+from pipeline.models import Pipeline
 
 
 @mocked_relations(Method, Transformation, TransformationInput, TransformationOutput)
@@ -290,8 +291,19 @@ class MethodMockTests(TestCase):
                                   min_row=min_row,
                                   max_row=max_row)
         parent = self.create_parent()
-        parent.inputs.get(dataset_idx=2).structure = structure
-        parent.outputs.get(dataset_idx=1).structure = structure
+
+        def get_input_structure(self):
+            if self.dataset_idx == 2:
+                return structure
+            raise XputStructure.DoesNotExist
+
+        def get_output_structure(self):
+            if self.dataset_idx == 1:
+                return structure
+            raise XputStructure.DoesNotExist
+
+        TransformationInput.structure = property(get_input_structure)
+        TransformationOutput.structure = property(get_output_structure)
         expected_inputs = {inp.dataset_idx for inp in parent.inputs}
         expected_outputs = {out.dataset_idx for out in parent.outputs}
 
@@ -303,6 +315,7 @@ class MethodMockTests(TestCase):
         self.assertEqual(expected_outputs,
                          {out.dataset_idx for out in foo.outputs})
         create_args = XputStructure.objects.create.call_args_list  # @UndefinedVariable
+        self.assertEqual(2, len(create_args))
         _args, kwargs = create_args[0]
         self.assertEqual(100, kwargs['max_row'])
 
@@ -427,3 +440,37 @@ class MethodMockTests(TestCase):
             out.transformationoutput = out
 
         self.assertFalse(m1.is_identical(m2))
+
+
+@mocked_relations(Method, MethodFamily)
+class MethodUpdateMockTests(TestCase):
+    def setUp(self):
+        self.family = MethodFamily()
+        self.old_method = self.family.members.create(family=self.family,
+                                                     revision_number=1,
+                                                     id=101)
+        self.old_method.method = self.old_method
+
+        self.new_method = self.family.members.create(family=self.family,
+                                                     revision_number=2,
+                                                     id=102)
+        self.new_method.method = self.new_method
+
+    def test_find_update_not_found(self):
+        update = self.new_method.find_update()
+
+        self.assertEqual(None, update)
+
+    def test_find_update(self):
+        update = self.old_method.find_update()
+
+        self.assertEqual(self.new_method, update)
+
+    @mocked_relations(Pipeline, Transformation)
+    def test_find_update_not_found_from_transformation(self):
+        del Transformation.method
+        transformation = Transformation(id=self.new_method.id)
+        transformation.method = self.new_method
+        update = transformation.find_update()
+
+        self.assertEqual(update, None)
