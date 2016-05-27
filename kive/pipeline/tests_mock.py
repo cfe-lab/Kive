@@ -61,13 +61,11 @@ class PipelineMockTests(TestCase):
         with mock_relations(Pipeline):
             p = Pipeline(family=PipelineFamily())
             self.add_inputs(p,
-                            TransformationInput(dataset_idx=1),
                             TransformationInput(dataset_idx=2),
+                            TransformationInput(dataset_idx=1),
                             TransformationInput(dataset_idx=3))
 
             p.clean()
-
-            p.inputs.order_by.assert_called_once_with('dataset_idx')
 
     def test_pipeline_many_invalid_inputs_clean(self):
         """A Pipeline with multiple, badly indexed inputs is not clean."""
@@ -119,13 +117,11 @@ class PipelineMockTests(TestCase):
             m = Method()
             self.add_inputs(m,
                             TransformationInput(dataset_idx=1))
-            p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=1))
             p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=2))
+            p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=1))
             p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=3))
-            p.steps.order_by.return_value = p.steps.all()
 
             p.clean()
-            p.steps.order_by.assert_called_once_with('step_num')
 
     def test_pipeline_many_invalid_steps_clean(self):
         """Test step index check, badly-indexed multi-step case."""
@@ -139,7 +135,6 @@ class PipelineMockTests(TestCase):
             p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=1))
             p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=4))
             p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=5))
-            p.steps.order_by = p.steps.all
 
             self.assertRaisesRegexp(
                     ValidationError,
@@ -198,7 +193,6 @@ class PipelineMockTests(TestCase):
 
             step1 = PipelineStep(pipeline=p, transformation=m, step_num=1)
             p.steps.add(step1)
-            p.steps.order_by = p.steps.all
 
             cable = PipelineStepInputCable(pipelinestep=step1,
                                            source_step=0,
@@ -752,7 +746,6 @@ class PipelineMockTests(TestCase):
 
             step1 = PipelineStep(pipeline=p, transformation=m, step_num=1)
             p.steps.add(step1)
-            p.steps.order_by = p.steps.all
 
             cable = PipelineStepInputCable(pipelinestep=step1,
                                            source_step=0,
@@ -768,7 +761,6 @@ class PipelineMockTests(TestCase):
                 source=m.outputs.all()[0],
                 output_cdt=m.outputs.all()[0].get_cdt())
             p.outcables.add(outcable)
-            p.outcables.order_by = p.outcables.all
 
             yield p
 
@@ -822,30 +814,23 @@ class PipelineMockTests(TestCase):
             for datatype_id in column_datatype_ids:
                 cdt.members.add(CompoundDatatypeMember(
                     datatype=Datatype(id=datatype_id)))
-            cdt.members.order_by = cdt.members.all
             xput.structure = XputStructure(compounddatatype=cdt)
 
     def add_inputs(self, transformation, *inputs):
         """ Wire up the inputs to a mocked transformation.
-
-        Also make order_by() return them in the given order.
         """
         for t_input in inputs:
             t_input.transformationinput = t_input
             t_input.transformation = transformation
             transformation.inputs.add(t_input)
-        transformation.inputs.order_by.return_value = transformation.inputs.all()
 
     def add_outputs(self, transformation, *outputs):
         """ Wire up the outputs to a mocked transformation.
-
-        Also make order_by() return them in the given order.
         """
         for t_output in outputs:
             t_output.transformationoutput = t_output
             t_output.transformation = transformation
             transformation.outputs.add(t_output)
-        transformation.outputs.order_by.return_value = transformation.outputs.all()
 
 
 class PipelineUpdateMockTests(TestCase):

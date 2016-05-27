@@ -497,22 +497,22 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                     dataset_name=parent_input.dataset_name,
                     dataset_idx=parent_input.dataset_idx)
                 if not parent_input.is_raw():
-                    transformation.models.XputStructure(
+                    transformation.models.XputStructure.objects.create(
                         transf_xput=new_input,
                         compounddatatype=parent_input.get_cdt(),
                         min_row=parent_input.get_min_row(),
-                        max_row=parent_input.get_max_row()).save()
+                        max_row=parent_input.get_max_row())
 
             for parent_output in self.revision_parent.outputs.all():
                 new_output = self.outputs.create(
                     dataset_name=parent_output.dataset_name,
                     dataset_idx=parent_output.dataset_idx)
                 if not parent_output.is_raw():
-                    transformation.models.XputStructure(
+                    transformation.models.XputStructure.objects.create(
                         transf_xput=new_output,
                         compounddatatype=parent_output.get_cdt(),
                         min_row=parent_output.get_min_row(),
-                        max_row=parent_output.get_max_row()).save()
+                        max_row=parent_output.get_max_row())
 
     def _poll_stream(self, source_stream, source_name, dest_streams):
         """ Redirect all input from source_stream to all the dest_streams
@@ -802,7 +802,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
     def is_identical(self, other):
         """Is this Method identical to another one?"""
-        return self.driver == other.driver and super(Method, self).is_identical(super(Method, other))
+        return self.driver == other.driver and super(Method, self).is_identical(other)
 
     @transaction.atomic
     def remove(self):

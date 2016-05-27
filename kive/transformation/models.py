@@ -336,7 +336,10 @@ class TransformationXput(models.Model):
             self.structure.clean()
 
     def __str__(self):
-        return "{}: {}".format(self.definite.dataset_idx, self.definite.dataset_name)
+        if self.is_input or self.is_output:
+            return "{}: {}".format(self.definite.dataset_idx,
+                                   self.definite.dataset_name)
+        return 'TransformationXput(id={})'.format(self.id)
 
     @property
     def compounddatatype(self):

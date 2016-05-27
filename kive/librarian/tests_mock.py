@@ -1,13 +1,13 @@
 import os
 from unittest.case import TestCase
 
-from mock import PropertyMock, Mock
+from mock import PropertyMock, Mock, patch
 
 from kive.mock_setup import mock_relations  # Import before any Django models
 from constants import datatypes
 from datachecking.models import BadData, CellError
 from kive.tests import dummy_file
-from librarian.models import Dataset, ExecRecord
+from librarian.models import Dataset
 from metadata.models import Datatype, CompoundDatatypeMember
 
 
@@ -101,7 +101,8 @@ Tom,15
 
             self.assertEqual(expected_rows, rows)
 
-    def test_rows_with_error_after_limit(self):
+    @patch('librarian.models.Dataset.structure')
+    def test_rows_with_error_after_limit(self, mock_structure):
         data_file = dummy_file("""\
 name,count
 Bob,20
@@ -125,7 +126,7 @@ Jim,th1rty
             str_datatype = Datatype(id=datatypes.STR_PK)
             name_column = CompoundDatatypeMember(id=name_column_id,
                                                  datatype=str_datatype)
-            compound_datatype = Dataset.structure.compounddatatype  # @UndefinedVariable
+            compound_datatype = mock_structure.compounddatatype
             compound_datatype.members.all.return_value = [count_column, name_column]
             extra_cell_errors = [{'column_id': count_column_id,
                                   'row_num__min': bad_row}]
@@ -179,7 +180,8 @@ Dave,40
 
             self.assertEqual(expected_rows, rows)
 
-    def test_check_file_contents(self):
+    @patch('librarian.models.Dataset.structure')
+    def test_check_file_contents(self, mock_structure):
         file_path = os.devnull
         with mock_relations(Dataset, BadData):
             expected_bad_data = BadData.objects.create.return_value  # @UndefinedVariable
@@ -188,7 +190,7 @@ Dave,40
             expected_bad_row = 42
             expected_bad_column = 2
             count_column = CompoundDatatypeMember()
-            compound_datatype = Dataset.structure.compounddatatype  # @UndefinedVariable
+            compound_datatype = mock_structure.compounddatatype
             compound_datatype.members.get.return_value = count_column
             compound_datatype.summarize_CSV.return_value = {
                 u'num_rows': expected_bad_row * 2,
