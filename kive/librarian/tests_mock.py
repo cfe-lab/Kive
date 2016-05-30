@@ -4,11 +4,11 @@ from unittest import skip
 
 from django.utils import timezone
 
-from mock import PropertyMock, Mock, patch
+from mock import PropertyMock, Mock
 
 from kive.mock_setup import mock_relations, mocked_relations  # Import before any Django models
 from constants import datatypes, runcomponentstates
-from datachecking.models import BadData, CellError
+from datachecking.models import BadData, CellError, ContentCheckLog
 from kive.tests import dummy_file
 from librarian.models import Dataset, ExecRecord, ExecRecordOut
 from metadata.models import Datatype, CompoundDatatypeMember
@@ -25,10 +25,10 @@ Dave,40
         expected_rows = [[('Bob', []), ('20', [])],
                          [('Dave', []), ('40', [])]]
 
-        with mock_relations(Dataset):
+        with mock_relations(Dataset, ContentCheckLog):
             dataset = Dataset()
             dataset.get_open_file_handle = lambda: data_file
-            expected_check = Dataset.content_checks.first.return_value  # @UndefinedVariable
+            expected_check = dataset.content_checks.create()
             type(expected_check).baddata = PropertyMock(side_effect=BadData.DoesNotExist)
 
             rows = list(dataset.rows(data_check=True))
@@ -44,10 +44,10 @@ Dave,40
         expected_rows = [[('', []), ('', []), ('Bob', []), ('20', [])],
                          [('', []), ('', []), ('Dave', []), ('40', [])]]
 
-        with mock_relations(Dataset):
+        with mock_relations(Dataset, ContentCheckLog):
             dataset = Dataset()
             dataset.get_open_file_handle = lambda: data_file
-            expected_check = Dataset.content_checks.first.return_value  # @UndefinedVariable
+            expected_check = dataset.content_checks.create()
             type(expected_check).baddata = PropertyMock(side_effect=BadData.DoesNotExist)
 
             rows = list(dataset.rows(data_check=True, insert_at=[0, 1]))
@@ -66,14 +66,15 @@ Tom,15
                          [('Dave', []), ('40', [])],
                          [('Tom', []), ('15', [])]]
 
-        with mock_relations(Dataset):
+        with mock_relations(Dataset, ContentCheckLog):
             int_datatype = Datatype(id=datatypes.INT_PK)
             count_column = CompoundDatatypeMember(column_idx=bad_column,
                                                   datatype=int_datatype)
             cell_error = CellError(column=count_column, row_num=bad_row)
             dataset = Dataset()
             dataset.get_open_file_handle = lambda: data_file
-            expected_check = Dataset.content_checks.first.return_value  # @UndefinedVariable
+            expected_check = dataset.content_checks.create()
+            ContentCheckLog.baddata = PropertyMock()
             expected_check.baddata.cell_errors.order_by.return_value = [cell_error]
 
             rows = list(dataset.rows(data_check=True))
@@ -91,14 +92,15 @@ Tom,15
         expected_rows = [[('Bob', []), ('tw3nty', [u'Was not integer'])],
                          [('Dave', []), ('40', [])]]
 
-        with mock_relations(Dataset):
+        with mock_relations(Dataset, ContentCheckLog):
             int_datatype = Datatype(id=datatypes.INT_PK)
             count_column = CompoundDatatypeMember(column_idx=bad_column,
                                                   datatype=int_datatype)
             cell_error = CellError(column=count_column, row_num=bad_row)
             dataset = Dataset()
             dataset.get_open_file_handle = lambda: data_file
-            expected_check = Dataset.content_checks.first.return_value  # @UndefinedVariable
+            expected_check = dataset.content_checks.create()
+            ContentCheckLog.baddata = PropertyMock()
             expected_check.baddata.cell_errors.order_by.return_value.filter.return_value = [cell_error]
 
             rows = list(dataset.rows(data_check=True, limit=2))
@@ -121,7 +123,7 @@ Jim,th1rty
         expected_extra_errors = [
             (bad_row, [('Jim', []), ('th1rty', [u'Was not integer'])])]
 
-        with mock_relations(Dataset):
+        with mock_relations(Dataset, ContentCheckLog):
             mock_structure = Mock(name='Dataset.structure')
             Dataset.structure = mock_structure
             int_datatype = Datatype(id=datatypes.INT_PK)
@@ -137,7 +139,8 @@ Jim,th1rty
                                   'row_num__min': bad_row}]
             dataset = Dataset()
             dataset.get_open_file_handle = lambda: data_file
-            expected_check = Dataset.content_checks.first.return_value  # @UndefinedVariable
+            expected_check = dataset.content_checks.create()
+            ContentCheckLog.baddata = PropertyMock()
             expected_check.baddata.cell_errors.order_by.return_value.filter.return_value = []
             expected_check.baddata.cell_errors.values.return_value.\
                 annotate.return_value.order_by.return_value = extra_cell_errors

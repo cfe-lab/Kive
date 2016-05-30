@@ -138,10 +138,24 @@ def _exclude(mock_set, *args, **kwargs):
     return MockSet(*remainder)
 
 
+def _first(mock_set):
+    for item in mock_set.all():
+        return item
+    return None
+
+
+def _last(mock_set):
+    for item in reversed(mock_set.all()):
+        return item
+    return None
+
+
 def _wrap_mock_set(*args, **kwargs):
     mock_set = OriginalMockSet(*args, **kwargs)
     mock_set.order_by = partial(_order_by, mock_set)
     mock_set.exclude = partial(_exclude, mock_set)
+    mock_set.first = partial(_first, mock_set)
+    mock_set.last = partial(_last, mock_set)
     return mock_set
 
 if MockSet is None:
