@@ -1592,7 +1592,7 @@ class ExecRecord(models.Model):
         """
         Quarantine RunComponents that used this ExecRecord.
         """
-        for rc in self.used_by_components.filter(_runcomponentstate__pk=runcomponentstates.SUCCESSFUL_PK):
+        for rc in self.used_by_components.filter(_runcomponentstate_id=runcomponentstates.SUCCESSFUL_PK):
             rc.quarantine(save=True, recurse_upward=True)
 
     @transaction.atomic
@@ -1600,7 +1600,7 @@ class ExecRecord(models.Model):
         """
         Decontaminate RunComponents that used this ExecRecord.
         """
-        for rc in self.used_by_components.filter(_runcomponentstate__pk=runcomponentstates.QUARANTINED_PK):
+        for rc in self.used_by_components.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK):
             rc.decontaminate(save=True, recurse_upward=True)
 
     @transaction.atomic
@@ -1618,14 +1618,15 @@ class ExecRecord(models.Model):
 
         last_rc = self.used_by_components.filter(
             log__isnull=False,
-            _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
+            _runcomponentstate_id__in=runcomponentstates.COMPLETE_STATE_PKS
         ).order_by("-end_time").first()
+        print "FOO {}".format(last_rc)
         if not last_rc.log.is_successful():
+            print "BAR"
             return
 
         # Having reached here, we now know that the ExecRecord can be decontaminated.
-        for rc in self.used_by_components.filter(_runcomponentstate__pk=runcomponentstates.QUARANTINED_PK):
-            rc.decontaminate(save=True, recurse_upward=True)
+        self.decontaminate_runcomponents()
 
 
 @python_2_unicode_compatible
