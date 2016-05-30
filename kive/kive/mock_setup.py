@@ -132,9 +132,16 @@ def _order_by(mock_set, attr):
     return MockSet(*ordered)
 
 
+def _exclude(mock_set, *args, **kwargs):
+    matches = mock_set.filter(*args, **kwargs)
+    remainder = [item for item in mock_set.all() if item not in matches]
+    return MockSet(*remainder)
+
+
 def _wrap_mock_set(*args, **kwargs):
     mock_set = OriginalMockSet(*args, **kwargs)
     mock_set.order_by = partial(_order_by, mock_set)
+    mock_set.exclude = partial(_exclude, mock_set)
     return mock_set
 
 if MockSet is None:
