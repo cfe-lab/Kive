@@ -782,7 +782,8 @@ class Manager(object):
             # Send messages to the foremen in charge of running this run's task.
             # We don't bother to do anything with the results.  Everything gets cancelled
             # even if it returned successfully or unsuccessfully.
-            for foreman in self.tasks_in_progress:
+            foremen = self.tasks_in_progress.keys()
+            for foreman in foremen:
                 if self.tasks_in_progress[foreman]["task"].top_level_run == run:
                     curr_task_in_progress = self.tasks_in_progress.pop(foreman)
                     self.interface.stop_run(foreman)
