@@ -126,6 +126,7 @@ def mocked_relations(*models):
     return decorator
 
 
+# TODO: remove when django_mock_queries is updated
 def _order_by(mock_set, attr):
     records = mock_set.all()
     core_attr = attr[1:] if attr.startswith('-') else attr
@@ -135,6 +136,7 @@ def _order_by(mock_set, attr):
     return MockSet(*ordered)
 
 
+# TODO: remove when django_mock_queries is updated
 def _exclude(mock_set, *args, **kwargs):
     matches = mock_set.filter(*args, **kwargs)
     remainder = [item for item in mock_set.all() if item not in matches]
