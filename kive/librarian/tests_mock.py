@@ -1,10 +1,9 @@
 import os
 from unittest.case import TestCase
-from unittest import skip
 
 from django.utils import timezone
 
-from mock import PropertyMock, Mock
+from mock import PropertyMock, Mock, patch
 
 from kive.mock_setup import mock_relations, mocked_relations  # Import before any Django models
 from constants import datatypes, runcomponentstates
@@ -272,8 +271,9 @@ class ExecRecordQuarantineDecontaminateMockTests(TestCase):
         rs2.decontaminate.assert_not_called()
         rs3.decontaminate.assert_called_once_with(save=True, recurse_upward=True)
 
-    @skip("broken MockSet")
-    def test_attempt_decontamination(self):
+    @patch('archive.models.ExecLog.is_successful')
+    @patch('librarian.models.ExecRecord.decontaminate_runcomponents')
+    def test_attempt_decontamination(self, mock_decontaminate, mock_is_successful):
         """
         ExecRecord correctly decontaminates all RunComponents using it.
         """
@@ -300,19 +300,19 @@ class ExecRecordQuarantineDecontaminateMockTests(TestCase):
         rs3 = RunStep(execrecord=er, _runcomponentstate_id=runcomponentstates.SUCCESSFUL_PK,
                       end_time=timezone.now())
         rs3.log = ExecLog(record=rs3)
-        rs3.log.is_successful = Mock(return_value=True)
+        mock_is_successful.return_value = True
         er.used_by_components.add(rs1, rs2, rs3)
-
-        er.decontaminate_runcomponents = Mock()
 
         er.attempt_decontamination(ds1)
         ero1.is_OK.assert_not_called()
         ero2.is_OK.assert_called_once_with()
         ero3.is_OK.assert_called_once_with()
-        rs3.log.is_successful.assert_called_once_with()
-        er.decontaminate_runcomponents.assert_called_once_with()
+        mock_is_successful.assert_called_once_with()
+        mock_decontaminate.assert_called_once_with()
 
-    def test_attempt_decontamination_still_has_bad_outputs(self):
+    @patch('archive.models.ExecLog.is_successful')
+    @patch('librarian.models.ExecRecord.decontaminate_runcomponents')
+    def test_attempt_decontamination_still_has_bad_outputs(self, mock_decontaminate, mock_is_successful):
         """
         Attempt bails if another output is still bad.
         """
@@ -339,16 +339,12 @@ class ExecRecordQuarantineDecontaminateMockTests(TestCase):
         rs3 = RunStep(execrecord=er, _runcomponentstate_id=runcomponentstates.SUCCESSFUL_PK,
                       end_time=timezone.now())
         rs3.log = ExecLog(record=rs3)
-        rs3.log.is_successful = Mock(return_value=True)
         er.used_by_components.add(rs1, rs2, rs3)
 
-        er.decontaminate_runcomponents = Mock()
-
         er.attempt_decontamination(ds1)
-        rs3.log.is_successful.assert_not_called()
-        er.decontaminate_runcomponents.assert_not_called()
+        mock_is_successful.assert_not_called()
+        mock_decontaminate.assert_not_called()
 
-    @skip("broken MockSet")
     def test_attempt_decontamination_last_log_unsuccessful(self):
         """
         Attempt bails if the last using component is not successful.

@@ -1620,9 +1620,7 @@ class ExecRecord(models.Model):
             log__isnull=False,
             _runcomponentstate_id__in=runcomponentstates.COMPLETE_STATE_PKS
         ).order_by("-end_time").first()
-        print "FOO {}".format(last_rc)
         if not last_rc.log.is_successful():
-            print "BAR"
             return
 
         # Having reached here, we now know that the ExecRecord can be decontaminated.

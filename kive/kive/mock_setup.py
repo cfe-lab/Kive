@@ -145,9 +145,10 @@ def _first(mock_set):
 
 
 def _last(mock_set):
-    for item in reversed(mock_set.all()):
-        return item
-    return None
+    last_item = None
+    for item in mock_set.all():
+        last_item = item
+    return last_item
 
 
 def _wrap_mock_set(*args, **kwargs):

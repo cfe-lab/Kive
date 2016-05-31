@@ -17,7 +17,25 @@ then open the source code in a Python IDE. You will also need to install some
 packages to run the tests.
 
     pip install mock
-    pip install django-mock-queries
+
+Our tests use the `django-mock-queries` package, but we needed some extra
+features. We are currently using a forked version with our extra features,
+but hopefully those features will get merged back into the main project after
+we create a pull request. For now, clone our forked version and install it from
+source.
+
+    cd ~/git
+    git clone https://github.com/cfe-lab/django-mock-queries.git
+    sudo python django-mock-queries/setup.py
+
+If you already had the main version installed, uninstall it with pip, and then
+check to see if you need to manually delete the files.
+
+    sudo pip uninstall django-mock-queries
+    locate django_mock_queries/query.py
+    ls /usr/local/lib/python2.7/dist-packages/django_mock_queries
+    sudo rm /usr/local/lib/python2.7.dist-packages/django_mock_queries/*
+    sudo python django-mock-queries/setup.py
 
 If you want to see what's currently being worked on, check out the [waffle board][waffle].
 
