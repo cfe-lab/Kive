@@ -1,9 +1,8 @@
+from datetime import datetime
 import os
 from unittest.case import TestCase
 
-from django.utils import timezone
-
-from mock import PropertyMock, Mock, patch
+from mock import PropertyMock, Mock
 
 from kive.mock_setup import mock_relations, mocked_relations  # Import before any Django models
 from constants import datatypes, runcomponentstates
@@ -271,9 +270,7 @@ class ExecRecordQuarantineDecontaminateMockTests(TestCase):
         rs2.decontaminate.assert_not_called()
         rs3.decontaminate.assert_called_once_with(save=True, recurse_upward=True)
 
-    @patch('archive.models.ExecLog.is_successful')
-    @patch('librarian.models.ExecRecord.decontaminate_runcomponents')
-    def test_attempt_decontamination(self, mock_decontaminate, mock_is_successful):
+    def test_attempt_decontamination(self):
         """
         ExecRecord correctly decontaminates all RunComponents using it.
         """
@@ -292,27 +289,27 @@ class ExecRecordQuarantineDecontaminateMockTests(TestCase):
         er.execrecordouts.add(ero1, ero2, ero3)
 
         rs1 = RunStep(execrecord=er, _runcomponentstate_id=runcomponentstates.QUARANTINED_PK,
-                      end_time=timezone.now())
+                      end_time=datetime(2000, 2, 14))
         rs1.log = ExecLog(record=rs1)
         rs2 = RunStep(execrecord=er, _runcomponentstate_id=runcomponentstates.QUARANTINED_PK,
-                      end_time=timezone.now())
+                      end_time=datetime(2000, 2, 15))
         rs2.log = ExecLog(record=rs2)
         rs3 = RunStep(execrecord=er, _runcomponentstate_id=runcomponentstates.SUCCESSFUL_PK,
-                      end_time=timezone.now())
+                      end_time=datetime(2000, 2, 16))
         rs3.log = ExecLog(record=rs3)
-        mock_is_successful.return_value = True
+        rs3.log.is_successful = Mock(return_value=True)
         er.used_by_components.add(rs1, rs2, rs3)
+
+        er.decontaminate_runcomponents = Mock()
 
         er.attempt_decontamination(ds1)
         ero1.is_OK.assert_not_called()
         ero2.is_OK.assert_called_once_with()
         ero3.is_OK.assert_called_once_with()
-        mock_is_successful.assert_called_once_with()
-        mock_decontaminate.assert_called_once_with()
+        rs3.log.is_successful.assert_called_once_with()
+        er.decontaminate_runcomponents.assert_called_once_with()
 
-    @patch('archive.models.ExecLog.is_successful')
-    @patch('librarian.models.ExecRecord.decontaminate_runcomponents')
-    def test_attempt_decontamination_still_has_bad_outputs(self, mock_decontaminate, mock_is_successful):
+    def test_attempt_decontamination_still_has_bad_outputs(self):
         """
         Attempt bails if another output is still bad.
         """
@@ -331,19 +328,22 @@ class ExecRecordQuarantineDecontaminateMockTests(TestCase):
         er.execrecordouts.add(ero1, ero2, ero3)
 
         rs1 = RunStep(execrecord=er, _runcomponentstate_id=runcomponentstates.QUARANTINED_PK,
-                      end_time=timezone.now())
+                      end_time=datetime(2000, 2, 14))
         rs1.log = ExecLog(record=rs1)
         rs2 = RunStep(execrecord=er, _runcomponentstate_id=runcomponentstates.QUARANTINED_PK,
-                      end_time=timezone.now())
+                      end_time=datetime(2000, 2, 15))
         rs2.log = ExecLog(record=rs2)
         rs3 = RunStep(execrecord=er, _runcomponentstate_id=runcomponentstates.SUCCESSFUL_PK,
-                      end_time=timezone.now())
+                      end_time=datetime(2000, 2, 16))
         rs3.log = ExecLog(record=rs3)
+        rs3.log.is_successful = Mock(return_value=True)
         er.used_by_components.add(rs1, rs2, rs3)
 
+        er.decontaminate_runcomponents = Mock()
+
         er.attempt_decontamination(ds1)
-        mock_is_successful.assert_not_called()
-        mock_decontaminate.assert_not_called()
+        rs3.log.is_successful.assert_not_called()
+        er.decontaminate_runcomponents.assert_not_called()
 
     def test_attempt_decontamination_last_log_unsuccessful(self):
         """
@@ -364,13 +364,13 @@ class ExecRecordQuarantineDecontaminateMockTests(TestCase):
         er.execrecordouts.add(ero1, ero2, ero3)
 
         rs1 = RunStep(execrecord=er, _runcomponentstate_id=runcomponentstates.QUARANTINED_PK,
-                      end_time=timezone.now())
-        rs1.log = ExecLog()
+                      end_time=datetime(2000, 2, 14))
+        rs1.log = ExecLog(record=rs1)
         rs2 = RunStep(execrecord=er, _runcomponentstate_id=runcomponentstates.QUARANTINED_PK,
-                      end_time=timezone.now())
-        rs2.log = ExecLog()
+                      end_time=datetime(2000, 2, 15))
+        rs2.log = ExecLog(record=rs2)
         rs3 = RunStep(execrecord=er, _runcomponentstate_id=runcomponentstates.SUCCESSFUL_PK,
-                      end_time=timezone.now())
+                      end_time=datetime(2000, 2, 16))
         rs3.log = ExecLog()
         rs3.log.is_successful = Mock(return_value=False)
         er.used_by_components.add(rs1, rs2, rs3)

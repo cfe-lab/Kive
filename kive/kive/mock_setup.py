@@ -128,7 +128,10 @@ def mocked_relations(*models):
 
 def _order_by(mock_set, attr):
     records = mock_set.all()
-    ordered = sorted(records, key=lambda r: get_attribute(r, attr))
+    core_attr = attr[1:] if attr.startswith('-') else attr
+    ordered = sorted(records, key=lambda r: get_attribute(r, core_attr))
+    if attr.startswith('-'):
+        ordered = reversed(ordered)
     return MockSet(*ordered)
 
 
