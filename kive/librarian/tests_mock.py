@@ -369,7 +369,7 @@ class ExecRecordQuarantineDecontaminateMockTests(TestCase):
         rs2 = RunStep(execrecord=er, _runcomponentstate_id=runcomponentstates.QUARANTINED_PK,
                       end_time=datetime(2000, 2, 15))
         rs2.log = ExecLog(record=rs2)
-        rs3 = RunStep(execrecord=er, _runcomponentstate_id=runcomponentstates.SUCCESSFUL_PK,
+        rs3 = RunStep(execrecord=er, _runcomponentstate_id=runcomponentstates.FAILED_PK,
                       end_time=datetime(2000, 2, 16))
         rs3.log = ExecLog()
         rs3.log.is_successful = Mock(return_value=False)
@@ -378,5 +378,5 @@ class ExecRecordQuarantineDecontaminateMockTests(TestCase):
         er.decontaminate_runcomponents = Mock()
 
         er.attempt_decontamination(ds1)
-        rs3.log.is_successful.assert_not_called()
+        rs3.log.is_successful.assert_called_once_with()
         er.decontaminate_runcomponents.assert_not_called()
