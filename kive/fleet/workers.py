@@ -377,7 +377,7 @@ class Manager(object):
                                                       max_available=self.max_host_cpus)
             self.mop_up_terminated_sandbox(sandbox)
             task.refresh_from_db()
-            assert task.is_cancelled_FIXME()  # this should happen in mop_up_terminated_sandbox
+            assert task.is_cancelled()  # this should happen in mop_up_terminated_sandbox
             sandbox.run.cancel(save=True)  # transition: Running->Cancelling
 
             # If there is nothing currently running from this Run, we can end it.

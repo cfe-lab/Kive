@@ -491,7 +491,7 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertTrue(run.is_failed())
 
         for cancelled_rs in run.runsteps.exclude(pk=rs.pk):
-            self.assertTrue(cancelled_rs.is_cancelled_FIXME())
+            self.assertTrue(cancelled_rs.is_cancelled())
 
     # FIXME this test revealed issues #534 and #535; when we fix these, revisit this test.
     # def test_filling_in_execrecord_with_incomplete_content_check(self):
@@ -881,7 +881,7 @@ class ExecuteExternalInputTests(ExecuteTestsBase):
         # The run should be cancelled by the first cable.
         self.assertTrue(run.is_cancelled())
         rsic = run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
-        self.assertTrue(rsic.is_cancelled_FIXME())
+        self.assertTrue(rsic.is_cancelled())
         self.assertTrue(hasattr(rsic, "input_integrity_check"))
         self.assertTrue(rsic.input_integrity_check.read_failed)
 

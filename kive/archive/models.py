@@ -159,13 +159,6 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     # State field to avoid the use of is_complete() and is_successful(), which can be slow.
     _runstate = models.ForeignKey(RunState, default=runstates.PENDING_PK, related_name="runs")
 
-    # FIXME remove these once data is migrated.
-    # State fields to avoid the use of is_complete() and is_successful(), which can be slow.
-    _complete = models.NullBooleanField(
-        help_text="Denotes whether this run component has been completed. Private use only")
-    _successful = models.NullBooleanField(
-        help_text="Denotes whether this has been successful. Private use only!")
-
     # Implicitly, this also has start_time and end_time through inheritance.
 
     def is_stopped(self):
@@ -513,7 +506,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                     log_char = ":"
                     step_status = "READY"
 
-            elif step.is_cancelled_FIXME():
+            elif step.is_cancelled():
                 log_char = "x"
                 step_status = "CANCELLED"
 
@@ -567,7 +560,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                         log_char = ":"
                         step_status = "READY"
 
-                elif curr_roc.is_cancelled_FIXME():
+                elif curr_roc.is_cancelled():
                     log_char = "x"
                     step_status = "CANCELLED"
 
@@ -924,20 +917,12 @@ class RunComponent(stopwatch.models.Stopwatch):
     """
     execrecord = models.ForeignKey("librarian.ExecRecord", null=True, blank=True, related_name="used_by_components")
     reused = models.NullBooleanField(help_text="Denotes whether this reuses an ExecRecord", default=None)
-    is_cancelled = models.BooleanField(help_text="Denotes whether this has been cancelled",
-                                       default=False)
 
     # State field to avoid the use of is_complete() and is_successful(), which can be slow.
     # Note that if this is a RunStep and the sub-Run is "Cancelling" or "Failing" that
     # will still count as "Running" here.
     _runcomponentstate = models.ForeignKey(RunComponentState, default=runcomponentstates.PENDING_PK,
                                            related_name="runcomponents")
-
-    # FIXME remove _complete, _successful, is_cancelled after data is migrated
-    _complete = models.NullBooleanField(
-        help_text="Denotes whether this run component has been completed. Private use only")
-    _successful = models.NullBooleanField(
-        help_text="Denotes whether this has been successful. Private use only!")
 
     _redacted = models.NullBooleanField(
         help_text="Denotes whether this has been redacted. Private use only!")
@@ -976,7 +961,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         """
         return self._runcomponentstate.pk == runcomponentstates.SUCCESSFUL_PK
 
-    def is_cancelled_FIXME(self):
+    def is_cancelled(self):
         """
         True if RunComponent is cancelled; False otherwise.
         """
@@ -1510,8 +1495,7 @@ class RunStep(RunComponent):
     @transaction.atomic
     def create(cls, pipelinestep, run, start=True):
         """Create a new RunStep from a PipelineStep."""
-        runstep = cls(pipelinestep=pipelinestep, run=run, _complete=False,
-                      _successful=True)
+        runstep = cls(pipelinestep=pipelinestep, run=run)
         if start:
             runstep.start()
         runstep.clean()

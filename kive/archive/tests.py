@@ -3313,7 +3313,7 @@ year,month,day,hour,minute,second,microsecond
 
         # run2_step1 is failed, run2_step2 is cancelled.
         self.assertTrue(run2_step1.is_failed())
-        self.assertTrue(run2_step2.is_cancelled_FIXME())
+        self.assertTrue(run2_step2.is_cancelled())
         self.assertTrue(run2.is_failed())
 
         # Run 2 is failed, run 1 is quarantined, and run1_step1 is quarantined.
@@ -3431,7 +3431,7 @@ with open(sys.argv[2], "wb") as f:
         self.assertTrue(run2_step2_RSIC.is_quarantined())
 
         # run2_step2, the recovering step, should be cancelled.
-        self.assertTrue(run2_step2.is_cancelled_FIXME())
+        self.assertTrue(run2_step2.is_cancelled())
 
         self.assertFalse(run2_step2.has_log)
         self.assertEquals(run2_step2.invoked_logs.count(), 2)
@@ -4209,7 +4209,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in self.running:
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for run in self.running_runs:
             run.refresh_from_db()
@@ -4217,7 +4217,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in self.pending:
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for run in self.pending_runs:
             run.refresh_from_db()
@@ -4242,7 +4242,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in set(self.running) - set(exempted):
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for rc in exempted:
             rc.refresh_from_db()
@@ -4258,7 +4258,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in self.pending:
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for run in self.pending_runs:
             run.refresh_from_db()
@@ -4283,7 +4283,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in set(self.running) - set(exempted):
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for rc in exempted:
             rc.refresh_from_db()
@@ -4299,7 +4299,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in self.pending:
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for run in self.pending_runs:
             run.refresh_from_db()
@@ -4329,7 +4329,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in set(self.running) - set(exempted):
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for rc in exempted:
             rc.refresh_from_db()
@@ -4345,7 +4345,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in self.pending:
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for run in self.pending_runs:
             run.refresh_from_db()

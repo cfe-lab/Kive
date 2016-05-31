@@ -699,7 +699,7 @@ class Sandbox:
 
             # If the step we just started is for a Method, and it was successfully reused, then we add its step
             # number to the list of those just completed.  This may then allow subsequent steps to also be started.
-            if curr_RS.is_cancelled_FIXME():
+            if curr_RS.is_cancelled():
                 # If the RunStep is cancelled after reuse, that means that one of
                 # its input cables failed on reuse, or a cable cancelled because it
                 # was unable to copy a file into the sandbox.
@@ -907,7 +907,7 @@ class Sandbox:
         except Sandbox.RunInputEmptyException:
             # This should have been cancelled already.
             curr_record.refresh_from_db()
-            assert curr_record.is_cancelled_FIXME()
+            assert curr_record.is_cancelled()
             curr_record.complete_clean()
 
             # Mark exec_info as cancelled.
