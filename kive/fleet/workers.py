@@ -915,8 +915,7 @@ class Manager(object):
         """
         name = name or ""
         description = description or ""
-        run = pipeline.pipeline_instances.create(user=user, _complete=False, _successful=True,
-                                                 name=name, description=description)
+        run = pipeline.pipeline_instances.create(user=user, name=name, description=description)
         users_allowed = users_allowed or []
         groups_allowed = groups_allowed or []
         run.users_allowed.add(*users_allowed)

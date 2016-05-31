@@ -3979,8 +3979,6 @@ class CancelComponentsTests(TestCase):
         # Start an instance of the top-level Pipeline.
         self.nested_run = self.p_top.pipeline_instances.create(
             user=self.user,
-            _complete=False,
-            _successful=True,
             name="FakeRun",
             description="Dummy run used for testing cancel_unfinished and cancel_unstarted."
         )

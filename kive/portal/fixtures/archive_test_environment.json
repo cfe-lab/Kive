@@ -387,13 +387,10 @@
     }, 
     {
         "fields": {
-            "_complete": null, 
             "_redacted": null, 
             "_runcomponentstate": 1, 
-            "_successful": null, 
             "end_time": null, 
             "execrecord": 1, 
-            "is_cancelled": false, 
             "reused": false, 
             "start_time": null
         }, 
@@ -402,13 +399,10 @@
     }, 
     {
         "fields": {
-            "_complete": null, 
             "_redacted": null, 
             "_runcomponentstate": 1, 
-            "_successful": null, 
             "end_time": null, 
             "execrecord": 2, 
-            "is_cancelled": false, 
             "reused": false, 
             "start_time": null
         }, 
@@ -417,13 +411,10 @@
     }, 
     {
         "fields": {
-            "_complete": null, 
             "_redacted": null, 
             "_runcomponentstate": 1, 
-            "_successful": null, 
             "end_time": null, 
             "execrecord": 3, 
-            "is_cancelled": false, 
             "reused": false, 
             "start_time": null
         }, 
@@ -675,18 +666,18 @@
     }, 
     {
         "fields": {
-            "dataset": 10, 
+            "dataset": 14, 
             "execrecord": 1, 
-            "generic_input": 4
+            "generic_input": 3
         }, 
         "model": "librarian.execrecordin", 
         "pk": 1
     }, 
     {
         "fields": {
-            "dataset": 14, 
+            "dataset": 10, 
             "execrecord": 1, 
-            "generic_input": 3
+            "generic_input": 4
         }, 
         "model": "librarian.execrecordin", 
         "pk": 2
@@ -702,18 +693,18 @@
     }, 
     {
         "fields": {
-            "dataset": 14, 
+            "dataset": 13, 
             "execrecord": 3, 
-            "generic_input": 7
+            "generic_input": 6
         }, 
         "model": "librarian.execrecordin", 
         "pk": 4
     }, 
     {
         "fields": {
-            "dataset": 13, 
+            "dataset": 14, 
             "execrecord": 3, 
-            "generic_input": 6
+            "generic_input": 7
         }, 
         "model": "librarian.execrecordin", 
         "pk": 5
@@ -1626,7 +1617,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$7wD2BIAPTcUG$LhR8U3u9M+KJLBrAGN35ZzYLl4Wo4Hthf6MRCYrziN0=", 
+            "password": "pbkdf2_sha256$24000$7z0JIa0d9Hdd$Y+cxQB7DhiFBFtrgDcThGmLUkhMu79RLucszkUMCpQc=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -1644,7 +1635,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$W3YkvqXLaIbs$EeYOm6MUdg8w3cdD5DG+iLkrd3UbDyaQeHY3Tx7c2+g=", 
+            "password": "pbkdf2_sha256$24000$ZkpV5sL3BqVi$miPqPqKyrnlbr7W2vMJfzjTzUdTFoE9YVMctf9tlzTg=", 
             "user_permissions": [], 
             "username": "ringo"
         }, 
@@ -1653,7 +1644,7 @@
     }, 
     {
         "fields": {
-            "date_joined": "2000-01-01T00:00:02Z", 
+            "date_joined": "2000-01-01T00:00:03Z", 
             "email": "bob@talabs.com", 
             "first_name": "", 
             "groups": [
@@ -1664,7 +1655,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$8ESAfAJusTG3$UFe4PpQxXPALnM/jejJz3eyVjGFIMfLh5d25A7DI6Rs=", 
+            "password": "pbkdf2_sha256$24000$CzAfA2TC8Pul$/L9Hbz0kzoty4GiAVSoTks7mlVfBNdRIWlmTeQZbRxk=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -1907,9 +1898,7 @@
     }, 
     {
         "fields": {
-            "_complete": null, 
             "_runstate": 1, 
-            "_successful": null, 
             "description": "", 
             "end_time": null, 
             "groups_allowed": [
@@ -1923,7 +1912,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2016-05-20T21:55:08.402Z", 
+            "time_queued": "2016-05-31T22:56:24.392Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1932,9 +1921,7 @@
     }, 
     {
         "fields": {
-            "_complete": null, 
             "_runstate": 1, 
-            "_successful": null, 
             "description": "", 
             "end_time": null, 
             "groups_allowed": [
@@ -1948,7 +1935,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2016-05-20T21:55:08.413Z", 
+            "time_queued": "2016-05-31T22:56:24.412Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1957,9 +1944,7 @@
     }, 
     {
         "fields": {
-            "_complete": null, 
             "_runstate": 1, 
-            "_successful": null, 
             "description": "", 
             "end_time": null, 
             "groups_allowed": [], 
@@ -1971,7 +1956,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2016-05-20T21:55:08.434Z", 
+            "time_queued": "2016-05-31T22:56:24.432Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1980,9 +1965,7 @@
     }, 
     {
         "fields": {
-            "_complete": null, 
             "_runstate": 1, 
-            "_successful": null, 
             "description": "", 
             "end_time": null, 
             "groups_allowed": [], 
@@ -1994,7 +1977,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2016-05-20T21:55:08.523Z", 
+            "time_queued": "2016-05-31T22:56:24.524Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -2003,9 +1986,7 @@
     }, 
     {
         "fields": {
-            "_complete": null, 
             "_runstate": 1, 
-            "_successful": null, 
             "description": "", 
             "end_time": null, 
             "groups_allowed": [], 
@@ -2017,7 +1998,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2016-05-20T21:55:08.575Z", 
+            "time_queued": "2016-05-31T22:56:24.581Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -2189,7 +2170,7 @@
             "MD5_checksum": "10a4bd15d1300fcaf5a3bdad54ef1d28", 
             "_redacted": false, 
             "dataset_file": "Datasets/2016_05/E11_32_output.csv", 
-            "date_created": "2000-01-01T00:00:01Z", 
+            "date_created": "2000-01-01T00:00:02Z", 
             "description": "result of E11_32 fed by doublet_cdt.csv", 
             "external_path": "", 
             "externalfiledirectory": null, 
@@ -2208,7 +2189,7 @@
         "fields": {
             "MD5_checksum": "00fd50bfe7ac63e2165a442f4101e05c", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_05/step_0_singlet_Bhu1y9M.csv", 
+            "dataset_file": "Datasets/2016_05/step_0_singlet_dbKDGsy.csv", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "external_path": "", 
@@ -2228,7 +2209,7 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_05/step_0_raw_89JkNmP.fasta", 
+            "dataset_file": "Datasets/2016_05/step_0_raw_3hTywtw.fasta", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "external_path": "", 
@@ -2248,7 +2229,7 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_05/step_0_raw_dHjRiOR.fasta", 
+            "dataset_file": "Datasets/2016_05/step_0_raw_v5TjF42.fasta", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "external_path": "", 

@@ -1419,7 +1419,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$TmYCLhmzMsvP$/VXv3KOVnmPG7x+O3Xi29O+JxTNIsv740/vQ5N3LcV0=", 
+            "password": "pbkdf2_sha256$24000$iU9EOgD3QyvW$qMTgeAINUxG7TsvvWQAoojtMbMmQZYavxjn/KBLDoQc=", 
             "user_permissions": [], 
             "username": "john"
         }, 
@@ -1437,7 +1437,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$ocPRmO3pHY19$WkzNoOA7ccrrxvvWq9Sk1O5nWWuWhMOjGd2q5aONAO0=", 
+            "password": "pbkdf2_sha256$24000$Ms3aVklHFKb6$dy/8nt9SyMNJtfnY+ssnP3tBa3ooxKTDKLh9L69ZhxE=", 
             "user_permissions": [], 
             "username": "ringo"
         }, 
@@ -1457,7 +1457,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$qjpJIDVG1wkw$EfPRLIOvpF13480Cz3cWb6YD7jceXAb82gFj7sgUXA8=", 
+            "password": "pbkdf2_sha256$24000$AhI9qvEscjyq$Sqk0Kv9bOll5Ccu2+fFJ9bgScs875utZc9+veEp9jf4=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -1502,7 +1502,7 @@
     }, 
     {
         "fields": {
-            "date_created": "2000-01-01T00:00:03Z", 
+            "date_created": "2000-01-01T00:00:02Z", 
             "description": "sequences of ASCII characters", 
             "groups_allowed": [
                 1
@@ -1700,9 +1700,7 @@
     }, 
     {
         "fields": {
-            "_complete": null, 
             "_runstate": 1, 
-            "_successful": null, 
             "description": "", 
             "end_time": null, 
             "groups_allowed": [
@@ -1716,7 +1714,7 @@
             "sandbox_path": "", 
             "start_time": null, 
             "stopped_by": null, 
-            "time_queued": "2016-05-20T21:54:46.820Z", 
+            "time_queued": "2016-05-31T22:56:02.356Z", 
             "user": 2, 
             "users_allowed": []
         }, 
@@ -1868,7 +1866,7 @@
             "MD5_checksum": "10a4bd15d1300fcaf5a3bdad54ef1d28", 
             "_redacted": false, 
             "dataset_file": "", 
-            "date_created": "2000-01-01T00:00:02Z", 
+            "date_created": "2000-01-01T00:00:01Z", 
             "description": "", 
             "external_path": "", 
             "externalfiledirectory": null, 
@@ -1907,7 +1905,7 @@
         "fields": {
             "MD5_checksum": "00fd50bfe7ac63e2165a442f4101e05c", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_05/step_0_singlet_idRo8VX.csv", 
+            "dataset_file": "Datasets/2016_05/step_0_singlet_TXsu0hO.csv", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "external_path": "", 
@@ -1927,7 +1925,7 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_05/step_0_raw_B1QXj22.fasta", 
+            "dataset_file": "Datasets/2016_05/step_0_raw_iEub0Q9.fasta", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "external_path": "", 
@@ -1947,7 +1945,7 @@
         "fields": {
             "MD5_checksum": "7dc85e11b5c02e434af5bd3b3da9938e", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_05/step_0_raw_Gu0oToe.fasta", 
+            "dataset_file": "Datasets/2016_05/step_0_raw_gITNnym.fasta", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "lol", 
             "external_path": "", 
@@ -2494,7 +2492,7 @@
     {
         "fields": {
             "dataset": 7, 
-            "end_time": "2000-01-01T00:00:02Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
             "start_time": "2000-01-01T00:00:01Z", 
             "user": 2
@@ -2507,7 +2505,7 @@
             "dataset": 8, 
             "end_time": "2000-01-01T00:00:02Z", 
             "execlog": null, 
-            "start_time": "2000-01-01T00:00:02Z", 
+            "start_time": "2000-01-01T00:00:01Z", 
             "user": 2
         }, 
         "model": "datachecking.contentchecklog", 
