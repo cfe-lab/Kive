@@ -522,6 +522,49 @@ class MethodDependencyMockTests(TestCase):
             "Conflicting dependencies",
             self.method.clean)
 
+    def test_list_all_filepaths_unnested_dep_blank_filename(self):
+        """
+        List all filepaths when dependency has no filename set and is not in a subdirectory.
+        """
+        expected_filepaths = ['driver.py', 'helper.py']
+
+        filepaths = self.method.list_all_filepaths()
+
+        self.assertEqual(expected_filepaths, filepaths)
+
+    def test_list_all_filepaths_nested_dep_blank_filename(self):
+        """
+        List all filepaths when dependency has no filename set and is in a subdirectory.
+        """
+        self.dependency.path = 'nest_folder'
+        expected_filepaths = ['driver.py', 'nest_folder/helper.py']
+
+        filepaths = self.method.list_all_filepaths()
+
+        self.assertEqual(expected_filepaths, filepaths)
+
+    def test_list_all_filepaths_unnested_dep_specified_filename(self):
+        """List all filepaths when dependency has a custom filename and is not in a subdirectory.
+        """
+        self.dependency.filename = 'foo.py'
+        expected_filepaths = ['driver.py', 'foo.py']
+
+        filepaths = self.method.list_all_filepaths()
+
+        self.assertEqual(expected_filepaths, filepaths)
+
+    def test_list_all_filepaths_nested_dep_specified_filename(self):
+        """
+        List all filepaths when dependency has a custom filename and is in a subdirectory.
+        """
+        self.dependency.path = 'nest_folder'
+        self.dependency.filename = 'foo.py'
+        expected_filepaths = ['driver.py', 'nest_folder/foo.py']
+
+        filepaths = self.method.list_all_filepaths()
+
+        self.assertEqual(expected_filepaths, filepaths)
+
 
 @mocked_relations(Method, MethodFamily)
 class MethodUpdateMockTests(TestCase):
