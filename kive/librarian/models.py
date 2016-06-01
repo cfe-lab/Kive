@@ -955,7 +955,7 @@ class Dataset(metadata.models.AccessControl):
         ccl.stop(save=True, clean=True)
         return ccl
 
-    def check_integrity(self, new_file_path, checking_user, execlog=None, runsic=None,
+    def check_integrity(self, new_file_path, checking_user, execlog=None, runcomponent=None,
                         newly_computed_MD5=None, notify_all=True):
         """
         Checks integrity of SD against the md5 provided (newly_computed_MD5),
@@ -973,7 +973,7 @@ class Dataset(metadata.models.AccessControl):
         # end time of an integrity check?  Is the check just the comparison
         # of the MD5s or is it the time that you finish computing the MD5 or
         # is it the time that you start computing the MD5?
-        icl = self.integrity_checks.create(execlog=execlog, runsic=runsic, user=checking_user)
+        icl = self.integrity_checks.create(execlog=execlog, runcomponent=runcomponent, user=checking_user)
         icl.start(save=True)
 
         if newly_computed_MD5 is None:
@@ -1445,7 +1445,7 @@ class ExecRecord(models.Model):
 
     def general_transf(self):
         """Returns the Method/POC/PSIC represented by this ExecRecord."""
-        if self.generator.record.is_cable:
+        if self.generator.record.is_cable():
             return self.generator.record.component
         else:
             # This is a Method.
@@ -1568,7 +1568,7 @@ class ExecRecord(models.Model):
         assert self not in removal_plan["ExecRecords"]
         removal_plan["ExecRecords"].add(self)
 
-        if not (self.generator.record.is_cable and self.general_transf().is_trivial()):
+        if not (self.generator.record.is_cable() and self.general_transf().is_trivial()):
             for ero in self.execrecordouts.exclude(
                     dataset__in=removal_plan["Datasets"]).select_related("dataset"):
                 if ero.dataset not in removal_plan["Datasets"]:

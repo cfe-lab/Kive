@@ -872,7 +872,7 @@ def create_librarian_test_environment(case):
     # Some ExecRecords, some failed, others not.
     i = 0
     for step in PipelineStep.objects.all():
-        if step.is_subpipeline:
+        if step.is_subpipeline():
             continue
         run = step.pipeline.pipeline_instances.create(user=step.pipeline.user)
         run.save()

@@ -63,7 +63,7 @@ class ArchiveTestCaseHelpers(object):
 
         execlog = ExecLog(record=record, invoking_record=record, start_time=timezone.now(), end_time=timezone.now())
         execlog.save()
-        if record.is_step:
+        if record.is_step():
             MethodOutput(execlog=execlog, return_code=0).save()
 
     def make_complete_reused(self, record, input_SDs, output_SDs, other_parent):
@@ -505,7 +505,7 @@ class RunComponentTests(ArchiveTestCase):
         # For every RunComponent invoked during this run, break each of its invoked_logs and see if it appears.
         atomicrunsteps = []
         for runstep in RunStep.objects.all():
-            if runstep.transformation.is_method:
+            if runstep.transformation.is_method():
                 atomicrunsteps.append(runstep)
         runcomponents = (atomicrunsteps + list(RunSIC.objects.all()) + list(RunOutputCable.objects.all()))
 
@@ -532,7 +532,7 @@ class RunComponentTests(ArchiveTestCase):
         # For every RunComponent invoked during this run, break each of its ICLs/CCLs and see if it appears.
         atomicrunsteps = []
         for runstep in RunStep.objects.all():
-            if runstep.transformation.is_method:
+            if runstep.transformation.is_method():
                 atomicrunsteps.append(runstep)
         runcomponents = (atomicrunsteps + list(RunSIC.objects.all()) + list(RunOutputCable.objects.all()))
 
@@ -1258,7 +1258,7 @@ class RunComponentTooManyChecks(TestCase):
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and
                     runstep.execrecord.execrecordouts.count() > 0 and
-                    runstep.has_log):
+                    runstep.has_log()):
                 break
         log = runstep.log
         sd = runstep.execrecord.execrecordouts.first().dataset
@@ -1275,7 +1275,7 @@ class RunComponentTooManyChecks(TestCase):
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and
                     runstep.execrecord.execrecordouts.count() > 0 and
-                    runstep.has_log and
+                    runstep.has_log() and
                     runstep.invoked_logs.count() > 1):
                 break
         for log in runstep.invoked_logs.all():
@@ -1295,7 +1295,7 @@ class RunComponentTooManyChecks(TestCase):
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and
                     runstep.execrecord.execrecordouts.count() > 0 and
-                    runstep.has_log):
+                    runstep.has_log()):
                 break
         log = runstep.log
         sd = runstep.execrecord.execrecordouts.first().dataset
@@ -1312,7 +1312,7 @@ class RunComponentTooManyChecks(TestCase):
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and
                     runstep.execrecord.execrecordouts.count() > 0 and
-                    runstep.has_log and
+                    runstep.has_log() and
                     runstep.invoked_logs.count() > 1):
                 break
         for log in runstep.invoked_logs.all():
@@ -2461,7 +2461,7 @@ class ExecLogTests(ArchiveTestCase):
         # Retrieve all ExecLogs of steps.
         step_ELs = []
         for candidate_EL in ExecLog.objects.all():
-            if candidate_EL.record.is_step:
+            if candidate_EL.record.is_step():
                 step_ELs.append(candidate_EL)
 
         for el in step_ELs:
@@ -2482,7 +2482,7 @@ class ExecLogTests(ArchiveTestCase):
         # Retrieve all ExecLogs of ROCs.
         ROC_ELs = []
         for candidate_EL in ExecLog.objects.all():
-            if candidate_EL.record.is_outcable:
+            if candidate_EL.record.is_outcable():
                 ROC_ELs.append(candidate_EL)
 
         for el in ROC_ELs:
@@ -3326,7 +3326,7 @@ year,month,day,hour,minute,second,microsecond
         run1_step2_RSIC = run1.runsteps.get(pipelinestep__step_num=2).RSICs.first()
         self.assertTrue(run1_step2_RSIC.is_successful())
 
-        self.assertFalse(run2_step2.has_log)
+        self.assertFalse(run2_step2.has_log())
         self.assertEquals(run2_step2.invoked_logs.count(), 2)
         self.assertEquals(set(run2_step2.invoked_logs.all()), {run2_step1.log, run2_step1_RSIC.log})
 
@@ -3433,7 +3433,7 @@ with open(sys.argv[2], "wb") as f:
         # run2_step2, the recovering step, should be cancelled.
         self.assertTrue(run2_step2.is_cancelled())
 
-        self.assertFalse(run2_step2.has_log)
+        self.assertFalse(run2_step2.has_log())
         self.assertEquals(run2_step2.invoked_logs.count(), 2)
         self.assertEquals(set(run2_step2.invoked_logs.all()), {run2_step1.log, run2_step1_RSIC.log})
 

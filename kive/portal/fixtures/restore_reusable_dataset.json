@@ -63,7 +63,7 @@
             "end_time": "2000-01-01T00:00:06Z", 
             "execrecord": 5, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:06Z"
+            "start_time": "2000-01-01T00:00:05Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 5
@@ -143,17 +143,17 @@
             "end_time": "2000-01-01T00:00:05Z", 
             "invoking_record": 2, 
             "record": 2, 
-            "start_time": "2000-01-01T00:00:05Z"
+            "start_time": "2000-01-01T00:00:04Z"
         }, 
         "model": "archive.execlog", 
         "pk": 4
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:06Z", 
+            "end_time": "2000-01-01T00:00:05Z", 
             "invoking_record": 5, 
             "record": 5, 
-            "start_time": "2000-01-01T00:00:06Z"
+            "start_time": "2000-01-01T00:00:05Z"
         }, 
         "model": "archive.execlog", 
         "pk": 5
@@ -714,10 +714,10 @@
             "paused_by": null, 
             "pipeline": 4, 
             "purged": true, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userkive_run1_4GkYbG", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/userkive_run1_6LUOmK", 
             "start_time": "2000-01-01T00:00:03Z", 
             "stopped_by": null, 
-            "time_queued": "2016-05-31T23:01:49.896Z", 
+            "time_queued": "2016-06-01T22:52:14.661Z", 
             "user": 1, 
             "users_allowed": []
         }, 
@@ -728,7 +728,7 @@
         "fields": {
             "MD5_checksum": "e093c9eac5d0cae832d4e2071ccfdc5f", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_05/pairs.csv", 
+            "dataset_file": "Datasets/2016_06/pairs.csv", 
             "date_created": "2000-01-01T00:00:01Z", 
             "description": "", 
             "external_path": "", 
@@ -746,11 +746,11 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "e48ad01840c66eb72f1d1460374be29d", 
+            "MD5_checksum": "133d7fc58ddaf785d32ea6e9b7152873", 
             "_redacted": false, 
             "dataset_file": "", 
-            "date_created": "2000-01-01T00:00:04Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-05-31 23:01:51.998249+00:00 by kive\nrun: 1\nuser: kive\nstep: 1\noutput: sums_and_products", 
+            "date_created": "2000-01-01T00:00:03Z", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-06-01 22:52:16.760304+00:00 by kive\nrun: 1\nuser: kive\nstep: 1\noutput: sums_and_products", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 1, 
@@ -764,11 +764,11 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "6dc476f01f77ab2aa13e3e5a6291edf1", 
+            "MD5_checksum": "7ff6ac15c4dd1c669671b0095937c4f5", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_05/step2_total_sums.raw", 
+            "dataset_file": "Datasets/2016_06/step2_total_sums.raw", 
             "date_created": "2000-01-01T00:00:05Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-05-31 23:01:51.998249+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-06-01 22:52:16.760304+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 2, 
@@ -1108,7 +1108,7 @@
             "end_time": "2000-01-01T00:00:03Z", 
             "execlog": null, 
             "read_failed": false, 
-            "runsic": 3, 
+            "runcomponent": 3, 
             "start_time": "2000-01-01T00:00:03Z", 
             "user": 1
         }, 

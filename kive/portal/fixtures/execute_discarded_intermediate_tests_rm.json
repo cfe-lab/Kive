@@ -1380,7 +1380,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$FYUeuxFWx2Ed$8FLjF75ev6AbJbM1QazpKoLg/X3Pb0unLgeslhXvSYA=", 
+            "password": "pbkdf2_sha256$24000$gz4vCJjFxw6Y$hiMo2XpU+VTXIwglAg5tfTb3RhF7Z0HXs8qRWvlVwE4=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -1400,7 +1400,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$3ezMBLrjTmpD$cZKIb82lGjLn7fs5i9oayryB6DKt8yIj1oLFKYryif4=", 
+            "password": "pbkdf2_sha256$24000$8G1dsWPWvgSz$f7ptxi9umyscuPibLaMPdsBWpGxUZwVt1gLJ9vPSVPA=", 
             "user_permissions": [], 
             "username": "alice"
         }, 
@@ -1478,10 +1478,10 @@
             "paused_by": null, 
             "pipeline": 10, 
             "purged": false, 
-            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/useralice_run1_Zfqs9A", 
+            "sandbox_path": "/Users/rliang/Documents/Research/Copperfish/copperfish/kive/Sandboxes/useralice_run1_xN6MhX", 
             "start_time": "2000-01-01T00:00:06Z", 
             "stopped_by": null, 
-            "time_queued": "2016-05-31T23:01:22.820Z", 
+            "time_queued": "2016-06-01T22:51:48.202Z", 
             "user": 3, 
             "users_allowed": []
         }, 
@@ -1492,7 +1492,7 @@
         "fields": {
             "MD5_checksum": "0082bc75b97d81a1b92adaa894fef1bd", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_05/tmpJCTfJa", 
+            "dataset_file": "Datasets/2016_06/tmpgV5tq0", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "data from the lab", 
             "external_path": "", 
@@ -1512,7 +1512,7 @@
             "_redacted": false, 
             "dataset_file": "", 
             "date_created": "2000-01-01T00:00:07Z", 
-            "description": "Generated data from a run of pipeline \"DNA revcomp:2 (2)\" started at 2016-05-31 23:01:25.014588+00:00 by alice\nrun: 1\nuser: alice\nstep: 1\noutput: reversed_DNA", 
+            "description": "Generated data from a run of pipeline \"DNA revcomp:2 (2)\" started at 2016-06-01 22:51:50.361749+00:00 by alice\nrun: 1\nuser: alice\nstep: 1\noutput: reversed_DNA", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 1, 
@@ -1530,7 +1530,7 @@
             "_redacted": false, 
             "dataset_file": "", 
             "date_created": "2000-01-01T00:00:08Z", 
-            "description": "Generated data from a run of pipeline \"DNA revcomp:2 (2)\" started at 2016-05-31 23:01:25.014588+00:00 by alice\nrun: 1\nuser: alice\nstep: 2\noutput: complemented_DNA", 
+            "description": "Generated data from a run of pipeline \"DNA revcomp:2 (2)\" started at 2016-06-01 22:51:50.361749+00:00 by alice\nrun: 1\nuser: alice\nstep: 2\noutput: complemented_DNA", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 2, 
@@ -1621,7 +1621,7 @@
         "fields": {
             "MD5_checksum": "5699120b018a7932c07be0412483c622", 
             "coderesource": 2, 
-            "content_file": "CodeResources/fdopen_8bt0bsw", 
+            "content_file": "CodeResources/fdopen_zjIm7l8", 
             "groups_allowed": [
                 1
             ], 
@@ -1640,7 +1640,7 @@
         "fields": {
             "MD5_checksum": "196144423c5bb98d59d78c729ce842f4", 
             "coderesource": 3, 
-            "content_file": "CodeResources/fdopen_HyQMHc8", 
+            "content_file": "CodeResources/fdopen_xzQcpXH", 
             "groups_allowed": [
                 1
             ], 
@@ -1659,7 +1659,7 @@
         "fields": {
             "MD5_checksum": "30e9a1ac1dad0c134d41bf826a53ba68", 
             "coderesource": 4, 
-            "content_file": "CodeResources/fdopen_Ef5gEzX", 
+            "content_file": "CodeResources/fdopen_o2VLLtd", 
             "groups_allowed": [
                 1
             ], 
@@ -2213,7 +2213,7 @@
             "end_time": "2000-01-01T00:00:06Z", 
             "execlog": null, 
             "read_failed": false, 
-            "runsic": 3, 
+            "runcomponent": 3, 
             "start_time": "2000-01-01T00:00:06Z", 
             "user": 3
         }, 

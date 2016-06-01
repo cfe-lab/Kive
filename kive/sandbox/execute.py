@@ -417,7 +417,7 @@ class Sandbox:
         # Update our lists of components completed.
         step_nums_completed = []
         if type(task_completed) == archive.models.RunSIC:
-            assert task_completed.dest_runstep.pipelinestep.is_subpipeline
+            assert task_completed.dest_runstep.pipelinestep.is_subpipeline()
             incables_completed.append(task_completed)
         elif type(task_completed) == archive.models.RunStep:
             steps_completed.append(task_completed)
@@ -440,7 +440,7 @@ class Sandbox:
 
             # If this is already running, we skip it, unless it's a sub-Pipeline.
             if curr_RS.is_running():
-                if not step.is_subpipeline:
+                if not step.is_subpipeline():
                     # This is a non-sub-run already in progress, so we leave it.
                     all_complete = False
                     continue
@@ -557,7 +557,7 @@ class Sandbox:
                 # or the output cable if it's a sub-pipeline.
                 if psic.source_step != 0:
                     generator = pipeline_to_resume.steps.get(step_num=psic.source_step)
-                    if socket.transformation.is_pipeline:
+                    if socket.transformation.is_pipeline():
                         run_to_query = run_to_resume.runsteps.get(pipelinestep=generator).child_run
                         generator = generator.transformation.pipeline.outcables.get(output_idx=socket.dataset_idx)
 
@@ -596,7 +596,7 @@ class Sandbox:
             self.logger.debug("Beginning execution of step %s (%s)", step_coord_render, step)
 
             # At this point we know that all inputs are available.
-            if step.is_subpipeline:
+            if step.is_subpipeline():
                 self.logger.debug("Step %s (coordinates %s) is a sub-Pipeline.  Marking it "
                                   "as started, and handling its input cables.",
                                   curr_RS, curr_RS.get_coordinates())
@@ -947,7 +947,8 @@ class Sandbox:
         # If this is independent of any step recovery, we add it to the queue; either by marking it as
         # waiting for stuff that's going to recover, or by throwing it directly onto the list of tasks to
         # perform.
-        queue_cable = (cable_record.component.is_outcable or cable_record.dest_runstep.pipelinestep.is_subpipeline or
+        queue_cable = (cable_record.component.is_outcable() or
+                       cable_record.dest_runstep.pipelinestep.is_subpipeline() or
                        (force and by_step is None))
         file_access_start = timezone.now()
         if dataset_path is None and not input_dataset.has_data():
@@ -955,7 +956,7 @@ class Sandbox:
 
             # Bail out here if the input dataset is a Pipeline input and cannot be recovered
             # (at this point we are probably in the case where an external file was removed).
-            if (cable_record.component.is_incable and
+            if (cable_record.component.is_incable() and
                     cable_record.top_level_run == cable_record.parent_run and
                     cable_record.component.definite.source_step == 0):
                 self.logger.debug("Cannot recover cable input: it is a Run input")
@@ -965,7 +966,7 @@ class Sandbox:
                     # Create a failed IntegrityCheckLog.
                     iic = IntegrityCheckLog(
                         dataset=input_dataset,
-                        runsic=cable_record,
+                        runcomponent=cable_record,
                         read_failed=True,
                         start_time=file_access_start,
                         end_time=file_access_end,
@@ -1018,7 +1019,7 @@ class Sandbox:
         curr_RS = step_plan.run_step
         curr_RS.start()
 
-        assert not pipelinestep.is_subpipeline
+        assert not pipelinestep.is_subpipeline()
 
         # Note: bad inputs will be caught by the cables.
         input_names = ", ".join(str(i) for i in inputs)
@@ -1188,7 +1189,7 @@ class Sandbox:
         recovering_record = execute_info.recovering_record
 
         pipelinestep = runstep.pipelinestep
-        assert not pipelinestep.is_subpipeline
+        assert not pipelinestep.is_subpipeline()
 
         # If this runstep is already on the queue, we can return.
         if runstep in self.queue_for_processing:
@@ -1444,7 +1445,7 @@ class Sandbox:
                     # Create a failed IntegrityCheckLog.
                     iic = IntegrityCheckLog(
                         dataset=input_dataset,
-                        runsic=curr_record,
+                        runcomponent=curr_record,
                         read_failed=True,
                         start_time=copy_start,
                         end_time=copy_end,
@@ -1484,7 +1485,7 @@ class Sandbox:
                             # Create a failed IntegrityCheckLog.
                             iic = IntegrityCheckLog(
                                 dataset=input_dataset,
-                                runsic=curr_record,
+                                runcomponent=curr_record,
                                 read_failed=True,
                                 start_time=copy_start,
                                 end_time=copy_end,
@@ -1499,7 +1500,7 @@ class Sandbox:
                 # first time.
                 logger.debug("[%d] Checking file just copied to sandbox for integrity.",
                              worker_rank)
-                check = input_dataset.check_integrity(input_dataset_path, user, execlog=None, runsic=curr_record)
+                check = input_dataset.check_integrity(input_dataset_path, user, execlog=None, runcomponent=curr_record)
 
                 fail_now = check.is_fail()
 
@@ -1670,7 +1671,7 @@ class Sandbox:
                 pk=step_execute_dict["recovering_record_pk"]
             ).definite
 
-        assert not curr_RS.pipelinestep.is_subpipeline
+        assert not curr_RS.pipelinestep.is_subpipeline()
 
         recover = recovering_record is not None
         invoking_record = recovering_record or curr_RS
@@ -1999,7 +2000,7 @@ class RunPlan(object):
         self.step_plans = []
         self.inputs = [DatasetPlan(input_item) for input_item in inputs]
         if subpipeline_step:
-            assert subpipeline_step.transformation.is_pipeline
+            assert subpipeline_step.transformation.is_pipeline()
             self.pipeline = subpipeline_step.transformation.definite
         else:
             self.pipeline = top_level_run.pipeline
@@ -2021,7 +2022,7 @@ class RunPlan(object):
                     input_plan = self.step_plans[step_index].outputs[output_index]
                 step_plan.inputs.append(input_plan)
 
-            if step.is_subpipeline:
+            if step.is_subpipeline():
                 step_plan.subrun_plan = RunPlan()
                 step_plan.subrun_plan.load(top_level_run, inputs, subpipeline_step=step)
 
@@ -2059,7 +2060,7 @@ class RunPlan(object):
             if run_step is None:
                 run_step = RunStep.create(step_plan.pipeline_step, self.run, start=False)
 
-                if run_step.pipelinestep.transformation.is_pipeline:
+                if run_step.pipelinestep.transformation.is_pipeline():
                     step_subrun = Run(
                         user=self.top_level_run.user,
                         pipeline=run_step.pipelinestep.transformation.definite,
@@ -2069,7 +2070,7 @@ class RunPlan(object):
                     step_subrun.users_allowed.add(*self.top_level_run.users_allowed.all())
                     step_subrun.groups_allowed.add(*self.top_level_run.groups_allowed.all())
 
-            elif run_step.pipelinestep.transformation.is_pipeline:
+            elif run_step.pipelinestep.transformation.is_pipeline():
                 step_subrun = run_step.child_run
 
             if step_subrun:
@@ -2082,7 +2083,7 @@ class RunPlan(object):
         Looks for suitable ExecRecords for the RunSteps and populates step_plan with them.
         """
         for step_plan in self.step_plans:
-            if step_plan.pipeline_step.is_subpipeline:
+            if step_plan.pipeline_step.is_subpipeline():
                 step_plan.subrun_plan.find_ERs()
                 continue
             elif step_plan.run_step.execrecord is not None:
@@ -2127,7 +2128,7 @@ class RunPlan(object):
         """
         is_changed = False
         for step_plan in reversed(self.step_plans):
-            if step_plan.pipeline_step.is_subpipeline:
+            if step_plan.pipeline_step.is_subpipeline():
                 is_changed = step_plan.subrun_plan.walk_backward() or is_changed
 
             elif not step_plan.execrecord:
@@ -2149,7 +2150,7 @@ class RunPlan(object):
         """
         is_changed = False
         for step_plan in self.step_plans:
-            if step_plan.pipeline_step.is_subpipeline:
+            if step_plan.pipeline_step.is_subpipeline():
                 is_changed = step_plan.subrun_plan.walk_forward() or is_changed
 
             else:
@@ -2184,7 +2185,7 @@ class StepPlan(object):
 
         @return: True if the execrecord had to be abandoned.
         """
-        if self.pipeline_step.is_subpipeline:
+        if self.pipeline_step.is_subpipeline():
             assert output_idx is not None
             # Look up the step that produced this output.
             curr_output_plan = self.subrun_plan.outputs[output_idx-1]
@@ -2277,7 +2278,7 @@ class RunStepExecuteInfo:
         self.output_paths = output_paths
         # FIXME in the future this number may vary across runs.
         self.threads_required = None
-        if not runstep.pipelinestep.is_subpipeline:
+        if not runstep.pipelinestep.is_subpipeline():
             self.threads_required = runstep.transformation.definite.threads
 
     def flag_for_recovery(self, recovering_record):

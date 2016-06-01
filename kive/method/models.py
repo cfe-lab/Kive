@@ -423,23 +423,18 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
     def view_url(self):
         return reverse("method_view", kwargs={"id": self.pk})
 
-    @property
     def is_method(self):
         return True
 
-    @property
     def is_pipeline(self):
         return False
 
-    @property
     def is_cable(self):
         return False
 
-    @property
     def is_incable(self):
         return False
 
-    @property
     def is_outcable(self):
         return False
 

@@ -472,7 +472,7 @@ class Manager(object):
         # task_finished_coords[idx] is the component coordinate in
         # the subrun idx levels deep (0 means top-level run).
         task_finished_coords = task_finished.get_coordinates()
-        if task_finished.is_outcable:
+        if task_finished.is_outcable():
             # Add a dummy entry at the end so that the 0th to 2nd-last coordinates
             # give the sub-run coordinates in all cases.
             task_finished_coords = task_finished_coords + (None,)
@@ -484,7 +484,7 @@ class Manager(object):
         for task_info in self.tasks_in_progress.itervalues():
             if task_info['task'].top_level_run == just_finished['task'].top_level_run:
                 running_task_coords = task_info["task"].get_coordinates()
-                if task_info["task"].is_outcable:
+                if task_info["task"].is_outcable():
                     running_task_coords = running_task_coords + (None,)
 
                 # These belong to the same Run, so we can't bail out yet if task_finished failed.
