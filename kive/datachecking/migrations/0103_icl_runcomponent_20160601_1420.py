@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('archive', '0034_remove_old_state_fields_20160531_1223'),
-        ('datachecking', '0008_runsic_input_integrity_check_20160323_1550'),
+        ('datachecking', '0102_relink_apps'),
     ]
 
     operations = [

@@ -32,7 +32,7 @@ def restore_runsic(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datachecking', '0009_icl_runcomponent_20160601_1420'),
+        ('datachecking', '0103_icl_runcomponent_20160601_1420'),
     ]
 
     operations = [

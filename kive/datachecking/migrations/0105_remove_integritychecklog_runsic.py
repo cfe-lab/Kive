@@ -8,7 +8,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datachecking', '0010_icl_copy_runsic_to_runcomponent_20160601_1343'),
+        ('datachecking', '0104_icl_copy_runsic_to_runcomponent_20160601_1343'),
     ]
 
     operations = [
