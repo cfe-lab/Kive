@@ -1018,6 +1018,21 @@ class Dataset(metadata.models.AccessControl):
         for er in ExecRecord.objects.filter(execrecordouts__dataset=self):
             er.attempt_decontamination(self)
 
+    def initially_OK(self):
+        """
+        Check that the Dataset was, at some point, okay.
+
+        Such Datasets may be used as Run inputs, even if they've had some
+        failed checks in the interim.
+        """
+        # If this is not raw, check that there is at least one content check completed and
+        # successful.
+        if not self.is_raw() and not self.content_checks.filter(
+                baddata__isnull=True, end_time__isnull=False).exists():
+            return False
+
+        return True
+
     def is_OK(self):
         """
         Check that this Dataset is fit for consumption.
@@ -1033,10 +1048,8 @@ class Dataset(metadata.models.AccessControl):
         if self.is_redacted():
             return False
 
-        # If this is not raw, check that there is at least one content check completed and
-        # successful.
-        if not self.is_raw() and not self.content_checks.filter(
-                baddata__isnull=True, end_time__isnull=False).exists():
+        # Was this Dataset initially OK?
+        if not self.initially_OK():
             return False
 
         # If there are any failures, check that the most recent integrity check is good.

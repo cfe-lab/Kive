@@ -311,8 +311,8 @@ class Pipeline(transformation.models.Transformation):
 
         # Check each individual input.
         for i, supplied_input in enumerate(inputs, start=1):
-            if not supplied_input.is_OK():
-                raise ValueError('Dataset {} passed as input {} to Pipeline "{}" is not OK'
+            if not supplied_input.initially_OK():
+                raise ValueError('Dataset {} passed as input {} to Pipeline "{}" was not initially OK'
                                  .format(supplied_input, i, self))
 
             pipeline_input = self.inputs.get(dataset_idx=i)
