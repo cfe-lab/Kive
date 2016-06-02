@@ -1882,7 +1882,7 @@ class RunStep(RunComponent):
         result = {"fully reusable": False, "successful": True}
         # Case 1: ER was a failure.  In this case, we don't want to proceed,
         # so we return the failure for appropriate handling.
-        if execrecord.outputs_failed_any_checks() or execrecord.has_ever_failed():
+        if execrecord.outputs_not_initially_OK() or execrecord.generator.record.is_failed():
             self.logger.debug("ExecRecord found (%s) was a failure", execrecord)
             result["successful"] = False
 
@@ -2283,14 +2283,13 @@ class RunCable(RunComponent):
 
         output_SD = execrecord.execrecordouts.first().dataset
 
-        # Terminal case 1: the found ExecRecord has failed some checks.  In this case,
+        # Terminal case 1: the found ExecRecord has failed some initial checks.  In this case,
         # we just return and the RunCable fails.
-        if output_SD.any_failed_checks():
-            self.logger.debug("The ExecRecord ({}) found is failed.".format(execrecord))
+        if not output_SD.initially_OK():
+            self.logger.debug("The ExecRecord ({}) found has a bad output.".format(execrecord))
             summary["successful"] = False
 
-        # Terminal case 2: the ExecRecord passed its checks and
-        # provides the output we need.
+        # Terminal case 2: the ExecRecord passed its checks and provides the output we need.
         elif output_SD.is_OK() and (not self.keeps_output() or output_SD.has_data()):
             self.logger.debug("Can fully reuse ER {}".format(execrecord))
             summary["fully reusable"] = True

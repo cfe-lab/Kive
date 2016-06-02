@@ -425,7 +425,38 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertIsNone(run.clean())
         self.assertIsNone(run.complete_clean())
 
-    def test_pipeline_inputs_not_OK_nonraw(self):
+    def test_pipeline_all_inputs_initially_OK(self):
+        """Execute a Pipeline with inputs that were initially OK but have a failed integrity check."""
+        pipeline = self.find_nonraw_pipeline(self.myUser)
+        inputs = self.find_inputs_for_pipeline(pipeline)
+        self.assertTrue(all(i.is_OK() for i in inputs))
+        self.assertFalse(all(i.is_raw() for i in inputs))
+
+        # Spoil one of the inputs with a bad integrity check.
+        for i, dataset in enumerate(inputs, start=1):
+            bad_input, bad_index = dataset, i
+            bad_icl = IntegrityCheckLog(dataset=dataset, user=self.myUser)
+            bad_icl.save()
+            MD5Conflict(integritychecklog=bad_icl, conflicting_dataset=dataset).save()
+            break
+        self.assertFalse(bad_input.is_OK())
+
+        run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+
+        self.check_run_OK(run)
+
+        # Check the full is_complete and is_successful.
+        self.assertTrue(run.is_complete())
+        self.assertTrue(run.is_successful())
+
+        self.assertIsNone(run.clean())
+        self.assertIsNone(run.complete_clean())
+
+        # The spoiled input should have been re-validated.
+        bad_input.refresh_from_db()
+        self.assertTrue(bad_input.is_OK())
+
+    def test_pipeline_inputs_not_initially_OK(self):
         """Can't execute a Pipeline with non-OK non-raw inputs."""
         pipeline = self.find_nonraw_pipeline(self.myUser)
         inputs = self.find_inputs_for_pipeline(pipeline)
@@ -433,41 +464,17 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertFalse(all(i.is_raw() for i in inputs))
 
         for i, dataset in enumerate(inputs, start=1):
-            if not dataset.is_raw():
+            if not dataset.is_raw() and dataset.content_checks.count() == 1:
                 bad_input, bad_index = dataset, i
-                bad_ccl = ContentCheckLog(dataset=dataset, user=self.myUser)
-                bad_ccl.save()
-                bad_ccl.add_missing_output()
+                orig_ccl = dataset.content_checks.first()
+                orig_ccl.add_missing_output()
                 break
-        self.assertFalse(all(i.is_OK() for i in inputs))
+        self.assertFalse(bad_input.initially_OK())
+        self.assertFalse(bad_input.is_OK())
 
         self.assertRaisesRegexp(
             ValueError,
-            re.escape('Dataset {} passed as input {} to Pipeline "{}" is not OK'
-                      .format(bad_input, bad_index, pipeline)),
-            lambda: Manager.execute_pipeline(self.myUser, pipeline, inputs)
-        )
-
-    def test_pipeline_inputs_not_OK_raw(self):
-        """Can't execute a Pipeline with non-OK raw inputs."""
-        pipeline = self.find_raw_pipeline(self.myUser)
-        self.assertIsNotNone(pipeline)
-        inputs = self.find_inputs_for_pipeline(pipeline)
-        self.assertTrue(all(i.is_OK() for i in inputs))
-        self.assertTrue(any(i.is_raw() for i in inputs))
-
-        for i, dataset in enumerate(inputs, start=1):
-            if dataset.is_raw():
-                bad_input, bad_index = dataset, i
-                bad_icl = IntegrityCheckLog(dataset=dataset, user=self.myUser)
-                bad_icl.save()
-                MD5Conflict(integritychecklog=bad_icl, conflicting_dataset=dataset).save()
-                break
-        self.assertFalse(all(i.is_OK() for i in inputs))
-
-        self.assertRaisesRegexp(
-            ValueError,
-            re.escape('Dataset {} passed as input {} to Pipeline "{}" is not OK'
+            re.escape('Dataset {} passed as input {} to Pipeline "{}" was not initially OK'
                       .format(bad_input, bad_index, pipeline)),
             lambda: Manager.execute_pipeline(self.myUser, pipeline, inputs)
         )
@@ -548,6 +555,48 @@ class ExecuteTests(ExecuteTestsBase):
         # There should be an integrity check and a content check both associated to r2s' log.
         self.assertEquals(r2s.log.integrity_checks.count(), 1)
         self.assertEquals(r2s.log.content_checks.count(), 1)
+
+    def test_execution_decontaminates_quarantined_runsteps(self):
+        """
+        Executing a pipeline with a quarantined component properly re-validates it.
+        """
+        # Start by executing a simple one-step pipeline.
+        pipeline = self.pX_raw
+        inputs = [self.raw_dataset]
+        run1 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        self.check_run_OK(run1)
+
+        # Now, let's invalidate the output of the first step.
+        run1_rs = run1.runsteps.first()
+        run1_outcable = run1.runoutputcables.first()
+        step1_orig_output = run1_rs.outputs.first()
+
+        corrupted_contents = "Corrupted file"
+        _, temp_file_path = tempfile.mkstemp()
+        with open(temp_file_path, "wb") as f:
+            f.write(corrupted_contents)
+        step1_orig_output.check_integrity(temp_file_path, self.myUser, notify_all=True)
+        os.remove(temp_file_path)
+
+        # This should have quarantined run1_rs and run1.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_outcable.refresh_from_db()
+        self.assertTrue(run1.is_quarantined())
+        self.assertTrue(run1_rs.is_quarantined())
+        self.assertTrue(run1_outcable.is_quarantined())
+
+        # Now, we try it again.
+        run2 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        # It should have re-validated run1 and run1_rs.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_outcable.refresh_from_db()
+        self.assertTrue(run1.is_successful())
+        self.assertTrue(run1_rs.is_successful())
+        self.assertTrue(run1_outcable.is_successful())
+
+        self.check_run_OK(run2)
 
 
 class SandboxTests(ExecuteTestsBase):

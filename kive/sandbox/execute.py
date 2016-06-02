@@ -819,8 +819,12 @@ class Sandbox:
         by_step = parent_record if isinstance(parent_record, archive.models.RunStep) else None
 
         # We bail out if the input has somehow been corrupted.
-        if not input_dataset.is_OK():
-            self.logger.debug("Input %s has corrupted.  Cancelling.", input_dataset)
+        if not input_dataset.initially_OK():
+            # FIXME this should never happen because if it's an input, it will have been
+            # checked by Sandbox, and if it's a cable inside the Pipeline, whatever fed
+            # this cable should have failed.
+            self.logger.debug("Input %s failed its initial check and should not be used.  Cancelling.",
+                              input_dataset)
 
             # Update state variables.
             curr_record.cancel_running(save=True)
@@ -850,6 +854,11 @@ class Sandbox:
 
                     if curr_ER is not None:
                         output_dataset = curr_ER.execrecordouts.first().dataset
+
+                        print "FOOOOOOO"
+                        print curr_ER.generator.record.get_state_name()
+                        print can_reuse
+                        print "BAAAAAAR"
 
                         if curr_ER.generator.record.is_quarantined():
                             # We will re-attempt; if it's fixed, then we un-quarantine the ExecRecord.
