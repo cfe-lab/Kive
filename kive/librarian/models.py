@@ -1033,6 +1033,30 @@ class Dataset(metadata.models.AccessControl):
 
         return True
 
+    def usable_in_run(self):
+        """
+        Check that the Dataset is eligible to be used in a Run.
+
+        Such a Dataset must not have failed its first content check, if there is one.
+        It may have failed subsequent checks, but either
+        a) it was initially good so warrants reexamination in case corruption has been fixed
+        b) it never got checked initially so it should be tried again and checked now
+        """
+        if self.is_redacted():
+            # Don't use redacted data.
+            return False
+        if self.is_raw():
+            # If it's raw, go ahead.
+            return True
+        elif self.initially_OK():
+            # If it was initially OK, go ahead.
+            return True
+        elif not self.content_checks.filter(baddata__isnull=False, end_time__isnull=False).exists():
+            # At least there is no failed content check yet (maybe the execution
+            # crashed during a content check), so go ahead and try again.
+            return True
+        return False
+
     def is_OK(self):
         """
         Check that this Dataset is fit for consumption.
@@ -1494,11 +1518,11 @@ class ExecRecord(models.Model):
         """Checks whether all of the EROs of this ER are OK."""
         return all([ero.is_OK() for ero in self.execrecordouts.all()])
 
-    def outputs_not_initially_OK(self):
+    def outputs_not_usable_in_run(self):
         """
         Checks whether any of the EROs of this ER have ever failed any checks.
         """
-        return any([not ero.dataset.initially_OK() for ero in self.execrecordouts.all()])
+        return any([not ero.dataset.usable_in_run() for ero in self.execrecordouts.all()])
 
     def has_ever_failed(self):
         """Has any execution of this ExecRecord ever failed?"""

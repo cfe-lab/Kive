@@ -598,6 +598,50 @@ class ExecuteTests(ExecuteTestsBase):
 
         self.check_run_OK(run2)
 
+    def test_execution_decontaminates_quarantined_runcables(self):
+        """
+        Executing a pipeline with a quarantined runcable properly re-validates it.
+        """
+        # Start by executing a simple one-step pipeline.
+        pipeline = self.pX
+        inputs = [self.dataset]
+        run1 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        self.check_run_OK(run1)
+
+        # Now, let's invalidate the output of the first cable, which is non-trivial.
+        run1_rs = run1.runsteps.first()
+        run1_rs_incable = run1_rs.RSICs.first()
+        incable_orig_output = run1_rs_incable.outputs.first()
+
+        corrupted_contents = "Corrupted file"
+        _, temp_file_path = tempfile.mkstemp()
+        with open(temp_file_path, "wb") as f:
+            f.write(corrupted_contents)
+        incable_orig_output.check_integrity(temp_file_path, self.myUser, notify_all=True)
+        os.remove(temp_file_path)
+
+        # This should have quarantined run1_rs_incable, and run1, but not run1_rs.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_rs_incable.refresh_from_db()
+        self.assertTrue(run1.is_quarantined())
+        self.assertTrue(run1_rs.is_successful())
+        self.assertTrue(run1_rs_incable.is_quarantined())
+
+        # Now, we try it again.
+        run2 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        # It should have re-validated run1 and run1_rs.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_rs_incable.refresh_from_db()
+        self.assertTrue(run1.is_successful())
+        self.assertTrue(run1_rs.is_successful())
+        self.assertTrue(run1_rs_incable.is_successful())
+
+        # FIXME note that this is affected by issues #534 and #535; the method does not
+        # find a suitable ExecRecord.
+        self.check_run_OK(run2)
+
 
 class SandboxTests(ExecuteTestsBase):
 

@@ -1882,7 +1882,7 @@ class RunStep(RunComponent):
         result = {"fully reusable": False, "successful": True}
         # Case 1: ER was a failure.  In this case, we don't want to proceed,
         # so we return the failure for appropriate handling.
-        if execrecord.outputs_not_initially_OK() or execrecord.generator.record.is_failed():
+        if execrecord.outputs_not_usable_in_run() or execrecord.generator.record.is_failed():
             self.logger.debug("ExecRecord found (%s) was a failure", execrecord)
             result["successful"] = False
 
@@ -2285,7 +2285,7 @@ class RunCable(RunComponent):
 
         # Terminal case 1: the found ExecRecord has failed some initial checks.  In this case,
         # we just return and the RunCable fails.
-        if not output_SD.initially_OK():
+        if not output_SD.usable_in_run():
             self.logger.debug("The ExecRecord ({}) found has a bad output.".format(execrecord))
             summary["successful"] = False
 
@@ -2332,7 +2332,7 @@ class RunCable(RunComponent):
         if len(other) > 0:
             return _first_ER_h(other)
 
-        return (None, None)
+        return None, None
 
 
 class RunSIC(RunCable):

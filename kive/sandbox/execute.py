@@ -855,11 +855,6 @@ class Sandbox:
                     if curr_ER is not None:
                         output_dataset = curr_ER.execrecordouts.first().dataset
 
-                        print "FOOOOOOO"
-                        print curr_ER.generator.record.get_state_name()
-                        print can_reuse
-                        print "BAAAAAAR"
-
                         if curr_ER.generator.record.is_quarantined():
                             # We will re-attempt; if it's fixed, then we un-quarantine the ExecRecord.
                             self.logger.debug(
