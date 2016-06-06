@@ -6,65 +6,8 @@ import os.path
 
 from django.conf import settings
 import django.core.validators
-from django.db import migrations, models, transaction
+from django.db import migrations, models
 import django.db.models.deletion
-
-
-@transaction.atomic
-def transfer_crd_to_md(apps, schema_editor):
-    """
-    Create MethodDependencies from CodeResourceDependencies.
-    """
-    CodeResourceDependency = apps.get_model("method", "CodeResourceDependency")
-
-    for crd in CodeResourceDependency.objects.all():
-        transfer_crd_helper(crd)
-
-
-def transfer_crd_helper(original_crd, current_crd=None, path_accumulator=None):
-    """
-    Creates appropriate MethodDependencies for a CodeResourceDependency.
-
-    current_crd specifies a CodeResourceDependency that is "above" original_crd -- i.e.
-    something that depends on original_crd is itself a dependency for something else --
-    or equal to it.  If it is None, then it's set to original_crd.
-
-    path_accumulator keeps track of the path (relative to the sandbox path) that
-    the code should be installed in.
-
-    If the requirement part of original_crd is a meta-package, we do nothing.
-    Its dependencies should be handled with their own calls to transfer_crd_helper.
-
-    A MethodDependency is created for any Method that used
-    current_crd.coderesourcerevision as a driver.
-
-    It then recurses up a layer, looking at any other CodeResourceRevisions that
-    depended on current_crd.coderesourcerevision.
-    """
-    current_crd = current_crd or original_crd
-    path_accumulator = path_accumulator or ""
-
-    if not original_crd.requirement.content_file:
-        # The dependency is a meta-package, so we bail.
-        return
-
-    path_accumulator = os.path.join(current_crd.depPath, path_accumulator)
-
-    for method in current_crd.coderesourcerevision.methods.all():
-        # Create a MethodDependency for this Method.
-        method.dependencies.create(
-            requirement=original_crd.requirement,
-            path=path_accumulator,
-            filename=original_crd.depFileName
-        )
-
-    # Recursive step: look and see if current_crd is depended on by any other CodeResourceRevisions.
-    for parent_crd in current_crd.coderesourcerevision.needed_by.all():
-        transfer_crd_helper(original_crd, parent_crd, path_accumulator)
-
-
-def noop(apps, schema_editor):
-    pass
 
 
 class Migration(migrations.Migration):
@@ -100,20 +43,12 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(help_text='The name for this resource and all subsequent revisions.', max_length=60, unique=True, verbose_name='Resource name')),
-                ('filename', models.CharField(blank=True, help_text='The filename for this resource', max_length=260, validators=[django.core.validators.RegexValidator(message='Invalid code resource filename', regex='^(\x08|([-_.()\\w]+ *)*[-_.()\\w]+)$')], verbose_name='Resource file name')),
+                ('filename', models.CharField(help_text='The filename for this resource', max_length=260, validators=[django.core.validators.RegexValidator(message='Invalid code resource filename', regex='^(\x08|([-_.()\\w]+ *)*[-_.()\\w]+)$')], verbose_name='Resource file name')),
                 ('description', models.TextField(blank=True, max_length=1000, verbose_name='Resource description')),
             ],
             options={
                 'ordering': ('name',),
             },
-        ),
-        migrations.CreateModel(
-            name='CodeResourceDependency',
-            fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('depPath', models.CharField(blank=True, help_text="Where a code resource dependency must exist in the sandbox relative to it's parent", max_length=255, verbose_name='Dependency path')),
-                ('depFileName', models.CharField(blank=True, help_text='The file name the dependency is given on the sandbox at execution', max_length=255, verbose_name='Dependency file name')),
-            ],
         ),
         migrations.CreateModel(
             name='CodeResourceRevision',
@@ -123,7 +58,7 @@ class Migration(migrations.Migration):
                 ('revision_name', models.CharField(blank=True, help_text='A name to differentiate revisions of a CodeResource', max_length=60)),
                 ('revision_DateTime', models.DateTimeField(auto_now_add=True, help_text='Date this resource revision was uploaded')),
                 ('revision_desc', models.TextField(blank=True, help_text='A description for this particular resource revision', max_length=1000, verbose_name='Revision description')),
-                ('content_file', models.FileField(blank=True, help_text='File contents of this code resource revision', null=True, upload_to='CodeResources', verbose_name='File contents')),
+                ('content_file', models.FileField(help_text='File contents of this code resource revision', upload_to='CodeResources', verbose_name='File contents')),
                 ('MD5_checksum', models.CharField(blank=True, help_text='Used to validate file contents of this resource revision', max_length=64)),
                 ('coderesource', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='revisions', to='method.CodeResource')),
                 ('revision_parent', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='descendants', to='method.CodeResourceRevision')),
@@ -174,16 +109,6 @@ class Migration(migrations.Migration):
         migrations.AlterUniqueTogether(
             name='method',
             unique_together=set([('family', 'revision_number')]),
-        ),
-        migrations.AddField(
-            model_name='coderesourcedependency',
-            name='coderesourcerevision',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='dependencies', to='method.CodeResourceRevision'),
-        ),
-        migrations.AddField(
-            model_name='coderesourcedependency',
-            name='requirement',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='needed_by', to='method.CodeResourceRevision'),
         ),
         migrations.AddField(
             model_name='coderesource',
@@ -262,32 +187,5 @@ class Migration(migrations.Migration):
                 ('method', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='dependencies', to='method.Method')),
                 ('requirement', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='used_by', to='method.CodeResourceRevision')),
             ],
-        ),
-        migrations.RunPython(code=transfer_crd_to_md, reverse_code=noop),
-        migrations.RemoveField(
-            model_name='coderesourcedependency',
-            name='coderesourcerevision',
-        ),
-        migrations.RemoveField(
-            model_name='coderesourcedependency',
-            name='requirement',
-        ),
-        migrations.DeleteModel(
-            name='CodeResourceDependency',
-        ),
-        migrations.AlterField(
-            model_name='coderesource',
-            name='filename',
-            field=models.CharField(help_text='The filename for this resource', max_length=260, validators=[django.core.validators.RegexValidator(message='Invalid code resource filename', regex='^(\x08|([-_.()\\w]+ *)*[-_.()\\w]+)$')], verbose_name='Resource file name'),
-        ),
-        migrations.AlterField(
-            model_name='coderesourcerevision',
-            name='content_file',
-            field=models.FileField(default=(), help_text='File contents of this code resource revision', upload_to='CodeResources', verbose_name='File contents'),
-        ),
-        migrations.AlterField(
-            model_name='coderesourcerevision',
-            name='content_file',
-            field=models.FileField(help_text='File contents of this code resource revision', upload_to='CodeResources', verbose_name='File contents'),
         ),
     ]

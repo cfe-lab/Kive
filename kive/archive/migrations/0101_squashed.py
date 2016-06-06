@@ -318,14 +318,6 @@ class Migration(migrations.Migration):
             bases=('archive.runcomponent',),
         ),
         migrations.CreateModel(
-            name='RunSIC',
-            fields=[
-                ('runcomponent_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='archive.RunComponent')),
-                ('PSIC', models.IntegerField(db_column='PSIC_id')),
-            ],
-            bases=('archive.runcomponent',),
-        ),
-        migrations.CreateModel(
             name='RunStep',
             fields=[
                 ('runcomponent_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='archive.RunComponent')),
@@ -338,6 +330,19 @@ class Migration(migrations.Migration):
             name='runstep',
             unique_together=set([('run', 'pipelinestep')]),
         ),
+        migrations.CreateModel(
+            name='RunSIC',
+            fields=[
+                ('runcomponent_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='archive.RunComponent')),
+                ('PSIC', models.IntegerField(db_column='PSIC_id')),
+                ('dest_runstep', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='RSICs', to='archive.RunStep')),
+            ],
+            bases=('archive.runcomponent',),
+        ),
+        migrations.AlterUniqueTogether(
+            name='runsic',
+            unique_together=set([('dest_runstep', 'PSIC')]),
+        ),
         migrations.AlterUniqueTogether(
             name='runoutputcable',
             unique_together=set([('run', 'pipelineoutputcable')]),
@@ -346,15 +351,6 @@ class Migration(migrations.Migration):
             model_name='run',
             name='pipeline',
             field=models.IntegerField(db_column='pipeline_id'),
-        ),
-        migrations.AddField(
-            model_name='runsic',
-            name='runstep',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='RSICs', to='archive.RunStep'),
-        ),
-        migrations.AlterUniqueTogether(
-            name='runsic',
-            unique_together=set([('runstep', 'PSIC')]),
         ),
         migrations.AddField(
             model_name='run',
@@ -493,15 +489,6 @@ class Migration(migrations.Migration):
             model_name='runcomponent',
             name='_successful',
             field=models.NullBooleanField(help_text='Denotes whether this has been successful. Private use only!'),
-        ),
-        migrations.RenameField(
-            model_name='runsic',
-            old_name='runstep',
-            new_name='dest_runstep',
-        ),
-        migrations.AlterUniqueTogether(
-            name='runsic',
-            unique_together=set([('dest_runstep', 'PSIC')]),
         ),
         migrations.AlterField(
             model_name='run',

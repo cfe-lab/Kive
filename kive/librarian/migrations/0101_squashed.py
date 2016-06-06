@@ -62,7 +62,7 @@ class Migration(migrations.Migration):
             ],
         ),
         migrations.CreateModel(
-            name='SymbolicDataset',
+            name='Dataset',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('MD5_checksum', models.CharField(blank=True, default='', help_text='Validates file integrity', max_length=64, validators=[django.core.validators.RegexValidator(message='MD5 checksum is not either 32 hex characters or blank', regex=re.compile('(^[0-9A-Fa-f]{32}$)|(^$)'))])),
@@ -74,8 +74,8 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='execrecordout',
-            name='symbolicdataset',
-            field=models.ForeignKey(help_text='Symbol for the dataset coming from this output', on_delete=django.db.models.deletion.CASCADE, related_name='execrecordouts', to='librarian.SymbolicDataset'),
+            name='dataset',
+            field=models.ForeignKey(help_text='Symbol for the dataset coming from this output', on_delete=django.db.models.deletion.CASCADE, related_name='execrecordouts', to='librarian.Dataset'),
         ),
         migrations.AlterUniqueTogether(
             name='execrecordout',
@@ -83,8 +83,8 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='execrecordin',
-            name='symbolicdataset',
-            field=models.ForeignKey(help_text='Symbol for the dataset fed to this input', on_delete=django.db.models.deletion.CASCADE, related_name='execrecordins', to='librarian.SymbolicDataset'),
+            name='dataset',
+            field=models.ForeignKey(help_text='Symbol for the dataset fed to this input', on_delete=django.db.models.deletion.CASCADE, related_name='execrecordins', to='librarian.Dataset'),
         ),
         migrations.AlterUniqueTogether(
             name='execrecordin',
@@ -92,41 +92,37 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='datasetstructure',
-            name='symbolicdataset',
-            field=models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='structure', to='librarian.SymbolicDataset'),
+            name='dataset',
+            field=models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='structure', to='librarian.Dataset'),
         ),
         migrations.AlterModelOptions(
-            name='symbolicdataset',
+            name='dataset',
             options={'ordering': ['-date_created', 'name']},
         ),
         migrations.AddField(
-            model_name='symbolicdataset',
+            model_name='dataset',
             name='file_source',
             field=models.IntegerField(db_column='file_source_id', null=True),
         ),
         migrations.AddField(
-            model_name='symbolicdataset',
+            model_name='dataset',
             name='dataset_file',
             field=models.FileField(help_text='Physical path where datasets are stored', max_length=260, null=True, upload_to=librarian.models.get_upload_path),
         ),
         migrations.AddField(
-            model_name='symbolicdataset',
+            model_name='dataset',
             name='date_created',
             field=models.DateTimeField(default=django.utils.timezone.now, help_text='Date of Dataset creation.'),
         ),
         migrations.AddField(
-            model_name='symbolicdataset',
+            model_name='dataset',
             name='description',
             field=models.TextField(blank=True, help_text='Description of this Dataset.', max_length=1000),
         ),
         migrations.AddField(
-            model_name='symbolicdataset',
+            model_name='dataset',
             name='name',
             field=models.CharField(blank=True, help_text='Name of this Dataset.', max_length=260),
-        ),
-        migrations.RenameModel(
-            old_name='SymbolicDataset',
-            new_name='Dataset',
         ),
         migrations.AlterField(
             model_name='dataset',
@@ -138,30 +134,15 @@ class Migration(migrations.Migration):
             name='users_allowed',
             field=models.ManyToManyField(blank=True, help_text='Which users have access?', null=True, related_name='librarian_dataset_has_access_to', to=settings.AUTH_USER_MODEL),
         ),
-        migrations.RenameField(
-            model_name='datasetstructure',
-            old_name='symbolicdataset',
-            new_name='dataset',
-        ),
         migrations.AlterField(
             model_name='datasetstructure',
             name='dataset',
             field=models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='structure', to='librarian.Dataset'),
         ),
-        migrations.RenameField(
-            model_name='execrecordin',
-            old_name='symbolicdataset',
-            new_name='dataset',
-        ),
         migrations.AlterField(
             model_name='execrecordin',
             name='dataset',
             field=models.ForeignKey(help_text='Dataset fed to this input', on_delete=django.db.models.deletion.CASCADE, related_name='execrecordins', to='librarian.Dataset'),
-        ),
-        migrations.RenameField(
-            model_name='execrecordout',
-            old_name='symbolicdataset',
-            new_name='dataset',
         ),
         migrations.AlterField(
             model_name='execrecordout',
