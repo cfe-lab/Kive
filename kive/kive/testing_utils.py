@@ -998,8 +998,10 @@ CCCTCCTC
     p_nested.create_outputs()
     p_nested.save()
 
-    first_run = Manager.execute_pipeline(remover, noop_pl, [seq_dataset], groups_allowed=[]).get_last_run()
-    second_run = Manager.execute_pipeline(remover, noop_pl, [seq_dataset], groups_allowed=[]).get_last_run()
+    # First run
+    Manager.execute_pipeline(remover, noop_pl, [seq_dataset], groups_allowed=[])
+    # Second run
+    Manager.execute_pipeline(remover, noop_pl, [seq_dataset], groups_allowed=[])
 
     two_step_noop_pl = make_first_pipeline(
         "Nucleotide Sequence two-step Noop",
@@ -1027,12 +1029,12 @@ TTTTTTC
         description="A dataset for use in the removal test case with the two-step Pipeline."
     )
 
-    two_step_run = Manager.execute_pipeline(
+    # Two step run
+    Manager.execute_pipeline(
         remover,
         two_step_noop_pl,
         [two_step_seq_dataset],
-        groups_allowed=[]
-    ).get_last_run()
+        groups_allowed=[])
 
 
 def create_sandbox_testing_tools_environment(case):
