@@ -189,6 +189,7 @@ Dave,40
     def test_check_file_contents(self):
         file_path = os.devnull
         with mock_relations(Dataset, BadData):
+            BadData.objects = Mock(name='BadData.objects')
             mock_structure = Mock(name='Dataset.structure')
             Dataset.structure = mock_structure
             expected_bad_data = BadData.objects.create.return_value  # @UndefinedVariable

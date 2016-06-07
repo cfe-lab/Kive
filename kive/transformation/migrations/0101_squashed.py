@@ -29,6 +29,9 @@ class Migration(migrations.Migration):
                 ('revision_name', models.CharField(blank=True, help_text='The name of this transformation revision', max_length=60, verbose_name='Transformation revision name')),
                 ('revision_DateTime', models.DateTimeField(auto_now_add=True, verbose_name='Revision creation date')),
                 ('revision_desc', models.TextField(blank=True, help_text='Description of this transformation revision', max_length=1000, verbose_name='Transformation revision description')),
+                ('groups_allowed', models.ManyToManyField(blank=True, help_text='What groups have access?', related_name='transformation_transformation_has_access_to', to=b'auth.Group')),
+                ('user', models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                ('users_allowed', models.ManyToManyField(blank=True, help_text='Which users have access?', related_name='transformation_transformation_has_access_to', to=settings.AUTH_USER_MODEL)),
             ],
         ),
         migrations.CreateModel(
@@ -76,22 +79,6 @@ class Migration(migrations.Migration):
                 ('compounddatatype', models.IntegerField(db_column='compounddatatype_id')),
                 ('transf_xput', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='structure', to='transformation.TransformationXput')),
             ],
-        ),
-        migrations.AddField(
-            model_name='transformation',
-            name='groups_allowed',
-            field=models.ManyToManyField(blank=True, help_text='What groups have access?', related_name='transformation_transformation_has_access_to', to=b'auth.Group'),
-        ),
-        migrations.AddField(
-            model_name='transformation',
-            name='user',
-            field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL),
-            preserve_default=False,
-        ),
-        migrations.AddField(
-            model_name='transformation',
-            name='users_allowed',
-            field=models.ManyToManyField(blank=True, help_text='Which users have access?', related_name='transformation_transformation_has_access_to', to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='transformationinput',

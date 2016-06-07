@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
         ('librarian', '__first__'),
         ('librarian', '0004_redacted_20150417_1128'),
         ('librarian', '0007_transition_SD_to_dataset_20151117_1748'),
-        ('metadata', '0101_squashed'),
+        ('metadata', '0017_order_cdt_by_name_20160215_1637'),
     ]
 
     operations = [
