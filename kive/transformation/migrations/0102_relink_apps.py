@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('transformation', '0100_unlink_apps'),
-        ('metadata', '0101_squashed'),
+        ('metadata', '0017_order_cdt_by_name_20160215_1637'),
     ]
 
     operations = [
