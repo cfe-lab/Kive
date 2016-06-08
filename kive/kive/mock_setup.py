@@ -149,12 +149,14 @@ def _exclude(mock_set, *args, **kwargs):
     return MockSet(*remainder)
 
 
+# TODO: remove when django_mock_queries is updated
 def _first(mock_set):
     for item in mock_set.all():
         return item
     return None
 
 
+# TODO: remove when django_mock_queries is updated
 def _last(mock_set):
     last_item = None
     for item in mock_set.all():
@@ -162,6 +164,7 @@ def _last(mock_set):
     return last_item
 
 
+# TODO: remove when django_mock_queries is updated
 def _distinct(mock_set):
     records = set(mock_set.all())
     return MockSet(*records)
