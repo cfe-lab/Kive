@@ -847,6 +847,7 @@ class Sandbox:
 
         succeeded_yet = False
         self.logger.debug("Checking whether cable can be reused")
+        could_be_reused = False
         while not succeeded_yet:
             try:
                 with transaction.atomic():
@@ -873,7 +874,8 @@ class Sandbox:
                             curr_record.execrecord = curr_ER
 
                             if can_reuse["successful"]:  # and therefore fully reusable
-                                curr_record.finish_successfully(save=True)
+                                # curr_record.finish_successfully(save=True)
+                                could_be_reused = True
                             else:
                                 curr_record.finish_failure(save=True)
                             curr_record.complete_clean()
@@ -894,7 +896,8 @@ class Sandbox:
                                         input_dataset,
                                         self.dataset_fs_map[input_dataset],
                                         output_path,
-                                        by_step=by_step)
+                                        by_step=by_step,
+                                        could_be_reused=could_be_reused)
         self.cable_execute_info[(curr_record.parent_run, cable)] = exec_info
         if return_now:
             return exec_info
@@ -1045,17 +1048,18 @@ class Sandbox:
 
             # If the cable was cancelled (e.g. due to bad input), we bail.
             return_because_fail = False
-            if cable_exec_info.cancelled:
+            if cable_exec_info.cable_record.is_cancelled():
                 self.logger.debug("Input cable %s to step %s was cancelled", cable_exec_info.cable_record,
                                   curr_RS)
                 return_because_fail = True
             elif (cable_exec_info.cable_record.reused
-                  and not cable_exec_info.cable_record.is_successful()):
+                  and cable_exec_info.cable_record.is_failed()):
                 self.logger.debug("Input cable %s to step %s failed on reuse", cable_exec_info.cable_record,
                                   curr_RS)
                 return_because_fail = True
-            # If the cable is not complete and not ready to go, we need to recover its input.
-            elif not cable_exec_info.cable_record.is_complete():
+            # If the cable is not fit to be reused and not ready to go, we need to recover its input.
+            # elif not cable_exec_info.cable_record.is_complete():
+            elif not cable_exec_info.could_be_reused:
                 if not cable_exec_info.ready_to_go:
                     datasets_to_recover.append(inputs[i])
             elif not cable_exec_info.execrecord.execrecordouts.first().dataset.has_data():
@@ -1065,6 +1069,8 @@ class Sandbox:
                 curr_RS.cancel_running(save=True)
                 curr_RS.complete_clean()
                 return curr_RS
+
+        # Having reached here, we know that all input cables are either fit for reuse or ready to go.
 
         # Bundle up the information required to process this step.
         _in_dir, _out_dir, log_dir = self._setup_step_paths(step_run_dir, False)
@@ -1099,11 +1105,10 @@ class Sandbox:
         inputs_after_cable = []
         all_inputs_present = True
         for i, curr_input in enumerate(pipelinestep.inputs):
-            curr_RSIC = cable_info_list[i].cable_record
-            if not curr_RSIC.is_complete():
+            if not cable_info_list[i].could_be_reused:
                 all_inputs_present = False
                 break
-            inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
+            inputs_after_cable.append(cable_info_list[i].cable_record.execrecord.execrecordouts.first().dataset)
 
         if all_inputs_present:
 
@@ -1135,6 +1140,10 @@ class Sandbox:
                                 )
                                 curr_RS.reused = True
                                 curr_RS.execrecord = curr_ER
+
+                                for cable_info in cable_info_list:
+                                    # Being here means all cables were able to be fully reused.
+                                    cable_info.cable_record.finish_successfully(save=True)
 
                                 if can_reuse["successful"]:
                                     curr_RS.finish_successfully(save=True)
@@ -1695,6 +1704,7 @@ class Sandbox:
                 curr_execute_dict["recovering_record_pk"] = recovering_record.pk
 
             curr_RSIC = Sandbox.finish_cable(curr_execute_dict, worker_rank)
+            completed_cable_pks.append(curr_RSIC.pk)
 
             # Cable failed, return incomplete RunStep.
             curr_RSIC.refresh_from_db()
@@ -1714,7 +1724,6 @@ class Sandbox:
                 return curr_RS
 
             # Cable succeeded.
-            completed_cable_pks.append(curr_RSIC.pk)
             inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
             input_paths.append(curr_execute_dict["output_path"])
 
@@ -2308,7 +2317,7 @@ class RunStepExecuteInfo:
 
 class RunCableExecuteInfo:
     def __init__(self, cable_record, user, execrecord, input_dataset, input_dataset_path, output_path,
-                 recovering_record=None, by_step=None):
+                 recovering_record=None, by_step=None, could_be_reused=False):
         """
         Constructor.
         """
@@ -2324,6 +2333,7 @@ class RunCableExecuteInfo:
         self.threads_required = 1
         self.ready_to_go = False
         self.cancelled = False
+        self.could_be_reused = could_be_reused
 
     def flag_for_recovery(self, recovering_record, by_step=None):
         assert self.recovering_record is None

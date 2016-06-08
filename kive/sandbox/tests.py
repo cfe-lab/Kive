@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import tempfile
+import shutil
 
 from django.contrib.auth.models import User
 from django.core.files import File
@@ -10,7 +11,7 @@ from django.test import TestCase
 
 from archive.models import Run
 from constants import datatypes
-from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
+from datachecking.models import IntegrityCheckLog, MD5Conflict
 from kive.testing_utils import clean_up_all_files
 from kive.tests import install_fixture_files, restore_production_files
 from librarian.models import Dataset, DatasetStructure, ExternalFileDirectory
@@ -642,6 +643,173 @@ class ExecuteTests(ExecuteTestsBase):
         # find a suitable ExecRecord.
         self.check_run_OK(run2)
 
+    def test_execution_external_file_decontaminates_quarantined_runcables(self):
+        """
+        Executing a pipeline on externally-backed data with a quarantined component properly re-validates a RunSIC.
+        """
+        # Set up a working directory and an externally-backed Dataset.
+        self.working_dir = tempfile.mkdtemp()
+        self.efd = ExternalFileDirectory(
+            name="ExecuteTestsEFD",
+            path=self.working_dir
+        )
+        self.efd.save()
+        self.ext_path = "ext.txt"
+        self.full_ext_path = os.path.join(self.working_dir, self.ext_path)
+
+        # Copy the contents of self.dataset to an external file and link the Dataset.
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
+
+        # Create a new externally-backed Dataset.
+        externally_backed_ds = Dataset.create_dataset(
+            self.full_ext_path,
+            user=self.myUser,
+            keep_file=False,
+            name="ExternallyBackedDS",
+            description="Dataset with external data and no internal data",
+            externalfiledirectory=self.efd
+        )
+
+        # Start by executing a simple one-step pipeline.
+        pipeline = self.pX_raw
+        inputs = [externally_backed_ds]
+        run1 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        self.check_run_OK(run1)
+
+        run1_rs = run1.runsteps.first()
+        run1_rs_incable = run1_rs.RSICs.first()
+
+        # Now, let's corrupt the input.
+        corrupted_contents = "Corrupted file"
+        with open(self.full_ext_path, "wb") as f:
+            f.write(corrupted_contents)
+        externally_backed_ds.check_integrity(self.full_ext_path, self.myUser, notify_all=True)
+
+        # This should have quarantined run1_rs_incable and run1 but not run1_rs.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_rs_incable.refresh_from_db()
+        self.assertTrue(run1.is_quarantined())
+        self.assertTrue(run1_rs.is_successful())
+        self.assertTrue(run1_rs_incable.is_quarantined())
+
+        # Now we fix the contents of the Dataset.
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
+
+        # Now, we try it again.
+        run2 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        # It should have re-validated run1 and run1_rs.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_rs_incable.refresh_from_db()
+        self.assertTrue(run1.is_successful())
+        self.assertTrue(run1_rs.is_successful())
+        self.assertTrue(run1_rs_incable.is_successful())
+
+        self.check_run_OK(run2)
+
+        shutil.rmtree(self.working_dir)
+
+    def test_execution_external_file_decontaminates_quarantined_runsteps(self):
+        """
+        Executing a pipeline on externally-backed data with a quarantined component properly re-validates RunSteps.
+        """
+        # Set up a working directory and an externally-backed Dataset.
+        self.working_dir = tempfile.mkdtemp()
+        self.efd = ExternalFileDirectory(
+            name="ExecuteTestsEFD",
+            path=self.working_dir
+        )
+        self.efd.save()
+        self.ext_path = "ext.txt"
+        self.full_ext_path = os.path.join(self.working_dir, self.ext_path)
+
+        # Copy the contents of self.dataset to an external file and link the Dataset.
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
+
+        # Create a new externally-backed Dataset.
+        externally_backed_ds = Dataset.create_dataset(
+            self.full_ext_path,
+            user=self.myUser,
+            keep_file=False,
+            name="ExternallyBackedDS",
+            description="Dataset with external data and no internal data",
+            externalfiledirectory=self.efd
+        )
+
+        # Start by executing a simple one-step pipeline.
+        pipeline = self.pX_raw
+        inputs = [externally_backed_ds]
+        run1 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        self.check_run_OK(run1)
+
+        run1_rs = run1.runsteps.first()
+        run1_rs_incable = run1_rs.RSICs.first()
+
+        # Now, let's corrupt the input.
+        corrupted_contents = "Corrupted file"
+        with open(self.full_ext_path, "wb") as f:
+            f.write(corrupted_contents)
+
+        # We also delete the output of the step so that it's forced to run.
+        output_ds = run1_rs.outputs.first()
+        output_ds.dataset_file.delete(save=True)
+
+        # We do another run.
+        run2 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+
+        # This should have quarantined run1_rs_incable and run1 but not run1_rs.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_rs_incable.refresh_from_db()
+        self.assertTrue(run1.is_quarantined())
+        self.assertTrue(run1_rs.is_successful())
+        self.assertTrue(run1_rs_incable.is_quarantined())
+
+        run2.assertTrue(run2.is_cancelled())
+        run2_rs = run2.runsteps.first()
+        run2_rs_incable = run2_rs.RSICs.first()
+        self.assertTrue(run2.is_cancelled())
+        self.assertTrue(run2_rs.is_cancelled())
+        self.assertTrue(run2_rs_incable.is_cancelled())
+
+        # Now we fix the contents of the Dataset.
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
+
+        # Now, we try it again.
+        run3 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        # It should have re-validated run1 and run1_rs.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_rs_incable.refresh_from_db()
+        self.assertTrue(run1.is_successful())
+        self.assertTrue(run1_rs.is_successful())
+        self.assertTrue(run1_rs_incable.is_successful())
+
+        # The stuff from run2 should be left alone.
+        run2.refresh_from_db()
+        run2_rs.refresh_from_db()
+        run2_rs_incable.refresh_from_db()
+        self.assertTrue(run2.is_cancelled())
+        self.assertTrue(run2_rs.is_cancelled())
+        self.assertTrue(run2_rs_incable.is_cancelled())
+
+        self.check_run_OK(run3)
+
+        shutil.rmtree(self.working_dir)
+
 
 class SandboxTests(ExecuteTestsBase):
 
@@ -923,6 +1091,10 @@ class ExecuteExternalInputTests(ExecuteTestsBase):
         self.ext_path = "ext.txt"
         self.full_ext_path = os.path.join(self.working_dir, self.ext_path)
 
+    def tearDown(self):
+        super(ExecuteExternalInputTests, self).tearDown()
+        shutil.rmtree(self.working_dir)
+
     def test_pipeline_external_file_input(self):
         """Execution of a pipeline whose input is externally-backed."""
 
@@ -978,35 +1150,34 @@ class ExecuteExternalInputTests(ExecuteTestsBase):
         self.assertTrue(hasattr(rsic, "input_integrity_check"))
         self.assertTrue(rsic.input_integrity_check.read_failed)
 
-    # FIXME disabled for v0.7.3; fix as part of #550.
-    # def test_pipeline_external_file_input_corrupted(self):
-    #     """Execution of a pipeline whose input is corrupted."""
-    #
-    #     # Copy the contents of self.dataset to an external file and link the Dataset.
-    #     self.raw_dataset.dataset_file.open()
-    #     with self.raw_dataset.dataset_file:
-    #         with open(self.full_ext_path, "wb") as f:
-    #             f.write(self.raw_dataset.dataset_file.read())
-    #
-    #     # Create a new externally-backed Dataset.
-    #     external_corrupted_ds = Dataset.create_dataset(
-    #         self.full_ext_path,
-    #         user=self.myUser,
-    #         keep_file=False,
-    #         name="ExternalCorruptedDS",
-    #         description="Dataset with corrupted external data and no internal data",
-    #         externalfiledirectory=self.efd
-    #     )
-    #     # Tamper with the external file.
-    #     with open(self.full_ext_path, "wb") as f:
-    #         f.write("Corrupted")
-    #
-    #     # Execute pipeline
-    #     run = Manager.execute_pipeline(self.myUser, self.pX_raw, [external_corrupted_ds]).get_last_run()
-    #
-    #     # The run should fail on the first cable.
-    #     self.assertFalse(run.is_successful(use_cache=True))
-    #     rsic = run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
-    #     self.assertFalse(rsic.is_successful(use_cache=True))
-    #     self.assertTrue(hasattr(rsic, "input_integrity_check"))
-    #     self.assertTrue(rsic.input_integrity_check.is_md5_conflict())
+    def test_pipeline_external_file_input_corrupted(self):
+        """Execution of a pipeline whose input is corrupted."""
+
+        # Copy the contents of self.dataset to an external file and link the Dataset.
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
+
+        # Create a new externally-backed Dataset.
+        external_corrupted_ds = Dataset.create_dataset(
+            self.full_ext_path,
+            user=self.myUser,
+            keep_file=False,
+            name="ExternalCorruptedDS",
+            description="Dataset with corrupted external data and no internal data",
+            externalfiledirectory=self.efd
+        )
+        # Tamper with the external file.
+        with open(self.full_ext_path, "wb") as f:
+            f.write("Corrupted")
+
+        # Execute pipeline
+        run = Manager.execute_pipeline(self.myUser, self.pX_raw, [external_corrupted_ds]).get_last_run()
+
+        # The run should fail on the first cable.
+        self.assertFalse(run.is_successful())
+        rsic = run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
+        self.assertFalse(rsic.is_successful())
+        self.assertTrue(hasattr(rsic, "input_integrity_check"))
+        self.assertTrue(rsic.input_integrity_check.is_md5_conflict())

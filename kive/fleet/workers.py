@@ -590,16 +590,20 @@ class Manager(object):
                             clean_up_now = True
 
         else:
-            # The component that just finished failed.  Cancellation is handled by stop_run
+            # The component that just finished failed or was cancelled (e.g. a RunCable fails to
+            # copy the input to the sandbox).  Cancellation is handled by stop_run
             # (or assign_task).
-            assert task_finished.is_failed(), "{} != Failed".format(task_finished.get_state_name())
+            assert task_finished.is_failed() or task_finished.is_cancelled(), "{} != Failed or Cancelled".format(
+                task_finished.get_state_name()
+            )
             stop_subruns_if_possible = True
             if curr_sdbx.run.is_failing() or curr_sdbx.run.is_cancelling():
                 assert curr_sdbx in self.sandboxes_shutting_down
                 mgr_logger.debug(
-                    'Task %s (pk=%d) failed; run "%s" (pk=%d, Pipeline: %s, User: %s) was already %s',
+                    'Task %s (pk=%d) %s; run "%s" (pk=%d, Pipeline: %s, User: %s) was already %s',
                     task_finished,
                     task_finished.pk,
+                    task_finished.get_state_name(),
                     curr_sdbx.run,
                     curr_sdbx.run.pk,
                     curr_sdbx.pipeline,

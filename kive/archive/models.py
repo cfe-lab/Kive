@@ -1021,7 +1021,9 @@ class RunComponent(stopwatch.models.Stopwatch):
         This is to be used to terminate RunComponents that are running, not ones
         that are still pending.
         """
-        assert self._runcomponentstate_id == runcomponentstates.RUNNING_PK
+        assert self._runcomponentstate_id == runcomponentstates.RUNNING_PK, "{} != {}".format(
+            self._runcomponentstate_id, runcomponentstates.RUNNING_PK
+        )
         self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.CANCELLED_PK)
         self.stop(save=save)
 
