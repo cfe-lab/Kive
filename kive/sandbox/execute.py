@@ -623,6 +623,9 @@ class Sandbox:
                     cable_record = cable_exec_info.cable_record
                     if cable_record.is_complete():
                         incables_completed.append(cable_record)
+                    elif cable_exec_info.could_be_reused:
+                        cable_record.finish_successfully()
+                        incables_completed.append(cable_record)
                     else:
                         self.sub_pipeline_cable_tracker[curr_RS].add(cable_record)
                         all_RSICs_done = False
@@ -635,7 +638,7 @@ class Sandbox:
                                           curr_RS)
                         return_because_fail = True
                     elif (cable_exec_info.cable_record.reused
-                          and not cable_exec_info.cable_record.is_successful()):
+                          and not cable_exec_info.could_be_reused):
                         self.logger.debug("Input cable %s to sub-pipeline step %s failed on reuse",
                                           cable_exec_info.cable_record,
                                           curr_RS)
@@ -785,12 +788,13 @@ class Sandbox:
 
             cr = cable_exec_info.cable_record
 
-            if cr.reused and not cr.is_successful():
+            if cr.is_failed():
                 self.logger.debug("Cable %s failed on reuse", cr.pipelineoutputcable)
                 run_to_resume.mark_failure(save=True)
                 return incables_completed, steps_completed, outcables_completed
 
-            elif cr.is_successful():
+            elif cable_exec_info.could_be_reused:
+                cr.finish_successfully(save=True)
                 outcables_completed.append(cr)
 
             elif cr.is_running():
@@ -878,7 +882,7 @@ class Sandbox:
                                 could_be_reused = True
                             else:
                                 curr_record.finish_failure(save=True)
-                            curr_record.complete_clean()
+                                # curr_record.complete_clean()
 
                             self.update_cable_maps(curr_record, output_dataset, output_path)
                             return_now = True
@@ -1709,15 +1713,14 @@ class Sandbox:
             # Cable failed, return incomplete RunStep.
             curr_RSIC.refresh_from_db()
             if not curr_RSIC.is_successful():
-                logger.error("[%d] PipelineStepInputCable %s failed.", worker_rank, curr_RSIC)
+                logger.error("[%d] PipelineStepInputCable %s %s.",
+                             worker_rank, curr_RSIC, curr_RSIC.get_state_name())
 
                 # Cancel the other RunSICs for this step.
                 for rsic in curr_RS.RSICs.exclude(pk__in=completed_cable_pks):
                     rsic.cancel_pending(save=True)
 
                 # Update state variables.
-                # We need to refresh curr_RS because this version hasn't had its
-                # _successful flag changed.
                 curr_RS.refresh_from_db()
                 curr_RS.cancel_running(save=True)  # Transition: Running->Cancelled
                 curr_RS.complete_clean()

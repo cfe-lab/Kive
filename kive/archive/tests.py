@@ -3407,7 +3407,7 @@ with open(sys.argv[2], "wb") as f:
         p_two.create_outputs()
         p_two.save()
         # We also delete the output of step 1 so that it reuses the existing ER we'll have
-        # create for p_one.
+        # created for p_one.
         p_two.steps.get(step_num=1).add_deletion(self.curr_time_method.outputs.first())
 
         run2 = Manager.execute_pipeline(self.user_bob, p_two, [self.time_SD]).get_last_run()
@@ -3422,13 +3422,13 @@ with open(sys.argv[2], "wb") as f:
         self.assertTrue(run2_step1.is_failed())
 
         # The corresponding step from run1 should also be quarantined, as should
-        # run1_step2_RSIC and run2_step2_RSIC (because there was a failed integrity check).
+        # run1_step2_RSIC.  run2_step2_RSIC is cancelled.
         run1_step1 = run1.runsteps.get(pipelinestep__step_num=1)
         self.assertTrue(run1_step1.is_quarantined())
         run1_step2_RSIC = run1.runsteps.get(pipelinestep__step_num=2).RSICs.first()
         run2_step2_RSIC = run2.runsteps.get(pipelinestep__step_num=2).RSICs.first()
         self.assertTrue(run1_step2_RSIC.is_quarantined())
-        self.assertTrue(run2_step2_RSIC.is_quarantined())
+        self.assertTrue(run2_step2_RSIC.is_cancelled())
 
         # run2_step2, the recovering step, should be cancelled.
         self.assertTrue(run2_step2.is_cancelled())

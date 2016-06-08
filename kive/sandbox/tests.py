@@ -775,10 +775,9 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertTrue(run1_rs.is_successful())
         self.assertTrue(run1_rs_incable.is_quarantined())
 
-        run2.assertTrue(run2.is_cancelled())
         run2_rs = run2.runsteps.first()
         run2_rs_incable = run2_rs.RSICs.first()
-        self.assertTrue(run2.is_cancelled())
+        self.assertTrue(run2.is_failed())
         self.assertTrue(run2_rs.is_cancelled())
         self.assertTrue(run2_rs_incable.is_cancelled())
 
@@ -802,7 +801,7 @@ class ExecuteTests(ExecuteTestsBase):
         run2.refresh_from_db()
         run2_rs.refresh_from_db()
         run2_rs_incable.refresh_from_db()
-        self.assertTrue(run2.is_cancelled())
+        self.assertTrue(run2.is_failed())
         self.assertTrue(run2_rs.is_cancelled())
         self.assertTrue(run2_rs_incable.is_cancelled())
 
