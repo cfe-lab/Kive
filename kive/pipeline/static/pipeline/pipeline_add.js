@@ -717,12 +717,12 @@ $(function() {
             $submit_error.show();
         }
         function submitPipelineAjax(family_pk, form_data) {
-            $.post(
-                '/api/pipelines/',
-                JSON.stringify(form_data),
-                form_data,
-                "application/json"// is this needed? jquery default is: application/x-www-form-urlencoded; charset=UTF-8
-            ).success(function() {
+            $.ajax({
+                type: "POST",
+                url: '/api/pipelines/',
+                data: JSON.stringify(form_data),
+                contentType: "application/json"// data will not be parsed correctly without this
+            }).success(function() {
                 $('#id_submit_error').empty().hide();
                 $(window).off('beforeunload');
                 window.location.href = '/pipelines/' + family_pk;
@@ -740,16 +740,15 @@ $(function() {
                 } else {
                     submitError(xhr.status + " - " + error);
                 }
-
-                console.error(form_data);
             });
         }
         function submitPipelineFamilyAjax(form_data) {
-            $.post(
-                '/api/pipelinefamilies/',
-                JSON.stringify(form_data),
-                "application/json"// is this needed? jquery default is: application/x-www-form-urlencoded; charset=UTF-8
-            ).success(function(result) {
+            $.ajax({
+                type: "POST",
+                url: '/api/pipelinefamilies/',
+                data: JSON.stringify(form_data),
+                contentType: "application/json"// data will not be parsed correctly without this
+            }).success(function(result) {
                 submitPipelineAjax(result.id, form_data);
             }).error(function(xhr, status, error) {
                 var json = xhr.responseJSON,
