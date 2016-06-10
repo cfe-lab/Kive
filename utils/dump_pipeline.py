@@ -1,3 +1,8 @@
+# Instructions:
+# Run the script once, and it will create a configuration file in your home
+# folder. Edit that file to point at the server you want to dump from,
+# then run the script again. It will ask you which pipeline you want to dump.
+
 from collections import Counter
 import errno
 import json
@@ -8,6 +13,7 @@ from requests.adapters import HTTPAdapter
 
 from kiveapi import KiveAPI
 from urlparse import urlparse
+from operator import itemgetter
 
 
 def main():
@@ -16,6 +22,7 @@ def main():
         logging.WARN)
     CONFIG_FILE = os.path.expanduser("~/.dump_pipeline.config")
     UNSET = '***'
+    print 'Starting.'
 
     try:
         with open(CONFIG_FILE, 'rU') as f:
@@ -40,11 +47,16 @@ def main():
     print 'Recent pipelines from {}:'.format(hostname)
     for pipeline in pipelines[:5]:
         print '{}, id {}'.format(pipeline, pipeline.pipeline_id)
-    pipeline_id = int(raw_input('Enter pipeline id to dump: '))
+    pipeline_request = raw_input("Enter pipeline id to dump, or 'm' for more:")
+    if pipeline_request == 'm':
+        for pipeline in pipelines[5:]:
+            print '{}, id {}'.format(pipeline, pipeline.pipeline_id)
+        pipeline_request = raw_input("Enter pipeline id to dump:")
+    pipeline_id = int(pipeline_request)
     dump_folder = 'utils/dump/{}_pipeline{}'.format(hostname, pipeline_id)
 
     if not os.path.isdir(dump_folder):
-        os.mkdir(dump_folder)
+        os.makedirs(dump_folder)
 
     compound_datatypes = {}  # {id: columns}
     for compound_datatype in kive.get_cdts():
@@ -61,21 +73,20 @@ def main():
         code_resource_revisions[revision['id']] = CodeResourceRevision(
             revision,
             code_resources)
-    for revision in code_resource_revisions.itervalues():
-        for dependency in revision['dependencies']:
-            requirement = code_resource_revisions[dependency['requirement']]
-            dependency['requirement'] = requirement
-        revision['dependencies'].sort(
-            key=lambda dep: (dep['depPath'],
-                             dep['depFileName'],
-                             dep['requirement']['coderesource']['filename']))
     methods = {}  # {id: method}
     for method in kive.get('/api/methods/').json():
+        for dep in method['dependencies']:
+            dep['requirement'] = code_resource_revisions[dep['requirement']]
+        method['dependencies'].sort(
+            key=lambda dep: (dep['path'],
+                             dep['filename'],
+                             dep['requirement']['coderesource']['filename']))
         dump = {'driver': code_resource_revisions[method['driver']]}
         for field in ('groups_allowed',
                       'users_allowed',
                       'reusable',
-                      'threads'):
+                      'threads',
+                      'dependencies'):
             dump[field] = method[field]
         methods[method['id']] = dump
 
@@ -108,7 +119,9 @@ def main():
             replace_structure(output_item, compound_datatypes)
         del step['transformation_family']
         step['transformation'] = methods[step['transformation']]
-        step['transformation']['driver'].collect_revisions(used_revisions)
+        used_revisions.add(step['transformation']['driver'])
+        used_revisions.update(map(itemgetter('requirement'),
+                                  step['transformation']['dependencies']))
     dump['steps'] = pipeline['steps']
 
     pipeline_filename = 'pipeline.json'
@@ -137,8 +150,7 @@ class CodeResourceRevision(dict):
     def __init__(self, data, code_resources):
         for field in ('groups_allowed',
                       'users_allowed',
-                      'MD5_checksum',
-                      'dependencies'):
+                      'MD5_checksum'):
             self[field] = data[field]
         self['coderesource'] = code_resources[data['coderesource']]
         self.id = data['id']
@@ -149,15 +161,6 @@ class CodeResourceRevision(dict):
 
     def __eq__(self, other):
         return self.id == other.id
-
-    def collect_revisions(self, used_revisions):
-        """ Collect all the related code resource revisions, including self.
-
-        @param used_revisions: a set of resource revision ids
-        """
-        used_revisions.add(self)
-        for dependency in self['dependencies']:
-            dependency['requirement'].collect_revisions(used_revisions)
 
 
 def replace_structure(item, compound_datatypes):

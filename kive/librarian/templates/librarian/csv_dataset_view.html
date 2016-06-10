@@ -23,10 +23,10 @@
 {% endblock %}
 
 {% block dataset_contents %}
+<div class="dataset_contents">
 <table>
 <thead>
     <tr>
-
     {% if dataset.content_matches_header %}
        {% for column in dataset.header %}
             <th>{{ column }}</th>
@@ -75,11 +75,38 @@
         </tr>
     {% endfor %}
 
-    {% if processed_rows|length == max_to_display %}
+    {% if are_rows_truncated %}
       <tr><td colspan="9999" style="text-align:center">&#8942;</td></tr>
     {% endif %}
+
+    {% for row_num, row in extra_errors %}
+    <tr><td colspan="9999">Error on row {{ row_num }}:</td></tr>
+    <tr>
+        {% if not dataset.content_matches_header %}
+            <td></td>
+        {% endif %}
+
+        {% for value,errors in row %}
+            <td {% if errors|length > 0 %} class="data-error" {% endif %}>
+                {{ value|truncatechars:30 }}
+                {% if errors|length > 0 %}
+                    <div class="value-error-tip">
+                        The following data checks failed:
+                        <ul>
+                        {% for error in errors %}
+                            <li>{{ error }} </li>
+                        {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+            </td>
+        {% endfor %}
+        </tr>
+    {% endfor %}
+    
 </tbody>
 </table>
+</div>
 
 {{ dataset_form.errors }}
 

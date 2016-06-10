@@ -240,14 +240,12 @@ var pipeline = (function(exports){
         });
 
         // Update each pipeline step
-        $.each(runstat.step_progress, function(method_pk, step){
-            var shape = self.canvasState.findMethodNode(parseInt(method_pk));
+        $.each(runstat.step_progress, function(step_index){
+            var shape = self.canvasState.methods[step_index];
 
-            if (shape instanceof drydock_objects.MethodNode) {
-                shape.status = step.status;
-                shape.log_id = step.log_id;
-                shape.run_id = run_id;
-            }
+            shape.status = this.status;
+            shape.log_id = this.log_id;
+            shape.run_id = run_id;
         });
 
         // Update the outputs

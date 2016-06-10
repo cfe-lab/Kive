@@ -64,7 +64,7 @@ var pipelines = (function() {
 
                 $.ajax({
                     type: "PATCH",
-                    url: "/api/pipelines/"  + pipeline.id,
+                    url: "/api/pipelines/"  + pipeline.id + "/",
                     data: { published: published },
                     datatype: "json",
                     success: function(){

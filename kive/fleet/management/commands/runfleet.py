@@ -1,4 +1,3 @@
-from optparse import make_option
 from django.core.management.base import BaseCommand
 import fleet.workers
 import sys
@@ -10,7 +9,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "-w",
-            "--worker_interfaces",
+            "--workers",
             dest="worker_interfaces",
             type=int,
             default=1

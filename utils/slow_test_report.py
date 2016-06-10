@@ -4,18 +4,30 @@ from operator import attrgetter
 import bisect
 import glob
 
-# To track progress, here is how we started on 9 Oct 2015, against SQLite:
-# 10 out of 1020 tests took 68s out of 657s
-# 15s for sandbox.ExecuteTests.test_pipeline_execute_C_twostep_pipeline_with_subpipeline
-# 8s for sandbox.ExecuteTests.test_pipeline_execute_B_twostep_pipeline_with_recycling
-# 8s for sandbox.FindSDTests.test_find_symds_subpipeline_input_and_intermediate
-# 7s for sandbox.ExecuteTests.test_pipeline_all_inputs_OK_nonraw
-# 7s for sandbox.ExecuteTests.test_pipeline_all_inputs_OK_raw
-# 7s for sandbox.ExecuteTests.test_pipeline_execute_A_simple_onestep_pipeline
-# 4s for archive.IsCompleteSuccessfulExecutionTests.test_runcomponent_unsuccessful_failed_integrity_check_during_recovery
-# 4s for sandbox.FindSDTests.test_find_symds_pipeline_input_and_intermediate_custom_wire
-# 4s for method.NonReusableMethodTests.test_execute_does_not_reuse
-# 4s for archive.RunTests.test_Run_clean_all_complete_RunOutputCables
+# To track progress, here is how we started on 25 May 2016, against SQLite:
+# 10 out of 1042 tests took 125s out of 692s
+# 15s for sandbox.BadRunTests.test_code_bad_execution
+# 15s for method.NonReusableMethodTests.test_execute_does_not_reuse
+# 14s for archive.RunStepReuseFailedExecRecordTests.test_reuse_failed_ER_can_have_missing_outputs
+# 14s for archive.StateMachineActualExecutionTests.test_runcomponent_unsuccessful_failed_integrity_check_during_recovery
+# 13s for sandbox.RawTests.test_execute_pipeline_raw_twice
+# 13s for archive.StateMachineActualExecutionTests.test_runcomponent_unsuccessful_failed_invoked_log
+# 12s for sandbox.ExecuteTests.test_filling_in_execrecord_with_incomplete_content_check
+# 11s for sandbox.FindDatasetTests.test_find_dataset_subpipeline_input_and_intermediate
+# 9s for sandbox.ExecuteTests.test_pipeline_execute_C_twostep_pipeline_with_subpipeline
+# 9s for sandbox.BadRunTests.test_method_fails
+# Slowest test classes:
+# 58.146 TEST-librarian.tests.ExecRecordTests-20160525154303.xml
+# 53.895 TEST-sandbox.tests.ExecuteTests-20160525154303.xml
+# 45.881 TEST-method.tests.MethodTests-20160525154303.xml
+# 34.804 TEST-archive.tests.StateMachineActualExecutionTests-20160525154303.xml
+# 30.56 TEST-metadata.tests_CustomConstraint.CustomConstraintTestsWithExecution-20160525154303.xml
+# 26.195 TEST-metadata.tests.DatatypeTests-20160525154303.xml
+# 24.387 TEST-sandbox.tests_rm.FindDatasetTests-20160525154303.xml
+# 23.7 TEST-sandbox.tests_rm.BadRunTests-20160525154303.xml
+# 22.201 TEST-method.tests.NonReusableMethodTests-20160525154303.xml
+# 20.715 TEST-sandbox.tests_rm.RawTests-20160525154303.xml
+
 
 def parseOptions():
     parser = argparse.ArgumentParser()

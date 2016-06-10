@@ -3,7 +3,16 @@
 {% load filters %}
 
 {% block dataset_contents %}
+    {% if is_binary %}
+        <p>File appears to be binary.</p>
+    {% else %}
+    <p>
+    Showing the first 1000 characters of the file:
+    </p>
+<div class="dataset_contents">
 <pre>
-{{ dataset.dataset_file.read }}
+{{ sample_content }}
 </pre>
+</div>
+    {% endif %}
 {% endblock %}

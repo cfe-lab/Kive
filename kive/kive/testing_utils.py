@@ -54,8 +54,7 @@ def fd_count(msg):
 
 def create_metadata_test_environment(case):
     """Setup default database state from which to perform unit testing."""
-    # Define a user.  This was previously in librarian/tests_queuedrunGETRIDOFTHIS,
-    # but we put it here now so all tests can use it.
+    # Define a user.
     case.myUser = User.objects.create_user('john',
                                            'lennon@thebeatles.com',
                                            'johnpassword')
@@ -925,18 +924,6 @@ cat "$1" > "$2"
         grant_everyone_access=False
     )
 
-    pass_through = make_first_revision(
-        "Pass Through", "A script that does nothing to its input and passes it through untouched.",
-        "passthrough.bash",
-        """#!/bin/bash
-./noop.bash "$1" "$2"
-""",
-        remover,
-        grant_everyone_access=False
-    )
-    # Use the defaults for path and filename.
-    pass_through.dependencies.create(requirement=noop)
-
     # A toy Datatype.
     nucleotide_seq = new_datatype("Nucleotide sequence", "Sequences of A, C, G, and T",
                                   Datatype.objects.get(pk=datatypes.STR_PK),
@@ -974,6 +961,26 @@ CCCTCCTC
         grant_everyone_access=False
     )
     simple_method_io(nuc_seq_noop, one_col_nuc_seq, "nuc_seq_in", "nuc_seq_out")
+
+    # Define a method that uses noop as a dependency.
+    pass_through = make_first_revision(
+        "Pass Through", "A script that does nothing to its input and passes it through untouched.",
+        "passthrough.bash",
+        """#!/bin/bash
+./noop.bash "$1" "$2"
+""",
+        remover,
+        grant_everyone_access=False
+    )
+    raw_pass_through = make_first_method(
+        "Pass-through (raw)",
+        "A pass-through on raw data that uses noop as a dependency",
+        pass_through,
+        remover,
+        grant_everyone_access=False
+    )
+    simple_method_io(raw_pass_through, None, "nuc_seq_in", "nuc_seq_out")
+    raw_pass_through.dependencies.create(requirement=noop)
 
     noop_pl = make_first_pipeline(
         "Nucleotide Sequence Noop",
@@ -1145,7 +1152,6 @@ def create_method_test_environment(case):
             revision_desc="First version",
             content_file=File(f),
             user=case.myUser)
-        # case.compv1_crRev.content_file.save(fn, File(f))
         case.compv1_crRev.full_clean()
         case.compv1_crRev.save()
     case.compv1_crRev.grant_everyone_access()
@@ -1160,7 +1166,6 @@ def create_method_test_environment(case):
             revision_parent=case.compv1_crRev,
             content_file=File(f),
             user=case.myUser)
-        # case.compv2_crRev.content_file.save(fn, File(f))
         case.compv2_crRev.full_clean()
         case.compv2_crRev.save()
     case.compv2_crRev.grant_everyone_access()
@@ -1181,13 +1186,9 @@ def create_method_test_environment(case):
             revision_desc="Reference DNA sequences",
             content_file=File(f),
             user=case.myUser)
-        # case.compv2_crRev.content_file.save(fn, File(f))
         dna_resource_revision.full_clean()
         dna_resource_revision.save()
     dna_resource_revision.grant_everyone_access()
-
-    case.compv2_crRev.dependencies.create(
-        requirement=dna_resource_revision)
 
     # The following is for testing code resource dependencies.
     case.test_cr_1 = CodeResource(name="test_cr_1",
@@ -1296,6 +1297,8 @@ def create_method_test_environment(case):
     case.DNAcompv2_m.save()
     case.DNAcompv2_m.grant_everyone_access()
     case.DNAcompv2_m.copy_io_from_parent()
+    # case.compv2_crRev requires this to work:
+    case.DNAcompv2_m.dependencies.create(requirement=dna_resource_revision)
 
     # Define second family, RNAcomp_mf
     case.RNAcomp_mf = MethodFamily(
@@ -1342,6 +1345,8 @@ def create_method_test_environment(case):
     case.RNAcompv2_m.save()
     case.RNAcompv2_m.copy_io_from_parent()
     case.RNAcompv2_m.grant_everyone_access()
+    # case.compv2_crRev requires this to work:
+    case.RNAcompv2_m.dependencies.create(requirement=dna_resource_revision)
 
     # Create method family for script_1_method / script_2_method / script_3_method
     case.test_mf = MethodFamily(name="Test method family",
@@ -1514,6 +1519,8 @@ def create_method_test_environment(case):
         driver=case.compv2_crRev,
         user=case.myUser)
     case.DNArecomp_m.grant_everyone_access()
+    # case.compv2_crRev requires this to work:
+    case.DNArecomp_m.dependencies.create(requirement=dna_resource_revision)
 
     # To this method revision, add inputs with CDT DNAoutput_cdt
     case.DNArecomp_m.create_input(

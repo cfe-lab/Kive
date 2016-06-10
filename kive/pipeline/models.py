@@ -103,21 +103,6 @@ class PipelineFamily(transformation.models.TransformationFamily):
 
         return removal_plan
 
-    def remove_list(self):
-        datasets_listed = set()
-        ERs_listed = set()
-        runs_listed = set()
-        pipelines_listed = set()
-
-        for pipeline in self.members.all():
-            curr_datasets_listed, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = pipeline.remove_list()
-            datasets_listed.update(curr_datasets_listed)
-            ERs_listed.update(curr_ERs_listed)
-            runs_listed.update(curr_runs_listed)
-            pipelines_listed.update(curr_pipelines_listed)
-
-        return datasets_listed, ERs_listed, runs_listed, pipelines_listed
-
 
 class PipelineSerializationException(exceptions.Exception):
     """
@@ -365,6 +350,8 @@ class Pipeline(transformation.models.Transformation):
                                  .format(self, i, minrows, maxrows, supplied_input.num_rows()))
 
     def threads_needed(self):
+        if not self.steps.all():
+            return 0
         return max(x.threads_needed() for x in self.steps.all())
 
     @transaction.atomic
@@ -393,33 +380,21 @@ class Pipeline(transformation.models.Transformation):
 
         return removal_plan
 
-    @transaction.atomic
-    def remove_list(self):
-        datasets_to_remove = set()
-        ERs_to_remove = set()
-        runs_to_remove = set()
-        pipelines_to_remove = {self}
-
-        for run in self.pipeline_instances.all():
-            curr_datasets_to_remove, curr_ERs_to_remove, curr_runs_to_remove = run.remove_list()
-            datasets_to_remove.update(curr_datasets_to_remove)
-            ERs_to_remove.update(curr_ERs_to_remove)
-            runs_to_remove.update(curr_runs_to_remove)
-
-        # Remove any pipeline that uses this one as a sub-pipeline.
-        for ps in self.pipelinesteps.all():
-            curr_datasets_to_remove, curr_ERs_to_remove, curr_runs_to_remove = ps.pipeline.remove_list()
-            datasets_to_remove.update(curr_datasets_to_remove)
-            ERs_to_remove.update(curr_ERs_to_remove)
-            runs_to_remove.update(curr_runs_to_remove)
-            pipelines_to_remove.add(ps.pipeline)
-
-        return datasets_to_remove, ERs_to_remove, runs_to_remove, pipelines_to_remove
-
     def find_step_updates(self):
+        """
+        Look for updated versions of all steps of this Pipeline.
+
+        If a step's Method has been updated, that is identified as the update
+        candidate.  Otherwise, we look at the driver and dependencies of
+        the Method and propose a new Method that uses the new code and leaves
+        all other settings the same (the path and filename of the
+        dependencies are left the same, no additional dependencies are
+        identified, inputs and outputs are left the same).
+
+        TODO: update this code to handle sub-Pipelines within the Pipeline.
+        """
         updates = []
         for step in self.steps.all():
-            update = None
             transformation = step.transformation.find_update()
             # TODO: handle nested pipelines
             if transformation is not None and transformation.is_method:
@@ -427,20 +402,20 @@ class Pipeline(transformation.models.Transformation):
                 update.method = transformation.definite
                 updates.append(update)
             else:
-                driver = getattr(step.transformation.definite, 'driver', None)
+                step_method = step.transformation.definite
+                driver = getattr(step_method, 'driver', None)
                 if driver is not None:
                     next_driver = driver.find_update()
-                    if next_driver is not None:
-                        update = PipelineStepUpdate(step.step_num)
-                        update.code_resource_revision = next_driver
-                        updates.append(update)
-                    for dependency in driver.dependencies.all():
+                    new_dependencies = []
+                    for dependency in step_method.dependencies.all():
                         next_dependency = dependency.requirement.find_update()
                         if next_dependency is not None:
-                            if update is None:
-                                update = PipelineStepUpdate(step.step_num)
-                                updates.append(update)
-                            update.dependencies.append(next_dependency)
+                            new_dependencies.append(next_dependency)
+                    if next_driver is not None or new_dependencies:
+                        update = PipelineStepUpdate(step.step_num)
+                        update.code_resource_revision = next_driver
+                        update.dependencies = new_dependencies
+                        updates.append(update)
         return updates
 
     def get_all_atomic_steps_cables(self):
@@ -515,12 +490,12 @@ class PipelineStep(models.Model):
     @property
     def inputs(self):
         """Inputs to this PipelineStep, ordered by index."""
-        return self.transformation.inputs.order_by("dataset_idx")
+        return self.transformation.inputs.all()
 
     @property
     def outputs(self):
         """Outputs from this PipelineStep, ordered by index."""
-        return self.transformation.outputs.order_by("dataset_idx")
+        return self.transformation.outputs.all()
 
     @property
     def is_cable(self):
@@ -668,7 +643,8 @@ class PipelineStep(models.Model):
 
 
 class PipelineStepUpdate(object):
-    """ A data object to hold details about how a pipeline step can be updated.
+    """
+    A data object to hold details about how a pipeline step can be updated.
     """
     def __init__(self, step_num):
         self.step_num = step_num
@@ -843,7 +819,7 @@ class PipelineCable(models.Model):
         # Set the ExecLog's start time.
         self.logger.debug("Filling in ExecLog of record {} and running cable (source='{}', output_path='{}')"
                           .format(cable_record, source, output_path))
-        curr_log.start(save=False)
+        curr_log.start(save=True)
 
         if self.is_trivial():
             self.logger.debug("Trivial cable, making sym link: os.link({},{})".format(source, output_path))
@@ -851,8 +827,6 @@ class PipelineCable(models.Model):
 
             try:
                 os.link(source, output_path)
-                curr_log.stop(save=True, clean=True)
-                return
             except OSError:
                 logger.warning(
                     "OSError occurred while linking %s to %s",
@@ -866,9 +840,10 @@ class PipelineCable(models.Model):
                     output_stat = os.stat(output_path)
                     if source_stat.st_ino == output_stat.st_ino:
                         logger.debug("Link was actually successful; moving on")
-                        return
                     else:
                         raise
+            curr_log.stop(save=True, clean=True)
+            return
 
         # Make a dict encapsulating the mapping required: keyed by the output column name, with value
         # being the input column name.
@@ -1454,7 +1429,7 @@ class PipelineOutputCable(PipelineCable):
         source_ps = self.pipeline.steps.get(step_num=self.source_step)
 
         # Try to find a matching output hole
-        if not source_ps.transformation.outputs.filter(pk=self.source.pk).exists():
+        if self.source.transformation.definite != source_ps.transformation.definite:
             raise ValidationError(
                 "Transformation at step {} does not produce output \"{}\"".
                 format(self.source_step, self.source))

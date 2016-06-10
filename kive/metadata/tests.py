@@ -5,7 +5,7 @@ import os
 import re
 
 from django.core.exceptions import ValidationError
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase
 from django.core.urlresolvers import reverse, resolve
 from django.contrib.auth.models import User, Group
 
@@ -22,19 +22,6 @@ samplecode_path = "../samplecode"
 
 
 class MetadataTestCase(TestCase):
-    """
-    Set up a database state for unit testing.
-    
-    Other test classes that require this state can extend this one.
-    """
-    def setUp(self):
-        tools.create_metadata_test_environment(self)
-
-    def tearDown(self):
-        tools.clean_up_all_files()
-
-
-class MetadataTransactionTestCase(TransactionTestCase):
     """
     Set up a database state for unit testing.
 
@@ -97,7 +84,7 @@ class DatatypeTests(MetadataTestCase):
         my_datatype = Datatype(name="fhqwhgads", user=self.myUser)
         self.assertEqual(unicode(my_datatype), "fhqwhgads")
 
-    ### Unit tests for datatype.clean (Circular restrictions) ###
+    # ### Unit tests for datatype.clean (Circular restrictions) ###
 
     # Direct circular cases: start, middle, end
     # Start   dt1 restricts dt1, dt3, dt4
@@ -115,7 +102,7 @@ class DatatypeTests(MetadataTestCase):
         self.dt_1.restricts.add(self.dt_4)
         self.dt_1.save()
 
-        self.assertRaisesRegexp(ValidationError, 
+        self.assertRaisesRegexp(ValidationError,
                                 re.escape('Datatype "{}" has a circular restriction'.format(self.dt_1)),
                                 self.dt_1.clean)
 
@@ -457,7 +444,7 @@ class DatatypeTests(MetadataTestCase):
             description="a clean, new datatype",
             user=self.myUser)
         # Note that this passes if the next line is uncommented.
-        #datatype.save()
+        # datatype.save()
         self.assertEqual(datatype.clean(), None)
 
     ########
@@ -632,7 +619,7 @@ class DatatypeTests(MetadataTestCase):
 
         self.DNA_dt.prototype = DNA_raw_prototype
         PROTOTYPE_CDT = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
-        self.assertRaisesRegexp(ValidationError, 
+        self.assertRaisesRegexp(ValidationError,
                                 re.escape('Prototype Dataset for Datatype "{}" should have CompoundDatatype "{}", '
                                           'but it is raw'.format(self.DNA_dt, PROTOTYPE_CDT)),
                                 self.DNA_dt.clean)
@@ -691,8 +678,10 @@ class DatatypeTests(MetadataTestCase):
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape((('BasicConstraint "{}" specifies a date/time format, but its parent '
-                                            'Datatype "{}" has builtin type "{}"')
-                                            .format(constr, constr_DT, self.FLOAT))),
+                                            'Datatype "{}" has builtin type "{}"').format(
+                                                constr,
+                                                constr_DT,
+                                                self.FLOAT))),
                                 constr_DT.clean)
 
     # Cases where a Datatype has a good BasicConstraint associated to it are well-tested in the
@@ -872,11 +861,11 @@ class DatatypeTests(MetadataTestCase):
                 dt.basic_constraints.create(ruletype=ruletype, rule=rule)
         return dt
 
-    def _setup_inheriting_datatype(self, 
+    def _setup_inheriting_datatype(self,
                                    super_name, super_desc, super_ruletype, super_rule, super_builtin,
                                    cnstr_name, cnstr_desc, cnstr_ruletype, cnstr_rule):
         """
-        Helper function to create a pair of Datatypes, one inheriting 
+        Helper function to create a pair of Datatypes, one inheriting
         from the other.
         """
         super_DT = self._setup_datatype(super_name, super_desc, [(super_ruletype, super_rule)], [super_builtin])
@@ -904,15 +893,22 @@ class DatatypeTests(MetadataTestCase):
         """
         Helper to test cases where numerical constraints conflict with those of the supertypes.
         """
-        super_DT, constr_DT = self._setup_inheriting_datatype("ParentDT", "Parent with constraint",
-                BC_type, supertype_constr_val, builtin_type, "ConstrDT", 
-                "Datatype whose constraint conflicts with parent",
-                BC_type, constr_val)
+        super_DT, constr_DT = self._setup_inheriting_datatype(
+            "ParentDT",
+            "Parent with constraint",
+            BC_type,
+            supertype_constr_val,
+            builtin_type,
+            "ConstrDT",
+            "Datatype whose constraint conflicts with parent",
+            BC_type,
+            constr_val)
 
         if BC_type == BasicConstraint.MIN_LENGTH:
             error_msg = 'Datatype "{}" has MIN_LENGTH {}, but its supertype "{}" has a longer or equal MIN_LENGTH of {}'
         elif BC_type == BasicConstraint.MAX_LENGTH:
-            error_msg = 'Datatype "{}" has MAX_LENGTH {}, but its supertype "{}" has a shorter or equal MAX_LENGTH of {}'
+            error_msg = ('Datatype "{}" has MAX_LENGTH {}, but its supertype '
+                         '"{}" has a shorter or equal MAX_LENGTH of {}')
         elif BC_type == BasicConstraint.MIN_VAL:
             error_msg = 'Datatype "{}" has MIN_VAL {}, but its supertype "{}" has a larger or equal MIN_VAL of {}'
         elif BC_type == BasicConstraint.MAX_VAL:
@@ -966,10 +962,16 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing clean() on the case where a Datatype has a DATETIMEFORMAT but so does its supertype.
         """
-        _super_DT, constr_DT = self._setup_inheriting_datatype("DateTimeDT", "String with a DATETIMEFORMAT",
-                BasicConstraint.DATETIMEFORMAT, "%Y %b %d", self.STR, "OverwritingDateTimeDT",
-                "String with a DATETIMEFORMAT whose parent also has one", 
-                BasicConstraint.DATETIMEFORMAT, "%Y-%b-%d")
+        _super_DT, constr_DT = self._setup_inheriting_datatype(
+            "DateTimeDT",
+            "String with a DATETIMEFORMAT",
+            BasicConstraint.DATETIMEFORMAT,
+            "%Y %b %d",
+            self.STR,
+            "OverwritingDateTimeDT",
+            "String with a DATETIMEFORMAT whose parent also has one",
+            BasicConstraint.DATETIMEFORMAT,
+            "%Y-%b-%d")
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape(('Datatype "{}" should have only one DATETIMEFORMAT restriction acting on '
@@ -982,7 +984,7 @@ class DatatypeTests(MetadataTestCase):
         """
         dtf = BasicConstraint.DATETIMEFORMAT
         _super_DT, _second_DT, constr_DT = self._setup_inheriting_datatype2(
-                "DateTimeDT", "String with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR, 
+                "DateTimeDT", "String with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR,
                 "OverwritingDateTimeDT", "Second string with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR,
                 "OverwritingDateTimeChildDT", "String with a DATETIMEFORMAT whose parent also has one", dtf, "%Y %b %d")
 
@@ -997,7 +999,7 @@ class DatatypeTests(MetadataTestCase):
         """
         dtf = BasicConstraint.DATETIMEFORMAT
         _super_DT, _second_DT, constr_DT = self._setup_inheriting_datatype2(
-                "DateTimeDT", "String with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR, 
+                "DateTimeDT", "String with a DATETIMEFORMAT", dtf, "%Y %b %d", self.STR,
                 "OtherDT", "String by a different name", None, None, self.STR,
                 "OverwritingDateTimeDT", "String with a DATETIMEFORMAT whose parent also has one", dtf, "%Y %d")
 
@@ -1024,8 +1026,11 @@ class DatatypeTests(MetadataTestCase):
         """
         Testing clean() on a float Datatype with conflicting MIN|MAX_VAL defined directly.
         """
-        constr_DT = self._setup_datatype("ConflictingBoundsDT", "Float with conflicting MIN|MAX_VAL",
-                [(BasicConstraint.MIN_VAL, "15"), (BasicConstraint.MAX_VAL, "5")], [self.FLOAT])
+        constr_DT = self._setup_datatype(
+            "ConflictingBoundsDT",
+            "Float with conflicting MIN|MAX_VAL",
+            [(BasicConstraint.MIN_VAL, "15"), (BasicConstraint.MAX_VAL, "5")],
+            [self.FLOAT])
 
         self.assertRaisesRegexp(ValidationError,
                                 re.escape(('Datatype "{}" has effective MIN_VAL {} exceeding its effective MAX_VAL {}'
@@ -1045,7 +1050,6 @@ class DatatypeTests(MetadataTestCase):
                                 re.escape(('Datatype "{}" has effective MIN_VAL {} exceeding its effective MAX_VAL {}'
                                            .format(constr_DT, 20, 18.2))),
                                 constr_DT.clean)
-
 
     def test_clean_float_conflicting_half_inherited_min_max_val_bad(self):
         """
@@ -1083,11 +1087,14 @@ class DatatypeTests(MetadataTestCase):
         constr_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_VAL, rule="15.7")
         constr_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="15.9")
 
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape((('Datatype "{}" has built-in type INT, but there are no integers between its '
-                                            'effective MIN_VAL {} and its effective MAX_VAL {}')
-                                            .format(constr_DT, 15.7, 15.9))),
-                                constr_DT.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape((('Datatype "{}" has built-in type INT, but there are no integers between its '
+                        'effective MIN_VAL {} and its effective MAX_VAL {}').format(
+                            constr_DT,
+                            15.7,
+                            15.9))),
+            constr_DT.clean)
 
     def test_clean_int_inherited_min_max_val_too_narrow_bad(self):
         """
@@ -1115,12 +1122,15 @@ class DatatypeTests(MetadataTestCase):
         constr_DT.restricts.add(super_DT)
         constr_DT.restricts.add(second_DT)
 
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape((('Datatype "{}" has built-in type INT, but there are no integers between its '
-                                            'effective MIN_VAL {} and its effective MAX_VAL {}')
-                                            .format(constr_DT, 20.2, 20.55))),
-                                constr_DT.clean)
-
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape((('Datatype "{}" has built-in type INT, but there '
+                        'are no integers between its effective MIN_VAL {} '
+                        'and its effective MAX_VAL {}').format(
+                            constr_DT,
+                            20.2,
+                            20.55))),
+            constr_DT.clean)
 
     def test_clean_int_half_inherited_min_max_val_too_narrow_bad(self):
         """
@@ -1141,11 +1151,12 @@ class DatatypeTests(MetadataTestCase):
         constr_DT.restricts.add(self.INT)
         constr_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_VAL, rule="17.8")
 
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape((('Datatype "{}" has built-in type INT, but there are no integers between its '
-                                            'effective MIN_VAL {} and its effective MAX_VAL {}')
-                                            .format(constr_DT, 17.1, 17.8))),
-                                constr_DT.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape((('Datatype "{}" has built-in type INT, but there are no '
+                        'integers between its effective MIN_VAL {} and its '
+                        'effective MAX_VAL {}').format(constr_DT, 17.1, 17.8))),
+            constr_DT.clean)
 
     def test_clean_str_conflicting_min_max_length_bad(self):
         """
@@ -1160,10 +1171,11 @@ class DatatypeTests(MetadataTestCase):
         constr_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="2234")
         constr_DT.basic_constraints.create(ruletype=BasicConstraint.MAX_LENGTH, rule="6")
 
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape(('Datatype "{}" has effective MIN_LENGTH {} exceeding its effective MAX_LENGTH {}'
-                                           .format(constr_DT, 2234, 6))),
-                                constr_DT.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape(('Datatype "{}" has effective MIN_LENGTH {} exceeding '
+                       'its effective MAX_LENGTH {}'.format(constr_DT, 2234, 6))),
+            constr_DT.clean)
 
     def test_clean_str_conflicting_inherited_min_max_length_bad(self):
         """
@@ -1189,10 +1201,11 @@ class DatatypeTests(MetadataTestCase):
         constr_DT.restricts.add(super_DT)
         constr_DT.restricts.add(second_DT)
 
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape(('Datatype "{}" has effective MIN_LENGTH {} exceeding its effective MAX_LENGTH {}'
-                                           .format(constr_DT, 44, 22))),
-                                constr_DT.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape(('Datatype "{}" has effective MIN_LENGTH {} exceeding '
+                       'its effective MAX_LENGTH {}'.format(constr_DT, 44, 22))),
+            constr_DT.clean)
 
     def test_clean_str_conflicting_half_inherited_min_max_length_bad(self):
         """
@@ -1213,10 +1226,11 @@ class DatatypeTests(MetadataTestCase):
         constr_DT.restricts.add(super_DT)
         constr_DT.basic_constraints.create(ruletype=BasicConstraint.MIN_LENGTH, rule="30")
 
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape(('Datatype "{}" has effective MIN_LENGTH {} exceeding its effective MAX_LENGTH {}'
-                                           .format(constr_DT, 30, 20))),
-                                constr_DT.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape(('Datatype "{}" has effective MIN_LENGTH {} exceeding '
+                       'its effective MAX_LENGTH {}'.format(constr_DT, 30, 20))),
+            constr_DT.clean)
 
     # FIXME: add some tests here when CustomConstraints are fully-coded.
 
@@ -1303,7 +1317,6 @@ class DatatypeTests(MetadataTestCase):
                                 re.escape(('Datatype "{}" does not restrict any of the Shipyard atomic Datatypes'
                                           .format(my_DT))),
                                 my_DT.complete_clean)
-
 
     def test_complete_clean_restricts_string(self):
         """
@@ -2251,8 +2264,10 @@ class CompoundDatatypeTests(MetadataTestCase):
                                column_name="ColumnTwo",
                                column_idx=3)
 
-        self.assertRaisesRegexp(ValidationError,
-            re.escape(('Column indices of CompoundDatatype "{}" are not consecutive starting from 1'.format(sad_cdt))),
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape(('Column indices of CompoundDatatype "{}" are not '
+                       'consecutive starting from 1'.format(sad_cdt))),
             sad_cdt.clean)
 
     def test_clean_consecutive_member_indices_correct(self):
@@ -2276,8 +2291,10 @@ class CompoundDatatypeTests(MetadataTestCase):
         bad_cdt.members.create(datatype=self.RNA_dt, column_name="ColumnOne", column_idx=3)
         bad_cdt.members.create(datatype=self.DNA_dt, column_name="ColumnTwo", column_idx=1)
 
-        self.assertRaisesRegexp(ValidationError,
-            re.escape(('Column indices of CompoundDatatype "{}" are not consecutive starting from 1'.format(bad_cdt))),
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape(('Column indices of CompoundDatatype "{}" are not '
+                       'consecutive starting from 1'.format(bad_cdt))),
             bad_cdt.clean)
 
     def test_clean_members_no_column_names(self):
@@ -2300,12 +2317,12 @@ class CompoundDatatypeTests(MetadataTestCase):
         self.assertIsNotNone(cdt_with_permissions)
         expected_permissions = set(
             cdt_with_permissions.users_allowed.values_list('username'))
-        
+
         cdt_without_permissions.copy_permissions(cdt_with_permissions)
-        
+
         permissions = set(
             cdt_without_permissions.users_allowed.values_list('username'))
-        
+
         self.assertEqual(expected_permissions, permissions)
 
     def test_copy_groups_allowed(self):
@@ -2317,12 +2334,12 @@ class CompoundDatatypeTests(MetadataTestCase):
         self.assertIsNotNone(cdt_with_permissions)
         expected_permissions = set(
             cdt_with_permissions.groups_allowed.values_list('name'))
-        
+
         cdt_without_permissions.copy_permissions(cdt_with_permissions)
-        
+
         permissions = set(
             cdt_without_permissions.groups_allowed.values_list('name'))
-        
+
         self.assertEqual(expected_permissions, permissions)
 
     def test_create_dataset_raw(self):
@@ -2347,20 +2364,22 @@ class CompoundDatatypeTests(MetadataTestCase):
     def test_create_dataset_bad_num_cols(self):
         """Define a dataset, but with the wrong number of headers."""
         path = os.path.join(samplecode_path, "step_0_triplet_3_rows.csv")
-        self.assertRaisesRegexp(ValueError,
-                re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
-                          .format(path, self.doublet_cdt)),
-                lambda: Dataset.create_dataset(file_path=path, user=self.myUser, cdt=self.doublet_cdt,
-                                               name="DS1", description="DS1 desc"))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
+                      .format(path, self.doublet_cdt)),
+            lambda: Dataset.create_dataset(file_path=path, user=self.myUser, cdt=self.doublet_cdt,
+                                           name="DS1", description="DS1 desc"))
 
     def test_create_dataset_bad_col_names(self):
         """Define a dataset with the right number of header columns, but the wrong column names."""
         path = os.path.join(samplecode_path, "three_random_columns.csv")
-        self.assertRaisesRegexp(ValueError,
-                re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
-                          .format(path, self.triplet_cdt)),
-                lambda: Dataset.create_dataset(file_path=path, user=self.myUser, cdt=self.triplet_cdt,
-                                               name="DS1", description="DS1 desc"))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
+                      .format(path, self.triplet_cdt)),
+            lambda: Dataset.create_dataset(file_path=path, user=self.myUser, cdt=self.triplet_cdt,
+                                           name="DS1", description="DS1 desc"))
 
     def test_type_constraints_row(self):
 
@@ -2394,7 +2413,7 @@ class DatatypeApiTests(TestCase):
         self.detail_path = reverse("datatype-detail",
                                    kwargs={'pk': self.detail_pk})
         self.removal_path = reverse("datatype-removal-plan",
-                                   kwargs={'pk': self.detail_pk})
+                                    kwargs={'pk': self.detail_pk})
 
         # This should equal metadata.ajax.CompoundDatatypeViewSet.as_view({"get": "list"}).
         self.list_view, _, _ = resolve(self.list_path)
@@ -2440,7 +2459,7 @@ class DatatypeApiTests(TestCase):
 
     def test_removal(self):
         start_count = Datatype.objects.all().count()
-        
+
         request = self.factory.delete(self.detail_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
@@ -2460,7 +2479,7 @@ class CompoundDatatypeApiTests(TestCase):
         self.detail_path = reverse("compounddatatype-detail",
                                    kwargs={'pk': self.detail_pk})
         self.removal_path = reverse("compounddatatype-removal-plan",
-                                   kwargs={'pk': self.detail_pk})
+                                    kwargs={'pk': self.detail_pk})
 
         # We can't remove the CDT with PK = 3 as it's used by Kive's internals.
         self.removal_pk = 4
@@ -2492,10 +2511,10 @@ class CompoundDatatypeApiTests(TestCase):
 
         # There are four CDTs loaded into the Database by default, and they're
         # sorted alphabetically.  See the migration where they're defined for
-        # details.
+        # details. SQLite sorts case-sensitive and PostgreSQL doesn't.
         self.assertEquals(len(response.data), 4)
-        self.assertEquals(response.data[0]['id'], 4)
-        self.assertEquals(response.data[2]['representation'],
+        cdt2 = next(cdt for cdt in response.data if cdt['id'] == 2)
+        self.assertEquals(cdt2['representation'],
                           '(failed_row: natural number)')
 
     def test_detail(self):
@@ -2513,7 +2532,7 @@ class CompoundDatatypeApiTests(TestCase):
 
     def test_removal(self):
         start_count = CompoundDatatype.objects.all().count()
-        
+
         request = self.factory.delete(self.detail_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.removal_pk)

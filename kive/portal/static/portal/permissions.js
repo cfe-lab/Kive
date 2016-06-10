@@ -346,9 +346,28 @@ var permissions = (function() {
     my.PermissionsTable.prototype.buildConfirmationMessage = function(
             plan,
             action) {
+        // We handle the Datasets and ExternalFiles entries differently.
+        var datasets = plan.Datasets,
+            external_files = plan.ExternalFiles;
+
+        if (datasets === undefined) {
+            datasets = 0;
+        }
+        if (external_files === undefined) {
+            external_files = 0;
+        }
+        var internal_files = datasets - external_files;
+
         var message = "This will " + action + ":\n";
+        if (internal_files !== 0) {
+            message += internal_files + " Datasets\n";
+        }
+        if (external_files !== 0) {
+            message += external_files + " Datasets with external files (external files will not be removed)\n";
+        }
+
         for(var k in plan) {
-            if (plan[k] !== 0) {
+            if (k !== "ExternalFiles" && k !== "Datasets" && plan[k] !== 0) {
                 message += plan[k] + " " + k + "\n";
             }
         }

@@ -14,9 +14,8 @@
         is_admin = {{ is_admin|lower }};
     </script>
     <script src="/static/portal/edit_details.js"></script>
-{% endblock %}
-
-{% block data_specific_js %}
+    {% block data_specific_js %}
+    {% endblock %}
 {% endblock %}
 
 {% block stylesheets %}
@@ -46,9 +45,11 @@
 {% endif %}
 
     <table id="dataset_details">
+    {% if dataset.has_data %}
     <tr>
         <td colspan="2"><a href="{{ dataset.absolute_url }}">Download</a></td>
     </tr>
+    {% endif %}
 
     <tr>
         <td>Date created:</td>
@@ -56,7 +57,13 @@
     </tr>
     <tr>
         <td>File size:</td>
-        <td>{{ dataset.get_formatted_filesize }}</td>
+        <td>
+        {% if dataset.has_data %}
+        {{ dataset.get_formatted_filesize }}
+        {% else %}
+        <em>N/A</em>
+        {% endif %}
+        </td>
     </tr>
     <tr>
         <td>Creator:</td>
@@ -130,9 +137,16 @@
 
 {{ dataset_form.non_field_errors }}
 
-<div class="dataset_contents">
+{% if dataset.external_path %}
+    <table>
+    <tr>
+        <td>External file path:</td>
+        <td>{{ dataset.external_absolute_path }}</td>
+    </tr>
+    </table>
+{% endif %}
+
 {% block dataset_contents %}
 {% endblock %}
-</div>
 
 {% endblock %}

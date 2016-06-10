@@ -812,216 +812,6 @@
 },
 {
     "fields": {
-        "depPath": ".",
-        "requirement": 3,
-        "coderesourcerevision": 6,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 1
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 4,
-        "coderesourcerevision": 6,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 2
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 5,
-        "coderesourcerevision": 6,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 3
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 3,
-        "coderesourcerevision": 7,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 4
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 4,
-        "coderesourcerevision": 7,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 5
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 5,
-        "coderesourcerevision": 7,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 6
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 3,
-        "coderesourcerevision": 8,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 7
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 3,
-        "coderesourcerevision": 11,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 8
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 4,
-        "coderesourcerevision": 11,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 10
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 10,
-        "coderesourcerevision": 11,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 11
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 14,
-        "coderesourcerevision": 19,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 15
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 15,
-        "coderesourcerevision": 19,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 16
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 16,
-        "coderesourcerevision": 19,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 17
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 17,
-        "coderesourcerevision": 19,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 18
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 18,
-        "coderesourcerevision": 19,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 19
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 22,
-        "coderesourcerevision": 6,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 20
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 22,
-        "coderesourcerevision": 7,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 21
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 22,
-        "coderesourcerevision": 11,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 22
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 5,
-        "coderesourcerevision": 11,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 23
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 5,
-        "coderesourcerevision": 21,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 24
-},
-{
-    "fields": {
-        "depPath": ".",
-        "requirement": 23,
-        "coderesourcerevision": 19,
-        "depFileName": ""
-    },
-    "model": "method.coderesourcedependency",
-    "pk": 25
-},
-{
-    "fields": {
         "revision_parent": null,
         "family": 2,
         "users_allowed": [],
@@ -1257,6 +1047,216 @@
     },
     "model": "method.method",
     "pk": 29
+},
+{
+    "model": "method.methoddependency",
+    "pk": 1,
+    "fields": {
+        "method": 4,
+        "requirement": 3,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 2,
+    "fields": {
+        "method": 4,
+        "requirement": 4,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 3,
+    "fields": {
+        "method": 4,
+        "requirement": 5,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 4,
+    "fields": {
+        "method": 5,
+        "requirement": 3,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 5,
+    "fields": {
+        "method": 5,
+        "requirement": 4,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 6,
+    "fields": {
+        "method": 5,
+        "requirement": 5,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 7,
+    "fields": {
+        "method": 6,
+        "requirement": 3,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 8,
+    "fields": {
+        "method": 7,
+        "requirement": 3,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 9,
+    "fields": {
+        "method": 7,
+        "requirement": 4,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 10,
+    "fields": {
+        "method": 7,
+        "requirement": 10,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 11,
+    "fields": {
+        "method": 9,
+        "requirement": 14,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 12,
+    "fields": {
+        "method": 9,
+        "requirement": 15,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 13,
+    "fields": {
+        "method": 9,
+        "requirement": 16,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 14,
+    "fields": {
+        "method": 9,
+        "requirement": 17,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 15,
+    "fields": {
+        "method": 9,
+        "requirement": 18,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 16,
+    "fields": {
+        "method": 4,
+        "requirement": 22,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 17,
+    "fields": {
+        "method": 5,
+        "requirement": 22,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 18,
+    "fields": {
+        "method": 7,
+        "requirement": 22,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 19,
+    "fields": {
+        "method": 7,
+        "requirement": 5,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 20,
+    "fields": {
+        "method": 11,
+        "requirement": 5,
+        "path": "./",
+        "filename": ""
+    }
+},
+{
+    "model": "method.methoddependency",
+    "pk": 21,
+    "fields": {
+        "method": 9,
+        "requirement": 23,
+        "path": "./",
+        "filename": ""
+    }
 },
 {
     "fields": {

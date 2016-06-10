@@ -12,7 +12,6 @@ import itertools
 import os
 import glob
 import shutil
-import threading
 import Queue
 import socket
 
@@ -22,9 +21,9 @@ from django.utils import timezone
 
 import archive.models
 from archive.models import Dataset, Run, ExceedsSystemCapabilities
-
 from sandbox.execute import Sandbox, sandbox_glob
 from fleet.exceptions import StopExecution
+from constants import runcomponentstates
 
 mgr_logger = logging.getLogger("fleet.Manager")
 worker_logger = logging.getLogger("fleet.Worker")
@@ -42,7 +41,9 @@ def adjust_log_files(target_logger, rank):
         if filename is not None:
             handler.close()
             fileRoot, fileExt = os.path.splitext(filename)
-            handler.baseFilename = '{}.{:03}{}'.format(fileRoot, rank, fileExt)
+            rank_suffix = '.{:03}'.format(rank)
+            if not fileRoot.endswith(rank_suffix):
+                handler.baseFilename = fileRoot + rank_suffix + fileExt
     if target_logger.parent is not None:
         adjust_log_files(target_logger.parent, rank)
 
@@ -65,10 +66,8 @@ class MPIFleetInterface(object):
         return MPI.Get_processor_name()
 
 
-class ThreadFleetInterface(object):
-    """
-    Base class for both ThreadManagerInterface and ThreadWorkerInterface.
-    """
+class SingleThreadedFleetInterface(object):
+    """ Base class for both single-threaded manager and worker. """
     def get_rank(self):
         raise NotImplementedError()
 
@@ -129,40 +128,34 @@ class MPIManagerInterface(MPIFleetInterface):
         """
         self.comm.isend("STOP", dest=foreman, tag=Worker.STOP)
         # Either the foreman got the message and ended the task, or it
-        # finished the task.
+        # finished the task (which is fine).
         self.comm.recv(source=foreman, tag=Worker.FINISHED)
+
+    def record_exception(self):
+        mgr_logger.error("Manager failed.", exc_info=True)
 
     def shut_down_fleet(self):
         for rank in range(self.get_size()):
             if rank != self.get_rank():
-                self.comm.send(dest=rank, tag=Worker.SHUTDOWN)
+                self.comm.send(None, dest=rank, tag=Worker.SHUTDOWN)
         self.comm.Disconnect()
 
 
-class ThreadManagerInterface(ThreadFleetInterface):
+class SingleThreadedManagerInterface(SingleThreadedFleetInterface):
     def __init__(self, worker_count):
         # Elements of this queue will be 2-tuples (foreman rank, result PK).
         self.finished_queues = [Queue.Queue() for _ in range(worker_count)]
 
         self.worker_count = worker_count
-        self.worker_threads = []
+        self.workers = []
         self.worker_interfaces = [None] * worker_count
 
-        tmi = self
-
-        class WorkerThreadStarter:
-            def __init__(self, rank):
-                worker_interface = ThreadWorkerInterface(rank=rank, manager_interface=tmi)
-                self.worker = Worker(interface=worker_interface)
-
-            def __call__(self, *args, **kwargs):
-                self.worker.main_procedure()
-
-        for idx in range(worker_count):
-            # Each thread will create a worker that adds itself to self.worker_interfaces.
-            worker_thread = threading.Thread(target=WorkerThreadStarter(idx))
-            worker_thread.start()
-            self.worker_threads.append(worker_thread)
+        for rank in range(worker_count):
+            # Each worker interface will add itself to self.worker_interfaces.
+            worker_interface = SingleThreadedWorkerInterface(
+                rank=rank,
+                manager_interface=self)
+            self.workers.append(Worker(interface=worker_interface))
 
     def send_task_to_worker(self, task_info, worker_rank):
         self.worker_interfaces[worker_rank-1].job_queue.put(
@@ -171,6 +164,10 @@ class ThreadManagerInterface(ThreadFleetInterface):
         )
 
     def probe_for_finished_worker(self):
+        for rank in range(self.worker_count):
+            worker_interface = self.worker_interfaces[rank]
+            if not worker_interface.job_queue.empty():
+                self.workers[rank].receive_and_perform_task()
         for worker_queue in self.finished_queues:
             if not worker_queue.empty():
                 return True
@@ -200,11 +197,12 @@ class ThreadManagerInterface(ThreadFleetInterface):
         # finished the task.  Either way, we wait for a message from this Worker.
         self.finished_queues[foreman.rank-1].get(block=True)
 
+    def record_exception(self):
+        # Just report the exception immediately by raising it again
+        raise
+
     def shut_down_fleet(self):
-        for worker_interface in self.worker_interfaces:
-            worker_interface.job_queue.put(("SHUTDOWN", Worker.SHUTDOWN))
-        for thread in self.worker_threads:
-            thread.join()
+        pass
 
 
 class Manager(object):
@@ -228,6 +226,8 @@ class Manager(object):
         self.task_queue = []
         # A table of currently running sandboxes, indexed by the Run.
         self.active_sandboxes = {}
+        # A table of sandboxes that are in the process of shutting down/being cancelled.
+        self.sandboxes_shutting_down = set()
 
         # roster will be a dictionary keyed by hostnames whose values are
         # the sets of ranks of processes running on that host.  This will be
@@ -272,22 +272,25 @@ class Manager(object):
         new_sdbx.advance_pipeline()
 
         # Refresh run_to_start.
-        run_to_start = Run.objects.get(pk=run_to_start.pk)
+        run_to_start.refresh_from_db()
 
         # If we were able to reuse throughout, then we're totally done.  Otherwise we
         # need to do some bookkeeping.
         finished_already = False
-        if run_to_start.is_complete(use_cache=True):
-            mgr_logger.info('Run "%s" completely reused (Pipeline: %s, User: %s)',
+        if run_to_start.is_successful():
+            mgr_logger.info('Run "%s" (Pipeline: %s, User: %s) completely reused successfully',
                             run_to_start, run_to_start.pipeline, run_to_start.user)
             finished_already = True
 
-        elif not run_to_start.is_successful(use_cache=True):
-            # The run failed somewhere in reuse.  This hasn't affected any of our maps yet, so we
+        elif run_to_start.is_failing() or run_to_start.is_cancelling():
+            # The run failed somewhere in preparation.  This hasn't affected any of our maps yet, so we
             # just report it and discard it.
-            mgr_logger.info('Run "%s" (pk=%d) (Pipeline: %s, User: %s) failed on reuse',
-                            run_to_start, run_to_start.pk, run_to_start.pipeline, run_to_start.user)
-            run_to_start.mark_complete()
+            status_str = "failed" if run_to_start.is_failing() else "cancelled"
+            mgr_logger.info('Run "%s" (pk=%d, Pipeline: %s, User: %s) %s before execution',
+                            run_to_start, run_to_start.pk, run_to_start.pipeline, run_to_start.user,
+                            status_str)
+            run_to_start.cancel_components()
+            run_to_start.stop(save=True)
             finished_already = True
 
         else:
@@ -296,8 +299,7 @@ class Manager(object):
                 self.task_queue.append((new_sdbx, task))
 
         if finished_already:
-            run_to_start.stop(save=True)
-            run_to_start.complete_clean(use_cache=True)
+            run_to_start.complete_clean()
             if self.history_queue.maxlen > 0:
                 self.history_queue.append(new_sdbx)
 
@@ -305,18 +307,52 @@ class Manager(object):
 
     def mop_up_terminated_sandbox(self, sandbox):
         """
-        Remove all tasks coming from the specified sandbox from the work queue
-        and mark them as cancelled.
+        Remove this sandbox's tasks from the queue after failure or cancellation.
         """
+        # Mark this sandbox as in the process of shutting down.
+        self.sandboxes_shutting_down.add(sandbox)
         new_task_queue = []
+        # Cancel all tasks that are still on the queue (and thus not actually running yet).
         for task_sdbx, task in self.task_queue:
             if task_sdbx != sandbox:
                 new_task_queue.append((task_sdbx, task))
             else:
-                task.is_cancelled = True
-                task.save()
+                if isinstance(task, archive.models.RunStep):
+                    for rsic in task.RSICs.filter(
+                            _runcomponentstate__pk__in=[runcomponentstates.PENDING_PK,
+                                                        runcomponentstates.RUNNING_PK]
+                    ):
+                        rsic.cancel(save=True)  # this saves rsic
+                task.cancel(save=True)  # this saves task
 
+        # Cancel all parts of the run that aren't currently processing.
+        steps_processing = []
+        incables_processing = []
+        outcables_processing = []
+        for foreman in self.tasks_in_progress:
+            task = self.tasks_in_progress[foreman]["task"]
+            if task.top_level_run == sandbox.run:
+                if isinstance(task, archive.models.RunStep):
+                    steps_processing.append(task)
+                elif isinstance(task, archive.models.RunSIC):
+                    incables_processing.append(task)
+                else:
+                    outcables_processing.append(task)
+        sandbox.run.cancel_components(except_steps=steps_processing, except_incables=incables_processing,
+                                      except_outcables=outcables_processing)
+
+        # Update the queue.
         self.task_queue = new_task_queue
+
+    def remove_sandbox_from_queues(self, sandbox):
+        """
+        Clear the sandbox out of the queues when it's completely finished running.
+        """
+        self.active_sandboxes.pop(sandbox.run)
+        # If this was already in the process of shutting down, remove the annotation.
+        self.sandboxes_shutting_down.discard(sandbox)
+        if self.history_queue.maxlen > 0:
+            self.history_queue.append(sandbox)
 
     def assign_task(self, sandbox, task):
         """
@@ -332,10 +368,30 @@ class Manager(object):
         if task_info.threads_required > self.max_host_cpus:
             mgr_logger.info(
                 "Task %s requested %d threads but there are only %d workers.  Terminating parent run (%s).",
-                task, task_info.threads_required, self.max_host_cpus, task.top_level_run)
-            task.not_enough_CPUs.create(threads_requested=task_info.threads_required,
-                                        max_available=self.max_host_cpus)
+                task,
+                task_info.threads_required,
+                self.max_host_cpus,
+                task.top_level_run
+            )
+            task.top_level_run.not_enough_CPUs.create(threads_requested=task_info.threads_required,
+                                                      max_available=self.max_host_cpus)
             self.mop_up_terminated_sandbox(sandbox)
+            task.refresh_from_db()
+            assert task.is_cancelled_FIXME()  # this should happen in mop_up_terminated_sandbox
+            sandbox.run.cancel(save=True)  # transition: Running->Cancelling
+
+            # If there is nothing currently running from this Run, we can end it.
+            end_now = True
+            for task_info in self.tasks_in_progress.itervalues():
+                if task_info['task'].top_level_run == sandbox.run:
+                    end_now = False
+                    break
+
+            if end_now:
+                # This stops the run and makes the transition: Cancelling->Cancelled
+                sandbox.run.stop(save=True)
+                self.remove_sandbox_from_queues(sandbox)
+
             return
 
         while True:
@@ -376,123 +432,16 @@ class Manager(object):
 
             # The task that returned may have belonged to the same sandbox, and
             # failed.  If so, we should cancel this task.
-            if sandbox.run not in self.active_sandboxes:
-                mgr_logger.debug("Run has been terminated; abandoning this task.")
+            if sandbox.run not in self.active_sandboxes or sandbox in self.sandboxes_shutting_down:
+                mgr_logger.debug(
+                    "Abandoning task %s (pk=%d) because its run has been terminated.",
+                    task,
+                    task.pk
+                )
                 return
-
-    def note_progress(self, lord_rank, task_finished):
-        """
-        Perform bookkeeping for a task that has just finished.
-        """
-        # Mark this task as having finished.
-        just_finished = self.tasks_in_progress.pop(lord_rank)
-        curr_sdbx = self.active_sandboxes[task_finished.top_level_run]
-        task_execute_info = curr_sdbx.get_task_info(task_finished)
-
-        workers_freed = [lord_rank] + just_finished["vassals"]
-        for worker_rank in workers_freed:
-            self.worker_status[worker_rank] = Worker.READY
-
-        # Is anything from the run still processing?  If this was a recovery, is anything else
-        # recovering for the invoking record?
-        tasks_currently_running = False
-        task_from_same_recovery = False
-
-        curr_run_tasks = []
-        for task_info in self.tasks_in_progress.itervalues():
-            if task_info['task'].top_level_run == just_finished['task'].top_level_run:
-                curr_run_tasks.append(task_info['task'])
-                tasks_currently_running = True
-
-                if task_execute_info.is_recovery():
-                    if task_info['task'].recovering_record == task_execute_info.recovering_record:
-                        task_from_same_recovery = True
-
-        # If this run has failed (either due to this task or another),
-        # we mop up.
-        clean_up_now = False
-        curr_sdbx.run = Run.objects.get(pk=curr_sdbx.run.pk)
-        if not curr_sdbx.run.is_successful(use_cache=True):
-            self.mop_up_terminated_sandbox(curr_sdbx)
-            if not task_finished.is_successful(use_cache=True):
-                mgr_logger.info('Task %s (pk=%d) of run "%s" (pk=%d) (Pipeline: %s, User: %s) failed.',
-                                task_finished, task_finished.pk, curr_sdbx.run, curr_sdbx.run.pk,
-                                curr_sdbx.pipeline, curr_sdbx.user)
-
-            task_finished.failed_mark_complete(curr_run_tasks)
-
-            if task_execute_info.is_recovery():
-                recovering_task = archive.models.RunComponent.objects.get(
-                    pk=task_execute_info.recovering_record.pk
-                ).definite
-                if not recovering_task.is_successful(use_cache=True) and not task_from_same_recovery:
-                    recovering_task.failed_mark_complete(curr_run_tasks)
-                    recovering_task.save()
-
-            if not tasks_currently_running:
-                clean_up_now = True
-
-        else:
-            # Was this task a recovery or novel progress?
-            if task_execute_info.is_recovery():
-                execrecordouts = task_execute_info.execrecord.execrecordouts.all()
-                data_newly_available = [execrecordout.dataset
-                                        for execrecordout in execrecordouts]
-                # Add anything that was waiting on this recovery to the queue.
-                curr_sdbx.enqueue_runnable_tasks(data_newly_available)
-            else:
-                # Update maps and advance the pipeline.
-                curr_sdbx.update_sandbox(task_finished)
-                curr_sdbx.advance_pipeline(task_completed=just_finished["task"])
-                curr_sdbx.run = Run.objects.get(pk=curr_sdbx.run.pk)
-                if curr_sdbx.run.is_complete(use_cache=True):
-                    mgr_logger.info('Rest of Run "%s" (pk=%d) completely reused (Pipeline: %s, User: %s)',
-                                    curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
-                    if not tasks_currently_running:
-                        clean_up_now = True
-
-                elif not curr_sdbx.run.is_successful(use_cache=False):
-                    # The task that just finished was unsuccessful.  We mop up the sandbox.
-                    self.mop_up_terminated_sandbox(curr_sdbx)
-                    if not tasks_currently_running:
-                        clean_up_now = True
-
-            if not clean_up_now:
-                # The Run is still going and there may be more stuff to do.
-                for task in curr_sdbx.hand_tasks_to_fleet():
-                    self.task_queue.append((curr_sdbx, task))
-
-        if clean_up_now:
-            if not curr_sdbx.run.is_successful(use_cache=True):
-                mgr_logger.info('Cleaning up failed run "%s" (pk=%d) (Pipeline: %s, User: %s)',
-                                curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
-
-            finished_sandbox = self.active_sandboxes.pop(curr_sdbx.run)
-            if self.history_queue.maxlen > 0:
-                self.history_queue.append(finished_sandbox)
-
-            curr_sdbx.run.mark_complete(mark_all_components=not curr_sdbx.run.is_successful(use_cache=True))
-            curr_sdbx.run.stop(save=True)
-            curr_sdbx.run.complete_clean(use_cache=True)
-
-            if curr_sdbx.run.is_successful(use_cache=True):
-                mgr_logger.info('Finished successful run "%s" (pk=%d) (Pipeline: %s, User: %s)',
-                                curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
-
-        return workers_freed
-
-    def main_procedure(self):
-        try:
-            self._startup()
-            self.main_loop()
-            mgr_logger.info("Manager shutting down.")
-        except:
-            mgr_logger.error("Manager failed.", exc_info=True)
-        self.interface.shut_down_fleet()
 
     def worker_finished(self, lord_rank, result_pk):
         """Handle bookkeeping when a worker finishes."""
-
         if result_pk == Worker.FAILURE:
             raise WorkerFailedException("Worker {} reports a failed task (PK {})".format(
                 lord_rank,
@@ -502,36 +451,231 @@ class Manager(object):
         mgr_logger.info(
             "Worker %d reports task with PK %d is finished",
             lord_rank, result_pk)
-
         task_finished = archive.models.RunComponent.objects.get(pk=result_pk).definite
-        self.note_progress(lord_rank, task_finished)
 
-    def main_loop(self):
-        """
-        Poll the database for new jobs, and handle running of sandboxes.
-        """
-        time_to_purge = None
-        while True:
-            self.find_stopped_runs()
+        # Mark this task as having finished.
+        just_finished = self.tasks_in_progress.pop(lord_rank)
+        assert task_finished == just_finished["task"]
+        curr_sdbx = self.active_sandboxes[task_finished.top_level_run]
+        task_execute_info = curr_sdbx.get_task_info(task_finished)
 
-            time_to_poll = time.time() + settings.FLEET_POLLING_INTERVAL
-            if not self.assign_tasks(time_to_poll):
-                return
+        workers_freed = [lord_rank] + just_finished["vassals"]
+        for worker_rank in workers_freed:
+            self.worker_status[worker_rank] = Worker.READY
 
-            # Everything in the queue has been started, so we check and see if
-            # anything has finished.
-            if not self.wait_for_polling(time_to_poll):
-                return
+        # Is anything from the run actively processing?
+        tasks_currently_running = False
+        # Recall:
+        # a RunStep gives you the step coordinates
+        # a RunSIC gives you its parent step coordinates
+        # a RunOutputCable gives you the parent run coordinates
+        # task_finished_coords[idx] is the component coordinate in
+        # the subrun idx levels deep (0 means top-level run).
+        task_finished_coords = task_finished.get_coordinates()
+        if task_finished.is_outcable:
+            # Add a dummy entry at the end so that the 0th to 2nd-last coordinates
+            # give the sub-run coordinates in all cases.
+            task_finished_coords = task_finished_coords + (None,)
 
-            self.find_new_runs()
-            if time_to_purge is None or time_to_poll > time_to_purge:
-                self.purge_sandboxes()
-                Dataset.purge()
-                time_to_purge = time_to_poll + settings.FLEET_PURGING_INTERVAL
+        # At position i, this list denotes whether any other tasks from the sub-run
+        # i levels deep (0 means top level run) are currently running.
+        subrun_tasks_currently_running = [False for _ in task_finished_coords]
 
-            if self.quit_idle and not self.active_sandboxes:
-                mgr_logger.info('Fleet is idle, quitting.')
-                return
+        for task_info in self.tasks_in_progress.itervalues():
+            if task_info['task'].top_level_run == just_finished['task'].top_level_run:
+                running_task_coords = task_info["task"].get_coordinates()
+                if task_info["task"].is_outcable:
+                    running_task_coords = running_task_coords + (None,)
+
+                # These belong to the same Run, so we can't bail out yet if task_finished failed.
+                tasks_currently_running = True
+                subrun_tasks_currently_running[0] = True
+                # If either task_finished_coords and running_task_coords are length 1 (i.e. one
+                # directly belongs to the top-level run), this does nothing.
+                for coord in range(1, min(len(task_finished_coords), len(running_task_coords))):
+                    if task_finished_coords[coord] == running_task_coords[coord]:
+                        subrun_tasks_currently_running[coord] = True
+                    else:
+                        # Nothing nested deeper can belong to the same sub-run.
+                        break
+
+        # If this run has failed (either due to this task or another),
+        # we mop up.
+        clean_up_now = False
+        curr_sdbx.run.refresh_from_db()
+        stop_subruns_if_possible = False
+
+        if task_finished.is_successful():
+            if curr_sdbx.run.is_failing() or curr_sdbx.run.is_cancelling():
+                assert curr_sdbx in self.sandboxes_shutting_down
+                mgr_logger.debug(
+                    'Task %s (pk=%d) was successful but run "%s" (pk=%d) (Pipeline: %s, User: %s) %s.',
+                    task_finished,
+                    task_finished.pk,
+                    curr_sdbx.run,
+                    curr_sdbx.run.pk,
+                    curr_sdbx.pipeline,
+                    curr_sdbx.user,
+                    "failing" if curr_sdbx.run.is_failing() else "cancelling"
+                )
+
+                # Stop any sub-Runs (or the top-level run) that this was the last
+                # running task of.
+                stop_subruns_if_possible = True
+
+                if not tasks_currently_running:
+                    clean_up_now = True
+
+            else:  # run is still processing successfully
+                assert curr_sdbx.run.is_running(), "{} != Running".format(curr_sdbx.run.get_state_name())
+
+                # Was this task a recovery or novel progress?
+                if task_execute_info.is_recovery():
+                    mgr_logger.debug(
+                        'Recovering task %s (pk=%d) was successful; '
+                        'queueing waiting tasks from run "%s" (pk=%d, Pipeline: %s, User: %s).',
+                        task_finished,
+                        task_finished.pk,
+                        curr_sdbx.run,
+                        curr_sdbx.run.pk,
+                        curr_sdbx.pipeline,
+                        curr_sdbx.user
+                    )
+
+                    execrecordouts = task_execute_info.execrecord.execrecordouts.all()
+                    data_newly_available = [execrecordout.dataset
+                                            for execrecordout in execrecordouts]
+                    # Add anything that was waiting on this recovery to the queue.
+                    curr_sdbx.enqueue_runnable_tasks(data_newly_available)
+
+                else:
+                    mgr_logger.debug(
+                        'Task %s (pk=%d) was successful; '
+                        'advancing run "%s" (pk=%d, Pipeline: %s, User: %s).',
+                        task_finished,
+                        task_finished.pk,
+                        curr_sdbx.run,
+                        curr_sdbx.run.pk,
+                        curr_sdbx.pipeline,
+                        curr_sdbx.user
+                    )
+
+                    # Update maps and advance the pipeline.  Note that advance_pipeline
+                    # will transition the states of runs and sub-runs appropriately.
+                    curr_sdbx.update_sandbox(task_finished)
+                    curr_sdbx.advance_pipeline(task_completed=just_finished["task"])
+                    curr_sdbx.run.refresh_from_db()
+                    if curr_sdbx.run.is_successful():
+                        assert not tasks_currently_running
+                        mgr_logger.info('Run "%s" (pk=%d, Pipeline: %s, User: %s) finished successfully',
+                                        curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
+                        clean_up_now = True  # this is the only "successful" clean up condition
+
+                    elif curr_sdbx.run.is_failing() or curr_sdbx.run.is_cancelling():
+                        # Something just failed in advance_pipeline.
+                        mgr_logger.debug(
+                            'Run "%s" (pk=%d, Pipeline: %s, User: %s) failed to advance '
+                            'after finishing task %s (pk=%d)',
+                            curr_sdbx.run,
+                            curr_sdbx.run.pk,
+                            curr_sdbx.pipeline,
+                            curr_sdbx.user,
+                            task_finished,
+                            task_finished.pk
+                        )
+
+                        if curr_sdbx not in self.sandboxes_shutting_down:
+                            self.mop_up_terminated_sandbox(curr_sdbx)
+                        if not tasks_currently_running:
+                            clean_up_now = True
+
+        else:
+            # The component that just finished failed.  Cancellation is handled by stop_run
+            # (or assign_task).
+            assert task_finished.is_failed(), "{} != Failed".format(task_finished.get_state_name())
+            stop_subruns_if_possible = True
+            if curr_sdbx.run.is_failing() or curr_sdbx.run.is_cancelling():
+                assert curr_sdbx in self.sandboxes_shutting_down
+                mgr_logger.debug(
+                    'Task %s (pk=%d) failed; run "%s" (pk=%d, Pipeline: %s, User: %s) was already %s',
+                    task_finished,
+                    task_finished.pk,
+                    curr_sdbx.run,
+                    curr_sdbx.run.pk,
+                    curr_sdbx.pipeline,
+                    curr_sdbx.user,
+                    "failing" if curr_sdbx.run.is_failing() else "cancelling"
+                )
+
+            else:
+                assert curr_sdbx.run.is_running(), "{} != Running".format(curr_sdbx.run.get_state_name())
+                mgr_logger.info('Task %s (pk=%d) of run "%s" (pk=%d, Pipeline: %s, User: %s) failed; '
+                                'marking run as failing',
+                                task_finished, task_finished.pk, curr_sdbx.run, curr_sdbx.run.pk,
+                                curr_sdbx.pipeline, curr_sdbx.user)
+
+                # Go through and mark all ancestor runs of task_finished as failing.
+                curr_sdbx.run.mark_failure(save=True)
+                curr_ancestor_run = curr_sdbx.run
+                # This does nothing if task_finished_coords is of length 1; i.e. if it's a component belonging
+                # to the top-level run.
+                for coord in task_finished_coords[:-1]:
+                    curr_ancestor_run = curr_ancestor_run.runsteps.get(pipelinestep__step_num=coord).child_run
+                    if curr_ancestor_run.is_running():  # skip over this if it's cancelling or failing already
+                        curr_ancestor_run.mark_failure(save=True)
+
+                self.mop_up_terminated_sandbox(curr_sdbx)  # this cancels the recovering record as well
+
+            # Now check whether we can do our final clean up.
+            if not tasks_currently_running:
+                clean_up_now = True
+
+        if stop_subruns_if_possible:
+
+            curr_run = task_finished.parent_run
+            for idx in range(len(task_finished_coords)-1, -1, -1):
+                # task_finished_coords[idx] is the component coordinate in
+                # the subrun idx levels deep (0 means top-level run).
+                # curr_run is this subrun.
+                if not subrun_tasks_currently_running[idx]:
+                    if not curr_run.has_ended():
+                        curr_run.stop(save=True)
+                    else:
+                        curr_run.finish_recovery(save=True)
+                else:
+                    # By definition everything above this point has stuff
+                    # still running.
+                    break
+                if idx > 0:
+                    curr_run = curr_run.parent_runstep.parent_run
+
+        if not clean_up_now:
+            # The Run is still going and there may be more stuff to do.
+            for task in curr_sdbx.hand_tasks_to_fleet():
+                self.task_queue.append((curr_sdbx, task))
+
+        else:
+            status_string = "successful"
+            if curr_sdbx.run.is_failing():
+                status_string = "failed"
+            elif curr_sdbx.run.is_cancelling():
+                status_string = "cancelled"
+
+            mgr_logger.info(
+                'Cleaning up %s run "%s" (pk=%d, Pipeline: %s, User: %s)',
+                status_string,
+                curr_sdbx.run,
+                curr_sdbx.run.pk,
+                curr_sdbx.pipeline,
+                curr_sdbx.user
+            )
+
+            self.remove_sandbox_from_queues(curr_sdbx)
+            if not curr_sdbx.run.is_successful():
+                curr_sdbx.run.stop(save=True)
+            # curr_sdbx.run.complete_clean()
+
+        return workers_freed
 
     def assign_tasks(self, time_to_poll):
         # We can't use a for loop over the task queue because assign_task
@@ -539,7 +683,7 @@ class Manager(object):
         while len(self.task_queue) > 0 and time.time() < time_to_poll:
             # task_queue entries are (sandbox, run_step)
             self.task_queue.sort(key=lambda entry: entry[0].run.start_time)
-            curr_task = self.task_queue[0]  # looks like (sandbox, task)
+            curr_task = self.task_queue.pop(0)  # looks like (sandbox, task)
             task_sdbx = self.active_sandboxes[curr_task[1].top_level_run]
             # We assign this task to a worker, and do not proceed until the task
             # is assigned.
@@ -548,7 +692,7 @@ class Manager(object):
             except WorkerFailedException as e:
                 mgr_logger.error(e.error_msg)
                 return False
-            self.task_queue = self.task_queue[1:]
+
         return True
 
     def wait_for_polling(self, time_to_poll):
@@ -616,33 +760,43 @@ class Manager(object):
         """
         Stop the specified run.
         """
-        if run not in self.active_sandboxes:
-            # This hasn't started yet, so we can just skip this one.
-            mgr_logger.warn("Run (pk=%d) is not active so just marking stopped",
+        mgr_logger.debug("Stopping run (pk=%d) on behalf of user %s",
+                         run.pk,
+                         run.stopped_by)
+
+        if not run.has_started():
+            run.start(save=True)
+
+        if run.is_complete():
+            # This run already completed, so we ignore this call.
+            mgr_logger.warn("Run (pk=%d) is already complete; ignoring stop request.", run.pk)
+            return
+        elif run not in self.active_sandboxes:
+            # This hasn't started yet, or is a remnant from a fleet crash/shutdown,
+            # so we can just skip this one.
+            mgr_logger.warn("Run (pk=%d) is not active.  Cancelling steps/cables that were unfinished.",
                             run.pk)
+            run.cancel_components()
         else:
-            mgr_logger.debug("Stopping run (pk=%d) on behalf of user %s",
-                             run.pk,
-                             run.stopped_by)
 
-            sandbox_to_end = self.active_sandboxes[run]
-
-            # Send a message to the foreman in charge of running this task.
-            foreman_found = False
+            # Send messages to the foremen in charge of running this run's task.
+            # We don't bother to do anything with the results.  Everything gets cancelled
+            # even if it returned successfully or unsuccessfully.
             for foreman in self.tasks_in_progress:
                 if self.tasks_in_progress[foreman]["task"].top_level_run == run:
-                    foreman_found = True
-                    break
+                    curr_task_in_progress = self.tasks_in_progress.pop(foreman)
+                    self.interface.stop_run(foreman)
+                    self.worker_status[foreman] = Worker.READY
+                    for worker_rank in curr_task_in_progress["vassals"]:
+                        self.worker_status[worker_rank] = Worker.READY
 
-            if foreman_found:
-                self.interface.stop_run(foreman)
-
-                self.worker_status[foreman] = Worker.READY
-                for worker_rank in self.tasks_in_progress[foreman]["vassals"]:
-                    self.worker_status[worker_rank] = Worker.READY
-
-            # Cancel all tasks on the task queue pertaining to this run.
+            sandbox_to_end = self.active_sandboxes[run]
+            # Cancel all tasks on the task queue pertaining to this run, and finalize the
+            # details.
             self.mop_up_terminated_sandbox(sandbox_to_end)
+            self.remove_sandbox_from_queues(sandbox_to_end)
+
+        run.cancel(save=True)
         run.stop(save=True)
 
         mgr_logger.debug("Run (pk={}) stopped by user {}".format(run.pk, run.stopped_by))
@@ -706,9 +860,52 @@ class Manager(object):
                 except OSError as e:
                     mgr_logger.warning(e)
 
+    def main_loop(self):
+        """
+        Poll the database for new jobs, and handle running of sandboxes.
+        """
+        time_to_purge = None
+        while True:
+            self.find_stopped_runs()
+
+            time_to_poll = time.time() + settings.FLEET_POLLING_INTERVAL
+            if not self.assign_tasks(time_to_poll):
+                return
+
+            # Everything in the queue has been started, so we check and see if
+            # anything has finished.
+            if not self.wait_for_polling(time_to_poll):
+                return
+
+            self.find_new_runs()
+            if time_to_purge is None or time_to_poll > time_to_purge:
+                self.purge_sandboxes()
+                Dataset.purge()
+                time_to_purge = time_to_poll + settings.FLEET_PURGING_INTERVAL
+
+            if self.quit_idle and not self.active_sandboxes:
+                mgr_logger.info('Fleet is idle, quitting.')
+                return
+
+    def main_procedure(self):
+        try:
+            self._startup()
+            self.main_loop()
+            mgr_logger.info("Manager shutting down.")
+        except:
+            mgr_logger.error("Manager failed.", exc_info=True)
+        self.interface.shut_down_fleet()
+
     @classmethod
-    def execute_pipeline(cls, user, pipeline, inputs, users_allowed=None, groups_allowed=None,
-                         name=None, description=None, threaded=True):
+    def execute_pipeline(cls,
+                         user,
+                         pipeline,
+                         inputs,
+                         users_allowed=None,
+                         groups_allowed=None,
+                         name=None,
+                         description=None,
+                         single_threaded=True):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
@@ -733,10 +930,10 @@ class Manager(object):
 
         # The run is already in the queue, so we can just start the fleet and let it exit
         # when it finishes.
-        if not threaded:
+        if not single_threaded:
             interface = MPIManagerInterface(worker_count=1, manage_script=sys.argv[0])
         else:
-            interface = ThreadManagerInterface(worker_count=1)
+            interface = SingleThreadedManagerInterface(worker_count=1)
         manager = cls(interface=interface, quit_idle=True, history=1)
         manager.main_procedure()
         return manager
@@ -785,17 +982,20 @@ class MPIWorkerInterface(MPIFleetInterface):
     def send_finished_task(self, message):
         return self.comm.send(message, dest=0, tag=Worker.FINISHED)
 
+    def record_exception(self, rank, task):
+        worker_logger.error("[%d] Task %s failed.", self.rank, task, exc_info=True)
+
     def close(self):
         self.comm.Disconnect()
 
 
-class ThreadWorkerInterface(ThreadFleetInterface):
+class SingleThreadedWorkerInterface(SingleThreadedFleetInterface):
     """
     Analogue of MPIWorkerInterface where threads are used instead of MPI.
     """
     def __init__(self, rank, manager_interface):
         self.rank = rank
-        assert isinstance(manager_interface, ThreadManagerInterface)
+        assert isinstance(manager_interface, SingleThreadedManagerInterface)
         self.manager_interface = manager_interface
         self.manager_interface.worker_interfaces[rank-1] = self
         self.job_queue = Queue.Queue()
@@ -825,6 +1025,10 @@ class ThreadWorkerInterface(ThreadFleetInterface):
 
     def send_finished_task(self, message):
         self.manager_interface.finished_queues[self.get_rank()-1].put(message)
+
+    def record_exception(self, rank, task):
+        # Just report the exception immediately by raising it again
+        raise
 
     def close(self):
         pass
@@ -867,6 +1071,12 @@ class Worker(object):
             worker_logger.info("Worker {} shutting down.".format(self.rank))
             return tag
 
+        elif tag == self.STOP:
+            # This was sent as an attempt to stop the last thing this Worker was
+            # doing, but was missed.
+            worker_logger.info("Worker {} received a stop message too late; ignoring.".format(self.rank))
+            return tag
+
         try:
             task = None
             if "cable_record_pk" in task_info_dict:
@@ -901,7 +1111,7 @@ class Worker(object):
                 result = Worker.STOP
         except:
             result = Worker.FAILURE  # bogus return value
-            worker_logger.error("[%d] Task %s failed.", self.rank, task, exc_info=True)
+            self.interface.record_exception(self.rank, task)
 
         message = (self.rank, result)
         self.interface.send_finished_task(message)

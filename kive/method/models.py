@@ -51,7 +51,7 @@ class CodeResource(metadata.models.AccessControl):
     # contains a slash. They can't start or end with spaces.
     filename = models.CharField("Resource file name", max_length=maxlengths.MAX_FILENAME_LENGTH,
                                 help_text="The filename for this resource",
-                                blank=True, validators=[
+                                validators=[
                                     RegexValidator(regex="^(\b|([-_.()\w]+ *)*[-_.()\w]+)$",
                                                    message="Invalid code resource filename"),
                                 ])
@@ -121,15 +121,14 @@ class CodeResourceRevision(metadata.models.AccessControl):
     A particular revision of a code resource.
 
     Related to :model:`method.CodeResource`
-    Related to :model:`method.CodeResourceDependency`
+    Related to :model:`method.MethodDependency`
     Related to :model:`method.Method`
     """
     UPLOAD_DIR = "CodeResources"
 
     # Implicitly defined
     #   descendents (self/ForeignKey)
-    #   dependencies (CodeResourceDependency/ForeignKey)
-    #   needed_by (CodeResourceDependency/ForeignKey)
+    #   used_by (MethodDependency/ForeignKey)
     #   methods (Method/ForeignKey)
 
     coderesource = models.ForeignKey(CodeResource, related_name="revisions")
@@ -137,16 +136,19 @@ class CodeResourceRevision(metadata.models.AccessControl):
     # revision_number is allowed to be null because it's automatically set on save
     revision_number = models.PositiveIntegerField(
         'Revision number', help_text="Revision number of code resource",
-        blank=True)
+        blank=True
+    )
 
     revision_name = models.CharField(
         max_length=maxlengths.MAX_NAME_LENGTH,
         help_text="A name to differentiate revisions of a CodeResource",
-        blank=True)
+        blank=True
+    )
 
     revision_DateTime = models.DateTimeField(
         auto_now_add=True,
-        help_text="Date this resource revision was uploaded")
+        help_text="Date this resource revision was uploaded"
+    )
 
     revision_parent = models.ForeignKey('self', related_name="descendants", null=True, blank=True,
                                         on_delete=models.SET_NULL)
@@ -154,19 +156,20 @@ class CodeResourceRevision(metadata.models.AccessControl):
         "Revision description",
         help_text="A description for this particular resource revision",
         max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
-        blank=True)
+        blank=True
+    )
 
     content_file = models.FileField(
         "File contents",
         upload_to=UPLOAD_DIR,
-        null=True,
-        blank=True,
-        help_text="File contents of this code resource revision")
+        help_text="File contents of this code resource revision"
+    )
 
     MD5_checksum = models.CharField(
         max_length=64,
         blank=True,
-        help_text="Used to validate file contents of this resource revision")
+        help_text="Used to validate file contents of this resource revision"
+    )
 
     class Meta:
         unique_together = (("coderesource", "revision_number"))
@@ -219,72 +222,6 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
         super(CodeResourceRevision, self).save(*args, **kwargs)
 
-    # This CRR includes it's own filename at the root
-    def list_all_filepaths(self):
-        """Return all filepaths associated with this CodeResourceRevision.
-
-        Filepaths are listed recursively following a root-first scheme,
-        with the filepaths of the children listed in order.
-        """
-        return self.list_all_filepaths_h(self.coderesource.filename)
-
-    # Self is be a dependency CRR, base_name is it's file name, specified either
-    # by the parent dependency layer, or in the case of a top-level CR, just CRR.name
-    def list_all_filepaths_h(self, base_name):
-
-        # Filepath includes the original file which has dependencies.
-        # If just a library of dependencies (IE, base_name=""), don't
-        # add base_path.
-        all_filepaths = []
-        if base_name != "":
-            all_filepaths = [unicode(base_name)]
-
-        # For each dependency in this code resource revision
-        for dep in self.dependencies.all():
-
-            # Get all file paths of the CR of the child dependency
-            # relative to itself
-            dep_fn = dep.depFileName
-            # If depFileName is blank, check and see if the
-            # corresponding CodeResource had a filename (i.e. if this
-            # is a non-metapackage CRR and so there is an associated
-            # file).
-            if dep_fn == "":
-                dep_fn = dep.requirement.coderesource.filename
-
-            inner_dep_paths = dep.requirement.list_all_filepaths_h(dep_fn)
-
-            # Convert the paths from being relative to the child CRR to being
-            # relative to the current parent CRR by appending pathing
-            # information from the dependency layer
-            for paths in inner_dep_paths:
-                correctedPath = os.path.join(dep.depPath, paths)
-                all_filepaths.append(unicode(correctedPath))
-
-        return all_filepaths
-
-    def has_circular_dependence(self):
-        """Detect any circular dependences defined in this CodeResourceRevision."""
-        return self.has_circular_dependence_h([])
-
-    def has_circular_dependence_h(self, dependants):
-        """Helper for has_circular_dependence.
-
-        dependants is an accumulator that tracks all of the all of the
-        CRRs that have this one as a dependency.
-        """
-        # Base case: self is dependant on itself, in which case, return true.
-        if self in dependants:
-            return True
-
-        # Recursive case: go to all dependencies and check them.
-        check_dep = False
-        for dep in self.dependencies.all():
-            if dep.requirement.has_circular_dependence_h(dependants + [self]):
-                check_dep = True
-
-        return check_dep
-
     def compute_md5(self):
         """Computes the MD5 checksum of the CodeResourceRevision."""
         try:
@@ -297,7 +234,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
     def check_md5(self):
         """
-        Checks the MD5s of the CodeResourceRevision and its dependencies against their stored values.
+        Checks the MD5 of the CodeResourceRevision against its stored value.
         """
         # Recompute the MD5, see if it equals what is already stored.
         new_md5 = self.compute_md5()
@@ -307,10 +244,10 @@ class CodeResourceRevision(metadata.models.AccessControl):
                              self.MD5_checksum,
                              new_md5)
             return False
-
-        for dep in self.dependencies.all():
-            if not dep.requirement.check_md5():
-                return False
+        #
+        # for dep in self.dependencies.all():
+        #     if not dep.requirement.check_md5():
+        #         return False
 
         return True
 
@@ -361,79 +298,10 @@ class CodeResourceRevision(metadata.models.AccessControl):
                     }
                 )
 
-        # Check for a circular dependency.
-        if self.has_circular_dependence():
-            raise ValidationError("Self-referential dependency")
-
-        for dep in self.dependencies.all():
-            dep.clean()
-
-        # Check if dependencies conflict with each other
-        listOfDependencyPaths = self.list_all_filepaths()
-        if len(set(listOfDependencyPaths)) != len(listOfDependencyPaths):
-            raise ValidationError("Conflicting dependencies")
-
-        # If content file exists, it must have a file name
-        if self.content_file and self.coderesource.filename == "":
-            raise ValidationError("If content file exists, it must have a file name")
-
-        # If no content file exists, it must not have a file name
-        if not self.content_file and self.coderesource.filename != "":
-            raise ValidationError("Cannot have a filename specified in the absence of a content file")
-
         # Check that user/group access is coherent.
         self.validate_restrict_access([self.coderesource])
         if self.revision_parent is not None:
             self.validate_restrict_access([self.revision_parent])
-
-    def install(self, install_path):
-        """
-        Install this CRR into the specified path.
-
-        PRE: install_path exists and has all the sufficient permissions for us
-        to write our files into.
-        """
-        self.install_h(install_path, self.coderesource.filename)
-
-    def install_h(self, install_path, base_name):
-        """Helper for install."""
-        self.logger.debug("Writing code to {}".format(install_path))
-
-        # Install if not a metapackage.
-        if base_name != "":
-            dest_path = os.path.join(install_path, base_name)
-            with open(dest_path, "w") as f:
-                self.content_file.open()
-                with self.content_file:
-                    shutil.copyfileobj(self.content_file, f)
-            # Make sure this is written with read, write, and execute
-            # permission.
-            os.chmod(dest_path, stat.S_IRWXU)
-            # This will tailor the permissions further if we are running
-            # sandboxes with another user account via SSH.
-            file_access_utils.configure_sandbox_permissions(dest_path)
-
-        for dep in self.dependencies.all():
-            # Create any necessary sub-directory.  This should never
-            # fail because we're in a nice clean working directory and
-            # we already checked that this CRR doesn't have file
-            # conflicts.  (Thus if an exception is raised, we want to
-            # propagate it as that's a pretty deep problem.)
-            path_for_deps = os.path.normpath(os.path.join(install_path, dep.depPath))
-            # the directory may already exist due to another dependency --
-            # or if depPath is ".".
-            try:
-                os.makedirs(path_for_deps)
-            except os.error:
-                pass
-
-            # Get the base name of this dependency.  If no special value
-            # is specified in dep, then use the dependency's CRR name.
-            dep_fn = dep.depFileName
-            if dep_fn == "":
-                dep_fn = dep.requirement.coderesource.filename
-
-            dep.requirement.install_h(path_for_deps, dep_fn)
 
     @transaction.atomic
     def remove(self):
@@ -446,11 +314,11 @@ class CodeResourceRevision(metadata.models.AccessControl):
         assert self not in removal_plan["CodeResourceRevisions"]
         removal_plan["CodeResourceRevisions"].add(self)
 
-        for dependant in self.needed_by.all().select_related("coderesourcerevision"):
-            if dependant.coderesourcerevision not in removal_plan["CodeResourceRevisions"]:
+        for dependant in self.used_by.all().select_related("method"):
+            if dependant.method not in removal_plan["Methods"]:
                 update_removal_plan(
                     removal_plan,
-                    dependant.coderesourcerevision.build_removal_plan(removal_plan)
+                    dependant.method.build_removal_plan(removal_plan)
                 )
 
         for method in self.methods.all():
@@ -459,90 +327,9 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
         return removal_plan
 
-    @transaction.atomic
-    def remove_list(self):
-        datasets_listed = set()
-        ERs_listed = set()
-        runs_listed = set()
-        pipelines_listed = set()
-        methods_listed = set()
-        CRRs_listed = {self}
-
-        for dependant in self.needed_by.all().select_related("coderesourcerevision"):
-            stuff_removed = dependant.coderesourcerevision.remove_list()
-            datasets_listed.update(stuff_removed[0])
-            ERs_listed.update(stuff_removed[1])
-            runs_listed.update(stuff_removed[2])
-            pipelines_listed.update(stuff_removed[3])
-            methods_listed.update(stuff_removed[4])
-            CRRs_listed.update(stuff_removed[5])
-
-        for method in self.members.all():
-            stuff_removed = method.remove_list()
-            datasets_listed.update(stuff_removed[0])
-            ERs_listed.update(stuff_removed[1])
-            runs_listed.update(stuff_removed[2])
-            pipelines_listed.update(stuff_removed[3])
-
-        return datasets_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed, CRRs_listed
-
     def find_update(self):
         update = self.coderesource.revisions.latest('revision_number')
         return update if update != self else None
-
-
-@python_2_unicode_compatible
-class CodeResourceDependency(models.Model):
-    """
-    Dependencies of a CodeResourceRevision - themselves also CRRs.
-
-    Related to :model:`method.CodeResourceRevision`
-    """
-
-    coderesourcerevision = models.ForeignKey(CodeResourceRevision, related_name="dependencies")
-
-    # Dependency is a codeResourceRevision
-    requirement = models.ForeignKey(CodeResourceRevision, related_name="needed_by")
-
-    # Where to place it during runtime relative to the CodeResource
-    # that relies on this CodeResourceDependency.
-    depPath = models.CharField(
-        "Dependency path",
-        max_length=255,
-        help_text="Where a code resource dependency must exist in the sandbox relative to it's parent",
-        blank=True)
-
-    depFileName = models.CharField(
-        "Dependency file name",
-        max_length=255,
-        help_text="The file name the dependency is given on the sandbox at execution",
-        blank=True)
-
-    def clean(self):
-        """
-        depPath cannot reference ".."
-        """
-        # Collapse down to a canonical path
-        self.depPath = os.path.normpath(self.depPath)
-        if any(component == ".." for component in self.depPath.split(os.sep)):
-            raise ValidationError("depPath cannot reference ../")
-
-        # If the child CR is a meta-package (no filename), we cannot
-        # have a depFileName as this makes no sense
-        if self.requirement.coderesource.filename == "" and self.depFileName != "":
-            raise ValidationError("Metapackage dependencies cannot have a depFileName")
-
-        # Check that user/group access is coherent.
-        self.coderesourcerevision.validate_restrict_access([self.requirement])
-
-    def __str__(self):
-        """Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
-        return "{} {} requires {} {} as {}".format(
-                self.coderesourcerevision.coderesource,
-                self.coderesourcerevision,
-                self.requirement.coderesource,
-                self.requirement,
-                os.path.join(self.depPath, self.depFileName))
 
 
 @python_2_unicode_compatible
@@ -568,7 +355,7 @@ class Method(transformation.models.Transformation):
     revision_parent = models.ForeignKey("self", related_name="descendants", null=True, blank=True,
                                         on_delete=models.SET_NULL)
 
-    # moved this here from Transformation so that it can be put into the
+    # Moved this here from Transformation so that it can be put into the
     # unique_together statement below. Allowed to be blank because it's
     # automatically set on save.
     revision_number = models.PositiveIntegerField(
@@ -598,9 +385,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         default=1,
         validators=[MinValueValidator(1)]
     )
-
-    # Implicitly defined:
-    # - execrecords: from ExecRecord
 
     class Meta:
         unique_together = (("family", "revision_number"))
@@ -671,9 +455,14 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         - Method does not have a Metapackage as a driver.
         """
         super(Method, self).clean()
-        if not self.driver.content_file:
-            raise ValidationError('Method "{}" cannot have CodeResourceRevision "{}" as a driver, because it has no '
-                                  'content file.'.format(self, self.driver))
+
+        for dep in self.dependencies.all():
+            dep.clean()
+
+        # Check if dependencies conflict with each other.
+        dependency_paths = self.list_all_filepaths()
+        if len(set(dependency_paths)) != len(dependency_paths):
+            raise ValidationError("Conflicting dependencies (full list: {})".format(dependency_paths))
 
         # Check that permissions are coherent.
         self.validate_restrict_access([self.family])
@@ -708,22 +497,22 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                     dataset_name=parent_input.dataset_name,
                     dataset_idx=parent_input.dataset_idx)
                 if not parent_input.is_raw():
-                    transformation.models.XputStructure(
+                    transformation.models.XputStructure.objects.create(
                         transf_xput=new_input,
                         compounddatatype=parent_input.get_cdt(),
                         min_row=parent_input.get_min_row(),
-                        max_row=parent_input.get_max_row()).save()
+                        max_row=parent_input.get_max_row())
 
             for parent_output in self.revision_parent.outputs.all():
                 new_output = self.outputs.create(
                     dataset_name=parent_output.dataset_name,
                     dataset_idx=parent_output.dataset_idx)
                 if not parent_output.is_raw():
-                    transformation.models.XputStructure(
+                    transformation.models.XputStructure.objects.create(
                         transf_xput=new_output,
                         compounddatatype=parent_output.get_cdt(),
                         min_row=parent_output.get_min_row(),
-                        max_row=parent_output.get_max_row()).save()
+                        max_row=parent_output.get_max_row())
 
     def _poll_stream(self, source_stream, source_name, dest_streams):
         """ Redirect all input from source_stream to all the dest_streams
@@ -747,6 +536,68 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         # As in _poll_stream, this drops the trailing \n.
         for dest_stream in dest_streams:
             dest_stream.write(source_contents)
+
+    def check_md5(self):
+        """
+        Checks the MD5 of the driver and its dependencies against their stored values.
+        """
+        if not self.driver.check_md5():
+            return False
+
+        for dep in self.dependencies.all():
+            if not dep.requirement.check_md5():
+                return False
+
+        return True
+
+    def list_all_filepaths(self):
+        """
+        Return all file paths associated with this Method, with the driver coming first.
+        """
+        file_paths = [os.path.normpath(self.driver.coderesource.filename)]
+        file_paths.extend(
+            [os.path.normpath(os.path.join(dep.path, dep.get_filename())) for dep in self.dependencies.all()]
+        )
+        return file_paths
+
+    def install(self, install_path):
+        """
+        Install this Method's code into the specified path.
+
+        PRE: install_path exists and has all the sufficient permissions for us
+        to write our files into.
+        """
+        base_name = self.driver.coderesource.filename
+        self.logger.debug("Writing code to {}".format(install_path))
+
+        destination_path = os.path.join(install_path, base_name)
+        with open(destination_path, "w") as f:
+            self.driver.content_file.open()
+            with self.driver.content_file:
+                shutil.copyfileobj(self.driver.content_file, f)
+        # Make sure this is written with read, write, and execute
+        # permission.
+        os.chmod(destination_path, stat.S_IRWXU)
+        # This will tailor the permissions further if we are running
+        # sandboxes with another user account via SSH.
+        file_access_utils.configure_sandbox_permissions(destination_path)
+
+        for dep in self.dependencies.all():
+            # Create any necessary sub-directory.  This directory may already exist due
+            # to another dependency -- or if depPath is "." -- so we catch os.error.
+            # We propagate any other errors.
+            dep_dir = os.path.normpath(os.path.join(install_path, dep.path))
+            try:
+                os.makedirs(dep_dir)
+            except os.error:
+                pass
+
+            # Write the dependency.
+            dep_path = os.path.join(dep_dir, dep.get_filename())
+            with open(dep_path, "wb") as f:
+                dep.requirement.content_file.open()
+                with dep.requirement.content_file:
+                    shutil.copyfileobj(dep.requirement.content_file, f)
 
     def run_code(self,
                  run_path,
@@ -792,7 +643,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         are handles to regular files, open for reading and writing.
         """
         if log:
-            log.start(save=False)
+            log.start(save=True)
 
         return_code = None
         try:
@@ -805,22 +656,20 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         is_terminated = False
         # Successful execution.
         if return_code is None:
+            err_thread = threading.Thread(
+                target=self._poll_stream,
+                args=(method_popen.stderr, 'stderr', error_streams))
+            err_thread.start()
+            out_thread = threading.Thread(
+                target=self._poll_stream,
+                args=(method_popen.stdout, 'stdout', output_streams))
+            out_thread.start()
+
             if stop_execution_callback is None:
-                self.logger.debug("Polling Popen + displaying stdout/stderr to console")
-
-                err_thread = threading.Thread(
-                    target=self._poll_stream,
-                    args=(method_popen.stderr, 'stderr', error_streams))
-                err_thread.start()
-                self._poll_stream(method_popen.stdout, 'stdout', output_streams)
-                err_thread.join()
-
                 return_code = method_popen.wait()
-
             else:
                 # While periodically checking for a STOP message, we
-                # monitor the progress of method_popen and update the
-                # streams.
+                # monitor the progress of method_popen.
                 while method_popen.returncode is None:
                     if stop_execution_callback() is not None:
                         # We have received a STOP message.  Terminate method_popen.
@@ -831,12 +680,12 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
                     time.sleep(settings.SLEEP_SECONDS)
                     method_popen.poll()
-
-                # Having stopped one way or another, make sure we capture the rest of the output.
-                self._capture_stream(method_popen.stderr, error_streams)
-                self._capture_stream(method_popen.stdout, output_streams)
                 if not is_terminated:
                     return_code = method_popen.returncode
+
+            # Having stopped one way or another, make sure we capture the rest of the output.
+            err_thread.join()
+            out_thread.join()
 
         for stream in output_streams + error_streams:
             stream.flush()
@@ -916,7 +765,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 raise ValueError(reason)
 
         self.logger.debug("Installing CodeResourceRevision driver to file system: {}".format(self.driver))
-        self.driver.install(run_path)
+        self.install(run_path)
 
         # At this point, run_path has all of the necessary stuff
         # written into place.  It remains to execute the code.
@@ -953,7 +802,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
     def is_identical(self, other):
         """Is this Method identical to another one?"""
-        return self.driver == other.driver and super(Method, self).is_identical(super(Method, other))
+        return self.driver == other.driver and super(Method, self).is_identical(other)
 
     @transaction.atomic
     def remove(self):
@@ -977,24 +826,58 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
         return removal_plan
 
-    def remove_list(self):
-        datasets_listed = set()
-        ERs_listed = set()
-        runs_listed = set()
-        pipelines_listed = set()
 
-        pipelines_affected = set([ps.pipeline for ps in self.pipelinesteps.all()])
-        for pipeline_affected in pipelines_affected:
-            (curr_datasets_listed,
-             curr_ERs_listed,
-             curr_runs_listed,
-             curr_pipelines_listed) = pipeline_affected.remove_list()
-            datasets_listed.update(curr_datasets_listed)
-            ERs_listed.update(curr_ERs_listed)
-            runs_listed.update(curr_runs_listed)
-            pipelines_listed.update(curr_pipelines_listed)
+@python_2_unicode_compatible
+class MethodDependency(models.Model):
+    """
+    CodeResourceRevisions needed by a Method in support of its driver.
 
-        return datasets_listed, ERs_listed, runs_listed, pipelines_listed
+    Related to :model:`method.CodeResourceRevision`
+    """
+    method = models.ForeignKey(Method, related_name="dependencies")
+
+    # Dependency is a codeResourceRevision
+    requirement = models.ForeignKey(CodeResourceRevision, related_name="used_by")
+
+    # Where to place it during runtime relative to the Method's sandbox directory.
+    path = models.CharField(
+        "Dependency path",
+        max_length=255,
+        help_text="Where a dependency must exist in the sandbox",
+        blank=True
+    )
+
+    filename = models.CharField(
+        "Dependency file name",
+        max_length=255,
+        help_text="The file name the dependency is given in the sandbox at execution",
+        blank=True
+    )
+
+    def clean(self):
+        """
+        dep_path cannot reference ".."
+        """
+        # Collapse down to a canonical path
+        self.path = os.path.normpath(self.path)
+        if any(component == ".." for component in self.path.split(os.sep)):
+            raise ValidationError("path cannot reference ../")
+
+        # Check that user/group access is coherent.
+        self.method.validate_restrict_access([self.requirement])
+
+    def __str__(self):
+        """Represent as [codeResourceRevision] requires [dependency] as [dependencyLocation]."""
+        return "{} {} requires {} {} as {}".format(
+            self.method.family,
+            self.method,
+            self.requirement.coderesource,
+            self.requirement,
+            os.path.join(self.path, self.get_filename())
+        )
+
+    def get_filename(self):
+        return self.filename or self.requirement.coderesource.filename
 
 
 @python_2_unicode_compatible
@@ -1050,23 +933,6 @@ class MethodFamily(transformation.models.TransformationFamily):
                 update_removal_plan(removal_plan, method.build_removal_plan(removal_plan))
 
         return removal_plan
-
-    def remove_list(self):
-        datasets_listed = set()
-        ERs_listed = set()
-        runs_listed = set()
-        pipelines_listed = set()
-        methods_listed = set()
-
-        for method in self.members.all():
-            curr_datasets_lsited, curr_ERs_listed, curr_runs_listed, curr_pipelines_listed = method.remove_list()
-            datasets_listed.update(curr_datasets_lsited)
-            ERs_listed.update(curr_ERs_listed)
-            runs_listed.update(curr_runs_listed)
-            pipelines_listed.update(curr_pipelines_listed)
-            methods_listed.add(method)
-
-        return datasets_listed, ERs_listed, runs_listed, pipelines_listed, methods_listed
 
 
 # Register signals.

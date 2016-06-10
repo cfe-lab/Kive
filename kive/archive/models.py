@@ -22,7 +22,7 @@ from django.utils import timezone
 from django.contrib.auth.models import User, Group
 
 import archive.exceptions
-from constants import maxlengths, groups
+from constants import maxlengths, groups, runstates, runcomponentstates
 from datachecking.models import ContentCheckLog, IntegrityCheckLog
 from librarian.models import Dataset, ExecRecord
 import metadata.models
@@ -37,7 +37,8 @@ def empty_redaction_plan():
         "ExecRecords": set(),
         "OutputLogs": set(),
         "ErrorLogs": set(),
-        "ReturnCodes": set()
+        "ReturnCodes": set(),
+        "ExternalFiles": set()
     }
 
 
@@ -101,6 +102,22 @@ class update_field(object):
         return wrapper
 
 
+class RunState(models.Model):
+    name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH)
+    description = models.TextField()
+
+    def __unicode__(self):
+        return self.name
+
+
+class RunComponentState(models.Model):
+    name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH)
+    description = models.TextField()
+
+    def __unicode__(self):
+        return self.name
+
+
 @python_2_unicode_compatible
 class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     """
@@ -139,6 +156,10 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                                           blank=True,
                                           help_text="Step of parent run initiating this one as a sub-run")
 
+    # State field to avoid the use of is_complete() and is_successful(), which can be slow.
+    _runstate = models.ForeignKey(RunState, default=runstates.PENDING_PK, related_name="runs")
+
+    # FIXME remove these once data is migrated.
     # State fields to avoid the use of is_complete() and is_successful(), which can be slow.
     _complete = models.NullBooleanField(
         help_text="Denotes whether this run component has been completed. Private use only")
@@ -209,7 +230,6 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             if runstep.pipelinestep.step_num != i:
                 raise ValidationError('RunSteps of Run "{}" are not consecutively numbered starting from 1'
                                       .format(self))
-            # RunStepInputCables are cleaned within RunStep.clean()
             runstep.clean()
 
         # Can't have RunOutputCables from non-existent RunSteps.
@@ -223,25 +243,191 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                                       .format(self, source_step))
             run_outcable.clean()
 
-    @property
+    def is_complete(self):
+        """
+        True if this run is ended; False otherwise.
+
+        By "ended" we mean Successful, Cancelled, Failed, or Quarantined.
+        """
+        return self._runstate.pk in runstates.COMPLETE_STATE_PKS
+
+    def is_pending(self):
+        return self._runstate.pk == runstates.PENDING_PK
+
+    def is_running(self):
+        return self._runstate.pk == runstates.RUNNING_PK
+
+    def is_successful(self):
+        """
+        Checks if this Run is successful.
+        """
+        return self._runstate.pk == runstates.SUCCESSFUL_PK
+
+    def is_failed(self):
+        """
+        Checks if this Run is failed.
+        """
+        return self._runstate.pk == runstates.FAILED_PK
+
+    def is_quarantined(self):
+        """
+        Checks if this Run is quarantined.
+        """
+        return self._runstate.pk == runstates.QUARANTINED_PK
+
+    def is_failing(self):
+        return self._runstate.pk == runstates.FAILING_PK
+
+    def is_cancelling(self):
+        return self._runstate.pk == runstates.CANCELLING_PK
+
+    def is_cancelled(self):
+        return self._runstate.pk == runstates.CANCELLED_PK
+
+    def get_state_name(self):
+        return self._runstate.name
+
     @transaction.atomic
-    def started(self):
-        return self.has_started() or hasattr(self, "not_enough_CPUs")
+    def start(self, save=True, **kwargs):
+        """
+        Start this run, changing its state from Pending to Running.
+        """
+        assert self._runstate_id == runstates.PENDING_PK
+        self._runstate = RunState.objects.get(pk=runstates.RUNNING_PK)
+        stopwatch.models.Stopwatch.start(self, save=save, **kwargs)
+
+    @transaction.atomic
+    def stop(self, save=True, **kwargs):
+        """
+        Stop this run, changing its state appropriately.
+        """
+        assert self._runstate_id in [runstates.RUNNING_PK, runstates.CANCELLING_PK, runstates.FAILING_PK]
+        if self._runstate_id == runstates.RUNNING_PK:
+            # Check that there are no quarantined components.  We don't need to
+            # recurse down into sub-run, because the cases where a sub-component gets
+            # quarantined are:
+            # - while the sub-Run is still in progress;
+            #   then it will be quarantined/failed/cancelled on its call to stop().
+            # - when the sub-Run is finished and successful;
+            #   then it will have already been quarantined.
+            # - when the sub-Run is failed/cancelled;
+            #   then any ancestor runs (including this one) should already be
+            #   Cancelling or Failing.
+            if (self.runsteps.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK).exists() or
+                    self.runoutputcables.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK).exists()):
+                self._runstate = RunState.objects.get(pk=runstates.QUARANTINED_PK)
+            else:
+                self._runstate = RunState.objects.get(pk=runstates.SUCCESSFUL_PK)
+        elif self._runstate_id == runstates.CANCELLING_PK:
+            self._runstate = RunState.objects.get(pk=runstates.CANCELLED_PK)
+        else:
+            self._runstate = RunState.objects.get(pk=runstates.FAILED_PK)
+        stopwatch.models.Stopwatch.stop(self, save=save, **kwargs)
+
+    @transaction.atomic
+    def cancel(self, save=True):
+        """
+        Mark this run as Cancelling.
+
+        This does not affect the RunComponents.
+        """
+        assert self._runstate_id in [runstates.PENDING_PK, runstates.RUNNING_PK]
+        self._runstate = RunState.objects.get(pk=runstates.CANCELLING_PK)
+        if save:
+            self.save()
+
+    @transaction.atomic
+    def mark_failure(self, save=True, recurse_upward=False):
+        """
+        Mark this run as Failing.
+
+        This does not affect the RunComponents, but it optionally affects
+        the parent Run, if this is a sub-Run.
+        """
+        assert self._runstate_id == runstates.RUNNING_PK
+        self._runstate = RunState.objects.get(pk=runstates.FAILING_PK)
+        if save:
+            self.save()
+
+        if recurse_upward and self.parent_runstep:
+            self.parent_runstep.run.mark_failure(save=save, recurse_upward=True)
+
+    @transaction.atomic
+    def begin_recovery(self, save=True, recurse_upward=False):
+        """
+        Transition this run from Successful to Running on recovery of one of its components.
+
+        This does not affect the RunComponents, but it optionally affects
+        the parent Run, if this is a sub-Run.
+        """
+        assert self._runstate_id == runstates.SUCCESSFUL_PK
+        assert self.has_ended()
+        self._runstate = RunState.objects.get(pk=runstates.RUNNING_PK)
+        if save:
+            self.save()
+
+        if recurse_upward and self.parent_runstep:
+            self.parent_runstep.run.begin_recovery(save=save, recurse_upward=True)
+
+    @transaction.atomic
+    def finish_recovery(self, save=True, recurse_upward=False):
+        """
+        Transition this run's state when its recovering components are done.
+        """
+        assert self._runstate_id in [runstates.RUNNING_PK, runstates.FAILING_PK, runstates.CANCELLING_PK]
+        assert self.has_ended()
+        if self.is_running():
+            self._runstate = RunState.objects.get(pk=runstates.SUCCESSFUL_PK)
+        elif self.is_failing():
+            self._runstate = RunState.objects.get(pk=runstates.FAILED_PK)
+        else:
+            self._runstate = RunState.objects.get(pk=runstates.CANCELLED_PK)
+
+        if save:
+            self.save()
+        if recurse_upward and self.parent_runstep:
+            self.parent_runstep.run.finish_recovery(save=save, recurse_upward=True)
+
+    @transaction.atomic
+    def quarantine(self, save=True, recurse_upward=False):
+        """
+        Transition this Run to a quarantined state.
+        """
+        assert self.is_successful()
+        self._runstate = RunState.objects.get(pk=runstates.QUARANTINED_PK)
+        if save:
+            self.save()
+
+        # Quarantine all ancestor runs.
+        if recurse_upward and self.parent_runstep is not None and self.parent_runstep.run.is_successful():
+            self.parent_runstep.run.quarantine(save=save, recurse_upward=True)
+
+    @transaction.atomic
+    def attempt_decontamination(self, save=True, recurse_upward=False):
+        """
+        Mark this quarantined Run as fixed.
+
+        Optionally, attempt to decontaminate ancestor runs that are quarantined.
+        """
+        assert self.is_quarantined()
+
+        # Look for components that are quarantined.
+        if self.runsteps.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK).exists():
+            return
+        elif self.runoutputcables.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK).exists():
+            return
+
+        self._runstate = RunState.objects.get(pk=runstates.SUCCESSFUL_PK)
+        if save:
+            self.save()
+
+        # Quarantine all ancestor runs.
+        if recurse_upward and self.parent_runstep and self.parent_runstep.run.is_quarantined():
+            self.parent_runstep.run.attempt_decontamination(save=save, recurse_upward=True)
 
     @classmethod
     def find_unstarted(cls):
-        return cls.objects.filter(start_time__isnull=True, not_enough_CPUs__isnull=True)
-
-    @property
-    @transaction.atomic
-    def running(self):
-        return self.started and not self.is_complete(use_cache=True)
-
-    # FIXME this will need to be changed when we introduce flags for a cancelled or paused run.
-    @property
-    @transaction.atomic
-    def finished(self):
-        return (self.started and self.is_complete()) or hasattr(self, "not_enough_CPUs")
+        return cls.objects.filter(_runstate__pk=runstates.PENDING_PK)
 
     @property
     def display_name(self):
@@ -294,12 +480,12 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         if hasattr(self, 'user'):
             result['user'] = self.user.username
 
-        if not self.started:
+        if self.is_pending():
             result['status'] = '?'
             return result
 
         status = ""
-        step_progress = {}
+        step_progress = []
         cable_progress = {}
         input_list = {}
 
@@ -314,34 +500,42 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         runsteps = self.runsteps.order_by("pipelinestep__step_num")
 
         for step in runsteps:
-            step_status = ""
-            log_char = ""
+            if step.is_pending():
+                log_char = "."
+                step_status = "WAITING"
 
-            if not step.is_complete(use_cache=True, dont_save=True):
+            elif step.is_running():
                 try:
                     step.log.id
                     log_char = "+"
                     step_status = "RUNNING"
                 except ExecLog.DoesNotExist:
-                    if step.has_started():
-                        log_char = ":"
-                        step_status = "READY"
-                    else:
-                        log_char = "."
-                        step_status = "WAITING"
+                    log_char = ":"
+                    step_status = "READY"
 
-            elif not step.is_successful(use_cache=True, dont_save=True):
+            elif step.is_cancelled_FIXME():
+                log_char = "x"
+                step_status = "CANCELLED"
+
+            elif step.is_failed():
                 log_char = "!"
                 step_status = "FAILURE"
+
+            elif step.is_quarantined():
+                log_char = "#"
+                step_status = "QUARANTINED"
+
             else:
                 log_char = "*"
                 step_status = "CLEAR"
 
             status += log_char
             if detailed:
-                step_progress[step.pipelinestep.transformation.pk] = {'status': step_status, 'log_id': None}
+                step_progress.append({'status': step_status,
+                                      'name': str(step.pipelinestep),
+                                      'log_id': None})
                 try:
-                    step_progress[step.pipelinestep.transformation.pk]['log_id'] = step.execrecord.generator.\
+                    step_progress[-1]['log_id'] = step.execrecord.generator.\
                         methodoutput.id
                 except:
                     pass
@@ -357,16 +551,14 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                              for c in self.runoutputcables.all()}
         for pipeline_cable in cables:
             curr_roc = run_output_cables.get(pipeline_cable)
-            log_char = ""
-            step_status = ""
             if curr_roc is None:
                 log_char = "."
                 step_status = "WAITING"
             else:
-                if curr_roc.is_complete(use_cache=True, dont_save=True):
-                    log_char = "*"
-                    step_status = "CLEAR"
-                else:
+                if curr_roc.is_pending():
+                    log_char = "."
+                    step_status = "WAITING"
+                elif curr_roc.is_running():
                     try:
                         curr_roc.log.id
                         log_char = "+"
@@ -374,6 +566,22 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                     except ExecLog.DoesNotExist:
                         log_char = ":"
                         step_status = "READY"
+
+                elif curr_roc.is_cancelled_FIXME():
+                    log_char = "x"
+                    step_status = "CANCELLED"
+
+                elif curr_roc.is_failed():
+                    log_char = "!"
+                    step_status = "FAILED"
+
+                elif curr_roc.is_quarantined():
+                    log_char = "#"
+                    step_status = "QUARANTINED"
+
+                else:
+                    log_char = "*"
+                    step_status = "CLEAR"
 
             # Log the status
             status += log_char
@@ -403,7 +611,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                 "Run (pk={}, Pipeline={}, queued {}, User={}) has no sandbox path".format(
                     self.pk, self.pipeline, self.time_queued, self.user)
                 )
-        elif not self.finished:
+        elif not self.is_complete():
             raise archive.exceptions.SandboxActiveException(
                 "Run (pk={}, Pipeline={}, queued {}, User={}) is not finished".format(
                     self.pk, self.pipeline, self.time_queued, self.user)
@@ -414,86 +622,12 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         self.purged = True
         self.save()
 
-    @update_field("_complete")
-    def is_complete(self, use_cache=False):
-        """
-        True if this run is complete; false otherwise.
-        """
-        if use_cache and self._complete is not None:
-            return self._complete
-
-        # A run is complete if all of its component RunSteps and
-        # RunOutputCables are complete, or if any one fails and the
-        # rest are complete or have not started.  If anything is in progress,
-        # immediately bail and return False.
-        anything_failed = False
-        all_exist = True
-
-        run_steps = self.runsteps.prefetch_related(
-            'execrecord__execrecordouts__dataset__structure',
-            'invoked_logs__content_checks__baddata',
-            'invoked_logs__integrity_checks__usurper',
-            'invoked_logs__methodoutput',
-            'log__content_checks__baddata',
-            'log__integrity_checks__usurper',
-            'log__record__execrecord__generator',
-            'pipelinestep__cables_in',
-            'RSICs__invoked_logs__content_checks__baddata',
-            'RSICs__invoked_logs__integrity_checks__usurper',
-            'RSICs__invoked_logs__methodoutput',
-            'RSICs__log__content_checks__baddata',
-            'RSICs__log__integrity_checks__usurper',
-            'RSICs__log__record__component__dest__structure',
-            'RSICs__log__record__execrecord__execrecordouts',
-            'RSICs__log__record__execrecord__generator',
-            'RSICs__PSIC')
-        run_step_map = {run_step.pipelinestep: run_step
-                        for run_step in run_steps}
-        for step in self.pipeline.steps.all():
-            corresp_rs = run_step_map.get(step)
-            if corresp_rs is None:
-                all_exist = False
-            elif corresp_rs.has_started() and not corresp_rs.is_complete(use_cache=use_cache):
-                return False
-            elif not corresp_rs.is_successful(use_cache=use_cache):
-                anything_failed = True
-
-        cables = self.runoutputcables.prefetch_related(
-            'invoked_logs__content_checks__baddata',
-            'invoked_logs__integrity_checks__usurper',
-            'invoked_logs__methodoutput',
-            'log__content_checks__baddata',
-            'log__integrity_checks__usurper',
-            'log__record__execrecord__execrecordouts',
-            'log__record__execrecord__generator')
-        run_output_cable_map = {cable.pipelineoutputcable: cable
-                                for cable in cables}
-        for outcable in self.pipeline.outcables.all():
-            corresp_roc = run_output_cable_map.get(outcable)
-            if corresp_roc is None:
-                all_exist = False
-            elif corresp_roc.has_started() and not corresp_roc.is_complete(use_cache=use_cache):
-                return False
-            elif not corresp_roc.is_successful(use_cache=use_cache):
-                anything_failed = True
-
-        # At this point, all RunSteps and ROCs that exist are complete or unstarted.
-        if anything_failed:
-            # This is the "unsuccessful complete" case.
-            return True
-        elif not all_exist:
-            # This is the "successful incomplete" case.
-            return False
-
-        # Nothing failed and all exist; we are complete and successful.
-        return True
-
-    def complete_clean(self, use_cache=False):
+    def complete_clean(self):
         """
         Checks completeness and coherence of a run.
         """
         self.clean()
-        if not self.is_complete(use_cache=use_cache):
+        if not self.is_complete():
             raise ValidationError('Run "{}" is not complete'.format(self))
 
     def __str__(self):
@@ -505,30 +639,6 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
     def is_subrun(self):
         return self.parent_runstep is not None
-
-    @update_field("_successful")
-    def is_successful(self, use_cache=False):
-        """
-        Checks if this Run is successful (so far).
-        """
-        if use_cache and self._successful is not None:
-            return self._successful
-
-        # Check steps for success.
-        for step in self.runsteps.all():
-            if not step.is_successful(use_cache=use_cache):
-                return False
-
-        # All steps checked out.  Check outcables.
-        for outcable in self.runoutputcables.all():
-            if not outcable.is_successful(use_cache=use_cache):
-                return False
-
-        # So far so good.
-        return True
-
-    # def successful_execution(self):
-    #     return self.is_successful()
 
     def get_coordinates(self):
         """
@@ -711,36 +821,76 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         return addable_users, addable_groups
 
-    def mark_unsuccessful(self):
-        self._successful = False
-        self.save(update_fields=["_successful"])
-        if self.parent_runstep is not None:
-            self.parent_runstep.mark_unsuccessful()
+    def cancel_components(self, except_steps=None, except_incables=None, except_outcables=None):
+        """
+        Cancel all components (and sub-Runs) except for those specified.
 
-    def mark_complete(self, save=False, mark_all_components=False):
-        self._complete = True
+        Returns True if all components are complete; False otherwise.
 
-        if mark_all_components:
-            for step in self.runsteps.all():
-                for rsic in step.RSICs.all():
-                    rsic.mark_complete(save=True)
+        PRE: anything that the fleet is currently running is specified among
+        the exceptions.
+        """
+        except_steps = except_steps or []
+        except_incables = except_incables or []
+        except_outcables = except_outcables or []
 
-                if step.has_subrun():
-                    step.child_run.mark_complete(save=True, mark_all_components=True)
-                step.mark_complete(save=True)
+        skip_step_pks = (x.pk for x in except_steps if x.parent_run == self)
+        skip_incable_pks = (x.pk for x in except_incables if x.parent_run == self)
+        skip_outcable_pks = (x.pk for x in except_outcables if x.parent_run == self)
 
-            for outcable in self.runoutputcables.all():
-                outcable.mark_complete(save=True)
+        # In addition to the steps and outcables, we also need to check that all
+        # incables are complete.
+        incables_still_running = False
+        for step in self.runsteps.exclude(pk__in=skip_step_pks).exclude(
+                _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
+        ):
+            for rsic in step.RSICs.exclude(pk__in=skip_incable_pks).exclude(
+                    _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
+            ):
+                rsic.cancel(save=True)
 
-        if save:
-            self.save()
+            if not step.has_subrun():
+                step.cancel(save=True)
+
+            else:
+                if step.child_run.is_pending():
+                    step.child_run.start()  # transition: Pending->Running
+
+                if step.child_run.is_running():
+                    step.child_run.cancel()  # transition: Running->Cancelling
+
+                all_stopped = step.child_run.cancel_components(except_steps=except_steps,
+                                                               except_incables=except_incables,
+                                                               except_outcables=except_outcables)
+                if all_stopped:
+                    step.child_run.stop(save=True)  # transition: Cancelling->Cancelled or Failing->Failed
+                    step.cancel(save=True)
+
+        for outcable in self.runoutputcables.exclude(pk__in=skip_outcable_pks).exclude(
+                _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
+        ):
+            outcable.cancel(save=True)
+
+        if RunSIC.objects.filter(dest_runstep__in=self.runsteps.all()).exclude(
+                _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
+        ):
+            incables_still_running = True
+
+        # Return True if everything is complete and False otherwise.
+        return not (
+            incables_still_running or
+            self.runsteps.exclude(
+                _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
+            ).exists() or
+            self.runoutputcables.exclude(
+                _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
+            ).exists()
+        )
 
 
 class RunInput(models.Model):
     """
     Represents an input to a run.
-
-    This won't exist in single-process execution.
     """
     run = models.ForeignKey(Run, related_name="inputs")
     dataset = models.ForeignKey(Dataset, related_name="runinputs")
@@ -777,10 +927,18 @@ class RunComponent(stopwatch.models.Stopwatch):
     is_cancelled = models.BooleanField(help_text="Denotes whether this has been cancelled",
                                        default=False)
 
+    # State field to avoid the use of is_complete() and is_successful(), which can be slow.
+    # Note that if this is a RunStep and the sub-Run is "Cancelling" or "Failing" that
+    # will still count as "Running" here.
+    _runcomponentstate = models.ForeignKey(RunComponentState, default=runcomponentstates.PENDING_PK,
+                                           related_name="runcomponents")
+
+    # FIXME remove _complete, _successful, is_cancelled after data is migrated
     _complete = models.NullBooleanField(
         help_text="Denotes whether this run component has been completed. Private use only")
     _successful = models.NullBooleanField(
         help_text="Denotes whether this has been successful. Private use only!")
+
     _redacted = models.NullBooleanField(
         help_text="Denotes whether this has been redacted. Private use only!")
 
@@ -799,12 +957,185 @@ class RunComponent(stopwatch.models.Stopwatch):
     def __str__(self):
         return 'RunComponent id {}'.format(self.id)
 
-    # def save(self, *args, **kwargs):
-    #     if 'update_fields' not in kwargs:
-    #         self._complete = self.is_complete()
-    #         self._successful = self.is_successful()
-    #         self._redacted = self.is_redacted()
-    #     super(RunComponent, self).save(*args, **kwargs)
+    # State getter methods.
+    def is_pending(self):
+        """
+        True if RunComponent is pending; False otherwise.
+        """
+        return self._runcomponentstate.pk == runcomponentstates.PENDING_PK
+
+    def is_running(self):
+        """
+        True if RunComponent is running; False otherwise.
+        """
+        return self._runcomponentstate.pk == runcomponentstates.RUNNING_PK
+
+    def is_successful(self):
+        """
+        True if RunComponent is successful; False otherwise.
+        """
+        return self._runcomponentstate.pk == runcomponentstates.SUCCESSFUL_PK
+
+    def is_cancelled_FIXME(self):
+        """
+        True if RunComponent is cancelled; False otherwise.
+        """
+        return self._runcomponentstate.pk == runcomponentstates.CANCELLED_PK
+
+    def is_failed(self):
+        """
+        True if RunComponent is failed; False otherwise.
+        """
+        return self._runcomponentstate.pk == runcomponentstates.FAILED_PK
+
+    def is_quarantined(self):
+        """
+        True if RunComponent is quarantined; False otherwise.
+        """
+        return self._runcomponentstate.pk == runcomponentstates.QUARANTINED_PK
+
+    def is_complete(self):
+        """
+        True if this RunComponent is complete; false otherwise.
+        """
+        return self._runcomponentstate.pk in runcomponentstates.COMPLETE_STATE_PKS
+
+    def get_state_name(self):
+        return self._runcomponentstate.name
+
+    # State transition methods.
+    @transaction.atomic
+    def start(self, save=True, **kwargs):
+        """
+        Start this RunComponent, changing its state from Pending to Running.
+        """
+        assert self._runcomponentstate_id == runcomponentstates.PENDING_PK
+        stopwatch.models.Stopwatch.start(self, save=False, **kwargs)  # we save below if necessary
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.RUNNING_PK)
+        if save:
+            self.save()
+
+    @transaction.atomic
+    def cancel_pending(self, save=True):
+        """
+        Cancel this pending RunComponent.
+
+        This is to be used to terminate RunComponents that are still pending, not
+        ones that are running.
+        """
+        assert self._runcomponentstate_id == runcomponentstates.PENDING_PK
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.CANCELLED_PK)
+        if save:
+            self.save()
+
+    @transaction.atomic
+    def cancel_running(self, save=True):
+        """
+        Cancel this running RunComponent.
+
+        This is to be used to terminate RunComponents that are running, not ones
+        that are still pending.
+        """
+        assert self._runcomponentstate_id == runcomponentstates.RUNNING_PK
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.CANCELLED_PK)
+        self.stop(save=save)
+
+    @transaction.atomic
+    def cancel(self, save=True):
+        """
+        Cancel this pending/running RunComponent.
+        """
+        assert self._runcomponentstate_id in [runcomponentstates.PENDING_PK, runcomponentstates.RUNNING_PK]
+        if self.is_pending():
+            self.cancel_pending(save=save)
+        else:
+            self.cancel_running(save=save)
+
+    @transaction.atomic
+    def begin_recovery(self, save=True, recurse_upward=False):
+        """
+        Mark a successful RunComponent as recovering.
+
+        Optionally this will mark all parent Runs as running.
+        """
+        assert self._runcomponentstate_id == runcomponentstates.SUCCESSFUL_PK
+        assert self.has_ended()
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.RUNNING_PK)
+        if save:
+            self.save()
+
+        if recurse_upward:
+            self.parent_run.begin_recovery(save=save, recurse_upward=True)
+
+    @transaction.atomic
+    def finish_successfully(self, save=True):
+        """
+        End this running RunComponent successfully.
+        """
+        assert self._runcomponentstate_id == runcomponentstates.RUNNING_PK
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.SUCCESSFUL_PK)
+        if not self.has_ended():
+            self.stop(save=False)
+        if save:
+            self.save()
+
+        if self.execrecord and self.execrecord.generator.record.is_quarantined():
+            # This has to have been an execution that used a quarantined ExecRecord,
+            # and it was successful, so we can decontaminate RunComponents.
+            self.execrecord.decontaminate_runcomponents()
+
+    @transaction.atomic
+    def finish_failure(self, save=True, recurse_upward=False):
+        """
+        End this running RunComponent, marking it as failed.
+
+        Optionally this will mark all parent Runs as failed too.
+        """
+        assert self._runcomponentstate_id == runcomponentstates.RUNNING_PK, (
+            "RunComponentState {} != Running".format(self._runcomponentstate)
+        )
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.FAILED_PK)
+        if not self.has_ended():
+            self.stop(save=False)
+        if save:
+            self.save()
+
+        # On recursion, mark any running ancestor runs as failing
+        # (ones that are already failing or cancelling can be left alone).
+        if recurse_upward and self.parent_run.is_running():
+            self.parent_run.mark_failure(save=save, recurse_upward=True)
+
+    @transaction.atomic
+    def quarantine(self, save=True, recurse_upward=False):
+        """
+        Transition this component to a quarantined state.
+
+        Optionally, quarantine ancestor runs that are still marked as Successful.
+        """
+        assert self._runcomponentstate_id == runcomponentstates.SUCCESSFUL_PK
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.QUARANTINED_PK)
+        if save:
+            self.save()
+
+        # Quarantine all ancestor runs.
+        if recurse_upward and self.parent_run.is_successful():
+            self.parent_run.quarantine(save=save, recurse_upward=True)
+
+    @transaction.atomic
+    def decontaminate(self, save=True, recurse_upward=False):
+        """
+        Mark this quarantined RunComponent as fixed.
+
+        Optionally, attempt to decontaminate ancestor runs that are quarantined.
+        """
+        assert self._runcomponentstate_id == runcomponentstates.QUARANTINED_PK
+        self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.SUCCESSFUL_PK)
+        if save:
+            self.save()
+
+        # Quarantine all ancestor runs.
+        if recurse_upward and self.parent_run.is_quarantined():
+            self.parent_run.attempt_decontamination(save=save, recurse_upward=True)
 
     def has_data(self):
         """
@@ -812,7 +1143,7 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         This is abstract and must be overridden.
         """
-        pass
+        raise NotImplementedError()
 
     @property
     def component(self):
@@ -1013,9 +1344,9 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         # If log exists and there are invoked_logs, log should be among
         # the invoked logs.  If log exists, any preceding logs should
-        # be complete and all tests should have passed (since they were
-        # recoveries happening before we could carry out the execution
-        # that log represents).
+        # be complete and all non-trivial cables' outputs' checks should
+        # have passed (since they were recoveries happening before we could
+        # carry out the execution that log represents).
         if self.invoked_logs.exists() and self.has_log:
             if not self.invoked_logs.filter(pk=self.log.pk).exists():
                 raise ValidationError(
@@ -1029,12 +1360,12 @@ class RunComponent(stopwatch.models.Stopwatch):
                    'ExecLog of {} "{}" is set before all invoked ExecLogs are complete'.format(
                        self.__class__.__name__, self)
                 )
-
-            if not all([x.all_checks_passed() for x in preceding_logs]):
-                raise ValidationError(
-                   'Invoked ExecLogs preceding log of {} "{}" did not successfully pass all of their checks'.format(
-                       self.__class__.__name__, self)
-                )
+            #
+            # if not all([x.all_checks_passed() for x in preceding_logs]):
+            #     raise ValidationError(
+            #        'Invoked ExecLogs preceding log of {} "{}" did not successfully pass all of their checks'.format(
+            #            self.__class__.__name__, self)
+            #     )
 
     def _clean_has_execlog_no_execrecord_yet(self):
         """
@@ -1050,116 +1381,6 @@ class RunComponent(stopwatch.models.Stopwatch):
                 '{} "{}" does not have an ExecRecord so should not have any data checks'.format(
                     self.__class__.__name__, self)
             )
-
-    def mark_complete(self, save=False):
-        self._complete = True
-        if save:
-            self.save(update_fields=["_complete"])
-
-    def failed_mark_complete(self, tasks_still_running):
-        """
-        Marks this RunComponent as complete and recurses as necessary.
-
-        This is used when a RunComponent belonging to a failed top-level Run
-        finishes.  It figures out whether it should mark the containing sub-Run
-        (or top-level Run) as complete or not.
-
-        Note that this is overridden by RunSIC.
-        """
-        self.mark_complete(save=True)
-
-        tasks_outside_this_subrun = []
-        for task in tasks_still_running:
-            if self.parent_run == task.parent_run:
-                # This sub-Run is still in progress, so we just terminate.
-                return
-            tasks_outside_this_subrun.append(task)
-
-        # Having reached this point, we know that there were no other tasks
-        # belonging to the same sub-Run as self, so we can mark that sub-Run
-        # as complete.
-        self.parent_run.mark_complete(save=True)
-        # Recurse upward if necessary.
-        if self.parent_run.parent_runstep is not None:
-            self.parent_run.parent_runstep.failed_mark_complete(tasks_outside_this_subrun)
-
-    @update_field("_complete")
-    def is_complete(self, use_cache=False, **kwargs):
-        """
-        True if this RunComponent is complete; false otherwise.
-
-        Note that this is overridden by RunStep.
-
-        If this RunComponent is reused, then completeness == having an ER.
-
-        If this RunComponent is not reused, then either all of its outputs
-        have been checked with an ICL/CCL and passed, or some
-        EL/ICL/CCL failed and the rest are complete (not all outputs
-        have to have been checked).
-
-        If use_cache is True, then we return the value of self._complete
-        if that value is set.
-
-        PRE: this RunComponent is clean.
-        """
-        if use_cache and self._complete is not None:
-            return self._complete
-
-        # Has this been cancelled before even being attempted?
-        if self.is_cancelled:
-            return True
-
-        # Is there an ExecRecord?  If not, check if this failed during
-        # recovery and then completed.
-        if self.execrecord is None:
-            if not self.is_successful():
-
-                for invoked_log in self.invoked_logs.all():
-                    if not invoked_log.is_complete():
-                        return False
-
-                    if not all([x.is_complete() for x in invoked_log.integrity_checks.all()]):
-                        return False
-
-                    if not all([x.is_complete() for x in invoked_log.content_checks.all()]):
-                        return False
-
-                # All ELs, and ICLs/CCLs are complete, albeit
-                # with a failure somewhere.
-                return True
-
-            # At this point we know that this is still a successful
-            # execution that isn't complete.
-            return False
-
-        # From here on, we know there is an ExecRecord; therefore reused
-        # is set.
-        if self.reused:
-            return True
-
-        # From here on we know we are not reusing and ExecRecord is
-        # set -- therefore log is set and complete.
-
-        # Check that either every output has been successfully checked
-        # or one+ has failed and the rest are complete.
-        if self.log.all_checks_passed():
-            return True
-
-        # From here on we know that one of the following happened:
-        # - the log was a failure
-        # - at least one of the checks failed or was not performed.
-        my_log = self.log
-        if not my_log.is_successful():
-            return True
-
-        if (any([x.is_fail() for x in my_log.integrity_checks.all()]) or
-                any([x.is_fail() for x in my_log.content_checks.all()])):
-            if (all([x.is_complete() for x in my_log.integrity_checks.all()]) and
-                    all([x.is_complete() for x in my_log.content_checks.all()])):
-                return True
-
-        # At this point, we know that it is unsuccessful and incomplete.
-        return False
 
     @update_field("_redacted")
     def is_redacted(self, use_cache=False):
@@ -1182,68 +1403,13 @@ class RunComponent(stopwatch.models.Stopwatch):
         if not self.is_step and not self.is_cable:
             raise ValidationError("RunComponent with pk={} is neither a step nor a cable".format(self.pk))
 
-    def complete_clean(self, use_cache=False):
+    def complete_clean(self):
         """
         Checks coherence and completeness of this RunComponent.
         """
         self.clean()
-        if not self.is_complete(use_cache=use_cache):
+        if not self.is_complete():
             raise ValidationError('{} "{}" is not complete'.format(self.__class__.__name__, self))
-
-    def mark_unsuccessful(self):
-        self._successful = False
-        self.save(update_fields=["_successful"])
-
-        if self.is_incable:
-            self.definite.runstep.mark_unsuccessful()
-        else:
-            self.definite.run.mark_unsuccessful()
-
-    @update_field("_successful")
-    def is_successful(self, use_cache=False, **kwargs):
-        if use_cache and self._successful is not None:
-            return self._successful
-
-        if self.is_cancelled:
-            return False
-        if self.reused:
-            return self.successful_reuse()
-        return self.successful_execution()
-
-    def successful_reuse(self):
-        """
-        True if RunComponent is successful on reuse; False otherwise.
-
-        PRE: this RunComponent is reused.
-        """
-        assert(self.reused)
-        if self.execrecord is not None:
-            return self.execrecord.outputs_OK() and not self.execrecord.has_ever_failed()
-        # If there is no ExecRecord yet then this is trivially true.
-        return True
-
-    def successful_execution(self):
-        """True if RunComponent is successful; False otherwise.
-
-        Any RunComponent is failed if any of its invoked ExecLogs have
-        failed, or if any CCLs/ICLs have failed.
-
-        PRE: this RunComponent is clean, and so are all of its invoked_logs.
-        (It's OK that they might not be complete.)
-        PRE: this RunComponent is not reused.
-        """
-        assert(not self.reused)
-
-        for invoked_log in self.invoked_logs.all():
-            if not invoked_log.is_successful():
-                return False
-            icls = invoked_log.integrity_checks.all()
-            if any([x.is_fail() for x in icls]):
-                return False
-            ccls = invoked_log.content_checks.all()
-            if any([x.is_fail() for x in ccls]):
-                return False
-        return True
 
     def build_removal_plan_h(self, removal_accumulator=None):
         """
@@ -1688,104 +1854,6 @@ class RunStep(RunComponent):
         if not self.reused or usable_dict["successful"]:
             self._clean_outputs()
 
-    @update_field("_complete")
-    def is_complete(self, use_cache=False, **kwargs):
-        """
-        True if RunStep is complete; False otherwise.
-
-        This extends the procedure to check for completeness of a
-        RunComponent.  In addition to the ways a RunComponent can fail, a
-        RunStep can fail while its cables are running before it even
-        gets to the recovery stage.  Also, if it represents
-        a sub-Pipeline, then it simply checks if its child_run
-        is complete.
-
-        PRE: this RunStep must be clean.
-        """
-
-        if use_cache and self._complete is not None:
-            return self._complete
-
-        # Sub-Pipeline case:
-        if self.pipelinestep.transformation.is_pipeline:
-            if self.has_subrun():
-                return self.child_run.is_complete(use_cache=use_cache)
-            # At this point, child_run hasn't been set yet, so we can
-            # say that it isn't complete.
-            return False
-
-        # From here on we know we are in the Method case.  Check that
-        # all PSICs have an RSIC that are complete and successful --
-        # in which case go on and check the same stuff as RunComponent --
-        # or that some RSIC failed and the rest are complete, and
-        # return.  Any incomplete RSIC causes us to return False.
-        all_cables_exist = True
-        any_cables_failed = False
-        run_step_input_cables = {cable.PSIC: cable
-                                 for cable in self.RSICs.all()}
-        for curr_cable in self.pipelinestep.cables_in.all():
-            corresp_RSIC = run_step_input_cables.get(curr_cable)
-            if corresp_RSIC is None:
-                all_cables_exist = False
-            elif not corresp_RSIC.is_complete(use_cache=use_cache, dont_save=True):
-                return False
-            elif not corresp_RSIC.is_successful(use_cache=use_cache, dont_save=True):
-                any_cables_failed = True
-
-        # At this point we know that all RSICs that exist are complete.
-        if any_cables_failed:
-            return True
-        elif not all_cables_exist:
-            return False
-
-        # At this point we know that all RSICs exist, and are complete
-        # and successful.  Proceed to check the RunComponent stuff.
-        return RunComponent.is_complete(self, use_cache=use_cache, **kwargs)
-
-    @update_field("_successful")
-    def is_successful(self, **kwargs):
-        if self.has_log:
-            try:
-                if not self.log.methodoutput.are_checksums_OK:
-                    return False
-            except MethodOutput.DoesNotExist:
-                pass
-
-        return super(RunStep, self).is_successful(**kwargs)
-
-    def successful_execution(self):
-        """
-        True if RunStep is successful; False otherwise.
-
-        This inherits from RunComponent's method, with the additional
-        wrinkle that a RunStep fails if any of its cables fails, or if
-        its child_run has failed.
-
-        PRE: this RunStep is clean.
-        PRE: this RunStep is not reused.
-        """
-        input_cables = self.RSICs.all()
-        if input_cables.exists():
-            if any(not ic.is_successful() for ic in input_cables):
-                return False
-
-        # At this point we know that all the cables were successful;
-        # we check for failure during recovery or during its own
-        # execution.
-        if not RunComponent.successful_execution(self):
-            return False
-
-        # In the case that this is a sub-Pipeline, check if child_run
-        # is successful.
-        try:
-            self.child_run
-            return self.child_run.is_successful()
-        except ObjectDoesNotExist:
-            pass
-
-        # No logs failed, and this wasn't a sub-Pipeline, so....
-        return True
-
     def get_coordinates(self):
         """
         Retrieves a tuple of pipeline coordinates of this RunStep.
@@ -1799,7 +1867,8 @@ class RunStep(RunComponent):
         return run_coords + (self.pipelinestep.step_num,)
 
     def find_compatible_ERs(self, input_datasets):
-        """ Find all ExecRecords that are compatible with this RunStep.
+        """
+        Find all ExecRecords that are compatible with this RunStep.
 
         Exclude redacted ones. Permissions of old run must include all
         permissions of new run.
@@ -1813,8 +1882,9 @@ class RunStep(RunComponent):
         if transformation.definite.reusable == Method.NON_REUSABLE:
             return
 
-        query = ExecRecord.objects.filter(
-            used_by_components__runstep__pipelinestep__transformation=transformation)
+        execrecord_ids = RunStep.objects.filter(
+            pipelinestep__transformation=transformation).values('execrecord_id')
+        query = ExecRecord.objects.filter(id__in=execrecord_ids)
         for dataset_idx, dataset in enumerate(input_datasets, 1):
             query = query.filter(
                 execrecordins__generic_input__transformationinput__dataset_idx=dataset_idx,
@@ -1848,7 +1918,7 @@ class RunStep(RunComponent):
         return result
 
     @transaction.atomic
-    def get_suitable_ER(self, input_SDs):
+    def get_suitable_ER(self, input_datasets):
         """
         Retrieve a suitable ExecRecord for this RunStep.
 
@@ -1860,7 +1930,7 @@ class RunStep(RunComponent):
         Return a tuple containing the ExecRecord along with its summary (as
         produced by check_ER_usable), or None if no appropriate ExecRecord is found.
         """
-        execrecords = self.find_compatible_ERs(input_SDs)
+        execrecords = self.find_compatible_ERs(input_datasets)
         failed = []
         fully_reusable = []
         other = []
@@ -1928,9 +1998,6 @@ class RunCable(RunComponent):
             runcable = RunSIC.create(cable, parent_record)
         else:
             runcable = RunOutputCable.create(cable, parent_record)
-        runcable.clean()
-        runcable.save()
-        runcable.start()
         return runcable
 
     def has_data(self):
@@ -2295,7 +2362,6 @@ class RunSIC(RunCable):
     Related to :model:`librarian.models.ExecRecord`
     Related to :model:`pipeline.models.PipelineStepInputCable`
     """
-    # FIXME need to rename this because it conflicts with the runstep field of RunComponent
     dest_runstep = models.ForeignKey(RunStep, related_name="RSICs")
     PSIC = models.ForeignKey("pipeline.PipelineStepInputCable", related_name="psic_instances")
 
@@ -2395,23 +2461,19 @@ class RunSIC(RunCable):
         """
         return self.dest_runstep.get_coordinates()
 
-    def failed_mark_complete(self, tasks_still_running):
+    def clean(self):
         """
-        Marks this RunSIC as complete and recurses as necessary.
+        Check data integrity of this RunSIC.
 
-        This overrides the method on RunComponent.
+        In addition to RunCable.clean(), also clean the input integrity check
+        if it exists.
         """
-        self.mark_complete(save=True)
+        super(RunSIC, self).clean()
 
-        tasks_outside_this_runstep = []
-        for task in tasks_still_running:
-            if isinstance(task, RunSIC) and self.dest_runstep == task.dest_runstep:
-                # This RunStep is still in progress, so we just terminate.
-                return
-            tasks_outside_this_runstep.append(task)
-
-        # No other RunSICs of our RunStep were running, so we can propagate upward.
-        self.dest_runstep.failed_mark_complete(tasks_outside_this_runstep)
+        try:
+            self.input_integrity_check.clean()
+        except IntegrityCheckLog.DoesNotExist:
+            pass
 
 
 class RunOutputCable(RunCable):
@@ -2680,25 +2742,39 @@ class ExecLog(stopwatch.models.Stopwatch):
         except ObjectDoesNotExist:
             pass
 
+        # If this ExecLog represents a RunSIC, check if it's got a failed input integrity check.
+        if self.record.is_incable:
+            try:
+                if self.record.definite.input_integrity_check.is_fail():
+                    return False
+            except IntegrityCheckLog.DoesNotExist:
+                pass
+
         # Having reached here, we are comfortable with the execution --
         # note that it may still be in progress!
         return True
 
     def all_checks_passed(self):
         """
-        True if every output of this ExecLog has passed its check.
+        True if every non-trivial output of this ExecLog has passed its check.
 
         First check that all of the tests have passed. Then check that all
         checks have been performed.
+
+        An exception is made for an ExecLog of a trivial cable.  Such cables
+        don't check their outputs.
         """
+        is_trivial_cable = self.record.is_cable and self.record.component.is_trivial()
+        if is_trivial_cable:
+            return True
+
         if self.record.execrecord is None:
             return False
-        is_trivial_cable = self.record.is_cable and self.record.component.is_trivial()
         is_original_run = self.record.execrecord.generator == self
         missing_content_checks = set()
         missing_integrity_checks = set()
         for ero in self.record.execrecord.execrecordouts.all():
-            if is_trivial_cable or not is_original_run:
+            if not is_original_run:
                 missing_integrity_checks.add(ero.dataset_id)
             elif not ero.dataset.is_raw():
                 missing_content_checks.add(ero.dataset_id)

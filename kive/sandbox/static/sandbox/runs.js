@@ -85,37 +85,31 @@ var RunsTable = function($table, user, is_user_admin, $no_results, $active_filte
             run_url = $a.attr("href"),
             run_table = event.data;
         event.preventDefault();
-        $.getJSON(
-            run_url,
-            {},
-            function () {
-                var stop_message = "Are you sure you want to stop this run?";
-                if (window.confirm(stop_message)) {
-                    $.ajax(
-                        {
-                            url: run_url,
-                            method: "PATCH",
-                            data: {
-                                is_stop_requested: true
-                            },
-                            success: function () {
-                                run_table.reloadTable();
-                            }
-                        }
-                    ).fail(
-                        function (request) {
-                            var response = request.responseJSON,
-                                detail = (
-                                    response ?
-                                    response.detail :
-                                    "Failed to redact"
-                                );
-                            window.alert(detail);
-                        }
-                    );
+        var stop_message = "Are you sure you want to stop this run?";
+        if (window.confirm(stop_message)) {
+            $.ajax(
+                {
+                    url: run_url,
+                    method: "PATCH",
+                    data: {
+                        is_stop_requested: true
+                    },
+                    success: function () {
+                        run_table.reloadTable();
+                    }
                 }
-            }
-        );
+            ).fail(
+                function (request) {
+                    var response = request.responseJSON,
+                        detail = (
+                            response ?
+                            response.detail :
+                            "Failed to redact"
+                        );
+                    window.alert(detail);
+                }
+            );
+        }
     }
 
     function clickRerun(event) {
@@ -125,37 +119,31 @@ var RunsTable = function($table, user, is_user_admin, $no_results, $active_filte
 
         event.preventDefault();
 
-        $.getJSON(
-            run_table.create_url,
-            {},
-            function () {
-                $.ajax(
-                    {
-                        url: run_table.create_url,
-                        method: "POST",
-                        data: JSON.stringify({
-                            pipeline: run.pipeline,
-                            name: run.name,
-                            description: run.description,
-                            users_allowed: run.users_allowed,
-                            groups_allowed: run.groups_allowed,
-                            inputs: run.inputs
-                        }),
-                        contentType: "application/json",
-                        processData: false,
-                        success: function () {
-                            run_table.reloadTable();
-                        }
-                    }
-                ).fail(
-                    function (request) {
-                        var response = request.responseJSON,
-                            detail = (
-                                "Failed to rerun"
-                            );
-                        window.alert(detail);
-                    }
-                );
+        $.ajax(
+            {
+                url: run_table.create_url,
+                method: "POST",
+                data: JSON.stringify({
+                    pipeline: run.pipeline,
+                    name: run.name,
+                    description: run.description,
+                    users_allowed: run.users_allowed,
+                    groups_allowed: run.groups_allowed,
+                    inputs: run.inputs
+                }),
+                contentType: "application/json",
+                processData: false,
+                success: function () {
+                    run_table.reloadTable();
+                }
+            }
+        ).fail(
+            function (request) {
+                var response = request.responseJSON,
+                    detail = (
+                        "Failed to rerun"
+                    );
+                window.alert(detail);
             }
         );
     }

@@ -7,6 +7,8 @@ from django.utils.translation import ugettext_lazy as _, ungettext_lazy
 from django.contrib.auth.models import User, Group
 
 import logging
+import re
+import os
 from datetime import datetime
 
 from metadata.models import CompoundDatatype
@@ -57,15 +59,41 @@ class DatasetForm(forms.ModelForm):
         required=False
     )
 
-    dataset_file = forms.FileField(allow_empty_file="False",  max_length=maxlengths.MAX_FILENAME_LENGTH)
+    dataset_file = forms.FileField(
+        required=False,
+        allow_empty_file=True,
+        max_length=maxlengths.MAX_FILENAME_LENGTH
+    )
 
     RAW_CDT_CHOICE = (CompoundDatatype.RAW_ID, CompoundDatatype.RAW_VERBOSE_NAME)
     compound_datatype_choices = [RAW_CDT_CHOICE]
     compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
 
+    save_in_db = forms.BooleanField(
+        label="Keep a copy in Kive",
+        required=False
+    )
+
+    # external_path = forms.CharField(
+    #     widget=forms.Select(
+    #         choices=[
+    #             ('', '--- choose an external file directory ---')
+    #         ]
+    #     )
+    # )
+
     class Meta:
         model = Dataset
-        fields = ('name', 'description', 'dataset_file', "permissions", "compound_datatype")
+        fields = (
+            'name',
+            'description',
+            'dataset_file',
+            'externalfiledirectory',
+            'external_path',
+            'save_in_db',
+            'permissions',
+            'compound_datatype'
+        )
 
     def __init__(self, data=None, files=None, users_allowed=None, groups_allowed=None, user=None, *args, **kwargs):
         super(DatasetForm, self).__init__(data, files, *args, **kwargs)
@@ -76,6 +104,33 @@ class DatasetForm(forms.ModelForm):
         user_specific_choices = ([DatasetForm.RAW_CDT_CHOICE] +
                                  CompoundDatatype.choices(user))
         self.fields["compound_datatype"].choices = user_specific_choices
+
+    def clean(self):
+        """
+        Some quick sanity checks on the input.
+
+        Note: external_path and externalfiledirectory must both or neither be specified,
+        which is handled by model validation *but* because we have overridden _post_clean
+        we need to do it here explicitly.
+        """
+        cleaned_data = super(DatasetForm, self).clean()
+        dataset_file = cleaned_data.get("dataset_file")
+        externalfiledirectory = cleaned_data.get("externalfiledirectory")
+        external_path = cleaned_data.get("external_path")
+
+        errors = []
+        if dataset_file and external_path:
+            errors.append("A file and an external path should not both be specified.")
+        if dataset_file and externalfiledirectory:
+            errors.append("A file and an external file directory should not both be specified.")
+
+        if not (externalfiledirectory and external_path
+                or not externalfiledirectory and not external_path):
+            errors.append("Both external file directory and external path should be set or "
+                          "neither should be set.")
+
+        if errors:
+            raise forms.ValidationError(errors)
 
     def _post_clean(self):
         """
@@ -124,35 +179,6 @@ class BulkDatasetUpdateForm(forms.Form):
             dataset.save()
             return dataset
         return None
-
-
-# FIXME: This was modified to support users and groups, but is not called by any view.
-# If you get to implementing a view using this, beware that it was not tested!
-class BulkCSVDatasetForm (metadata.forms.AccessControlForm):
-    """
-    Creates multiple datasets from a CSV.
-    Expects that BulkDatasetForm.is_valid() has been called so that BulkDatasetForm.cleaned_data dict has been populated
-        with validated data.
-    """
-
-    datasets_csv = forms.FileField(allow_empty_file="False",  max_length=4096,
-                                   widget=ClearableFileInput(attrs={"multiple": "true"}))  # multiselect files
-
-    compound_datatype_choices = [DatasetForm.RAW_CDT_CHOICE]
-    compound_datatype = forms.ChoiceField(choices=compound_datatype_choices)
-
-    def create_datasets(self, user):
-
-        compound_datatype_obj = None
-        if self.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
-            compound_datatype_obj = CompoundDatatype.objects.get(pk=self.cleaned_data['compound_datatype'])
-
-        # FIXME this doesn't support PermissionsWidget.
-        Dataset.create_dataset_bulk(csv_file_path=None, user=user,
-                                    users_allowed=self.cleaned_data["users_allowed"],
-                                    groups_allowed=self.cleaned_data["groups_allowed"],
-                                    csv_file_handle=self.cleaned_data['datasets_csv'], cdt=compound_datatype_obj,
-                                    keep_files=True, file_source=None, check=True)
 
 
 class MultiFileField(forms.Field):

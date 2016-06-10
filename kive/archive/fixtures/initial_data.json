@@ -1,0 +1,114 @@
+[
+{
+    "model": "archive.runstate",
+    "pk": 1,
+    "fields": {
+        "name": "Pending",
+        "description": "Has not started execution yet"
+    }
+},
+{
+    "model": "archive.runstate",
+    "pk": 2,
+    "fields": {
+        "name": "Running",
+        "description": "Executing; no issues reported"
+    }
+},
+{
+    "model": "archive.runstate",
+    "pk": 3,
+    "fields": {
+        "name": "Successful",
+        "description": "Execution complete and successful"
+    }
+},
+{
+    "model": "archive.runstate",
+    "pk": 4,
+    "fields": {
+        "name": "Cancelling",
+        "description": "Execution cancelling; will finalize when all components are stopped"
+    }
+},
+{
+    "model": "archive.runstate",
+    "pk": 5,
+    "fields": {
+        "name": "Cancelled",
+        "description": "Execution cancelled and finalized"
+    }
+},
+{
+    "model": "archive.runstate",
+    "pk": 6,
+    "fields": {
+        "name": "Failing",
+        "description": "Execution failed; some components running"
+    }
+},
+{
+    "model": "archive.runstate",
+    "pk": 7,
+    "fields": {
+        "name": "Failed",
+        "description": "Execution failed; no components running"
+    }
+},
+{
+    "model": "archive.runstate",
+    "pk": 8,
+    "fields": {
+        "name": "Quarantined",
+        "description": "Execution finished successfully but a component is quarantined"
+    }
+},
+{
+    "model": "archive.runcomponentstate",
+    "pk": 1,
+    "fields": {
+        "name": "Pending",
+        "description": "Has not started execution yet"
+    }
+},
+{
+    "model": "archive.runcomponentstate",
+    "pk": 2,
+    "fields": {
+        "name": "Running",
+        "description": "Executing"
+    }
+},
+{
+    "model": "archive.runcomponentstate",
+    "pk": 3,
+    "fields": {
+        "name": "Successful",
+        "description": "Execution complete and successful"
+    }
+},
+{
+    "model": "archive.runcomponentstate",
+    "pk": 4,
+    "fields": {
+        "name": "Cancelled",
+        "description": "Execution cancelled"
+    }
+},
+{
+    "model": "archive.runcomponentstate",
+    "pk": 5,
+    "fields": {
+        "name": "Failed",
+        "description": "Execution finished unsuccessfully"
+    }
+},
+{
+    "model": "archive.runcomponentstate",
+    "pk": 6,
+    "fields": {
+        "name": "Quarantined",
+        "description": "Execution finished successfully but results have been invalidated"
+    }
+}
+]

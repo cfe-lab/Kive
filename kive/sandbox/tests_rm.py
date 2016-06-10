@@ -1,4 +1,4 @@
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.conf import settings
@@ -11,7 +11,7 @@ import os.path
 from librarian.models import Dataset
 import kive.testing_utils as tools
 from pipeline.models import Pipeline, PipelineFamily
-from kive.tests import install_fixture_files, restore_production_files, KiveTransactionTestCase
+from kive.tests import install_fixture_files, restore_production_files
 from method.models import Method
 from fleet.workers import Manager
 from archive.models import Run
@@ -19,14 +19,6 @@ import file_access_utils
 
 
 class SandboxRMTestCase(TestCase):
-    def setUp(self):
-        tools.create_sandbox_testing_tools_environment(self)
-
-    def tearDown(self):
-        tools.destroy_sandbox_testing_tools_environment(self)
-
-
-class SandboxRMTransactionTestCase(KiveTransactionTestCase):
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
 
@@ -99,12 +91,12 @@ class ExecuteResultTestsRM(TestCase):
         runstep = run.runsteps.first()
 
         self.assertEqual(runstep.run, run)
-        self.assertEqual(runstep.start_time < timezone.now(), True)
-        self.assertEqual(runstep.reused, False)
-        self.assertEqual(runstep.is_complete(), True)
+        self.assertTrue(runstep.start_time < timezone.now())
+        self.assertFalse(runstep.reused)
+        self.assertTrue(runstep.is_complete())
         self.assertEqual(runstep.complete_clean(), None)
-        self.assertEqual(hasattr(runstep, "child_run"), False)
-        self.assertEqual(runstep.successful_execution(), True)
+        self.assertFalse(hasattr(runstep, "child_run"))
+        self.assertTrue(runstep.is_successful())
         self.assertEqual(runstep.outputs.count(), 1)
 
     def test_execute_pipeline_dataset_contents(self):
@@ -289,7 +281,7 @@ class ExecuteResultTestsRM(TestCase):
         self.assertEqual(outcable_input_dataset.num_rows(), outcable_output_dataset.num_rows())
 
 
-class ExecuteDiscardedIntermediateTests(KiveTransactionTestCase):
+class ExecuteDiscardedIntermediateTests(TestCase):
     fixtures = ["execute_discarded_intermediate_tests_rm"]
 
     def setUp(self):
@@ -335,13 +327,10 @@ class ExecuteDiscardedIntermediateTests(KiveTransactionTestCase):
             [self.dataset_labdata]
         ).get_last_run()
 
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_successful(use_cache=True))
+        self.assertTrue(run.is_successful())
 
 
-class BadRunTests(KiveTransactionTestCase):
+class BadRunTests(TestCase):
     """
     Tests for when things go wrong during Pipeline execution.
     """
@@ -353,11 +342,7 @@ class BadRunTests(KiveTransactionTestCase):
 
     def cable_tester(self, runstep):
         for rsic in runstep.RSICs.all():
-            self.assertTrue(rsic._complete is not None)
-            self.assertTrue(rsic._successful is not None)
-            self.assertTrue(rsic.is_complete(use_cache=True))
-            self.assertTrue(rsic.is_successful(use_cache=True))
-
+            self.assertTrue(rsic.is_successful())
 
     @unittest.skipIf(
         settings.KIVE_SANDBOX_WORKER_ACCOUNT,
@@ -375,15 +360,9 @@ class BadRunTests(KiveTransactionTestCase):
         interm_dataset = runstep1.execrecord.execrecordouts.first().dataset
 
         self.cable_tester(runstep1)
-        self.assertTrue(runstep1._complete is not None)
-        self.assertTrue(runstep1._successful is not None)
-        self.assertTrue(runstep1.is_complete(use_cache=True))
-        self.assertFalse(runstep1.is_successful(use_cache=True))
+        self.assertTrue(runstep1.is_failed())
 
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertFalse(run.is_successful(use_cache=True))
+        self.assertTrue(run.is_failed())
 
         self.assertEqual(log.is_successful(), False)
         self.assertEqual(log.methodoutput.return_code, -1)
@@ -393,30 +372,18 @@ class BadRunTests(KiveTransactionTestCase):
         """Properly handle a failed method in a pipeline."""
         run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_fubar, [self.dataset_grandpa]).get_last_run()
 
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertFalse(run.is_successful(use_cache=True))
+        self.assertTrue(run.is_failed())
         self.assertIsNone(run.complete_clean())
-        self.assertFalse(run.is_successful())
 
         runstep1 = run.runsteps.get(pipelinestep__step_num=1)
         self.cable_tester(runstep1)
-        self.assertTrue(runstep1._complete is not None)
-        self.assertTrue(runstep1._successful is not None)
-        self.assertTrue(runstep1.is_complete(use_cache=True))
-        self.assertTrue(runstep1.is_successful(use_cache=True))
         self.assertIsNone(runstep1.complete_clean())
-        self.assertTrue(runstep1.successful_execution())
+        self.assertTrue(runstep1.is_successful())
 
         runstep2 = run.runsteps.get(pipelinestep__step_num=2)
         self.cable_tester(runstep2)
-        self.assertTrue(runstep2._complete is not None)
-        self.assertTrue(runstep2._successful is not None)
-        self.assertTrue(runstep2.is_complete(use_cache=True))
-        self.assertFalse(runstep2.is_successful(use_cache=True))
         self.assertIsNone(runstep2.complete_clean())
-        self.assertFalse(runstep2.successful_execution())
+        self.assertTrue(runstep2.is_failed())
 
         log = runstep2.log
 
@@ -425,7 +392,7 @@ class BadRunTests(KiveTransactionTestCase):
         self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().dataset])
 
 
-class FindDatasetTests(KiveTransactionTestCase):
+class FindDatasetTests(TestCase):
     """
     Tests for first_generator_of_dataset.
     """
@@ -531,7 +498,7 @@ class FindDatasetTests(KiveTransactionTestCase):
         self.assertEqual(gen_2, cable.PSIC)
 
 
-class RawTests(SandboxRMTransactionTestCase):
+class RawTests(SandboxRMTestCase):
 
     def setUp(self):
         super(RawTests, self).setUp()
@@ -555,26 +522,17 @@ class RawTests(SandboxRMTransactionTestCase):
         """Execute a raw Pipeline."""
         run = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
         run = Run.objects.get(pk=run.pk)
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_successful(use_cache=True))
+        self.assertTrue(run.is_successful())
 
     def test_execute_pipeline_raw_twice(self):
         """Execute a raw Pipeline and reuse an ExecRecord."""
         run = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
         run = Run.objects.get(pk=run.pk)
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run.is_complete(use_cache=True))
-        self.assertTrue(run.is_successful(use_cache=True))
+        self.assertTrue(run.is_successful())
 
         run2 = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
         run2 = Run.objects.get(pk=run2.pk)
-        self.assertTrue(run._complete is not None)
-        self.assertTrue(run._successful is not None)
-        self.assertTrue(run2.is_complete(use_cache=True))
-        self.assertTrue(run2.is_successful(use_cache=True))
+        self.assertTrue(run2.is_successful())
 
     def tearDown(self):
         super(RawTests, self).tearDown()

@@ -1,16 +1,11 @@
-from django.conf import settings
-from django.test import TestCase, TransactionTestCase
-
-from django.db import connections, IntegrityError
-from django.apps import apps
-from django.core import serializers
-from django.utils.six import StringIO
-from django.core.management import call_command
-
-from rest_framework.test import APIRequestFactory, force_authenticate
-
 import os
 import shutil
+from StringIO import StringIO
+
+from django.conf import settings
+from django.test import TestCase
+
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from metadata.models import kive_user
 
@@ -29,6 +24,8 @@ class DuckRequest(object):
     def __init__(self, user=None):
         self.user = user or kive_user()
         self.GET = {}
+        self.META = {}
+        self.method = 'GET'
 
     def build_absolute_uri(self, url):
         return url
@@ -78,50 +75,19 @@ class BaseTestCases:
             self.assertNotIn('detail', response.data)
 
 
-class KiveTransactionTestCase(TransactionTestCase):
+def dummy_file(content, name='dummy_file'):
+    """ Create an in-memory, file-like object.
 
-    serialized_rollback = True
+    :param str content: the contents of the file
+    :param str name: a name for the file
+    :return: an object that looks like an open file handle.
+    """
 
-    def _fixture_setup(self):
-
-        for db_name in self._databases_names(include_mirrors=False):
-            # Reset sequences
-            if self.reset_sequences:
-                self._reset_sequences(db_name)
-
-            # If we need to provide replica initial data from migrated apps,
-            # then do so.
-            if self.serialized_rollback and hasattr(connections[db_name], "_test_serialized_contents"):
-                if self.available_apps is not None:
-                    apps.unset_available_apps()
-
-                with connections[db_name].constraint_checks_disabled():
-                    data = StringIO(connections[db_name]._test_serialized_contents)
-                    try_again = []
-                    objects_to_save = serializers.deserialize(
-                        "json",
-                        data,
-                        using=connections[db_name].creation.connection.alias,
-                        ignorenonexistent=False)
-
-                    while objects_to_save:
-                        for obj in objects_to_save:
-                            try:
-                                obj.save()
-                            except IntegrityError:
-                                try_again.append(obj)
-
-                        objects_to_save = try_again
-                        try_again = []
-
-                if self.available_apps is not None:
-                    apps.set_available_apps(self.available_apps)
-
-            if self.fixtures:
-                # We have to use this slightly awkward syntax due to the fact
-                # that we're using *args and **kwargs together.
-                call_command('loaddata', *self.fixtures,
-                             **{'verbosity': 0, 'database': db_name})
+    data_file = StringIO(content)
+    data_file.name = name
+    data_file.__enter__ = lambda: None
+    data_file.__exit__ = lambda type, value, traceback: None
+    return data_file
 
 
 def install_fixture_files(fixture_name):

@@ -15,7 +15,6 @@ from method.models import MethodFamily, CodeResource
 from librarian.models import Dataset
 from datachecking.models import ContentCheckLog
 from fleet.workers import Manager
-from kive.tests import KiveTransactionTestCase
 
 import kive.testing_utils as tools
 import file_access_utils
@@ -39,7 +38,7 @@ class CustomConstraintTestPreamble(object):
         # A Datatype with basic constraints.
         self.dt_basic = self._setup_datatype("alpha", "strings of letters", self.user_oscar,
                                              [("regexp", "^[A-Za-z]+$")], [Datatype.objects.get(pk=datatypes.STR_PK)])
-        
+
         # A Datatype with custom constraints restricting the basic datatype.
         self.dt_custom = self._setup_datatype("words", "correctly spelled words", self.user_oscar,
                                               [], [self.dt_basic])
@@ -56,8 +55,8 @@ class CustomConstraintTestPreamble(object):
                  grep $row /usr/share/dict/words > /dev/null
                  if [[ $? -eq 1 ]]; then
                     echo $row_num >> "$2"
-                 fi  
-              fi  
+                 fi
+              fi
               row_num=$(($row_num+1))
             done""",
             self.dt_custom,
@@ -69,25 +68,29 @@ class CustomConstraintTestPreamble(object):
             [self.dt_basic, self.dt_custom], ["letter strings", "words"], self.user_oscar)
 
         # A file conforming to the compound datatype.
-        self.good_datafile = self._setup_datafile(self.cdt_constraints,
-                [["abcab", "hello"], ["goodbye", "world"]])
+        self.good_datafile = self._setup_datafile(
+            self.cdt_constraints,
+            [["abcab", "hello"], ["goodbye", "world"]])
 
         # A file not conforming to the compound datatype.
-        self.bad_datafile = self._setup_datafile(self.cdt_constraints,
-                [["hello", "there"], ["live", "long"], ["and", "porsper"]])
+        self.bad_datafile = self._setup_datafile(
+            self.cdt_constraints,
+            [["hello", "there"], ["live", "long"], ["and", "porsper"]])
 
         # A pipeline to process the constraint CDT.
-        self.pipeline_noop = self._setup_onestep_pipeline("does nothing",
-                "does nothing", '#!/bin/bash\n cat "$1" > "$2"',
-                self.cdt_constraints)
+        self.pipeline_noop = self._setup_onestep_pipeline(
+            "does nothing",
+            "does nothing", '#!/bin/bash\n cat "$1" > "$2"',
+            self.cdt_constraints)
 
         # A pipeline to mess up the constraint CDT.
-        self.pipeline_mangle = self._setup_onestep_pipeline("mangle",
-                "messes up data", 
-                """#!/bin/bash
-                echo "letter strings,words" > "$2"
-                echo 1234,yarrr >> "$2"
-                """, self.cdt_constraints)
+        self.pipeline_mangle = self._setup_onestep_pipeline(
+            "mangle",
+            "messes up data",
+            """#!/bin/bash
+            echo "letter strings,words" > "$2"
+            echo 1234,yarrr >> "$2"
+            """, self.cdt_constraints)
 
     def tearDown(self):
         shutil.rmtree(self.workdir)
@@ -148,7 +151,8 @@ class CustomConstraintTestPreamble(object):
         compounddatatype.save()
         for i in range(len(datatypes)):
             compounddatatype.members.create(datatype=datatypes[i],
-                    column_name = column_names[i], column_idx=i+1)
+                                            column_name=column_names[i],
+                                            column_idx=i+1)
         compounddatatype.save()
         compounddatatype.grant_everyone_access()
         return compounddatatype
@@ -156,7 +160,7 @@ class CustomConstraintTestPreamble(object):
     def _setup_custom_constraint(self, famname, famdesc, crname, crdesc, script, datatype, user):
         """
         Helper function to set up a custom constraint on a datatype.
-        
+
         INPUTS
         name        name of the code resource of the verifier
         desc        description for the code resource of the verifier
@@ -210,9 +214,9 @@ class CustomConstraintTestPreamble(object):
         self.assertEqual(content_check.dataset, dataset)
         self.assertIsNotNone(content_check.end_time)
         self.assertEqual(content_check.start_time.date(),
-                content_check.end_time.date())
+                         content_check.end_time.date())
         self.assertEqual(content_check.start_time <= content_check.end_time,
-                True)
+                         True)
 
     def _test_upload_data_good(self):
         """
@@ -242,9 +246,13 @@ class CustomConstraintTestPreamble(object):
 
     def _test_setup_prototype_good(self):
         prototype_cdt = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
-        prototype_file = self._setup_datafile(prototype_cdt,
-                [["hello", "True"], ["hell", "True"], ["hel", "False"],
-                 ["he", "True"], ["h", "False"]])
+        prototype_file = self._setup_datafile(
+            prototype_cdt,
+            [["hello", "True"],
+             ["hell", "True"],
+             ["hel", "False"],
+             ["he", "True"],
+             ["h", "False"]])
         prototype_SD = Dataset.create_dataset(
             prototype_file,
             user=self.user_oscar,
@@ -262,9 +270,13 @@ class CustomConstraintTestPreamble(object):
 
     def _test_setup_prototype_bad(self):
         prototype_cdt = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
-        prototype_file = self._setup_datafile(prototype_cdt,
-                [["hello", "False"], ["hell", "True"], ["hel", "False"],
-                 ["he", "True"], ["h", "False"]])
+        prototype_file = self._setup_datafile(
+            prototype_cdt,
+            [["hello", "False"],
+             ["hell", "True"],
+             ["hel", "False"],
+             ["he", "True"],
+             ["h", "False"]])
         prototype_SD = Dataset.create_dataset(
             prototype_file,
             user=self.user_oscar,
@@ -319,12 +331,13 @@ class CustomConstraintTests(CustomConstraintTestPreamble, TestCase):
             "empty", "Methods producing no output",
             "empty", "a script producing no output", "#!/bin/bash", dt_no_output,
             self.user_oscar)
-        cdt_no_output = self._setup_compounddatatype( 
+        cdt_no_output = self._setup_compounddatatype(
             [dt_no_output, self.dt_basic],
             ["numerics", "letter strings"],
             self.user_oscar)
-        no_output_datafile = self._setup_datafile(cdt_no_output,
-                [[123, "foo"], [456, "bar"], [789, "baz"]])
+        no_output_datafile = self._setup_datafile(
+            cdt_no_output,
+            [[123, "foo"], [456, "bar"], [789, "baz"]])
 
         self.assertRaisesRegexp(
             ValueError,
@@ -360,8 +373,9 @@ class CustomConstraintTests(CustomConstraintTestPreamble, TestCase):
             self.user_oscar)
         cdt_big_row = self._setup_compounddatatype([dt_big_row, self.dt_custom], ["barcodes", "words"],
                                                    self.user_oscar)
-        big_row_datafile = self._setup_datafile(cdt_big_row,
-                [["ABCDE12345", "hello"], ["12345ABCDE", "goodbye"]])
+        big_row_datafile = self._setup_datafile(
+            cdt_big_row,
+            [["ABCDE12345", "hello"], ["12345ABCDE", "goodbye"]])
 
         self.assertRaisesRegexp(
             ValueError,
@@ -388,11 +402,11 @@ class CustomConstraintTests(CustomConstraintTestPreamble, TestCase):
         with open(self.good_datafile) as f:
             summary = self.cdt_constraints.summarize_CSV(f, self.workdir, log)
         expected_header = [m.column_name for m in self.cdt_constraints.members.order_by("column_idx")]
-        self.assertEqual(summary.has_key("num_rows"), True)
-        self.assertEqual(summary.has_key("header"), True)
-        self.assertEqual(summary.has_key("bad_num_cols"), False)
-        self.assertEqual(summary.has_key("bad_col_indices"), False)
-        self.assertEqual(summary.has_key("failing_cells"), False)
+        self.assertTrue("num_rows" in summary)
+        self.assertTrue("header" in summary)
+        self.assertTrue("bad_num_cols" not in summary)
+        self.assertTrue("bad_col_indices" not in summary)
+        self.assertTrue("failing_cells" not in summary)
         self.assertEqual(summary["num_rows"], 2)
         self.assertEqual(summary["header"], expected_header)
 
@@ -405,14 +419,12 @@ class CustomConstraintTests(CustomConstraintTestPreamble, TestCase):
             ValueError,
             re.escape('The entry at row {}, column {} of file "{}" did not pass the constraints of '
                       'Datatype "{}"'.format(3, 2, self.bad_datafile, self.dt_custom)),
-                      lambda: Dataset.create_dataset(
-                          self.bad_datafile,
-                          user=self.user_oscar,
-                          cdt=self.cdt_constraints,
-                          name="bad data",
-                          description="invalid data to test custom constraint checking"
-                      )
-        )
+            lambda: Dataset.create_dataset(
+                self.bad_datafile,
+                user=self.user_oscar,
+                cdt=self.cdt_constraints,
+                name="bad data",
+                description="invalid data to test custom constraint checking"))
 
     def test_upload_data_content_check_good(self):
         """
@@ -467,7 +479,7 @@ class CustomConstraintTests(CustomConstraintTestPreamble, TestCase):
                                 dt.clean)
 
 
-class CustomConstraintTestsWithExecution(CustomConstraintTestPreamble, KiveTransactionTestCase):
+class CustomConstraintTestsWithExecution(CustomConstraintTestPreamble, TestCase):
     def test_execute_pipeline_content_check_good(self):
         """
         Test the integrity of the ContentCheck created while running a
@@ -492,7 +504,7 @@ class CustomConstraintTestsWithExecution(CustomConstraintTestPreamble, KiveTrans
         Test the integrity of the VerificationLog created while running a
         Pipeline on some data with CustomConstraints.
         """
-        content_check, execlog, dataset_out = self._test_execute_pipeline_constraints(self.pipeline_noop)
+        content_check, _execlog, _dataset_out = self._test_execute_pipeline_constraints(self.pipeline_noop)
 
         verif_log = content_check.verification_logs.first()
         self._test_verification_log(verif_log, content_check, self.cdt_constraints.members.last())
@@ -506,7 +518,7 @@ class CustomConstraintTestsWithExecution(CustomConstraintTestPreamble, KiveTrans
         Pipeline on some data with CustomConstraints, when the data does not
         conform.
         """
-        content_check, execlog, dataset_out = self._test_execute_pipeline_constraints(self.pipeline_mangle)
+        content_check, _execlog, _dataset_out = self._test_execute_pipeline_constraints(self.pipeline_mangle)
         verif_log = content_check.verification_logs.first()
         self._test_verification_log(verif_log, content_check, self.cdt_constraints.members.last())
         self.assertEqual(verif_log.return_code, 0)

@@ -4,14 +4,20 @@ var choose_inputs = (function() {
     
     // function buildRadioButton($td, row, table) {
     //     var name = row.name;
-    //     $td.append(
-    //             $('<label>').text(row.name).prepend($(
-    //                     '<input>',
-    //                     {
-    //                         type: 'radio',
-    //                         value: row.id,
-    //                         name: 'input_' + table.input_index
-    //                     })));
+    //     var $label = $('<label>').text(row.name);
+
+    //     if (row.has_data) {
+    //         var $radio_button = $(
+    //             '<input>',
+    //             {
+    //                 type: 'radio',
+    //                 value: row.id,
+    //                 name: 'input_' + table.input_index
+    //             });
+    //         $label.prepend($radio_button);
+    //     }
+
+    //     $td.append($label);
     // }
     
     function buildName($td, row) {
@@ -20,7 +26,19 @@ var choose_inputs = (function() {
     function buildDateCreated($td, row) {
         $td.text(permissions.formatDate(row.date_created)).addClass('date');
     }
-    
+
+    function buildFileSize($td, dataset) {
+        if (dataset.has_data) {
+            $td.append(dataset.filesize_display);
+        }
+        else if (dataset.is_redacted) {
+            $td.append("<em>redacted</em>");
+        }
+        else {
+            $td.append("<em>missing</em>");
+        }
+    }
+
     my.DatasetsTable = function(
             $table,
             is_user_admin,
@@ -43,7 +61,7 @@ var choose_inputs = (function() {
                 });
         this.registerColumn("Name", buildName);
         this.registerColumn("Date", buildDateCreated);
-        this.registerColumn("File Size (B)", "filesize");
+        this.registerColumn("File Size (B)", buildFileSize);
 
         this.registerStandardColumn("user");
         this.registerStandardColumn("users_allowed");

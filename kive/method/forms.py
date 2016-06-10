@@ -57,7 +57,7 @@ class CodeResourcePrototypeForm(AccessControlForm):
     )
 
     resource_desc = forms.CharField(
-        widget=forms.Textarea(attrs={'rows':5}),
+        widget=forms.Textarea(attrs={'rows': 5}),
         label='Resource description',
         help_text='A brief description of what this CodeResource (this and all subsequent versions) is supposed to do',
         required=False
@@ -123,7 +123,7 @@ def _get_code_resource_list(user, but_not_this_one=None):
     Gets all CodeResources other than that of the specified one.
 
     This is required to refresh the list of eligible CodeResources during the
-    addition of a new CodeResourceDependency.
+    addition of a new MethodDependency.
     """
     if user is None:
         queryset = CodeResource.objects.all()
@@ -134,12 +134,12 @@ def _get_code_resource_list(user, but_not_this_one=None):
     return [('', '--- CodeResource ---')] + [(x.id, x.name) for x in queryset]
 
 
-class CodeResourceDependencyForm(forms.Form):
+class MethodDependencyForm(forms.Form):
     """
-    Form for submitting a CodeResourceDependency.
+    Form for submitting a MethodDependency.
 
     initial:  A dictionary to pass initial values from view function
-    parent:  Primary key (ID) of CodeResource having this dependency.
+    parent:  Primary key (ID) of Method having this dependency.
     """
     # The attrs to the widget are to enhance the resulting HTML output.
     coderesource = forms.ChoiceField(
@@ -148,24 +148,25 @@ class CodeResourceDependencyForm(forms.Form):
     )
 
     # We override this field so that it doesn't try to validate.
-    revisions = forms.IntegerField(widget=forms.Select(choices=[('', '--- select a CodeResource first ---')]))
+    revisions = forms.IntegerField(
+        widget=forms.Select(choices=[('', '--- select a CodeResource first ---')]))
 
-    depPath = forms.CharField(
+    path = forms.CharField(
         label="Dependency path",
         help_text="Where a code resource dependency must exist in the sandbox relative to it's parent",
         required=False
     )
 
-    depFileName = forms.CharField(
+    filename = forms.CharField(
         label="Dependency file name",
         help_text="The file name the dependency is given on the sandbox at execution",
         required=False
     )
 
-    def __init__(self, data=None, user=None, initial=None, parent=None, *args, **kwargs):
-        super(CodeResourceDependencyForm, self).__init__(data, initial=initial, *args, **kwargs)
+    def __init__(self, data=None, user=None, initial=None, *args, **kwargs):
+        super(MethodDependencyForm, self).__init__(data, initial=initial, *args, **kwargs)
 
-        eligible_crs = _get_code_resource_list(user, parent)
+        eligible_crs = _get_code_resource_list(user)
         self.fields['coderesource'].choices = eligible_crs
 
         # Re-populate drop-downs before rendering if possible.
@@ -186,11 +187,12 @@ class CodeResourceDependencyForm(forms.Form):
                         populator["coderesource"]))
 
             rev = CodeResourceRevision.filter_by_user(user).filter(coderesource__pk=cr_pk)
-            self.fields['revisions'].widget.choices = [(x.pk, x.revision_name) for x in rev]
+            self.fields['revisions'].widget.choices = [
+                (x.pk, x.revision_name) for x in rev]
             if "revisions" in populator:
                 try:
                     assert "coderesource" in populator
-                    assert int(populator["revisions"]) in [x.pk for x in rev]
+                    assert int(populator["revisions"]) in (x.pk for x in rev)
                 except AssertionError as e:
                     raise Http404(e)
 
@@ -199,7 +201,8 @@ class CodeResourceDependencyForm(forms.Form):
 class MethodReviseForm(AccessControlForm):
     """Revise an existing method.  No need to specify the CodeResource."""
     # This is populated by the calling view.
-    revisions = forms.IntegerField(
+    driver_revisions = forms.IntegerField(
+        label='Revisions',
         widget=forms.Select(choices=[('', '--- select a CodeResource first ---')])
     )
 
@@ -271,7 +274,6 @@ class MethodDetailsForm(forms.ModelForm):
 
 
 class TransformationXputForm (forms.Form):
-
     dataset_name = forms.CharField()
 
 

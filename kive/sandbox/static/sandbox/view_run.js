@@ -35,7 +35,6 @@ $(function() {
             this.prepend('<img src="/static/sandbox/preload.gif"> &nbsp;');
         }
     }
-
     function grabStatus() {
         if (timer === undefined) {
             timer = setInterval(grabStatus, timerInterval);

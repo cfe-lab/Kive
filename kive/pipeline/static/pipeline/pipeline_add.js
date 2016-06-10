@@ -112,14 +112,13 @@ $(function() {
         // Update preview picture of node to show a CDtNode or RawNode appropriately
         var preview_canvas = $(this).closest('.modal_dialog').find('canvas'),
             val = this.value,
-            ctx, filename, colour;
+            ctx,
+            colour;
         
         if (preview_canvas.length) {
             preview_canvas = preview_canvas[0];
             ctx = preview_canvas.getContext('2d');
-            filename = $(this).find('option:selected').attr('title');
             colour = $(this).closest('.modal_dialog').find('#id_select_colour').val();
-            $('#id_method_name').val_(filename);
             
             // use AJAX to retrieve Revision inputs and outputs
             $.getJSON("/api/methods/" + val + "/").done(function(result) {
@@ -234,6 +233,7 @@ $(function() {
         
         var node_label = $('#id_datatype_name', this).val(),
             pos,
+            shape,
             dlg = $(this).closest('.modal_dialog'),
             preview_canvas = dlg.find('canvas'),
             dt_error = $('#id_dt_error', this)[0];
@@ -262,8 +262,7 @@ $(function() {
             dt_error.innerHTML = "Label is required";
         } else {
             dt_error.innerHTML = "";
-            var this_pk = $('#id_select_cdt', this).val(), // primary key
-                shape;
+            var this_pk = $('#id_select_cdt', this).val(); // primary key
             
             if (this_pk === ""){
                 shape = new drydock_objects.RawNode(pos.left, pos.top, node_label);
@@ -412,42 +411,46 @@ $(function() {
         }
     };
 
-    var resize_timeout = false;
-    var documentResizeHandler = function() {
-        var shape, i, scale_x, scale_y;
+    var documentResizeHandler = (function() {
+        var resize_timeout = false,
+            endDocumentResize = function() {
+                canvasState.valid = false;
+                for (var i = 0, shape; (shape = canvasState.shapes[i]); i++) {
+                    shape.dx = shape.dy = 0;
+                    canvasState.detectCollisions(shape);
+                }
+                canvasState.outputZone.alignWithCanvas(canvas.width, canvas.height);
+            }
+        ;
 
-        canvasState.width  = canvas.width  = window.innerWidth;
-        canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
-        
-        scale_x = canvas.width  / canvasState.old_width;
-        scale_y = canvas.height / canvasState.old_height;
+        return function() {
+            var shape, i, scale_x, scale_y;
+
+            canvasState.width  = canvas.width  = window.innerWidth;
+            canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
             
-        if (scale_x == 1 && scale_y == 1) {
-            return;
-        }
-        
-        for (i = 0; (shape = canvasState.shapes[i]); i++) {
-            shape.x *= scale_x;
-            shape.y *= scale_y;
-            shape.dx *= scale_x;
-            shape.dy *= scale_y;
-        }
-        
-        canvasState.old_width = canvas.width;
-        canvasState.old_height = canvas.height;
-        canvasState.valid = false;
+            scale_x = canvas.width  / canvasState.old_width;
+            scale_y = canvas.height / canvasState.old_height;
+                
+            if (scale_x == 1 && scale_y == 1) {
+                return;
+            }
+            
+            for (i = 0; (shape = canvasState.shapes[i]); i++) {
+                shape.x *= scale_x;
+                shape.y *= scale_y;
+                shape.dx *= scale_x;
+                shape.dy *= scale_y;
+            }
+            
+            canvasState.old_width = canvas.width;
+            canvasState.old_height = canvas.height;
+            canvasState.valid = false;
 
-        clearTimeout(resize_timeout);
-        resize_timeout = setTimeout(endDocumentResize, 500);
-    };
-    var endDocumentResize = function() {
-        canvasState.valid = false;
-        for (var i = 0, shape; (shape = canvasState.shapes[i]); i++) {
-            shape.dx = shape.dy = 0;
-            canvasState.detectCollisions(shape);
-        }
-        canvasState.outputZone.alignWithCanvas(canvas.width, canvas.height);
-    };
+            clearTimeout(resize_timeout);
+            resize_timeout = setTimeout(endDocumentResize, 500);
+        };
+    })();
 
     var chooseContextMenuOption = function(e) {
         e.stopPropagation();
@@ -486,23 +489,29 @@ $(function() {
                     var $method_family = $('#id_select_method_family', menu);
                     $method_family.val(sel.family);
                     var request = updateMethodRevisionsMenu.call($method_family[0]); // trigger ajax
-                    if (sel.new_code_resource_revision) {
+                    if (sel.new_code_resource_revision || (sel.new_dependencies && sel.new_dependencies.length > 0)) {
                         request.done(function() {
-                            var name = sel.new_code_resource_revision.revision_name;
+                            var name = "[";
+                            if (sel.new_code_resource_revision) {
+                                name += "driver updated (" + sel.new_code_resource_revision.revision_name + ")";
+                                if (sel.new_dependencies && sel.new_dependencies.length > 0) {
+                                    name += "; ";
+                                }
+                            }
+                            if (sel.new_dependencies && sel.new_dependencies.length > 0) {
+                                name += "dependencies updated (";
+                                for (var i = 0; i < sel.new_dependencies.length; i++) {
+                                    if (i > 0) {
+                                        name += ", ";
+                                    }
+                                    name += sel.new_dependencies[i].revision_name;
+                                }
+                                name += ")";
+                            }
+                            name += "]";
+
                             $('<option>', { value: sel.pk })
                                 .text('new: ' + name)
-                                .prependTo($("#id_select_method", menu));
-                        });
-                    }
-                    if (sel.new_dependencies) {
-                        request.done(function() {
-                            var name = "new: ";
-                            for (var i = 0; i < sel.new_dependencies.length; i++) {
-                                if (i > 0) name += ", ";
-                                name += sel.new_dependencies[i].revision_name;
-                            }
-                            $('<option>', { value: sel.pk })
-                                .text(name)
                                 .prependTo($("#id_select_method", menu));
                         });
                     }
@@ -668,12 +677,12 @@ $(function() {
             if(!is_new) {
                 submitPipelineAjax($('#id_family_pk').val(), form_data);
             } else { // Pushing a new family
-                submitPipelineFamilyAjax(JSON.stringify({
+                submitPipelineFamilyAjax({
                     users_allowed: users_allowed,
                     groups_allowed: groups_allowed,
                     name: family.name.val(),
                     description: family.desc.val()
-                }));
+                });
             }
         };// end exposed function - everything that follows is closed over
             
@@ -708,11 +717,12 @@ $(function() {
             $submit_error.show();
         }
         function submitPipelineAjax(family_pk, form_data) {
-            $.post({
-                url: '/api/pipelines/',
-                data: JSON.stringify(form_data),
-                contentType: "application/json"// is this needed? jquery default is: application/x-www-form-urlencoded; charset=UTF-8
-            }).success(function() {
+            $.post(
+                '/api/pipelines/',
+                JSON.stringify(form_data),
+                form_data,
+                "application/json"// is this needed? jquery default is: application/x-www-form-urlencoded; charset=UTF-8
+            ).success(function() {
                 $('#id_submit_error').empty().hide();
                 $(window).off('beforeunload');
                 window.location.href = '/pipelines/' + family_pk;
@@ -730,14 +740,16 @@ $(function() {
                 } else {
                     submitError(xhr.status + " - " + error);
                 }
+
+                console.error(form_data);
             });
         }
         function submitPipelineFamilyAjax(form_data) {
-            $.post({
-                url: '/api/pipelinefamilies/',
-                data: form_data,
-                contentType: "application/json"// is this needed? jquery default is: application/x-www-form-urlencoded; charset=UTF-8
-            }).success(function(result) {
+            $.post(
+                '/api/pipelinefamilies/',
+                JSON.stringify(form_data),
+                "application/json"// is this needed? jquery default is: application/x-www-form-urlencoded; charset=UTF-8
+            ).success(function(result) {
                 submitPipelineAjax(result.id, form_data);
             }).error(function(xhr, status, error) {
                 var json = xhr.responseJSON,
@@ -954,7 +966,11 @@ jQuery.fn.extend({
                 $drag = $(this).addClass('draggable');
             } else {
                 $drag = $(this).addClass('active-handle').parent().addClass('draggable');
-            }  
+            }
+
+            if (typeof opt.start == 'function') {
+                opt.start(this);
+            }
             
             $drag.data('z', $drag.data('z') || $drag.css('z-index'));
             
@@ -978,6 +994,9 @@ jQuery.fn.extend({
                 $(this).removeClass('draggable');
             } else {
                 $(this).removeClass('active-handle').parent().removeClass('draggable');
+            }
+            if (typeof opt.stop == 'function') {
+                opt.stop(this);
             }
         });
         
