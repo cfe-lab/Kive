@@ -7,6 +7,9 @@ import re
 import tempfile
 import json
 
+from mock.mock import patch
+from mock import call, Mock
+
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.core.files import File
@@ -3267,7 +3270,31 @@ year,month,day,hour,minute,second,microsecond
             True
         )
 
-    def test_runcomponent_unsuccessful_failed_invoked_log(self):
+    @patch.object(Run, "quarantine", autospec=True, side_effect=Run.quarantine)
+    @patch.object(Run, "mark_failure", autospec=True, side_effect=Run.mark_failure)
+    @patch.object(Run, "stop", autospec=True, side_effect=Run.stop)
+    @patch.object(Run, "start", autospec=True, side_effect=Run.start)
+    @patch.object(RunComponent, "cancel_running", autospec=True, side_effect=RunComponent.cancel_running)
+    @patch.object(RunComponent, "cancel_pending", autospec=True, side_effect=RunComponent.cancel_pending)
+    @patch.object(RunComponent, "begin_recovery", autospec=True, side_effect=RunComponent.begin_recovery)
+    @patch.object(RunComponent, "quarantine", autospec=True, side_effect=RunComponent.quarantine)
+    @patch.object(RunComponent, "finish_failure", autospec=True, side_effect=RunComponent.finish_failure)
+    @patch.object(RunComponent, "finish_successfully", autospec=True, side_effect=RunComponent.finish_successfully)
+    @patch.object(RunComponent, "start", autospec=True, side_effect=RunComponent.start)
+    def test_runcomponent_unsuccessful_failed_invoked_log(
+            self,
+            mock_start,
+            mock_finish_successfully,
+            mock_finish_failure,
+            mock_quarantine,
+            mock_begin_recovery,
+            mock_cancel_pending,
+            mock_cancel_running,
+            mock_run_start,
+            mock_run_stop,
+            mock_run_mark_failure,
+            mock_run_quarantine
+    ):
         """Testing of a RunComponent which has a failed invoked_log and never gets to its own execution."""
 
         # Run two pipelines, the second of which reuses parts of the first, but the method has been
@@ -3286,6 +3313,45 @@ year,month,day,hour,minute,second,microsecond
                                         p_one,
                                         [self.dataset_words],
                                         groups_allowed=[everyone_group()]).get_last_run()
+
+        # All of the RunComponents should have been started.
+        run1_step1 = run1.runsteps.get(pipelinestep__step_num=1)
+        run1_step2 = run1.runsteps.get(pipelinestep__step_num=2)
+        run1_outcable = run1.runoutputcables.first()
+        mock_start.assert_has_calls([
+            call(run1_step1),
+            call(run1_step1.RSICs.first()),
+            call(run1_step2),
+            call(run1_step2.RSICs.first()),
+            call(run1_outcable)
+        ])
+        self.assertEquals(mock_start.call_count, 5)
+
+        # All of them should have been finished successfully without event.
+        mock_finish_successfully.assert_has_calls([
+            call(run1_step1.RSICs.first(), save=True),
+            call(run1_step1, save=True),
+            call(run1_step2.RSICs.first(), save=True),
+            call(run1_step2, save=True),
+            call(run1_outcable, save=True)
+        ])
+        self.assertEquals(mock_finish_successfully.call_count, 5)
+
+        # These were not called, so have not been mocked yet.
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+
+        mock_run_start.assert_called_once_with(run1, save=True)
+        mock_run_stop.assert_called_once_with(run1, save=True)
+        self.assertFalse(hasattr(mock_run_mark_failure, "assert_not_called"))
+
+        mock_run_start.reset_mock()
+        mock_run_stop.reset_mock()
+        mock_start.reset_mock()
+        mock_finish_successfully.reset_mock()
 
         # Oops!  Between runs, self.method_noop gets screwed with.
         with tempfile.TemporaryFile() as f:
@@ -3332,6 +3398,61 @@ year,month,day,hour,minute,second,microsecond
 
         self.assertTrue(run2_step1_RSIC.log.is_successful())
         self.assertFalse(run2_step1.log.is_successful())
+
+        # The following RunComponents should have been started.
+        mock_start.assert_has_calls(
+            [
+                call(run2_step1),
+                call(run2_step1.RSICs.first()),
+                call(run2_step2),
+                call(run2_step2.RSICs.first())
+            ]
+        )
+        self.assertEquals(mock_start.call_count, 4)
+
+        # run2_step1 and its input cable attempted recovery.
+        mock_begin_recovery.assert_has_calls(
+            [
+                call(run2_step1, save=True),
+                call(run2_step1.RSICs.first(), save=True)
+            ]
+        )
+        self.assertEquals(mock_begin_recovery.call_count, 2)
+
+        # The first step and cable finished successfully without event, and then the cable
+        # did again on recovery.
+        mock_finish_successfully.assert_has_calls(
+            [
+                call(run2_step1.RSICs.first(), save=True),
+                call(run2_step1, save=True),
+                call(run2_step1.RSICs.first(), save=True)
+            ]
+        )
+        self.assertEquals(mock_finish_successfully.call_count, 3)
+
+        # run2_step1 failed on recovery.
+        mock_finish_failure.assert_called_once_with(run2_step1, save=True)
+
+        # This stuff gets cancelled after the recovery fails.
+        mock_cancel_running.assert_has_calls(
+            [
+                call(run2_step2.RSICs.first(), save=True),
+                call(run2_step2, save=True)
+            ]
+        )
+        self.assertEquals(mock_cancel_running.call_count, 2)
+
+        # run2 should have started, been marked as a failure, and then stopped.
+        mock_run_start.assert_called_once_with(run2, save=True)
+        mock_run_mark_failure.assert_called_once_with(run2, save=True)
+        mock_run_stop.assert_called_once_with(run2, save=True)
+
+        # run1_step2 should have been quarantined.
+        mock_quarantine.assert_called_once_with(RunComponent.objects.get(pk=run1_step1.pk),
+                                                recurse_upward=True, save=True)
+
+        # run1 should have been quarantined.
+        mock_run_quarantine.assert_called_once_with(run1, recurse_upward=True, save=True)
 
     def test_long_output(self):
         """Should handle lots of output to stdout or stderr without deadlocking."""
@@ -3385,7 +3506,31 @@ with open(sys.argv[2], "wb") as f:
         self.assertTrue(run_step.log.is_successful())
         self.assertEqual(stdout_content, expected_output)
 
-    def test_runcomponent_unsuccessful_failed_integrity_check_during_recovery(self):
+    @patch.object(Run, "quarantine", autospec=True, side_effect=Run.quarantine)
+    @patch.object(Run, "mark_failure", autospec=True, side_effect=Run.mark_failure)
+    @patch.object(Run, "stop", autospec=True, side_effect=Run.stop)
+    @patch.object(Run, "start", autospec=True, side_effect=Run.start)
+    @patch.object(RunComponent, "cancel_running", autospec=True, side_effect=RunComponent.cancel_running)
+    @patch.object(RunComponent, "cancel_pending", autospec=True, side_effect=RunComponent.cancel_pending)
+    @patch.object(RunComponent, "begin_recovery", autospec=True, side_effect=RunComponent.begin_recovery)
+    @patch.object(RunComponent, "quarantine", autospec=True, side_effect=RunComponent.quarantine)
+    @patch.object(RunComponent, "finish_failure", autospec=True, side_effect=RunComponent.finish_failure)
+    @patch.object(RunComponent, "finish_successfully", autospec=True, side_effect=RunComponent.finish_successfully)
+    @patch.object(RunComponent, "start", autospec=True, side_effect=RunComponent.start)
+    def test_runcomponent_unsuccessful_failed_integrity_check_during_recovery(
+            self,
+            mock_start,
+            mock_finish_successfully,
+            mock_finish_failure,
+            mock_quarantine,
+            mock_begin_recovery,
+            mock_cancel_pending,
+            mock_cancel_running,
+            mock_run_start,
+            mock_run_stop,
+            mock_run_mark_failure,
+            mock_run_quarantine
+    ):
         """Testing of a RunComponent which has a failed integrity check during recovery."""
 
         # Run two pipelines, the second of which reuses parts of the first, but the first step's output
@@ -3400,6 +3545,45 @@ with open(sys.argv[2], "wb") as f:
         p_one.steps.get(step_num=1).add_deletion(self.curr_time_method.outputs.first())
 
         run1 = Manager.execute_pipeline(self.user_bob, p_one, [self.time_SD]).get_last_run()
+
+        # All of the RunComponents should have been started.
+        run1_step1 = run1.runsteps.get(pipelinestep__step_num=1)
+        run1_step2 = run1.runsteps.get(pipelinestep__step_num=2)
+        run1_outcable = run1.runoutputcables.first()
+        mock_start.assert_has_calls([
+            call(run1_step1),
+            call(run1_step1.RSICs.first()),
+            call(run1_step2),
+            call(run1_step2.RSICs.first()),
+            call(run1_outcable)
+        ])
+        self.assertEquals(mock_start.call_count, 5)
+
+        # All of them should have been finished successfully without event.
+        mock_finish_successfully.assert_has_calls([
+            call(run1_step1.RSICs.first(), save=True),
+            call(run1_step1, save=True),
+            call(run1_step2.RSICs.first(), save=True),
+            call(run1_step2, save=True),
+            call(run1_outcable, save=True)
+        ])
+        self.assertEquals(mock_finish_successfully.call_count, 5)
+
+        # These were not called, so have not been mocked yet.
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+
+        mock_run_start.assert_called_once_with(run1, save=True)
+        mock_run_stop.assert_called_once_with(run1, save=True)
+        self.assertFalse(hasattr(mock_run_mark_failure, "assert_not_called"))
+
+        mock_run_start.reset_mock()
+        mock_run_stop.reset_mock()
+        mock_start.reset_mock()
+        mock_finish_successfully.reset_mock()
 
         # Oops!  The first step should not have been marked as deterministic.
         p_two = tools.make_first_pipeline("p_two", "time then trivial", self.user_bob)
@@ -3440,6 +3624,66 @@ with open(sys.argv[2], "wb") as f:
         self.assertTrue(run2_step1_RSIC.log.is_successful())
         self.assertTrue(run2_step1.log.is_successful())
         self.assertFalse(run2_step1.log.all_checks_passed())
+
+        # The following RunComponents should have been started.
+        mock_start.assert_has_calls(
+            [
+                call(run2_step1),
+                call(run2_step1.RSICs.first()),
+                call(run2_step2),
+                call(run2_step2.RSICs.first())
+            ]
+        )
+        self.assertEquals(mock_start.call_count, 4)
+
+        # run2_step1 and its input cable attempted recovery.
+        mock_begin_recovery.assert_has_calls(
+            [
+                call(run2_step1, save=True),
+                call(run2_step1.RSICs.first(), save=True)
+            ]
+        )
+        self.assertEquals(mock_begin_recovery.call_count, 2)
+
+        # The first step and cable finished successfully without event, and then the cable
+        # did again on recovery.
+        mock_finish_successfully.assert_has_calls(
+            [
+                call(run2_step1.RSICs.first(), save=True),
+                call(run2_step1, save=True),
+                call(run2_step1.RSICs.first(), save=True)
+            ]
+        )
+        self.assertEquals(mock_finish_successfully.call_count, 3)
+
+        # run2_step1 failed on recovery.
+        mock_finish_failure.assert_called_once_with(run2_step1, save=True)
+
+        # This stuff gets cancelled after the recovery fails.
+        mock_cancel_running.assert_has_calls(
+            [
+                call(run2_step2.RSICs.first(), save=True),
+                call(run2_step2, save=True)
+            ]
+        )
+        self.assertEquals(mock_cancel_running.call_count, 2)
+
+        # run2 should have started, been marked as a failure, and then stopped.
+        mock_run_start.assert_called_once_with(run2, save=True)
+        mock_run_mark_failure.assert_called_once_with(run2, save=True)
+        mock_run_stop.assert_called_once_with(run2, save=True)
+
+        # run1_step1 should have been quarantined, along with run1_step2's input cable.
+        mock_quarantine.assert_has_calls(
+            [
+                call(RunComponent.objects.get(pk=run1_step1.pk), recurse_upward=True, save=True),
+                call(RunComponent.objects.get(pk=run1_step2.RSICs.first().pk), recurse_upward=True, save=True)
+            ],
+            any_order=True
+        )
+
+        # run1 should have been quarantined.
+        mock_run_quarantine.assert_called_once_with(run1, recurse_upward=True, save=True)
 
 
 class TopLevelRunTests(TestCase, ArchiveTestCaseHelpers):

@@ -641,6 +641,7 @@ class Manager(object):
                 # task_finished_coords[idx] is the component coordinate in
                 # the subrun idx levels deep (0 means top-level run).
                 # curr_run is this subrun.
+                curr_run.refresh_from_db()
                 if not subrun_tasks_currently_running[idx]:
                     if not curr_run.has_ended():
                         curr_run.stop(save=True)
@@ -659,15 +660,10 @@ class Manager(object):
                 self.task_queue.append((curr_sdbx, task))
 
         else:
-            status_string = "successful"
-            if curr_sdbx.run.is_failing():
-                status_string = "failed"
-            elif curr_sdbx.run.is_cancelling():
-                status_string = "cancelled"
-
+            curr_sdbx.run.refresh_from_db()
             mgr_logger.info(
                 'Cleaning up %s run "%s" (pk=%d, Pipeline: %s, User: %s)',
-                status_string,
+                curr_sdbx.run.get_state_name(),
                 curr_sdbx.run,
                 curr_sdbx.run.pk,
                 curr_sdbx.pipeline,
@@ -675,8 +671,9 @@ class Manager(object):
             )
 
             self.remove_sandbox_from_queues(curr_sdbx)
-            if not curr_sdbx.run.is_successful():
-                curr_sdbx.run.stop(save=True)
+            # Having reached here, this run should have been properly stopped in the
+            # "if stop_subruns_if_possible" block.
+            assert curr_sdbx.run.is_complete(), "{} is not one of the complete states"
             # curr_sdbx.run.complete_clean()
 
         return workers_freed

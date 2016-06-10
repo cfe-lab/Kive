@@ -1694,7 +1694,7 @@ class Sandbox:
         invoking_record = recovering_record or curr_RS
 
         if recover:
-            curr_RS.begin_recovery()
+            curr_RS.begin_recovery(save=True)
 
         ####
         # Gather inputs: finish all input cables -- we want them written to the sandbox now, which is never
