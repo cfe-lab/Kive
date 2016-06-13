@@ -51,7 +51,7 @@ class Migration(migrations.Migration):
                 ('name', models.CharField(help_text='The name given to a group of methods/pipelines', max_length=60, verbose_name='Transformation family name')),
                 ('description', models.TextField(blank=True, help_text='A description for this collection of methods/pipelines', max_length=1000, verbose_name='Transformation family description')),
                 ('groups_allowed', models.ManyToManyField(blank=True, help_text='What groups have access?', related_name='pipeline_pipelinefamily_has_access_to', to=b'auth.Group')),
-                ('user', models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
                 ('users_allowed', models.ManyToManyField(blank=True, help_text='Which users have access?', related_name='pipeline_pipelinefamily_has_access_to', to=settings.AUTH_USER_MODEL)),
             ],
             options={
