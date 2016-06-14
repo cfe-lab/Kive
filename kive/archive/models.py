@@ -1686,9 +1686,8 @@ class RunStep(RunComponent):
         This is a helper function for clean.
         """
         # If there is no ExecLog there is no notion of missing outputs.
-        outputs_missing = []
-        if self.has_log():
-            outputs_missing = self.log.missing_outputs()
+        exec_log = getattr(self, 'log', None)
+        outputs_missing = [] if exec_log is None else exec_log.missing_outputs()
 
         # Go through all of the outputs.
         for to in self.pipelinestep.transformation.outputs.all():
@@ -1708,10 +1707,14 @@ class RunStep(RunComponent):
                     raise ValidationError('Output "{}" of RunStep "{}" is missing; no data should be associated'
                                           .format(to, self))
 
-            # The corresponding ERO should have existent data.
+            # The corresponding ERO should have existent data, unless it failed
+            # an integrity check.
             elif not corresp_ds.has_data():
-                raise ValidationError('ExecRecordOut "{}" of RunStep "{}" should reference existent data'
-                                      .format(corresp_ero, self))
+                check = exec_log and exec_log.integrity_checks.filter(
+                    dataset=corresp_ds).first()
+                if not check or not check.is_fail():
+                    raise ValidationError('ExecRecordOut "{}" of RunStep "{}" should reference existent data'
+                                          .format(corresp_ero, self))
 
         # Check that any associated data belongs to an ERO of this ER
         # Supposed to be the datasets attached to this runstep (Produced by this runstep)

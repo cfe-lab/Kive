@@ -18,6 +18,7 @@ from archive.models import RunStep, Run
 from constants import dirnames, extensions, runcomponentstates
 import file_access_utils
 import librarian.models
+from librarian.models import Dataset
 import pipeline.models
 from method.models import Method
 from datachecking.models import IntegrityCheckLog
@@ -637,8 +638,8 @@ class Sandbox:
                                           cable_exec_info.cable_record,
                                           curr_RS)
                         return_because_fail = True
-                    elif (cable_exec_info.cable_record.reused
-                          and not cable_exec_info.could_be_reused):
+                    elif (cable_exec_info.cable_record.reused and
+                          not cable_exec_info.could_be_reused):
                         self.logger.debug("Input cable %s to sub-pipeline step %s failed on reuse",
                                           cable_exec_info.cable_record,
                                           curr_RS)
@@ -1056,8 +1057,8 @@ class Sandbox:
                 self.logger.debug("Input cable %s to step %s was cancelled", cable_exec_info.cable_record,
                                   curr_RS)
                 return_because_fail = True
-            elif (cable_exec_info.cable_record.reused
-                  and cable_exec_info.cable_record.is_failed()):
+            elif (cable_exec_info.cable_record.reused and
+                  cable_exec_info.cable_record.is_failed()):
                 self.logger.debug("Input cable %s to step %s failed on reuse", cable_exec_info.cable_record,
                                   curr_RS)
                 return_because_fail = True
@@ -1832,6 +1833,7 @@ class Sandbox:
 
         succeeded_yet = False
         while not succeeded_yet:
+            integrity_checks = {}  # {output_idx: check}
             try:
                 with transaction.atomic():
                     # Create outputs.
@@ -1873,15 +1875,23 @@ class Sandbox:
                                 make_dataset = curr_RS.keeps_output(curr_output)
 
                                 if preexisting_ER:
-                                    # Wrap in a transaction to prevent concurrent authoring of Datasets to
-                                    # an existing Dataset.
-                                    output_ERO = curr_ER.get_execrecordout(curr_output)
-                                    with transaction.atomic():
-                                        output_dataset = librarian.models.Dataset.objects.select_for_update().filter(
-                                            pk=output_ERO.dataset.pk
-                                        ).first()
-                                        if make_dataset and not output_dataset.has_data():
-                                            output_dataset.register_file(output_path)
+                                    if make_dataset:
+                                        # Wrap in a transaction to prevent
+                                        # concurrent authoring of Datasets to
+                                        # an existing Dataset.
+                                        output_ERO = curr_ER.get_execrecordout(curr_output)
+                                        with transaction.atomic():
+                                            output_dataset = Dataset.objects.select_for_update().filter(
+                                                pk=output_ERO.dataset.pk).first()
+                                            if not output_dataset.has_data():
+                                                check = output_dataset.check_integrity(
+                                                    output_path,
+                                                    checking_user=user,
+                                                    execlog=curr_log,
+                                                    notify_all=True)
+                                                integrity_checks[i] = check
+                                                if not check.is_fail():
+                                                    output_dataset.register_file(output_path)
 
                                 else:
                                     output_dataset = librarian.models.Dataset.create_dataset(
@@ -1941,7 +1951,9 @@ class Sandbox:
                     # Perform integrity check.
                     logger.debug("[%d] Dataset has been computed before, checking integrity of %s",
                                  worker_rank, output_dataset)
-                    check = output_dataset.check_integrity(output_path, user, curr_log)
+                    check = integrity_checks.get(i)
+                    if check is None:
+                        check = output_dataset.check_integrity(output_path, user, curr_log)
 
                     # We may also need to perform a content check if there isn't a complete
                     # one already.
