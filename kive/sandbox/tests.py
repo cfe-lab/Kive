@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.core.files import File
 from django.core.files.base import ContentFile
 from django.test import TestCase
+from django.utils import timezone
 
 from archive.models import Run
 from constants import datatypes
@@ -434,9 +435,13 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertFalse(all(i.is_raw() for i in inputs))
 
         # Spoil one of the inputs with a bad integrity check.
+        now = timezone.now()
         for i, dataset in enumerate(inputs, start=1):
-            bad_input, bad_index = dataset, i
-            bad_icl = IntegrityCheckLog(dataset=dataset, user=self.myUser)
+            bad_input = dataset
+            bad_icl = IntegrityCheckLog(dataset=dataset,
+                                        user=self.myUser,
+                                        start_time=now,
+                                        end_time=now)
             bad_icl.save()
             MD5Conflict(integritychecklog=bad_icl, conflicting_dataset=dataset).save()
             break

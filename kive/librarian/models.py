@@ -1078,11 +1078,11 @@ class Dataset(metadata.models.AccessControl):
 
         # If there are any failures, check that the most recent integrity check is good.
         if self.any_failed_checks():
-            last_icl = self.integrity_checks.order_by("-end_time").last()
+            last_icl = self.integrity_checks.order_by("-end_time").first()
             if last_icl is None or last_icl.is_fail():
                 return False
 
-            last_bad_ccl = self.content_checks.filter(baddata__isnull=False).order_by("-end_time").last()
+            last_bad_ccl = self.content_checks.filter(baddata__isnull=False).order_by("-end_time").first()
             if last_bad_ccl is not None and last_icl.start_time <= last_bad_ccl.end_time:
                 return False
 

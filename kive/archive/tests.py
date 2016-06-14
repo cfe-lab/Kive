@@ -7,8 +7,7 @@ import re
 import tempfile
 import json
 
-from mock.mock import patch
-from mock import call, Mock
+from mock import call, patch
 
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
@@ -614,7 +613,8 @@ class RunComponentTests(ArchiveTestCase):
     #
     #     self.assertRaisesRegexp(
     #         ValidationError,
-    #         re.escape('Invoked ExecLogs preceding log of {} "{}" did not successfully pass all of their checks'.format(
+    #         re.escape(
+    #             'Invoked ExecLogs preceding log of {} "{}" did not successfully pass all of their checks'.format(
     #             self.step_E3_RS.__class__.__name__, self.step_E3_RS
     #         )),
     #         self.step_E3_RS.clean)
@@ -3027,7 +3027,9 @@ class ExecLogIsCompleteIsSuccessfulTests(ArchiveTestCase):
 #         icl.stop(save=False)
 #         icl.save()
 #
-#         self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_dataset, self.singlet_dataset], [self.C1_in_dataset])
+#         self.make_complete_non_reused(self.step_D1_RS,
+#                                       [self.D1_in_dataset, self.singlet_dataset],
+#                                       [self.C1_in_dataset])
 #         # Mark step_D1_RS as having failed on execution.
 #         step_D1_mo = self.step_D1_RS.log.methodoutput
 #         step_D1_mo.return_code = 1
