@@ -4,16 +4,17 @@
 # then run the script again. It will ask you which pipeline you want to dump.
 
 from collections import Counter
+from datetime import datetime, timedelta
 import errno
 import json
 import logging
+from operator import itemgetter
 import os
+from urlparse import urlparse
 
 from requests.adapters import HTTPAdapter
 
 from kiveapi import KiveAPI
-from urlparse import urlparse
-from operator import itemgetter
 
 
 def main():
@@ -133,9 +134,18 @@ def main():
         filename = revision['coderesource']['filename']
         filename_counts[filename] += 1
         response = kive.get(revision.url, is_json=False, stream=True)
+        deadline = datetime.now() + timedelta(seconds=10)
+        is_complete = True
         with open(os.path.join(dump_folder, filename), 'w') as f:
             for block in response.iter_content():
                 f.write(block)
+                if datetime.now() > deadline:
+                    is_complete = False
+                    break
+        if not is_complete:
+            os.remove(os.path.join(dump_folder, filename))
+            with open(os.path.join(dump_folder, filename + '_timed_out'), 'w'):
+                pass
     duplicate_filenames = [filename
                            for filename, count in filename_counts.iteritems()
                            if count > 1]
