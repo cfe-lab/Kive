@@ -18,6 +18,9 @@ var RunsTable = function($table, user, is_user_admin, $no_results, $active_filte
             function() {
                 runsTable.page = 1;
                 runsTable.reloadTable();
+                sessionStorage.setItem(
+                        'runFilters',
+                        runsTable.filterSet.getPairs());
             });
     this.list_url = "/api/runs/status/";
     this.reload_interval = pollingInterval;
@@ -212,6 +215,6 @@ $(function(){ // wait for page to finish loading before executing jQuery code
         $('#active_filters'),
         $(".navigation_links")
     );
-    // runsTable.filterSet.add('active');
+    runsTable.filterSet.setFromPairs(sessionStorage.getItem('runFilters'));
     runsTable.reloadTable();
 });

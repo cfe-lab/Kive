@@ -127,9 +127,85 @@
                 expect(this.changeCount).toBe(1, 'change count');
             });
             
+            it("should set filters from pairs", function() {
+                this.filterSet.setFromPairs('name=Bob&age=23');
+                
+                var filters = this.filterSet.getFilters();
+                
+                expect(filters).toEqual([{ key: "name", val: "Bob" },
+                                         { key: "age", val: "23" }]);
+                expect(this.changeCount).toBe(1, 'change count');
+            });
+            
+            it("should set filters from pairs and replace existing", function() {
+                this.filterSet.add('name', 'Tom');
+                this.filterSet.setFromPairs('name=Bob&age=23');
+                
+                var filters = this.filterSet.getFilters();
+                
+                expect(filters).toEqual([{ key: "name", val: "Bob" },
+                                         { key: "age", val: "23" }]);
+                expect(this.changeCount).toBe(2, 'change count');
+            });
+            
+            it("should set filters from empty pairs string", function() {
+                this.filterSet.setFromPairs('');
+                
+                var filters = this.filterSet.getFilters();
+                
+                expect(filters).toEqual([]);
+                expect(this.changeCount).toBe(1, 'change count');
+            });
+            
+            it("should set filters from null pairs string", function() {
+                this.filterSet.setFromPairs(null);
+                
+                var filters = this.filterSet.getFilters();
+                
+                expect(filters).toEqual([]);
+                expect(this.changeCount).toBe(1, 'change count');
+            });
+            
+            it("should build pairs from filters", function() {
+                this.filterSet.add('age', '23');
+                this.filterSet.add('name', 'Bob');
+                
+                var pairs = this.filterSet.getPairs();
+                
+                expect(pairs).toEqual('name=Bob&age=23');
+            });
+            
+            it("should build empty pairs string", function() {
+                var pairs = this.filterSet.getPairs();
+                
+                expect(pairs).toEqual('');
+            });
+            
+            it("should handle special characters in filter pairs", function() {
+                this.filterSet.add('comment', '1=2');
+                this.filterSet.add('name', 'Tom & Jerry');
+                var pairs = this.filterSet.getPairs();
+                this.filterSet.setFromPairs(pairs);
+                
+                var filters = this.filterSet.getFilters();
+                
+                expect(filters).toEqual([{ key: "name", val: "Tom & Jerry" },
+                                         { key: "comment", val: "1=2" }]);
+            });
+            
             it("should add boolean filter from a checkbox", function() {
                 this.$active.prop("checked", true);
                 this.filterSet.addFromForm(this.$form[0]);
+                
+                var filters = this.filterSet.getFilters();
+                
+                expect(filters).toEqual([{ key: "active" }]);
+            });
+            
+            it("should handle boolean filter in filter pairs", function() {
+                this.filterSet.add('active');
+                var pairs = this.filterSet.getPairs();
+                this.filterSet.setFromPairs(pairs);
                 
                 var filters = this.filterSet.getFilters();
                 

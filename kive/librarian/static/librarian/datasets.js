@@ -41,6 +41,9 @@ var datasets = (function() {
             function() {
                 datasetsTable.page = 1;
                 datasetsTable.reloadTable();
+                sessionStorage.setItem(
+                        'datasetFilters',
+                        datasetsTable.filterSet.getPairs());
             }
         );
 
@@ -94,9 +97,14 @@ var datasets = (function() {
             $('#datasets'),
             is_user_admin,
             $("#active_filters"),
-            $(".navigation_links")
-        );
-        table.filterSet.add('uploaded');
+            $(".navigation_links")),
+            pairs = sessionStorage.getItem('datasetFilters');
+        if (pairs === null) {
+            table.filterSet.add('uploaded');
+        }
+        else {
+            table.filterSet.setFromPairs(pairs);
+        }
         table.reloadTable();
     };
 

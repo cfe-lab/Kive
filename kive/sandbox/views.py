@@ -61,10 +61,10 @@ def _choose_inputs_for_pipeline(request,
 
 class RunSubmissionError(Exception):
     """ Exception used to roll back a run submission.
-    
+
     Includes the error response to display to the user.
     """
-    
+
     def __init__(self, response):
         self.response = response
 
@@ -84,13 +84,13 @@ def run_pipeline(request):
         with transaction.atomic():
             dummy_rtp = Run(user=request.user)
             rsf = RunSubmissionForm(request.POST, instance=dummy_rtp)
-    
+
             try:
                 rsf_good = rsf.is_valid()
             except ValidationError as e:
                 rsf.add_error(None, e)
                 rsf_good = False
-    
+
             curr_pipeline = rsf.cleaned_data["pipeline"]
             if not rsf_good:
                 if "pipeline" in rsf.cleaned_data:
@@ -101,10 +101,10 @@ def run_pipeline(request):
                         rsf))
                 raise RunSubmissionError(choose_pipeline(request,
                                                          "Pipeline was invalid."))
-    
+
             rtp = rsf.save()
             rtp.grant_from_json(rsf.cleaned_data["permissions"])
-    
+
             # Now try and put together RunInputs from the specified inputs.
             for i in range(1, curr_pipeline.inputs.count()+1):
                 curr_input_form = InputSubmissionForm({"input_pk": request.POST.get("input_{}".format(i))})
@@ -114,7 +114,7 @@ def run_pipeline(request):
                         curr_pipeline.pk,
                         rsf,
                         "Input {} is invalid".format(i)))
-    
+
                 # Check that the chosen dataset is usable.
                 dataset = Dataset.objects.get(pk=curr_input_form.cleaned_data["input_pk"])
                 try:
@@ -125,9 +125,9 @@ def run_pipeline(request):
                         curr_pipeline.pk,
                         rsf,
                         e.messages))
-    
+
                 rtp.inputs.create(dataset=dataset, index=i)
-    
+
             try:
                 rtp.clean()
             except ValidationError as e:
@@ -157,7 +157,7 @@ def runs(request):
 def view_results(request, run_id):
     """View outputs from a pipeline run."""
     go_back_to_view = request.GET.get('back_to_view', None) == 'true'
-    
+
     four_oh_four = False
     try:
         # If we're going to change the permissions, this will make it faster.

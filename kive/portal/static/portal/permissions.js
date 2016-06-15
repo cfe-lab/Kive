@@ -534,6 +534,50 @@ var permissions = (function() {
         });
         this.onChange();
     };
+
+    /* Set search filters from key-value pairs in a string.
+     * 
+     * Example: "key1=value1&key2=value2"
+     * Keys and values are URI encoded.
+     */
+    my.FilterSet.prototype.setFromPairs = function(pairs) {
+        var filterSet = this,
+            pairsArray,
+            pair,
+            value;
+        pairsArray = pairs === null || pairs.length === 0 ? [] : pairs.split('&');
+        this.$active.find('.filter').remove();
+        for (var i = pairsArray.length-1; i >= 0; i--) {
+            pair = pairsArray[i].split('=');
+            value = pair[1] === undefined ? undefined : decodeURIComponent(pair[1]);
+            addFilter(
+                    filterSet,
+                    decodeURIComponent(pair[0]),
+                    value);
+        }
+        this.onChange();
+    };
+    
+    /* Get key-value pairs in a string for all search filters.
+     * 
+     * Example: "key1=value1&key2=value2"
+     * Keys and values are URI encoded.
+     */
+    my.FilterSet.prototype.getPairs = function() {
+        var filters = this.getFilters(),
+            pairs = '';
+        for (var i = 0; i < filters.length; i++) {
+            var filter = filters[i];
+            if (pairs.length) {
+                pairs += '&';
+            }
+            pairs += encodeURIComponent(filter.key);
+            if (filter.val !== undefined) {
+                pairs += '=' + encodeURIComponent(filter.val);
+            }
+        }
+        return pairs;
+    };
     
     my.FilterSet.prototype.getFilters = function() {
         var filters = [];
