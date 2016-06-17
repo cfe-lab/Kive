@@ -2,6 +2,7 @@ $(function() {
     // Security stuff to prevent cross-site scripting.
     noXSS();
     var is_user_admin = false, // Never show admin tools on this page
+        body = $('body'),
         dataset_input_table = $('#dataset_input_table tbody'),
         dataset_search_dialog = $('.dataset-search-dlg'),
         set_dataset = {
@@ -31,6 +32,9 @@ $(function() {
         }).addClass('hidden');
     };
     above_box.show = function(callback) {
+        dataset_input_table.closest('table').animate({
+            top: '40em'
+        });
         this.animate({
             height: '30em',
             'border-color': '#000',
@@ -65,23 +69,64 @@ $(function() {
         e.preventDefault();
         dataset_search_table.filterSet.addFromForm(this);
     };
+    var scrollInputSetDatasetButton = function() {
+        var cellOffsetX = $('button.receiving').offset().left,
+            underset = cellOffsetX - above_box.offset().left,
+            overset = underset + $('button.receiving').outerWidth() - above_box.outerWidth(),
+            insert_dataset = set_dataset.wrapper,
+            d_scroll = 0,
+            d_pos;
+
+        if (overset > 0) {
+            d_scroll = overset;
+        } else if (underset < 0) {
+            d_scroll = underset;
+        }
+        d_pos = cellOffsetX - insert_dataset.offset().left - d_scroll;
+        if (d_pos) {
+            insert_dataset.css('left', insert_dataset.position().left + d_pos);
+        }
+    };
     var showInputSearchDlg = (function() {
         var dialog_state = {},
             cellOffsetX,
-            cellWidth;
+            cellWidth,
+            underset,
+            overset,
+            d_scroll;
 
         function moveInputSetDatasetButton() {
             var insertBtnOffsetX = set_dataset.wrapper.offset().left -
                     set_dataset.wrapper.position().left;
 
             cellOffsetX = $('button.receiving').offset().left;
+            underset = cellOffsetX - above_box.offset().left;
+            overset = underset + cellWidth - above_box.outerWidth();
+            d_scroll = 0;
 
+            if (overset > 0) {
+                d_scroll = overset;
+            } else if (underset < 0) {
+                d_scroll = underset;
+            }
+
+            if (d_scroll) {
+                $(document).off('scroll');
+                body.animate({
+                    scrollLeft: body.scrollLeft() + d_scroll
+                }, {
+                    complete: function() {
+                        $(document).on('scroll', scrollInputSetDatasetButton);
+                    }
+                });
+            }
             // Animate green arrow button
             set_dataset.wrapper
                 .animate({
                     width: cellWidth,
-                    left: cellOffsetX - insertBtnOffsetX
+                    left: cellOffsetX - insertBtnOffsetX - d_scroll
                 }, 150, 'linear');
+
         }
 
         // dialog_state will allow the dialog to have disjunct states according to which input is at hand.
@@ -186,7 +231,7 @@ $(function() {
             // Move green button before and also after revealing above_box.
             // This allows it to start animating concurrently with above_box,
             // but also moves with the correct final position of above_box.
-            moveInputSetDatasetButton();
+            // moveInputSetDatasetButton();
             above_box.showIfHidden(moveInputSetDatasetButton);
         };
     })();
@@ -451,9 +496,9 @@ $(function() {
         setRunNamesPrefix();
     };
     var removeLastRunRow = function() {
-        var $tr = dataset_input_table.find('tr').eq(-1);
-        if ($tr.length) {
-            if ($tr.find('.receiving').length) {
+        var $tr = dataset_input_table.find('tr');
+        if ($tr.length > 1) {
+            if ($tr.eq(-1).find('.receiving').length) {
                 closeSearchDialog();
             }
             $tr.eq(-1).remove();
@@ -558,7 +603,7 @@ $(function() {
         return position - 1;
     };
 
-    +function() {
+    (function() {
         // override keyboard and mouse events for run name inputs
         // in effect make the prefix portion "read-only" while
         // allowing the user to edit the rest of the name.
@@ -597,7 +642,7 @@ $(function() {
         dataset_input_table.on({// delegate target is ".run-name"
             /* 
              * keydown and mousedown do not provide any information on
-             * what's GOING to happen, so we have to reason that ourself
+             * what's GOING to happen, so we have to reason that ourselves
              * based on mouse coordinates and key codes.
              */
             keydown: function(e) {
@@ -652,11 +697,12 @@ $(function() {
             active_input = $active_input = input_offset = input_height = undefined;
             $('body').off('mousemove', selectText);
         }
-    }();
+    })();
 
     $.getJSON('/api/datasets/?format=json', initUsersList);
 
-    $('body')                  .click(   deselectAll                                            );
+    body                       .click(   deselectAll                                            );
+    $(document)               .scroll(   scrollInputSetDatasetButton                            );
     set_dataset.btn            .click(   addSelectedDatasetsToInput                             );
     set_dataset.options_btn    .click(   showFillOptions                                        )
                           .mouseleave(   hideFillOptions                                        );
@@ -667,18 +713,18 @@ $(function() {
     $('#creator')             .change(   creatorFilterHandler                                   );
     $('#id_name')              .keyup(   setRunNamesPrefix                                      );
     $('#run_pipeline')        .submit(   mainSubmitHandler                                      )
-                            .on( 'click',  'input, textarea',      stopProp );
-    dataset_search_dialog   .on( 'submit', 'form',                 submitDatasetSearch )
-      .find('.search_form') .click(                                focusSearchField );
-    dataset_input_table     .on( 'click',  '.input-dataset',       toggleInputDatasetSelection )
-                            .on( 'click',  '.remove.ctrl',         removeDatasetFromInput )
-                            .on( 'click',  'button[name="input"]', showInputSearchDlg );
-    $('.search_results')    .on({ click:                           selectSearchResult,
-                                  dblclick:                        function() { set_dataset.btn.click(); }
-                            },             'tbody tr' );
-    $('#run_controls')      .on( 'click',  '.add_run',             addNewRunRow )
-                            .on( 'click',  '.remove_run',          removeLastRunRow );
-    set_dataset.options_menu.on( 'click',  'li',                   fillMenuChoose );
+                                  .on( 'click',  'input, textarea',      stopProp                     );
+    dataset_search_dialog         .on( 'submit', 'form',                 submitDatasetSearch          )
+      .find('.search_form')    .click(                                   focusSearchField             );
+    dataset_input_table           .on( 'click',  '.input-dataset',       toggleInputDatasetSelection  )
+                                  .on( 'click',  '.remove.ctrl',         removeDatasetFromInput       )
+                                  .on( 'click',  'button[name="input"]', showInputSearchDlg           );
+    $('.search_results')          .on({ click:                           selectSearchResult,
+                                     dblclick:                           function() { set_dataset.btn.click(); }
+                                  },             'tbody tr' );
+    $('#run_controls')            .on( 'click',  '.add_run',             addNewRunRow                 )
+                                  .on( 'click',  '.remove_run',          removeLastRunRow             );
+    set_dataset.options_menu      .on( 'click',  'li',                   fillMenuChoose               );
 
 
     // Pack help text into an unobtrusive icon

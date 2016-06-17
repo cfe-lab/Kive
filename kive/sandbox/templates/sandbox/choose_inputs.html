@@ -24,87 +24,137 @@
 {% endblock %}
 
 {% block content %}
+<div id="fixed_overlay">
+    <a href="choose_pipeline" rel="prev">Back to pipeline selection</a>
 
-<a href="choose_pipeline" rel="prev">Back to pipeline selection</a>
+    <div id="errors" class="errortext">{{ input_error_msg }}</div>
 
-<div id="errors" class="errortext">{{ input_error_msg }}</div>
+    <h4 id="pipeline_name">{{ pipeline }}</h4>
 
-<h4 id="pipeline_name">{{ pipeline }}</h4>
+    <div id="above_box" class="hidden">
 
-<div id="above_box" class="hidden">
+    <div class="dataset-search-dlg">
+        <a class="close ctrl">&times;</a>
+        <h2>Search for datasets to put into <em></em></h2>
 
-<div class="dataset-search-dlg">
-    <a class="close ctrl">&times;</a>
-    <h2>Search for datasets to put into <em></em></h2>
+        <div class="search_results">
 
-    <div class="search_results">
+            <form>
 
-        <form>
+            <div class="search_form">
+                <div class="active_filters"></div>
+                <input type="text" name="smart">
+                <input type="submit" class="search_button">
+            </div>
 
-        <div class="search_form">
-            <div class="active_filters"></div>
-            <input type="text" name="smart">
-            <input type="submit" class="search_button">
+            <div class="search_filters">
+                <h4>Filter results</h4>
+                <select name="creator" id="creator">
+                    <option value="">Creator</option>
+                </select>
+                <select name="date_added" id="date_added">
+                    <option value="">Date Added</option>
+                    <option value="day">Today</option>
+                    <option value="week">This week</option>
+                    <option value="month">This month</option>
+                    <option value="year">This year</option>
+                    <option value="t-0.5h">In the last 30 minutes</option>
+                    <option value="t-1h">In the last hour</option>
+                    <option value="t-1d">In the last day</option>
+                    <option value="t-7d">In the last week</option>
+                    <option value="t-1m">In the last month</option>
+                    <option value="t-1y">In the last year</option>
+                    <option value="custom" disabled>Custom...</option>
+                </select>
+                <select name="date_last_run" id="date_last_run">
+                    <option value="">Date Last Run</option>
+                    <option value="day">Today</option>
+                    <option value="week">This week</option>
+                    <option value="month">This month</option>
+                    <option value="year">This year</option>
+                    <option value="t-0.5h">In the last 30 minutes</option>
+                    <option value="t-1h">In the last hour</option>
+                    <option value="t-1d">In the last day</option>
+                    <option value="t-7d">In the last week</option>
+                    <option value="t-1m">In the last month</option>
+                    <option value="t-1y">In the last year</option>
+                    <option value="custom" disabled>Custom...</option>
+                </select>
+            </div>
+
+            </form>
+
+
+            <!-- <a class="select-all ctrl">Select All</a> -->
+            <h4>Search results</h4>
+            <table>
+                <tfoot><tr><td colspan="100">
+                <div class="navigation_links"></div>
+                <div class="error">Please select at least 1 dataset to add.</div>
+                </td></tr></tfoot>
+            </table>
         </div>
 
-        <div class="search_filters">
-            <h4>Filter results</h4>
-            <select name="creator" id="creator">
-                <option value="">Creator</option>
-            </select>
-            <select name="date_added" id="date_added">
-                <option value="">Date Added</option>
-                <option value="day">Today</option>
-                <option value="week">This week</option>
-                <option value="month">This month</option>
-                <option value="year">This year</option>
-                <option value="t-0.5h">In the last 30 minutes</option>
-                <option value="t-1h">In the last hour</option>
-                <option value="t-1d">In the last day</option>
-                <option value="t-7d">In the last week</option>
-                <option value="t-1m">In the last month</option>
-                <option value="t-1y">In the last year</option>
-                <option value="custom" disabled>Custom...</option>
-            </select>
-            <select name="date_last_run" id="date_last_run">
-                <option value="">Date Last Run</option>
-                <option value="day">Today</option>
-                <option value="week">This week</option>
-                <option value="month">This month</option>
-                <option value="year">This year</option>
-                <option value="t-0.5h">In the last 30 minutes</option>
-                <option value="t-1h">In the last hour</option>
-                <option value="t-1d">In the last day</option>
-                <option value="t-7d">In the last week</option>
-                <option value="t-1m">In the last month</option>
-                <option value="t-1y">In the last year</option>
-                <option value="custom" disabled>Custom...</option>
-            </select>
+        <div id="insert_dataset">
+            <div id="insert_many_dataset">Menu
+            <div id="insert_many_menu">
+                <ul>
+                    <li data-action="fill-column">Fill column</li>
+                </ul>
+            </div></div>
+            <button id="insert_one_dataset">↓</button>
         </div>
+    </div>
 
+    </div>
+
+    <div id="below_box">
+        <form action="run_pipeline" id="run_pipeline" method="post">
+
+            <div id="name_description">
+            <table>
+                <tr>
+                    <td>{{ run_submission_form.name.label }}</td>
+                    <td>
+                        {{ run_submission_form.name }}
+                        <div class="helptext">{{ run_submission_form.name.help_text }}</div>
+                        <div class="errortext">{{ run_submission_form.name.errors }}</div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>{{ run_submission_form.description.label }}</td>
+                    <td>
+                        {{ run_submission_form.description }}
+                        <div class="helptext">{{ run_submission_form.description.help_text }}</div>
+                        <div class="errortext">{{ run_submission_form.description.errors }}</div>
+                    </td>
+                </tr>
+            </table>
+            </div>
+
+            <div style="display:none">
+            <p>{{ run_submission_form.permissions.label }}:
+                <span class="helptext">{{ run_submission_form.permissions.help_text }}</span>
+            {{ run_submission_form.permissions }}
+                <div class="errortext">{{ run_submission_form.permissions.errors }}</div>
+            </p>
+            </div>
+
+            {{ run_submission_form.pipeline }}
+                <div class="errortext">{{ run_submission_form.pipeline.errors }}</div>
+                <div class="errortext">{{ run_submission_form.non_field_errors }}</div>
+            {% csrf_token %}
+            <input type="submit" id="submit" value="Go">
         </form>
-
-
-        <!-- <a class="select-all ctrl">Select All</a> -->
-        <h4>Search results</h4>
-        <table>
-            <tfoot><tr><td colspan="100">
-            <div class="navigation_links"></div>
-            <div class="error">Please select at least 1 dataset to add.</div>
-            </td></tr></tfoot>
-        </table>
+        <div id="run_controls">
+            <div class="error"></div>
+            <label>Add or remove rows:</label>
+            <input type="button" class="add_run left-button" value="+"/><input type="button" class="remove_run right-button" value="&minus;"/>
+        </div>
     </div>
 
-    <div id="insert_dataset">
-        <div id="insert_many_dataset">Menu
-        <div id="insert_many_menu">
-            <ul>
-                <li data-action="fill-column">Fill column</li>
-            </ul>
-        </div></div>
-        <button id="insert_one_dataset">↓</button>
-    </div>
-</div>
+    <div id="progress"></div>
+    <div id="details"></div>
 
 </div>
 
@@ -128,55 +178,6 @@
         </tr>
     </tbody>
 
-    <tfoot>
-        <tr>
-            <td colspan="999" id="run_controls">
-                <div class="error"></div>
-                <label>Add or remove rows:</label>
-                <input type="button" class="add_run left-button" value="+"/><input type="button" class="remove_run right-button" value="&minus;"/>
-            </td>
-        </tr>
-    </tfoot>
-
 </table>
-
-<form action="run_pipeline" id="run_pipeline" method="post">
-
-    <div id="name_description">
-    <table>
-        <tr>
-            <td>{{ run_submission_form.name.label }}</td>
-            <td>
-                {{ run_submission_form.name }}
-                <div class="helptext">{{ run_submission_form.name.help_text }}</div>
-                <div class="errortext">{{ run_submission_form.name.errors }}</div>
-            </td>
-        </tr>
-        <tr>
-            <td>{{ run_submission_form.description.label }}</td>
-            <td>
-                {{ run_submission_form.description }}
-                <div class="helptext">{{ run_submission_form.description.help_text }}</div>
-                <div class="errortext">{{ run_submission_form.description.errors }}</div>
-            </td>
-        </tr>
-    </table>
-    </div>
-
-    <p>{{ run_submission_form.permissions.label }}:
-        <span class="helptext">{{ run_submission_form.permissions.help_text }}</span>
-    {{ run_submission_form.permissions }}
-        <div class="errortext">{{ run_submission_form.permissions.errors }}</div>
-    </p>
-
-    {{ run_submission_form.pipeline }}
-        <div class="errortext">{{ run_submission_form.pipeline.errors }}</div>
-        <div class="errortext">{{ run_submission_form.non_field_errors }}</div>
-    {% csrf_token %}
-    <input type="submit" id="submit" value="Go">
-</form>
-
-<div id="progress"></div>
-<div id="details"></div>
 
 {% endblock %}

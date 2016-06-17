@@ -1,11 +1,28 @@
+h1 {
+  position: fixed;
+  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
+  top: 0; }
+
+#inner_wrap {
+  margin-top: 7.2em; }
+
+#fixed_overlay {
+  position: fixed;
+  z-index: 1;
+  top: 7.2em; }
+
 #above_box {
-  position: relative;
+  position: fixed;
+  top: 8em;
+  left: 4em;
   border: 1px solid white;
   padding-top: 1em;
   padding-left: 1em;
   padding-right: 0;
   padding-bottom: 0;
-  width: 49em;
+  width: calc(100% - 8em);
   height: 50px; }
   #above_box h2 {
     margin-top: 0; }
@@ -13,7 +30,7 @@
 .dataset-search-dlg {
   display: none; }
   .dataset-search-dlg h4 {
-    margin-bottom: -0.75em; }
+    margin-bottom: 0; }
   .dataset-search-dlg .search_form {
     border: 1px solid #ccc;
     background-color: #fff;
@@ -56,6 +73,7 @@
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
+    width: calc(100% - 13.3em);
     font-size: 0.9em; }
     .dataset-search-dlg .search_results table .error {
       display: none;
@@ -179,8 +197,31 @@
     .ctrl.remove:hover {
       background-color: #34a; }
 
+#below_box {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 1em 4em;
+  border-top: 1px solid #888;
+  background-color: #fff;
+  font-size: 0.9em; }
+  #below_box #name_description td {
+    padding-top: 0;
+    padding-bottom: 0; }
+    #below_box #name_description td #id_name {
+      margin-bottom: -1px; }
+  #below_box #run_controls {
+    float: right; }
+
 #dataset_input_table {
-  width: 50em; }
+  max-width: 100%;
+  max-height: 20em;
+  overflow: auto;
+  position: absolute;
+  top: 15em;
+  border-right: 160em solid transparent; }
   #dataset_input_table thead th {
     text-align: center;
     border-bottom: 1px solid black; }
@@ -188,7 +229,8 @@
     padding: 0 1px 1px 0;
     vertical-align: middle;
     position: relative;
-    height: 5em; }
+    height: 5em;
+    min-width: 8em; }
     #dataset_input_table tbody td.selected {
       background-color: #238;
       color: #fff; }

@@ -52,7 +52,7 @@ class RunDetailsForm(forms.ModelForm):
     )
 
     description = forms.CharField(
-        widget=forms.Textarea(attrs={'rows':5}),
+        widget=forms.Textarea(attrs={'rows':3}),
         label='Description',
         help_text='A brief description of this run',
         required=False
