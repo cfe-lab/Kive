@@ -91,6 +91,30 @@ var permissions = (function() {
                 'groups_allowed');
         }
     };
+
+    /**
+     * Attach some error messages to a cell in the table.
+     * 
+     * @param $td: a cell in the table, wrapped in a jQuery object
+     * @param errors: an array of strings
+     */
+    my.PermissionsTable.prototype.setErrors = function($td, errors) {
+        if (errors === undefined || errors.length === 0) {
+            return;
+        }
+        var errorList = $('<ul/>');
+        $.each(errors, function() {
+            errorList.append($('<li/>').text(this));
+        });
+        $td.addClass('with-error').append(
+                $('<div class="error-tip"/>').append(errorList));
+        $td.hover(function() {
+            $(this).find('.error-tip').show();
+        },
+        function(){
+            $(this).find('.error-tip').hide();
+        });
+    };
     
     function defaultBuilder($td, row, field_name) {
         $td.text(row[field_name]);

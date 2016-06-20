@@ -56,7 +56,7 @@ class _RunDataset(object):
                  redaction_plan=None,
                  is_ok=True,
                  filename=None,
-                 error=None):
+                 errors=None):
         self.step_name = str(step_name)
         self.name = name
         self.display = str(display or name)
@@ -67,7 +67,7 @@ class _RunDataset(object):
         self.url = url
         self.redaction_plan = redaction_plan
         self.is_ok = is_ok
-        self.error = error
+        self.errors = errors or []
         self.filename = filename
 
     def set_dataset(self, dataset, request):
@@ -87,7 +87,8 @@ class _RunDataset(object):
         self.size = self.date = 'redacted'
 
     def set_missing_output(self):
-        self.error = self.size = self.date = 'not created'
+        self.size = self.date = 'not created'
+        self.errors.append(self.size)
         self.is_ok = False
 
 
@@ -183,8 +184,8 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     output.date = execlog.end_time
                     output.is_ok = methodoutput.return_code == 0
                     if not output.is_ok:
-                        output.error = 'return code {}'.format(
-                            methodoutput.return_code)
+                        output.errors.append('return code {}'.format(
+                            methodoutput.return_code))
                     output.url = reverse('methodoutput-detail',
                                          kwargs={'pk': methodoutput.id},
                                          request=request)
@@ -241,13 +242,13 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                         output.set_dataset(execrecordout.dataset, request)
                         if corrupted_data.exists():
                             output.is_ok = False
-                            output.error = 'failed integrity check'
-                        elif bad_data.exists():
+                            output.errors.append('failed integrity check')
+                        if bad_data.exists():
                             output.is_ok = False
-                            output.error = 'failed content check'
+                            output.errors.append('failed content check')
                         elif not content_checks.exists():
                             output.is_ok = False
-                            output.error = 'not checked'
+                            output.errors.append('content not checked')
                     elif execrecordout.dataset.is_redacted():
                         output.set_redacted()
                     elif missing_data.exists():

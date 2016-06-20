@@ -2,8 +2,6 @@
 archive views
 """
 import logging
-import mimetypes
-import os
 
 from django.contrib.auth.decorators import login_required
 from django.core.urlresolvers import reverse
@@ -34,8 +32,13 @@ def stdout_view(request, methodoutput_id):
     """
     Display the standard output associated with the method output in the browser.
     """
+    return_url = None
     return_to_run = request.GET.get('run_id', None)
-    return_url = None if return_to_run is None else reverse('view_run', kwargs={'run_id': return_to_run})
+    if return_to_run is not None:
+        if "view_run" in request.GET:
+            return_url = reverse('view_run', kwargs={'run_id': return_to_run})
+        else:
+            return_url = reverse('view_results', kwargs={'run_id': return_to_run})
 
     try:
         methodoutput = MethodOutput.objects.get(pk=methodoutput_id)
@@ -64,8 +67,13 @@ def stderr_view(request, methodoutput_id):
     """
     Display the standard error associated with the method output in the browser.
     """
+    return_url = None
     return_to_run = request.GET.get('run_id', None)
-    return_url = None if return_to_run is None else reverse('view_run', kwargs={'run_id': return_to_run})
+    if return_to_run is not None:
+        if "view_run" in request.GET:
+            return_url = reverse('view_run', kwargs={'run_id': return_to_run})
+        else:
+            return_url = reverse('view_results', kwargs={'run_id': return_to_run})
 
     try:
         methodoutput = MethodOutput.objects.get(pk=methodoutput_id)

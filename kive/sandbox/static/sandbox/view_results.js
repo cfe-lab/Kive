@@ -2,9 +2,13 @@
 
 var OutputsTable = function($table, is_user_admin, run_id) {
     permissions.PermissionsTable.call(this, $table, is_user_admin);
+    var outputsTable = this;
     this.list_url = "/api/runs/" + run_id + "/run_outputs/";
     this.registerColumn("Source", "step_name");
-    this.registerColumn("Input/Output", "display");
+    this.registerColumn("Input/Output", function($td, output) {
+        $td.text(output.display);
+        outputsTable.setErrors($td, output.errors);
+    });
     this.registerColumn("Size", "size");
     this.registerColumn("Date created", "date");
     this.registerColumn("", function($td, output) {
