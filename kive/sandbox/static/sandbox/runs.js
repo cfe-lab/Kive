@@ -156,6 +156,7 @@ RunsTable.prototype = Object.create(permissions.PermissionsTable.prototype);
 RunsTable.prototype.getQueryParams = function() {
     var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
     params.filters = this.filterSet.getFilters();
+    sessionStorage.setItem('runPage', this.page);
     return params;
 };
 
@@ -222,6 +223,8 @@ $(function(){ // wait for page to finish loading before executing jQuery code
         $('#active_filters'),
         $(".navigation_links")
     );
+    var storedPage = parseInt(sessionStorage.getItem('runPage') || 1);
     runsTable.filterSet.setFromPairs(sessionStorage.getItem('runFilters'));
+    runsTable.page = storedPage;
     runsTable.reloadTable();
 });
