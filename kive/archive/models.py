@@ -1707,14 +1707,14 @@ class RunStep(RunComponent):
                     raise ValidationError('Output "{}" of RunStep "{}" is missing; no data should be associated'
                                           .format(to, self))
 
-            # The corresponding ERO should have existent data, unless it failed
-            # an integrity check.
-            elif not corresp_ds.has_data():
-                check = exec_log and exec_log.integrity_checks.filter(
-                    dataset=corresp_ds).first()
-                if not check or not check.is_fail():
-                    raise ValidationError('ExecRecordOut "{}" of RunStep "{}" should reference existent data'
-                                          .format(corresp_ero, self))
+            # # The corresponding ERO should have existent data, unless it failed
+            # # an integrity check.
+            # elif not corresp_ds.has_data():
+            #     check = exec_log and exec_log.integrity_checks.filter(
+            #         dataset=corresp_ds).first()
+            #     if not check or not check.is_fail():
+            #         raise ValidationError('ExecRecordOut "{}" of RunStep "{}" should reference existent data'
+            #                               .format(corresp_ero, self))
 
         # Check that any associated data belongs to an ERO of this ER
         # Supposed to be the datasets attached to this runstep (Produced by this runstep)
