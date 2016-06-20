@@ -182,6 +182,13 @@ RunsTable.prototype.extractRows = function(response) {
     return []; // no runs
 };
 
+RunsTable.prototype.buildHeaders = function($tr) {
+    this.buildPermissionHeaders($tr);
+    $tr.eq(0).attr(
+            'title',
+            'steps-outputs\n? new\n. waiting\n: ready\n+ running\n* finished\n! failed\nx cancelled\n# quarantined');
+}
+
 $(function(){ // wait for page to finish loading before executing jQuery code
     // Security stuff to prevent cross-site scripting.
     noXSS();

@@ -240,15 +240,15 @@ class RunOutputsSerializer(serializers.ModelSerializer):
 
                     if execrecordout.dataset.has_data():
                         output.set_dataset(execrecordout.dataset, request)
-                        if corrupted_data.exists():
-                            output.is_ok = False
-                            output.errors.append('failed integrity check')
-                        if bad_data.exists():
-                            output.is_ok = False
-                            output.errors.append('failed content check')
-                        elif not content_checks.exists():
-                            output.is_ok = False
-                            output.errors.append('content not checked')
+                    if corrupted_data.exists():
+                        output.is_ok = False
+                        output.errors.append('failed integrity check')
+                    if bad_data.exists():
+                        output.is_ok = False
+                        output.errors.append('failed content check')
+                    elif not content_checks.exists():
+                        output.is_ok = False
+                        output.errors.append('content not checked')
                     elif execrecordout.dataset.is_redacted():
                         output.set_redacted()
                     elif missing_data.exists():
