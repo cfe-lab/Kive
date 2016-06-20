@@ -1067,7 +1067,7 @@ class Sandbox:
             elif not cable_exec_info.could_be_reused:
                 if not cable_exec_info.ready_to_go:
                     datasets_to_recover.append(inputs[i])
-            elif not cable_exec_info.execrecord.execrecordouts.first().dataset.has_data():
+            elif not cable_exec_info.execrecord.execrecordins.first().dataset.has_data():
                 symbolically_okay_datasets.append(inputs[i])
 
             if return_because_fail:
