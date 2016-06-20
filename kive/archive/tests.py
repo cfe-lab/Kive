@@ -1140,19 +1140,6 @@ class RunStepTests(ArchiveTestCase):
                                           .format(output, self.step_E1_RS)),
                                 self.step_E1_RS.clean)
 
-    def test_RunStep_kept_output_without_data(self):
-        """
-        A RunStep which keeps its outputs, but has an ExecRecordOut
-        without data, is not clean.
-        """
-        self.step_through_runstep_creation("first_step_complete")
-        ero = self.step_E1_RS.execrecord.execrecordouts.first()
-        ero.dataset.dataset_file.delete(save=True)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('ExecRecordOut "{}" of RunStep "{}" should reference existent data'
-                                          .format(ero, self.step_E1_RS)),
-                                self.step_E1_RS.clean)
-
     def test_RunStep_output_not_in_ExecRecord(self):
         """
         A RunStep with a Dataset not in its ExecRecord is not clean.
