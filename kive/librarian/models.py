@@ -1535,10 +1535,17 @@ class ExecRecord(models.Model):
         return False
 
     def is_redacted(self):
-        for eri in self.execrecordins.all().select_related("dataset"):
+        ins = self.execrecordins.all()
+        outs = self.execrecordouts.all()
+        if not hasattr(self, '_prefetched_objects_cache'):
+            # Not already prefetched, use select_related.
+            ins = ins.select_related('dataset')
+            outs = outs.select_related('dataset')
+
+        for eri in ins:
             if eri.dataset.is_redacted():
                 return True
-        for ero in self.execrecordouts.all().select_related("dataset"):
+        for ero in outs:
             if ero.dataset.is_redacted():
                 return True
 

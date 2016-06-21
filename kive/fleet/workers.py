@@ -299,7 +299,6 @@ class Manager(object):
                 self.task_queue.append((new_sdbx, task))
 
         if finished_already:
-            run_to_start.complete_clean()
             if self.history_queue.maxlen > 0:
                 self.history_queue.append(new_sdbx)
 

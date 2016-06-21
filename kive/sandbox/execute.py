@@ -1155,7 +1155,6 @@ class Sandbox:
                                 else:
                                     curr_RS.finish_failure(save=True)
 
-                                curr_RS.complete_clean()
                                 self.update_step_maps(curr_RS, step_run_dir, output_paths)
                                 return curr_RS
 

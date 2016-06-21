@@ -934,7 +934,11 @@ class PipelineCable(models.Model):
                         ExecRecord exists
         """
         # Look at ERIs with matching input dataset.
-        candidate_ERIs = librarian.models.ExecRecordIn.objects.filter(dataset=input_dataset)
+        candidate_ERIs = librarian.models.ExecRecordIn.objects.filter(
+            dataset=input_dataset).prefetch_related(
+                'execrecord__execrecordins__dataset',
+                'execrecord__execrecordouts__dataset',
+                'execrecord__generator__methodoutput')
 
         candidates = []
         for candidate_ERI in candidate_ERIs:
