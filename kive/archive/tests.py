@@ -20,7 +20,7 @@ from rest_framework import status
 from rest_framework.test import force_authenticate
 
 from archive.models import ExecLog, MethodOutput, Run, RunComponent,\
-    RunOutputCable, RunStep, RunSIC
+    RunOutputCable, RunStep, RunSIC, RunBatch
 from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, Dataset, DatasetStructure
@@ -1512,6 +1512,26 @@ class RunTests(ArchiveTestCase):
         self.assertIsNone(self.pE_run.clean())
         self.assertTrue(self.pE_run.is_complete())
         self.assertIsNone(self.pE_run.complete_clean())
+
+    def test_Run_clean_permissions_exceed_RunBatch(self):
+        """A Run's permissions should not exceed those of its RunBatch."""
+        rb = RunBatch(user=self.pE_run.user)
+        rb.save()
+        self.pE_run.runbatch = rb
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape("Group(s) Everyone cannot be granted access'"),
+            self.pE_run.clean
+        )
+
+    def test_Run_clean_permissions_do_not_exceed_RunBatch(self):
+        """A Run whose permissions don't exceed those of its RunBatch is OK."""
+        rb = RunBatch(user=self.pE_run.user)
+        rb.save()
+        rb.grant_everyone_access()
+        self.pE_run.runbatch = rb
+        # This doesn't raise an exception.
+        self.pE_run.clean()
 
 
 class RunSICTests(ArchiveTestCase):
