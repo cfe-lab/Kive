@@ -119,6 +119,26 @@ class RunComponentState(models.Model):
 
 
 @python_2_unicode_compatible
+class RunBatch(metadata.models.AccessControl):
+
+    name = models.CharField(
+        "Name of this batch of runs",
+        max_length=maxlengths.MAX_NAME_LENGTH,
+        null=False,
+        blank=True
+    )
+    description = models.TextField(
+        "Batch description",
+        max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
+        null=False,
+        blank=True
+    )
+
+    def __str__(self):
+        return "{} (pk={})".format(self.name, self.pk)
+
+
+@python_2_unicode_compatible
 class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     """
     Stores data associated with an execution of a pipeline.
@@ -159,6 +179,14 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     # State field to avoid the use of is_complete() and is_successful(), which can be slow.
     _runstate = models.ForeignKey(RunState, default=runstates.PENDING_PK, related_name="runs")
 
+    runbatch = models.ForeignKey(
+        RunBatch,
+        help_text="Run batch that this Run is a part of",
+        null=True,
+        blank=True,
+        related_name="runs"
+    )
+
     # Implicitly, this also has start_time and end_time through inheritance.
 
     def is_stopped(self):
@@ -198,8 +226,10 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
            which are associated (ie. at least in progress), and must
            be clean
         """
-        # Access to this Run must not exceed that of the pipeline.
+        # Access to this Run must not exceed that of the pipeline or of the batch.
         self.validate_restrict_access([self.pipeline])
+        if self.runbatch is not None:
+            self.validate_restrict_access([self.runbatch])
 
         for rtp_input in self.inputs.all():
             rtp_input.clean()
@@ -785,6 +815,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         a) the Pipeline
         b) the input Datasets
         c) the top-level Runs of the ExecRecords it reuses
+        d) the RunBatch
         """
         if not self.is_complete():
             raise RuntimeError("Eligible permissions cannot be found until the run is complete")
@@ -794,6 +825,8 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         # ... and then refine it.
         addable_users, addable_groups = self.pipeline.intersect_permissions(addable_users, addable_groups)
+        if self.runbatch is not None:
+            addable_users, addable_groups = self.runbatch.intersect_permissions(addable_users, addable_groups)
 
         for run_input in self.inputs.all():
             addable_users, addable_groups = run_input.dataset.intersect_permissions(

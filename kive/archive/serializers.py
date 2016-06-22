@@ -6,7 +6,7 @@ from django.contrib.auth.models import User, Group
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from archive.models import Run, MethodOutput, RunInput
+from archive.models import Run, MethodOutput, RunInput, RunBatch
 from transformation.models import TransformationInput
 from pipeline.models import Pipeline
 from metadata.models import who_cannot_access
@@ -309,7 +309,8 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
             'users_allowed',
             'groups_allowed',
             'inputs',
-            'stopped_by'
+            'stopped_by',
+            'runbatch'
         )
         read_only_fields = (
             "purged",
