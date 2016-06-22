@@ -405,6 +405,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         assert self.is_quarantined()
 
         # Look for components that are quarantined.
+        for rs in self.runsteps.filter(_runcomponentstate_id=runcomponentstates.SUCCESSFUL_PK):
+            if rs.RSICs.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK).exists():
+                return
         if self.runsteps.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK).exists():
             return
         elif self.runoutputcables.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK).exists():
@@ -1121,6 +1124,7 @@ class RunComponent(stopwatch.models.Stopwatch):
             self.save()
 
         # Quarantine all ancestor runs.
+        self.parent_run.refresh_from_db()
         if recurse_upward and self.parent_run.is_quarantined():
             self.parent_run.attempt_decontamination(save=save, recurse_upward=True)
 

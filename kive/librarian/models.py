@@ -994,11 +994,23 @@ class Dataset(metadata.models.AccessControl):
 
         icl.stop(save=True, clean=True)
 
+        # for rc in self.used_by_components.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK):
+
         if notify_all:
             if newly_computed_MD5 != self.MD5_checksum:
-                self.quarantine_runcomponents_using_as_output()
+                any_successful_ers = ExecRecord.objects.filter(
+                    execrecordouts__dataset=self,
+                    used_by_components___runcomponentstate_id=runcomponentstates.SUCCESSFUL_PK
+                ).exists()
+                if any_successful_ers:
+                    self.quarantine_runcomponents_using_as_output()
             else:
-                self.attempt_to_decontaminate_runcomponents_using_as_output()
+                any_quarantined_ers = ExecRecord.objects.filter(
+                    execrecordouts__dataset=self,
+                    used_by_components___runcomponentstate_id=runcomponentstates.QUARANTINED_PK
+                ).exists()
+                if any_quarantined_ers:
+                    self.attempt_to_decontaminate_runcomponents_using_as_output()
 
         return icl
 

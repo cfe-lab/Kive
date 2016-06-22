@@ -905,6 +905,7 @@ class Sandbox:
                                         could_be_reused=could_be_reused)
         self.cable_execute_info[(curr_record.parent_run, cable)] = exec_info
         if return_now:
+            curr_record.save()
             return exec_info
 
         # We didn't find a compatible and reusable ExecRecord, so we are committed to executing
