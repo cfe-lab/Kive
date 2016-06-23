@@ -200,17 +200,15 @@ h1
   left: 0
   box-sizing: border-box
   width: 100%
-  padding: 1em 4em
+  padding: .75em 4em
   border-top: 1px solid #888
-  background-color: #fff
+  background-color: #eee
   font-size: 0.9em
-  #name_description td
-    padding-top: 0
-    padding-bottom: 0
-    #id_name
-      margin-bottom: -1px
   #run_controls
     float: right
+    padding-top: .25em
+  #run_pipeline
+    padding-top: 0
 
 #dataset_input_table
   // width: 50em
@@ -234,6 +232,8 @@ h1
         text-indent: 1em
       &:last-child
         padding-right: 0
+      .run-name
+        padding: 1.85em .25em
       padding: 0 1px 1px 0
       vertical-align: middle
       position: relative
@@ -267,3 +267,76 @@ h1
 
 button:focus
   outline: none
+
+
+@media (max-height: 900px) and (min-height: 701px)
+  #above_box
+    h2
+      font-size: 1.1em
+    top: 6em
+    padding-top: 0.5em
+  .dataset-search-dlg
+    .search_form
+      .active_filters .filter 
+        margin-bottom: .2em
+      input[type="text"]
+        margin-bottom: .1em
+      margin-bottom: .2em
+    .search_filters
+      h4
+        margin-bottom: .25em
+      select
+        margin-bottom: .15em
+    .search_results table
+      th, td 
+        padding: .25em
+  #dataset_input_table
+    button
+      padding: .2em .75em
+      font-size: 2em
+    tbody td
+      height: 3.85em
+      .run-name
+        padding: 1.25em .25em
+  .ctrl.remove
+    height: 65px
+    line-height: 32px
+    padding: .85em
+
+@media (max-height: 700px)
+  #above_box
+    h2
+      font-size: 1em
+    top: 5em
+    padding-top: 0.35em
+  .dataset-search-dlg
+    font-size: .9em
+  #dataset_input_table
+    button
+      padding: .15em .5em
+      font-size: 1.5em
+    tbody td
+      height: 2.7em
+      .run-name
+        padding: .7em .25em
+  .ctrl.remove
+    height: 43px
+    line-height: 21px
+    padding: .7em
+
+@media (max-width: 720px)
+  .dataset-search-dlg
+    .search_filters
+      h4
+        margin-bottom: 0.5em
+        display: inline
+        &:after
+          content: ":"
+      select
+        display: inline-block
+        width: calc(33.3% - 2.5em)
+        margin-bottom: 0.25em
+      float: none
+      width: 100%
+    .search_results table
+      width: 100%

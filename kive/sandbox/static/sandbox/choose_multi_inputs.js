@@ -19,24 +19,27 @@ $(function() {
             dataset_search_dialog.find('.active_filters'),
             dataset_search_dialog.find(".navigation_links")
         ),
-        cell_width = 100 / dataset_input_table.find('tr').eq(0).find('td').length + '%'
+        cell_width = 100 / dataset_input_table.find('tr').eq(0).find('td').length + '%',
+        dataset_input_table_top = '40em',
+        above_box_height = '30em'
     ;
 
     dataset_input_table.find('td').css('width', cell_width);
 
     above_box.hide = function() {
         this.animate({
-            height: '50px',
+            'height': '50px',
             'border-color': 'transparent',
             'background-color': 'transparent'
         }).addClass('hidden');
     };
     above_box.show = function(callback) {
+        aboveBoxSpaceAdjustment();
         dataset_input_table.closest('table').animate({
-            top: '40em'
+            'top': dataset_input_table_top
         });
         this.animate({
-            height: '30em',
+            'height': above_box_height,
             'border-color': '#000',
             'background-color': '#eee'
         }, callback).removeClass('hidden');
@@ -68,6 +71,22 @@ $(function() {
     var submitDatasetSearch = function(e) {
         e.preventDefault();
         dataset_search_table.filterSet.addFromForm(this);
+    };
+    var aboveBoxSpaceAdjustment = function() {
+        if (window.innerHeight <= 700) {
+            above_box_height = "18em";
+            dataset_input_table_top = "23.5em";
+        } else if (window.innerHeight <= 900) {
+            above_box_height = "23em";
+            dataset_input_table_top = "30em";
+        } else {
+            above_box_height = "30em";
+            dataset_input_table_top = "40em";
+        }
+        if (!above_box.hasClass('hidden')) {
+            dataset_input_table.closest('table').css('top', dataset_input_table_top);
+            above_box.css('height', above_box_height);
+        }
     };
     var scrollInputSetDatasetButton = function() {
         var cellOffsetX = $('button.receiving').offset().left,
@@ -703,6 +722,8 @@ $(function() {
 
     body                       .click(   deselectAll                                            );
     $(document)               .scroll(   scrollInputSetDatasetButton                            );
+    $(window)                 .resize(   scrollInputSetDatasetButton                            )
+                              .resize(   aboveBoxSpaceAdjustment                                );
     set_dataset.btn            .click(   addSelectedDatasetsToInput                             );
     set_dataset.options_btn    .click(   showFillOptions                                        )
                           .mouseleave(   hideFillOptions                                        );

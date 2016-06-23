@@ -203,17 +203,15 @@ h1 {
   left: 0;
   box-sizing: border-box;
   width: 100%;
-  padding: 1em 4em;
+  padding: 0.75em 4em;
   border-top: 1px solid #888;
-  background-color: #fff;
+  background-color: #eee;
   font-size: 0.9em; }
-  #below_box #name_description td {
-    padding-top: 0;
-    padding-bottom: 0; }
-    #below_box #name_description td #id_name {
-      margin-bottom: -1px; }
   #below_box #run_controls {
-    float: right; }
+    float: right;
+    padding-top: 0.25em; }
+  #below_box #run_pipeline {
+    padding-top: 0; }
 
 #dataset_input_table {
   max-width: 100%;
@@ -240,6 +238,8 @@ h1 {
         text-indent: 0; }
     #dataset_input_table tbody td:last-child {
       padding-right: 0; }
+    #dataset_input_table tbody td .run-name {
+      padding: 1.85em 0.25em; }
   #dataset_input_table tfoot td {
     text-align: right; }
     #dataset_input_table tfoot td label {
@@ -275,5 +275,75 @@ h1 {
 
 button:focus {
   outline: none; }
+
+@media (max-height: 900px) and (min-height: 701px) {
+  #above_box {
+    top: 6em;
+    padding-top: 0.5em; }
+    #above_box h2 {
+      font-size: 1.1em; }
+
+  .dataset-search-dlg .search_form {
+    margin-bottom: 0.2em; }
+    .dataset-search-dlg .search_form .active_filters .filter {
+      margin-bottom: 0.2em; }
+    .dataset-search-dlg .search_form input[type="text"] {
+      margin-bottom: 0.1em; }
+  .dataset-search-dlg .search_filters h4 {
+    margin-bottom: 0.25em; }
+  .dataset-search-dlg .search_filters select {
+    margin-bottom: 0.15em; }
+  .dataset-search-dlg .search_results table th, .dataset-search-dlg .search_results table td {
+    padding: 0.25em; }
+
+  #dataset_input_table button {
+    padding: 0.2em 0.75em;
+    font-size: 2em; }
+  #dataset_input_table tbody td {
+    height: 3.85em; }
+    #dataset_input_table tbody td .run-name {
+      padding: 1.25em 0.25em; }
+
+  .ctrl.remove {
+    height: 65px;
+    line-height: 32px;
+    padding: 0.85em; } }
+@media (max-height: 700px) {
+  #above_box {
+    top: 5em;
+    padding-top: 0.35em; }
+    #above_box h2 {
+      font-size: 1em; }
+
+  .dataset-search-dlg {
+    font-size: 0.9em; }
+
+  #dataset_input_table button {
+    padding: 0.15em 0.5em;
+    font-size: 1.5em; }
+  #dataset_input_table tbody td {
+    height: 2.7em; }
+    #dataset_input_table tbody td .run-name {
+      padding: 0.7em 0.25em; }
+
+  .ctrl.remove {
+    height: 43px;
+    line-height: 21px;
+    padding: 0.7em; } }
+@media (max-width: 720px) {
+  .dataset-search-dlg .search_filters {
+    float: none;
+    width: 100%; }
+    .dataset-search-dlg .search_filters h4 {
+      margin-bottom: 0.5em;
+      display: inline; }
+      .dataset-search-dlg .search_filters h4:after {
+        content: ":"; }
+    .dataset-search-dlg .search_filters select {
+      display: inline-block;
+      width: calc(33.3% - 2.5em);
+      margin-bottom: 0.25em; }
+  .dataset-search-dlg .search_results table {
+    width: 100%; } }
 
 /*# sourceMappingURL=choose_inputs.css.map */
