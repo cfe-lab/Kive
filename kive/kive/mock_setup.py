@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from functools import partial
 from itertools import chain
 from mock import Mock, PropertyMock
 import os
@@ -12,7 +11,7 @@ from django.db.utils import ConnectionHandler, NotSupportedError
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
-get_attribute = OriginalMockSet = MockSet = None  # place holder until it can be imported properly
+from django_mock_queries.query import MockSet
 
 if not apps.ready:
     # Do the Django set up when running as a stand-alone unit test.
@@ -61,7 +60,6 @@ def setup_mock_relations(*models):
                     new_relation = PropertyMock(side_effect=ObjectDoesNotExist)
                 else:
                     new_relation = MockSet(cls=old_relation.field.model)
-                    new_relation.order_by = partial(_order_by, new_relation)
                 setattr(model, name, new_relation)
         model.objects = MockSet(mock_name=model_name + '.objects', cls=model)
         model.save = Mock(name=model_name + '.save')
@@ -130,60 +128,3 @@ def mocked_relations(*models):
                 return target(*args, **kwargs)
         return wrapped
     return decorator
-
-
-# TODO: remove when django_mock_queries is updated
-def _order_by(mock_set, attr):
-    records = mock_set.all()
-    core_attr = attr[1:] if attr.startswith('-') else attr
-    ordered = sorted(records, key=lambda r: get_attribute(r, core_attr))
-    if attr.startswith('-'):
-        ordered = reversed(ordered)
-    return MockSet(*ordered)
-
-
-# TODO: remove when django_mock_queries is updated
-def _exclude(mock_set, *args, **kwargs):
-    matches = mock_set.filter(*args, **kwargs)
-    remainder = [item for item in mock_set.all() if item not in matches]
-    return MockSet(*remainder)
-
-
-# TODO: remove when django_mock_queries is updated
-def _first(mock_set):
-    for item in mock_set.all():
-        return item
-    return None
-
-
-# TODO: remove when django_mock_queries is updated
-def _last(mock_set):
-    last_item = None
-    for item in mock_set.all():
-        last_item = item
-    return last_item
-
-
-# TODO: remove when django_mock_queries is updated
-def _distinct(mock_set):
-    records = set(mock_set.all())
-    return MockSet(*records)
-
-
-def _wrap_mock_set(*args, **kwargs):
-    mock_set = OriginalMockSet(*args, **kwargs)
-    mock_set.order_by = partial(_order_by, mock_set)
-    mock_set.exclude = partial(_exclude, mock_set)
-    mock_set.first = partial(_first, mock_set)
-    mock_set.last = partial(_last, mock_set)
-    mock_set.distinct = partial(_distinct, mock_set)
-    return mock_set
-
-if MockSet is None:
-    # fails if imported before setup
-    if 'django_mock_queries.query' in sys.modules:
-        raise RuntimeError('django_mock_queries.query imported before mock_setup.')
-    from django_mock_queries.query import MockSet as OriginalMockSet
-    from django_mock_queries.utils import get_attribute
-    MockSet = _wrap_mock_set
-    sys.modules['django_mock_queries.query'].MockSet = MockSet
