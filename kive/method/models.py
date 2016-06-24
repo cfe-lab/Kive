@@ -46,15 +46,21 @@ class CodeResource(metadata.models.AccessControl):
                             help_text="The name for this resource and all subsequent revisions.",
                             unique=True)  # to prevent confusion in drop-down menus
 
-    # File names must either be empty, or be 1 or more of any from
-    # {alphanumeric, space, "-._()"}. This will prevent "../" as it
-    # contains a slash. They can't start or end with spaces.
-    filename = models.CharField("Resource file name", max_length=maxlengths.MAX_FILENAME_LENGTH,
-                                help_text="The filename for this resource",
-                                validators=[
-                                    RegexValidator(regex="^(\b|([-_.()\w]+ *)*[-_.()\w]+)$",
-                                                   message="Invalid code resource filename"),
-                                ])
+    # File names must consist of alphanumerics, spaces, or "-._()".
+    # This will prevent "../" as it contains a slash. They can't start or
+    # end with spaces.
+    filename = models.CharField(
+        "Resource file name",
+        max_length=maxlengths.MAX_FILENAME_LENGTH,
+        help_text="The filename for this resource",
+        validators=[
+            RegexValidator(
+                regex="^([-_.()\w]+ *)*[-_.()\w]+$",
+                message='Filename must contain only: alphanumeric characters; spaces; and the characters -._(), '
+                        'and cannot start with a space'
+            )
+        ]
+    )
     description = models.TextField("Resource description", blank=True, max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
 
     class Meta:
