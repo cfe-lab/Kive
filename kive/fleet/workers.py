@@ -417,9 +417,10 @@ class Manager(object):
 
             # Having reached this point, we know that no host was capable of taking on the task.
             # We block and wait for a worker to become ready, so we can try again.
-            mgr_logger.debug("Waiting for host to become ready....")
-            while not self.interface.probe_for_finished_worker():
-                time.sleep(settings.SLEEP_SECONDS)
+            mgr_logger.debug("Looking for a host that has become ready....")
+            if not self.interface.probe_for_finished_worker():
+                raise NoWorkersAvailable("No hosts ready to handle task {}".format(task))
+            # Having reached here, we know something finished.
             lord_rank, result_pk = self.interface.receive_finished()
 
             # Note the task that just finished, and release its workers.
@@ -692,6 +693,11 @@ class Manager(object):
             except WorkerFailedException as e:
                 mgr_logger.error(e.error_msg)
                 return False
+            except NoWorkersAvailable as e:
+                # We restore the task to the queue and go back to the main loop.
+                mgr_logger.info(e.error_msg)
+                self.task_queue.insert(0, curr_task)
+                return True
 
         return True
 
@@ -1130,5 +1136,10 @@ class Worker(object):
 
 
 class WorkerFailedException(Exception):
+    def __init__(self, error_msg):
+        self.error_msg = error_msg
+
+
+class NoWorkersAvailable(Exception):
     def __init__(self, error_msg):
         self.error_msg = error_msg
