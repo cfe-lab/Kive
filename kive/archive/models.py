@@ -324,7 +324,10 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         Stop this run, changing its state appropriately.
         """
-        assert self._runstate_id in [runstates.RUNNING_PK, runstates.CANCELLING_PK, runstates.FAILING_PK]
+        active_state_pks = [runstates.RUNNING_PK,
+                            runstates.CANCELLING_PK,
+                            runstates.FAILING_PK]
+        assert self._runstate_id in active_state_pks, self.get_state_name()
         if self._runstate_id == runstates.RUNNING_PK:
             # Check that there are no quarantined components.  We don't need to
             # recurse down into sub-run, because the cases where a sub-component gets

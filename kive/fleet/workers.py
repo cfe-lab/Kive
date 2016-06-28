@@ -527,8 +527,6 @@ class Manager(object):
                     clean_up_now = True
 
             else:  # run is still processing successfully
-                assert curr_sdbx.run.is_running(), "{} != Running".format(curr_sdbx.run.get_state_name())
-
                 # Was this task a recovery or novel progress?
                 if task_execute_info.is_recovery():
                     mgr_logger.debug(
@@ -566,11 +564,10 @@ class Manager(object):
                     curr_sdbx.advance_pipeline(task_completed=just_finished["task"])
                     curr_sdbx.run.refresh_from_db()
                     if curr_sdbx.run.is_successful():
-                        assert not tasks_currently_running
-                        mgr_logger.info('Run "%s" (pk=%d, Pipeline: %s, User: %s) finished successfully',
-                                        curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
-                        clean_up_now = True  # this is the only "successful" clean up condition
-
+                        clean_up_now = not tasks_currently_running
+                        if clean_up_now and curr_sdbx.run.is_successful():
+                            mgr_logger.info('Run "%s" (pk=%d, Pipeline: %s, User: %s) finished successfully',
+                                            curr_sdbx.run, curr_sdbx.run.pk, curr_sdbx.pipeline, curr_sdbx.user)
                     elif curr_sdbx.run.is_failing() or curr_sdbx.run.is_cancelling():
                         # Something just failed in advance_pipeline.
                         mgr_logger.debug(
@@ -586,8 +583,7 @@ class Manager(object):
 
                         if curr_sdbx not in self.sandboxes_shutting_down:
                             self.mop_up_terminated_sandbox(curr_sdbx)
-                        if not tasks_currently_running:
-                            clean_up_now = True
+                        clean_up_now = not tasks_currently_running
 
         else:
             # The component that just finished failed or was cancelled (e.g. a RunCable fails to
@@ -673,7 +669,8 @@ class Manager(object):
             self.remove_sandbox_from_queues(curr_sdbx)
             # Having reached here, this run should have been properly stopped in the
             # "if stop_subruns_if_possible" block.
-            assert curr_sdbx.run.is_complete(), "{} is not one of the complete states"
+            assert curr_sdbx.run.is_complete(), \
+                curr_sdbx.run.get_state_name() + " is not one of the complete states"
             # curr_sdbx.run.complete_clean()
 
         return workers_freed

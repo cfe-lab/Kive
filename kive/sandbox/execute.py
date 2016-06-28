@@ -803,7 +803,7 @@ class Sandbox:
 
             # FIXME check that this is all the possible conditions coming out of r_o_p_c
 
-        if all_complete:
+        if all_complete and not run_to_resume.is_complete():
             self.logger.debug("Run (coordinates %s) completed.", run_to_resume.get_coordinates())
             with transaction.atomic():
                 run_to_resume.stop(save=True)  # this transitions the state appropriately.
