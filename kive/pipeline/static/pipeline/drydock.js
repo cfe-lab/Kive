@@ -1072,9 +1072,12 @@ var drydock = (function() {
             shapes = this.shapes,
             connectors = this.connectors,
             sel = this.selection,
-            labels = [],
+            step_labels = [],
+            input_labels = [],
+            output_labels = [],
             flat_exec_order = [],
-            i, l, L, textWidth, shape, method;
+            pipeline_inputs = [],
+            i, l, L, textWidth, shape, method, pipeline_input, idx;
         ctx.save();
         this.clear();
         ctx.scale(this.scale, this.scale);
@@ -1100,17 +1103,31 @@ var drydock = (function() {
             shape.draw(ctx);
             L = shape.getLabel();
             
-            // queue label to be drawn after
-            if (this.force_show_exec_order === false ||
-                    !(shape instanceof drydock_objects.MethodNode) ||
-                    this.force_show_exec_order === undefined &&
-                    !this.exec_order_is_ambiguous) {
-                L.label = (L.suffix? L.suffix +' ' : '')+ L.label;
+            // Queue label to be drawn after.
+            if (shape instanceof drydock_objects.CdtNode || shape instanceof drydock_objects.RawNode) {
+                pipeline_inputs.push(shape);
+            } else if (shape instanceof drydock_objects.MethodNode) {
+                if (this.force_show_exec_order === false ||
+                        this.force_show_exec_order === undefined &&
+                        !this.exec_order_is_ambiguous) {
+                    L.label = (L.suffix ? L.suffix + ' ' : '') + L.label;
+                } else {
+                    // Add information about execution order.
+                    L.label = "s" + (flat_exec_order.indexOf(shape) + 1) + L.suffix + ': ' + L.label;
+                }
+                step_labels.push(L);
             } else {
-                // add information about execution order
-                L.label = (flat_exec_order.indexOf(shape) + 1) + L.suffix +': '+ L.label;
+                // This is an OutputNode.
+                L.label = (L.suffix? L.suffix +' ' : '')+ L.label;
+                output_labels.push(L);
             }
-            labels.push(L);
+        }
+
+        pipeline_inputs.sort(Geometry.isometricSort);
+        for (idx = 0; (pipeline_input = pipeline_inputs[idx]); idx++) {
+            L = pipeline_input.getLabel();
+            L.label = "i" + (idx + 1) + L.suffix + ": " + L.label;
+            input_labels.push(L);
         }
 
         // draw all connectors
@@ -1148,13 +1165,14 @@ var drydock = (function() {
             // canvas state changes are computationally expensive.
             ctx.fillStyle = '#fff';
             ctx.globalAlpha = 0.7;
-            for (i = 0; (l = labels[i]); i++) {
+            var all_labels = input_labels.concat(step_labels).concat(output_labels);
+            for (i = 0; (l = all_labels[i]); i++) {
                 textWidth = ctx.measureText(l.label).width;
                 ctx.fillRect(l.x - textWidth/2 - 2, l.y - 11, textWidth + 4, 14);
             }
             ctx.fillStyle = '#000';
             ctx.globalAlpha = 1.0;
-            for (i = 0; (l = labels[i]); i++) {
+            for (i = 0; (l = all_labels[i]); i++) {
                 ctx.fillText(l.label, l.x, l.y);
             }
         }
