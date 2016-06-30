@@ -170,30 +170,18 @@
         <thead>
             <tr>
                 <th>Run Name</th>
-                <th class="scroll-inner">
-                    <table>
-                        <tr>
-                        {% for input in inputs %}
-                            <th>{{ input.dataset_name }}</th>
-                        {% endfor %}
-                        </tr>
-                    </table>
-                </th>
+            {% for input in inputs %}
+                <th>{{ input.dataset_name }}</th>
+            {% endfor %}
             </tr>
         </thead>
 
         <tbody>
             <tr>
                 <td><input type="text" name="run_name[0]" class="run-name"></td>
-                <td class="scroll-inner">
-                    <table>
-                        <tr>
-                        {% for input in inputs %}
-                            <td class="pipeline-input"><button name="input" data-input-name="{{ input.dataset_name }}" data-dataset-idx="{{ input.dataset_idx }}" data-cdt="{{ input.compounddatatype.id }}" class="select_dataset">+</button></td>
-                        {% endfor %}
-                        </tr>
-                    </table>
-                </td>
+            {% for input in inputs %}
+                <td class="pipeline-input"><button name="input" data-input-name="{{ input.dataset_name }}" data-dataset-idx="{{ input.dataset_idx }}" data-cdt="{{ input.compounddatatype.id }}" class="select_dataset">+</button></td>
+            {% endfor %}
             </tr>
         </tbody>
 
