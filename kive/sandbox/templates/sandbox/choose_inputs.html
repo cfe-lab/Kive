@@ -29,8 +29,6 @@
 
     <div id="errors" class="errortext">{{ input_error_msg }}</div>
 
-    <h4 id="pipeline_name">{{ pipeline }}</h4>
-
     <div id="above_box" class="hidden">
 
     <div class="dataset-search-dlg">
@@ -114,7 +112,7 @@
             <label>Add or remove rows:</label>
             <input type="button" class="add_run left-button" value="+"/><input type="button" class="remove_run right-button" value="&minus;"/>
         </div>
-        
+
         <form action="run_pipeline" id="run_pipeline" method="post">
 
             {{ run_submission_form.name.label }}
@@ -165,26 +163,41 @@
 
 </div>
 
-<table id="dataset_input_table">
+<div id="scroll_content">
+    <h4 id="pipeline_name">{{ pipeline }}</h4>
+    <table id="dataset_input_table">
 
-    <thead>
-        <tr>
-            <th>Run Name</th>
-        {% for input in inputs %}
-            <th>{{ input.dataset_name }}</th>
-        {% endfor %}
-        </tr>
-    </thead>
+        <thead>
+            <tr>
+                <th>Run Name</th>
+                <th class="scroll-inner">
+                    <table>
+                        <tr>
+                        {% for input in inputs %}
+                            <th>{{ input.dataset_name }}</th>
+                        {% endfor %}
+                        </tr>
+                    </table>
+                </th>
+            </tr>
+        </thead>
 
-    <tbody>
-        <tr>
-            <td><input type="text" name="run_name[0]" class="run-name"></td>
-        {% for input in inputs %}
-            <td class="pipeline-input"><button name="input" data-input-name="{{ input.dataset_name }}" data-dataset-idx="{{ input.dataset_idx }}" data-cdt="{{ input.compounddatatype.id }}" class="select_dataset">+</button></td>
-        {% endfor %}
-        </tr>
-    </tbody>
+        <tbody>
+            <tr>
+                <td><input type="text" name="run_name[0]" class="run-name"></td>
+                <td class="scroll-inner">
+                    <table>
+                        <tr>
+                        {% for input in inputs %}
+                            <td class="pipeline-input"><button name="input" data-input-name="{{ input.dataset_name }}" data-dataset-idx="{{ input.dataset_idx }}" data-cdt="{{ input.compounddatatype.id }}" class="select_dataset">+</button></td>
+                        {% endfor %}
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </tbody>
 
-</table>
+    </table>
+</div>
 
 {% endblock %}

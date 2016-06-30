@@ -29,28 +29,39 @@ h1
   width: 100%
   box-sizing: border-box
   top: 0
-#inner_wrap
-  margin-top: 7.2em
+html #inner_wrap
+  margin:
+    top: 7.2em
+    left: 0
 
 #fixed_overlay
   position: fixed
   z-index: 1
   top: 7.2em
+  a[rel="prev"]
+    margin-left: 0
+  @at-root html #auth_info 
+    position: fixed
+    right: 0
+    margin-right: 0
+
+#scroll_content
+  > h4
+    padding-left: 1em
 
 #above_box
   h2
     margin-top: 0
   position: fixed
-  top: 8em
-  left: 4em
-  border: 1px solid white
+  top: 2.7em
   padding:
-    top: 1em
-    left: 1em
+    top: 2em
+    left: 2em
     right: 0
     bottom: 0
-  width: calc(100% - 8em)
+  width: 100%
   height: 50px
+  border-bottom: 1px solid transparent
 
 =green-button
   &:focus
@@ -176,7 +187,8 @@ h1
   cursor: pointer
   &.close
     float: right
-    margin-right: 1em
+    margin-right: 3em
+    margin-top: 1em
   &.select-all
     float: right
     font-size: 0.8em
@@ -210,14 +222,17 @@ h1
   #run_pipeline
     padding-top: 0
 
+#scroll_content
+  position: absolute
+  top: 25%
+  padding:
+    right: 30em
+    bottom: 5em
+
 #dataset_input_table
-  // width: 50em
   max-width: 100%
   max-height: 20em
   overflow: auto
-  position: absolute
-  top: 15em
-  border-right: 160em solid transparent
   thead th
     text-align: center
     border-bottom: 1px solid black
@@ -269,12 +284,11 @@ button:focus
   outline: none
 
 
-@media (max-height: 900px) and (min-height: 701px)
+@media (max-height: 1000px) and (min-height: 701px)
   #above_box
     h2
       font-size: 1.1em
-    top: 6em
-    padding-top: 0.5em
+    padding-top: 1.5em
   .dataset-search-dlg
     .search_form
       .active_filters .filter 
@@ -307,8 +321,7 @@ button:focus
   #above_box
     h2
       font-size: 1em
-    top: 5em
-    padding-top: 0.35em
+    padding-top: 1.35em
   .dataset-search-dlg
     font-size: .9em
   #dataset_input_table

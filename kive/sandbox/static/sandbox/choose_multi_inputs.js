@@ -20,13 +20,17 @@ $(function() {
             dataset_search_dialog.find(".navigation_links")
         ),
         cell_width = 100 / dataset_input_table.find('tr').eq(0).find('td').length + '%',
-        dataset_input_table_top = '40em',
+        dataset_input_table_top,
+        scroll_content_top = $('#scroll_content').css('top'),
         above_box_height = '30em'
     ;
 
     dataset_input_table.find('td').css('width', cell_width);
 
     above_box.hide = function() {
+        dataset_input_table.closest('#scroll_content').animate({
+            'top': scroll_content_top
+        });
         this.animate({
             'height': '50px',
             'border-color': 'transparent',
@@ -35,7 +39,7 @@ $(function() {
     };
     above_box.show = function(callback) {
         aboveBoxSpaceAdjustment();
-        dataset_input_table.closest('table').animate({
+        dataset_input_table.closest('#scroll_content').animate({
             'top': dataset_input_table_top
         });
         this.animate({
@@ -75,16 +79,16 @@ $(function() {
     var aboveBoxSpaceAdjustment = function() {
         if (window.innerHeight <= 700) {
             above_box_height = "18em";
-            dataset_input_table_top = "23.5em";
-        } else if (window.innerHeight <= 900) {
+            dataset_input_table_top = "18em";
+        } else if (window.innerHeight <= 1000) {
             above_box_height = "23em";
-            dataset_input_table_top = "30em";
+            dataset_input_table_top = "23.3em";
         } else {
             above_box_height = "30em";
-            dataset_input_table_top = "40em";
+            dataset_input_table_top = "31em";
         }
         if (!above_box.hasClass('hidden')) {
-            dataset_input_table.closest('table').css('top', dataset_input_table_top);
+            dataset_input_table.closest('#scroll_content').css('top', dataset_input_table_top);
             above_box.css('height', above_box_height);
         }
     };
