@@ -1185,7 +1185,7 @@
             it('should draw', function() {
                 this.expectedInput.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
-                        {x: 30, y: 19.5, text: "in", style: "node", dir: 0});
+                        {x: 30, y: 19.5, text: "i1: in", style: "node", dir: 0});
                 
                 this.state.draw(this.ctx);
             });
@@ -1194,7 +1194,7 @@
                 this.expectedCanvas.ctx.scale(0.5, 0.5);
                 this.expectedInput.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
-                        {x: 30, y: 19.5, text: "in", style: "node", dir: 0});
+                        {x: 30, y: 19.5, text: "i1: in", style: "node", dir: 0});
                 
                 this.state.setScale(0.5);
                 this.state.draw(this.ctx);
@@ -1204,7 +1204,7 @@
                 this.expectedCanvas.ctx.scale(0.5, 0.5);
                 this.expectedInput.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
-                        {x: 30, y: 19.5, text: "in", style: "node", dir: 0});
+                        {x: 30, y: 19.5, text: "i1: in", style: "node", dir: 0});
                 
                 this.state.setScale(0.2);
                 this.state.draw(this.ctx);
@@ -1220,7 +1220,7 @@
                 this.expectedCanvas.ctx.lineWidth = 4;
                 this.expectedInput.highlight(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
-                        {x: 40, y: 19.5, text: "in", style: "node", dir: 0});
+                        {x: 40, y: 19.5, text: "i1: in", style: "node", dir: 0});
                 
                 this.state.doDown({pageX: 30, pageY: 50});
                 this.state.doMove({pageX: 40, pageY: 50});
@@ -1231,7 +1231,7 @@
                 beforeEach(function() {
                     this.methodId = 27;
                     this.methodFamilyId = 13;
-                    this.methodInputs = [{dataset_idx: 1, dataset_name: "in", structure: null}];
+                    this.methodInputs = [{dataset_idx: 1, dataset_name: "i1: in", structure: null}];
                     this.methodOutputs = [{dataset_idx: 1, dataset_name: "out", structure: {compounddatatype: 17}}];
 
                     this.expectedMethod = new drydock_objects.MethodNode(
@@ -1268,7 +1268,7 @@
                 function drawStartingPipeline(testCase) {
                     testCase.expectedInput.draw(testCase.expectedCanvas.ctx);
                     testCase.expectedCanvas.drawText(
-                            {x: 30, y: 19.5, text: "in", style: "node", dir: 0});
+                            {x: 30, y: 19.5, text: "i1: in", style: "node", dir: 0});
                     testCase.expectedMethod.draw(testCase.expectedCanvas.ctx);
                     testCase.expectedCanvas.drawText(
                             {x: 111.25, y: 14.5, text: "example", style: "node", dir: 0});
@@ -1369,7 +1369,7 @@
                     this.expectedInput.y += 50;
                     this.expectedInput.draw(this.expectedCanvas.ctx);
                     this.expectedCanvas.drawText(
-                            {x: 30, y: 69.5, text: "in", style: "node", dir: 0});
+                            {x: 30, y: 69.5, text: "i1: in", style: "node", dir: 0});
                     this.expectedMethod.draw(this.expectedCanvas.ctx);
                     this.expectedCanvas.drawText(
                             {x: 111.25, y: 14.5, text: "example", style: "node", dir: 0});
@@ -1389,7 +1389,7 @@
                     this.expectedInput.y += 110;
                     this.expectedInput.draw(this.expectedCanvas.ctx);
                     this.expectedCanvas.drawText(
-                            {x: 30, y: 129.5, text: "in", style: "node", dir: 0});
+                            {x: 30, y: 129.5, text: "i1: in", style: "node", dir: 0});
                     this.expectedMethod.draw(this.expectedCanvas.ctx);
                     this.expectedCanvas.drawText(
                             {x: 111.25, y: 14.5, text: "example", style: "node", dir: 0});
@@ -1410,7 +1410,7 @@
                     this.expectedMethod.y += 50;
                     this.expectedInput.draw(this.expectedCanvas.ctx);
                     this.expectedCanvas.drawText(
-                            {x: 30, y: 69.5, text: "in", style: "node", dir: 0});
+                            {x: 30, y: 69.5, text: "i1: in", style: "node", dir: 0});
                     this.expectedMethod.draw(this.expectedCanvas.ctx);
                     this.expectedCanvas.drawText(
                             {x: 111.25, y: 64.5, text: "example", style: "node", dir: 0});
@@ -1443,7 +1443,7 @@
                     this.expectedMethod.y += 50;
                     this.expectedInput.draw(this.expectedCanvas.ctx);
                     this.expectedCanvas.drawText(
-                            {x: 30, y: 69.5, text: "in", style: "node", dir: 0});
+                            {x: 30, y: 69.5, text: "i1: in", style: "node", dir: 0});
                     this.expectedMethod.draw(this.expectedCanvas.ctx);
                     this.expectedCanvas.drawText(
                             {x: 111.25, y: 64.5, text: "example", style: "node", dir: 0});
@@ -1485,7 +1485,7 @@
                     this.expectedMethod.y += 50;
                     this.expectedInput.draw(this.expectedCanvas.ctx);
                     this.expectedCanvas.drawText(
-                            {x: 30, y: 69.5, text: "in", style: "node", dir: 0});
+                            {x: 30, y: 69.5, text: "i1: in", style: "node", dir: 0});
                     this.expectedMethod.draw(this.expectedCanvas.ctx);
                     this.expectedCanvas.drawText(
                             {x: 111.25, y: 64.5, text: "example", style: "node", dir: 0});
@@ -1713,7 +1713,7 @@
                     
                     this.expectedInput.draw(this.expectedCanvas.ctx);
                     this.expectedCanvas.drawText(
-                            {x: 45, y: 97, text: "in", style: "node", dir: 0});
+                            {x: 45, y: 97, text: "i1: in", style: "node", dir: 0});
                     this.expectedMethod.draw(this.expectedCanvas.ctx);
                     this.actualInput.x = 100;
                     this.actualInput.y = 310;
@@ -1741,9 +1741,9 @@
                     this.expectedMethod.x = 100+8.8388;
                     this.expectedMethod.y = 50-8.8388;
                     this.expectedInput.draw(this.expectedCanvas.ctx);
-                    this.expectedCanvas.drawText(
-                            {x: 75.555, y: 43.945, text: "in", style: "node", dir: 0});
                     this.expectedMethod.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText(
+                            {x: 75.555, y: 43.945, text: "i1: in", style: "node", dir: 0});
                     this.expectedCanvas.drawText(
                             {x: 120.089, y: 5.661, text: "example", style: "node", dir: 0});
                     

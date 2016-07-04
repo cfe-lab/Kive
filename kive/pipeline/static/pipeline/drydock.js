@@ -939,7 +939,6 @@ var drydock = (function() {
     
         // esoteric syntax: label before a loop allows "continue" and "break" to specify which loop they are continuing or breaking.
         // check number of methods in the phases array
-        // sanity check... don't let this algorithm run away
         fill_phases_ar: while (methods.length > totalLength(phases) && L < 200) {
             phase = [];
             
@@ -995,6 +994,7 @@ var drydock = (function() {
             L++;
         }
         
+        // sanity check... don't let this algorithm run away
         if (L >= 200) {
             console.log('DEBUG: Runaway topological sort algorithm');
             phases = false;
@@ -1046,6 +1046,20 @@ var drydock = (function() {
         return steps;
     };
     
+    my.CanvasState.prototype.getXputs = function() {
+        var inputs = [],
+            outputs = [];
+        for (var i=0, shape; (shape = this.shapes[i]); i++) {
+            if (shape instanceof drydock_objects.CdtNode || shape instanceof drydock_objects.RawNode) {
+                inputs.push(shape);
+            } else if (shape instanceof drydock_objects.OutputNode) {
+                outputs.push(shape);
+            }
+        }
+        inputs.sort(Geometry.isometricSort);// Outputs are not ordered.
+        return { inputs: inputs, outputs: outputs };
+    };
+    
     my.CanvasState.prototype.clear = function() {
         // wipe canvas content clean before redrawing
         this.ctx.clearRect(0, 0, this.width / this.scale, this.height / this.scale);
@@ -1072,20 +1086,11 @@ var drydock = (function() {
             shapes = this.shapes,
             connectors = this.connectors,
             sel = this.selection,
-            step_labels = [],
-            input_labels = [],
-            output_labels = [],
-            flat_exec_order = [],
-            pipeline_inputs = [],
-            i, l, L, textWidth, shape, method, pipeline_input, idx;
+            labels = [],
+            i, l, textWidth, shape, method, idx;
         ctx.save();
         this.clear();
         ctx.scale(this.scale, this.scale);
-
-        for( i = 0; i < this.exec_order.length; i++) {
-            //"flatten" 2d array into 1d by concatenation.
-            flat_exec_order = flat_exec_order.concat(this.exec_order[i]);
-        }
         
         var draggingFromMethodOut = (
                 this.dragging &&
@@ -1101,33 +1106,6 @@ var drydock = (function() {
         // draw all shapes and magnets
         for (i = 0; (shape = shapes[i]); i++) {
             shape.draw(ctx);
-            L = shape.getLabel();
-            
-            // Queue label to be drawn after.
-            if (shape instanceof drydock_objects.CdtNode || shape instanceof drydock_objects.RawNode) {
-                pipeline_inputs.push(shape);
-            } else if (shape instanceof drydock_objects.MethodNode) {
-                if (this.force_show_exec_order === false ||
-                        this.force_show_exec_order === undefined &&
-                        !this.exec_order_is_ambiguous) {
-                    L.label = (L.suffix ? L.suffix + ' ' : '') + L.label;
-                } else {
-                    // Add information about execution order.
-                    L.label = "s" + (flat_exec_order.indexOf(shape) + 1) + L.suffix + ': ' + L.label;
-                }
-                step_labels.push(L);
-            } else {
-                // This is an OutputNode.
-                L.label = (L.suffix? L.suffix +' ' : '')+ L.label;
-                output_labels.push(L);
-            }
-        }
-
-        pipeline_inputs.sort(Geometry.isometricSort);
-        for (idx = 0; (pipeline_input = pipeline_inputs[idx]); idx++) {
-            L = pipeline_input.getLabel();
-            L.label = "i" + (idx + 1) + L.suffix + ": " + L.label;
-            input_labels.push(L);
         }
 
         // draw all connectors
@@ -1137,8 +1115,8 @@ var drydock = (function() {
         }
         ctx.globalAlpha = 1.0;
 
+        // draw selection ring
         if (sel.length > 0) {
-            // draw selection ring
             ctx.strokeStyle = this.selectionColor;
             ctx.lineWidth = this.selectionWidth * 2;
             ctx.font = '9pt Lato, sans-serif';
@@ -1149,13 +1127,16 @@ var drydock = (function() {
             }
         }
         
+        // draw all update signals above shapes and connectors
         for (i = 0; (method = this.methods[i]); i++) {
-            // draw all update signals above shapes and connectors
             if (method.update_signal) {
                 method.update_signal.draw(ctx);
             }
         }
+
         if (this.enable_labels) {
+            labels = this.generateLabels();
+
             // draw all labels
             ctx.textAlign = 'center';
             ctx.textBaseline = 'alphabetic';
@@ -1165,14 +1146,13 @@ var drydock = (function() {
             // canvas state changes are computationally expensive.
             ctx.fillStyle = '#fff';
             ctx.globalAlpha = 0.7;
-            var all_labels = input_labels.concat(step_labels).concat(output_labels);
-            for (i = 0; (l = all_labels[i]); i++) {
+            for (i = 0; (l = labels[i]); i++) {
                 textWidth = ctx.measureText(l.label).width;
                 ctx.fillRect(l.x - textWidth/2 - 2, l.y - 11, textWidth + 4, 14);
             }
             ctx.fillStyle = '#000';
             ctx.globalAlpha = 1.0;
-            for (i = 0; (l = all_labels[i]); i++) {
+            for (i = 0; (l = labels[i]); i++) {
                 ctx.fillText(l.label, l.x, l.y);
             }
         }
@@ -1185,6 +1165,54 @@ var drydock = (function() {
         ctx.restore();
         this.valid = true;
     };
+
+    my.CanvasState.prototype.generateLabels = (function() {
+        // format for each type of node's label
+        // (properties must match pipeline's properties)
+        var labelFns = {
+            inputs: function(l, _i) {
+                return "i" + (_i + 1) + l.suffix + ": " + l.label;
+            },
+            _steps: function(l, _i) {
+                return "s" + (_i + 1) + l.suffix + ': ' + l.label;
+            },
+            outputs: function(l) {
+                return (l.suffix ? l.suffix + ' ' : '') + l.label;
+            }
+        }
+
+        return function() {
+            var pipeline_xputs = this.getXputs(),
+                current_pipeline = {
+                    steps: this.methods,
+                    inputs: pipeline_xputs.inputs,
+                    outputs: pipeline_xputs.outputs
+                },
+                labels = [],
+                node, L, i
+            ;
+
+            // check if method node order is not needed
+            if (this.force_show_exec_order === false ||
+                    this.force_show_exec_order === undefined &&
+                    !this.exec_order_is_ambiguous) {
+                labelFns.steps = labelFns.outputs;// treatment is identical to outputs (unordered)
+            } else {
+                labelFns.steps = labelFns._steps;
+            }
+
+            // prepare all labels
+            for (var nodeType in current_pipeline) if (current_pipeline.hasOwnProperty(nodeType)) {
+                for (i = 0; (node = current_pipeline[nodeType][i]); i++) {
+                    L = node.getLabel();
+                    L.label = labelFns[nodeType](L, i);
+                    labels.push(L);
+                }
+            }
+
+            return labels;
+        };
+    })();
     
     my.CanvasState.prototype.getPos = function(e) {
         // returns an object with x, y coordinates defined
