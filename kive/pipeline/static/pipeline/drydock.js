@@ -1179,7 +1179,7 @@ var drydock = (function() {
             outputs: function(l) {
                 return (l.suffix ? l.suffix + ' ' : '') + l.label;
             }
-        }
+        };
 
         return function() {
             var pipeline_xputs = this.getXputs(),
