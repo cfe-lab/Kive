@@ -25,12 +25,14 @@ html #inner_wrap {
 
 #above_box {
   position: fixed;
+  z-index: 3;
   top: 2.7em;
   padding-top: 2em;
   padding-left: 2em;
   padding-right: 0;
   padding-bottom: 0;
   width: 100%;
+  box-sizing: border-box;
   height: 50px;
   border-bottom: 1px solid transparent; }
   #above_box h2 {
@@ -188,7 +190,7 @@ html #inner_wrap {
   cursor: pointer; }
   .ctrl.close {
     float: right;
-    margin-right: 3em;
+    margin-right: 1em;
     margin-top: 1em; }
   .ctrl.select-all {
     float: right;
@@ -229,62 +231,64 @@ html #inner_wrap {
   padding-right: 30em;
   padding-bottom: 5em; }
 
-#dataset_input_table {
-  max-width: 100%;
-  max-height: 20em;
-  overflow: auto; }
-  #dataset_input_table thead th {
-    text-align: center;
-    border-bottom: 1px solid black; }
-  #dataset_input_table tbody td {
-    padding: 0 1px 1px 0;
-    vertical-align: middle;
-    position: relative;
-    height: 5em;
-    min-width: 8em; }
-    #dataset_input_table tbody td.selected {
-      background-color: #238;
-      color: #fff; }
-    #dataset_input_table tbody td.input-dataset {
-      text-indent: 1em; }
-      #dataset_input_table tbody td.input-dataset * {
-        text-indent: 0; }
-    #dataset_input_table tbody td:last-child {
-      padding-right: 0; }
-    #dataset_input_table tbody td .run-name {
-      padding: 1.85em 0.25em; }
-  #dataset_input_table tfoot td {
-    text-align: right; }
-    #dataset_input_table tfoot td label {
-      font-size: 0.8em;
-      font-style: italic; }
-    #dataset_input_table tfoot td green-button {
-      width: 100%;
-      font-size: 1.5em;
-      box-sizing: border-box;
-      margin-bottom: 1px; }
-    #dataset_input_table tfoot td .error {
-      color: #f00;
-      font-style: italic;
-      font-size: 0.8em;
-      float: left; }
-  #dataset_input_table button {
-    background-color: #22b24c;
-    color: white;
-    font-weight: bold;
-    border: 0;
-    margin-bottom: -1px;
-    padding: 0.25em 1em;
+#dataset_input_table thead th {
+  text-align: center;
+  border-bottom: 1px solid black; }
+#dataset_input_table tbody td {
+  padding: 0 1px 1px 0;
+  vertical-align: middle;
+  position: relative;
+  height: 5em;
+  min-width: 7.5em; }
+  #dataset_input_table tbody td.selected {
+    background-color: #238;
+    color: #fff; }
+  #dataset_input_table tbody td.input-dataset {
+    text-indent: 1em; }
+    #dataset_input_table tbody td.input-dataset * {
+      text-indent: 0; }
+  #dataset_input_table tbody td:last-child {
+    padding-right: 0; }
+  #dataset_input_table tbody td .run-name {
+    padding: 1.85em 0.25em 1.85em 1em; }
+#dataset_input_table tfoot td {
+  text-align: right; }
+  #dataset_input_table tfoot td label {
+    font-size: 0.8em;
+    font-style: italic; }
+  #dataset_input_table tfoot td green-button {
     width: 100%;
-    font-size: 2.5em;
-    line-height: 1.5em; }
-    #dataset_input_table button:focus {
-      outline: none;
-      cursor: pointer; }
-  #dataset_input_table .inactive button {
-    background-color: #666; }
-    #dataset_input_table .inactive button.receiving {
-      background-color: #aaa; }
+    font-size: 1.5em;
+    box-sizing: border-box;
+    margin-bottom: 1px; }
+  #dataset_input_table tfoot td .error {
+    color: #f00;
+    font-style: italic;
+    font-size: 0.8em;
+    float: left; }
+#dataset_input_table button {
+  background-color: #22b24c;
+  color: white;
+  font-weight: bold;
+  border: 0;
+  margin-bottom: -1px;
+  padding: 0.25em 1em;
+  width: 100%;
+  font-size: 2.5em;
+  line-height: 1.5em; }
+  #dataset_input_table button:focus {
+    outline: none;
+    cursor: pointer; }
+#dataset_input_table .inactive button {
+  background-color: #666; }
+  #dataset_input_table .inactive button.receiving {
+    background-color: #aaa; }
+.fixed-header {
+  display: none;
+  position: fixed;
+  overflow: hidden;
+  z-index: 2;
+  background-color: #fff; }
 
 button:focus {
   outline: none; }

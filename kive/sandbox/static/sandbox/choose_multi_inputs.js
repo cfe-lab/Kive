@@ -4,6 +4,7 @@ $(function() {
     var is_user_admin = false, // Never show admin tools on this page
         body = $('body'),
         dataset_input_table = $('#dataset_input_table tbody'),
+        dataset_input_table_fixed_header,
         dataset_search_dialog = $('.dataset-search-dlg'),
         set_dataset = {
             wrapper: $('#insert_dataset'),
@@ -22,7 +23,8 @@ $(function() {
         cell_width = 100 / dataset_input_table.find('tr').eq(0).find('td').length + '%',
         dataset_input_table_top,
         scroll_content_top = $('#scroll_content').css('top'),
-        above_box_height = '30em'
+        above_box_height = '32em',
+        pipeline_pk = $("#id_pipeline").val()
     ;
 
     dataset_input_table.find('td').css('width', cell_width);
@@ -30,6 +32,8 @@ $(function() {
     above_box.hide = function() {
         dataset_input_table.closest('#scroll_content').animate({
             'top': scroll_content_top
+        }, function() {
+            dataset_input_table_fixed_header.css('top', $('h1').outerHeight());
         });
         this.animate({
             'height': '50px',
@@ -41,6 +45,8 @@ $(function() {
         aboveBoxSpaceAdjustment();
         dataset_input_table.closest('#scroll_content').animate({
             'top': dataset_input_table_top
+        }, function() {
+            dataset_input_table_fixed_header.css('top', Math.floor(above_box.position().top + above_box.outerHeight()));
         });
         this.animate({
             'height': above_box_height,
@@ -78,18 +84,35 @@ $(function() {
     };
     var aboveBoxSpaceAdjustment = function() {
         if (window.innerHeight <= 700) {
-            above_box_height = "18em";
+            above_box_height = "20em";
             dataset_input_table_top = "18em";
         } else if (window.innerHeight <= 1000) {
-            above_box_height = "23em";
+            above_box_height = "25em";
             dataset_input_table_top = "23.3em";
         } else {
-            above_box_height = "30em";
+            above_box_height = "32em";
             dataset_input_table_top = "31em";
         }
         if (!above_box.hasClass('hidden')) {
             dataset_input_table.closest('#scroll_content').css('top', dataset_input_table_top);
             above_box.css('height', above_box_height);
+        }
+    };
+    var scrollTableHeader = function(e) {
+        var header_is_visible = dataset_input_table_fixed_header.is(':visible'),
+            header_top = 4;
+
+        if (above_box.hasClass('hidden')) {
+            header_top = dataset_input_table.closest('table').offset().top - $('h1').outerHeight();
+        }
+
+        if ($(this).scrollTop() > header_top) {
+            if (!header_is_visible) {
+                dataset_input_table_fixed_header.show();
+            }
+            dataset_input_table_fixed_header.css('left', -$(this).scrollLeft());
+        } else if (header_is_visible) {
+            dataset_input_table_fixed_header.hide();
         }
     };
     var scrollInputSetDatasetButton = function() {
@@ -473,30 +496,50 @@ $(function() {
         };
     })();
     var mainSubmitHandler = function(e) {
-        var hidden_inputs = [];
+        var serialized_data = serialize(e);
+
+        if (!e.defaultPrevented) {
+            $(this).find('input').remove();
+            $(this).append(uiFactory.hiddenInput(
+                'runbatch',
+                JSON.stringify(serialized_data)
+            ));
+        }
+
+        /**
+         * @debug
+         */
+        console.log(serialized_data);
+        console.log(hidden_inputs);
+        e.preventDefault();
+        /***/
+    };
+    var serialize = function(e) {
+        var runs = [];
         dataset_input_table.find('tr').each(function(run_index) {
+            var run = runs[run_index] = {
+                pipeline: pipeline_pk,
+                description: '',
+                users_allowed: [],
+                groups_allowed: [],
+                runbatch: '',
+                inputs: []
+            };
             var row = $(this);
             if (row.find('button').length === 0) {
+                run.name = row.find('.run-name').val();
                 row.find('.input-dataset').each(function() {
-                    var cell = $(this),
-                        dataset_id = cell.data('id'),
-                        input_index = cell.data('dataset-idx');
-
-                    hidden_inputs.push(
-                        uiFactory.hiddenInput(
-                            'input_'+ input_index +'['+ run_index +']',
-                            dataset_id
-                        )
-                    );
+                    var cell = $(this);
+                    run.inputs.push({
+                        index: cell.data('dataset-idx'),
+                        dataset: cell.data('id')
+                    });
                 });
             } else {
                 e.preventDefault();
             }
         });
-
-        if (!e.defaultPrevented) {
-            $(this).append(hidden_inputs);
-        }
+        return { name: $('#id_name').val(), runs: runs };
     };
     var focusSearchField = function(e) {
         // prevent this event from bubbling
@@ -727,7 +770,8 @@ $(function() {
     body                       .click(   deselectAll                                            );
     $(document)               .scroll(   scrollInputSetDatasetButton                            );
     $(window)                 .resize(   scrollInputSetDatasetButton                            )
-                              .resize(   aboveBoxSpaceAdjustment                                );
+                              .resize(   aboveBoxSpaceAdjustment                                )
+                              .scroll(   scrollTableHeader                                      );
     set_dataset.btn            .click(   addSelectedDatasetsToInput                             );
     set_dataset.options_btn    .click(   showFillOptions                                        )
                           .mouseleave(   hideFillOptions                                        );
@@ -763,4 +807,21 @@ $(function() {
         setTimeout(function() { $('.fulltext').fadeOut(300); }, 5000);
     });
     
+
+    (function initFixedTableHeader() {
+        var in_tb = dataset_input_table.closest('table'),
+            header_row = in_tb.find('thead tr'),
+            clone_table = in_tb.clone().wrap('<div>').parent().addClass('fixed-header');
+
+        dataset_input_table_fixed_header = clone_table.css({
+            height: header_row.outerHeight() + 1,
+            top: $('h1').outerHeight(),
+            left: in_tb.offset().left,
+            width: in_tb.outerWidth()
+        }).insertBefore(in_tb);
+
+        if ($(document).scrollTop() > 0) {
+            dataset_input_table_fixed_header.show();
+        }
+    })();
 });

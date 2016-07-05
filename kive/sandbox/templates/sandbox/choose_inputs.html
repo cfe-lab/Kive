@@ -120,36 +120,6 @@
             {{ run_submission_form.name }}
             <div class="errortext">{{ run_submission_form.name.errors }}</div>
 
-            <div style="display:none">
-            <!--<div id="name_description">
-            <table>
-                <tr>
-                    <td>{{ run_submission_form.name.label }}</td>
-                    <td>
-                        {{ run_submission_form.name }}
-                        <div class="helptext">{{ run_submission_form.name.help_text }}</div>
-                        <div class="errortext">{{ run_submission_form.name.errors }}</div>
-                    </td>
-                </tr>
-                <tr>
-                    <td>{{ run_submission_form.description.label }}</td>
-                    <td>
-                        {{ run_submission_form.description }}
-                        <div class="helptext">{{ run_submission_form.description.help_text }}</div>
-                        <div class="errortext">{{ run_submission_form.description.errors }}</div>
-                    </td>
-                </tr>
-            </table>
-            </div>
-
-            <p>{{ run_submission_form.permissions.label }}:
-                <span class="helptext">{{ run_submission_form.permissions.help_text }}</span>
-            {{ run_submission_form.permissions }}
-                <div class="errortext">{{ run_submission_form.permissions.errors }}</div>
-            </p>
-            -->
-            </div>
-
             {{ run_submission_form.pipeline }}
                 <div class="errortext">{{ run_submission_form.pipeline.errors }}</div>
                 <div class="errortext">{{ run_submission_form.non_field_errors }}</div>
