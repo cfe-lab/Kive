@@ -53,7 +53,7 @@ class KiveRouter(routers.DefaultRouter):
                             kwargs=kwargs,
                             request=request,
                             format=kwargs.get('format', None)
-                        )
+                        ) + '?page_size=25'
                     except NoReverseMatch:
                         # Don't bail out if eg. no list routes exist, only detail routes.
                         continue

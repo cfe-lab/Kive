@@ -955,7 +955,7 @@ class Dataset(metadata.models.AccessControl):
         ccl.stop(save=True, clean=True)
         return ccl
 
-    def check_integrity(self, new_file_path, checking_user, execlog=None, runsic=None,
+    def check_integrity(self, new_file_path, checking_user, execlog=None, runcomponent=None,
                         newly_computed_MD5=None, notify_all=True):
         """
         Checks integrity of SD against the md5 provided (newly_computed_MD5),
@@ -973,7 +973,7 @@ class Dataset(metadata.models.AccessControl):
         # end time of an integrity check?  Is the check just the comparison
         # of the MD5s or is it the time that you finish computing the MD5 or
         # is it the time that you start computing the MD5?
-        icl = self.integrity_checks.create(execlog=execlog, runsic=runsic, user=checking_user)
+        icl = self.integrity_checks.create(execlog=execlog, runcomponent=runcomponent, user=checking_user)
         icl.start(save=True)
 
         if newly_computed_MD5 is None:
@@ -994,11 +994,23 @@ class Dataset(metadata.models.AccessControl):
 
         icl.stop(save=True, clean=True)
 
+        # for rc in self.used_by_components.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK):
+
         if notify_all:
             if newly_computed_MD5 != self.MD5_checksum:
-                self.quarantine_runcomponents_using_as_output()
+                any_successful_ers = ExecRecord.objects.filter(
+                    execrecordouts__dataset=self,
+                    used_by_components___runcomponentstate_id=runcomponentstates.SUCCESSFUL_PK
+                ).exists()
+                if any_successful_ers:
+                    self.quarantine_runcomponents_using_as_output()
             else:
-                self.attempt_to_decontaminate_runcomponents_using_as_output()
+                any_quarantined_ers = ExecRecord.objects.filter(
+                    execrecordouts__dataset=self,
+                    used_by_components___runcomponentstate_id=runcomponentstates.QUARANTINED_PK
+                ).exists()
+                if any_quarantined_ers:
+                    self.attempt_to_decontaminate_runcomponents_using_as_output()
 
         return icl
 
@@ -1018,6 +1030,45 @@ class Dataset(metadata.models.AccessControl):
         for er in ExecRecord.objects.filter(execrecordouts__dataset=self):
             er.attempt_decontamination(self)
 
+    def initially_OK(self):
+        """
+        Check that the Dataset was, at some point, okay.
+
+        Such Datasets may be used as Run inputs, even if they've had some
+        failed checks in the interim.
+        """
+        # If this is not raw, check that there is at least one content check completed and
+        # successful.
+        if not self.is_raw() and not self.content_checks.filter(
+                baddata__isnull=True, end_time__isnull=False).exists():
+            return False
+
+        return True
+
+    def usable_in_run(self):
+        """
+        Check that the Dataset is eligible to be used in a Run.
+
+        Such a Dataset must not have failed its first content check, if there is one.
+        It may have failed subsequent checks, but either
+        a) it was initially good so warrants reexamination in case corruption has been fixed
+        b) it never got checked initially so it should be tried again and checked now
+        """
+        if self.is_redacted():
+            # Don't use redacted data.
+            return False
+        if self.is_raw():
+            # If it's raw, go ahead.
+            return True
+        elif self.initially_OK():
+            # If it was initially OK, go ahead.
+            return True
+        elif not self.content_checks.filter(baddata__isnull=False, end_time__isnull=False).exists():
+            # At least there is no failed content check yet (maybe the execution
+            # crashed during a content check), so go ahead and try again.
+            return True
+        return False
+
     def is_OK(self):
         """
         Check that this Dataset is fit for consumption.
@@ -1033,19 +1084,17 @@ class Dataset(metadata.models.AccessControl):
         if self.is_redacted():
             return False
 
-        # If this is not raw, check that there is at least one content check completed and
-        # successful.
-        if not self.is_raw() and not self.content_checks.filter(
-                baddata__isnull=True, end_time__isnull=False).exists():
+        # Was this Dataset initially OK?
+        if not self.initially_OK():
             return False
 
         # If there are any failures, check that the most recent integrity check is good.
         if self.any_failed_checks():
-            last_icl = self.integrity_checks.order_by("-end_time").last()
+            last_icl = self.integrity_checks.order_by("-end_time").first()
             if last_icl is None or last_icl.is_fail():
                 return False
 
-            last_bad_ccl = self.content_checks.filter(baddata__isnull=False).order_by("-end_time").last()
+            last_bad_ccl = self.content_checks.filter(baddata__isnull=False).order_by("-end_time").first()
             if last_bad_ccl is not None and last_icl.start_time <= last_bad_ccl.end_time:
                 return False
 
@@ -1445,7 +1494,7 @@ class ExecRecord(models.Model):
 
     def general_transf(self):
         """Returns the Method/POC/PSIC represented by this ExecRecord."""
-        if self.generator.record.is_cable:
+        if self.generator.record.is_cable():
             return self.generator.record.component
         else:
             # This is a Method.
@@ -1481,11 +1530,11 @@ class ExecRecord(models.Model):
         """Checks whether all of the EROs of this ER are OK."""
         return all([ero.is_OK() for ero in self.execrecordouts.all()])
 
-    def outputs_failed_any_checks(self):
+    def outputs_not_usable_in_run(self):
         """
         Checks whether any of the EROs of this ER have ever failed any checks.
         """
-        return any([ero.dataset.any_failed_checks() for ero in self.execrecordouts.all()])
+        return any([not ero.dataset.usable_in_run() for ero in self.execrecordouts.all()])
 
     def has_ever_failed(self):
         """Has any execution of this ExecRecord ever failed?"""
@@ -1498,10 +1547,17 @@ class ExecRecord(models.Model):
         return False
 
     def is_redacted(self):
-        for eri in self.execrecordins.all().select_related("dataset"):
+        ins = self.execrecordins.all()
+        outs = self.execrecordouts.all()
+        if not hasattr(self, '_prefetched_objects_cache'):
+            # Not already prefetched, use select_related.
+            ins = ins.select_related('dataset')
+            outs = outs.select_related('dataset')
+
+        for eri in ins:
             if eri.dataset.is_redacted():
                 return True
-        for ero in self.execrecordouts.all().select_related("dataset"):
+        for ero in outs:
             if ero.dataset.is_redacted():
                 return True
 
@@ -1568,7 +1624,7 @@ class ExecRecord(models.Model):
         assert self not in removal_plan["ExecRecords"]
         removal_plan["ExecRecords"].add(self)
 
-        if not (self.generator.record.is_cable and self.general_transf().is_trivial()):
+        if not (self.generator.record.is_cable() and self.general_transf().is_trivial()):
             for ero in self.execrecordouts.exclude(
                     dataset__in=removal_plan["Datasets"]).select_related("dataset"):
                 if ero.dataset not in removal_plan["Datasets"]:
@@ -1592,7 +1648,7 @@ class ExecRecord(models.Model):
         """
         Quarantine RunComponents that used this ExecRecord.
         """
-        for rc in self.used_by_components.filter(_runcomponentstate__pk=runcomponentstates.SUCCESSFUL_PK):
+        for rc in self.used_by_components.filter(_runcomponentstate_id=runcomponentstates.SUCCESSFUL_PK):
             rc.quarantine(save=True, recurse_upward=True)
 
     @transaction.atomic
@@ -1600,7 +1656,7 @@ class ExecRecord(models.Model):
         """
         Decontaminate RunComponents that used this ExecRecord.
         """
-        for rc in self.used_by_components.filter(_runcomponentstate__pk=runcomponentstates.QUARANTINED_PK):
+        for rc in self.used_by_components.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK):
             rc.decontaminate(save=True, recurse_upward=True)
 
     @transaction.atomic
@@ -1618,14 +1674,13 @@ class ExecRecord(models.Model):
 
         last_rc = self.used_by_components.filter(
             log__isnull=False,
-            _runcomponentstate__pk__in=runcomponentstates.COMPLETE_STATE_PKS
+            _runcomponentstate_id__in=runcomponentstates.COMPLETE_STATE_PKS
         ).order_by("-end_time").first()
         if not last_rc.log.is_successful():
             return
 
         # Having reached here, we now know that the ExecRecord can be decontaminated.
-        for rc in self.used_by_components.filter(_runcomponentstate__pk=runcomponentstates.QUARANTINED_PK):
-            rc.decontaminate(save=True, recurse_upward=True)
+        self.decontaminate_runcomponents()
 
 
 @python_2_unicode_compatible

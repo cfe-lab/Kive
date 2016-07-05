@@ -718,11 +718,13 @@ class RunComponentStateMockTests(TestCase):
         rs.stop = Mock()
         rs.run.attempt_decontamination = Mock()
         rs.run.is_quarantined = Mock()
+        rs.run.refresh_from_db = Mock()
 
         rs.decontaminate()
         self.assertEqual(rs._runcomponentstate_id, runcomponentstates.SUCCESSFUL_PK)
         rs.run.is_quarantined.assert_not_called()
         rs.run.attempt_decontamination.assert_not_called()
+        rs.run.refresh_from_db.assert_called_once_with()
 
     def test_decontaminate_recurse_upward_run_not_quarantined(self):
         """
@@ -736,11 +738,13 @@ class RunComponentStateMockTests(TestCase):
         rs.stop = Mock()
         rs.run.attempt_decontamination = Mock()
         rs.run.is_quarantined = Mock(return_value=False)
+        rs.run.refresh_from_db = Mock()
 
         rs.decontaminate(recurse_upward=True)
         self.assertEqual(rs._runcomponentstate_id, runcomponentstates.SUCCESSFUL_PK)
         rs.run.is_quarantined.assert_called_once_with()
         rs.run.attempt_decontamination.assert_not_called()
+        rs.run.refresh_from_db.assert_called_once_with()
 
     def test_decontaminate_recurse_upward(self):
         """
@@ -754,8 +758,10 @@ class RunComponentStateMockTests(TestCase):
         rs.stop = Mock()
         rs.run.attempt_decontamination = Mock()
         rs.run.is_quarantined = Mock(return_value=True)
+        rs.run.refresh_from_db = Mock()
 
         rs.decontaminate(recurse_upward=True)
         self.assertEqual(rs._runcomponentstate_id, runcomponentstates.SUCCESSFUL_PK)
         rs.run.is_quarantined.assert_called_once_with()
         rs.run.attempt_decontamination.assert_called_once_with(save=True, recurse_upward=True)
+        rs.run.refresh_from_db.assert_called_once_with()

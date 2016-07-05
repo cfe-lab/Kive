@@ -91,6 +91,30 @@ var permissions = (function() {
                 'groups_allowed');
         }
     };
+
+    /**
+     * Attach some error messages to a cell in the table.
+     * 
+     * @param $td: a cell in the table, wrapped in a jQuery object
+     * @param errors: an array of strings
+     */
+    my.PermissionsTable.prototype.setErrors = function($td, errors) {
+        if (errors === undefined || errors.length === 0) {
+            return;
+        }
+        var errorList = $('<ul/>');
+        $.each(errors, function() {
+            errorList.append($('<li/>').text(this));
+        });
+        $td.addClass('with-error').append(
+                $('<div class="error-tip"/>').append(errorList));
+        $td.hover(function() {
+            $(this).find('.error-tip').show();
+        },
+        function(){
+            $(this).find('.error-tip').hide();
+        });
+    };
     
     function defaultBuilder($td, row, field_name) {
         $td.text(row[field_name]);
@@ -552,6 +576,50 @@ var permissions = (function() {
             }
         });
         this.onChange();
+    };
+
+    /* Set search filters from key-value pairs in a string.
+     * 
+     * Example: "key1=value1&key2=value2"
+     * Keys and values are URI encoded.
+     */
+    my.FilterSet.prototype.setFromPairs = function(pairs) {
+        var filterSet = this,
+            pairsArray,
+            pair,
+            value;
+        pairsArray = pairs === null || pairs.length === 0 ? [] : pairs.split('&');
+        this.$active.find('.filter').remove();
+        for (var i = pairsArray.length-1; i >= 0; i--) {
+            pair = pairsArray[i].split('=');
+            value = pair[1] === undefined ? undefined : decodeURIComponent(pair[1]);
+            addFilter(
+                    filterSet,
+                    decodeURIComponent(pair[0]),
+                    value);
+        }
+        this.onChange();
+    };
+    
+    /* Get key-value pairs in a string for all search filters.
+     * 
+     * Example: "key1=value1&key2=value2"
+     * Keys and values are URI encoded.
+     */
+    my.FilterSet.prototype.getPairs = function() {
+        var filters = this.getFilters(),
+            pairs = '';
+        for (var i = 0; i < filters.length; i++) {
+            var filter = filters[i];
+            if (pairs.length) {
+                pairs += '&';
+            }
+            pairs += encodeURIComponent(filter.key);
+            if (filter.val !== undefined) {
+                pairs += '=' + encodeURIComponent(filter.val);
+            }
+        }
+        return pairs;
     };
     
     my.FilterSet.prototype.getFilters = function() {

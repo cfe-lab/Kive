@@ -260,9 +260,19 @@ class IntegrityCheckLog(stopwatch.models.Stopwatch):
     dataset = models.ForeignKey("librarian.Dataset", related_name="integrity_checks")
 
     # The execution during which this check occurred, if applicable.
-    execlog = models.ForeignKey("archive.ExecLog", null=True, related_name="integrity_checks")
+    execlog = models.ForeignKey(
+        "archive.ExecLog",
+        null=True,
+        related_name="integrity_checks",
+        help_text="Log of the execution where dataset was produced as an output"
+    )
 
-    runsic = models.OneToOneField("archive.RunSIC", null=True, related_name="input_integrity_check")
+    runcomponent = models.OneToOneField(
+        "archive.RunComponent",
+        null=True,
+        help_text="RunComponent responsible for copying dataset to a sandbox",
+        related_name="input_integrity_check"
+    )
 
     # The user performing the check.
     user = models.ForeignKey(User)

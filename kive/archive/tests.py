@@ -7,6 +7,8 @@ import re
 import tempfile
 import json
 
+from mock import call, patch
+
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.core.files import File
@@ -18,7 +20,7 @@ from rest_framework import status
 from rest_framework.test import force_authenticate
 
 from archive.models import ExecLog, MethodOutput, Run, RunComponent,\
-    RunOutputCable, RunStep, RunSIC
+    RunOutputCable, RunStep, RunSIC, RunBatch
 from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, Dataset, DatasetStructure
@@ -63,7 +65,7 @@ class ArchiveTestCaseHelpers(object):
 
         execlog = ExecLog(record=record, invoking_record=record, start_time=timezone.now(), end_time=timezone.now())
         execlog.save()
-        if record.is_step:
+        if record.is_step():
             MethodOutput(execlog=execlog, return_code=0).save()
 
     def make_complete_reused(self, record, input_SDs, output_SDs, other_parent):
@@ -505,7 +507,7 @@ class RunComponentTests(ArchiveTestCase):
         # For every RunComponent invoked during this run, break each of its invoked_logs and see if it appears.
         atomicrunsteps = []
         for runstep in RunStep.objects.all():
-            if runstep.transformation.is_method:
+            if runstep.transformation.is_method():
                 atomicrunsteps.append(runstep)
         runcomponents = (atomicrunsteps + list(RunSIC.objects.all()) + list(RunOutputCable.objects.all()))
 
@@ -532,7 +534,7 @@ class RunComponentTests(ArchiveTestCase):
         # For every RunComponent invoked during this run, break each of its ICLs/CCLs and see if it appears.
         atomicrunsteps = []
         for runstep in RunStep.objects.all():
-            if runstep.transformation.is_method:
+            if runstep.transformation.is_method():
                 atomicrunsteps.append(runstep)
         runcomponents = (atomicrunsteps + list(RunSIC.objects.all()) + list(RunOutputCable.objects.all()))
 
@@ -611,7 +613,8 @@ class RunComponentTests(ArchiveTestCase):
     #
     #     self.assertRaisesRegexp(
     #         ValidationError,
-    #         re.escape('Invoked ExecLogs preceding log of {} "{}" did not successfully pass all of their checks'.format(
+    #         re.escape(
+    #             'Invoked ExecLogs preceding log of {} "{}" did not successfully pass all of their checks'.format(
     #             self.step_E3_RS.__class__.__name__, self.step_E3_RS
     #         )),
     #         self.step_E3_RS.clean)
@@ -1137,19 +1140,6 @@ class RunStepTests(ArchiveTestCase):
                                           .format(output, self.step_E1_RS)),
                                 self.step_E1_RS.clean)
 
-    def test_RunStep_kept_output_without_data(self):
-        """
-        A RunStep which keeps its outputs, but has an ExecRecordOut
-        without data, is not clean.
-        """
-        self.step_through_runstep_creation("first_step_complete")
-        ero = self.step_E1_RS.execrecord.execrecordouts.first()
-        ero.dataset.dataset_file.delete(save=True)
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('ExecRecordOut "{}" of RunStep "{}" should reference existent data'
-                                          .format(ero, self.step_E1_RS)),
-                                self.step_E1_RS.clean)
-
     def test_RunStep_output_not_in_ExecRecord(self):
         """
         A RunStep with a Dataset not in its ExecRecord is not clean.
@@ -1258,7 +1248,7 @@ class RunComponentTooManyChecks(TestCase):
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and
                     runstep.execrecord.execrecordouts.count() > 0 and
-                    runstep.has_log):
+                    runstep.has_log()):
                 break
         log = runstep.log
         sd = runstep.execrecord.execrecordouts.first().dataset
@@ -1275,7 +1265,7 @@ class RunComponentTooManyChecks(TestCase):
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and
                     runstep.execrecord.execrecordouts.count() > 0 and
-                    runstep.has_log and
+                    runstep.has_log() and
                     runstep.invoked_logs.count() > 1):
                 break
         for log in runstep.invoked_logs.all():
@@ -1295,7 +1285,7 @@ class RunComponentTooManyChecks(TestCase):
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and
                     runstep.execrecord.execrecordouts.count() > 0 and
-                    runstep.has_log):
+                    runstep.has_log()):
                 break
         log = runstep.log
         sd = runstep.execrecord.execrecordouts.first().dataset
@@ -1312,7 +1302,7 @@ class RunComponentTooManyChecks(TestCase):
         for runstep in RunStep.objects.all():
             if (runstep.execrecord is not None and
                     runstep.execrecord.execrecordouts.count() > 0 and
-                    runstep.has_log and
+                    runstep.has_log() and
                     runstep.invoked_logs.count() > 1):
                 break
         for log in runstep.invoked_logs.all():
@@ -1522,6 +1512,26 @@ class RunTests(ArchiveTestCase):
         self.assertIsNone(self.pE_run.clean())
         self.assertTrue(self.pE_run.is_complete())
         self.assertIsNone(self.pE_run.complete_clean())
+
+    def test_Run_clean_permissions_exceed_RunBatch(self):
+        """A Run's permissions should not exceed those of its RunBatch."""
+        rb = RunBatch(user=self.pE_run.user)
+        rb.save()
+        self.pE_run.runbatch = rb
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape("Group(s) Everyone cannot be granted access'"),
+            self.pE_run.clean
+        )
+
+    def test_Run_clean_permissions_do_not_exceed_RunBatch(self):
+        """A Run whose permissions don't exceed those of its RunBatch is OK."""
+        rb = RunBatch(user=self.pE_run.user)
+        rb.save()
+        rb.grant_everyone_access()
+        self.pE_run.runbatch = rb
+        # This doesn't raise an exception.
+        self.pE_run.clean()
 
 
 class RunSICTests(ArchiveTestCase):
@@ -2461,7 +2471,7 @@ class ExecLogTests(ArchiveTestCase):
         # Retrieve all ExecLogs of steps.
         step_ELs = []
         for candidate_EL in ExecLog.objects.all():
-            if candidate_EL.record.is_step:
+            if candidate_EL.record.is_step():
                 step_ELs.append(candidate_EL)
 
         for el in step_ELs:
@@ -2482,7 +2492,7 @@ class ExecLogTests(ArchiveTestCase):
         # Retrieve all ExecLogs of ROCs.
         ROC_ELs = []
         for candidate_EL in ExecLog.objects.all():
-            if candidate_EL.record.is_outcable:
+            if candidate_EL.record.is_outcable():
                 ROC_ELs.append(candidate_EL)
 
         for el in ROC_ELs:
@@ -2817,340 +2827,6 @@ class ExecLogIsCompleteIsSuccessfulTests(ArchiveTestCase):
         self.assertFalse(self.step_E1_RS.log.is_successful())
 
 
-# class StateMachineTests(ArchiveTestCase):
-#     """
-#     Tests the state machine functionality of Run and RunComponent.
-#     """
-#
-#     def test_runcomponent_successful_run(self):
-#         """
-#         Quick test of good cases coming out of a (simulated) good run.
-#         """
-#         self.step_through_run_creation("outcables_done")
-#
-#         atomicrunsteps = []
-#         for runstep in RunStep.objects.all():
-#             if runstep.transformation.is_method:
-#                 atomicrunsteps.append(runstep)
-#         runcomponents = (atomicrunsteps + list(RunSIC.objects.all()) + list(RunOutputCable.objects.all()))
-#
-#         for runcomponent in runcomponents:
-#             # Skip RunComponents that are not part of this Run.
-#             if runcomponent.top_level_run != self.pE_run:
-#                 continue
-#
-#             self.assertTrue(runcomponent.is_successful())
-#
-#     def test_runcomponent_successful_no_execrecord(self):
-#         """Testing of a RunComponent (RunSIC) that is successful but has no ExecRecord yet."""
-#         self.step_through_run_creation("first_cable_created")
-#
-#         incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
-#         incomplete_cable.start()
-#
-#         self.make_execlog_and_mark_non_reused_runcomponent(incomplete_cable)
-#         self.assertTrue(incomplete_cable.is_running())
-#
-#     def test_runcomponent_successful_has_execrecord_reused(self):
-#         """Testing of a RunComponent which has an ExecRecord and is reused (so is done)"""
-#         self.step_through_run_creation("first_cable_created")
-#
-#         incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
-#
-#         # Create another run.
-#         other_run = self.pE.pipeline_instances.create(user=self.myUser)
-#         other_run.grant_everyone_access()
-#         other_step1 = self.step_E1.pipelinestep_instances.create(run=other_run)
-#         self.make_complete_reused(incomplete_cable, [self.raw_dataset], [self.raw_dataset], other_step1)
-#         other_cable = other_step1.RSICs.first()
-#         icl = self.raw_dataset.integrity_checks.create(execlog=other_cable.log, user=self.myUser)
-#         icl.start(save=False)
-#         icl.stop(save=False)
-#         icl.save()
-#
-#         self.assertTrue(incomplete_cable.is_successful())
-#
-#     def test_nontrivial_rsic_successful_checks_not_passed(self):
-#         """Testing of a RunComponent (non-trivial RunSIC) that is successful but has no data checks yet."""
-#         self.step_through_runstep_creation("second_runstep")
-#         # Follow the procedure in step_through_runstep_creation but stopping short of the checks.
-#         self.complete_RSICs(self.step_E2_RS,
-#                             [self.triplet_dataset, self.singlet_dataset],
-#                             [self.D1_in_dataset, self.singlet_dataset])
-#         # This is a non-trivial cable, so data checks must be part of its completion.
-#         self.E01_21_RSIC = self.step_E2_RS.RSICs.filter(PSIC=self.E01_21).first()
-#
-#         self.assertTrue(self.E01_21_RSIC.is_running())
-#
-#     def test_runcomponent_successful_checks_passed(self):
-#         """Testing of a RunComponent (RunSIC) that is successful and all checks pass."""
-#         self.step_through_run_creation("first_cable_created")
-#
-#         incomplete_cable = self.step_E1_RS.RSICs.get(PSIC=self.step_E1.cables_in.first())
-#         self.make_complete_non_reused(incomplete_cable, [self.raw_dataset], [self.raw_dataset])
-#
-#         icl = self.raw_dataset.integrity_checks.create(execlog=incomplete_cable.log, user=self.myUser)
-#         icl.start(save=False)
-#         icl.stop(save=False)
-#         icl.save()
-#
-#         self.assertTrue(incomplete_cable.is_successful())
-#
-#     def test_runcomponent_unsuccessful_failed_execlog(self):
-#         """Testing of a RunComponent (RunStep) which fails at the ExecLog stage."""
-#         self.step_through_run_creation("first_step_complete")
-#
-#         step_1_log = self.step_E1_RS.log
-#
-#         ccl_to_wipe = step_1_log.content_checks.first()
-#         ccl_to_wipe.execlog = None
-#         ccl_to_wipe.save()
-#
-#         mo_to_change = step_1_log.methodoutput
-#         mo_to_change.return_code = 1
-#         mo_to_change.save()
-#
-#         self.assertTrue(self.step_E1_RS.is_complete())
-#         # This is a test that is_successful properly calls successful_execution.
-#         self.assertFalse(self.step_E1_RS.is_successful())
-#
-#     def test_runcomponent_unsuccessful_failed_content_check(self):
-#         """Testing of a RunComponent (RunStep) which failed at the content check stage."""
-#         self.step_through_run_creation("first_step_complete")
-#
-#         step_1_log = self.step_E1_RS.log
-#
-#         ccl_to_fail = step_1_log.content_checks.first()
-#         ccl_to_fail.add_bad_header()
-#
-#         self.assertTrue(self.step_E1_RS.is_complete())
-#         self.assertFalse(self.step_E1_RS.is_successful())
-#
-#     def test_runcomponent_unsuccessful_failed_integrity_check(self):
-#         """Testing of a RunComponent (RunSIC) which failed at the integrity check stage."""
-#         self.step_through_run_creation("first_cable_created")
-#         step_E1_RSIC = self.step_E1_RS.RSICs.first()
-#         self.make_complete_non_reused(step_E1_RSIC, [self.raw_dataset], [self.raw_dataset])
-#
-#         # Make a bad ICL.
-#         conflicting_datafile = tempfile.NamedTemporaryFile()
-#         conflicting_datafile.write("THIS IS A FAILURE")
-#
-#         # The output of this first cable is self.raw_dataset.  This creates a bad ICL.
-#         self.raw_dataset.check_integrity(conflicting_datafile.name, self.pE_run.user, step_E1_RSIC.log)
-#         self.assertTrue(step_E1_RSIC.is_complete())
-#         # This tests that is_successful properly calls successful_execution.
-#         self.assertFalse(step_E1_RSIC.is_successful())
-#         conflicting_datafile.close()
-#
-#     def test_runstep_subpipeline_not_complete(self):
-#         """Testing on a RunStep containing a sub-pipeline that is not complete."""
-#         self.step_through_run_creation("sub_pipeline")
-#         self.assertFalse(self.step_E2_RS.is_complete())
-#         self.assertTrue(self.step_E2_RS.is_successful())
-#
-#     def test_runstep_subpipeline_complete(self):
-#         """Testing on a RunStep containing a sub-pipeline that is complete."""
-#         self.step_through_run_creation("sub_pipeline_complete")
-#         self.assertTrue(self.step_E2_RS.is_complete())
-#         self.assertTrue(self.step_E2_RS.is_successful())
-#
-#     def test_runstep_no_cables_yet(self):
-#         """Testing on a RunStep with no RSICs yet."""
-#         self.step_through_run_creation("first_step")
-#         self.assertFalse(self.step_E1_RS.is_complete())
-#         self.assertTrue(self.step_E1_RS.is_successful())
-#
-#     def test_runstep_cable_just_started(self):
-#         """Testing on a RunStep with a just-started RSIC."""
-#         self.step_through_run_creation("first_cable_created")
-#         step_E1_RSIC = self.step_E1_RS.RSICs.first()
-#         step_E1_RSIC.start(save=True)
-#
-#         self.assertFalse(self.step_E1_RS.is_complete())
-#         self.assertTrue(self.step_E1_RS.is_successful())
-#
-#     def test_runstep_cable_complete(self):
-#         """Testing on a RunStep with a RSIC that has run but has not done data checking yet."""
-#         self.step_through_run_creation("first_cable")
-#         self.assertFalse(self.step_E1_RS.is_complete())
-#         self.assertTrue(self.step_E1_RS.is_successful())
-#
-#     def test_runstep_cable_failed(self):
-#         """Testing on a RunStep with a RSIC that has run and failed in data checking."""
-#         self.step_through_run_creation("first_cable_created")
-#         step_E1_RSIC = self.step_E1_RS.RSICs.first()
-#
-#         # Let's tamper with self.raw_dataset.
-#         with tempfile.NamedTemporaryFile() as f:
-#             f.write("This is a tampered-with file.")
-#             os.remove(self.raw_dataset.dataset_file.path)
-#             self.raw_dataset.dataset_file = File(f, name="tampered")
-#             self.raw_dataset.save()
-#
-#             self.make_complete_non_reused(step_E1_RSIC, [self.raw_dataset], [self.raw_dataset])
-#
-#             # Check the integrity of self.raw_dataset -- this should fail.
-#             self.raw_dataset.check_integrity(f.name, self.myUser, step_E1_RSIC.log)
-#
-#         self.assertTrue(self.step_E1_RS.is_complete())
-#         self.assertFalse(self.step_E1_RS.is_successful())
-#
-#     def test_runstep_successful_checks_not_passed(self):
-#         """Testing of a RunComponent (RunStep) that is successful but has no data checks yet."""
-#         self.step_through_run_creation("first_cable")
-#         # Follow the procedure in step_through_run_creation but stopping short of the checks.
-#         self.make_complete_non_reused(self.step_E1_RS, [self.raw_dataset], [self.doublet_dataset])
-#
-#         self.assertFalse(self.step_E1_RS.is_complete())
-#         self.assertTrue(self.step_E1_RS.is_successful())
-#
-#     def test_runstep_failed_subrun(self):
-#         """Testing on a RunStep with a child_run that fails."""
-#         self.step_through_run_creation("sub_pipeline")
-#         # Fail the sub-pipeline.
-#         self.step_D1_RS = self.step_D1.pipelinestep_instances.create(run=self.pD_run)
-#         self.complete_RSICs(self.step_D1_RS, [self.D1_in_dataset, self.singlet_dataset],
-#                                              [self.D1_in_dataset, self.singlet_dataset])
-#
-#         self.D01_11_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D01_11).first()
-#         self.D02_12_RSIC = self.step_D1_RS.RSICs.filter(PSIC=self.D02_12).first()
-#         icl = self.D1_in_dataset.integrity_checks.create(execlog=self.D01_11_RSIC.log, user=self.myUser)
-#         icl.start(save=False)
-#         icl.stop(save=False)
-#         icl.save()
-#         icl = self.singlet_dataset.integrity_checks.create(execlog=self.D02_12_RSIC.log, user=self.myUser)
-#         icl.start(save=False)
-#         icl.stop(save=False)
-#         icl.save()
-#
-#         self.make_complete_non_reused(self.step_D1_RS, [self.D1_in_dataset, self.singlet_dataset], [self.C1_in_dataset])
-#         # Mark step_D1_RS as having failed on execution.
-#         step_D1_mo = self.step_D1_RS.log.methodoutput
-#         step_D1_mo.return_code = 1
-#         step_D1_mo.save()
-#
-#         self.assertTrue(self.step_D1_RS.is_complete())
-#         self.assertFalse(self.step_D1_RS.is_successful())  # calls successful_execution
-#
-#         self.assertTrue(self.step_E2_RS.is_complete())
-#         self.assertFalse(self.step_E2_RS.is_successful())  # calls successful_execution
-#
-#     def test_run_no_steps_yet(self):
-#         """Test on a Run with nothing started yet."""
-#         self.step_through_run_creation("empty_runs")
-#         self.assertFalse(self.pE_run.is_complete())
-#         self.assertTrue(self.pE_run.is_successful())
-#
-#     def test_run_incomplete_step(self):
-#         """Test on a Run with nothing started yet."""
-#         self.step_through_run_creation("third_step_cables_done")
-#         self.assertFalse(self.pE_run.is_complete())
-#         self.assertTrue(self.pE_run.is_successful())
-#
-#     def test_run_step_failed(self):
-#         """Test on a Run with a failed and complete step."""
-#         # Setup copied from test_runcomponent_unsuccessful_failed_execlog.
-#         self.step_through_run_creation("first_step_complete")
-#
-#         step_1_log = self.step_E1_RS.log
-#
-#         ccl_to_wipe = step_1_log.content_checks.first()
-#         ccl_to_wipe.execlog = None
-#         ccl_to_wipe.save()
-#
-#         mo_to_change = step_1_log.methodoutput
-#         mo_to_change.return_code = 1
-#         mo_to_change.save()
-#
-#         self.assertTrue(self.pE_run.is_complete())
-#         self.assertFalse(self.pE_run.is_successful())
-#
-#     def test_run_one_failed_step_one_incomplete_step(self):
-#         """Test on a Run with one failed and one incomplete step."""
-#         self.step_through_run_creation("second_step")
-#
-#         # Make the first step a failure by making self.doublet_dataset (its output) fail its check.
-#         step1_out_ccl = self.doublet_dataset.content_checks.first()
-#         step1_out_ccl.add_bad_header()
-#         step1_out_ccl.save()
-#
-#         # Start the second step.
-#         step2 = self.pE_run.runsteps.get(pipelinestep__step_num=2)
-#         step2.start()
-#
-#         self.assertFalse(self.pE_run.is_complete())
-#         self.assertFalse(self.pE_run.is_successful())
-#
-#     def test_run_no_output_cables(self):
-#         """Test on a Run with no output cables yet."""
-#         self.step_through_run_creation("third_step_complete")
-#         self.assertFalse(self.pE_run.is_complete())
-#         self.assertTrue(self.pE_run.is_successful())
-#
-#     def test_run_incomplete_output_cable(self):
-#         """Test on a Run having an incomplete output cable."""
-#         self.step_through_run_creation("third_step_complete")
-#
-#         # Add but do not complete an output cable.
-#         roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
-#         self.make_complete_non_reused(roc1, [self.C1_in_dataset], [self.E1_out_dataset])
-#         # Note that this isn't actually complete -- it doesn't have data checks yet.
-#         self.assertFalse(self.pE_run.is_complete())
-#         self.assertTrue(self.pE_run.is_successful())
-#
-#     def test_run_failed_output_cable(self):
-#         """Test on a Run having a failed output cable."""
-#         self.step_through_run_creation("third_step_complete")
-#
-#         # Add but do not complete an output cable.
-#         roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
-#         self.make_complete_non_reused(roc1, [self.C1_in_dataset], [self.E1_out_dataset])
-#
-#         # Break the data.
-#         E1_out_ccl = self.E1_out_dataset.content_checks.first()
-#         E1_out_ccl.execlog = roc1.log
-#         E1_out_ccl.add_bad_header()
-#         E1_out_ccl.save()
-#         self.E1_out_dataset.file_source = roc1
-#         self.E1_out_dataset.save()
-#
-#         self.assertTrue(self.pE_run.is_complete())
-#         self.assertFalse(self.pE_run.is_successful())
-#
-#     def test_run_one_failed_output_cable_one_incomplete_output_cable(self):
-#         """Test on a Run having one failed output cable and one incomplete one."""
-#         self.step_through_run_creation("third_step_complete")
-#
-#         # Add a complete output cable.
-#         roc1 = self.pE.outcables.get(output_idx=1).poc_instances.create(run=self.pE_run)
-#         self.make_complete_non_reused(roc1, [self.C1_in_dataset], [self.E1_out_dataset])
-#
-#         # Break the data.
-#         E1_out_ccl = self.E1_out_dataset.content_checks.first()
-#         E1_out_ccl.execlog = roc1.log
-#         E1_out_ccl.add_bad_header()
-#         E1_out_ccl.save()
-#
-#         roc2 = self.pE.outcables.get(output_idx=2).poc_instances.create(run=self.pE_run)
-#         roc2.start()
-#
-#         self.assertFalse(self.pE_run.is_complete())
-#         self.assertFalse(self.pE_run.is_successful())
-#
-#     def test_run_missing_output_cables(self):
-#         """Test on a Run having missing output cables."""
-#         self.step_through_run_creation("first_outcable")
-#         self.assertFalse(self.pE_run.is_complete())
-#         self.assertTrue(self.pE_run.is_successful())
-#
-#     def test_run_all_steps_and_cables_done(self):
-#         """Test on a Run that's completely done."""
-#         self.step_through_run_creation("outcables_done")
-#         self.assertTrue(self.pE_run.is_complete())
-#         self.assertTrue(self.pE_run.is_successful())
-
-
 class StateMachineActualExecutionTests(TestCase):
     fixtures = ["archive_no_runs_test_environment"]
 
@@ -3267,7 +2943,31 @@ year,month,day,hour,minute,second,microsecond
             True
         )
 
-    def test_runcomponent_unsuccessful_failed_invoked_log(self):
+    @patch.object(Run, "quarantine", autospec=True, side_effect=Run.quarantine)
+    @patch.object(Run, "mark_failure", autospec=True, side_effect=Run.mark_failure)
+    @patch.object(Run, "stop", autospec=True, side_effect=Run.stop)
+    @patch.object(Run, "start", autospec=True, side_effect=Run.start)
+    @patch.object(RunComponent, "cancel_running", autospec=True, side_effect=RunComponent.cancel_running)
+    @patch.object(RunComponent, "cancel_pending", autospec=True, side_effect=RunComponent.cancel_pending)
+    @patch.object(RunComponent, "begin_recovery", autospec=True, side_effect=RunComponent.begin_recovery)
+    @patch.object(RunComponent, "quarantine", autospec=True, side_effect=RunComponent.quarantine)
+    @patch.object(RunComponent, "finish_failure", autospec=True, side_effect=RunComponent.finish_failure)
+    @patch.object(RunComponent, "finish_successfully", autospec=True, side_effect=RunComponent.finish_successfully)
+    @patch.object(RunComponent, "start", autospec=True, side_effect=RunComponent.start)
+    def test_runcomponent_unsuccessful_failed_invoked_log(
+            self,
+            mock_start,
+            mock_finish_successfully,
+            mock_finish_failure,
+            mock_quarantine,
+            mock_begin_recovery,
+            mock_cancel_pending,
+            mock_cancel_running,
+            mock_run_start,
+            mock_run_stop,
+            mock_run_mark_failure,
+            mock_run_quarantine
+    ):
         """Testing of a RunComponent which has a failed invoked_log and never gets to its own execution."""
 
         # Run two pipelines, the second of which reuses parts of the first, but the method has been
@@ -3286,6 +2986,45 @@ year,month,day,hour,minute,second,microsecond
                                         p_one,
                                         [self.dataset_words],
                                         groups_allowed=[everyone_group()]).get_last_run()
+
+        # All of the RunComponents should have been started.
+        run1_step1 = run1.runsteps.get(pipelinestep__step_num=1)
+        run1_step2 = run1.runsteps.get(pipelinestep__step_num=2)
+        run1_outcable = run1.runoutputcables.first()
+        mock_start.assert_has_calls([
+            call(run1_step1),
+            call(run1_step1.RSICs.first()),
+            call(run1_step2),
+            call(run1_step2.RSICs.first()),
+            call(run1_outcable)
+        ])
+        self.assertEquals(mock_start.call_count, 5)
+
+        # All of them should have been finished successfully without event.
+        mock_finish_successfully.assert_has_calls([
+            call(run1_step1.RSICs.first(), save=True),
+            call(run1_step1, save=True),
+            call(run1_step2.RSICs.first(), save=True),
+            call(run1_step2, save=True),
+            call(run1_outcable, save=True)
+        ])
+        self.assertEquals(mock_finish_successfully.call_count, 5)
+
+        # These were not called, so have not been mocked yet.
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+
+        mock_run_start.assert_called_once_with(run1, save=True)
+        mock_run_stop.assert_called_once_with(run1, save=True)
+        self.assertFalse(hasattr(mock_run_mark_failure, "assert_not_called"))
+
+        mock_run_start.reset_mock()
+        mock_run_stop.reset_mock()
+        mock_start.reset_mock()
+        mock_finish_successfully.reset_mock()
 
         # Oops!  Between runs, self.method_noop gets screwed with.
         with tempfile.TemporaryFile() as f:
@@ -3313,7 +3052,7 @@ year,month,day,hour,minute,second,microsecond
 
         # run2_step1 is failed, run2_step2 is cancelled.
         self.assertTrue(run2_step1.is_failed())
-        self.assertTrue(run2_step2.is_cancelled_FIXME())
+        self.assertTrue(run2_step2.is_cancelled())
         self.assertTrue(run2.is_failed())
 
         # Run 2 is failed, run 1 is quarantined, and run1_step1 is quarantined.
@@ -3326,12 +3065,67 @@ year,month,day,hour,minute,second,microsecond
         run1_step2_RSIC = run1.runsteps.get(pipelinestep__step_num=2).RSICs.first()
         self.assertTrue(run1_step2_RSIC.is_successful())
 
-        self.assertFalse(run2_step2.has_log)
+        self.assertFalse(run2_step2.has_log())
         self.assertEquals(run2_step2.invoked_logs.count(), 2)
         self.assertEquals(set(run2_step2.invoked_logs.all()), {run2_step1.log, run2_step1_RSIC.log})
 
         self.assertTrue(run2_step1_RSIC.log.is_successful())
         self.assertFalse(run2_step1.log.is_successful())
+
+        # The following RunComponents should have been started.
+        mock_start.assert_has_calls(
+            [
+                call(run2_step1),
+                call(run2_step1.RSICs.first()),
+                call(run2_step2),
+                call(run2_step2.RSICs.first())
+            ]
+        )
+        self.assertEquals(mock_start.call_count, 4)
+
+        # run2_step1 and its input cable attempted recovery.
+        mock_begin_recovery.assert_has_calls(
+            [
+                call(run2_step1, save=True),
+                call(run2_step1.RSICs.first(), save=True)
+            ]
+        )
+        self.assertEquals(mock_begin_recovery.call_count, 2)
+
+        # The first step and cable finished successfully without event, and then the cable
+        # did again on recovery.
+        mock_finish_successfully.assert_has_calls(
+            [
+                call(run2_step1.RSICs.first(), save=True),
+                call(run2_step1, save=True),
+                call(run2_step1.RSICs.first(), save=True)
+            ]
+        )
+        self.assertEquals(mock_finish_successfully.call_count, 3)
+
+        # run2_step1 failed on recovery.
+        mock_finish_failure.assert_called_once_with(run2_step1, save=True)
+
+        # This stuff gets cancelled after the recovery fails.
+        mock_cancel_running.assert_has_calls(
+            [
+                call(run2_step2.RSICs.first(), save=True),
+                call(run2_step2, save=True)
+            ]
+        )
+        self.assertEquals(mock_cancel_running.call_count, 2)
+
+        # run2 should have started, been marked as a failure, and then stopped.
+        mock_run_start.assert_called_once_with(run2, save=True)
+        mock_run_mark_failure.assert_called_once_with(run2, save=True)
+        mock_run_stop.assert_called_once_with(run2, save=True)
+
+        # run1_step2 should have been quarantined.
+        mock_quarantine.assert_called_once_with(RunComponent.objects.get(pk=run1_step1.pk),
+                                                recurse_upward=True, save=True)
+
+        # run1 should have been quarantined.
+        mock_run_quarantine.assert_called_once_with(run1, recurse_upward=True, save=True)
 
     def test_long_output(self):
         """Should handle lots of output to stdout or stderr without deadlocking."""
@@ -3385,7 +3179,31 @@ with open(sys.argv[2], "wb") as f:
         self.assertTrue(run_step.log.is_successful())
         self.assertEqual(stdout_content, expected_output)
 
-    def test_runcomponent_unsuccessful_failed_integrity_check_during_recovery(self):
+    @patch.object(Run, "quarantine", autospec=True, side_effect=Run.quarantine)
+    @patch.object(Run, "mark_failure", autospec=True, side_effect=Run.mark_failure)
+    @patch.object(Run, "stop", autospec=True, side_effect=Run.stop)
+    @patch.object(Run, "start", autospec=True, side_effect=Run.start)
+    @patch.object(RunComponent, "cancel_running", autospec=True, side_effect=RunComponent.cancel_running)
+    @patch.object(RunComponent, "cancel_pending", autospec=True, side_effect=RunComponent.cancel_pending)
+    @patch.object(RunComponent, "begin_recovery", autospec=True, side_effect=RunComponent.begin_recovery)
+    @patch.object(RunComponent, "quarantine", autospec=True, side_effect=RunComponent.quarantine)
+    @patch.object(RunComponent, "finish_failure", autospec=True, side_effect=RunComponent.finish_failure)
+    @patch.object(RunComponent, "finish_successfully", autospec=True, side_effect=RunComponent.finish_successfully)
+    @patch.object(RunComponent, "start", autospec=True, side_effect=RunComponent.start)
+    def test_runcomponent_unsuccessful_failed_integrity_check_during_recovery(
+            self,
+            mock_start,
+            mock_finish_successfully,
+            mock_finish_failure,
+            mock_quarantine,
+            mock_begin_recovery,
+            mock_cancel_pending,
+            mock_cancel_running,
+            mock_run_start,
+            mock_run_stop,
+            mock_run_mark_failure,
+            mock_run_quarantine
+    ):
         """Testing of a RunComponent which has a failed integrity check during recovery."""
 
         # Run two pipelines, the second of which reuses parts of the first, but the first step's output
@@ -3401,13 +3219,52 @@ with open(sys.argv[2], "wb") as f:
 
         run1 = Manager.execute_pipeline(self.user_bob, p_one, [self.time_SD]).get_last_run()
 
+        # All of the RunComponents should have been started.
+        run1_step1 = run1.runsteps.get(pipelinestep__step_num=1)
+        run1_step2 = run1.runsteps.get(pipelinestep__step_num=2)
+        run1_outcable = run1.runoutputcables.first()
+        mock_start.assert_has_calls([
+            call(run1_step1),
+            call(run1_step1.RSICs.first()),
+            call(run1_step2),
+            call(run1_step2.RSICs.first()),
+            call(run1_outcable)
+        ])
+        self.assertEquals(mock_start.call_count, 5)
+
+        # All of them should have been finished successfully without event.
+        mock_finish_successfully.assert_has_calls([
+            call(run1_step1.RSICs.first(), save=True),
+            call(run1_step1, save=True),
+            call(run1_step2.RSICs.first(), save=True),
+            call(run1_step2, save=True),
+            call(run1_outcable, save=True)
+        ])
+        self.assertEquals(mock_finish_successfully.call_count, 5)
+
+        # These were not called, so have not been mocked yet.
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+
+        mock_run_start.assert_called_once_with(run1, save=True)
+        mock_run_stop.assert_called_once_with(run1, save=True)
+        self.assertFalse(hasattr(mock_run_mark_failure, "assert_not_called"))
+
+        mock_run_start.reset_mock()
+        mock_run_stop.reset_mock()
+        mock_start.reset_mock()
+        mock_finish_successfully.reset_mock()
+
         # Oops!  The first step should not have been marked as deterministic.
         p_two = tools.make_first_pipeline("p_two", "time then trivial", self.user_bob)
         tools.create_linear_pipeline(p_two, [self.curr_time_method, self.time_trivial], "p_two_in", "p_two_out")
         p_two.create_outputs()
         p_two.save()
         # We also delete the output of step 1 so that it reuses the existing ER we'll have
-        # create for p_one.
+        # created for p_one.
         p_two.steps.get(step_num=1).add_deletion(self.curr_time_method.outputs.first())
 
         run2 = Manager.execute_pipeline(self.user_bob, p_two, [self.time_SD]).get_last_run()
@@ -3422,24 +3279,84 @@ with open(sys.argv[2], "wb") as f:
         self.assertTrue(run2_step1.is_failed())
 
         # The corresponding step from run1 should also be quarantined, as should
-        # run1_step2_RSIC and run2_step2_RSIC (because there was a failed integrity check).
+        # run1_step2_RSIC.  run2_step2_RSIC is cancelled.
         run1_step1 = run1.runsteps.get(pipelinestep__step_num=1)
         self.assertTrue(run1_step1.is_quarantined())
         run1_step2_RSIC = run1.runsteps.get(pipelinestep__step_num=2).RSICs.first()
         run2_step2_RSIC = run2.runsteps.get(pipelinestep__step_num=2).RSICs.first()
         self.assertTrue(run1_step2_RSIC.is_quarantined())
-        self.assertTrue(run2_step2_RSIC.is_quarantined())
+        self.assertTrue(run2_step2_RSIC.is_cancelled())
 
         # run2_step2, the recovering step, should be cancelled.
-        self.assertTrue(run2_step2.is_cancelled_FIXME())
+        self.assertTrue(run2_step2.is_cancelled())
 
-        self.assertFalse(run2_step2.has_log)
+        self.assertFalse(run2_step2.has_log())
         self.assertEquals(run2_step2.invoked_logs.count(), 2)
         self.assertEquals(set(run2_step2.invoked_logs.all()), {run2_step1.log, run2_step1_RSIC.log})
 
         self.assertTrue(run2_step1_RSIC.log.is_successful())
         self.assertTrue(run2_step1.log.is_successful())
         self.assertFalse(run2_step1.log.all_checks_passed())
+
+        # The following RunComponents should have been started.
+        mock_start.assert_has_calls(
+            [
+                call(run2_step1),
+                call(run2_step1.RSICs.first()),
+                call(run2_step2),
+                call(run2_step2.RSICs.first())
+            ]
+        )
+        self.assertEquals(mock_start.call_count, 4)
+
+        # run2_step1 and its input cable attempted recovery.
+        mock_begin_recovery.assert_has_calls(
+            [
+                call(run2_step1, save=True),
+                call(run2_step1.RSICs.first(), save=True)
+            ]
+        )
+        self.assertEquals(mock_begin_recovery.call_count, 2)
+
+        # The first step and cable finished successfully without event, and then the cable
+        # did again on recovery.
+        mock_finish_successfully.assert_has_calls(
+            [
+                call(run2_step1.RSICs.first(), save=True),
+                call(run2_step1, save=True),
+                call(run2_step1.RSICs.first(), save=True)
+            ]
+        )
+        self.assertEquals(mock_finish_successfully.call_count, 3)
+
+        # run2_step1 failed on recovery.
+        mock_finish_failure.assert_called_once_with(run2_step1, save=True)
+
+        # This stuff gets cancelled after the recovery fails.
+        mock_cancel_running.assert_has_calls(
+            [
+                call(run2_step2.RSICs.first(), save=True),
+                call(run2_step2, save=True)
+            ]
+        )
+        self.assertEquals(mock_cancel_running.call_count, 2)
+
+        # run2 should have started, been marked as a failure, and then stopped.
+        mock_run_start.assert_called_once_with(run2, save=True)
+        mock_run_mark_failure.assert_called_once_with(run2, save=True)
+        mock_run_stop.assert_called_once_with(run2, save=True)
+
+        # run1_step1 should have been quarantined, along with run1_step2's input cable.
+        mock_quarantine.assert_has_calls(
+            [
+                call(RunComponent.objects.get(pk=run1_step1.pk), recurse_upward=True, save=True),
+                call(RunComponent.objects.get(pk=run1_step2.RSICs.first().pk), recurse_upward=True, save=True)
+            ],
+            any_order=True
+        )
+
+        # run1 should have been quarantined.
+        mock_run_quarantine.assert_called_once_with(run1, recurse_upward=True, save=True)
 
 
 class TopLevelRunTests(TestCase, ArchiveTestCaseHelpers):
@@ -3979,8 +3896,6 @@ class CancelComponentsTests(TestCase):
         # Start an instance of the top-level Pipeline.
         self.nested_run = self.p_top.pipeline_instances.create(
             user=self.user,
-            _complete=False,
-            _successful=True,
             name="FakeRun",
             description="Dummy run used for testing cancel_unfinished and cancel_unstarted."
         )
@@ -4209,7 +4124,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in self.running:
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for run in self.running_runs:
             run.refresh_from_db()
@@ -4217,7 +4132,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in self.pending:
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for run in self.pending_runs:
             run.refresh_from_db()
@@ -4242,7 +4157,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in set(self.running) - set(exempted):
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for rc in exempted:
             rc.refresh_from_db()
@@ -4258,7 +4173,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in self.pending:
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for run in self.pending_runs:
             run.refresh_from_db()
@@ -4283,7 +4198,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in set(self.running) - set(exempted):
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for rc in exempted:
             rc.refresh_from_db()
@@ -4299,7 +4214,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in self.pending:
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for run in self.pending_runs:
             run.refresh_from_db()
@@ -4329,7 +4244,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in set(self.running) - set(exempted):
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for rc in exempted:
             rc.refresh_from_db()
@@ -4345,7 +4260,7 @@ class CancelComponentsTests(TestCase):
 
         for rc in self.pending:
             rc.refresh_from_db()
-            self.assertTrue(rc.is_cancelled_FIXME())
+            self.assertTrue(rc.is_cancelled())
 
         for run in self.pending_runs:
             run.refresh_from_db()

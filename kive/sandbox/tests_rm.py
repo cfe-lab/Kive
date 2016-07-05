@@ -202,7 +202,7 @@ class ExecuteResultTestsRM(TestCase):
 
         self.assertEqual(step1.reused, False)
         self.assertEqual(step2.reused, True)
-        self.assertFalse(step2.has_log)
+        self.assertFalse(step2.has_log())
         self.assertEqual(step1.execrecord, step2.execrecord)
 
     def test_execute_pipeline_fill_in_ER(self):
@@ -215,8 +215,8 @@ class ExecuteResultTestsRM(TestCase):
 
         self.assertEqual(step1.reused, False)
         self.assertEqual(step2.reused, True)
-        self.assertTrue(step1.has_log)
-        self.assertFalse(step2.has_log)
+        self.assertTrue(step1.has_log())
+        self.assertFalse(step2.has_log())
         self.assertEqual(step1.execrecord, step2.execrecord)
 
     def test_execute_pipeline_reuse_within_different_pipeline(self):
@@ -229,7 +229,7 @@ class ExecuteResultTestsRM(TestCase):
 
         self.assertEqual(step1.reused, False)
         self.assertEqual(step2.reused, True)
-        self.assertFalse(step2.has_log)
+        self.assertFalse(step2.has_log())
         self.assertEqual(step1.execrecord, step2.execrecord)
 
     def test_execute_pipeline_output_dataset(self):

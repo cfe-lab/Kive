@@ -18,6 +18,9 @@ var RunsTable = function($table, user, is_user_admin, $no_results, $active_filte
             function() {
                 runsTable.page = 1;
                 runsTable.reloadTable();
+                sessionStorage.setItem(
+                        'runFilters',
+                        runsTable.filterSet.getPairs());
             });
     this.list_url = "/api/runs/status/";
     this.reload_interval = pollingInterval;
@@ -153,6 +156,7 @@ RunsTable.prototype = Object.create(permissions.PermissionsTable.prototype);
 RunsTable.prototype.getQueryParams = function() {
     var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
     params.filters = this.filterSet.getFilters();
+    sessionStorage.setItem('runPage', this.page);
     return params;
 };
 
@@ -178,6 +182,13 @@ RunsTable.prototype.extractRows = function(response) {
     $no_results.show();
     return []; // no runs
 };
+
+RunsTable.prototype.buildHeaders = function($tr) {
+    this.buildPermissionHeaders($tr);
+    $tr.eq(0).attr(
+            'title',
+            'steps-outputs\n? new\n. waiting\n: ready\n+ running\n* finished\n! failed\nx cancelled\n# quarantined');
+}
 
 $(function(){ // wait for page to finish loading before executing jQuery code
     // Security stuff to prevent cross-site scripting.
@@ -212,6 +223,8 @@ $(function(){ // wait for page to finish loading before executing jQuery code
         $('#active_filters'),
         $(".navigation_links")
     );
-    // runsTable.filterSet.add('active');
+    var storedPage = parseInt(sessionStorage.getItem('runPage') || 1);
+    runsTable.filterSet.setFromPairs(sessionStorage.getItem('runFilters'));
+    runsTable.page = storedPage;
     runsTable.reloadTable();
 });

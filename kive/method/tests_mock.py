@@ -6,7 +6,7 @@ from kive.mock_setup import mocked_relations  # Import before any Django models
 from django_mock_queries.query import MockSet
 from metadata.models import CompoundDatatype
 from method.models import Method, MethodFamily, CodeResourceRevision,\
-    CodeResource
+    CodeResource, MethodDependency
 from transformation.models import TransformationInput, TransformationOutput,\
     XputStructure, Transformation
 from django.contrib.auth.models import User
@@ -440,6 +440,130 @@ class MethodMockTests(TestCase):
             out.transformationoutput = out
 
         self.assertFalse(m1.is_identical(m2))
+
+
+@mocked_relations(Method, MethodDependency)
+class MethodDependencyMockTests(TestCase):
+    def setUp(self):
+        driver = CodeResourceRevision(
+            coderesource=CodeResource(filename='driver.py'))
+        self.method = Method(driver=driver, family=MethodFamily())
+        self.dependency = self.add_dependency('helper.py')
+
+    def add_dependency(self, filename, path=''):
+        helper = CodeResourceRevision(
+            coderesource=CodeResource(filename=filename))
+        dependency = self.method.dependencies.create(requirement=helper)
+        dependency.method = self.method
+        return dependency
+
+    def test_dependency_depends_on_nothing_clean_good(self):
+        self.method.dependencies.clear()
+
+        self.method.clean()
+
+    def test_dependency_current_folder_same_name_clean_bad(self):
+        """
+        A depends on B - current folder, same name
+        """
+        # We're giving the dependency a conflicting filename.
+        self.dependency.filename = self.method.driver.coderesource.filename
+
+        self.assertRaisesRegexp(ValidationError,
+                                "Conflicting dependencies",
+                                self.method.clean)
+
+    def test_dependency_current_folder_different_name_clean_good(self):
+        """
+        1 depends on 2 - current folder, different name
+        """
+        self.dependency.filename = 'different_name.py'
+
+        self.method.clean()
+
+    def test_dependency_inner_folder_same_name_clean_good(self):
+        """
+        1 depends on 2 - different folder, same name
+        """
+        self.dependency.path = 'subfolder'
+        self.dependency.filename = self.method.driver.coderesource.filename
+
+        self.method.clean()
+
+    def test_dependency_inner_folder_different_name_clean_good(self):
+        """
+        1 depends on 2 - different folder, different name
+        """
+        self.dependency.path = 'subfolder'
+        self.dependency.filename = 'different_name.py'
+
+        self.method.clean()
+
+    def test_dependency_A_depends_BC_same_folder_no_conflicts_clean_good(self):
+        """
+        A depends on B, A depends on C
+        BC in same folder as A
+        Nothing conflicts
+        """
+        self.add_dependency('helper2.py')
+
+        self.method.clean()
+
+    def test_dependency_A_depends_BC_same_folder_B_conflicts_with_C_clean_bad(self):
+        """
+        A depends on B, A depends on C
+        BC in same folder as A, BC conflict
+        """
+        self.dependency.filename = 'same_name.py'
+        self.add_dependency(self.dependency.filename)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Conflicting dependencies",
+            self.method.clean)
+
+    def test_list_all_filepaths_unnested_dep_blank_filename(self):
+        """
+        List all filepaths when dependency has no filename set and is not in a subdirectory.
+        """
+        expected_filepaths = ['driver.py', 'helper.py']
+
+        filepaths = self.method.list_all_filepaths()
+
+        self.assertEqual(expected_filepaths, filepaths)
+
+    def test_list_all_filepaths_nested_dep_blank_filename(self):
+        """
+        List all filepaths when dependency has no filename set and is in a subdirectory.
+        """
+        self.dependency.path = 'nest_folder'
+        expected_filepaths = ['driver.py', 'nest_folder/helper.py']
+
+        filepaths = self.method.list_all_filepaths()
+
+        self.assertEqual(expected_filepaths, filepaths)
+
+    def test_list_all_filepaths_unnested_dep_specified_filename(self):
+        """List all filepaths when dependency has a custom filename and is not in a subdirectory.
+        """
+        self.dependency.filename = 'foo.py'
+        expected_filepaths = ['driver.py', 'foo.py']
+
+        filepaths = self.method.list_all_filepaths()
+
+        self.assertEqual(expected_filepaths, filepaths)
+
+    def test_list_all_filepaths_nested_dep_specified_filename(self):
+        """
+        List all filepaths when dependency has a custom filename and is in a subdirectory.
+        """
+        self.dependency.path = 'nest_folder'
+        self.dependency.filename = 'foo.py'
+        expected_filepaths = ['driver.py', 'nest_folder/foo.py']
+
+        filepaths = self.method.list_all_filepaths()
+
+        self.assertEqual(expected_filepaths, filepaths)
 
 
 @mocked_relations(Method, MethodFamily)

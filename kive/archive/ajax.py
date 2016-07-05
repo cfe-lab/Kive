@@ -135,6 +135,9 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
         ended after the given date and time.
     * filters[n][key]=endbefore&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
         ended before the given date and time.
+    * filters[n][key]=batch_name - runs belonging to a RunBatch whose name matches
+        the value (case insensitive).
+    * filters[n][key]=batch_pk - runs belonging to the specified RunBatch.
 
     Parameter for a PATCH:
     * is_stop_requested(=true) - the Run is marked for stopping.
@@ -251,6 +254,11 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
                 return queryset.filter(end_time__gte=t)
             if key == 'endbefore':
                 return queryset.filter(end_time__lte=t)
+        if key == "batch_name":
+            return queryset.filter(runbatch__name__icontains=t)
+        if key == "batch_pk":
+            return queryset.filter(runbatch__pk=t)
+
         raise APIException('Unknown filter key: {}'.format(key))
 
     @detail_route(methods=['get'], suffix='Eligible Permissions')

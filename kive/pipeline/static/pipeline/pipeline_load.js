@@ -90,9 +90,8 @@ var pipeline = (function(exports){
             }
         });
 
-
-        // sort pipelines by their isometric position, left-to-right, top-to-bottom
-        // (sort of like reading order if you tilt your screen 30° clockwise)
+        // Sort inputs and outputs by their isometric position, left-to-right, top-to-bottom
+        // (sort of like reading order if you tilt your screen 30° clockwise).
         pipeline_inputs.sort(Geometry.isometricSort);
         pipeline_outputs.sort(Geometry.isometricSort);
 

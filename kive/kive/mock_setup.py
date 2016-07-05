@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from functools import partial
 from itertools import chain
 from mock import Mock, PropertyMock
 import os
@@ -12,7 +11,7 @@ from django.db.utils import ConnectionHandler, NotSupportedError
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
-get_attribute = OriginalMockSet = MockSet = None  # place holder until it can be imported properly
+from django_mock_queries.query import MockSet
 
 if not apps.ready:
     # Do the Django set up when running as a stand-alone unit test.
@@ -28,8 +27,14 @@ if not apps.ready:
     db['USER'] = '**Database disabled for unit tests**'
     ConnectionHandler.__getitem__ = Mock(name='mock_connection')
     mock_ops = ConnectionHandler.__getitem__.return_value.ops  # @UndefinedVariable
-    mock_execute = mock_ops.compiler.return_value.return_value.execute_sql
-    mock_execute.side_effect = NotSupportedError("Mock database can't execute sql.")
+
+    def compiler(queryset, connection, using, **kwargs):
+        result = Mock(name='mock_connection.ops.compiler()')
+        result.execute_sql.side_effect = NotSupportedError(
+            "Mock database tried to execute SQL for {} model.".format(
+                queryset.model._meta.object_name))
+        return result
+    mock_execute = mock_ops.compiler.return_value.side_effect = compiler
     mock_ops.integer_field_range.return_value = (-sys.maxint - 1, sys.maxint)
 
 
@@ -55,9 +60,8 @@ def setup_mock_relations(*models):
                     new_relation = PropertyMock(side_effect=ObjectDoesNotExist)
                 else:
                     new_relation = MockSet(cls=old_relation.field.model)
-                    new_relation.order_by = partial(_order_by, new_relation)
                 setattr(model, name, new_relation)
-        model.objects = Mock(name=model_name + '.objects')
+        model.objects = MockSet(mock_name=model_name + '.objects', cls=model)
         model.save = Mock(name=model_name + '.save')
 
 
@@ -124,24 +128,3 @@ def mocked_relations(*models):
                 return target(*args, **kwargs)
         return wrapped
     return decorator
-
-
-def _order_by(mock_set, attr):
-    records = mock_set.all()
-    ordered = sorted(records, key=lambda r: get_attribute(r, attr))
-    return MockSet(*ordered)
-
-
-def _wrap_mock_set(*args, **kwargs):
-    mock_set = OriginalMockSet(*args, **kwargs)
-    mock_set.order_by = partial(_order_by, mock_set)
-    return mock_set
-
-if MockSet is None:
-    # fails if imported before setup
-    if 'django_mock_queries.query' in sys.modules:
-        raise RuntimeError('django_mock_queries.query imported before mock_setup.')
-    from django_mock_queries.query import MockSet as OriginalMockSet
-    from django_mock_queries.utils import get_attribute
-    MockSet = _wrap_mock_set
-    sys.modules['django_mock_queries.query'].MockSet = MockSet

@@ -899,7 +899,7 @@
             "is_superuser": false, 
             "last_login": null, 
             "last_name": "", 
-            "password": "pbkdf2_sha256$24000$bUrKkoMxUchj$5e2QcTw7iAV0MujMIKz2LNXLMyMncyFv709PnABZhuU=", 
+            "password": "pbkdf2_sha256$24000$tFrKGGNYx1kM$RhorLbSd4TBpbTUsECC6u8vkMLbBXGKrJ7pPje2uN60=", 
             "user_permissions": [], 
             "username": "bob"
         }, 
@@ -964,7 +964,7 @@
         "fields": {
             "MD5_checksum": "092ef90fe0201f4b002cd200f7754d45", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_05/tmpuzkXnD", 
+            "dataset_file": "Datasets/2016_06/tmpQ5yBBk", 
             "date_created": "2000-01-01T00:00:01Z", 
             "description": "blahblahblah", 
             "external_path": "", 
@@ -984,7 +984,7 @@
         "fields": {
             "MD5_checksum": "1772221e5facf83f44d7077ed6dd416f", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_05/tmpcnfoYP", 
+            "dataset_file": "Datasets/2016_06/tmp6fxEdT", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "random reversed words", 
             "external_path": "", 
@@ -1004,7 +1004,7 @@
         "fields": {
             "MD5_checksum": "33e4aca01ee5dd9a4a456d0a107be50c", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_05/tmpfDgbQy", 
+            "dataset_file": "Datasets/2016_06/tmphuXZ_x", 
             "date_created": "2000-01-01T00:00:02Z", 
             "description": "random reversed words", 
             "external_path": "", 
@@ -1071,7 +1071,7 @@
         "fields": {
             "MD5_checksum": "55d9a706ac81b733f851a279d27d8cf2", 
             "coderesource": 2, 
-            "content_file": "CodeResources/fdopen_HJ5ZjwY", 
+            "content_file": "CodeResources/fdopen_lIpXj9G", 
             "groups_allowed": [
                 1
             ], 

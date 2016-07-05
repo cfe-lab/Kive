@@ -6,11 +6,11 @@ from django.contrib.auth.models import User, Group
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from archive.models import Run, MethodOutput, RunInput
+from archive.models import Run, MethodOutput, RunInput, RunBatch
 from transformation.models import TransformationInput
 from pipeline.models import Pipeline
 from metadata.models import who_cannot_access
-from datachecking.models import BadData
+from datachecking.models import BadData, MD5Conflict, ContentCheckLog
 
 from kive.serializers import AccessControlSerializer
 
@@ -55,7 +55,8 @@ class _RunDataset(object):
                  url=None,
                  redaction_plan=None,
                  is_ok=True,
-                 filename=None):
+                 filename=None,
+                 errors=None):
         self.step_name = str(step_name)
         self.name = name
         self.display = str(display or name)
@@ -66,6 +67,7 @@ class _RunDataset(object):
         self.url = url
         self.redaction_plan = redaction_plan
         self.is_ok = is_ok
+        self.errors = errors or []
         self.filename = filename
 
     def set_dataset(self, dataset, request):
@@ -86,6 +88,8 @@ class _RunDataset(object):
 
     def set_missing_output(self):
         self.size = self.date = 'not created'
+        self.errors.append(self.size)
+        self.is_ok = False
 
 
 class RunOutputsSerializer(serializers.ModelSerializer):
@@ -178,6 +182,10 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     output.id = methodoutput.id
                     output.size = methodoutput.output_log.size
                     output.date = execlog.end_time
+                    output.is_ok = methodoutput.return_code == 0
+                    if not output.is_ok:
+                        output.errors.append('return code {}'.format(
+                            methodoutput.return_code))
                     output.url = reverse('methodoutput-detail',
                                          kwargs={'pk': methodoutput.id},
                                          request=request)
@@ -221,14 +229,26 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                         is_ok=execrecordout.is_OK(),
                         type='dataset')
 
-                    # Look for any bad ContentCheckLogs that indicate missing output.
-                    missing_data = BadData.objects.filter(
-                        contentchecklog__in=execrecordout.dataset.content_checks.values_list("pk", flat=True),
-                        missing_output=True
-                    )
+                    # Look for any failed checks.
+                    content_checks = ContentCheckLog.objects.filter(
+                        dataset=execrecordout.dataset)
+                    bad_data = BadData.objects.filter(
+                        contentchecklog__in=content_checks)
+                    missing_data = bad_data.filter(missing_output=True)
+                    corrupted_data = MD5Conflict.objects.filter(
+                        integritychecklog__dataset=execrecordout.dataset)
 
                     if execrecordout.dataset.has_data():
                         output.set_dataset(execrecordout.dataset, request)
+                    if corrupted_data.exists():
+                        output.is_ok = False
+                        output.errors.append('failed integrity check')
+                    if bad_data.exists():
+                        output.is_ok = False
+                        output.errors.append('failed content check')
+                    elif not content_checks.exists():
+                        output.is_ok = False
+                        output.errors.append('content not checked')
                     elif execrecordout.dataset.is_redacted():
                         output.set_redacted()
                     elif missing_data.exists():
@@ -289,7 +309,8 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
             'users_allowed',
             'groups_allowed',
             'inputs',
-            'stopped_by'
+            'stopped_by',
+            'runbatch'
         )
         read_only_fields = (
             "purged",

@@ -57,6 +57,8 @@ var drydock = (function() {
         this.valid = false; // if false, canvas will redraw everything
         this.shapes = []; // collection of shapes to be drawn
         this.methods = []; // collection of methods to be drawn (subset of shapes)
+        this.inputs = []; // collection of inputs to be drawn (subset of shapes)
+        this.outputs = []; // collection of outputs to be drawn (subset of shapes)
         this.connectors = []; // collection of connectors between shapes
         this.dragging = false; // if mouse drag
     
@@ -68,6 +70,7 @@ var drydock = (function() {
         this.exec_order = [];
         this.exec_order_is_ambiguous = null;
         this.exec_order_may_have_changed = false;
+        this.input_order_may_have_changed = false;
         this.has_unsaved_changes = false;
         
         this.collisions = 0;
@@ -85,6 +88,10 @@ var drydock = (function() {
                 if (myState.exec_order_may_have_changed) {
                     myState.disambiguateExecutionOrder();
                     myState.exec_order_may_have_changed = false;
+                }
+                if (myState.input_order_may_have_changed) {
+                    myState.inputs.sort(Geometry.isometricSort);
+                    myState.input_order_may_have_changed = false;
                 }
                 if (!myState.valid) {
                     myState.draw();
@@ -226,6 +233,7 @@ var drydock = (function() {
                     // if execution order is ambiguous, the tiebreaker is the y-position.
                     // dragging a method node needs to calculate this in real-time.
                     this.exec_order_may_have_changed |= this.exec_order_is_ambiguous && sel.affects_exec_order;
+                    this.input_order_may_have_changed |= sel instanceof drydock_objects.CdtNode || sel instanceof drydock_objects.RawNode;
                 }
             }
             
@@ -410,6 +418,7 @@ var drydock = (function() {
             this_node,
             connected_nodes_in_order,
             magnets_in_order = [],
+            original_input_order = [],
             i, j,
             state = this;
         
@@ -417,6 +426,10 @@ var drydock = (function() {
             if (this.exec_order[i].length > max_layer) {
                 max_layer = this.exec_order[i].length;
             }
+        }
+
+        for (i = 0; i < this.inputs.length; i++) {
+            original_input_order[i] = this.inputs[i];
         }
         
         // First two layers are relatively easy.
@@ -455,7 +468,11 @@ var drydock = (function() {
         $(this.canvas).fadeOut({ complete: function() {
             var layer_length,
                 layer_out_magnets,
-                num_magnets;
+                num_magnets,
+                input,
+                first_layer_iso_y,
+                new_dims, idx;
+
             for (j = 0; j < node_order.length; j++) {
                 layer_length = node_order[j].length;
                 layer_out_magnets = [];
@@ -477,7 +494,7 @@ var drydock = (function() {
                     }
                 }
             
-                // added candy: the isometric X centre of the layer after this one will be aligned with the centre of the magnets leading to its nodes.
+                // the isometric X centre of the layer after this one will be aligned with the centre of the magnets leading to its nodes.
                 if (j !== node_order.length - 1) {
                     num_magnets = layer_out_magnets.length;
                     var avg = averageCoordinates(layer_out_magnets);
@@ -487,6 +504,16 @@ var drydock = (function() {
                     }
                 }
             }
+
+            // part ii: maintain input order
+            // put all inputs on the y-position of the first node_order
+            first_layer_iso_y = Geometry.isometricYCoord(node_order[0][0].x, node_order[0][0].y);
+            for (i = 0; i < original_input_order.length; i++ ) {
+                new_dims = Geometry.iso2twodim(x_spacing * (i - original_input_order.length / 2), first_layer_iso_y);
+                original_input_order[i].x = new_dims.x;
+                original_input_order[i].y = new_dims.y;
+            }
+
             state.scaleToCanvas(true);// "true" to maintain aspect ratio
             state.centreCanvas();
             for (i = 0; i < state.shapes.length; i++) {
@@ -763,7 +790,7 @@ var drydock = (function() {
             } 
         }
             
-        // see if this has changed the execution order
+        // see if this has changed the execution order or input order
         this.testExecutionOrder();
     
         // turn off all in-magnets
@@ -835,6 +862,11 @@ var drydock = (function() {
         if (shape instanceof drydock_objects.MethodNode) {
             this.methods.push(shape);
             this.testExecutionOrder();
+        } else if (shape instanceof drydock_objects.CdtNode || shape instanceof drydock_objects.RawNode) {
+            this.inputs.push(shape);
+            this.inputs.sort(Geometry.isometricSort);
+        } else if (shape instanceof drydock_objects.OutputNode) {
+            this.outputs.push(shape);
         }
         shape.has_unsaved_changes = true;
         this.valid = false;
@@ -939,7 +971,6 @@ var drydock = (function() {
     
         // esoteric syntax: label before a loop allows "continue" and "break" to specify which loop they are continuing or breaking.
         // check number of methods in the phases array
-        // sanity check... don't let this algorithm run away
         fill_phases_ar: while (methods.length > totalLength(phases) && L < 200) {
             phase = [];
             
@@ -995,6 +1026,7 @@ var drydock = (function() {
             L++;
         }
         
+        // sanity check... don't let this algorithm run away
         if (L >= 200) {
             console.log('DEBUG: Runaway topological sort algorithm');
             phases = false;
@@ -1027,11 +1059,13 @@ var drydock = (function() {
     };
     
     my.CanvasState.prototype.disambiguateExecutionOrder = function() {
+        this.methods = [];
         for (var k=0; k < this.exec_order.length; k++ ) {
             // @note: nodes also have dx and dy properties which are !== 0 when collisions were detected.
             // I have not accounted for these properties in this method because they could shift around
             // on window resize, and it makes no sense for the pipeline to change on window resize.
             this.exec_order[k].sort(Geometry.isometricSort);
+            this.methods = this.methods.concat(this.exec_order[k]);
         }
     };
     
@@ -1059,6 +1093,8 @@ var drydock = (function() {
         // reset containers to reflect canvas
         this.shapes = [];
         this.methods = [];
+        this.inputs = [];
+        this.outputs = [];
         this.connectors = [];
         this.exec_order = [];
         this.selection = [];
@@ -1073,16 +1109,10 @@ var drydock = (function() {
             connectors = this.connectors,
             sel = this.selection,
             labels = [],
-            flat_exec_order = [],
-            i, l, L, textWidth, shape, method;
+            i, l, textWidth, shape, method, idx;
         ctx.save();
         this.clear();
         ctx.scale(this.scale, this.scale);
-
-        for( i = 0; i < this.exec_order.length; i++) {
-            //"flatten" 2d array into 1d by concatenation.
-            flat_exec_order = flat_exec_order.concat(this.exec_order[i]);
-        }
         
         var draggingFromMethodOut = (
                 this.dragging &&
@@ -1098,19 +1128,6 @@ var drydock = (function() {
         // draw all shapes and magnets
         for (i = 0; (shape = shapes[i]); i++) {
             shape.draw(ctx);
-            L = shape.getLabel();
-            
-            // queue label to be drawn after
-            if (this.force_show_exec_order === false ||
-                    !(shape instanceof drydock_objects.MethodNode) ||
-                    this.force_show_exec_order === undefined &&
-                    !this.exec_order_is_ambiguous) {
-                L.label = (L.suffix? L.suffix +' ' : '')+ L.label;
-            } else {
-                // add information about execution order
-                L.label = (flat_exec_order.indexOf(shape) + 1) + L.suffix +': '+ L.label;
-            }
-            labels.push(L);
         }
 
         // draw all connectors
@@ -1120,8 +1137,8 @@ var drydock = (function() {
         }
         ctx.globalAlpha = 1.0;
 
+        // draw selection ring
         if (sel.length > 0) {
-            // draw selection ring
             ctx.strokeStyle = this.selectionColor;
             ctx.lineWidth = this.selectionWidth * 2;
             ctx.font = '9pt Lato, sans-serif';
@@ -1132,13 +1149,16 @@ var drydock = (function() {
             }
         }
         
+        // draw all update signals above shapes and connectors
         for (i = 0; (method = this.methods[i]); i++) {
-            // draw all update signals above shapes and connectors
             if (method.update_signal) {
                 method.update_signal.draw(ctx);
             }
         }
+
         if (this.enable_labels) {
+            labels = this.generateLabels();
+
             // draw all labels
             ctx.textAlign = 'center';
             ctx.textBaseline = 'alphabetic';
@@ -1167,6 +1187,49 @@ var drydock = (function() {
         ctx.restore();
         this.valid = true;
     };
+
+    my.CanvasState.prototype.generateLabels = (function() {
+        // format for each type of node's label
+        // (properties must match pipeline's properties)
+        var labelFns = {
+            inputs: function(l, _i) {
+                return "i" + (_i + 1) + l.suffix + ": " + l.label;
+            },
+            _methods: function(l, _i) {
+                return "s" + (_i + 1) + l.suffix + ': ' + l.label;
+            },
+            outputs: function(l) {
+                return (l.suffix ? l.suffix + ' ' : '') + l.label;
+            }
+        };
+
+        return function() {
+            var nodeTypes = [ "methods", "inputs", "outputs" ],
+                labels = [],
+                node, nodeType, L, i, j
+            ;
+
+            // check if method node order is not needed
+            if (this.force_show_exec_order === false ||
+                    this.force_show_exec_order === undefined &&
+                    !this.exec_order_is_ambiguous) {
+                labelFns.methods = labelFns.outputs;// treatment is identical to outputs (unordered)
+            } else {
+                labelFns.methods = labelFns._methods;
+            }
+
+            // prepare all labels
+            for (j = 0; (nodeType = nodeTypes[j]); j++) {
+                for (i = 0; (node = this[nodeType][i]); i++) {
+                    L = node.getLabel();
+                    L.label = labelFns[nodeType](L, i);
+                    labels.push(L);
+                }
+            }
+
+            return labels;
+        };
+    })();
     
     my.CanvasState.prototype.getPos = function(e) {
         // returns an object with x, y coordinates defined
@@ -1214,7 +1277,7 @@ var drydock = (function() {
     
     my.CanvasState.prototype.findMethodNode = function(method_pk) {
         var methods = this.methods;
-        for(var i = 0; i < methods.length; i++) {
+        for (var i = 0; i < methods.length; i++) {
             if (methods[i].pk == method_pk) {
                 return methods[i];
             }
@@ -1223,23 +1286,20 @@ var drydock = (function() {
     };
     
     my.CanvasState.prototype.findOutputNode = function(pk) {
-        var shapes = this.shapes;
-        for(var i = 0; i < shapes.length; i++) {
-            if (shapes[i] instanceof drydock_objects.OutputNode && shapes[i].pk == pk) {
-                return shapes[i];
+        var outputs = this.outputs;
+        for (var i = 0; i < outputs.length; i++) {
+            if (outputs[i].pk == pk) {
+                return outputs[i];
             }
         }
         return null;
     };
 
     my.CanvasState.prototype.findInputNode = function(input_index) {
-        var shapes = this.shapes;
-        for(var i = 0; i < shapes.length; i++) {
-            if ((shapes[i] instanceof drydock_objects.CdtNode ||
-                 shapes[i] instanceof drydock_objects.RawNode ) &&
-                shapes[i].input_index == input_index) {
-                
-                return shapes[i];
+        var inputs = this.inputs;
+        for (var i = 0; i < inputs.length; i++) {
+            if (inputs[i].input_index == input_index) {
+                return inputs[i];
             }
         }
         return null;

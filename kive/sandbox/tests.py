@@ -2,18 +2,22 @@ import os
 import re
 import sys
 import tempfile
+import shutil
+
+from mock import call, patch
 
 from django.contrib.auth.models import User
 from django.core.files import File
 from django.core.files.base import ContentFile
 from django.test import TestCase
+from django.utils import timezone
 
-from archive.models import Run
+from archive.models import Run, RunComponent
 from constants import datatypes
-from datachecking.models import ContentCheckLog, IntegrityCheckLog, MD5Conflict
+from datachecking.models import IntegrityCheckLog, MD5Conflict
 from kive.testing_utils import clean_up_all_files
 from kive.tests import install_fixture_files, restore_production_files
-from librarian.models import Dataset, DatasetStructure, ExternalFileDirectory
+from librarian.models import Dataset, DatasetStructure, ExternalFileDirectory, ExecRecord
 from metadata.models import Datatype, CompoundDatatype, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
 from method.tests import samplecode_path
@@ -425,7 +429,42 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertIsNone(run.clean())
         self.assertIsNone(run.complete_clean())
 
-    def test_pipeline_inputs_not_OK_nonraw(self):
+    def test_pipeline_all_inputs_initially_OK(self):
+        """Execute a Pipeline with inputs that were initially OK but have a failed integrity check."""
+        pipeline = self.find_nonraw_pipeline(self.myUser)
+        inputs = self.find_inputs_for_pipeline(pipeline)
+        self.assertTrue(all(i.is_OK() for i in inputs))
+        self.assertFalse(all(i.is_raw() for i in inputs))
+
+        # Spoil one of the inputs with a bad integrity check.
+        now = timezone.now()
+        for i, dataset in enumerate(inputs, start=1):
+            bad_input = dataset
+            bad_icl = IntegrityCheckLog(dataset=dataset,
+                                        user=self.myUser,
+                                        start_time=now,
+                                        end_time=now)
+            bad_icl.save()
+            MD5Conflict(integritychecklog=bad_icl, conflicting_dataset=dataset).save()
+            break
+        self.assertFalse(bad_input.is_OK())
+
+        run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+
+        self.check_run_OK(run)
+
+        # Check the full is_complete and is_successful.
+        self.assertTrue(run.is_complete())
+        self.assertTrue(run.is_successful())
+
+        self.assertIsNone(run.clean())
+        self.assertIsNone(run.complete_clean())
+
+        # The spoiled input should have been re-validated.
+        bad_input.refresh_from_db()
+        self.assertTrue(bad_input.is_OK())
+
+    def test_pipeline_inputs_not_initially_OK(self):
         """Can't execute a Pipeline with non-OK non-raw inputs."""
         pipeline = self.find_nonraw_pipeline(self.myUser)
         inputs = self.find_inputs_for_pipeline(pipeline)
@@ -433,41 +472,17 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertFalse(all(i.is_raw() for i in inputs))
 
         for i, dataset in enumerate(inputs, start=1):
-            if not dataset.is_raw():
+            if not dataset.is_raw() and dataset.content_checks.count() == 1:
                 bad_input, bad_index = dataset, i
-                bad_ccl = ContentCheckLog(dataset=dataset, user=self.myUser)
-                bad_ccl.save()
-                bad_ccl.add_missing_output()
+                orig_ccl = dataset.content_checks.first()
+                orig_ccl.add_missing_output()
                 break
-        self.assertFalse(all(i.is_OK() for i in inputs))
+        self.assertFalse(bad_input.initially_OK())
+        self.assertFalse(bad_input.is_OK())
 
         self.assertRaisesRegexp(
             ValueError,
-            re.escape('Dataset {} passed as input {} to Pipeline "{}" is not OK'
-                      .format(bad_input, bad_index, pipeline)),
-            lambda: Manager.execute_pipeline(self.myUser, pipeline, inputs)
-        )
-
-    def test_pipeline_inputs_not_OK_raw(self):
-        """Can't execute a Pipeline with non-OK raw inputs."""
-        pipeline = self.find_raw_pipeline(self.myUser)
-        self.assertIsNotNone(pipeline)
-        inputs = self.find_inputs_for_pipeline(pipeline)
-        self.assertTrue(all(i.is_OK() for i in inputs))
-        self.assertTrue(any(i.is_raw() for i in inputs))
-
-        for i, dataset in enumerate(inputs, start=1):
-            if dataset.is_raw():
-                bad_input, bad_index = dataset, i
-                bad_icl = IntegrityCheckLog(dataset=dataset, user=self.myUser)
-                bad_icl.save()
-                MD5Conflict(integritychecklog=bad_icl, conflicting_dataset=dataset).save()
-                break
-        self.assertFalse(all(i.is_OK() for i in inputs))
-
-        self.assertRaisesRegexp(
-            ValueError,
-            re.escape('Dataset {} passed as input {} to Pipeline "{}" is not OK'
+            re.escape('Dataset {} passed as input {} to Pipeline "{}" was not initially OK'
                       .format(bad_input, bad_index, pipeline)),
             lambda: Manager.execute_pipeline(self.myUser, pipeline, inputs)
         )
@@ -491,7 +506,7 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertTrue(run.is_failed())
 
         for cancelled_rs in run.runsteps.exclude(pk=rs.pk):
-            self.assertTrue(cancelled_rs.is_cancelled_FIXME())
+            self.assertTrue(cancelled_rs.is_cancelled())
 
     # FIXME this test revealed issues #534 and #535; when we fix these, revisit this test.
     # def test_filling_in_execrecord_with_incomplete_content_check(self):
@@ -548,6 +563,901 @@ class ExecuteTests(ExecuteTestsBase):
         # There should be an integrity check and a content check both associated to r2s' log.
         self.assertEquals(r2s.log.integrity_checks.count(), 1)
         self.assertEquals(r2s.log.content_checks.count(), 1)
+
+    @patch.object(Dataset, "attempt_to_decontaminate_runcomponents_using_as_output", autospec=True,
+                  side_effect=Dataset.attempt_to_decontaminate_runcomponents_using_as_output)
+    @patch.object(Dataset, "quarantine_runcomponents_using_as_output", autospec=True,
+                  side_effect=Dataset.quarantine_runcomponents_using_as_output)
+    @patch.object(ExecRecord, "attempt_decontamination", autospec=True,
+                  side_effect=ExecRecord.attempt_decontamination)
+    @patch.object(ExecRecord, "quarantine_runcomponents", autospec=True,
+                  side_effect=ExecRecord.quarantine_runcomponents)
+    @patch.object(Run, "attempt_decontamination", autospec=True, side_effect=Run.attempt_decontamination)
+    @patch.object(RunComponent, "decontaminate", autospec=True, side_effect=RunComponent.decontaminate)
+    @patch.object(Run, "quarantine", autospec=True, side_effect=Run.quarantine)
+    @patch.object(Run, "mark_failure", autospec=True, side_effect=Run.mark_failure)
+    @patch.object(Run, "stop", autospec=True, side_effect=Run.stop)
+    @patch.object(Run, "start", autospec=True, side_effect=Run.start)
+    @patch.object(RunComponent, "cancel_running", autospec=True, side_effect=RunComponent.cancel_running)
+    @patch.object(RunComponent, "cancel_pending", autospec=True, side_effect=RunComponent.cancel_pending)
+    @patch.object(RunComponent, "begin_recovery", autospec=True, side_effect=RunComponent.begin_recovery)
+    @patch.object(RunComponent, "quarantine", autospec=True, side_effect=RunComponent.quarantine)
+    @patch.object(RunComponent, "finish_failure", autospec=True, side_effect=RunComponent.finish_failure)
+    @patch.object(RunComponent, "finish_successfully", autospec=True, side_effect=RunComponent.finish_successfully)
+    @patch.object(RunComponent, "start", autospec=True, side_effect=RunComponent.start)
+    def test_execution_decontaminates_quarantined_runsteps(
+            self,
+            mock_start,
+            mock_finish_successfully,
+            mock_finish_failure,
+            mock_quarantine,
+            mock_begin_recovery,
+            mock_cancel_pending,
+            mock_cancel_running,
+            mock_run_start,
+            mock_run_stop,
+            mock_run_mark_failure,
+            mock_run_quarantine,
+            mock_decontaminate,
+            mock_run_attempt_decontamination,
+            mock_execrecord_quarantine_runcomponents,
+            mock_execrecord_attempt_decontamination,
+            mock_dataset_quarantine_rcs,
+            mock_dataset_attempt_decontamination
+    ):
+        """
+        Executing a pipeline with a quarantined component properly re-validates it.
+        """
+        # Start by executing a simple one-step pipeline.
+        pipeline = self.pX_raw
+        inputs = [self.raw_dataset]
+        run1 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        self.check_run_OK(run1)
+
+        run1_step1 = run1.runsteps.get(pipelinestep__step_num=1)
+        run1_outcable = run1.runoutputcables.first()
+
+        # All of the RunComponents should have been started.
+        mock_start.assert_has_calls([
+            call(run1_step1),
+            call(run1_step1.RSICs.first()),
+            call(run1_outcable)
+        ])
+        self.assertEquals(mock_start.call_count, 3)
+
+        # All of them should have been finished successfully without event.
+        mock_finish_successfully.assert_has_calls([
+            call(run1_step1.RSICs.first(), save=True),
+            call(run1_step1, save=True),
+            call(run1_outcable, save=True)
+        ])
+        self.assertEquals(mock_finish_successfully.call_count, 3)
+
+        # These were not called, so have not been mocked yet.
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_decontaminate, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_quarantine_runcomponents, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_dataset_quarantine_rcs, "assert_not_called"))
+        self.assertFalse(hasattr(mock_dataset_attempt_decontamination, "assert_not_called"))
+
+        mock_run_start.assert_called_once_with(run1, save=True)
+        mock_run_stop.assert_called_once_with(run1, save=True)
+        self.assertFalse(hasattr(mock_run_mark_failure, "assert_not_called"))
+
+        mock_run_start.reset_mock()
+        mock_run_stop.reset_mock()
+        mock_start.reset_mock()
+        mock_finish_successfully.reset_mock()
+
+        # Now, let's invalidate the output of the first step.
+        run1_rs = run1.runsteps.first()
+        run1_outcable = run1.runoutputcables.first()
+        step1_orig_output = run1_rs.outputs.first()
+
+        corrupted_contents = "Corrupted file"
+        _, temp_file_path = tempfile.mkstemp()
+        with open(temp_file_path, "wb") as f:
+            f.write(corrupted_contents)
+        step1_orig_output.check_integrity(temp_file_path, self.myUser, notify_all=True)
+        os.remove(temp_file_path)
+
+        # This should have quarantined run1_rs and run1.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_outcable.refresh_from_db()
+        self.assertTrue(run1.is_quarantined())
+        self.assertTrue(run1_rs.is_quarantined())
+        self.assertTrue(run1_outcable.is_quarantined())
+
+        # Check that all the calls were made correctly.
+        mock_dataset_quarantine_rcs.assert_called_once_with(step1_orig_output)
+        mock_execrecord_quarantine_runcomponents.assert_has_calls(
+            [
+                call(run1_rs.execrecord),
+                call(run1_outcable.execrecord)
+            ],
+            any_order=True
+        )
+
+        mock_quarantine.assert_has_calls(
+            [
+                call(RunComponent.objects.get(pk=run1_rs.pk), recurse_upward=True, save=True),
+                call(RunComponent.objects.get(pk=run1_outcable.pk), recurse_upward=True, save=True)
+            ],
+            any_order=True
+        )
+        self.assertEquals(mock_quarantine.call_count, 2)
+        mock_run_quarantine.assert_called_once_with(run1, recurse_upward=True, save=True)
+
+        # These still haven't been mocked yet after being reset.
+        self.assertFalse(hasattr(mock_start, "assert_not_called"))
+        self.assertFalse(hasattr(mock_finish_successfully, "assert_not_called"))
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+        self.assertFalse(hasattr(mock_decontaminate, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_dataset_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_start, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_stop, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_mark_failure, "assert_not_called"))
+
+        mock_dataset_quarantine_rcs.reset_mock()
+        mock_execrecord_quarantine_runcomponents.reset_mock()
+        mock_quarantine.reset_mock()
+        mock_run_quarantine.reset_mock()
+
+        # Now, we try it again.
+        run2 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        # It should have re-validated run1 and run1_rs.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_outcable.refresh_from_db()
+        self.assertTrue(run1.is_successful())
+        self.assertTrue(run1_rs.is_successful())
+        self.assertTrue(run1_outcable.is_successful())
+
+        self.check_run_OK(run2)
+        run2_step1 = run2.runsteps.first()
+        run2_outcable = run2.runoutputcables.first()
+
+        # Check all calls.
+        mock_start.assert_has_calls([
+            call(run2_step1),
+            call(run2_step1.RSICs.first()),
+            call(run2_outcable)
+        ])
+        self.assertEquals(mock_start.call_count, 3)
+
+        # All of them should have been finished successfully without event.
+        mock_finish_successfully.assert_has_calls([
+            call(run2_step1.RSICs.first(), save=True),
+            call(run2_step1, save=True),
+            call(run2_outcable, save=True)
+        ])
+        self.assertEquals(mock_finish_successfully.call_count, 3)
+
+        # Test the decontamination calls.
+        mock_dataset_attempt_decontamination.assert_called_once_with(step1_orig_output)
+        mock_execrecord_attempt_decontamination.assert_has_calls(
+            [
+                call(run1_step1.execrecord, step1_orig_output),
+                call(run1_outcable.execrecord, step1_orig_output)
+            ],
+            any_order=True
+        )
+        self.assertEquals(mock_execrecord_attempt_decontamination.call_count, 2)
+
+        mock_decontaminate.assert_has_calls(
+            [
+                call(RunComponent.objects.get(pk=run1_step1.pk), recurse_upward=True, save=True),
+                call(RunComponent.objects.get(pk=run1_outcable.pk), recurse_upward=True, save=True)
+            ],
+            any_order=True
+        )
+        self.assertEquals(mock_decontaminate.call_count, 2)
+        # run1 attempts to decontaminate itself twice; the first time, it doesn't do anything
+        # because there's still another RunComponent that's contaminated.
+        mock_run_attempt_decontamination.assert_has_calls(
+            [
+                call(run1, recurse_upward=True, save=True),
+                call(run1, recurse_upward=True, save=True)
+            ],
+            any_order=True
+        )
+        self.assertEquals(mock_run_attempt_decontamination.call_count, 2)
+
+        # These haven't been mocked.
+        self.assertFalse(hasattr(mock_dataset_quarantine_rcs, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_quarantine_runcomponents, "assert_not_called"))
+        self.assertFalse(hasattr(mock_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+
+    @patch.object(Dataset, "attempt_to_decontaminate_runcomponents_using_as_output", autospec=True,
+                  side_effect=Dataset.attempt_to_decontaminate_runcomponents_using_as_output)
+    @patch.object(Dataset, "quarantine_runcomponents_using_as_output", autospec=True,
+                  side_effect=Dataset.quarantine_runcomponents_using_as_output)
+    @patch.object(ExecRecord, "attempt_decontamination", autospec=True,
+                  side_effect=ExecRecord.attempt_decontamination)
+    @patch.object(ExecRecord, "quarantine_runcomponents", autospec=True,
+                  side_effect=ExecRecord.quarantine_runcomponents)
+    @patch.object(Run, "attempt_decontamination", autospec=True, side_effect=Run.attempt_decontamination)
+    @patch.object(RunComponent, "decontaminate", autospec=True, side_effect=RunComponent.decontaminate)
+    @patch.object(Run, "quarantine", autospec=True, side_effect=Run.quarantine)
+    @patch.object(Run, "mark_failure", autospec=True, side_effect=Run.mark_failure)
+    @patch.object(Run, "stop", autospec=True, side_effect=Run.stop)
+    @patch.object(Run, "start", autospec=True, side_effect=Run.start)
+    @patch.object(RunComponent, "cancel_running", autospec=True, side_effect=RunComponent.cancel_running)
+    @patch.object(RunComponent, "cancel_pending", autospec=True, side_effect=RunComponent.cancel_pending)
+    @patch.object(RunComponent, "begin_recovery", autospec=True, side_effect=RunComponent.begin_recovery)
+    @patch.object(RunComponent, "quarantine", autospec=True, side_effect=RunComponent.quarantine)
+    @patch.object(RunComponent, "finish_failure", autospec=True, side_effect=RunComponent.finish_failure)
+    @patch.object(RunComponent, "finish_successfully", autospec=True, side_effect=RunComponent.finish_successfully)
+    @patch.object(RunComponent, "start", autospec=True, side_effect=RunComponent.start)
+    def test_execution_decontaminates_quarantined_runcables(
+            self,
+            mock_start,
+            mock_finish_successfully,
+            mock_finish_failure,
+            mock_quarantine,
+            mock_begin_recovery,
+            mock_cancel_pending,
+            mock_cancel_running,
+            mock_run_start,
+            mock_run_stop,
+            mock_run_mark_failure,
+            mock_run_quarantine,
+            mock_decontaminate,
+            mock_run_attempt_decontamination,
+            mock_execrecord_quarantine_runcomponents,
+            mock_execrecord_attempt_decontamination,
+            mock_dataset_quarantine_rcs,
+            mock_dataset_attempt_decontamination
+    ):
+        """
+        Executing a pipeline with a quarantined runcable properly re-validates it.
+        """
+        # Start by executing a simple one-step pipeline.
+        pipeline = self.pX
+        inputs = [self.dataset]
+        run1 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        self.check_run_OK(run1)
+
+        run1_rs = run1.runsteps.first()
+        run1_rs_incable = run1_rs.RSICs.first()
+        run1_outcable = run1.runoutputcables.first()
+
+        # All of the RunComponents should have been started.
+        mock_start.assert_has_calls([
+            call(run1_rs),
+            call(run1_rs_incable),
+            call(run1_outcable)
+        ])
+        self.assertEquals(mock_start.call_count, 3)
+
+        # All of them should have been finished successfully without event.
+        mock_finish_successfully.assert_has_calls([
+            call(run1_rs_incable, save=True),
+            call(run1_rs, save=True),
+            call(run1_outcable, save=True)
+        ])
+        self.assertEquals(mock_finish_successfully.call_count, 3)
+
+        # These were not called, so have not been mocked yet.
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_decontaminate, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_quarantine_runcomponents, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_dataset_quarantine_rcs, "assert_not_called"))
+        self.assertFalse(hasattr(mock_dataset_attempt_decontamination, "assert_not_called"))
+
+        mock_run_start.assert_called_once_with(run1, save=True)
+        mock_run_stop.assert_called_once_with(run1, save=True)
+        self.assertFalse(hasattr(mock_run_mark_failure, "assert_not_called"))
+
+        mock_run_start.reset_mock()
+        mock_run_stop.reset_mock()
+        mock_start.reset_mock()
+        mock_finish_successfully.reset_mock()
+
+        # Now, let's invalidate the output of the first cable, which is non-trivial.
+        incable_orig_output = run1_rs_incable.outputs.first()
+
+        corrupted_contents = "Corrupted file"
+        _, temp_file_path = tempfile.mkstemp()
+        with open(temp_file_path, "wb") as f:
+            f.write(corrupted_contents)
+        incable_orig_output.check_integrity(temp_file_path, self.myUser, notify_all=True)
+        os.remove(temp_file_path)
+
+        # This should have quarantined run1_rs_incable, and run1, but not run1_rs.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_rs_incable.refresh_from_db()
+        run1_outcable.refresh_from_db()
+        self.assertTrue(run1.is_quarantined())
+        self.assertTrue(run1_rs.is_successful())
+        self.assertTrue(run1_rs_incable.is_quarantined())
+
+        # Check that all the calls were made correctly.
+        mock_dataset_quarantine_rcs.assert_called_once_with(incable_orig_output)
+        mock_execrecord_quarantine_runcomponents.assert_called_once_with(run1_rs_incable.execrecord)
+
+        mock_quarantine.assert_called_once_with(RunComponent.objects.get(pk=run1_rs_incable.pk),
+                                                recurse_upward=True, save=True)
+        mock_run_quarantine.assert_called_once_with(run1, recurse_upward=True, save=True)
+
+        # These still haven't been mocked yet after being reset.
+        self.assertFalse(hasattr(mock_start, "assert_not_called"))
+        self.assertFalse(hasattr(mock_finish_successfully, "assert_not_called"))
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+        self.assertFalse(hasattr(mock_decontaminate, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_dataset_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_start, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_stop, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_mark_failure, "assert_not_called"))
+
+        mock_dataset_quarantine_rcs.reset_mock()
+        mock_execrecord_quarantine_runcomponents.reset_mock()
+        mock_quarantine.reset_mock()
+        mock_run_quarantine.reset_mock()
+
+        # Now, we try it again.
+        run2 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        # It should have re-validated run1 and run1_rs.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_rs_incable.refresh_from_db()
+        self.assertTrue(run1.is_successful())
+        self.assertTrue(run1_rs.is_successful())
+        self.assertTrue(run1_rs_incable.is_successful())
+
+        # FIXME note that this is affected by issues #534 and #535; the method does not
+        # find a suitable ExecRecord.
+        self.check_run_OK(run2)
+        run2_step1 = run2.runsteps.first()
+        run2_outcable = run2.runoutputcables.first()
+
+        # Check all calls.
+        mock_start.assert_has_calls([
+            call(run2_step1),
+            call(run2_step1.RSICs.first()),
+            call(run2_outcable)
+        ])
+        self.assertEquals(mock_start.call_count, 3)
+
+        # All of them should have been finished successfully without event.
+        mock_finish_successfully.assert_has_calls([
+            call(run2_step1.RSICs.first(), save=True),
+            call(run2_step1, save=True),
+            call(run2_outcable, save=True)
+        ])
+        self.assertEquals(mock_finish_successfully.call_count, 3)
+
+        # Test the decontamination calls.
+        mock_dataset_attempt_decontamination.assert_called_once_with(incable_orig_output)
+        mock_execrecord_attempt_decontamination.assert_called_once_with(run1_rs_incable.execrecord,
+                                                                        incable_orig_output)
+
+        mock_decontaminate.assert_called_once_with(RunComponent.objects.get(pk=run1_rs_incable.pk),
+                                                   recurse_upward=True, save=True)
+        # run1 attempts to decontaminate itself once because there's only
+        # one RunComponent contaminated.
+        mock_run_attempt_decontamination.assert_called_once_with(run1, recurse_upward=True, save=True)
+
+        # These haven't been mocked.
+        self.assertFalse(hasattr(mock_dataset_quarantine_rcs, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_quarantine_runcomponents, "assert_not_called"))
+        self.assertFalse(hasattr(mock_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+
+    @patch.object(Dataset, "attempt_to_decontaminate_runcomponents_using_as_output", autospec=True,
+                  side_effect=Dataset.attempt_to_decontaminate_runcomponents_using_as_output)
+    @patch.object(Dataset, "quarantine_runcomponents_using_as_output", autospec=True,
+                  side_effect=Dataset.quarantine_runcomponents_using_as_output)
+    @patch.object(ExecRecord, "attempt_decontamination", autospec=True,
+                  side_effect=ExecRecord.attempt_decontamination)
+    @patch.object(ExecRecord, "quarantine_runcomponents", autospec=True,
+                  side_effect=ExecRecord.quarantine_runcomponents)
+    @patch.object(Run, "attempt_decontamination", autospec=True, side_effect=Run.attempt_decontamination)
+    @patch.object(RunComponent, "decontaminate", autospec=True, side_effect=RunComponent.decontaminate)
+    @patch.object(Run, "quarantine", autospec=True, side_effect=Run.quarantine)
+    @patch.object(Run, "mark_failure", autospec=True, side_effect=Run.mark_failure)
+    @patch.object(Run, "stop", autospec=True, side_effect=Run.stop)
+    @patch.object(Run, "start", autospec=True, side_effect=Run.start)
+    @patch.object(RunComponent, "cancel_running", autospec=True, side_effect=RunComponent.cancel_running)
+    @patch.object(RunComponent, "cancel_pending", autospec=True, side_effect=RunComponent.cancel_pending)
+    @patch.object(RunComponent, "begin_recovery", autospec=True, side_effect=RunComponent.begin_recovery)
+    @patch.object(RunComponent, "quarantine", autospec=True, side_effect=RunComponent.quarantine)
+    @patch.object(RunComponent, "finish_failure", autospec=True, side_effect=RunComponent.finish_failure)
+    @patch.object(RunComponent, "finish_successfully", autospec=True, side_effect=RunComponent.finish_successfully)
+    @patch.object(RunComponent, "start", autospec=True, side_effect=RunComponent.start)
+    def test_execution_external_file_decontaminates_quarantined_runcables(
+            self,
+            mock_start,
+            mock_finish_successfully,
+            mock_finish_failure,
+            mock_quarantine,
+            mock_begin_recovery,
+            mock_cancel_pending,
+            mock_cancel_running,
+            mock_run_start,
+            mock_run_stop,
+            mock_run_mark_failure,
+            mock_run_quarantine,
+            mock_decontaminate,
+            mock_run_attempt_decontamination,
+            mock_execrecord_quarantine_runcomponents,
+            mock_execrecord_attempt_decontamination,
+            mock_dataset_quarantine_rcs,
+            mock_dataset_attempt_decontamination
+    ):
+        """
+        Executing a pipeline on externally-backed data with a quarantined component properly re-validates a RunSIC.
+        """
+        # Set up a working directory and an externally-backed Dataset.
+        self.working_dir = tempfile.mkdtemp()
+        self.efd = ExternalFileDirectory(
+            name="ExecuteTestsEFD",
+            path=self.working_dir
+        )
+        self.efd.save()
+        self.ext_path = "ext.txt"
+        self.full_ext_path = os.path.join(self.working_dir, self.ext_path)
+
+        # Copy the contents of self.dataset to an external file and link the Dataset.
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
+
+        # Create a new externally-backed Dataset.
+        externally_backed_ds = Dataset.create_dataset(
+            self.full_ext_path,
+            user=self.myUser,
+            keep_file=False,
+            name="ExternallyBackedDS",
+            description="Dataset with external data and no internal data",
+            externalfiledirectory=self.efd
+        )
+
+        # Start by executing a simple one-step pipeline.
+        pipeline = self.pX_raw
+        inputs = [externally_backed_ds]
+        run1 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        self.check_run_OK(run1)
+
+        run1_rs = run1.runsteps.first()
+        run1_rs_incable = run1_rs.RSICs.first()
+        run1_outcable = run1.runoutputcables.first()
+
+        # All of the RunComponents should have been started.
+        mock_start.assert_has_calls([
+            call(run1_rs),
+            call(run1_rs_incable),
+            call(run1_outcable)
+        ])
+        self.assertEquals(mock_start.call_count, 3)
+
+        # All of them should have been finished successfully without event.
+        mock_finish_successfully.assert_has_calls([
+            call(run1_rs_incable, save=True),
+            call(run1_rs, save=True),
+            call(run1_outcable, save=True)
+        ])
+        self.assertEquals(mock_finish_successfully.call_count, 3)
+
+        # These were not called, so have not been mocked yet.
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_decontaminate, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_quarantine_runcomponents, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_dataset_quarantine_rcs, "assert_not_called"))
+        self.assertFalse(hasattr(mock_dataset_attempt_decontamination, "assert_not_called"))
+
+        mock_run_start.assert_called_once_with(run1, save=True)
+        mock_run_stop.assert_called_once_with(run1, save=True)
+        self.assertFalse(hasattr(mock_run_mark_failure, "assert_not_called"))
+
+        mock_run_start.reset_mock()
+        mock_run_stop.reset_mock()
+        mock_start.reset_mock()
+        mock_finish_successfully.reset_mock()
+
+        # Now, let's corrupt the input.
+        corrupted_contents = "Corrupted file"
+        with open(self.full_ext_path, "wb") as f:
+            f.write(corrupted_contents)
+        externally_backed_ds.check_integrity(self.full_ext_path, self.myUser, notify_all=True)
+
+        # This should have quarantined run1_rs_incable and run1 but not run1_rs.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_rs_incable.refresh_from_db()
+        self.assertTrue(run1.is_quarantined())
+        self.assertTrue(run1_rs.is_successful())
+        self.assertTrue(run1_rs_incable.is_quarantined())
+
+        # Check that all the calls were made correctly.
+        mock_dataset_quarantine_rcs.assert_called_once_with(externally_backed_ds)
+        mock_execrecord_quarantine_runcomponents.assert_called_once_with(run1_rs_incable.execrecord)
+
+        mock_quarantine.assert_called_once_with(RunComponent.objects.get(pk=run1_rs_incable.pk),
+                                                recurse_upward=True, save=True)
+        mock_run_quarantine.assert_called_once_with(run1, recurse_upward=True, save=True)
+
+        # These still haven't been mocked yet after being reset.
+        self.assertFalse(hasattr(mock_start, "assert_not_called"))
+        self.assertFalse(hasattr(mock_finish_successfully, "assert_not_called"))
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+        self.assertFalse(hasattr(mock_decontaminate, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_dataset_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_start, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_stop, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_mark_failure, "assert_not_called"))
+
+        mock_dataset_quarantine_rcs.reset_mock()
+        mock_execrecord_quarantine_runcomponents.reset_mock()
+        mock_quarantine.reset_mock()
+        mock_run_quarantine.reset_mock()
+
+        # Now we fix the contents of the Dataset.
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
+
+        # Now, we try it again.
+        run2 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        # It should have re-validated run1 and run1_rs.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_rs_incable.refresh_from_db()
+        self.assertTrue(run1.is_successful())
+        self.assertTrue(run1_rs.is_successful())
+        self.assertTrue(run1_rs_incable.is_successful())
+
+        self.check_run_OK(run2)
+        run2_step1 = run2.runsteps.first()
+        run2_outcable = run2.runoutputcables.first()
+
+        # Check all calls.
+        mock_start.assert_has_calls([
+            call(run2_step1),
+            call(run2_step1.RSICs.first()),
+            call(run2_outcable)
+        ])
+        self.assertEquals(mock_start.call_count, 3)
+
+        # All of them should have been finished successfully without event.
+        mock_finish_successfully.assert_has_calls([
+            call(run2_step1.RSICs.first(), save=True),
+            call(run2_step1, save=True),
+            call(run2_outcable, save=True)
+        ])
+        self.assertEquals(mock_finish_successfully.call_count, 3)
+
+        # Test the decontamination calls.
+        mock_dataset_attempt_decontamination.assert_called_once_with(externally_backed_ds)
+        mock_execrecord_attempt_decontamination.assert_called_once_with(run1_rs_incable.execrecord,
+                                                                        externally_backed_ds)
+
+        mock_decontaminate.assert_called_once_with(RunComponent.objects.get(pk=run1_rs_incable.pk),
+                                                   recurse_upward=True, save=True)
+        # run1 attempts to decontaminate itself once because there's only
+        # one RunComponent contaminated.
+        mock_run_attempt_decontamination.assert_called_once_with(run1, recurse_upward=True, save=True)
+
+        # These haven't been mocked.
+        self.assertFalse(hasattr(mock_dataset_quarantine_rcs, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_quarantine_runcomponents, "assert_not_called"))
+        self.assertFalse(hasattr(mock_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+
+        shutil.rmtree(self.working_dir)
+
+    @patch.object(Dataset, "attempt_to_decontaminate_runcomponents_using_as_output", autospec=True,
+                  side_effect=Dataset.attempt_to_decontaminate_runcomponents_using_as_output)
+    @patch.object(Dataset, "quarantine_runcomponents_using_as_output", autospec=True,
+                  side_effect=Dataset.quarantine_runcomponents_using_as_output)
+    @patch.object(ExecRecord, "attempt_decontamination", autospec=True,
+                  side_effect=ExecRecord.attempt_decontamination)
+    @patch.object(ExecRecord, "quarantine_runcomponents", autospec=True,
+                  side_effect=ExecRecord.quarantine_runcomponents)
+    @patch.object(Run, "attempt_decontamination", autospec=True, side_effect=Run.attempt_decontamination)
+    @patch.object(RunComponent, "decontaminate", autospec=True, side_effect=RunComponent.decontaminate)
+    @patch.object(Run, "quarantine", autospec=True, side_effect=Run.quarantine)
+    @patch.object(Run, "mark_failure", autospec=True, side_effect=Run.mark_failure)
+    @patch.object(Run, "stop", autospec=True, side_effect=Run.stop)
+    @patch.object(Run, "start", autospec=True, side_effect=Run.start)
+    @patch.object(RunComponent, "cancel_running", autospec=True, side_effect=RunComponent.cancel_running)
+    @patch.object(RunComponent, "cancel_pending", autospec=True, side_effect=RunComponent.cancel_pending)
+    @patch.object(RunComponent, "begin_recovery", autospec=True, side_effect=RunComponent.begin_recovery)
+    @patch.object(RunComponent, "quarantine", autospec=True, side_effect=RunComponent.quarantine)
+    @patch.object(RunComponent, "finish_failure", autospec=True, side_effect=RunComponent.finish_failure)
+    @patch.object(RunComponent, "finish_successfully", autospec=True, side_effect=RunComponent.finish_successfully)
+    @patch.object(RunComponent, "start", autospec=True, side_effect=RunComponent.start)
+    def test_execution_external_file_decontaminates_quarantined_runsteps(
+            self,
+            mock_start,
+            mock_finish_successfully,
+            mock_finish_failure,
+            mock_quarantine,
+            mock_begin_recovery,
+            mock_cancel_pending,
+            mock_cancel_running,
+            mock_run_start,
+            mock_run_stop,
+            mock_run_mark_failure,
+            mock_run_quarantine,
+            mock_decontaminate,
+            mock_run_attempt_decontamination,
+            mock_execrecord_quarantine_runcomponents,
+            mock_execrecord_attempt_decontamination,
+            mock_dataset_quarantine_rcs,
+            mock_dataset_attempt_decontamination
+    ):
+        """
+        Executing a pipeline on externally-backed data with a quarantined component properly re-validates RunSteps.
+        """
+        # Set up a working directory and an externally-backed Dataset.
+        self.working_dir = tempfile.mkdtemp()
+        self.efd = ExternalFileDirectory(
+            name="ExecuteTestsEFD",
+            path=self.working_dir
+        )
+        self.efd.save()
+        self.ext_path = "ext.txt"
+        self.full_ext_path = os.path.join(self.working_dir, self.ext_path)
+
+        # Copy the contents of self.dataset to an external file and link the Dataset.
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
+
+        # Create a new externally-backed Dataset.
+        externally_backed_ds = Dataset.create_dataset(
+            self.full_ext_path,
+            user=self.myUser,
+            keep_file=False,
+            name="ExternallyBackedDS",
+            description="Dataset with external data and no internal data",
+            externalfiledirectory=self.efd
+        )
+
+        # Start by executing a simple one-step pipeline.
+        pipeline = self.pX_raw
+        inputs = [externally_backed_ds]
+        run1 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        self.check_run_OK(run1)
+
+        run1_rs = run1.runsteps.first()
+        run1_rs_incable = run1_rs.RSICs.first()
+        run1_outcable = run1.runoutputcables.first()
+
+        # All of the RunComponents should have been started.
+        mock_start.assert_has_calls([
+            call(run1_rs),
+            call(run1_rs_incable),
+            call(run1_outcable)
+        ])
+        self.assertEquals(mock_start.call_count, 3)
+
+        # All of them should have been finished successfully without event.
+        mock_finish_successfully.assert_has_calls([
+            call(run1_rs_incable, save=True),
+            call(run1_rs, save=True),
+            call(run1_outcable, save=True)
+        ])
+        self.assertEquals(mock_finish_successfully.call_count, 3)
+
+        # These were not called, so have not been mocked yet.
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_decontaminate, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_quarantine_runcomponents, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_dataset_quarantine_rcs, "assert_not_called"))
+        self.assertFalse(hasattr(mock_dataset_attempt_decontamination, "assert_not_called"))
+
+        mock_run_start.assert_called_once_with(run1, save=True)
+        mock_run_stop.assert_called_once_with(run1, save=True)
+        self.assertFalse(hasattr(mock_run_mark_failure, "assert_not_called"))
+
+        mock_run_start.reset_mock()
+        mock_run_stop.reset_mock()
+        mock_start.reset_mock()
+        mock_finish_successfully.reset_mock()
+
+        # Now, let's corrupt the input.
+        corrupted_contents = "Corrupted file"
+        with open(self.full_ext_path, "wb") as f:
+            f.write(corrupted_contents)
+
+        # We also delete the output of the step so that it's forced to run.
+        output_ds = run1_rs.outputs.first()
+        output_ds.dataset_file.delete(save=True)
+
+        # We do another run.
+        run2 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+
+        # This should have quarantined run1_rs_incable and run1 but not run1_rs.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_rs_incable.refresh_from_db()
+        self.assertTrue(run1.is_quarantined())
+        self.assertTrue(run1_rs.is_successful())
+        self.assertTrue(run1_rs_incable.is_quarantined())
+
+        run2_rs = run2.runsteps.first()
+        run2_rs_incable = run2_rs.RSICs.first()
+        self.assertTrue(run2.is_failed())
+        self.assertTrue(run2_rs.is_cancelled())
+        self.assertTrue(run2_rs_incable.is_cancelled())
+
+        # The step and incable should have been started.
+        mock_start.assert_has_calls([
+            call(run2_rs),
+            call(run2_rs_incable),
+        ])
+        self.assertEquals(mock_start.call_count, 2)
+
+        # Both are cancelled.
+        mock_cancel_running.assert_has_calls([
+            call(run2_rs_incable, save=True),
+            call(run2_rs, save=True)
+        ])
+        self.assertEquals(mock_cancel_running.call_count, 2)
+
+        # The run started, was marked a failure, and stopped.
+        mock_run_start.assert_called_once_with(run2, save=True)
+        mock_run_mark_failure.assert_called_once_with(run2, save=True)
+        mock_run_stop.assert_called_once_with(run2, save=True)
+
+        # The input dataset should have called quarantine.
+        mock_dataset_quarantine_rcs.assert_called_once_with(externally_backed_ds)
+        mock_execrecord_quarantine_runcomponents.assert_called_once_with(run2_rs_incable.execrecord)
+        mock_quarantine.assert_called_once_with(
+            RunComponent.objects.get(pk=run1_rs_incable.pk), recurse_upward=True, save=True
+        )
+        mock_run_quarantine.assert_called_once_with(run1, recurse_upward=True, save=True)
+
+        # These were not called, so have not been mocked yet.
+        self.assertFalse(hasattr(mock_finish_successfully, "assert_not_called"))
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_decontaminate, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_attempt_decontamination, "assert_not_called"))
+        self.assertFalse(hasattr(mock_dataset_attempt_decontamination, "assert_not_called"))
+
+        mock_run_start.reset_mock()
+        mock_run_stop.reset_mock()
+        mock_run_mark_failure.reset_mock()
+        mock_start.reset_mock()
+        mock_finish_successfully.reset_mock()
+        mock_dataset_quarantine_rcs.reset_mock()
+        mock_execrecord_quarantine_runcomponents.reset_mock()
+        mock_quarantine.reset_mock()
+        mock_run_quarantine.reset_mock()
+
+        # Now we fix the contents of the Dataset.
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
+
+        # Now, we try it again.
+        run3 = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+        # It should have re-validated run1 and run1_rs.
+        run1.refresh_from_db()
+        run1_rs.refresh_from_db()
+        run1_rs_incable.refresh_from_db()
+        self.assertTrue(run1.is_successful())
+        self.assertTrue(run1_rs.is_successful())
+        self.assertTrue(run1_rs_incable.is_successful())
+
+        # The stuff from run2 should be left alone.
+        run2.refresh_from_db()
+        run2_rs.refresh_from_db()
+        run2_rs_incable.refresh_from_db()
+        self.assertTrue(run2.is_failed())
+        self.assertTrue(run2_rs.is_cancelled())
+        self.assertTrue(run2_rs_incable.is_cancelled())
+
+        self.check_run_OK(run3)
+        run3_rs = run3.runsteps.first()
+        run3_rs_incable = run3_rs.RSICs.first()
+        run3_outcable = run3.runoutputcables.first()
+
+        # Check all calls.
+        mock_start.assert_has_calls([
+            call(run3_rs),
+            call(run3_rs_incable),
+            call(run3_outcable)
+        ])
+        self.assertEquals(mock_start.call_count, 3)
+
+        # All of them should have been finished successfully without event.
+        mock_finish_successfully.assert_has_calls([
+            call(run3_rs_incable, save=True),
+            call(run3_rs, save=True),
+            call(run3_outcable, save=True)
+        ])
+        self.assertEquals(mock_finish_successfully.call_count, 3)
+
+        # Test the decontamination calls.
+        mock_dataset_attempt_decontamination.assert_called_once_with(externally_backed_ds)
+        mock_execrecord_attempt_decontamination.assert_called_once_with(run1_rs_incable.execrecord,
+                                                                        externally_backed_ds)
+
+        mock_decontaminate.assert_called_once_with(RunComponent.objects.get(pk=run1_rs_incable.pk),
+                                                   recurse_upward=True, save=True)
+        # run1 attempts to decontaminate itself once.
+        mock_run_attempt_decontamination.assert_called_once_with(run1, recurse_upward=True, save=True)
+
+        # These haven't been mocked.
+        self.assertFalse(hasattr(mock_dataset_quarantine_rcs, "assert_not_called"))
+        self.assertFalse(hasattr(mock_execrecord_quarantine_runcomponents, "assert_not_called"))
+        self.assertFalse(hasattr(mock_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_run_quarantine, "assert_not_called"))
+        self.assertFalse(hasattr(mock_finish_failure, "assert_not_called"))
+        self.assertFalse(hasattr(mock_begin_recovery, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_pending, "assert_not_called"))
+        self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
+
+        shutil.rmtree(self.working_dir)
 
 
 class SandboxTests(ExecuteTestsBase):
@@ -830,6 +1740,10 @@ class ExecuteExternalInputTests(ExecuteTestsBase):
         self.ext_path = "ext.txt"
         self.full_ext_path = os.path.join(self.working_dir, self.ext_path)
 
+    def tearDown(self):
+        super(ExecuteExternalInputTests, self).tearDown()
+        shutil.rmtree(self.working_dir)
+
     def test_pipeline_external_file_input(self):
         """Execution of a pipeline whose input is externally-backed."""
 
@@ -881,39 +1795,38 @@ class ExecuteExternalInputTests(ExecuteTestsBase):
         # The run should be cancelled by the first cable.
         self.assertTrue(run.is_cancelled())
         rsic = run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
-        self.assertTrue(rsic.is_cancelled_FIXME())
+        self.assertTrue(rsic.is_cancelled())
         self.assertTrue(hasattr(rsic, "input_integrity_check"))
         self.assertTrue(rsic.input_integrity_check.read_failed)
 
-    # FIXME disabled for v0.7.3; fix as part of #550.
-    # def test_pipeline_external_file_input_corrupted(self):
-    #     """Execution of a pipeline whose input is corrupted."""
-    #
-    #     # Copy the contents of self.dataset to an external file and link the Dataset.
-    #     self.raw_dataset.dataset_file.open()
-    #     with self.raw_dataset.dataset_file:
-    #         with open(self.full_ext_path, "wb") as f:
-    #             f.write(self.raw_dataset.dataset_file.read())
-    #
-    #     # Create a new externally-backed Dataset.
-    #     external_corrupted_ds = Dataset.create_dataset(
-    #         self.full_ext_path,
-    #         user=self.myUser,
-    #         keep_file=False,
-    #         name="ExternalCorruptedDS",
-    #         description="Dataset with corrupted external data and no internal data",
-    #         externalfiledirectory=self.efd
-    #     )
-    #     # Tamper with the external file.
-    #     with open(self.full_ext_path, "wb") as f:
-    #         f.write("Corrupted")
-    #
-    #     # Execute pipeline
-    #     run = Manager.execute_pipeline(self.myUser, self.pX_raw, [external_corrupted_ds]).get_last_run()
-    #
-    #     # The run should fail on the first cable.
-    #     self.assertFalse(run.is_successful(use_cache=True))
-    #     rsic = run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
-    #     self.assertFalse(rsic.is_successful(use_cache=True))
-    #     self.assertTrue(hasattr(rsic, "input_integrity_check"))
-    #     self.assertTrue(rsic.input_integrity_check.is_md5_conflict())
+    def test_pipeline_external_file_input_corrupted(self):
+        """Execution of a pipeline whose input is corrupted."""
+
+        # Copy the contents of self.dataset to an external file and link the Dataset.
+        self.raw_dataset.dataset_file.open()
+        with self.raw_dataset.dataset_file:
+            with open(self.full_ext_path, "wb") as f:
+                f.write(self.raw_dataset.dataset_file.read())
+
+        # Create a new externally-backed Dataset.
+        external_corrupted_ds = Dataset.create_dataset(
+            self.full_ext_path,
+            user=self.myUser,
+            keep_file=False,
+            name="ExternalCorruptedDS",
+            description="Dataset with corrupted external data and no internal data",
+            externalfiledirectory=self.efd
+        )
+        # Tamper with the external file.
+        with open(self.full_ext_path, "wb") as f:
+            f.write("Corrupted")
+
+        # Execute pipeline
+        run = Manager.execute_pipeline(self.myUser, self.pX_raw, [external_corrupted_ds]).get_last_run()
+
+        # The run should fail on the first cable.
+        self.assertFalse(run.is_successful())
+        rsic = run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
+        self.assertFalse(rsic.is_successful())
+        self.assertTrue(hasattr(rsic, "input_integrity_check"))
+        self.assertTrue(rsic.input_integrity_check.is_md5_conflict())

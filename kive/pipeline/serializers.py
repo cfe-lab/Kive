@@ -378,14 +378,18 @@ class PipelineSerializer(AccessControlSerializer,
             new_method = methods_already_upgraded.get(old_method, old_method)
             if old_method not in methods_already_upgraded:
                 # Look to see if we need to make a new version of the Method.
-                updated_driver = old_method.driver
+                updated_driver = old_method.driver  # default to old version
                 if new_driver_pk is not None:
+                    # CR has been updated
                     updated_driver = CodeResourceRevision.objects.get(pk=new_driver_pk)
 
                 revision_name = updated_driver.revision_name
                 revision_description = updated_driver.revision_desc
 
+
+                resource_map = {}
                 if new_dependency_ids:
+                    # revised CR has new dependencies
                     dependency_revisions = CodeResourceRevision.objects.filter(id__in=new_dependency_ids)
                     revision_name += " ({})".format(
                         ', '.join([d.revision_name for d in dependency_revisions])
@@ -394,6 +398,7 @@ class PipelineSerializer(AccessControlSerializer,
                         '\n---\n'.join([d.revision_desc for d in dependency_revisions])
                     )
                     resource_map = {d.coderesource_id: d for d in dependency_revisions}
+
 
                 if new_driver_pk is not None or new_dependency_ids:
                     # Create a new Method from the updated driver and dependencies.

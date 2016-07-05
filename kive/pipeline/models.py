@@ -173,11 +173,9 @@ class Pipeline(transformation.models.Transformation):
             self.revision_number = self.family.next_revision()
         super(Pipeline, self).save(*args, **kwargs)
 
-    @property
     def is_method(self):
         return False
 
-    @property
     def is_pipeline(self):
         return True
 
@@ -313,8 +311,8 @@ class Pipeline(transformation.models.Transformation):
 
         # Check each individual input.
         for i, supplied_input in enumerate(inputs, start=1):
-            if not supplied_input.is_OK():
-                raise ValueError('Dataset {} passed as input {} to Pipeline "{}" is not OK'
+            if not supplied_input.initially_OK():
+                raise ValueError('Dataset {} passed as input {} to Pipeline "{}" was not initially OK'
                                  .format(supplied_input, i, self))
 
             pipeline_input = self.inputs.get(dataset_idx=i)
@@ -397,7 +395,7 @@ class Pipeline(transformation.models.Transformation):
         for step in self.steps.all():
             transformation = step.transformation.find_update()
             # TODO: handle nested pipelines
-            if transformation is not None and transformation.is_method:
+            if transformation is not None and transformation.is_method():
                 update = PipelineStepUpdate(step.step_num)
                 update.method = transformation.definite
                 updates.append(update)
@@ -430,7 +428,7 @@ class Pipeline(transformation.models.Transformation):
         atomic_step_pks = []
         for ps in self.steps.all():
             psic_iterables.append(ps.cables_in.all())
-            if ps.is_subpipeline:
+            if ps.is_subpipeline():
                 sub_steps, sub_psics, sub_pocs = ps.child_run.get_all_atomic_steps_cables()
                 atomic_step_iterables.append(sub_steps)
                 psic_iterables.append(sub_psics)
@@ -482,10 +480,9 @@ class PipelineStep(models.Model):
         """ Represent with the pipeline and step number """
         return "{}: {}".format(self.step_num, self.name)
 
-    @property
     def is_subpipeline(self):
         """Is this PipelineStep a sub-pipeline?"""
-        return self.transformation.is_pipeline
+        return self.transformation.is_pipeline()
 
     @property
     def inputs(self):
@@ -497,7 +494,6 @@ class PipelineStep(models.Model):
         """Outputs from this PipelineStep, ordered by index."""
         return self.transformation.outputs.all()
 
-    @property
     def is_cable(self):
         return False
 
@@ -511,7 +507,7 @@ class PipelineStep(models.Model):
         contains_pipeline = False
 
         # Base case 1: the transformation is a method and can't possibly contain the pipeline.
-        if self.transformation.is_method:
+        if self.transformation.is_method():
             contains_pipeline = False
 
         # Base case 2: this step's transformation exactly equals the pipeline specified
@@ -637,7 +633,7 @@ class PipelineStep(models.Model):
         return outputs_needed
 
     def threads_needed(self):
-        if self.transformation.is_pipeline:
+        if self.transformation.is_pipeline():
             return self.transformation.definite.threads_needed()
         return self.transformation.definite.threads
 
@@ -658,7 +654,6 @@ class PipelineCable(models.Model):
     # Implicitly defined:
     # - custom_wires: from a FK in CustomCableWire
 
-    @property
     def is_incable(self):
         """Is this an input cable, as opposed to an output cable?"""
         try:
@@ -667,7 +662,6 @@ class PipelineCable(models.Model):
             return False
         return True
 
-    @property
     def is_outcable(self):
         """Is this an output cable, as opposed to an input cable?"""
         try:
@@ -676,7 +670,6 @@ class PipelineCable(models.Model):
             return False
         return True
 
-    @property
     def is_cable(self):
         return True
 
@@ -738,7 +731,7 @@ class PipelineCable(models.Model):
 
     @property
     def definite(self):
-        if self.is_incable:
+        if self.is_incable():
             return self.pipelinestepinputcable
         else:
             return self.pipelineoutputcable
@@ -927,7 +920,7 @@ class PipelineCable(models.Model):
 
     def clean(self):
         """This must be either a PSIC or POC."""
-        if not self.is_incable and not self.is_outcable:
+        if not self.is_incable() and not self.is_outcable():
             raise ValidationError("PipelineCable with pk={} is neither a PSIC nor a POC".format(self.pk))
 
     def find_compatible_ERs(self, input_dataset, runcable):
@@ -941,7 +934,11 @@ class PipelineCable(models.Model):
                         ExecRecord exists
         """
         # Look at ERIs with matching input dataset.
-        candidate_ERIs = librarian.models.ExecRecordIn.objects.filter(dataset=input_dataset)
+        candidate_ERIs = librarian.models.ExecRecordIn.objects.filter(
+            dataset=input_dataset).prefetch_related(
+                'execrecord__execrecordins__dataset',
+                'execrecord__execrecordouts__dataset',
+                'execrecord__generator__methodoutput')
 
         candidates = []
         for candidate_ERI in candidate_ERIs:
@@ -951,7 +948,7 @@ class PipelineCable(models.Model):
 
             candidate_component = candidate_execrecord.general_transf()
 
-            if not candidate_component.is_cable:
+            if not candidate_component.is_cable():
                 continue
 
             # Check that this ER is accessible by runcable.
@@ -1289,7 +1286,7 @@ class CustomCableWire(models.Model):
         source_CDT_members = self.cable.source.get_cdt().members.all()  # Duck typing
         dest_CDT = None
         dest_CDT_members = None
-        if self.cable.is_incable:
+        if self.cable.is_incable():
             dest_CDT = self.cable.dest.get_cdt()
             dest_CDT_members = dest_CDT.members.all()
         else:

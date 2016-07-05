@@ -495,6 +495,8 @@ var drydock_objects = (function() {
         }
         index = cs.shapes.indexOf(this);
         cs.shapes.splice(index, 1);
+        index = cs.inputs.indexOf(this);
+        cs.inputs.splice(index, 1);
     };
 
     my.CdtNode = function(pk, x, y, label, input_index) {
@@ -1433,6 +1435,8 @@ var drydock_objects = (function() {
             if (this.dest.parent instanceof drydock_objects.OutputNode) {
                 index = cs.shapes.indexOf(this.dest.parent);
                 if (index > -1) cs.shapes.splice(index, 1);
+                index = cs.outputs.indexOf(this.dest.parent);
+                if (index > -1) cs.outputs.splice(index, 1);
             } else {
                 // remove connector from destination in-magnet
                 index = this.dest.connected.indexOf(this);

@@ -92,7 +92,6 @@ class Transformation(metadata.models.AccessControl):
     # we try to invoke them directly on either.  (This code wouldn't work
     # in that case because a Method wouldn't have a field called "pipeline"
     # and vice versa.)
-    @property
     def is_pipeline(self):
         """Is this a Pipeline, as opposed to a Method?"""
         try:
@@ -101,7 +100,6 @@ class Transformation(metadata.models.AccessControl):
             return False
         return True
 
-    @property
     def is_method(self):
         """Is this a method, as opposed to a Pipeline?"""
         try:
@@ -112,7 +110,7 @@ class Transformation(metadata.models.AccessControl):
 
     @property
     def definite(self):
-        if self.is_pipeline:
+        if self.is_pipeline():
             return self.pipeline
         else:
             return self.method
@@ -154,7 +152,7 @@ class Transformation(metadata.models.AccessControl):
 
     def clean(self):
         """Validate transformation inputs and outputs, and reject if it is neither Method nor Pipeline."""
-        if not self.is_pipeline and not self.is_method:
+        if not self.is_pipeline() and not self.is_method():
             raise ValidationError("Transformation with pk={} is neither Method nor Pipeline".format(self.pk))
 
         for curr_input in self.inputs.all():
@@ -216,7 +214,7 @@ class Transformation(metadata.models.AccessControl):
 
         # Hack: complete_clean() for Methods only (Pipelines can be
         # created without being complete).
-        if transformation.is_method:
+        if transformation.is_method():
             transformation.complete_clean()
         else:
             transformation.full_clean()
