@@ -4,15 +4,14 @@ $(function() {
     var is_user_admin = false, // Never show admin tools on this page
         body = $('body'),
         dataset_input_table = $('#dataset_input_table tbody'),
-        dataset_input_table_fixed_header,
         dataset_search_dialog = $('.dataset-search-dlg'),
+        above_box = $('#above_box'),
         set_dataset = {
             wrapper: $('#insert_dataset'),
             btn: $('#insert_one_dataset'),
             options_btn: $('#insert_many_dataset'),
             options_menu: $('#insert_many_menu')
         },
-        above_box = $('#above_box'),
         dataset_search_table = new choose_inputs.DatasetsTable(
             dataset_search_dialog.find('table'),
             is_user_admin,
@@ -21,19 +20,15 @@ $(function() {
             dataset_search_dialog.find(".navigation_links")
         ),
         cell_width = 100 / dataset_input_table.find('tr').eq(0).find('td').length + '%',
-        dataset_input_table_top,
         scroll_content_top = $('#scroll_content').css('top'),
-        above_box_height = '32em',
         pipeline_pk = $("#id_pipeline").val()
     ;
-
-    dataset_input_table.find('td').css('width', cell_width);
 
     above_box.hide = function() {
         dataset_input_table.closest('#scroll_content').animate({
             'top': scroll_content_top
         }, function() {
-            dataset_input_table_fixed_header.css('top', $('h1').outerHeight());
+            dataset_input_table.$fixed_header.css('top', $('h1').outerHeight());
         });
         this.animate({
             'height': '50px',
@@ -42,14 +37,19 @@ $(function() {
         }).addClass('hidden');
     };
     above_box.show = function(callback) {
-        aboveBoxSpaceAdjustment();
-        dataset_input_table.closest('#scroll_content').animate({
-            'top': dataset_input_table_top
+        var table = dataset_input_table,
+            _this = this;
+        this.adjustSpacing();
+        table.closest('#scroll_content').animate({
+            'top': table._top
         }, function() {
-            dataset_input_table_fixed_header.css('top', Math.floor(above_box.position().top + above_box.outerHeight()));
+            table.$fixed_header.css(
+                'top',
+                Math.floor(_this.position().top + _this.outerHeight())
+            );
         });
         this.animate({
-            'height': above_box_height,
+            'height': this._height,
             'border-color': '#000',
             'background-color': '#eee'
         }, callback).removeClass('hidden');
@@ -61,6 +61,24 @@ $(function() {
             callback();
         }
     };
+    above_box.adjustSpacing = function() {
+        if (window.innerHeight <= 700) {
+            this._height = "20em";
+            dataset_input_table._top = "18em";
+        } else if (window.innerHeight <= 1000) {
+            this._height = "25em";
+            dataset_input_table._top = "23.3em";
+        } else {
+            this._height = "32em";
+            dataset_input_table._top = "31em";
+        }
+        if (!this.hasClass('hidden')) {
+            dataset_input_table.closest('#scroll_content').css('top', dataset_input_table._top);
+            this.css('height', this._height);
+        }
+    }
+
+    dataset_input_table.find('td').css('width', cell_width);
     dataset_input_table.error = function(message) {
         var $error_div = $(this).closest('table').find('.error');
         $error_div.show().text(message);
@@ -68,6 +86,69 @@ $(function() {
         setTimeout(function() {
             $error_div.hide();
         }, 5000);
+    };
+    dataset_input_table.createHeader = function() {
+        var in_tb = this.closest('table'),
+            header_row = in_tb.find('thead tr');
+
+        return in_tb.clone()// <table>
+            .wrap('<div>').parent()// <div>
+            .addClass('fixed-header')
+            .css({
+                height: header_row.outerHeight() + 1,
+                top: $('h1').outerHeight(),
+                left: in_tb.offset().left,
+                width: in_tb.outerWidth()
+            })
+            .insertBefore(in_tb)
+        ;
+    };
+    dataset_input_table.scrollHeader = function(e) {
+        if (!this.hasOwnProperty("$fixed_header")) {
+            this.$fixed_header = this.createHeader();
+        }
+
+        var header = this.$fixed_header,
+            header_is_visible = header.is(':visible'),
+            header_top = 4;
+
+        if (above_box.hasClass('hidden')) {
+            header_top = this.closest('table').offset().top - $('h1').outerHeight();
+        }
+
+        if ($(window).scrollTop() > header_top) {
+            if (!header_is_visible) {
+                header.show();
+            }
+            header.css('left', -$(window).scrollLeft());
+        } else if (header_is_visible) {
+            header.hide();
+        }
+    };
+    dataset_input_table.addNewRunRow = function() {
+        for (
+            var new_run_ix = $('tr', this).length;
+            $('.run-name[name="run_name[' + new_run_ix + ']"]').length > 0;
+            new_run_ix++
+        );
+        uiFactory.pipelineInputRow()
+            .find('.run-name')
+                .attr('name', 'run_name[' + new_run_ix + ']')
+            .end()
+            .appendTo(this)
+        ;
+        setRunNamesPrefix();
+    };
+    dataset_input_table.removeLastRunRow = function() {
+        var $tr = this.find('tr');
+        if ($tr.length > 1) {
+            if ($tr.eq(-1).find('.receiving').length) {
+                closeSearchDialog();
+            }
+            $tr.eq(-1).remove();
+        } else {
+            this.error("Error: You must have at least 1 run.");
+        }
     };
 
     var deselectAll = function() {
@@ -81,39 +162,6 @@ $(function() {
     var submitDatasetSearch = function(e) {
         e.preventDefault();
         dataset_search_table.filterSet.addFromForm(this);
-    };
-    var aboveBoxSpaceAdjustment = function() {
-        if (window.innerHeight <= 700) {
-            above_box_height = "20em";
-            dataset_input_table_top = "18em";
-        } else if (window.innerHeight <= 1000) {
-            above_box_height = "25em";
-            dataset_input_table_top = "23.3em";
-        } else {
-            above_box_height = "32em";
-            dataset_input_table_top = "31em";
-        }
-        if (!above_box.hasClass('hidden')) {
-            dataset_input_table.closest('#scroll_content').css('top', dataset_input_table_top);
-            above_box.css('height', above_box_height);
-        }
-    };
-    var scrollTableHeader = function(e) {
-        var header_is_visible = dataset_input_table_fixed_header.is(':visible'),
-            header_top = 4;
-
-        if (above_box.hasClass('hidden')) {
-            header_top = dataset_input_table.closest('table').offset().top - $('h1').outerHeight();
-        }
-
-        if ($(this).scrollTop() > header_top) {
-            if (!header_is_visible) {
-                dataset_input_table_fixed_header.show();
-            }
-            dataset_input_table_fixed_header.css('left', -$(this).scrollLeft());
-        } else if (header_is_visible) {
-            dataset_input_table_fixed_header.hide();
-        }
     };
     var scrollInputSetDatasetButton = function() {
         var cellOffsetX = $('button.receiving').offset().left,
@@ -547,31 +595,6 @@ $(function() {
             $(this).find('input[type="text"]').trigger('focus');
         }
     };
-    var addNewRunRow = function() {
-        for (
-            var new_run_ix = $('tr', dataset_input_table).length;
-            $('.run-name[name="run_name[' + new_run_ix + ']"]').length > 0;
-            new_run_ix++
-        );
-        uiFactory.pipelineInputRow()
-            .find('.run-name')
-                .attr('name', 'run_name[' + new_run_ix + ']')
-            .end()
-            .appendTo(dataset_input_table)
-        ;
-        setRunNamesPrefix();
-    };
-    var removeLastRunRow = function() {
-        var $tr = dataset_input_table.find('tr');
-        if ($tr.length > 1) {
-            if ($tr.eq(-1).find('.receiving').length) {
-                closeSearchDialog();
-            }
-            $tr.eq(-1).remove();
-        } else {
-            dataset_input_table.error("Error: You must have at least 1 run.");
-        }
-    };
     var showFillOptions = function() {
         set_dataset.options_menu.show();
         set_dataset.options_btn.addClass('active');
@@ -621,7 +644,7 @@ $(function() {
         }
     };
     var setRunNamesPrefix = (function() {
-        var old_prefix = '';
+        var old_prefix = '';// closure variable is "static" in effect
         return function() {
             var prefix = $('#id_name').val();
             $('.run-name').each(function(ix) {
@@ -675,10 +698,57 @@ $(function() {
         // allowing the user to edit the rest of the name.
 
         // this closure block exists to close over the following variables.
-        var select_start, active_input, $active_input, input_height, input_offset;
+        var select_start, 
+            active_input, 
+            $active_input, 
+            input_height, 
+            input_offset;
+            prefix_el = $('#id_name');
 
-        var prefix_el = $('#id_name');
+        /**
+         * keydown and mousedown do not provide any information on
+         * what's GOING to happen, so we have to reason that ourselves
+         * based on mouse coordinates and key codes.
+         */
+        var keyDownHandler = function(e) {
+            var prefix_length = prefix_el.val().length + 1,
+                // these are the keys/combinations we have to watch out for.
+                carat_is_on_boundary = this.selectionStart <= prefix_length,
+                key_is_back_or_left = [8,37].indexOf(e.keyCode) > -1,
+                key_is_up_or_home = [36,38].indexOf(e.keyCode) > -1,
+                select_all_cmd = e.keyCode == 65 && (e.metaKey || e.ctrlKey)
+            ;
 
+            if (carat_is_on_boundary && key_is_back_or_left ||
+                    key_is_up_or_home || select_all_cmd
+                ) {
+                if (key_is_up_or_home) {
+                    this.setSelectionRange(
+                        prefix_length, 
+                        e.shiftKey ? this.selectionStart : prefix_length
+                    );
+                }
+                if (select_all_cmd) {
+                    this.setSelectionRange(prefix_length, this.value.length);
+                }
+                e.preventDefault();
+            }
+        };
+        var mouseDownHandler = function(e) {
+            var prefix = prefix_el.val() + '_',
+                offset = e.offsetX,
+                prefix_width = prefix_el.textWidth(prefix);
+
+            activateInput(this);
+            if (offset < prefix_width) {
+                this.focus();
+                this.setSelectionRange(prefix.length, prefix.length);
+                e.preventDefault();
+                select_start = prefix.length;
+            } else {
+                select_start = $(this).caretTarget(offset, prefix.length);
+            }
+        };
         var selectText = function(e) {// mousemove event when dragging from input
             var prefix_length = prefix_el.val().length + 1,
                 full_name_length = active_input.value.length,
@@ -702,99 +772,53 @@ $(function() {
             }
             e.preventDefault();
         };
-
-        $('body').on('mouseup', deactivateInput);
-
-        dataset_input_table.on({// delegate target is ".run-name"
-            /* 
-             * keydown and mousedown do not provide any information on
-             * what's GOING to happen, so we have to reason that ourselves
-             * based on mouse coordinates and key codes.
-             */
-            keydown: function(e) {
-                var prefix_length = prefix_el.val().length + 1,
-                    // these are the keys/combinations we have to watch out for.
-                    carat_is_on_boundary = this.selectionStart <= prefix_length,
-                    key_is_back_or_left = [8,37].indexOf(e.keyCode) > -1,
-                    key_is_up_or_home = [36,38].indexOf(e.keyCode) > -1,
-                    select_all_cmd = e.keyCode == 65 && (e.metaKey || e.ctrlKey)
-                ;
-
-                if (carat_is_on_boundary && key_is_back_or_left ||
-                        key_is_up_or_home || select_all_cmd
-                    ) {
-                    if (key_is_up_or_home) {
-                        this.setSelectionRange(
-                            prefix_length, 
-                            e.shiftKey ? this.selectionStart : prefix_length
-                        );
-                    }
-                    if (select_all_cmd) {
-                        this.setSelectionRange(prefix_length, this.value.length);
-                    }
-                    e.preventDefault();
-                }
-            },
-            mousedown: function(e) {
-                var prefix = prefix_el.val() + '_',
-                    offset = e.offsetX,
-                    prefix_width = prefix_el.textWidth(prefix);
-
-                activateInput(this);
-                if (offset < prefix_width) {
-                    this.focus();
-                    this.setSelectionRange(prefix.length, prefix.length);
-                    e.preventDefault();
-                    select_start = prefix.length;
-                } else {
-                    select_start = $(this).caretTarget(offset, prefix.length);
-                }
-            }
-        }, '.run-name');
-
-        function activateInput(input) {
+        var activateInput = function(input) {
             active_input = input;
             $active_input = $(input);
             input_offset = $active_input.offset();
             input_height = $active_input.outerHeight();
             $('body').on('mousemove', selectText);
-        }
-        function deactivateInput() {
+        };
+        var deactivateInput = function() {
             active_input = $active_input = input_offset = input_height = undefined;
             $('body').off('mousemove', selectText);
-        }
+        };
+
+        $('body').mouseup(deactivateInput);
+        dataset_input_table.on({// delegate target is ".run-name"
+            keydown: keyDownHandler,
+            mousedown: mouseDownHandler
+        }, '.run-name');
     })();
 
     $.getJSON('/api/datasets/?format=json', initUsersList);
 
-    body                       .click(   deselectAll                                            );
-    $(document)               .scroll(   scrollInputSetDatasetButton                            );
-    $(window)                 .resize(   scrollInputSetDatasetButton                            )
-                              .resize(   aboveBoxSpaceAdjustment                                )
-                              .scroll(   scrollTableHeader                                      );
-    set_dataset.btn            .click(   addSelectedDatasetsToInput                             );
-    set_dataset.options_btn    .click(   showFillOptions                                        )
-                          .mouseleave(   hideFillOptions                                        );
-    $('.permissions-widget')   .click(   stopProp                                               );
-    above_box                  .click(   stopProp                                               );
-    $('.close.ctrl', above_box).click(   closeSearchDialog                                      );
-    $('#date_added')          .change(   dateAddedFilterHandler                                 );
-    $('#creator')             .change(   creatorFilterHandler                                   );
-    $('#id_name')              .keyup(   setRunNamesPrefix                                      );
-    $('#run_pipeline')        .submit(   mainSubmitHandler                                      )
-                                  .on( 'click',  'input, textarea',      stopProp                     );
-    dataset_search_dialog         .on( 'submit', 'form',                 submitDatasetSearch          )
-      .find('.search_form')    .click(                                   focusSearchField             );
-    dataset_input_table           .on( 'click',  '.input-dataset',       toggleInputDatasetSelection  )
-                                  .on( 'click',  '.remove.ctrl',         removeDatasetFromInput       )
-                                  .on( 'click',  'button[name="input"]', showInputSearchDlg           );
-    $('.search_results')          .on({ click:                           selectSearchResult,
-                                     dblclick:                           function() { set_dataset.btn.click(); }
-                                  },             'tbody tr' );
-    $('#run_controls')            .on( 'click',  '.add_run',             addNewRunRow                 )
-                                  .on( 'click',  '.remove_run',          removeLastRunRow             );
-    set_dataset.options_menu      .on( 'click',  'li',                   fillMenuChoose               );
-
+    body                    .click(   deselectAll                                         );
+    $(document)            .scroll(   scrollInputSetDatasetButton                         );
+    $(window)              .resize(   scrollInputSetDatasetButton                         )
+                           .resize(   function() { above_box.adjustSpacing();            })
+                           .scroll(   function(e) { dataset_input_table.scrollHeader(e); });
+    set_dataset.btn         .click(   addSelectedDatasetsToInput                          );
+    set_dataset.options_btn .click(   showFillOptions                                     )
+                       .mouseleave(   hideFillOptions                                     );
+    $('.permissions-widget').click(   stopProp                                            );
+    above_box               .click(   stopProp                                            )
+        .find('.close.ctrl').click(   closeSearchDialog                                   );
+    $('#date_added')       .change(   dateAddedFilterHandler                              );
+    $('#creator')          .change(   creatorFilterHandler                                );
+    $('#id_name')           .keyup(   setRunNamesPrefix                                   );
+    $('#run_pipeline')     .submit(   mainSubmitHandler                                   )
+                              .on( 'click', 'input, textarea', stopProp                     );
+    dataset_search_dialog     .on( 'submit','form',            submitDatasetSearch          )
+      .find('.search_form').click(                             focusSearchField             );
+    dataset_input_table       .on( 'click', '.input-dataset',  toggleInputDatasetSelection  )
+                              .on( 'click', '.remove.ctrl',    removeDatasetFromInput       )
+                              .on( 'click', '.select_dataset', showInputSearchDlg           );
+    set_dataset.options_menu  .on( 'click', 'li',              fillMenuChoose               );
+    $('.search_results')      .on( 'click', 'tbody tr',        selectSearchResult           )
+                           .on( 'dblclick', 'tbody tr',    function() { set_dataset.btn.click(); } );
+    $('#run_controls')        .on( 'click', '.add_run',    function() { dataset_input_table.addNewRunRow() } )
+                              .on( 'click', '.remove_run', function() { dataset_input_table.removeLastRunRow() } );
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
@@ -806,22 +830,6 @@ $(function() {
         $(this).siblings('.fulltext').show().css({ top: e.pageY, left: e.pageX, 'z-index': 3 });
         setTimeout(function() { $('.fulltext').fadeOut(300); }, 5000);
     });
-    
 
-    (function initFixedTableHeader() {
-        var in_tb = dataset_input_table.closest('table'),
-            header_row = in_tb.find('thead tr'),
-            clone_table = in_tb.clone().wrap('<div>').parent().addClass('fixed-header');
-
-        dataset_input_table_fixed_header = clone_table.css({
-            height: header_row.outerHeight() + 1,
-            top: $('h1').outerHeight(),
-            left: in_tb.offset().left,
-            width: in_tb.outerWidth()
-        }).insertBefore(in_tb);
-
-        if ($(document).scrollTop() > 0) {
-            dataset_input_table_fixed_header.show();
-        }
-    })();
+    $(window).scroll();
 });

@@ -14,7 +14,8 @@ html #inner_wrap {
   z-index: 1;
   top: 7.2em; }
   #fixed_overlay a[rel="prev"] {
-    margin-left: 0; }
+    margin-left: 0;
+    z-index: 4; }
   html #auth_info {
     position: fixed;
     right: 0;
