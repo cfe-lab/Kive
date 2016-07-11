@@ -5,7 +5,6 @@ import hashlib
 import logging
 import mimetypes
 import os
-from binaryornot.check import is_binary
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -16,6 +15,7 @@ from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader
 from wsgiref.util import FileWrapper
 from django.conf import settings
+from django.utils.encoding import DjangoUnicodeDecodeError
 
 from librarian.forms import DatasetForm, DatasetDetailsForm, BulkAddDatasetForm, BulkDatasetUpdateForm,\
     ArchiveAddDatasetForm
@@ -154,6 +154,7 @@ def dataset_view(request, dataset_id):
         "dataset_form": dataset_form
     }
 
+    rendered_response = None
     if not dataset.has_data():
         t = loader.get_template("librarian/missing_dataset_view.html")
         if dataset.external_path:
@@ -163,6 +164,7 @@ def dataset_view(request, dataset_id):
             c["missing_data_message"] = "Data has been redacted."
         else:
             c["missing_data_message"] = "Data was not retained or has been purged."
+        rendered_response = t.render(c, request)
 
     elif dataset.is_raw():
         t = loader.get_template("librarian/raw_dataset_view.html")
@@ -174,20 +176,21 @@ def dataset_view(request, dataset_id):
         elif dataset.external_path:
             file_path = dataset.external_absolute_path()
 
-        if is_binary(file_path):
+        # Read 1000 characters.
+        with dataset.get_open_file_handle() as data_handle:
+            sample_content = data_handle.read(1000)
+        c.update(
+            {
+                "sample_content": sample_content
+            }
+        )
+        c["is_binary"] = False
+        try:
+            rendered_response = t.render(c, request)
+        except DjangoUnicodeDecodeError as e:
             c["is_binary"] = True
-
-        else:
-            c["is_binary"] = False
-
-            # Read 1000 characters.
-            with dataset.get_open_file_handle() as data_handle:
-                sample_content = data_handle.read(1000)
-            c.update(
-                {
-                    "sample_content": sample_content
-                }
-            )
+            del c["sample_content"]
+            rendered_response = t.render(c, request)
     else:
         extra_errors = []
         # If we have a mismatched output, we do an alignment
@@ -213,7 +216,8 @@ def dataset_view(request, dataset_id):
                 "are_rows_truncated": len(processed_rows) >= settings.DATASET_DISPLAY_MAX
             }
         )
-    return HttpResponse(t.render(c, request))
+        rendered_response = t.render(c, request)
+    return HttpResponse(rendered_response)
 
 
 @login_required

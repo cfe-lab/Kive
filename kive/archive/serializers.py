@@ -448,3 +448,21 @@ class RunProgressSerializer(RunSerializer):
     def get_run_progress(self, obj):
         if obj is not None:
             return obj.get_run_progress()
+
+
+class RunBatchSerializer(AccessControlSerializer, serializers.ModelSerializer):
+
+    runs = RunSerializer(many=True)
+
+    class Meta:
+        model = RunBatch
+        fields = (
+            "id",
+            "url",
+            "name",
+            "description",
+            "user",
+            "users_allowed",
+            "groups_allowed",
+            "runs"
+        )
