@@ -486,6 +486,7 @@ var pipeline = (function(exports){
                     connector.dest = output_node.in_magnets[0];
                     connector.dest.connected = [connector];  // bind cable to output node
                     connector.source = magnet;
+                    connector.dest.cdt = connector.source.cdt;
 
                     source.out_magnets[j].connected.push(connector);  // bind cable to source Method
                     self.canvasState.connectors.push(connector);
