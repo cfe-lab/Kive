@@ -2,6 +2,7 @@ import os.path
 import re
 import tempfile
 import itertools
+import copy
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -14,7 +15,7 @@ from rest_framework import status
 
 from archive.models import Run, RunStep, RunSIC, ExecLog, RunOutputCable,\
     RunInput
-from archive.serializers import RunSerializer
+from archive.serializers import RunSerializer, RunBatchSerializer
 from archive.exceptions import SandboxActiveException, RunNotFinished
 from librarian.models import ExecRecord, Dataset
 from pipeline.models import Pipeline, PipelineFamily
@@ -23,7 +24,6 @@ from kive.testing_utils import clean_up_all_files
 from kive import settings
 from kive.tests import install_fixture_files, restore_production_files, DuckContext
 from fleet.workers import Manager
-from sandbox.execute import Sandbox
 
 
 class QueuedRunTest(TestCase):
@@ -861,7 +861,7 @@ class RunApiTests(TestCase):
         self.assertEquals(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
-class RunSerializerTests(TestCase):
+class RunSerializerTestBase(TestCase):
     fixtures = ["em_sandbox_test_environment"]
 
     def setUp(self):
@@ -906,6 +906,8 @@ class RunSerializerTests(TestCase):
     def tearDown(self):
         restore_production_files()
 
+
+class RunSerializerTests(RunSerializerTestBase):
     def test_validate(self):
         """
         Validating a well-specified Run to process.
@@ -1127,3 +1129,200 @@ class RunSerializerTests(TestCase):
         self.assertEqual(rtp.inputs.get(index=1).dataset, self.triplet_SD)
         self.assertEqual(rtp.inputs.get(index=2).dataset, self.singlet_SD)
         self.assertEqual(rtp.inputs.get(index=3).dataset, self.raw_SD)
+
+
+class RunBatchSerializerTests(RunSerializerTestBase):
+    def setUp(self):
+        super(RunBatchSerializerTests, self).setUp()
+        self.serialized_run = {
+            "pipeline": self.em_pipeline.pk,
+            "inputs": [
+                {
+                    "dataset": self.triplet_SD.pk,
+                    "index": 1
+                },
+                {
+                    "dataset": self.singlet_SD.pk,
+                    "index": 2
+                },
+                {
+                    "dataset": self.raw_SD.pk,
+                    "index": 3
+                }
+            ],
+            "users_allowed": [],
+            "groups_allowed": []
+        }
+
+    def test_validate(self):
+        """
+        Validating a well-formed RunBatch.
+        """
+        serialized_rb = {
+            "name": "My RunBatch",
+            "description": "foo",
+            "runs": [
+                self.serialized_run,
+                self.serialized_run,
+                self.serialized_run
+            ]
+        }
+        rb_serializer = RunBatchSerializer(data=serialized_rb, context=self.john_context)
+        self.assertTrue(rb_serializer.is_valid())
+
+    def test_validate_bad_permissions(self):
+        """
+        Validating a well-formed RunBatch.
+        """
+        second_serialized_run = copy.deepcopy(self.serialized_run)
+
+        self.serialized_run["users_allowed"] = [self.kive_user.username]
+        self.serialized_run["groups_allowed"] = [everyone_group().name]
+        self.serialized_run["name"] = "OverlyPermissiveRun"
+
+        second_serialized_run["users_allowed"] = [self.kive_user.username]
+        second_serialized_run["groups_allowed"] = []
+        second_serialized_run["name"] = "LessPermissiveButStillTooMuchRun"
+
+        serialized_rb = {
+            "name": "RunBatch with permissions issues",
+            "description": "foo",
+            "runs": [
+                self.serialized_run,
+                second_serialized_run
+            ]
+        }
+
+        rb_serializer = RunBatchSerializer(data=serialized_rb, context=self.john_context)
+        self.assertFalse(rb_serializer.is_valid())
+        self.assertListEqual(
+            rb_serializer.errors["non_field_errors"],
+            [
+                "User(s) {} may not be granted access to run {} (index {})".format(
+                    [self.kive_user.username],
+                    self.serialized_run["name"],
+                    1
+                ),
+                "Group(s) {} may not be granted access to run {} (index {})".format(
+                    [everyone_group().name],
+                    self.serialized_run["name"],
+                    1
+                ),
+                "User(s) {} may not be granted access to run {} (index {})".format(
+                    [self.kive_user.username],
+                    second_serialized_run["name"],
+                    2
+                ),
+            ]
+        )
+
+    def test_validate_OK_permissions(self):
+        """
+        Validating a well-formed RunBatch.
+        """
+        second_serialized_run = copy.deepcopy(self.serialized_run)
+
+        self.serialized_run["users_allowed"] = [self.kive_user.username]
+        self.serialized_run["name"] = "LetKiveSee"
+
+        second_serialized_run["users_allowed"] = [self.kive_user.username]
+        second_serialized_run["groups_allowed"] = []
+        second_serialized_run["name"] = "LetKiveSeeToo"
+
+        serialized_rb = {
+            "name": "RunBatch that Kive sees",
+            "description": "foo",
+            "runs": [
+                self.serialized_run,
+                second_serialized_run
+            ],
+            "users_allowed": [self.kive_user.username]
+        }
+
+        rb_serializer = RunBatchSerializer(data=serialized_rb, context=self.john_context)
+        self.assertTrue(rb_serializer.is_valid())
+
+    def test_validate_everyone_has_access(self):
+        """
+        Validating a well-formed RunBatch.
+        """
+        second_serialized_run = copy.deepcopy(self.serialized_run)
+        third_serialized_run = copy.deepcopy(self.serialized_run)
+
+        self.serialized_run["users_allowed"] = [self.kive_user.username]
+        self.serialized_run["name"] = "LetKiveSee"
+
+        second_serialized_run["users_allowed"] = [self.kive_user.username]
+        second_serialized_run["groups_allowed"] = [everyone_group().name]
+        second_serialized_run["name"] = "EveryoneSees"
+
+        third_serialized_run["name"] = "OwnerOnly"
+
+        serialized_rb = {
+            "name": "RunBatch that everyone sees",
+            "description": "foo",
+            "runs": [
+                self.serialized_run,
+                second_serialized_run
+            ],
+            "groups_allowed": [everyone_group().name]
+        }
+
+        rb_serializer = RunBatchSerializer(data=serialized_rb, context=self.john_context)
+        self.assertTrue(rb_serializer.is_valid())
+
+    def test_create(self):
+        """
+        Create a well-formed RunBatch.
+        """
+        second_serialized_run = copy.deepcopy(self.serialized_run)
+        third_serialized_run = copy.deepcopy(self.serialized_run)
+
+        self.serialized_run["name"] = "One"
+
+        second_serialized_run["name"] = "Two"
+        second_serialized_run["users_allowed"] = [self.kive_user.username]
+
+        third_serialized_run["name"] = "Three"
+        third_serialized_run["groups_allowed"] = [everyone_group().name]
+
+        serialized_rb = {
+            "name": "My RunBatch",
+            "description": "foo",
+            "runs": [
+                self.serialized_run,
+                second_serialized_run,
+                third_serialized_run
+            ],
+            "users_allowed": [self.kive_user.username],
+            "groups_allowed": [everyone_group().name]
+        }
+        rb_serializer = RunBatchSerializer(data=serialized_rb, context=self.john_context)
+        self.assertTrue(rb_serializer.is_valid())
+        rb = rb_serializer.save()
+
+        # Probe the RunBatch to check that it was correctly created.
+        self.assertEqual(rb.user, self.myUser)
+        self.assertEqual(set(rb.users_allowed.all()), set([self.kive_user]))
+        self.assertEqual(set(rb.groups_allowed.all()), set([everyone_group()]))
+
+        self.assertEqual(rb.runs.count(), 3)
+
+        # Run One inherits its permissions.
+        run1 = rb.runs.get(name="One")
+        self.assertEqual(run1.users_allowed.count(), 1)
+        self.assertEqual(run1.users_allowed.first(), self.kive_user)
+        self.assertEqual(run1.groups_allowed.count(), 1)
+        self.assertEqual(run1.groups_allowed.first(), everyone_group())
+
+        # Runs Two and Three had their own permissions defined.
+        run2 = rb.runs.get(name="Two")
+        self.assertEqual(run2.users_allowed.count(), 1)
+        self.assertEqual(run2.users_allowed.first(), self.kive_user)
+        self.assertEqual(run2.groups_allowed.count(), 0)
+
+        run3 = rb.runs.get(name="Three")
+        self.assertEqual(run3.users_allowed.count(), 0)
+        self.assertEqual(run3.groups_allowed.count(), 1)
+        self.assertEqual(run3.groups_allowed.first(), everyone_group())
+        

@@ -12,6 +12,8 @@ from pipeline.models import Pipeline
 from metadata.models import who_cannot_access
 from datachecking.models import BadData, MD5Conflict, ContentCheckLog
 
+from constants import groups
+
 from kive.serializers import AccessControlSerializer
 
 
@@ -389,6 +391,13 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
         """
         Create a Run to process, i.e. add a job to the work queue.
         """
+        return RunSerializer.create_from_validated_data(validated_data)
+
+    @staticmethod
+    def create_from_validated_data(validated_data):
+        """
+        Helper method used by create and also by RunBatchSerializer.create.
+        """
         inputs = validated_data.pop("inputs")
         users_allowed = validated_data.pop("users_allowed", [])
         groups_allowed = validated_data.pop("groups_allowed", [])
@@ -466,3 +475,75 @@ class RunBatchSerializer(AccessControlSerializer, serializers.ModelSerializer):
             "groups_allowed",
             "runs"
         )
+
+    def validate(self, data):
+        """
+        Check that the Runs are coherently specified with the RunBatch.
+
+        In particular, check that the permissions specified for the Run
+        do not exceed those of the RunBatch.
+        """
+        # Note that we don't have to check the user because it's the same user
+        # creating this RunBatch and the child Runs.
+        batch_users_allowed_names = data.get("users_allowed") or []
+        batch_groups_allowed_names = data.get("groups_allowed") or []
+
+        batch_groups_allowed = Group.objects.filter(name__in=batch_groups_allowed_names)
+        if batch_groups_allowed.filter(pk=groups.EVERYONE_PK).exists():
+            # Trivial case: anything goes, so just return.
+            return data
+
+        errors = []
+        for i, run_data in enumerate(data["runs"], start=1):
+            # Check that the permissions don't exceed those of the RunBatch.
+            run_users = run_data.get("users_allowed") or []
+            run_groups = run_data.get("groups_allowed") or []
+
+            extra_users = set(run_users).difference(batch_users_allowed_names)
+            extra_groups = set(run_groups).difference(batch_groups_allowed_names)
+
+            if len(extra_users) != 0:
+                errors.append(
+                    "User(s) {} may not be granted access to run {} (index {})".format(
+                        [x.username for x in extra_users],
+                        run_data.get("name", "[blank]"),
+                        i
+                    )
+                )
+
+            if len(extra_groups) != 0:
+                errors.append(
+                    "Group(s) {} may not be granted access to run {} (index {})".format(
+                        [x.name for x in extra_groups],
+                        run_data.get("name", "[blank]"),
+                        i
+                    )
+                )
+
+        if len(errors) > 0:
+            raise serializers.ValidationError(errors)
+
+        return data
+
+    def create(self, validated_data):
+        """Create a RunBatch and the Runs it contains."""
+        run_dictionaries = validated_data.pop("runs")
+        users_allowed = validated_data.pop("users_allowed", [])
+        groups_allowed = validated_data.pop("groups_allowed", [])
+
+        rb = RunBatch(**validated_data)
+        rb.save()
+        rb.users_allowed.add(*users_allowed)
+        rb.groups_allowed.add(*groups_allowed)
+
+        runs = []
+        for run_data in run_dictionaries:
+            if len(run_data.get("users_allowed", [])) == 0 and len(run_data.get("groups_allowed", [])) == 0:
+                run_data["users_allowed"] = users_allowed
+                run_data["groups_allowed"] = groups_allowed
+
+            run_data["user"] = validated_data["user"]
+            run_data["runbatch"] = rb
+            runs.append(RunSerializer.create_from_validated_data(run_data))
+
+        return rb
