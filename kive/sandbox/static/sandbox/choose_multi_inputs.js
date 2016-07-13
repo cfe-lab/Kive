@@ -126,17 +126,25 @@ $(function() {
         }
     };
     dataset_input_table.addNewRunRow = function() {
+        var i, cell_selector, new_run_ix, row;
         for (
-            var new_run_ix = $('tr', this).length;
+            new_run_ix = $('tr', this).length;
             $('.run-name[name="run_name[' + new_run_ix + ']"]').length > 0;
             new_run_ix++
         );
-        uiFactory.pipelineInputRow()
+        row = uiFactory.pipelineInputRow()
             .find('.run-name')
                 .attr('name', 'run_name[' + new_run_ix + ']')
             .end()
-            .appendTo(this)
         ;
+        if (this.hasOwnProperty('auto_fill')) {
+            for (i = 0; (cell_selector = this.auto_fill[i]); i++) {
+                row.children(cell_selector).replaceWith(
+                    this.find('tr:last ' + cell_selector).clone()
+                );
+            }
+        }
+        row.appendTo(this);
         setRunNamesPrefix();
     };
     dataset_input_table.removeLastRunRow = function() {
@@ -148,6 +156,39 @@ $(function() {
             $tr.eq(-1).remove();
         } else {
             this.error("Error: You must have at least 1 run.");
+        }
+    };
+    dataset_input_table.fillColumn = function(selection, column_ix) {
+        // @todo: add pattern fill when multiple datasets are selected
+        var selected_val = selection.eq(0),
+            receiving_cell = $('button.receiving', this),
+            inactive_buttons,
+            column = receiving_cell
+                .closest('tbody')
+                .children('tr')
+                .children(column_ix)
+        ;
+
+        if (selected_val.length > 0) {
+            dataset_search_table.$table.removeClass('none-selected-error');
+            column.replaceWith(
+                uiFactory.inputDatasetCell(
+                    selected_val.text(),
+                    selected_val.data('id'),
+                    receiving_cell.data()
+                )
+            );
+            inactive_buttons = $('button:not(.receiving)', this);
+
+            // decide where to go next
+            if (inactive_buttons.length) {
+                inactive_buttons.eq(0).trigger('click');
+            } else {
+                dataset_search_dialog.fadeOut('fast');
+                above_box.hide();
+            }
+        } else {
+            dataset_search_table.$table.addClass('none-selected-error');
         }
     };
 
@@ -606,41 +647,26 @@ $(function() {
     var fillMenuChoose = function(e) {
         var action = $(this).data('action');
 
+        if (!dataset_input_table.hasOwnProperty('auto_fill')) {
+            dataset_input_table.auto_fill = [];
+        }
+
+        var selected_val = dataset_search_dialog.find('.search_results .selected .primary').eq(0);
+            receiving_cell = $('button.receiving'),
+            receiving_cell_selector = 'td:nth-child(' +
+                (receiving_cell.parent().index() + 1) +
+                ')'// css pseudo-class is 1-indexed
+        ;
+
         if (action == 'fill-column') {
-            // @todo: add pattern fill when multiple datasets are selected
-            var selected_val = dataset_search_dialog.find('.search_results .selected .primary').eq(0),
-                receiving_cell = $('button.receiving'),
-                receiving_cell_selector = 'td:nth-child(' +
-                    (receiving_cell.parent().index() + 1) +
-                    ')',// css pseudo-class is 1-indexed
-                column = receiving_cell
-                    .closest('tbody')
-                    .children('tr')
-                    .children(receiving_cell_selector),
-                inactive_buttons
-            ;
-
-            if (selected_val.length > 0) {
-                dataset_search_table.$table.removeClass('none-selected-error');
-                column.replaceWith(
-                    uiFactory.inputDatasetCell(
-                        selected_val.text(),
-                        selected_val.data('id'),
-                        receiving_cell.data()
-                    )
-                );
-                inactive_buttons = $('button:not(.receiving)', dataset_input_table);
-
-                // decide where to go next
-                if (inactive_buttons.length) {
-                    inactive_buttons.eq(0).trigger('click');
-                } else {
-                    dataset_search_dialog.fadeOut('fast');
-                    above_box.hide();
-                }
-            } else {
-                dataset_search_table.$table.addClass('none-selected-error');
-            }
+            dataset_input_table.auto_fill.splice(
+                dataset_input_table.auto_fill.indexOf(receiving_cell_selector),
+                1
+            );
+            dataset_input_table.fillColumn(selected_val, receiving_cell_selector);
+        } else if (action == 'auto-fill-column') {
+            dataset_input_table.auto_fill.push(receiving_cell_selector);
+            dataset_input_table.fillColumn(selected_val, receiving_cell_selector);
         }
     };
     var setRunNamesPrefix = (function() {
@@ -678,18 +704,22 @@ $(function() {
         var position = 0;
         var position_offset = [ 0 ];
         var text = this.val() || this.text();
+        var rel_offset = offset + this[0].scrollLeft - parseInt(this.css('padding-left'), 10)
 
         // @todo 
         // use the "start" parameter to skip characters.
 
         // currently just scrolls through until it finds that offset.
         // a better algorithm would do midpoint, then quartiles, etc
-        while (position_offset[position] < offset && position < text.length + 1) {
+        while (position_offset[position] < rel_offset && position < text.length + 1) {
             position++;
             position_offset[position] = this.textWidth(text.substr(0, position));
         }
 
-        return position - 1;
+        var last2_avg = position_offset.slice(-2).reduce(function(a,b) {return a+b;}) / 2;
+            half_char_adjustment = +(rel_offset < last2_avg);
+
+        return position - half_char_adjustment;
     };
 
     (function() {
@@ -739,6 +769,10 @@ $(function() {
                 offset = e.offsetX,
                 prefix_width = prefix_el.textWidth(prefix);
 
+            if (prefix == "_") {
+                prefix = "";
+            }
+
             activateInput(this);
             if (offset < prefix_width) {
                 this.focus();
@@ -748,6 +782,7 @@ $(function() {
             } else {
                 select_start = $(this).caretTarget(offset, prefix.length);
             }
+            selectText(e);
         };
         var selectText = function(e) {// mousemove event when dragging from input
             var prefix_length = prefix_el.val().length + 1,
@@ -770,6 +805,7 @@ $(function() {
             } else {
                 active_input.setSelectionRange(select_start, end);
             }
+            console.log(select_start, end);
             e.preventDefault();
         };
         var activateInput = function(input) {
@@ -784,7 +820,7 @@ $(function() {
             $('body').off('mousemove', selectText);
         };
 
-        $('body').mouseup(deactivateInput);
+        body.mouseup(deactivateInput);
         dataset_input_table.on({// delegate target is ".run-name"
             keydown: keyDownHandler,
             mousedown: mouseDownHandler
