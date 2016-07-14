@@ -809,7 +809,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         return itertools.chain(*rc_querysets)
 
-    def eligible_permissions(self):
+    def eligible_permissions(self, include_runbatch=True):
         """
         Determine which users and groups may be granted access to this Run.
 
@@ -828,7 +828,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         # ... and then refine it.
         addable_users, addable_groups = self.pipeline.intersect_permissions(addable_users, addable_groups)
-        if self.runbatch is not None:
+        if include_runbatch and self.runbatch is not None:
             addable_users, addable_groups = self.runbatch.intersect_permissions(addable_users, addable_groups)
 
         for run_input in self.inputs.all():
