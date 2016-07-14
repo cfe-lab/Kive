@@ -25,21 +25,22 @@ $(function(){ // wait for page to finish loading before executing jQuery code
                 .closest('li').removeClass('advanced');
         } });
     });
-    
+
     $('form.short-filter, form.advanced-filter').submit(function(e) {
         e.preventDefault();
         runsTable.filterSet.addFromForm(this);
     });
-    
+
     runsTable = new RunsTable(
         $('#runs'),
         user,
         is_user_admin,
         $('.no_results'),
-        null,
+        runbatch_pk,
         $('#active_filters'),
         $(".navigation_links")
     );
+
     var storedPage = parseInt(sessionStorage.getItem('runPage') || 1);
     runsTable.filterSet.setFromPairs(sessionStorage.getItem('runFilters'));
     runsTable.page = storedPage;

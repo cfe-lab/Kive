@@ -12,13 +12,14 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from archive.serializers import MethodOutputSerializer, RunSerializer,\
-    RunProgressSerializer, RunOutputsSerializer
+    RunProgressSerializer, RunOutputsSerializer, RunBatchSerializer
 from archive.models import Run, RunInput, ExceedsSystemCapabilities, MethodOutput,\
-    summarize_redaction_plan
+    summarize_redaction_plan, RunBatch
 from portal.views import admin_check
 from kive.serializers import PermissionsSerializer
 from kive.ajax import RemovableModelViewSet, IsGrantedReadOnly,\
-    StandardPagination, CleanCreateModelMixin, SearchableModelMixin
+    StandardPagination, CleanCreateModelMixin, SearchableModelMixin,\
+    GrantedModelMixin
 
 JSON_CONTENT_TYPE = 'application/json'
 
@@ -255,9 +256,9 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
             if key == 'endbefore':
                 return queryset.filter(end_time__lte=t)
         if key == "batch_name":
-            return queryset.filter(runbatch__name__icontains=t)
+            return queryset.filter(runbatch__name__icontains=value)
         if key == "batch_pk":
-            return queryset.filter(runbatch__pk=t)
+            return queryset.filter(runbatch__pk=value)
 
         raise APIException('Unknown filter key: {}'.format(key))
 
@@ -267,6 +268,40 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
 
         try:
             addable_users, addable_groups = run.eligible_permissions()
+        except RuntimeError as e:
+            return Response(
+                {
+                    "detail": e.message
+                },
+                status=500
+            )
+
+        return Response(
+            PermissionsSerializer(
+                {
+                    "users": addable_users,
+                    "groups": addable_groups
+                }
+            ).data
+        )
+
+
+# FIXME does this have to be removable?
+class RunBatchViewSet(CleanCreateModelMixin, GrantedModelMixin, ReadOnlyModelViewSet):
+    """
+    API for viewing/working with RunBatches.
+    """
+    queryset = RunBatch.objects.all()
+    serializer_class = RunBatchSerializer
+    permission_classes = (permissions.IsAuthenticated, RunPermission)
+    pagination_class = StandardPagination
+
+    @detail_route(methods=['get'], suffix='Eligible Permissions')
+    def eligible_permissions(self, request, pk=None):
+        rb = self.get_object()
+
+        try:
+            addable_users, addable_groups = rb.eligible_permissions()
         except RuntimeError as e:
             return Response(
                 {

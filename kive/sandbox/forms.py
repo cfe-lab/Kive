@@ -7,7 +7,7 @@ from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
 
 from pipeline.models import PipelineFamily, Pipeline
-from archive.models import Run
+from archive.models import Run, RunBatch
 
 import metadata.forms
 
@@ -91,3 +91,41 @@ class RunSubmissionForm(RunDetailsForm):
                                                 groups_allowed=groups_allowed, *args, **kwargs)
         if pipeline_qs is not None:
             self.fields["pipeline"].queryset = pipeline_qs
+
+
+class RunBatchDetailsForm(forms.ModelForm):
+    """
+    Form used for validating details when updating a RunBatch.
+    """
+    permissions = metadata.forms.PermissionsField(
+        label="Users and groups allowed",
+        help_text="Which users and groups are allowed access to this batch of runs?",
+        required=False
+    )
+
+    name = forms.CharField(
+        max_length=maxlengths.MAX_NAME_LENGTH,
+        label='Name',
+        help_text='A name to identify this batch of runs',
+        required=False
+    )
+
+    description = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 5}),
+        label='Description',
+        help_text='A brief description of this batch of runs',
+        required=False
+    )
+
+    class Meta:
+        model = RunBatch
+        fields = ("permissions", "name", "description")
+
+    def __init__(self, data=None, users_allowed=None, groups_allowed=None, *args, **kwargs):
+        super(RunBatchDetailsForm, self).__init__(data, *args, **kwargs)
+
+        # We can't simply use "users_allowed or User.objects.all()" because we may specify
+        # an empty QuerySet, and that's falsy.
+        users_allowed = users_allowed if users_allowed is not None else get_user_model().objects.all()
+        groups_allowed = groups_allowed if groups_allowed is not None else Group.objects.all()
+        self.fields["permissions"].set_users_groups_allowed(users_allowed, groups_allowed)

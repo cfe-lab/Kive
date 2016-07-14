@@ -137,6 +137,35 @@ class RunBatch(metadata.models.AccessControl):
     def __str__(self):
         return "{} (pk={})".format(self.name, self.pk)
 
+    def all_runs_complete(self):
+        """
+        Checks whether all Runs in this batch are complete.
+        """
+        return not self.runs.exclude(_runstate__pk__in=runstates.COMPLETE_STATE_PKS).exists()
+
+    def eligible_permissions(self):
+        """
+        Determine which users and groups may be granted access to this RunBatch.
+
+        The run's permissions can only be extended to those users and groups
+        that have access to
+        a) the Pipeline
+        b) the input Datasets
+        c) the top-level Runs of the ExecRecords it reuses
+        d) the RunBatch
+        """
+        if not self.all_runs_complete():
+            raise RuntimeError("Eligible permissions cannot be found until all runs are complete")
+
+        addable_users = User.objects.all()
+        addable_groups = Group.objects.all()
+        for run in self.runs.all():
+            run_addable_users, run_addable_groups = run.eligible_permissions(include_runbatch=False)
+            addable_users = addable_users.filter(pk__in=run_addable_users.values_list("pk", flat=True))
+            addable_groups = addable_groups.filter(pk__in=run_addable_groups.values_list("pk", flat=True))
+
+        return addable_users, addable_groups
+
 
 @python_2_unicode_compatible
 class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
@@ -226,21 +255,22 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
            which are associated (ie. at least in progress), and must
            be clean
         """
-        # Access to this Run must not exceed that of the pipeline or of the batch.
-        self.validate_restrict_access([self.pipeline])
-        if self.runbatch is not None:
-            self.validate_restrict_access([self.runbatch])
-
-        for rtp_input in self.inputs.all():
-            rtp_input.clean()
+        Run.validate_permissions(self)
+        # # Access to this Run must not exceed that of the pipeline or of the batch.
+        # self.validate_restrict_access([self.pipeline])
+        # if self.runbatch is not None:
+        #     self.validate_restrict_access([self.runbatch])
+        #
+        # for rtp_input in self.inputs.all():
+        #     rtp_input.clean()
 
         if hasattr(self, "not_enough_CPUs"):
             self.not_enough_CPUs.clean()
 
-        # If this is not a top-level run it must have the same access as the top-level run.
-        my_top_level_run = self.top_level_run
-        if self != my_top_level_run:
-            self.validate_identical_access(my_top_level_run)
+        # # If this is not a top-level run it must have the same access as the top-level run.
+        # my_top_level_run = self.top_level_run
+        # if self != my_top_level_run:
+        #     self.validate_identical_access(my_top_level_run)
 
         # Check that start- and end-time are coherent.
         stopwatch.models.Stopwatch.clean(self)
@@ -265,6 +295,21 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                 raise ValidationError('Run "{}" has a RunOutputCable from step {}, but no corresponding RunStep'
                                       .format(self, source_step))
             run_outcable.clean()
+
+    @staticmethod
+    def validate_permissions(run):
+        """
+        Check that the permissions set on this run are coherent.
+        """
+        # Access to this Run must not exceed that of the pipeline or of the batch.
+        run.validate_restrict_access([run.pipeline])
+        if run.runbatch is not None:
+            run.validate_restrict_access([run.runbatch])
+
+        # If this is not a top-level run it must have the same access as the top-level run.
+        my_top_level_run = run.top_level_run
+        if run != my_top_level_run:
+            run.validate_identical_access(my_top_level_run)
 
     def is_complete(self):
         """

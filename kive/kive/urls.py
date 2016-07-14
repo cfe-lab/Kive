@@ -1,7 +1,7 @@
 from django.conf.urls import url, include
 import django.contrib.auth.views
 
-from archive.ajax import MethodOutputViewSet, RunViewSet
+from archive.ajax import MethodOutputViewSet, RunViewSet, RunBatchViewSet
 from librarian.ajax import DatasetViewSet, ExternalFileDirectoryViewSet
 from kive.kive_router import KiveRouter
 from metadata.ajax import DatatypeViewSet, CompoundDatatypeViewSet
@@ -35,6 +35,7 @@ router.register(r'methods', MethodViewSet)
 router.register(r'pipelinefamilies', PipelineFamilyViewSet)
 router.register(r'pipelines', PipelineViewSet)
 router.register(r'runs', RunViewSet)
+router.register(r'runbatches', RunBatchViewSet)
 router.register(r'stagedfiles', portal.ajax.StagedFileViewSet)
 
 urlpatterns = [
@@ -113,6 +114,7 @@ urlpatterns = [
     url(r'^run_pipeline$', sandbox.views.run_pipeline, name='run_pipeline'),
     url(r'^view_run/(?P<run_id>\d+)$', sandbox.views.view_run, name='view_run'),
     url(r'^view_run/(?P<run_id>\d+)/(?P<md5>[0-9a-fA-F]{32})$', sandbox.views.view_run, name='view_run'),
+    url(r'^runbatch/(?P<runbatch_pk>\d+)$', sandbox.views.runbatch, name='runbatch'),
 
     # Urls for django-rest-framework
     url(r'^api/', include(router.urls), name='api_home'),

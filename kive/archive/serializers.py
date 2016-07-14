@@ -479,7 +479,7 @@ class RunProgressSerializer(RunSerializer):
 class RunBatchSerializer(AccessControlSerializer, serializers.ModelSerializer):
 
     runs = RunSerializer(many=True, required=False)
-    copy_permissions_to_runs = serializers.BooleanField(default=True)
+    copy_permissions_to_runs = serializers.BooleanField(default=True, write_only=True)
 
     class Meta:
         model = RunBatch
