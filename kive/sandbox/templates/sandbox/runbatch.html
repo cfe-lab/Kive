@@ -40,16 +40,15 @@
 
 <h2> {{ runbatch.name }} </h2>
 
-{% if not is_owner and is_admin and is_complete %}
+{% if not is_owner and is_admin %}
+    <p>FOO</p>
     <div id="lock"><img src=""/></div>
 {% endif %}
 
 <h3>Details</h3>
 
-{% if is_complete %}
 {% if is_owner or is_admin %}
 <form id="runbatchDetails" name="runbatchDetails" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
-{% endif %}
 {% endif %}
 
     <table id="runbatch_details">
@@ -71,6 +70,11 @@
             <span class="edit">{{ runbatch_form.description }}</span>
             {% endif %}
         </td>
+    </tr>
+
+    <tr>
+        <td>Creator:</td>
+        <td>{{ runbatch.user }}</td>
     </tr>
 
     <tr>
@@ -98,7 +102,7 @@
             <em>None</em>
             {% endif %}
         </td>
-        {% if is_complete %}
+        {% if all_runs_complete %}
         {% if is_owner or is_admin %}
         <td class="edit">
         <div id="edit_permissions"><a href="/api/runbatches/{{ runbatch.pk }}/eligible_permissions">Edit permissions</a></div>
@@ -112,7 +116,7 @@
     </table>
 
 {% if is_owner or is_admin %}
-<span class="edit"><input type="submit" name="reviseRunDetails" value="Revise details"/></span>
+<span class="edit"><input type="submit" name="reviseRunBatchDetails" value="Revise details"/></span>
 </form>
 {% endif %}
 

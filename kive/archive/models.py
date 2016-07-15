@@ -213,7 +213,8 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         help_text="Run batch that this Run is a part of",
         null=True,
         blank=True,
-        related_name="runs"
+        related_name="runs",
+        on_delete=models.SET_NULL
     )
 
     # Implicitly, this also has start_time and end_time through inheritance.

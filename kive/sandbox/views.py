@@ -312,16 +312,17 @@ def runbatch(request, runbatch_pk):
                     rb.save()
 
                     permissions = json.loads(rb_form.cleaned_data["permissions"])
-                    if len(permissions) > 0 and not all_runs_complete:
-                        raise ValueError("Permissions cannot be modified until all runs are complete")
-                    rb.increase_permissions_from_json(rb_form.cleaned_data["permissions"])
+                    if len(permissions[0]) > 0 or len(permissions[1]) > 0:
+                        if not all_runs_complete:
+                            raise ValueError("Permissions cannot be modified until all runs are complete")
+                        rb.grant_from_json(rb_form.cleaned_data["permissions"])
 
                     for run in batch_runs:
                         run.increase_permissions_from_json(rb_form.cleaned_data["permissions"])
                         Run.validate_permissions(run)  # FIXME this could be slow
                     rb.clean()
 
-                return HttpResponseRedirect("/view_runbatch/{}".format(runbatch_pk))
+                return HttpResponseRedirect("/runbatch/{}".format(runbatch_pk))
 
         except (AttributeError, ValidationError, ValueError) as e:
             LOGGER.exception(e.message)
