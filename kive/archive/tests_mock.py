@@ -2,12 +2,12 @@ from unittest.case import TestCase
 
 from mock import Mock
 
-from kive.mock_setup import mock_relations  # Import before any Django models
 from django_mock_queries.query import MockSet
 
 from django.utils import timezone
 
-from archive.models import Run, RunState, RunComponent, RunStep, RunOutputCable, RunComponentState, ExecLog
+from archive.models import Run, RunState, RunStep, RunOutputCable,\
+    RunComponentState, ExecLog
 from librarian.models import ExecRecord
 from constants import runstates, runcomponentstates
 from kive.mock_setup import mocked_relations

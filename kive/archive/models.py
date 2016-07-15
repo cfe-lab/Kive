@@ -141,7 +141,7 @@ class RunBatch(metadata.models.AccessControl):
         """
         Checks whether all Runs in this batch are complete.
         """
-        return not self.runs.exclude(_runstate__pk__in=runstates.COMPLETE_STATE_PKS).exists()
+        return not self.runs.exclude(_runstate_id__in=runstates.COMPLETE_STATE_PKS).exists()
 
     def eligible_permissions(self):
         """
