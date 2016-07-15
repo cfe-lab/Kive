@@ -339,5 +339,6 @@ def runbatch(request, runbatch_pk):
         "user": request.user,
         "is_user_admin": admin_check(request.user)
     }
+    print "FOO {}".format(context)
 
     return HttpResponse(template.render(context, request))
