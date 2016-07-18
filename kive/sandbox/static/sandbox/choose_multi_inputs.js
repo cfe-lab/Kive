@@ -675,7 +675,13 @@ $(function() {
                 e.preventDefault();
             }
         });
-        return { name: $('#id_name').val(), runs: runs };
+        return {
+            name: $('#id_name').val(),
+            runs: runs,
+            users_allowed: [],
+            groups_allowed: [],
+            copy_permissions_to_runs: true
+        };
     };
     var focusSearchField = function(e) {
         // prevent this event from bubbling
