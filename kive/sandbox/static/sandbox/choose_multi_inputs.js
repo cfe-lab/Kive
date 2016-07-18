@@ -6,6 +6,7 @@ $(function() {
         dataset_input_table = $('#dataset_input_table tbody'),
         dataset_search_dialog = $('.dataset-search-dlg'),
         above_box = $('#above_box'),
+        below_box = $('#below_box'),
         set_dataset = {
             wrapper: $('#insert_dataset'),
             btn: $('#insert_one_dataset'),
@@ -269,7 +270,30 @@ $(function() {
                     width: cellWidth,
                     left: cellOffsetX - insertBtnOffsetX - d_scroll
                 }, 150, 'linear');
+        }
 
+        function scrollToMakeButtonVisible() {
+            var button = $('button.receiving');
+            var button_top = button.offset().top;
+            var button_bottom = button_top + button.outerHeight();
+            var visible_top = above_box.offset().top + above_box.outerHeight() + 
+                dataset_input_table.siblings('thead').outerHeight();
+            var visible_bottom = below_box.offset().top;
+            var underset = button_top - visible_top;
+            var overset = button_bottom - visible_bottom;
+            var d_scroll = 0;
+
+            if (underset < 0) {
+                d_scroll = underset;
+            } else if (overset > 0) {
+                d_scroll = overset;
+            }
+
+            if (d_scroll) {
+                body.animate({
+                    scrollTop: body.scrollTop() + d_scroll
+                });
+            }
         }
 
         // dialog_state will allow the dialog to have disjunct states according to which input is at hand.
@@ -375,7 +399,10 @@ $(function() {
             // This allows it to start animating concurrently with above_box,
             // but also moves with the correct final position of above_box.
             // moveInputSetDatasetButton();
-            above_box.showIfHidden(moveInputSetDatasetButton);
+            above_box.showIfHidden(function() {
+                scrollToMakeButtonVisible();
+                moveInputSetDatasetButton();
+            });
         };
     })();
     var uiFactory = (function() {
@@ -518,12 +545,17 @@ $(function() {
             inactive_buttons = $('button:not(.receiving)', dataset_input_table);
 
             // decide where to go next
-            if ((e.metaKey || e.ctrlKey) && blank_input_queue.length) {
-                blank_input_queue.eq(0).find('button')
-                    .trigger('click');
-            } else if (inactive_buttons.length) {
+            if ((e.metaKey || e.ctrlKey) && inactive_buttons.length) {
                 inactive_buttons.eq(0)
                     .trigger('click');
+            } else if (inactive_buttons.length) {
+                if (blank_input_queue.length) {
+                    blank_input_queue.eq(0).find('button')
+                        .trigger('click');
+                } else {
+                    inactive_buttons.eq(0)
+                        .trigger('click');
+                }
             } else {
                 dataset_search_dialog.fadeOut('fast');
                 above_box.hide();
