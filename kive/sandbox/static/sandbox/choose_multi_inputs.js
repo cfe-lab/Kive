@@ -76,7 +76,7 @@ $(function() {
             dataset_input_table.closest('#scroll_content').css('top', dataset_input_table._top);
             this.css('height', this._height);
         }
-    }
+    };
 
     dataset_input_table.find('td').css('width', cell_width);
     dataset_input_table.error = function(message) {
@@ -651,12 +651,12 @@ $(function() {
             dataset_input_table.auto_fill = [];
         }
 
-        var selected_val = dataset_search_dialog.find('.search_results .selected .primary').eq(0);
+        var selected_val = dataset_search_dialog.find('.search_results .selected .primary').eq(0),
             receiving_cell = $('button.receiving'),
             receiving_cell_selector = 'td:nth-child(' +
                 (receiving_cell.parent().index() + 1) +
-                ')'// css pseudo-class is 1-indexed
-        ;
+                ')'
+        ;// css pseudo-class is 1-indexed
 
         if (action == 'fill-column') {
             dataset_input_table.auto_fill.splice(
@@ -701,25 +701,27 @@ $(function() {
     };
     $.fn.caretTarget = function(offset, start) {
         if (!this.is('input')) return null;
-        var position = 0;
-        var position_offset = [ 0 ];
-        var text = this.val() || this.text();
-        var rel_offset = offset + this[0].scrollLeft - parseInt(this.css('padding-left'), 10)
+        var pos = start || 1,
+            px_offset = [],
+            text = this.val() || this.text(),
+            last2_avg, half_char_adjustment;
 
-        // @todo 
-        // use the "start" parameter to skip characters.
+        // correct offset
+        offset += this[0].scrollLeft - parseInt(this.css('padding-left'), 10);
+
+        px_offset[pos - 1] = 0;
 
         // currently just scrolls through until it finds that offset.
         // a better algorithm would do midpoint, then quartiles, etc
-        while (position_offset[position] < rel_offset && position < text.length + 1) {
-            position++;
-            position_offset[position] = this.textWidth(text.substr(0, position));
+        for (pos; px_offset[pos - 1] < offset && pos - 1 < text.length + 1; pos++) {
+            px_offset[pos] = this.textWidth(text.substr(0, pos));
         }
+        pos--;
 
-        var last2_avg = position_offset.slice(-2).reduce(function(a,b) {return a+b;}) / 2;
-            half_char_adjustment = +(rel_offset < last2_avg);
+        last2_avg = (px_offset[pos] + px_offset[pos - 1]) / 2;
+        half_char_adjustment = +(offset < last2_avg);
 
-        return position - half_char_adjustment;
+        return pos - half_char_adjustment;
     };
 
     (function() {
@@ -728,7 +730,8 @@ $(function() {
         // allowing the user to edit the rest of the name.
 
         // this closure block exists to close over the following variables.
-        var select_start, 
+        var select_start,
+            select_end,
             active_input, 
             $active_input, 
             input_height, 
@@ -741,7 +744,7 @@ $(function() {
          * based on mouse coordinates and key codes.
          */
         var keyDownHandler = function(e) {
-            var prefix_length = prefix_el.val().length + 1,
+            var prefix_length = getPrefix().length,
                 // these are the keys/combinations we have to watch out for.
                 carat_is_on_boundary = this.selectionStart <= prefix_length,
                 key_is_back_or_left = [8,37].indexOf(e.keyCode) > -1,
@@ -754,7 +757,7 @@ $(function() {
                 ) {
                 if (key_is_up_or_home) {
                     this.setSelectionRange(
-                        prefix_length, 
+                        prefix_length,
                         e.shiftKey ? this.selectionStart : prefix_length
                     );
                 }
@@ -764,14 +767,17 @@ $(function() {
                 e.preventDefault();
             }
         };
+        var getPrefix = function() {
+            var prefix = prefix_el.val();
+            if (prefix) {
+                prefix += "_";
+            }
+            return prefix;
+        };
         var mouseDownHandler = function(e) {
-            var prefix = prefix_el.val() + '_',
+            var prefix = getPrefix(),
                 offset = e.offsetX,
                 prefix_width = prefix_el.textWidth(prefix);
-
-            if (prefix == "_") {
-                prefix = "";
-            }
 
             activateInput(this);
             if (offset < prefix_width) {
@@ -782,31 +788,32 @@ $(function() {
             } else {
                 select_start = $(this).caretTarget(offset, prefix.length);
             }
-            selectText(e);
         };
         var selectText = function(e) {// mousemove event when dragging from input
-            var prefix_length = prefix_el.val().length + 1,
+            var prefix_length = getPrefix().length,
                 full_name_length = active_input.value.length,
                 mouse_is_before_input = e.pageY < input_offset.top || 
                     e.pageY < input_height + input_offset.top && 
-                    e.pageX < input_offset.left,
-                end;
+                    e.pageX < input_offset.left;
 
             if (active_input == e.target) {
-                end = Math.max(
+                select_end = Math.max(
                     prefix_length,
                     $active_input.caretTarget(e.offsetX, prefix_length)
                 );
             } else {
-                end = mouse_is_before_input ? prefix_length : full_name_length;
+                select_end = mouse_is_before_input ? prefix_length : full_name_length;
             } 
-            if (select_start > end) {
-                active_input.setSelectionRange(end, select_start);
+            if (select_start < select_end) {
+                active_input.setSelectionRange(select_start, select_end);
             } else {
-                active_input.setSelectionRange(select_start, end);
+                active_input.setSelectionRange(select_end, select_start);
             }
-            console.log(select_start, end);
             e.preventDefault();
+        };
+        var selectAll = function(e) {
+            e.preventDefault();
+            this.setSelectionRange(getPrefix().length, this.value.length);
         };
         var activateInput = function(input) {
             active_input = input;
@@ -816,14 +823,19 @@ $(function() {
             $('body').on('mousemove', selectText);
         };
         var deactivateInput = function() {
-            active_input = $active_input = input_offset = input_height = undefined;
+            if (active_input && select_end === undefined) {
+                active_input.focus();
+                active_input.setSelectionRange(select_start, select_start);
+            }
+            active_input = $active_input = input_offset = input_height = select_end = undefined;
             $('body').off('mousemove', selectText);
         };
 
         body.mouseup(deactivateInput);
         dataset_input_table.on({// delegate target is ".run-name"
             keydown: keyDownHandler,
-            mousedown: mouseDownHandler
+            mousedown: mouseDownHandler,
+            dblclick: selectAll
         }, '.run-name');
     })();
 
@@ -853,8 +865,8 @@ $(function() {
     set_dataset.options_menu  .on( 'click', 'li',              fillMenuChoose               );
     $('.search_results')      .on( 'click', 'tbody tr',        selectSearchResult           )
                            .on( 'dblclick', 'tbody tr',    function() { set_dataset.btn.click(); } );
-    $('#run_controls')        .on( 'click', '.add_run',    function() { dataset_input_table.addNewRunRow() } )
-                              .on( 'click', '.remove_run', function() { dataset_input_table.removeLastRunRow() } );
+    $('#run_controls')        .on( 'click', '.add_run',    function() { dataset_input_table.addNewRunRow(); } )
+                              .on( 'click', '.remove_run', function() { dataset_input_table.removeLastRunRow(); } );
 
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
