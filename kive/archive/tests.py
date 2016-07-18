@@ -7,7 +7,7 @@ import re
 import tempfile
 import json
 
-from mock import call, patch
+from mock import call, patch, Mock
 
 from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
@@ -20,7 +20,7 @@ from rest_framework import status
 from rest_framework.test import force_authenticate
 
 from archive.models import ExecLog, MethodOutput, Run, RunComponent,\
-    RunOutputCable, RunStep, RunSIC, RunBatch
+    RunOutputCable, RunStep, RunSIC, RunBatch, RunState
 from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, Dataset, DatasetStructure
@@ -28,6 +28,7 @@ from librarian.models import ExecRecord, Dataset, DatasetStructure
 from kive.tests import BaseTestCases, install_fixture_files, restore_production_files
 from method.models import Method, MethodFamily, CodeResource
 from pipeline.models import Pipeline, PipelineStep, PipelineFamily
+from kive.mock_setup import mocked_relations
 
 from fleet.workers import Manager
 import kive.testing_utils as tools
@@ -36,7 +37,7 @@ import kive.testing_utils as tools
 # database access.
 from metadata.models import kive_user, everyone_group, CompoundDatatype
 
-from constants import groups
+from constants import groups, runstates
 
 
 class ArchiveTestCaseHelpers(object):
@@ -4273,3 +4274,117 @@ class CancelComponentsTests(TestCase):
         for run in self.successful_runs:
             run.refresh_from_db()
             self.assertTrue(run.is_successful())
+
+
+@mocked_relations(RunBatch, RunState)
+class RunBatchMockTests(TestCase):
+    def test_all_runs_complete_true(self):
+        """
+        Testing when all runs are complete.
+        """
+        rb = RunBatch()
+
+        run1 = Run(_runstate_id=runstates.SUCCESSFUL_PK)
+        run2 = Run(_runstate_id=runstates.FAILED_PK)
+        run3 = Run(_runstate_id=runstates.QUARANTINED_PK)
+
+        rb.runs.add(run1, run2, run3)
+
+        self.assertTrue(rb.all_runs_complete())
+
+    def test_all_runs_complete_false(self):
+        """
+        Testing when some runs are incomplete.
+        """
+        rb = RunBatch()
+
+        run1 = Run(_runstate_id=runstates.SUCCESSFUL_PK)
+        run2 = Run(_runstate_id=runstates.RUNNING_PK)
+        run3 = Run(_runstate_id=runstates.QUARANTINED_PK)
+
+        rb.runs.add(run1, run2, run3)
+
+        self.assertFalse(rb.all_runs_complete())
+
+    def test_eligible_permissions_no_runs(self):
+        """
+        Testing that the eligible permissions on an empty RunBatch are everything.
+        """
+        rb = RunBatch()
+        eligible_users, eligible_groups = rb.eligible_permissions()
+        self.assertSetEqual(set(eligible_users), set(User.objects.all()))
+        self.assertSetEqual(set(eligible_groups), set(Group.objects.all()))
+
+    def test_eligible_permissions_not_all_runs_complete(self):
+        """
+        Testing eligible permissions raises an exception if not all runs are complete.
+        """
+        rb = RunBatch()
+        rb.all_runs_complete = Mock(return_value=False)
+        self.assertRaisesRegexp(
+            RuntimeError,
+            "Eligible permissions cannot be found until all runs are complete",
+            rb.eligible_permissions
+        )
+
+    def test_eligible_permissions_runs_have_permissions(self):
+        """
+        Testing that the eligible permissions on an empty RunBatch are everything.
+        """
+        user_1 = User.objects.create_user("userone", "user1@ponzi.io", "user1")
+        user_2 = User.objects.create_user("usertwo", "user2@ponzi.io", "user2")
+        user_3 = User.objects.create_user("userthree", "user3@ponzi.io", "user3")
+
+        group_1 = Group(name="groupone")
+        group_2 = Group(name="grouptwo")
+        group_3 = Group(name="groupthree")
+        group_1.save()
+        group_2.save()
+        group_3.save()
+
+        rb = RunBatch()
+
+        run1 = Run(_runstate_id=runstates.SUCCESSFUL_PK)
+        run2 = Run(_runstate_id=runstates.SUCCESSFUL_PK)
+        run3 = Run(_runstate_id=runstates.CANCELLED_PK)
+
+        run1.eligible_permissions = Mock(
+            return_value=[
+                User.objects.filter(pk__in=[user_1.pk, user_2.pk]),
+                Group.objects.filter(pk__in=[group_1.pk, group_2.pk])
+            ]
+        )
+        run2.eligible_permissions = Mock(
+            return_value=[
+                User.objects.filter(pk__in=[user_2.pk, user_3.pk]),
+                Group.objects.filter(pk__in=[group_2.pk, group_3.pk])
+            ]
+        )
+
+        # run3 has Everyone permissions, so should pose no limits.
+        run3.eligible_permissions = Mock(
+            return_value=[
+                User.objects.all(),
+                Group.objects.all()
+            ]
+        )
+
+        rb.runs.add(run1, run2, run3)
+
+        eligible_users, eligible_groups = rb.eligible_permissions()
+        self.assertSetEqual(set(eligible_users), {user_2})
+        self.assertSetEqual(set(eligible_groups), {group_2})
+
+        # This run grants no one access.
+        run4 = Run(_runstate_id=runstates.SUCCESSFUL_PK)
+        run4.eligible_permissions = Mock(
+            return_value=[
+                User.objects.none(),
+                Group.objects.none()
+            ]
+        )
+        rb.runs.add(run4)
+
+        eligible_users, eligible_groups = rb.eligible_permissions()
+        self.assertFalse(eligible_users.exists())
+        self.assertFalse(eligible_groups.exists())

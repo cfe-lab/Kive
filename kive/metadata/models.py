@@ -529,10 +529,8 @@ class AccessControl(models.Model):
         """
         Given a list with two entries (one iterable of users and one of groups), add permissions.
         """
-        for user in permissions_list[0]:
-            self.users_allowed.add(user)
-        for group in permissions_list[1]:
-            self.groups_allowed.add(group)
+        self.users_allowed.add(*permissions_list[0])
+        self.groups_allowed.add(*permissions_list[1])
 
     def copy_permissions(self, source):
         """ Copy users_allowed and groups_allowed from the source object.

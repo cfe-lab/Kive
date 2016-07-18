@@ -1595,12 +1595,12 @@
                 
                 it('should create and move output', function() {
                     drawStartingPipeline(this);
-                    this.expectedOutput.x = 221.56696744775581;
-                    this.expectedOutput.y = 97.44283749469356;
+                    this.expectedOutput.x = 233.56696744775581;
+                    this.expectedOutput.y = 109.94283749469356;
                     this.expectedOutput.draw(this.expectedCanvas.ctx);
                     this.expectedCanvas.drawText({
-                        x: 221.56696744775581,
-                        y: 66.94283749469356,
+                        x: 233.56696744775581,
+                        y: 79.44283749469356,
                         text: "* out",
                         style: "node",
                         dir: 0
@@ -1622,11 +1622,124 @@
                     this.state.doMove({pageX: 250, pageY: 20});
                     this.state.doUp({pageX: 250, pageY: 20}); // in output zone
                     this.state.draw(this.ctx);
-                    // select connector and move it
+                    // clear selection
+                    this.state.doDown({pageX: 0, pageY: 0});
+                    this.state.doUp({pageX: 0, pageY: 0});
+                    // select output and move it
                     var startX = this.actualMethod.out_magnets[0].connected[0].x,
+                        startY = this.actualMethod.out_magnets[0].connected[0].y + 10;
+                    this.state.doDown({ pageX: startX, pageY: startY });
+                    this.state.doMove({ pageX: startX+10, pageY: startY+80 });
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should drag output cable', function() {
+                    drawStartingPipeline(this);
+                    this.expectedOutputZone.draw(this.expectedCanvas.ctx);
+                    this.expectedOutput.x = 250-25.775455885674518;
+                    this.expectedOutput.y = 40+20.932840815284735;
+                    this.expectedOutput.in_magnets[0].acceptingConnector = true;
+                    this.expectedOutput.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText({
+                        x: 224.22454411432548,
+                        y: 30.432840815284735,
+                        text: "* out",
+                        style: "node",
+                        dir: 0
+                    });
+                    // connector
+                    //this.expectedConnector.dest = this.expectedOutput.in_magnets[0];
+                    this.expectedConnector.x = 212.22454411432548;
+                    this.expectedConnector.y = 128.43284081528475;
+                    this.expectedCanvas.ctx.globalAlpha = 0.75;
+                    this.expectedConnector.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.ctx.globalAlpha = 1.0;
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                    var magnet = this.expectedMethod.out_magnets[0];
+                    
+                    this.state.draw(this.ctx);
+                    // drag to create output
+                    this.state.doDown({pageX: magnet.x, pageY: magnet.y});
+                    this.state.doMove({pageX: 250, pageY: 40});
+                    this.state.doUp({pageX: 250, pageY: 40}); // in output zone
+                    this.state.draw(this.ctx);
+                    // clear selection
+                    this.state.doDown({pageX: 0, pageY: 0});
+                    this.state.doUp({pageX: 0, pageY: 0});
+                    // select connector and move it
+                    var startX = this.actualMethod.out_magnets[0].connected[0].x - 10,
                         startY = this.actualMethod.out_magnets[0].connected[0].y;
                     this.state.doDown({ pageX: startX, pageY: startY });
                     this.state.doMove({ pageX: startX+10, pageY: startY+80 });
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should drag output cable, then delete output', function() {
+                    drawStartingPipeline(this);
+                    var magnet = this.expectedMethod.out_magnets[0];
+                    
+                    this.state.draw(this.ctx);
+                    // drag to create output
+                    this.state.doDown({pageX: magnet.x, pageY: magnet.y});
+                    this.state.doMove({pageX: 250, pageY: 40});
+                    this.state.doUp({pageX: 250, pageY: 40}); // in output zone
+                    this.state.draw(this.ctx);
+                    // clear selection
+                    this.state.doDown({pageX: 0, pageY: 0});
+                    this.state.doUp({pageX: 0, pageY: 0});
+                    // select connector and move it
+                    var startX = this.actualMethod.out_magnets[0].connected[0].x - 10,
+                        startY = this.actualMethod.out_magnets[0].connected[0].y;
+                    this.state.doDown({ pageX: startX, pageY: startY });
+                    this.state.doMove({ pageX: startX+10, pageY: startY+80 });
+                    this.state.doUp({ pageX: startX+10, pageY: startY+80 });
+                    // select output and delete it.
+                    this.state.doDown({ pageX: startX + 10, pageY: startY });
+                    this.state.doUp({ pageX: startX + 10, pageY: startY });
+                    this.state.deleteObject();
+                    this.state.draw(this.ctx);
+                });
+                
+                it('should drag output cable, then reconnect', function() {
+                    drawStartingPipeline(this);
+                    this.expectedOutput.x = 250-25.775455885674518;
+                    this.expectedOutput.y = 40+20.932840815284735;
+                    this.expectedOutput.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.drawText({
+                        x: 224.22454411432548,
+                        y: 30.432840815284735,
+                        text: "* out",
+                        style: "node",
+                        dir: 0
+                    });
+                    // connector
+                    this.expectedConnector.dest = this.expectedOutput.in_magnets[0];
+                    this.expectedCanvas.ctx.globalAlpha = 0.75;
+                    this.expectedConnector.draw(this.expectedCanvas.ctx);
+                    this.expectedCanvas.ctx.globalAlpha = 1.0;
+                    this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                    this.expectedCanvas.ctx.lineWidth = 4;
+                    this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                    var magnet = this.expectedMethod.out_magnets[0];
+                    
+                    this.state.draw(this.ctx);
+                    // drag to create output
+                    this.state.doDown({pageX: magnet.x, pageY: magnet.y});
+                    this.state.doMove({pageX: 250, pageY: 40});
+                    this.state.doUp({pageX: 250, pageY: 40}); // in output zone
+                    this.state.draw(this.ctx);
+                    // clear selection
+                    this.state.doDown({pageX: 0, pageY: 0});
+                    this.state.doUp({pageX: 0, pageY: 0});
+                    // select connector and move it
+                    var startX = this.actualMethod.out_magnets[0].connected[0].x - 10,
+                    startY = this.actualMethod.out_magnets[0].connected[0].y;
+                    this.state.doDown({ pageX: startX, pageY: startY });
+                    this.state.doMove({ pageX: startX+10, pageY: startY+80 });
+                    this.state.doMove({ pageX: startX+10, pageY: startY });
+                    this.state.doUp({ pageX: startX+10, pageY: startY });
                     this.state.draw(this.ctx);
                 });
                 

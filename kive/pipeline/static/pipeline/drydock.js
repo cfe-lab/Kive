@@ -169,10 +169,9 @@ var drydock = (function() {
          event handler for mouse motion over canvas
          */
         var mouse = this.getPos(e),
-            methods = this.methods,
             dx, dy,
             i, j, k,
-            method, 
+            shape, 
             sel, 
             source_shape, 
             in_magnet,
@@ -198,20 +197,20 @@ var drydock = (function() {
                     }
 
                     // check if connector has been dragged to an in-magnet
-                    for (i = 0; (method = methods[i]); i++) {
+                    for (i = 0; (shape = this.shapes[i]); i++) {
                         // disallow self-referential connections
-                        if (source_shape !== undefined && method === source_shape) {
+                        if (source_shape !== undefined && shape === source_shape) {
                             continue;
                         }
 
-                        for (k = 0; (in_magnet = method.in_magnets[k]); k++) {
+                        for (k = 0; (in_magnet = shape.in_magnets[k]); k++) {
                             // light up magnet
                             if (in_magnet.connected.length === 0 && sel.source.cdt === in_magnet.cdt) {
                                 in_magnet.acceptingConnector = true;
                             }
                         }
 
-                        in_magnet = method.getMouseTarget(mouse.x, mouse.y);
+                        in_magnet = shape.getMouseTarget(mouse.x, mouse.y);
 
                         // does this in-magnet accept this CompoundDatatype?
                         // cdt is null if own_shape is a RawNode
@@ -242,8 +241,8 @@ var drydock = (function() {
         
         var was_highlighted = this.mouse_highlight instanceof drydock_objects.Magnet;
         this.mouse_highlight = null;
-        for (i = 0; (method = methods[i]); i++) {
-            magnet = method.getMouseTarget(mouse.x, mouse.y);
+        for (i = 0; (shape = this.shapes[i]); i++) {
+            magnet = shape.getMouseTarget(mouse.x, mouse.y);
             if (magnet instanceof drydock_objects.Magnet && 
                     magnet.connected.length === 0) {
                 if (magnet !== this.mouse_highlight) {

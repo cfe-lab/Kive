@@ -1,0 +1,183 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Analysis{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script type="text/javascript">
+        var is_user_admin = {{ is_user_admin|lower }},
+            runbatch_pk = {{ runbatch.pk }},
+            user = "{{ user.get_username }}",
+            is_owner = {{ is_owner|lower }};
+        var is_admin = is_user_admin;
+    </script>
+    <script src="/static/sandbox/runs_table.js"></script>
+    <script src="/static/sandbox/runbatch.js"></script>
+    <script src="/static/sandbox/jq_color_anim.min.js"></script>
+    <script src="/static/portal/edit_details.js"></script>
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/portal/permissions.css"/>
+    <link rel="stylesheet" href="/static/portal/search.css"/>
+    <link rel="stylesheet" href="/static/sandbox/sandbox.css"/>
+    <style>
+        .error-msg {
+            color:red;
+        }
+    </style>
+{% endblock %}
+
+{% block widget_media %}
+{{ runbatch_form.media }}
+{% endblock %}
+
+{% block content %}
+
+    <a href="../../runs" rel="prev">Back to runs</a>  {# FIXME do we want a list of RunBatches instead? #}
+
+<h2> {{ runbatch.name }} </h2>
+
+{% if not is_owner and is_user_admin %}
+    <div id="lock"><img src=""/></div>
+{% endif %}
+
+<h3>Details</h3>
+
+{% if is_owner or is_user_admin %}
+<form id="runbatchDetails" name="runbatchDetails" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+{% endif %}
+
+    <table id="runbatch_details">
+    <tr>
+        <td>Name:</td>
+        <td>
+            <span class="readonly">{{ runbatch.name }}</span>
+            {% if is_owner or is_user_admin %}
+            <span class="edit">{{ runbatch_form.name }}</span>
+            {% endif %}
+        </td>
+    </tr>
+
+    <tr>
+        <td>Description:</td>
+        <td class="run_description">
+            <span class="readonly">{{ runbatch.description }}</span>
+            {% if is_owner or is_user_admin %}
+            <span class="edit">{{ runbatch_form.description }}</span>
+            {% endif %}
+        </td>
+    </tr>
+
+    <tr>
+        <td>Creator:</td>
+        <td>{{ runbatch.user }}</td>
+    </tr>
+
+    <tr>
+        <td>Permissions:</td>
+        <td>
+            <h4>Users allowed</h4>
+            {% if runbatch.users_allowed.exists %}
+                <ul>
+                {% for user in runbatch.users_allowed.all %}
+                    <li>{{ user }}</li>
+                {% endfor %}
+                </ul>
+            {% else %}
+            <em>None</em>
+            {% endif %}
+
+            <h4>Groups allowed</h4>
+            {% if runbatch.groups_allowed.exists %}
+                <ul>
+                {% for group in runbatch.groups_allowed.all %}
+                    <li>{{ group }}</li>
+                {% endfor %}
+                </ul>
+            {% else %}
+            <em>None</em>
+            {% endif %}
+        </td>
+        {% if all_runs_complete %}
+        {% if is_owner or is_user_admin %}
+        <td class="edit">
+        <div id="edit_permissions"><a href="/api/runbatches/{{ runbatch.pk }}/eligible_permissions">Edit permissions</a></div>
+        <div id="loading_message">Computing eligible users and groups....</div>
+        <div id="permissions_widget">{{ runbatch_form.permissions }}</div>
+        </td>
+        {% endif %}
+        {% endif %}
+    </tr>
+
+    </table>
+
+{% if is_owner or is_user_admin %}
+<span class="edit"><input type="submit" name="reviseRunBatchDetails" value="Revise details"/></span>
+</form>
+{% endif %}
+
+{{ runbatch_form.errors }}
+
+<h3>Runs</h3>
+    <div class="filter_ctrl">
+        <form class="short-filter">
+        <input name="name" type="text"
+            ><input type="button" class="advanced ctrl" value="Advanced"
+            ><input type="submit" value="Filter">
+        </form>
+
+        <form class="advanced-filter">
+        <h4>Advanced search</h4>
+        <table>
+        <tr>
+            <td><label>Name<input name="name" type="text"/></label></td>
+        </tr>
+        <tr>
+            <td><label>Creator<input name="user" type="text"/></label></td>
+            <td><label><input
+                name="active"
+                type="checkbox"/>Is active</label></td>
+        </tr>
+        <tr>
+            <td><label>Started after<input
+                name="startafter"
+                type="text"
+                class="datetime"/></label>
+            <td><label>Started before<input
+                name="startbefore"
+                type="text"
+                class="datetime"/></label>
+        </tr>
+        <tr>
+            <td><label>Ended after<input
+                name="endafter"
+                type="text"
+                class="datetime"/></label>
+            <td><label>Ended before<input
+                name="endbefore"
+                type="text"
+                class="datetime"/></label>
+        </tr>
+        </table>
+        <input type="submit" value="Filter"/>
+        </form>
+    </div>
+
+    <div id="active_filters"></div>
+
+    <div class="navigation_links"></div>
+
+    <div class="results">
+        <table id="runs">
+                <caption>showing all matching runs</caption>
+        </table>
+    </div>
+
+    <div class="no_results">
+        <strong>No matching runs were found.</strong>
+    </div>
+
+{% endblock %}

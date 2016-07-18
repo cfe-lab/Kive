@@ -1,4 +1,5 @@
 import logging
+import json
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -10,11 +11,14 @@ from django.contrib.auth.models import User, Group
 
 from rest_framework.renderers import JSONRenderer
 
-from archive.models import Dataset, Run
+from archive.models import Dataset, Run, RunBatch
 from archive.serializers import RunOutputsSerializer
 from pipeline.models import Pipeline
 from portal.views import admin_check
-from sandbox.forms import InputSubmissionForm, RunSubmissionForm, RunDetailsForm
+from sandbox.forms import InputSubmissionForm, RunSubmissionForm, RunDetailsForm,\
+    RunBatchDetailsForm
+
+from constants import runstates
 
 
 LOGGER = logging.getLogger(__name__)
@@ -253,4 +257,88 @@ def view_run(request, run_id, md5=None):
         'run': run,
         'md5': md5
     }
+    return HttpResponse(template.render(context, request))
+
+
+@login_required
+def runbatch(request, runbatch_pk):
+    """Display the specified RunBatch, allowing changes to metadata."""
+    four_oh_four = False
+    try:
+        rb = RunBatch.objects.get(pk=runbatch_pk)
+        if not rb.can_be_accessed(request.user) and not admin_check(request.user):
+            four_oh_four = True
+
+        # If we're going to change the permissions, this will make it faster.
+        # FIXME punch this up so it gets the top-level runs of the ExecRecords it reuses
+        batch_runs = Run.objects.prefetch_related(
+            "runsteps__RSICs__outputs__integrity_checks__usurper",
+            "runsteps__outputs__integrity_checks__usurper",
+            "runoutputcables__outputs__integrity_checks__usurper",
+            "runsteps__execrecord__generator__record__runstep__run",
+            "runsteps__RSICs__execrecord__generator__record__runsic__runstep__run",
+            "runoutputcables__execrecord__generator__record__runoutputcable__run"
+        ).filter(runbatch=rb)
+    except RunBatch.DoesNotExist:
+        four_oh_four = True
+    if four_oh_four:
+        raise Http404("ID {} does not exist or is not accessible".format(runbatch_pk))
+
+    with transaction.atomic():
+        all_runs_complete = batch_runs.filter(_runstate__pk__in=runstates.COMPLETE_STATE_PKS)
+
+    if not request.method == "POST":
+        # A form which we can use to make editing easier.
+        rb_form = RunBatchDetailsForm(
+            users_allowed=User.objects.none(),
+            groups_allowed=Group.objects.none(),
+            initial={"name": rb.name, "description": rb.description}
+        )
+
+    else:
+        # We are going to try and update this RunBatch.  We don't bother restricting the
+        # PermissionsField here; instead we will catch errors at the model validation
+        # step.
+        rb_form = RunBatchDetailsForm(
+            request.POST,
+            instance=rb
+        )
+        try:
+            if rb_form.is_valid():
+                with transaction.atomic():
+                    all_runs_complete = batch_runs.filter(_runstate__pk__in=runstates.COMPLETE_STATE_PKS)
+                    rb.name = rb_form.cleaned_data["name"]
+                    rb.description = rb_form.cleaned_data["description"]
+                    rb.save()
+
+                    permissions = json.loads(rb_form.cleaned_data["permissions"])
+                    if len(permissions[0]) > 0 or len(permissions[1]) > 0:
+                        if not all_runs_complete:
+                            raise ValueError("Permissions cannot be modified until all runs are complete")
+                        rb.grant_from_json(rb_form.cleaned_data["permissions"])
+
+                    for run in batch_runs:
+                        run.increase_permissions_from_json(rb_form.cleaned_data["permissions"])
+                        Run.validate_permissions(run)  # FIXME this could be slow
+                    rb.clean()
+
+                return HttpResponseRedirect("/runbatch/{}".format(runbatch_pk))
+
+        except (AttributeError, ValidationError, ValueError) as e:
+            LOGGER.exception(e.message)
+            rb_form.add_error(None, e)
+
+    template = loader.get_template("sandbox/runbatch.html")
+
+    # FIXME what do we put in here?
+    context = {
+        "runbatch": rb,
+        "runbatch_form": rb_form,
+        "all_runs_complete": all_runs_complete,
+        "is_owner": rb.user == request.user,
+        "user": request.user,
+        "is_user_admin": admin_check(request.user)
+    }
+    print "FOO {}".format(context)
+
     return HttpResponse(template.render(context, request))

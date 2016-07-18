@@ -1,4 +1,5 @@
 import os
+import copy
 
 from django.template.defaultfilters import filesizeformat
 from django.utils import timezone
@@ -8,9 +9,10 @@ from rest_framework.reverse import reverse
 
 from archive.models import Run, MethodOutput, RunInput, RunBatch
 from transformation.models import TransformationInput
-from pipeline.models import Pipeline
-from metadata.models import who_cannot_access
+from metadata.models import who_cannot_access, everyone_group
 from datachecking.models import BadData, MD5Conflict, ContentCheckLog
+
+from constants import groups, runstates
 
 from kive.serializers import AccessControlSerializer
 
@@ -326,7 +328,7 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
         First, check that the inputs are correctly specified; then,
         check that the permissions are OK.
         """
-        pipeline = Pipeline.objects.get(pk=data["pipeline"])
+        pipeline = data["pipeline"]
 
         posted_input_count = len(data["inputs"])
         pipeline_input_count = pipeline.inputs.count()
@@ -341,6 +343,34 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
             raise serializers.ValidationError(
                 'Pipeline inputs must be uniquely specified'
             )
+
+        errors = RunSerializer.validate_permissions(data)
+        if len(errors) > 0:
+            raise serializers.ValidationError(errors)
+
+        return data
+
+    # We don't place this in a transaction; when it's called from a ViewSet, it'll already be
+    # in one.
+    def create(self, validated_data):
+        """
+        Create a Run to process, i.e. add a job to the work queue.
+        """
+        return RunSerializer.create_from_validated_data(validated_data)
+
+    @staticmethod
+    def validate_permissions(data, users_allowed=None, groups_allowed=None):
+        """
+        Helper used by validate and RunBatch.validate that checks the permissions are OK.
+
+        If users_allowed and groups_allowed are specified, then they're used instead of the
+        corresponding entries in data.
+        """
+        # These are lists of users and groups, not usernames and group names.
+        users_allowed = users_allowed or data.get("users_allowed", [])
+        groups_allowed = groups_allowed or data.get("groups_allowed", [])
+
+        pipeline = data["pipeline"]
 
         all_access_controlled_objects = [pipeline]
         errors = []
@@ -367,9 +397,9 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
 
         # Check that the specified user, users_allowed, and groups_allowed are all okay.
         users_without_access, groups_without_access = who_cannot_access(
-            self.context["request"].user,
-            User.objects.filter(username__in=data.get("users_allowed", [])),
-            Group.objects.filter(name__in=data.get("groups_allowed", [])),
+            data["user"],
+            User.objects.filter(pk__in=[x.pk for x in users_allowed]),
+            Group.objects.filter(pk__in=[x.pk for x in groups_allowed]),
             all_access_controlled_objects)
 
         if len(users_without_access) != 0:
@@ -378,16 +408,12 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
         if len(groups_without_access) != 0:
             errors.append("Group(s) {} may not be granted access".format(list(groups_without_access)))
 
-        if len(errors) > 0:
-            raise serializers.ValidationError(errors)
+        return errors
 
-        return data
-
-    # We don't place this in a transaction; when it's called from a ViewSet, it'll already be
-    # in one.
-    def create(self, validated_data):
+    @staticmethod
+    def create_from_validated_data(validated_data):
         """
-        Create a Run to process, i.e. add a job to the work queue.
+        Helper method used by create and also by RunBatchSerializer.create.
         """
         inputs = validated_data.pop("inputs")
         users_allowed = validated_data.pop("users_allowed", [])
@@ -448,3 +474,178 @@ class RunProgressSerializer(RunSerializer):
     def get_run_progress(self, obj):
         if obj is not None:
             return obj.get_run_progress()
+
+
+class RunBatchSerializer(AccessControlSerializer, serializers.ModelSerializer):
+
+    runs = RunSerializer(many=True, required=False)
+    copy_permissions_to_runs = serializers.BooleanField(default=True, write_only=True)
+
+    class Meta:
+        model = RunBatch
+        fields = (
+            "id",
+            "url",
+            "name",
+            "description",
+            "user",
+            "users_allowed",
+            "groups_allowed",
+            "runs",
+            "copy_permissions_to_runs"
+        )
+
+    def validate(self, data):
+        """
+        Check that the Runs are coherently specified with the RunBatch.
+
+        In particular, check that the permissions specified for the Run
+        do not exceed those of the RunBatch.
+        """
+        # If this is an update of a RunBatch, and we are trying to set the
+        # permissions but the Runs aren't complete yet, we should fail immediately.
+        permission_change_requested = (data.get("users_allowed") is not None or
+                                       data.get("groups_allowed") is not None)
+        if self.instance is not None:
+            any_unfinished_runs = self.instance.runs.filter(_runstate__pk__in=runstates.COMPLETE_STATE_PKS).exists()
+            if any_unfinished_runs and permission_change_requested:
+                raise serializers.ValidationError("Permissions may not be modified while Runs are incomplete")
+
+        # Note that we don't have to check the user because it's the same user
+        # creating this RunBatch and the child Runs.
+        batch_users_allowed = data.get("users_allowed") or []
+        batch_groups_allowed = data.get("groups_allowed") or []
+
+        errors = []
+        run_dicts = data.get("runs", [])
+
+        if self.instance is None:
+            # We're defining Runs here.
+            for i, run_data in enumerate(run_dicts, start=1):
+                if (data.get("copy_permissions_to_runs") and
+                        run_data.get("users_allowed") is None and
+                        run_data.get("groups_allowed") is None):
+                    # Here, we're overriding the permissions of this Run, so check that they
+                    # don't exceed those of the Pipeline, inputs, etc.
+                    original_errors = RunSerializer.validate_permissions(run_data, users_allowed=batch_users_allowed,
+                                                                         groups_allowed=batch_groups_allowed)
+
+                    errors = [
+                        "{} to run {} (index {})".format(
+                            error,
+                            run_data.get("name", "[blank]"),
+                            i
+                        )
+                        for error in original_errors
+                    ]
+                elif everyone_group() not in batch_groups_allowed:
+                    # This Run has its own permissions defined, and the batch does not have
+                    # Everyone permissions.  Check that they don't exceed
+                    # those of the RunBatch.  Other validation will have already been taken
+                    # care of by field validation on the "runs" field.
+                    extra_users = set(run_data.get("users_allowed", [])).difference(batch_users_allowed)
+                    extra_groups = set(run_data.get("groups_allowed", [])).difference(batch_groups_allowed)
+
+                    if len(extra_users) != 0:
+                        errors.append(
+                            "User(s) {} may not be granted access to run {} (index {})".format(
+                                list(extra_users),
+                                run_data.get("name", "[blank]"),
+                                i
+                            )
+                        )
+
+                    if len(extra_groups) != 0:
+                        errors.append(
+                            "Group(s) {} may not be granted access to run {} (index {})".format(
+                                list(extra_groups),
+                                run_data.get("name", "[blank]"),
+                                i
+                            )
+                        )
+
+        elif permission_change_requested and data.get("copy_permissions_to_runs"):
+            # This is an update, make sure that the permissions we're changing are OK with
+            # each individual run.
+            batch_users_allowed_qs = User.objects.filter(pk__in=[x.pk for x in batch_users_allowed])
+            batch_groups_allowed_qs = Group.objects.filter(pk__in=[x.pk for x in batch_groups_allowed])
+            for run in self.instance.runs.all():
+                # Note that if the Everyone group is among eligible groups, eligible_users
+                # and eligible_groups will have all Users and Groups in them.
+                eligible_users, eligible_groups = run.eligible_permissions(include_runbatch=False)
+                extra_users = batch_users_allowed_qs.exclude(pk__in=[x.pk for x in eligible_users])
+                extra_groups = batch_groups_allowed_qs.exclude(pk__in=[x.pk for x in eligible_groups])
+
+                if extra_users.exists():
+                    errors.append(
+                        "User(s) {} may not be granted access to run {}".format(
+                            list(extra_users),
+                            run
+                        )
+                    )
+
+                if len(extra_groups) != 0:
+                    errors.append(
+                        "Group(s) {} may not be granted access to run {}".format(
+                            list(extra_groups),
+                            run
+                        )
+                    )
+
+        if len(errors) > 0:
+            raise serializers.ValidationError(errors)
+
+        return data
+
+    def create(self, validated_data):
+        """Create a RunBatch and the Runs it contains."""
+        run_dictionaries = validated_data.pop("runs")
+        users_allowed = validated_data.pop("users_allowed", [])
+        groups_allowed = validated_data.pop("groups_allowed", [])
+        copy_permissions_to_runs = validated_data.pop("copy_permissions_to_runs")
+
+        rb = RunBatch(**validated_data)
+        rb.save()
+        rb.users_allowed.add(*users_allowed)
+        rb.groups_allowed.add(*groups_allowed)
+
+        runs = []
+        for run_data in run_dictionaries:
+            if (len(run_data.get("users_allowed", [])) == 0 and
+                    len(run_data.get("groups_allowed", [])) == 0
+                    and copy_permissions_to_runs):
+                run_data["users_allowed"] = users_allowed
+                run_data["groups_allowed"] = groups_allowed
+
+            run_data["user"] = validated_data["user"]
+            run_data["runbatch"] = rb
+            runs.append(RunSerializer.create_from_validated_data(run_data))
+
+        return rb
+
+    def update(self, instance, validated_data):
+        """
+        Update a RunBatch (e.g. on a PATCH).
+
+        If permissions are updated and copy_permissions_to_runs is specified,
+        we add all of those permissions to the child runs.
+        """
+        instance.name = validated_data.get("name", instance.name)
+        instance.description = validated_data.get("description", instance.description)
+        instance.user = validated_data.get("user", instance.user)
+        instance.save()
+
+        users_allowed = validated_data.get("users_allowed", [])
+        groups_allowed = validated_data.get("groups_allowed", [])
+        copy_permissions_to_runs = validated_data.get("copy_permissions_to_runs")
+
+        instance.users_allowed.add(*users_allowed)
+        instance.groups_allowed.add(*groups_allowed)
+
+        for run in instance.runs.all():
+            if copy_permissions_to_runs:
+                # Validation assures that these can all be added.
+                run.users_allowed.add(*users_allowed)
+                run.groups_allowed.add(*groups_allowed)
+
+        return instance

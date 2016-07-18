@@ -13,7 +13,7 @@ def developer_check(user):
 
 
 def admin_check(user):
-    return user.groups.filter(pk=groups.ADMIN_PK).exists()
+    return user.is_staff
 
 
 @login_required

@@ -1402,6 +1402,7 @@ var drydock_objects = (function() {
     my.Connector.prototype.spawnOutputNode = function(new_output_label) {
         var out_node = new drydock_objects.OutputNode(this.x, this.y, new_output_label);
         this.dest = out_node.in_magnets[0];
+        this.dest.cdt = this.source.cdt;
         this.dest.connected = [ this ];
         return out_node;
     };
@@ -1409,13 +1410,7 @@ var drydock_objects = (function() {
     my.Connector.prototype.doDown = function(cs, e) {
         var pos = cs.getPos(e),
             out_node;
-        if (this.dest && this.dest.parent instanceof my.OutputNode) {
-            out_node = this.dest.parent;
-            out_node.x = pos.x;
-            out_node.y = pos.y;
-            out_node.dx = out_node.dy = 0;
-            out_node.doDown(cs, e);
-        } else if (!e.shiftKey || cs.selection.length === 0) {
+        if (!e.shiftKey || cs.selection.length === 0) {
             cs.selection = [ this ];
             if (cs.can_edit) {
                 cs.dragoffx = cs.dragoffy = 0;
@@ -1598,7 +1593,16 @@ var drydock_objects = (function() {
         this.fill = this.defaultFill = "#d40";
         this.found_fill = "blue";
         this.inset = 12; // distance of magnet from center
-        this.in_magnets.push(new my.Magnet(this, 5, 2, "white", null, this.label, pk));
+        this.in_magnets.push(new my.Magnet(
+                this,
+                5,
+                2,
+                "white",
+                null,
+                label,
+                undefined,
+                undefined,
+                pk));
         this.pk = pk;
         this.status = status;
         this.md5 = md5;
@@ -1640,6 +1644,11 @@ var drydock_objects = (function() {
         var connected_cable = this.in_magnets[0].connected;
         if (connected_cable.length > 0) {
             connected_cable[0].deleteFrom(cs);
+        } else {
+            var index = cs.shapes.indexOf(this);
+            if (index > -1) cs.shapes.splice(index, 1);
+            index = cs.outputs.indexOf(this);
+            if (index > -1) cs.outputs.splice(index, 1);
         }
     };
     

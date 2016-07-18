@@ -692,7 +692,7 @@ class Manager(object):
                 return False
             except NoWorkersAvailable as e:
                 # We restore the task to the queue and go back to the main loop.
-                mgr_logger.info(e.error_msg)
+                mgr_logger.debug(e.error_msg)
                 self.task_queue.insert(0, curr_task)
                 return True
 

@@ -12,7 +12,6 @@ Before installing Kive, you need to install some other software.
 * PostgreSQL
 * psycopg2 (Python library for interfacing with PostgreSQL)
 * pytz
-* binaryornot
 * OpenMPI (optional, for running Kive on a cluster)
 * mpi4py (optional, for running Kive on a cluster)
 * django-extensions (optional, for creating a UML diagram of the backend
