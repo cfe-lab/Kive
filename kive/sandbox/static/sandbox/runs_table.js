@@ -51,13 +51,13 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
     if (runbatch_pk === null) {
         this.registerColumn("Batch", function($td, run) {
             var $name;
-            if (run.runbatch === null) {
+            if (run.runbatch_name === null) {
                 $name = $('<span/>');
             }
             else {
                 $name = $('<a/>').attr("href", "../runbatch/" + run.runbatch);
-                $td.append($name.text(run.runbatch_name));
             }
+            $td.append($name.text(run.runbatch_name));
         });
     }
 
