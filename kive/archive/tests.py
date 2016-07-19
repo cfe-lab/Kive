@@ -4277,7 +4277,7 @@ class CancelComponentsTests(TestCase):
 
 
 @mocked_relations(RunBatch, RunState)
-class RunBatchMockTests(TestCase):
+class RunBatchTests(TestCase):
     def test_all_runs_complete_true(self):
         """
         Testing when all runs are complete.
@@ -4329,7 +4329,7 @@ class RunBatchMockTests(TestCase):
 
     def test_eligible_permissions_runs_have_permissions(self):
         """
-        Testing that the eligible permissions on an empty RunBatch are everything.
+        Testing the eligible permissions on a non-trivial RunBatch.
         """
         user_1 = User.objects.create_user("userone", "user1@ponzi.io", "user1")
         user_2 = User.objects.create_user("usertwo", "user2@ponzi.io", "user2")
