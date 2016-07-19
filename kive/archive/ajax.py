@@ -136,9 +136,10 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
         ended after the given date and time.
     * filters[n][key]=endbefore&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
         ended before the given date and time.
-    * filters[n][key]=batch_name - runs belonging to a RunBatch whose name matches
-        the value (case insensitive).
-    * filters[n][key]=batch_pk - runs belonging to the specified RunBatch.
+    * filters[n][key]=batch_name&filters[n][val]=match - runs belonging to a
+        RunBatch whose name matches the value (case insensitive).
+    * filters[n][key]=batch_pk&filters[n][val]=match - runs belonging to the specified
+        RunBatch.
 
     Parameter for a PATCH:
     * is_stop_requested(=true) - the Run is marked for stopping.

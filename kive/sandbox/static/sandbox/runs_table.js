@@ -10,21 +10,21 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
 
     this.user = user;
 
+    this.session_filters_key = runbatch_pk === null ? "runFilters" : "batchFilters_" + runbatch_pk;
+    this.session_page_key = runbatch_pk === null? "runPage" : "batchPage_" + runbatch_pk;
+
     this.filterSet = new permissions.FilterSet(
             $active_filters,
             function() {
                 runsTable.page = 1;
                 runsTable.reloadTable();
                 sessionStorage.setItem(
-                        'runFilters',
-                        runsTable.filterSet.getPairs());
+                    this.session_filters_key,
+                    runsTable.filterSet.getPairs()
+                );
             });
 
-    if (runbatch_pk !== null) {
-        // Filter for the current RunBatch.
-        var $pf_filter = this.filterSet.add("runbatch_pk", runbatch_pk, true);
-        $pf_filter.hide();
-    }
+    this.runbatch_pk = runbatch_pk;
 
     this.list_url = "/api/runs/status/";
     this.reload_interval = pollingInterval;
@@ -47,6 +47,19 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
         }
         $td.append($name.text(run.display_name));
     });
+
+    if (runbatch_pk === null) {
+        this.registerColumn("Batch", function($td, run) {
+            var $name;
+            if (run.runbatch === null) {
+                $name = $('<span/>');
+            }
+            else {
+                $name = $('<a/>').attr("href", "../runbatch/" + run.runbatch);
+                $td.append($name.text(run.runbatch_name));
+            }
+        });
+    }
 
     this.registerColumn("Start", function($td, run) {
         $td.text(run.run_progress.start || '-');
@@ -160,7 +173,18 @@ RunsTable.prototype = Object.create(permissions.PermissionsTable.prototype);
 RunsTable.prototype.getQueryParams = function() {
     var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
     params.filters = this.filterSet.getFilters();
-    sessionStorage.setItem('runPage', this.page);
+    sessionStorage.setItem(this.session_page_key, this.page);
+
+    if (this.runbatch_pk !== null) {
+        // Filter for the current RunBatch.
+        params.filters.push(
+            {
+                key: "batch_pk",
+                val: this.runbatch_pk
+            }
+        );
+    }
+
     return params;
 };
 

@@ -12,7 +12,7 @@ from django.contrib.auth.models import User, Group
 from rest_framework.renderers import JSONRenderer
 
 from archive.models import Dataset, Run, RunBatch
-from archive.serializers import RunOutputsSerializer
+from archive.serializers import RunOutputsSerializer, RunBatchSerializer
 from pipeline.models import Pipeline
 from portal.views import admin_check
 from sandbox.forms import InputSubmissionForm, RunSubmissionForm, RunDetailsForm,\
@@ -285,7 +285,7 @@ def runbatch(request, runbatch_pk):
         raise Http404("ID {} does not exist or is not accessible".format(runbatch_pk))
 
     with transaction.atomic():
-        all_runs_complete = batch_runs.filter(_runstate__pk__in=runstates.COMPLETE_STATE_PKS)
+        all_runs_complete = not batch_runs.exclude(_runstate__pk__in=runstates.COMPLETE_STATE_PKS).exists()
 
     if not request.method == "POST":
         # A form which we can use to make editing easier.
@@ -339,6 +339,5 @@ def runbatch(request, runbatch_pk):
         "user": request.user,
         "is_user_admin": admin_check(request.user)
     }
-    print "FOO {}".format(context)
 
     return HttpResponse(template.render(context, request))

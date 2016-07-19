@@ -290,6 +290,11 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
         read_only=True
     )
 
+    runbatch_name = serializers.CharField(
+        source="runbatch.name",
+        read_only=True
+    )
+
     class Meta:
         model = Run
         fields = (
@@ -312,7 +317,8 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
             'groups_allowed',
             'inputs',
             'stopped_by',
-            'runbatch'
+            'runbatch',
+            'runbatch_name'
         )
         read_only_fields = (
             "purged",
@@ -462,7 +468,9 @@ class RunProgressSerializer(RunSerializer):
             'users_allowed',
             'groups_allowed',
             'inputs',
-            'stopped_by'
+            'stopped_by',
+            'runbatch',
+            'runbatch_name'
         )
         read_only_fields = (
             "purged",
