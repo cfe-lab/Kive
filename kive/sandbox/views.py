@@ -12,7 +12,7 @@ from django.contrib.auth.models import User, Group
 from rest_framework.renderers import JSONRenderer
 
 from archive.models import Dataset, Run, RunBatch
-from archive.serializers import RunOutputsSerializer
+from archive.serializers import RunOutputsSerializer, RunBatchSerializer
 from pipeline.models import Pipeline
 from portal.views import admin_check
 from sandbox.forms import InputSubmissionForm, RunSubmissionForm, RunDetailsForm,\

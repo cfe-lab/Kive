@@ -48,6 +48,17 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
         $td.append($name.text(run.display_name));
     });
 
+    this.registerColumn("Batch", function($td, run) {
+        var $name;
+        if (run.runbatch === null) {
+            $name = $('<span/>');
+        }
+        else {
+            $name = $('<a/>').attr("href", "../runbatch/" + run.runbatch);
+            $td.append($name.text(run.runbatch_name));
+        }
+    });
+
     this.registerColumn("Start", function($td, run) {
         $td.text(run.run_progress.start || '-');
     });
