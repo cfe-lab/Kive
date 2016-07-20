@@ -27,7 +27,11 @@ $(function() {
             NaN, NaN,// these will be set later
             dataset_search_dialog.find('.active_filters'),
             dataset_search_dialog.find(".navigation_links")
-        )
+        ),
+        permissions = {
+            widget: $("#permissions_widget"),
+            ctrl: $("#permissions_ctrl")
+        }
     ;
 
     // some more vars
@@ -89,19 +93,14 @@ $(function() {
     };
 
     dataset_input_table.find('td').css('width', cell_width);
-    function showPageError(message) {
-        var $error_div = $('.pipeline-error').eq(0);
+    function showPageError(message, selector, persist) {
+        var $error_div = $(selector).eq(0);
         $error_div.show().text(message);
-        setTimeout(function() {
-            $error_div.hide();
-        }, 5000);
-    }
-    function showSubmitError(message) {
-        var $error_div = $('.pipeline-error').eq(0);
-        $error_div.show().text(message);
-//        setTimeout(function() {
-//            $error_div.hide();
-//        }, 5000);
+        if (!persist) {
+            setTimeout(function() {
+                $error_div.hide();
+            }, 5000);
+        }
     }
 
     (function() {// extends dataset_input_table
@@ -172,7 +171,7 @@ $(function() {
                 }
                 $tr.eq(-1).remove();
             } else {
-                showPageError("Error: You must have at least 1 run.");
+                showPageError("Error: You must have at least 1 run.", '.row-ctrl-error');
             }
         };
         dataset_input_table.fillColumn = function(selection, column_ix) {
@@ -633,19 +632,16 @@ $(function() {
         };
     })();
     var mainSubmitHandler = function(e) {
-        if (!e.defaultPrevented) {
-//            console.log(
-//                $(this).find('input')
-//                    .not('[name="csrfmiddlewaretoken"]')
-//                    .not('#id_pipeline')
-//                    .remove()
-//            );
+        e.preventDefault();
+        var serialized_data = serialize();
+
+        if (serialized_data) {
             $.ajax(
                 '/api/runbatches/',
                 {
                     method: "POST",
                     contentType: 'application/json',
-                    data: JSON.stringify(serialize(e)),
+                    data: JSON.stringify(serialized_data),
                     success: function(data) {
                         if (data.hasOwnProperty('id')) {
                             window.location = '/runbatch/' + data.id;
@@ -653,49 +649,42 @@ $(function() {
                     }
                 }
             ).fail(function(xhr) {
-                // FIXME this doesn't seem to go to the right place?
-                showSubmitError(xhr.responseText);
+                showPageError(xhr.responseText, '.pipeline-error', true);
             });
         }
-
-        /**
-         * @debug
-         */
-        // console.log(serialize(e));
-        e.preventDefault();
-        /***/
     };
     var serialize = function(e) {
         var runs = [];
-        dataset_input_table.find('tr').each(function(run_index) {
-            var run = runs[run_index] = {
-                pipeline: PIPELINE_PK,
-                description: '',
-                users_allowed: [],
-                groups_allowed: [],
-                inputs: []
-            };
-            var row = $(this);
-            if (row.find('button').length === 0) {
-                run.name = row.find('.run-name').val();
-                row.find('.input-dataset').each(function() {
+
+        if (dataset_input_table.find('button').length === 0) {
+            dataset_input_table.find('tr').each(function(run_index) {
+                var row = $(this);
+                var run = runs[run_index] = {
+                    pipeline: PIPELINE_PK,
+                    description: '',
+                    users_allowed: [],
+                    groups_allowed: [],
+                    inputs: [],
+                    name: $('.run-name', row).val()
+                };
+                $('.input-dataset', row).each(function() {
                     var cell = $(this);
                     run.inputs.push({
                         index: cell.data('dataset-idx'),
                         dataset: cell.data('id')
                     });
                 });
-            } else {
-                e.preventDefault();
-            }
-        });
-        return {
-            name: $('#id_name').val(),
-            runs: runs,
-            users_allowed: $('#id_permissions_0').val() || [],
-            groups_allowed: $('#id_permissions_1').val() || [],
-            copy_permissions_to_runs: true
-        };
+            });
+            return {
+                name: $('#id_name').val(),
+                runs: runs,
+                users_allowed: $('#id_permissions_0').val() || [],
+                groups_allowed: $('#id_permissions_1').val() || [],
+                copy_permissions_to_runs: true
+            };
+        } else {
+            return false;
+        }
     };
     var focusSearchField = function(e) {
         // prevent this event from bubbling
@@ -907,33 +896,56 @@ $(function() {
         }, '.run-name');
     })();
 
-    $("#permissions_ctrl").click(function() {
-        var widget = $("#permissions_widget");
-        widget.toggle();
-        if (widget.is(':visible')) {
-            widget.css('bottom', below_box.outerHeight());
-            widget.css('left', $(this).offset().left );
+    permissions.widget.toggle = function() {
+        $.fn.toggle.call(permissions.widget);//call prototype's toggle function
+        permissions.ctrl.toggleClass("active");
+        permissions.widget.autoPosition();
+    };
+    permissions.widget.autoPosition = function() {
+        var left = '', right = '',
+            ctrl_left = permissions.ctrl.offset().left;
+        if (permissions.widget.is(':visible')) {
+            if (ctrl_left + permissions.widget.outerWidth() > window.innerWidth) {
+                right = 0;
+            } else {
+                left = ctrl_left
+            }
+            permissions.widget.css({
+                right: right,
+                left: left,
+                bottom: below_box.outerHeight()
+            });
         }
-    });
+    }
+
+    var unfocusAll = function() {
+        dataset_input_table.deselectAll();
+        if (permissions.widget.is(':visible')) {
+            permissions.widget.toggle();
+        }
+    };
 
     $.getJSON('/api/datasets/?format=json', initUsersList);
 
-    body                    .click(   function() { dataset_input_table.deselectAll(); }   );
-    $(document)            .scroll(   dataset_search_dialog.scrollButton                  );
+    $(document)            .scroll(   dataset_search_dialog.scrollButton                  )
+                            .click(   unfocusAll                                          );
     $(window)              .resize(   dataset_search_dialog.scrollButton                  )
+                           .resize(   permissions.widget.autoPosition                     )
                            .resize(   function() { above_box.adjustSpacing();            })
                            .scroll(   function(e) { dataset_input_table.scrollHeader(e); });
     set_dataset.btn         .click(   addSelectedDatasetsToInput                          );
-    set_dataset.options_btn .click(   set_dataset.options_menu.show                         )
-                       .mouseleave(   set_dataset.options_menu.hide                         );
-    $('.permissions-widget').click(   stopProp                                            );
+    set_dataset.options_btn .click(   set_dataset.options_menu.show                       )
+                       .mouseleave(   set_dataset.options_menu.hide                       );
+    permissions.ctrl        .click(   permissions.widget.toggle                           )
+                            .click(   stopProp                                            );
+    permissions.widget      .click(   stopProp                                            );
     above_box               .click(   stopProp                                            )
         .find('.close.ctrl').click(   dataset_search_dialog.hide                          );
     $('#date_added')       .change(   dateAddedFilterHandler                              );
     $('#creator')          .change(   creatorFilterHandler                                );
     $('#id_name')           .keyup(   setRunNamesPrefix                                   );
-    $('#run_pipeline')     .submit(   mainSubmitHandler                                   )
-                              .on( 'click', 'input, textarea', stopProp                     );
+    $('#run_pipeline')     .submit(   mainSubmitHandler                                   );
+    below_box                 .on( 'click', 'input, textarea', stopProp                     );
     dataset_search_dialog     .on( 'submit','form',            submitDatasetSearch          )
       .find('.search_form').click(                             focusSearchField             );
     dataset_input_table       .on( 'click', '.input-dataset',  toggleInputDatasetSelection  )
@@ -946,15 +958,66 @@ $(function() {
                               .on( 'click', '.remove_run', function() { dataset_input_table.removeLastRunRow(); } );
 
     // Pack help text into an unobtrusive icon
-    $('.helptext', 'form').each(function() {
+    $('.helptext').each(function() {
         var $this = $(this);
         $this.wrapInner('<span class="fulltext">').prepend('<a rel="ctrl">?</a>');
     });
 
     $('a[rel="ctrl"]').on('click', function (e) {
-        $(this).siblings('.fulltext').show().css({ top: e.pageY, left: e.pageX, 'z-index': 999 });
-        setTimeout(function() { $('.fulltext').fadeOut(300); }, 5000);
-        // @todo: check to make sure it doesn't go off the page!
+        var data = $(this).data(),
+            fulltext = data.fulltext,
+            left = '',
+            right = '',
+            top = '',
+            bottom = '';
+
+        if (e.pageX + data.width > document.body.scrollWidth) {
+            right = 0;
+        } else {
+            left = e.pageX;
+        }
+        if (e.pageY + data.height > document.body.scrollHeight) {
+            bottom = 0;
+        } else {
+            top = e.pageY;
+        }
+        fulltext.show()
+            .css({
+                top: top, 
+                left: left, 
+                right: right,
+                bottom: bottom,
+                'z-index': 999
+            })
+        ;
+        setTimeout(function() { 
+            fulltext.fadeOut(300); 
+        }, 5000);
+    }).each(function() {
+        var $this = $(this),
+            fulltext = $this.siblings('.fulltext').show(0);
+        function elementIsPosFixed(el) {
+            var fixed = false;
+            $(el).parents().addBack().each(function() {
+                fixed = $(this).css("position") === "fixed";
+                return !fixed;
+            });
+            return fixed;
+        }
+        if (elementIsPosFixed(fulltext)) {
+            fulltext.css('position', 'fixed');
+        }
+        $this.data({
+            width: fulltext.outerWidth(),
+            height: fulltext.outerHeight(),
+            fulltext: fulltext
+        });
+        fulltext
+            .hide(0)
+            .detach().appendTo('body')
+            .addClass('detached')
+            .click(function() { fulltext.hide(); })
+        ;
     });
 
     $(window).scroll();

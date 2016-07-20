@@ -260,7 +260,8 @@ select option {
     font-size: 0.8em;
     cursor: pointer;
 }
-.helptext .fulltext {
+.helptext .fulltext,
+.fulltext.detached {
     display: none;
     position: absolute;
     border: 1px solid #FF9; /* FF9 is superior to both 8 and 10. */
@@ -327,7 +328,8 @@ a.button {
 input[type="button"]:active, 
 input[type="submit"]:active, 
 input[type="reset"]:active,
-a.button:active {
+a.button:active,
+a.button.active {
     box-shadow: inset  .2em  .4em .4em -.2em #ccc, 
                 inset -.2em -.8em  1em -.2em #fff;
 }

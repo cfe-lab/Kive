@@ -1,5 +1,6 @@
 $selected-blue: #238
 $next-step-green: #22b24c
+$below-box-border: 2px
 
 =no-select
   -webkit-touch-callout: none
@@ -215,36 +216,49 @@ html #inner_wrap
   left: 0
   box-sizing: border-box
   width: 100%
-  padding: .75em 4em
-  border-top: 1px solid #888
-  background-color: #eee
+  padding: .75em 2em
+  border-top: $below-box-border solid #ccc
+  background-color: #f4f4f4
   font-size: 0.9em
-  #run_controls
+  table
     float: left
-    padding-top: .25em
+    margin-bottom: 0
+    td
+      vertical-align: middle
+      padding-right: 1.5em
+  input[type="submit"]
+    padding: .25em 1em
   #permissions_widget
     display: none
     position: fixed
+    .permissions-widget
+      border-width: $below-box-border 1px 0
+      margin-bottom: -$below-box-border
   #permissions_ctrl
     +no-select
     display: block
-    float: left
-    margin-left: 2em
     cursor: pointer
+    text-align: center
+    font-weight: normal
     padding: .25em 1em
   #run_pipeline
     float: right
-    padding-top: 0
-    input[type="submit"]
-      padding: .25em 1em
-    .error
-      color: #f00
-      font-style: italic
-      font-size: 0.8em
-      font-weight: bold
-      margin:
-        top: 1em
-        bottom: 1em
+    text-align: right
+    clear: none
+    padding-top: .5em
+
+.error
+  display: none
+  color: #f00
+  font-style: italic
+  font-size: 0.8em
+  font-weight: bold
+  margin:
+    top: .8em
+
+
+.nobreak
+  white-space: nowrap
 
 #scroll_content
   position: absolute

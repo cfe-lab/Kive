@@ -108,10 +108,30 @@
     </div>
 
     <div id="below_box">
+        <div id="permissions_widget">
+            {{ run_submission_form.permissions }}
+            <div class="errortext">{{ run_submission_form.permissions.errors }}</div>
+        </div>
+        <table>
+            <tr>
+                <td>
+                    {{ run_submission_form.name.label }}
+                    <div class="helptext">{{ run_submission_form.name.help_text }}</div>
+                    {{ run_submission_form.name }}
+                </td>
+                <td id="run_controls">
+                    <label>Add or remove runs:</label>
+                    <span class="nobreak"><input type="button" class="add_run left-button" value="+"><input type="button" class="remove_run right-button" value="&minus;"></span>
+
+                    <div class="error row-ctrl-error"></div>
+                </td>
+                <td>
+                    <a id="permissions_ctrl" class="button">Manage Permissions</a>
+                </td>
+            </tr>
+        </table>
         <form action="run_pipeline" id="run_pipeline" method="post">
-            {{ run_submission_form.name.label }}
-            <div class="helptext">{{ run_submission_form.name.help_text }}</div>
-            {{ run_submission_form.name }}<input type="submit" id="submit" class="right-button" value="Start Run(s)">
+            <input type="submit" id="submit" value="Start Run(s)">
             <div class="errortext">{{ run_submission_form.name.errors }}</div>
 
             {{ run_submission_form.pipeline }}
@@ -121,17 +141,6 @@
 
             <div class="error pipeline-error"></div>
         </form>
-
-        <div id="run_controls">
-            <label>Add or remove rows:</label>
-            <input type="button" class="add_run left-button" value="+"/><input type="button" class="remove_run right-button" value="&minus;"/>
-        </div>
-
-        <a id="permissions_ctrl" class="button">Manage Permissions</a>
-        <div id="permissions_widget">
-            {{ run_submission_form.permissions }}
-            <div class="errortext">{{ run_submission_form.permissions.errors }}</div>
-        </div>
     </div>
 
     <div id="progress"></div>

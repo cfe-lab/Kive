@@ -46,7 +46,7 @@ class RunDetailsForm(forms.ModelForm):
 
     name = forms.CharField(
         max_length=maxlengths.MAX_NAME_LENGTH,
-        label='Prefix for all runs (optional)',
+        label='Name prefix (optional)',
         help_text='String to prepend to the beginning of all runs in this batch',
         required=False
     )
