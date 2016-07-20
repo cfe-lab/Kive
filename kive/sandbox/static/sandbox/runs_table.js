@@ -51,13 +51,16 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
     if (runbatch_pk === null) {
         this.registerColumn("Batch", function($td, run) {
             var $name;
-            if (run.runbatch_name === null) {
-                $name = $('<span/>');
+            if (run.runbatch !== null) {
+                $name = $("<a/>").attr("href", "../runbatch/" + run.runbatch);
+                if (! run.runbatch_name) {
+                    $name.text("[batch " + run.runbatch + " (unnamed)]");
+                }
+                else {
+                    $name.text(run.runbatch_name);
+                }
+                $td.append($name);
             }
-            else {
-                $name = $('<a/>').attr("href", "../runbatch/" + run.runbatch);
-            }
-            $td.append($name.text(run.runbatch_name));
         });
     }
 

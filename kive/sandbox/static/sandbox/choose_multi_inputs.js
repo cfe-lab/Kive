@@ -89,14 +89,15 @@ $(function() {
     };
 
     dataset_input_table.find('td').css('width', cell_width);
+    function showPageError(message) {
+        var $error_div = dataset_input_table.closest('table').find('.error');
+        $error_div.show().text(message);
+        setTimeout(function() {
+            $error_div.hide();
+        }, 5000);
+    }
+
     (function() {// extends dataset_input_table
-        function error(message) {
-            var $error_div = dataset_input_table.closest('table').find('.error');
-            $error_div.show().text(message);
-            setTimeout(function() {
-                $error_div.hide();
-            }, 5000);
-        }
         function createHeader() {
             var in_tb = dataset_input_table.closest('table'),
                 header_row = in_tb.find('thead tr');
@@ -164,7 +165,7 @@ $(function() {
                 }
                 $tr.eq(-1).remove();
             } else {
-                error("Error: You must have at least 1 run.");
+                showPageError("Error: You must have at least 1 run.");
             }
         };
         dataset_input_table.fillColumn = function(selection, column_ix) {
@@ -625,25 +626,35 @@ $(function() {
         };
     })();
     var mainSubmitHandler = function(e) {
-        var serialized_data = serialize(e);
-
         if (!e.defaultPrevented) {
-            console.log(
-                $(this).find('input')
-                    .not('[name="csrfmiddlewaretoken"]')
-                    .not('#id_pipeline')
-                    .remove()
-            );
-            $(this).append(uiFactory.hiddenInput(
-                'runbatch',
-                JSON.stringify(serialized_data)
-            ));
+//            console.log(
+//                $(this).find('input')
+//                    .not('[name="csrfmiddlewaretoken"]')
+//                    .not('#id_pipeline')
+//                    .remove()
+//            );
+            $.ajax(
+                '/api/runbatches/',
+                {
+                    method: "POST",
+                    contentType: 'application/json',
+                    data: JSON.stringify(serialize(e)),
+                    success: function(data) {
+                        if (data.hasOwnProperty('id')) {
+                            window.location = '/runbatch/' + data.id;
+                        }
+                    }
+                }
+            ).fail(function(xhr) {
+                // FIXME this doesn't seem to go to the right place?
+                showPageError(xhr.responseText);
+            });
         }
 
         /**
          * @debug
          */
-        console.log(serialized_data);
+        // console.log(serialize(e));
         e.preventDefault();
         /***/
     };
@@ -676,7 +687,7 @@ $(function() {
             runs: runs,
             users_allowed: [],
             groups_allowed: [],
-            copy_permissions_to_runs: true
+            copy_permissions_to_runs: true,
         };
     };
     var focusSearchField = function(e) {
