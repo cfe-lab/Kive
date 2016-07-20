@@ -108,25 +108,30 @@
     </div>
 
     <div id="below_box">
-        <div id="run_controls">
-            <div class="error"></div>
-            <label>Add or remove rows:</label>
-            <input type="button" class="add_run left-button" value="+"/><input type="button" class="remove_run right-button" value="&minus;"/>
-        </div>
-
         <form action="run_pipeline" id="run_pipeline" method="post">
-
             {{ run_submission_form.name.label }}
             <div class="helptext">{{ run_submission_form.name.help_text }}</div>
-            {{ run_submission_form.name }}
+            {{ run_submission_form.name }}<input type="submit" id="submit" class="right-button" value="Start Run(s)">
             <div class="errortext">{{ run_submission_form.name.errors }}</div>
 
             {{ run_submission_form.pipeline }}
                 <div class="errortext">{{ run_submission_form.pipeline.errors }}</div>
                 <div class="errortext">{{ run_submission_form.non_field_errors }}</div>
             {% csrf_token %}
-            <input type="submit" id="submit" value="Start Run(s)">
+
+            <div class="error pipeline-error"></div>
         </form>
+
+        <div id="run_controls">
+            <label>Add or remove rows:</label>
+            <input type="button" class="add_run left-button" value="+"/><input type="button" class="remove_run right-button" value="&minus;"/>
+        </div>
+
+        <a id="permissions_ctrl" class="button">Manage Permissions</a>
+        <div id="permissions_widget">
+            {{ run_submission_form.permissions }}
+            <div class="errortext">{{ run_submission_form.permissions.errors }}</div>
+        </div>
     </div>
 
     <div id="progress"></div>

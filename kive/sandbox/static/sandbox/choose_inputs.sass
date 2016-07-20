@@ -220,10 +220,31 @@ html #inner_wrap
   background-color: #eee
   font-size: 0.9em
   #run_controls
-    float: right
+    float: left
     padding-top: .25em
+  #permissions_widget
+    display: none
+    position: fixed
+  #permissions_ctrl
+    +no-select
+    display: block
+    float: left
+    margin-left: 2em
+    cursor: pointer
+    padding: .25em 1em
   #run_pipeline
+    float: right
     padding-top: 0
+    input[type="submit"]
+      padding: .25em 1em
+    .error
+      color: #f00
+      font-style: italic
+      font-size: 0.8em
+      font-weight: bold
+      margin:
+        top: 1em
+        bottom: 1em
 
 #scroll_content
   position: absolute
@@ -263,11 +284,6 @@ html #inner_wrap
       font-size: 1.5em
       box-sizing: border-box
       margin-bottom: 1px
-    .error
-      color: #f00
-      font-style: italic
-      font-size: 0.8em
-      float: left
   button
     +green-button
     padding: .25em 1em

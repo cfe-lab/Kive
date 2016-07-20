@@ -90,11 +90,18 @@ $(function() {
 
     dataset_input_table.find('td').css('width', cell_width);
     function showPageError(message) {
-        var $error_div = dataset_input_table.closest('table').find('.error');
+        var $error_div = $('.pipeline-error').eq(0);
         $error_div.show().text(message);
         setTimeout(function() {
             $error_div.hide();
         }, 5000);
+    }
+    function showSubmitError(message) {
+        var $error_div = $('.pipeline-error').eq(0);
+        $error_div.show().text(message);
+//        setTimeout(function() {
+//            $error_div.hide();
+//        }, 5000);
     }
 
     (function() {// extends dataset_input_table
@@ -647,7 +654,7 @@ $(function() {
                 }
             ).fail(function(xhr) {
                 // FIXME this doesn't seem to go to the right place?
-                showPageError(xhr.responseText);
+                showSubmitError(xhr.responseText);
             });
         }
 
@@ -685,9 +692,9 @@ $(function() {
         return {
             name: $('#id_name').val(),
             runs: runs,
-            users_allowed: [],
-            groups_allowed: [],
-            copy_permissions_to_runs: true,
+            users_allowed: $('#id_permissions_0').val() || [],
+            groups_allowed: $('#id_permissions_1').val() || [],
+            copy_permissions_to_runs: true
         };
     };
     var focusSearchField = function(e) {
@@ -900,6 +907,15 @@ $(function() {
         }, '.run-name');
     })();
 
+    $("#permissions_ctrl").click(function() {
+        var widget = $("#permissions_widget");
+        widget.toggle();
+        if (widget.is(':visible')) {
+            widget.css('bottom', below_box.outerHeight());
+            widget.css('left', $(this).offset().left );
+        }
+    });
+
     $.getJSON('/api/datasets/?format=json', initUsersList);
 
     body                    .click(   function() { dataset_input_table.deselectAll(); }   );
@@ -936,8 +952,9 @@ $(function() {
     });
 
     $('a[rel="ctrl"]').on('click', function (e) {
-        $(this).siblings('.fulltext').show().css({ top: e.pageY, left: e.pageX, 'z-index': 3 });
+        $(this).siblings('.fulltext').show().css({ top: e.pageY, left: e.pageX, 'z-index': 999 });
         setTimeout(function() { $('.fulltext').fadeOut(300); }, 5000);
+        // @todo: check to make sure it doesn't go off the page!
     });
 
     $(window).scroll();

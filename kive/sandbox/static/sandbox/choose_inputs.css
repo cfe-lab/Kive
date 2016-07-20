@@ -165,7 +165,7 @@ html #inner_wrap {
   #insert_many_menu {
     display: none;
     position: absolute;
-    z-index: 1;
+    z-index: 5;
     right: 0;
     top: 100%;
     background: white;
@@ -221,10 +221,35 @@ html #inner_wrap {
   background-color: #eee;
   font-size: 0.9em; }
   #below_box #run_controls {
-    float: right;
+    float: left;
     padding-top: 0.25em; }
+  #below_box #permissions_widget {
+    display: none;
+    position: fixed; }
+  #below_box #permissions_ctrl {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    display: block;
+    float: left;
+    margin-left: 2em;
+    cursor: pointer;
+    padding: 0.25em 1em; }
   #below_box #run_pipeline {
+    float: right;
     padding-top: 0; }
+    #below_box #run_pipeline input[type="submit"] {
+      padding: 0.25em 1em; }
+    #below_box #run_pipeline .error {
+      color: #f00;
+      font-style: italic;
+      font-size: 0.8em;
+      font-weight: bold;
+      margin-top: 1em;
+      margin-bottom: 1em; }
 
 #scroll_content {
   position: absolute;
@@ -262,11 +287,6 @@ html #inner_wrap {
     font-size: 1.5em;
     box-sizing: border-box;
     margin-bottom: 1px; }
-  #dataset_input_table tfoot td .error {
-    color: #f00;
-    font-style: italic;
-    font-size: 0.8em;
-    float: left; }
 #dataset_input_table button {
   background-color: #22b24c;
   color: white;
