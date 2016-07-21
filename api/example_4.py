@@ -32,7 +32,7 @@ rb = kive.create_run_batch(
     name="TestRunBatch",
     description="Created by Python API",
     users=["kive"],
-    groups=["Everyone"]
+    groups=["Developers"]
 )
 
 # Run the pipeline.
@@ -49,4 +49,22 @@ status2 = kive.run_pipeline(
     [fastq2, fastq1],
     name="run2",
     runbatch=rb.id
+)
+
+# Run another one, with coherent permissions.
+status3 = kive.run_pipeline(
+    pipeline_family.published_or_latest(),
+    [fastq2, fastq1],
+    name="run2",
+    runbatch=rb.id,
+    users=["kive"]
+)
+
+# Run another one, with bad permissions.
+status4 = kive.run_pipeline(
+    pipeline_family.published_or_latest(),
+    [fastq2, fastq1],
+    name="run2",
+    runbatch=rb.id,
+    groups=["Everyone"]
 )

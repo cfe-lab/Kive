@@ -110,9 +110,19 @@ class KiveAPI(Session):
                                             requests.codes['conflict']):
                     if is_json:
                         json_fields = json_data.iteritems()
+                        field_error_messages = []
+                        for field, errors in json_fields:
+                            curr_msg = "{}: ".format(field)
+                            # errors is either a list of strings or a string, so we can't use join
+                            # all the time.
+                            if isinstance(errors, list):
+                                curr_msg += ', '.join(errors)
+                            else:
+                                curr_msg += errors
+                            field_error_messages.append(curr_msg)
+
                         message += ': '
-                        message += '; '.join((field + ': ' + ', '.join(errors)
-                                              for field, errors in json_fields))
+                        message += '; '.join(field_error_messages)
                     raise KiveMalformedDataException(message)
                 if is_json and 'detail' in json_data:
                     message += ': ' + json_data['detail']
