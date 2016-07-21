@@ -85,7 +85,7 @@ html #inner_wrap {
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
-    width: calc(100% - 13.3em);
+    width: calc(100% - 13.4em);
     font-size: 0.9em; }
     .dataset-search-dlg .search_results table tr.selected td {
       background-color: #238;
