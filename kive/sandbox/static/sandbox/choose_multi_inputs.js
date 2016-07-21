@@ -106,23 +106,30 @@ $(function() {
                 current_item_number = dst.page_size * (dst.page - 1);
                 new_pg = Math.floor(current_item_number / new_pg_size) + 1;
 
-                /* @debug */
-                // console.log({
-                //     'rows_over': rows_over,
-                //     'current_item_number': current_item_number,
-                //     'new_pg': new_pg,
-                //     'new_pg_size': new_pg_size
-                // });
-                /* // */
-
                 if (new_pg_size < 1) {
                     showPageError("There's no room in this window to show search results.", '.results-table-error');
                 } else {
                     $('.results-table-error').hide();
                     dst.page = new_pg;
-                    dst.page_size = new_pg_size;
-                    dst.reloadTable();
-                }
+
+                    // check if a table reload is needed
+                    if (new_pg_size < dst.page_size) {
+                        // check if a table reload is already in progress
+                        if (dst.ajax_request === undefined) {
+                            // prune rows without doing a table reload
+                            rows.slice(new_pg_size).remove();
+                            dst.page_size = new_pg_size;
+                        } else {
+                            // if a table reload is in progress, check overflow again when it's complete.
+                            dst.ajax_request.done(function() {
+                                dataset_search_table.checkOverflow();
+                            });
+                        }
+                    } else {
+                        dst.page_size = new_pg_size;
+                        dst.reloadTable();
+                    }
+                } 
             }
         }
     };
