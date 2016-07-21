@@ -59,8 +59,15 @@ th:last-child:empty {
     display: none;
 }
 td ul {
-    -webkit-margin-before: 0;
-    -webkit-margin-after: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-left: 1.5em;
+}
+td h4 {
+    margin: .7em 0;
+}
+td h4:first-child {
+    margin-top: 0;
 }
 tr:hover td {
     background-color: rgba(0,0,0,0.02);
@@ -341,6 +348,10 @@ a.button {
 a.button:hover, a.button:active {
     outline: none;
     cursor: default;
+}
+a.button.large {
+    padding-top: .25em;
+    padding-bottom: .25em;
 }
 .button-lbl {
     font-size: 0.85em;

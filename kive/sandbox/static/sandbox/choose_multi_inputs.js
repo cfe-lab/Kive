@@ -970,7 +970,7 @@ $(function() {
             if (ctrl_left + permissions.widget.outerWidth() > window.innerWidth) {
                 right = 0;
             } else {
-                left = ctrl_left
+                left = ctrl_left;
             }
             permissions.widget.css({
                 right: right,
@@ -978,7 +978,7 @@ $(function() {
                 bottom: below_box.outerHeight()
             });
         }
-    }
+    };
 
     var unfocusAll = function() {
         dataset_input_table.deselectAll();

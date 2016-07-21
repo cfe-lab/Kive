@@ -1,4 +1,3 @@
-
 .status_cell {
 
 }
@@ -18,4 +17,21 @@
 
 textarea:focus, input:focus{
     outline: none;
+}
+
+
+.bulk_dataset_table td {
+	padding: .25em;
+	text-align: center;
+}
+.bulk_dataset_table td.first {
+	padding-left: 0;
+}
+
+.bulk_dataset_table textarea {
+	width: 15em;
+	height: 3em;
+}
+.bulk_dataset_table textarea:focus {
+	height: 8em;
 }
