@@ -488,19 +488,19 @@ class RunBatchSerializer(AccessControlSerializer, serializers.ModelSerializer):
 
     runs = RunSerializer(many=True, required=False)
     copy_permissions_to_runs = serializers.BooleanField(default=True, write_only=True)
-
-    users_allowed = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(),
-        many=True,
-        allow_null=True,
-        required=False
-    )
-    groups_allowed = serializers.PrimaryKeyRelatedField(
-        queryset=Group.objects.all(),
-        many=True,
-        allow_null=True,
-        required=False
-    )
+    #
+    # users_allowed = serializers.PrimaryKeyRelatedField(
+    #     queryset=User.objects.all(),
+    #     many=True,
+    #     allow_null=True,
+    #     required=False
+    # )
+    # groups_allowed = serializers.PrimaryKeyRelatedField(
+    #     queryset=Group.objects.all(),
+    #     many=True,
+    #     allow_null=True,
+    #     required=False
+    # )
 
     class Meta:
         model = RunBatch
@@ -620,7 +620,7 @@ class RunBatchSerializer(AccessControlSerializer, serializers.ModelSerializer):
 
     def create(self, validated_data):
         """Create a RunBatch and the Runs it contains."""
-        run_dictionaries = validated_data.pop("runs")
+        run_dictionaries = validated_data.pop("runs", [])
         users_allowed = validated_data.pop("users_allowed", [])
         groups_allowed = validated_data.pop("groups_allowed", [])
         copy_permissions_to_runs = validated_data.pop("copy_permissions_to_runs")

@@ -14,6 +14,7 @@ from .errors import KiveMalformedDataException, KiveAuthException,\
     KiveClientException, KiveServerException, is_client_error, is_server_error
 from .pipeline import PipelineFamily, Pipeline
 from .runstatus import RunStatus
+from .runbatch import RunBatch
 
 logger = logging.getLogger('kiveapi')
 
@@ -52,6 +53,9 @@ class KiveAPI(Session):
             'api_runs': '/api/runs/',
             'api_run': '/api/runs/{run-id}/',
             'api_find_runs': '/api/runs/status/?{filters}',
+
+            'api_runbatches': '/api/runbatches/',
+            'api_runbatch': '/api/runbatches/{runbatch-id}'
         }
         super(KiveAPI, self).__init__()
         self.verify = verify
@@ -298,6 +302,7 @@ class KiveAPI(Session):
                      inputs,
                      name=None,
                      force=False,
+                     runbatch=None,
                      users=None,
                      groups=None):
         """
@@ -309,6 +314,7 @@ class KiveAPI(Session):
         :param name: An optional name for the run
         :param force: True if the datasets should not be checked for matching
             compound datatypes
+        :param runbatch: An optional RunBatch object or the integer primary key of an object
         :param users: None or a list of user names that should be
             allowed to see the run
         :param groups: None or a list of group names that should be
@@ -339,17 +345,45 @@ class KiveAPI(Session):
                     )
 
         # Construct the inputs
-        params = dict(pipeline=pipeline.pipeline_id,
-                      inputs=[dict(dataset=d.dataset_id,
-                                   index=i)
-                              for i, d in enumerate(inputs, 1)],
-                      name=name,
-                      users_allowed=users_allowed,
-                      groups_allowed=groups_allowed)
+        params = dict(
+            pipeline=pipeline.pipeline_id,
+            inputs=[dict(dataset=d.dataset_id,
+                         index=i)
+                    for i, d in enumerate(inputs, 1)],
+            name=name if name is not None else "",
+            users_allowed=users_allowed,
+            groups_allowed=groups_allowed,
+            runbatch=runbatch.id if isinstance(runbatch, RunBatch) else runbatch)
         run = self.post('@api_runs',
                         json=params,
                         is_json=True).json()
         return RunStatus(run, self)
+
+    def create_run_batch(self,
+                         name=None,
+                         description=None,
+                         users=None,
+                         groups=None):
+        """
+        Creates a RunBatch in Kive.
+
+        :param name: An optional name for the RunBatch
+        :param description: An optional description for the RunBatch
+        :param users: None or a list of user names that should be
+            allowed to see the run
+        :param groups: None or a list of group names that should be
+            allowed to see the run
+        :return: A RunStatus object
+        """
+        # Construct the inputs
+        params = dict(name=name,
+                      description=description,
+                      users_allowed=users,
+                      groups_allowed=groups)
+        run = self.post('@api_runbatches',
+                        json=params,
+                        is_json=True).json()
+        return RunBatch(run)
 
     def get_run(self, id):
         """ Get a RunStatus object for the given id.
