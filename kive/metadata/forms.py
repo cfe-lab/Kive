@@ -153,7 +153,7 @@ class PermissionsField(forms.MultiValueField):
             user_names = []
             group_names = []
         else:
-            user_names = [x.name for x in data_list[0]]
+            user_names = [x.username for x in data_list[0]]
             group_names = [x.name for x in data_list[1]]
 
         return json.dumps([user_names, group_names])

@@ -20,7 +20,7 @@
 {% endblock %}
 
 {% block widget_media %}
-{{ run_submission_form.media }}
+{{ start_form.media }}
 {% endblock %}
 
 {% block content %}
@@ -109,15 +109,15 @@
 
     <div id="below_box">
         <div id="permissions_widget">
-            {{ run_submission_form.permissions }}
-            <div class="errortext">{{ run_submission_form.permissions.errors }}</div>
+            {{ start_form.permissions }}
+            <div class="errortext">{{ start_form.permissions.errors }}</div>
         </div>
         <table>
             <tr>
                 <td>
-                    {{ run_submission_form.name.label }}
-                    <div class="helptext">{{ run_submission_form.name.help_text }}</div>
-                    {{ run_submission_form.name }}
+                    {{ start_form.name.label }}
+                    <div class="helptext">{{ start_form.name.help_text }}</div>
+                    {{ start_form.name }}
                 </td>
                 <td id="run_controls">
                     <label>Add or remove runs:</label>
@@ -132,11 +132,11 @@
         </table>
         <form action="run_pipeline" id="run_pipeline" method="post">
             <input type="submit" id="submit" value="Start Run(s)">
-            <div class="errortext">{{ run_submission_form.name.errors }}</div>
+            <div class="errortext">{{ start_form.name.errors }}</div>
 
-            {{ run_submission_form.pipeline }}
-                <div class="errortext">{{ run_submission_form.pipeline.errors }}</div>
-                <div class="errortext">{{ run_submission_form.non_field_errors }}</div>
+            {{ start_form.pipeline }}
+                <div class="errortext">{{ start_form.pipeline.errors }}</div>
+                <div class="errortext">{{ start_form.non_field_errors }}</div>
             {% csrf_token %}
 
             <div class="error pipeline-error"></div>
