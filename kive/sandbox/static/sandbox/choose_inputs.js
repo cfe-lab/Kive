@@ -2,41 +2,24 @@ var choose_inputs = (function() {
     "use strict";
     var my = {};
     
-    // function buildRadioButton($td, row, table) {
-    //     var name = row.name;
-    //     var $label = $('<label>').text(row.name);
-
-    //     if (row.has_data) {
-    //         var $radio_button = $(
-    //             '<input>',
-    //             {
-    //                 type: 'radio',
-    //                 value: row.id,
-    //                 name: 'input_' + table.input_index
-    //             });
-    //         $label.prepend($radio_button);
-    //     }
-
-    //     $td.append($label);
-    // }
-    
     function buildName($td, row) {
-        $td.text(row.name).addClass('primary').data('id', row.id);
+        var inner_div = $('<div>').text(row.name);
+        $td.append(inner_div).addClass('primary').data('id', row.id);
     }
     function buildDateCreated($td, row) {
         $td.text(permissions.formatDate(row.date_created)).addClass('date');
     }
 
     function buildFileSize($td, dataset) {
+        var el = $('<em>');
         if (dataset.has_data) {
-            $td.append(dataset.filesize_display);
+            el = dataset.filesize_display;
+        } else if (dataset.is_redacted) {
+            el.text('redacted');
+        } else {
+            el.text('missing');
         }
-        else if (dataset.is_redacted) {
-            $td.append("<em>redacted</em>");
-        }
-        else {
-            $td.append("<em>missing</em>");
-        }
+        $td.append(el);
     }
 
     my.DatasetsTable = function(
@@ -102,8 +85,9 @@ var choose_inputs = (function() {
                 caption = 'Showing all matching datasets.';
             }
             else {
-                caption = ('Showing ' + datasets.length +
-                        ' most recent matching datasets out of ' + count + '.');
+                caption = 'Showing ' + datasets.length +
+                        ' most recent matching datasets out of ' + 
+                        count + '.';
             }
         }
         

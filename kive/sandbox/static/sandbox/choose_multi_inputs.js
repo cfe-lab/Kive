@@ -78,10 +78,10 @@ $(function() {
     above_box.adjustSpacing = function() {
         if (window.innerHeight <= 700) {
             this._height = "20em";
-            dataset_input_table._top = "18em";
+            dataset_input_table._top = "19em";
         } else if (window.innerHeight <= 1000) {
             this._height = "25em";
-            dataset_input_table._top = "23.3em";
+            dataset_input_table._top = "23.8em";
         } else {
             this._height = "32em";
             dataset_input_table._top = "31em";
@@ -89,6 +89,46 @@ $(function() {
         if (!this.hasClass('hidden')) {
             scroll_content.css('top', dataset_input_table._top);
             this.css('height', this._height);
+        }
+    };
+
+    dataset_search_table.checkOverflow = function() {
+        var dst = this,
+            available_space = set_dataset.wrapper.offset().top -
+                dst.$table.offset().top - dst.$table.outerHeight() + 10,
+            rows = dst.$table.find("tbody tr"),
+            row_height, rows_over, new_pg_size, current_item_number, new_pg;
+
+        /* @debug */
+        // console.log('available_space', available_space);
+
+        if (available_space && rows.length) {
+            row_height = rows.eq(0).outerHeight();
+            rows_over = Math.ceil(- available_space / row_height);
+            new_pg_size = rows.length - rows_over;
+
+            if (new_pg_size !== dst.page_size) {
+                current_item_number = dst.page_size * (dst.page - 1);
+                new_pg = Math.floor(current_item_number / new_pg_size) + 1;
+
+                /* @debug */
+                // console.log('rows_over', rows_over);
+                // console.log('row_height', row_height);
+                // console.log('current_item_number', current_item_number);
+                // console.log('new_pg', new_pg);
+                // console.log('new_pg_size', new_pg_size);
+                /* // */
+
+                if (new_pg_size < 1) {
+                    showPageError("There's no room in this window to show search results.", '.results-table-error');
+                } else {
+                    dst.page = new_pg;
+                    dst.page_size = new_pg_size;
+                    dst.reloadTable();
+                    // if we recurse, it sometimes does a better job, and other times gets stuck in an infinite loop.
+                    // dst.reloadTable(function() { dataset_search_table.checkOverflow(); });
+                }
+            }
         }
     };
 
@@ -171,7 +211,7 @@ $(function() {
                 }
                 $tr.eq(-1).remove();
             } else {
-                showPageError("Error: You must have at least 1 run.", '.row-ctrl-error');
+                showPageError("You must have at least 1 run.", '.row-ctrl-error');
             }
         };
         dataset_input_table.fillColumn = function(selection, column_ix) {
@@ -186,8 +226,6 @@ $(function() {
             ;
 
             if (selected_vals.length > 0) {
-                dataset_search_table.$table.removeClass('none-selected-error');
-
                 column.each(function(ix) {
                     var cell = $(this),
                         selected_val = selected_vals.eq(ix % selected_vals.length);
@@ -211,7 +249,7 @@ $(function() {
                 }
                 return true;
             } else {
-                dataset_search_table.$table.addClass('none-selected-error');
+                showPageError("Please select at least 1 dataset to add.", ".results-table-error");
                 return false;
             }
         };
@@ -235,7 +273,9 @@ $(function() {
             cellWidth,
             underset,
             overset,
-            d_scroll;
+            d_scroll,
+            above_box_opened,
+            search_table_loaded;
 
         // dialog_state will allow the dialog to have disjunct states according to which input is at hand.
         // when a different input is selected, the old input's dialog is saved, and the new one is loaded
@@ -288,17 +328,33 @@ $(function() {
                             .empty()
                             .append(state.table.filters)
                         ;
-                        dst.reloadTable();
                     } else {
                         // default filter set
-                        dst.filterSet.add('uploaded'); // includes reloadTable()
+                        dst.filterSet.add('uploaded', undefined, true);// 3rd arg = skip reload
                     }
-
+                    dst.reloadTable(function() {
+                        search_table_loaded = true;
+                        if (above_box_opened) {
+                            dataset_search_table.checkOverflow();
+                        }
+                    });
                     dst.$table.removeClass('none-selected-error');
                 }
             }
         });
         function scrollInputSetDatasetButton() {
+
+            cellOffsetX = $('button.receiving').offset().left;
+            underset = cellOffsetX - above_box.offset().left;
+            overset = underset + cellWidth - above_box.outerWidth();
+            d_scroll = 0;
+
+            if (overset > 0) {
+                d_scroll = overset;
+            } else if (underset < 0) {
+                d_scroll = underset;
+            }
+
             var d_pos = cellOffsetX - button.offset().left - d_scroll;
             if (d_pos) {
                 button.css('left', button.position().left + d_pos);
@@ -396,6 +452,10 @@ $(function() {
             // but also moves with the correct final position of above_box.
             // moveInputSetDatasetButton();
             above_box.showIfHidden(function() {
+                above_box_opened = true;
+                if (search_table_loaded) {
+                    dataset_search_table.checkOverflow();
+                }
                 scrollToMakeButtonVisible();
                 moveInputSetDatasetButton();
             });
@@ -459,6 +519,13 @@ $(function() {
                     .text(name)
                     .data(extra_data)
                     .data('id', id);
+            },
+            dummyTableRow: function() {
+                return $('<tbody>').append(
+                    $('<tr>').append(
+                        $('<td>').attr('colspan', 99).text('asdf')
+                    )
+                );
             }
         };
     })();
@@ -931,6 +998,7 @@ $(function() {
                             .click(   unfocusAll                                          );
     $(window)              .resize(   dataset_search_dialog.scrollButton                  )
                            .resize(   permissions.widget.autoPosition                     )
+                           .resize(   function() { dataset_search_table.checkOverflow(); })
                            .resize(   function() { above_box.adjustSpacing();            })
                            .scroll(   function(e) { dataset_input_table.scrollHeader(e); });
     set_dataset.btn         .click(   addSelectedDatasetsToInput                          );

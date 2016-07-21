@@ -237,7 +237,7 @@ var permissions = (function() {
         navLink(event);
     }
     
-    my.PermissionsTable.prototype.reloadTable = function() {
+    my.PermissionsTable.prototype.reloadTable = function(callback) {
         var permissions_table = this;
         if (permissions_table.timeout_id !== undefined) {
             window.clearTimeout(permissions_table.timeout_id);
@@ -304,6 +304,10 @@ var permissions = (function() {
 
                 permissions_table.buildTable(rows);
                 permissions_table.setCaption("");
+
+                if (typeof callback == 'function') {
+                    callback(permissions_table);
+                }
             }).fail(function(request) {
                 var response = request.responseJSON,
                     detail = (

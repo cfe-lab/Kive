@@ -80,7 +80,6 @@ html #inner_wrap
 .dataset-search-dlg
   display: none
   h4
-    // margin-bottom: -.75em
     margin-bottom: 0
   .search_form
     .active_filters
@@ -121,14 +120,6 @@ html #inner_wrap
   .search_results table
     +no-select
     width: calc(100% - 13.3em)
-    .error
-      display: none
-      color: red
-      font-style: italic
-    &.none-selected-error
-      .error
-        display: block
-      outline: 1px solid red
     tr.selected td
       background-color: $selected-blue
       color: #fff
@@ -138,6 +129,18 @@ html #inner_wrap
       text-align: center
     td.date
       min-width: 5.5em
+    td.primary div
+      overflow: hidden
+      text-overflow: ellipsis
+      max-width: 40em
+      white-space: nowrap
+    tr:hover
+      td.primary div
+        overflow: visible
+      td:not(.primary)
+        color: rgba(0,0,0,.1)
+      &.selected td:not(.primary)
+        color: rgba(255,255,255,.15)
     font-size: 0.9em
   @at-root #insert_dataset
     +green-button
@@ -351,6 +354,10 @@ button:focus
     height: 65px
     line-height: 32px
     padding: .85em
+  #insert_one_dataset, 
+  #insert_many_dataset, 
+  #insert_many_dataset.active
+    padding: 0
 
 @media (max-height: 700px)
   #above_box
@@ -359,6 +366,9 @@ button:focus
     padding-top: 1.35em
   .dataset-search-dlg
     font-size: .9em
+    .search_results table
+      th, td 
+        padding: .25em
   #dataset_input_table
     button
       padding: .15em .5em
@@ -371,6 +381,30 @@ button:focus
     height: 43px
     line-height: 21px
     padding: .7em
+  #insert_one_dataset, 
+  #insert_many_dataset, 
+  #insert_many_dataset.active
+    padding: 0
+
+@media (max-width: 1280px) and (min-width: 1139px)
+  .dataset-search-dlg .search_results table td.primary div
+    max-width: 24em
+
+@media (max-width: 1138px) and (min-width: 961px)
+  .dataset-search-dlg .search_results table td.primary div
+    max-width: 18em
+
+@media (max-width: 960px) and (min-width: 881px)
+  .dataset-search-dlg .search_results table td.primary div
+    max-width: 12em
+
+@media (max-width: 880px) and (min-width: 801px)
+  .dataset-search-dlg .search_results table td.primary div
+    max-width: 10.5em
+
+@media (max-width: 800px)
+  .dataset-search-dlg .search_results table td.primary div
+    max-width: 9em
 
 @media (max-width: 720px)
   .dataset-search-dlg
@@ -386,5 +420,8 @@ button:focus
         margin-bottom: 0.25em
       float: none
       width: 100%
-    .search_results table
-      width: 100%
+    .search_results 
+      h4
+        display: none
+      table
+        width: 100%
