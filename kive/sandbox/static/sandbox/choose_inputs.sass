@@ -1,4 +1,5 @@
 $selected-blue: #238
+$selected-highlight-blue: #34a
 $next-step-green: #22b24c
 $below-box-border: 2px
 
@@ -47,9 +48,8 @@ html #inner_wrap
     right: 0
     margin-right: 0
 
-#scroll_content
-  > h4
-    padding-left: 1em
+#pipeline_name
+  padding-left: 3em
 
 #above_box
   h2
@@ -134,7 +134,7 @@ html #inner_wrap
       text-overflow: ellipsis
       max-width: 40em
       white-space: nowrap
-    tr:hover
+    tbody tr:hover
       td.primary div
         overflow: visible
       td:not(.primary)
@@ -202,7 +202,8 @@ html #inner_wrap
     text-decoration: underline
   &.remove
     &:hover
-      background-color: #34a
+      background-color: $selected-highlight-blue
+    background-color: $selected-blue
     position: absolute
     right: 0
     top: 0
@@ -265,12 +266,13 @@ html #inner_wrap
 
 #scroll_content
   position: absolute
-  top: 25%
+  top: 12em
   padding:
     right: 30em
     bottom: 5em
 
 #dataset_input_table
+  margin-left: 3em
   thead th
     text-align: center
     border-bottom: 1px solid black
@@ -279,16 +281,26 @@ html #inner_wrap
       background-color: $selected-blue
       color: #fff
     &.input-dataset
-      *
-        text-indent: 0
-      text-indent: 1em
+      box-sizing: border-box
+      padding:
+        left: 1em
+        right: 1em
+      div.text
+        word-break: break-all
+        overflow: hidden
+        text-overflow: ellipsis
+        max-width: 10em
+        max-height: 5em
     &:last-child
       padding-right: 0
+    &:first-child
+      width: auto
     .run-name
       padding: 1.85em .25em 1.85em 1em
     padding: 0 1px 1px 0
     vertical-align: middle
     position: relative
+    width: 12em
     height: 5em
     min-width: 7.5em
   tfoot td
@@ -350,14 +362,23 @@ button:focus
       height: 3.85em
       .run-name
         padding: 1.25em .25em
+      &.input-dataset
+        padding:
+          left: .5em
+          right: .5em
+        div.text
+          font-size: 0.9em
+          max-height: 3.85em
   .ctrl.remove
-    height: 65px
-    line-height: 32px
+    height: 62px
+    line-height: 31px
     padding: .85em
   #insert_one_dataset, 
   #insert_many_dataset, 
   #insert_many_dataset.active
     padding: 0
+  #scroll_content
+    top: 9em
 
 @media (max-height: 700px)
   #above_box
@@ -377,6 +398,13 @@ button:focus
       height: 2.7em
       .run-name
         padding: .7em .25em
+      &.input-dataset
+        padding:
+          left: .3em
+          right: .3em
+        div.text
+          font-size: 0.8em
+          max-height: 2.7em
   .ctrl.remove
     height: 43px
     line-height: 21px
@@ -385,6 +413,8 @@ button:focus
   #insert_many_dataset, 
   #insert_many_dataset.active
     padding: 0
+  #scroll_content
+    top: 6em
 
 @media (max-width: 1280px) and (min-width: 1139px)
   .dataset-search-dlg .search_results table td.primary div

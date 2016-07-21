@@ -35,7 +35,6 @@ $(function() {
     ;
 
     // some more vars
-    var cell_width = 100 / dataset_input_table.find('tr').eq(0).find('td').length + '%';
     scroll_content._top = scroll_content.css('top');
 
     above_box.hide = function() {
@@ -81,7 +80,7 @@ $(function() {
             dataset_input_table._top = "19em";
         } else if (window.innerHeight <= 1000) {
             this._height = "25em";
-            dataset_input_table._top = "23.8em";
+            dataset_input_table._top = "24em";
         } else {
             this._height = "32em";
             dataset_input_table._top = "31em";
@@ -97,14 +96,10 @@ $(function() {
             available_space = set_dataset.wrapper.offset().top -
                 dst.$table.offset().top - dst.$table.outerHeight() + 10,
             rows = dst.$table.find("tbody tr"),
-            row_height, rows_over, new_pg_size, current_item_number, new_pg;
-
-        /* @debug */
-        // console.log('available_space', available_space);
+            rows_over, new_pg_size, current_item_number, new_pg;
 
         if (available_space && rows.length) {
-            row_height = rows.eq(0).outerHeight();
-            rows_over = Math.ceil(- available_space / row_height);
+            rows_over = Math.ceil(- available_space / rows.eq(0).outerHeight());
             new_pg_size = rows.length - rows_over;
 
             if (new_pg_size !== dst.page_size) {
@@ -112,27 +107,26 @@ $(function() {
                 new_pg = Math.floor(current_item_number / new_pg_size) + 1;
 
                 /* @debug */
-                // console.log('rows_over', rows_over);
-                // console.log('row_height', row_height);
-                // console.log('current_item_number', current_item_number);
-                // console.log('new_pg', new_pg);
-                // console.log('new_pg_size', new_pg_size);
+                // console.log({
+                //     'rows_over': rows_over,
+                //     'current_item_number': current_item_number,
+                //     'new_pg': new_pg,
+                //     'new_pg_size': new_pg_size
+                // });
                 /* // */
 
                 if (new_pg_size < 1) {
                     showPageError("There's no room in this window to show search results.", '.results-table-error');
                 } else {
+                    $('.results-table-error').hide();
                     dst.page = new_pg;
                     dst.page_size = new_pg_size;
                     dst.reloadTable();
-                    // if we recurse, it sometimes does a better job, and other times gets stuck in an infinite loop.
-                    // dst.reloadTable(function() { dataset_search_table.checkOverflow(); });
                 }
             }
         }
     };
 
-    dataset_input_table.find('td').css('width', cell_width);
     function showPageError(message, selector, persist) {
         var $error_div = $(selector).eq(0);
         $error_div.show().text(message);
@@ -141,6 +135,7 @@ $(function() {
                 $error_div.hide();
             }, 5000);
         }
+        return $error_div;
     }
 
     (function() {// extends dataset_input_table
@@ -343,21 +338,24 @@ $(function() {
             }
         });
         function scrollInputSetDatasetButton() {
+            var table_btn = $('button.receiving');
 
-            cellOffsetX = $('button.receiving').offset().left;
-            underset = cellOffsetX - above_box.offset().left;
-            overset = underset + cellWidth - above_box.outerWidth();
-            d_scroll = 0;
+            if (table_btn.is(':visible')) {
+                cellOffsetX = table_btn.offset().left;
+                underset = cellOffsetX - above_box.offset().left;
+                overset = underset + cellWidth - above_box.outerWidth();
+                d_scroll = 0;
 
-            if (overset > 0) {
-                d_scroll = overset;
-            } else if (underset < 0) {
-                d_scroll = underset;
-            }
+                if (overset > 0) {
+                    d_scroll = overset;
+                } else if (underset < 0) {
+                    d_scroll = underset;
+                }
 
-            var d_pos = cellOffsetX - button.offset().left - d_scroll;
-            if (d_pos) {
-                button.css('left', button.position().left + d_pos);
+                var d_pos = cellOffsetX - button.offset().left - d_scroll;
+                if (d_pos) {
+                    button.css('left', button.position().left + d_pos);
+                }
             }
         }
         function moveInputSetDatasetButton() {
@@ -488,7 +486,6 @@ $(function() {
     var uiFactory = (function() {
         var remove_ctrl = $('<div>').addClass('remove ctrl').text('×'),
             plus_button_cell = $('<td>')
-                .css('width', cell_width)
                 .append(
                     $('<button>')
                         .attr('name', "input")
@@ -498,7 +495,7 @@ $(function() {
                 .addClass('pipeline-input'),
             pipeline_original_row = $('tr', dataset_input_table).eq(0).clone(),
             hidden_input = $('<input type="hidden">'),
-            input_dataset = $('<td>').addClass('primary input-dataset pipeline-input').css('width', cell_width)
+            input_dataset = $('<td>').addClass('primary input-dataset pipeline-input')
         ;
         return {
             plusButton: function(data) {
@@ -516,16 +513,10 @@ $(function() {
             },
             inputDatasetCell: function(name, id, extra_data) {
                 return input_dataset.clone()
-                    .text(name)
+                    .append($('<div>').text(name).addClass('text'))
                     .data(extra_data)
-                    .data('id', id);
-            },
-            dummyTableRow: function() {
-                return $('<tbody>').append(
-                    $('<tr>').append(
-                        $('<td>').attr('colspan', 99).text('asdf')
-                    )
-                );
+                    .data('id', id)
+                ;
             }
         };
     })();
@@ -652,9 +643,6 @@ $(function() {
 
         $old_td.replaceWith( $new_td = uiFactory.plusButtonCell( $old_td.data() ) );
 
-        if ($row.find('.input-dataset, .receiving').length === 0) {
-            $row.remove();
-        }
         if (auto_fill_index > -1) {
             auto_fill.splice(auto_fill_index, 1);
         }

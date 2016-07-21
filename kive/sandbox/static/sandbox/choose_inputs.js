@@ -50,6 +50,8 @@ var choose_inputs = (function() {
         this.registerStandardColumn("users_allowed");
         this.registerStandardColumn("groups_allowed");
 
+        this.page_size = 8;
+
         this.$table.click(function(e) {
             var $target = $(e.target),
                 $tr = $target.closest('tr');

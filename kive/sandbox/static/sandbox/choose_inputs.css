@@ -21,8 +21,8 @@ html #inner_wrap {
     right: 0;
     margin-right: 0; }
 
-#scroll_content > h4 {
-  padding-left: 1em; }
+#pipeline_name {
+  padding-left: 3em; }
 
 #above_box {
   position: fixed;
@@ -101,11 +101,11 @@ html #inner_wrap {
       text-overflow: ellipsis;
       max-width: 40em;
       white-space: nowrap; }
-    .dataset-search-dlg .search_results table tr:hover td.primary div {
+    .dataset-search-dlg .search_results table tbody tr:hover td.primary div {
       overflow: visible; }
-    .dataset-search-dlg .search_results table tr:hover td:not(.primary) {
+    .dataset-search-dlg .search_results table tbody tr:hover td:not(.primary) {
       color: rgba(0, 0, 0, 0.1); }
-    .dataset-search-dlg .search_results table tr:hover.selected td:not(.primary) {
+    .dataset-search-dlg .search_results table tbody tr:hover.selected td:not(.primary) {
       color: rgba(255, 255, 255, 0.15); }
   #insert_dataset {
     background-color: #22b24c;
@@ -201,6 +201,7 @@ html #inner_wrap {
     font-size: 0.8em;
     text-decoration: underline; }
   .ctrl.remove {
+    background-color: #238;
     position: absolute;
     right: 0;
     top: 0;
@@ -268,63 +269,74 @@ html #inner_wrap {
 
 #scroll_content {
   position: absolute;
-  top: 25%;
+  top: 12em;
   padding-right: 30em;
   padding-bottom: 5em; }
 
-#dataset_input_table thead th {
-  text-align: center;
-  border-bottom: 1px solid black; }
-#dataset_input_table tbody td {
-  padding: 0 1px 1px 0;
-  vertical-align: middle;
-  position: relative;
-  height: 5em;
-  min-width: 7.5em; }
-  #dataset_input_table tbody td.selected {
-    background-color: #238;
-    color: #fff; }
-  #dataset_input_table tbody td.input-dataset {
-    text-indent: 1em; }
-    #dataset_input_table tbody td.input-dataset * {
-      text-indent: 0; }
-  #dataset_input_table tbody td:last-child {
-    padding-right: 0; }
-  #dataset_input_table tbody td .run-name {
-    padding: 1.85em 0.25em 1.85em 1em; }
-#dataset_input_table tfoot td {
-  text-align: right; }
-  #dataset_input_table tfoot td label {
-    font-size: 0.8em;
-    font-style: italic; }
-  #dataset_input_table tfoot td green-button {
+#dataset_input_table {
+  margin-left: 3em; }
+  #dataset_input_table thead th {
+    text-align: center;
+    border-bottom: 1px solid black; }
+  #dataset_input_table tbody td {
+    padding: 0 1px 1px 0;
+    vertical-align: middle;
+    position: relative;
+    width: 12em;
+    height: 5em;
+    min-width: 7.5em; }
+    #dataset_input_table tbody td.selected {
+      background-color: #238;
+      color: #fff; }
+    #dataset_input_table tbody td.input-dataset {
+      box-sizing: border-box;
+      padding-left: 1em;
+      padding-right: 1em; }
+      #dataset_input_table tbody td.input-dataset div.text {
+        word-break: break-all;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 10em;
+        max-height: 5em; }
+    #dataset_input_table tbody td:last-child {
+      padding-right: 0; }
+    #dataset_input_table tbody td:first-child {
+      width: auto; }
+    #dataset_input_table tbody td .run-name {
+      padding: 1.85em 0.25em 1.85em 1em; }
+  #dataset_input_table tfoot td {
+    text-align: right; }
+    #dataset_input_table tfoot td label {
+      font-size: 0.8em;
+      font-style: italic; }
+    #dataset_input_table tfoot td green-button {
+      width: 100%;
+      font-size: 1.5em;
+      box-sizing: border-box;
+      margin-bottom: 1px; }
+  #dataset_input_table button {
+    background-color: #22b24c;
+    color: white;
+    font-weight: bold;
+    border: 0;
+    margin-bottom: -1px;
+    padding: 0.25em 1em;
     width: 100%;
-    font-size: 1.5em;
-    box-sizing: border-box;
-    margin-bottom: 1px; }
-#dataset_input_table button {
-  background-color: #22b24c;
-  color: white;
-  font-weight: bold;
-  border: 0;
-  margin-bottom: -1px;
-  padding: 0.25em 1em;
-  width: 100%;
-  font-size: 2.5em;
-  line-height: 1.5em; }
-  #dataset_input_table button:focus {
-    outline: none;
-    cursor: pointer; }
-#dataset_input_table .inactive button {
-  background-color: #666; }
-  #dataset_input_table .inactive button.receiving {
-    background-color: #aaa; }
-.fixed-header {
-  display: none;
-  position: fixed;
-  overflow: hidden;
-  z-index: 2;
-  background-color: #fff; }
+    font-size: 2.5em;
+    line-height: 1.5em; }
+    #dataset_input_table button:focus {
+      outline: none;
+      cursor: pointer; }
+  #dataset_input_table .inactive button {
+    background-color: #666; }
+    #dataset_input_table .inactive button.receiving {
+      background-color: #aaa; }
+  .fixed-header {
+    display: none;
+    position: fixed;
+    overflow: hidden;
+    z-index: 2;
+    background-color: #fff; }
 
 button:focus {
   outline: none; }
@@ -355,16 +367,25 @@ button:focus {
     height: 3.85em; }
     #dataset_input_table tbody td .run-name {
       padding: 1.25em 0.25em; }
+    #dataset_input_table tbody td.input-dataset {
+      padding-left: 0.5em;
+      padding-right: 0.5em; }
+      #dataset_input_table tbody td.input-dataset div.text {
+        font-size: 0.9em;
+        max-height: 3.85em; }
 
   .ctrl.remove {
-    height: 65px;
-    line-height: 32px;
+    height: 62px;
+    line-height: 31px;
     padding: 0.85em; }
 
   #insert_one_dataset,
   #insert_many_dataset,
   #insert_many_dataset.active {
-    padding: 0; } }
+    padding: 0; }
+
+  #scroll_content {
+    top: 9em; } }
 @media (max-height: 700px) {
   #above_box {
     padding-top: 1.35em; }
@@ -383,6 +404,12 @@ button:focus {
     height: 2.7em; }
     #dataset_input_table tbody td .run-name {
       padding: 0.7em 0.25em; }
+    #dataset_input_table tbody td.input-dataset {
+      padding-left: 0.3em;
+      padding-right: 0.3em; }
+      #dataset_input_table tbody td.input-dataset div.text {
+        font-size: 0.8em;
+        max-height: 2.7em; }
 
   .ctrl.remove {
     height: 43px;
@@ -392,7 +419,10 @@ button:focus {
   #insert_one_dataset,
   #insert_many_dataset,
   #insert_many_dataset.active {
-    padding: 0; } }
+    padding: 0; }
+
+  #scroll_content {
+    top: 6em; } }
 @media (max-width: 1280px) and (min-width: 1139px) {
   .dataset-search-dlg .search_results table td.primary div {
     max-width: 24em; } }
