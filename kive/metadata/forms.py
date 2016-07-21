@@ -97,8 +97,8 @@ class PermissionsWidget(forms.MultiWidget):
 
     def format_output(self, rendered_widgets):
         pw_template = loader.get_template("metadata/permissions_widget.html")
-        users = [{"id": x[0], "username": x[1]} for x in self.user_choices]
-        groups = [{"id": x[0], "name": x[1]} for x in self.group_choices]
+        users = [{"username": x[0], "username": x[1]} for x in self.user_choices]
+        groups = [{"name": x[0], "name": x[1]} for x in self.group_choices]
         c = {
             "users": users,
             "groups": groups,
@@ -109,11 +109,11 @@ class PermissionsWidget(forms.MultiWidget):
 
 
 def user_choices(user_queryset):
-    return [(x.id, x.username) for x in user_queryset]
+    return [(x.username, x.username) for x in user_queryset]
 
 
 def group_choices(group_queryset):
-    return [(x.id, x.name) for x in group_queryset]
+    return [(x.name, x.name) for x in group_queryset]
 
 
 class PermissionsField(forms.MultiValueField):
@@ -129,8 +129,8 @@ class PermissionsField(forms.MultiValueField):
         # group_queryset = group_queryset or Group.objects.all()
 
         fields = (
-            forms.ModelMultipleChoiceField(queryset=None, required=False),
-            forms.ModelMultipleChoiceField(queryset=None, required=False)
+            forms.ModelMultipleChoiceField(queryset=None, required=False, to_field_name="username"),
+            forms.ModelMultipleChoiceField(queryset=None, required=False, to_field_name="name")
         )
 
         widget = widget or self.widget()
@@ -150,13 +150,13 @@ class PermissionsField(forms.MultiValueField):
     def compress(self, data_list):
         # data_list consists of two lists: the first is of Users, the second of Groups.
         if len(data_list) == 0:
-            user_pks = []
-            group_pks = []
+            user_names = []
+            group_names = []
         else:
-            user_pks = [x.pk for x in data_list[0]]
-            group_pks = [x.pk for x in data_list[1]]
+            user_names = [x.username for x in data_list[0]]
+            group_names = [x.name for x in data_list[1]]
 
-        return json.dumps([user_pks, group_pks])
+        return json.dumps([user_names, group_names])
 
     def set_users_groups_allowed(self, users_allowed, groups_allowed):
         """

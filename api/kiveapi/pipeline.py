@@ -8,7 +8,7 @@ from . import KiveMalformedDataException
 
 class PipelineInput(object):
     """
-    A wrapper class for Kive's TransformInput object
+    A wrapper class for Kive's TransformationInput object
     """
 
     def __init__(self, obj):

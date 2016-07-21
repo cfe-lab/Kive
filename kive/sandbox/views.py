@@ -11,12 +11,11 @@ from django.contrib.auth.models import User, Group
 
 from rest_framework.renderers import JSONRenderer
 
-from archive.models import Dataset, Run, RunBatch
-from archive.serializers import RunOutputsSerializer, RunBatchSerializer
+from archive.models import Run, RunBatch
+from archive.serializers import RunOutputsSerializer
 from pipeline.models import Pipeline
 from portal.views import admin_check
-from sandbox.forms import InputSubmissionForm, RunSubmissionForm, RunDetailsForm,\
-    RunBatchDetailsForm
+from sandbox.forms import RunDetailsForm, RunBatchDetailsForm, StartRunBatchForm
 
 from constants import runstates
 
@@ -36,13 +35,13 @@ def choose_pipeline(request, error_message=''):
 @require_GET
 def choose_inputs(request):
     pipeline_pk = int(request.GET.get("pipeline"))
-    return _choose_inputs_for_pipeline(request, pipeline_pk)
+    return _choose_inputs_for_batch(request, pipeline_pk)
 
 
-def _choose_inputs_for_pipeline(request,
-                                pipeline_pk,
-                                rsf=None,
-                                input_error_message=''):
+def _choose_inputs_for_batch(request,
+                             pipeline_pk,
+                             start_form=None,
+                             input_error_message=''):
     """Load the input selection page."""
     context = {}
 
@@ -53,97 +52,14 @@ def _choose_inputs_for_pipeline(request,
     if pipeline is None:
         raise Http404("ID {} is not accessible".format(pipeline_pk))
 
-    if rsf is None:
-        rsf = RunSubmissionForm({"pipeline": pipeline}, pipeline_qs=pipeline_qs)
+    if start_form is None:
+        start_form = StartRunBatchForm({"pipeline": pipeline}, pipeline_qs=pipeline_qs)
 
     context.update({"inputs": pipeline.inputs.order_by("dataset_idx"),
-                    "run_submission_form": rsf,
+                    "start_form": start_form,
                     "input_error_msg": input_error_message,
                     "pipeline": pipeline})
     return HttpResponse(template.render(context, request))
-
-
-class RunSubmissionError(Exception):
-    """ Exception used to roll back a run submission.
-
-    Includes the error response to display to the user.
-    """
-
-    def __init__(self, response):
-        self.response = response
-
-
-@login_required
-@require_POST
-def run_pipeline(request):
-    """Run a Pipeline.
-
-    Request parameters are:
-
-    * pipeline - the pipeline id
-    * input_1, input_2, etc. - the dataset ids to use as inputs
-    """
-
-    try:
-        with transaction.atomic():
-            dummy_rtp = Run(user=request.user)
-            rsf = RunSubmissionForm(request.POST, instance=dummy_rtp)
-
-            try:
-                rsf_good = rsf.is_valid()
-            except ValidationError as e:
-                rsf.add_error(None, e)
-                rsf_good = False
-
-            curr_pipeline = rsf.cleaned_data["pipeline"]
-            if not rsf_good:
-                if "pipeline" in rsf.cleaned_data:
-                    # back to choose inputs, with form now including errors.
-                    raise RunSubmissionError(_choose_inputs_for_pipeline(
-                        request,
-                        curr_pipeline.pk,
-                        rsf))
-                raise RunSubmissionError(choose_pipeline(request,
-                                                         "Pipeline was invalid."))
-
-            rtp = rsf.save()
-            rtp.grant_from_json(rsf.cleaned_data["permissions"])
-
-            # Now try and put together RunInputs from the specified inputs.
-            for i in range(1, curr_pipeline.inputs.count()+1):
-                curr_input_form = InputSubmissionForm({"input_pk": request.POST.get("input_{}".format(i))})
-                if not curr_input_form.is_valid():
-                    raise RunSubmissionError(_choose_inputs_for_pipeline(
-                        request,
-                        curr_pipeline.pk,
-                        rsf,
-                        "Input {} is invalid".format(i)))
-
-                # Check that the chosen dataset is usable.
-                dataset = Dataset.objects.get(pk=curr_input_form.cleaned_data["input_pk"])
-                try:
-                    rtp.validate_restrict_access([dataset])
-                except ValidationError as e:
-                    raise RunSubmissionError(_choose_inputs_for_pipeline(
-                        request,
-                        curr_pipeline.pk,
-                        rsf,
-                        e.messages))
-
-                rtp.inputs.create(dataset=dataset, index=i)
-
-            try:
-                rtp.clean()
-            except ValidationError as e:
-                raise RunSubmissionError(_choose_inputs_for_pipeline(
-                    request,
-                    curr_pipeline.pk,
-                    rsf))
-    except RunSubmissionError as e:
-        return e.response
-
-    # Success -- redirect to the active runs view.
-    return HttpResponseRedirect("/view_run/%d" % rtp.id)
 
 
 @login_required
@@ -191,7 +107,7 @@ def view_results(request, run_id):
     if request.method == "POST":
         # We don't allow changing anything until after the Run is finished.
         if not run_complete:
-            # A RunSubmissionForm which we can use to make submission and editing easier.
+            # A form which we can use to make submission and editing easier.
             run_form = RunDetailsForm(
                 users_allowed=User.objects.none(),
                 groups_allowed=Group.objects.none(),
@@ -226,8 +142,8 @@ def view_results(request, run_id):
                 run_form.add_error(None, e)
 
     else:
-        # A RunSubmissionForm which we can use to make submission and editing easier.
-        run_form = RunSubmissionForm(
+        # A form which we can use to make submission and editing easier.
+        run_form = RunDetailsForm(
             users_allowed=User.objects.none(),
             groups_allowed=Group.objects.none(),
             initial={"name": run.name, "description": run.description}
@@ -330,7 +246,6 @@ def runbatch(request, runbatch_pk):
 
     template = loader.get_template("sandbox/runbatch.html")
 
-    # FIXME what do we put in here?
     context = {
         "runbatch": rb,
         "runbatch_form": rb_form,

@@ -111,7 +111,6 @@ urlpatterns = [
     url(r'^choose_inputs$', sandbox.views.choose_inputs, name='choose_inputs'),
     url(r'^runs$', sandbox.views.runs, name='runs'),
     url(r'^view_results/(?P<run_id>\d+)/$', sandbox.views.view_results, name='view_results'),
-    url(r'^run_pipeline$', sandbox.views.run_pipeline, name='run_pipeline'),
     url(r'^view_run/(?P<run_id>\d+)$', sandbox.views.view_run, name='view_run'),
     url(r'^view_run/(?P<run_id>\d+)/(?P<md5>[0-9a-fA-F]{32})$', sandbox.views.view_run, name='view_run'),
     url(r'^runbatch/(?P<runbatch_pk>\d+)$', sandbox.views.runbatch, name='runbatch'),

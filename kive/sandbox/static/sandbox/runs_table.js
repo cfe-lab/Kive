@@ -43,7 +43,7 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
             $name = $('<span/>');
         }
         else {
-            $name = $('<a/>').attr("href", "view_results/" + run.id);
+            $name = $('<a/>').attr("href", "/view_results/" + run.id);
         }
         $td.append($name.text(run.display_name));
     });
@@ -52,7 +52,7 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
         this.registerColumn("Batch", function($td, run) {
             var $name;
             if (run.runbatch !== null) {
-                $name = $("<a/>").attr("href", "../runbatch/" + run.runbatch);
+                $name = $("<a/>").attr("href", "/runbatch/" + run.runbatch);
                 if (! run.runbatch_name) {
                     $name.text("[batch " + run.runbatch + " (unnamed)]");
                 }

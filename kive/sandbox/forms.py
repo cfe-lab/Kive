@@ -129,3 +129,32 @@ class RunBatchDetailsForm(forms.ModelForm):
         users_allowed = users_allowed if users_allowed is not None else get_user_model().objects.all()
         groups_allowed = groups_allowed if groups_allowed is not None else Group.objects.all()
         self.fields["permissions"].set_users_groups_allowed(users_allowed, groups_allowed)
+
+
+class StartRunBatchForm(RunBatchDetailsForm):
+    """
+    Form used for validating the request values when submitting a Pipeline to run.
+    """
+    # Use Pipeline.objects.all() as the default queryset so that when creating a form without pipeline_qs
+    # specified, any pipeline will be OK.
+    pipeline = forms.ModelChoiceField(
+        widget=forms.HiddenInput,
+        queryset=Pipeline.objects.all())
+
+    name = forms.CharField(
+        max_length=maxlengths.MAX_NAME_LENGTH,
+        label='Name',
+        help_text='A name to identify this batch of runs',
+        required=False,
+        widget=forms.TextInput(attrs={"autocomplete": "off"})
+    )
+
+    class Meta:
+        model = RunBatch
+        fields = ("pipeline", "permissions", "name", "description")
+
+    def __init__(self, data=None, pipeline_qs=None, users_allowed=None, groups_allowed=None, *args, **kwargs):
+        super(StartRunBatchForm, self).__init__(data, users_allowed=users_allowed,
+                                                groups_allowed=groups_allowed, *args, **kwargs)
+        if pipeline_qs is not None:
+            self.fields["pipeline"].queryset = pipeline_qs

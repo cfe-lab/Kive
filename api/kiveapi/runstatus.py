@@ -19,6 +19,7 @@ class RunStatus(object):
         self.pipeline_id = obj['pipeline']
         self.url = obj['run_status']
         self.results_url = obj['run_outputs']
+        self.runbatch_id = obj['runbatch']
         self.api = api
         self.raw = obj
 
