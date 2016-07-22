@@ -27,7 +27,6 @@ html #inner_wrap {
 #above_box {
   position: fixed;
   z-index: 3;
-  overflow: hidden;
   top: 2.7em;
   padding-top: 2em;
   padding-left: 2em;
