@@ -41,7 +41,7 @@
         this.registerColumn("Name", coderevision_view_link);
         this.registerColumn("", coderevision_link);
         this.registerColumn("Description", "revision_desc");
-        this.registerColumn("Date", "revision_DateTime");
+        this.registerDateTimeColumn("Date", "revision_DateTime");
         this.registerColumn("", buildDownload);
 
         this.registerStandardColumn("user");

@@ -25,7 +25,7 @@
         this.registerColumn("Description", "description");
         this.registerColumn("Filename", "filename");
         this.registerColumn("# of revisions", "num_revisions");
-        this.registerColumn("Last revision date", "last_revision_date");
+        this.registerDateTimeColumn("Last revision date", "last_revision_date");
 
         this.registerStandardColumn("user");
         this.registerStandardColumn("users_allowed");

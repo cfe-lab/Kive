@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from kive.serializers import AccessControlSerializer
-from method.models import CodeResourceRevision
+from method.models import CodeResourceRevision, Method
 from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
 from pipeline.models import PipelineFamily, Pipeline, CustomCableWire,\
     PipelineStepInputCable, PipelineStep, PipelineOutputCable
@@ -355,6 +355,7 @@ class PipelineSerializer(AccessControlSerializer,
                     **structure_data
                 ).save()
 
+        name_length = Method._meta.get_field('revision_name').max_length  # @UndefinedVariable
         # Next, create the PipelineSteps.
         # We keep a directory of Methods that have already been upgraded.
         methods_already_upgraded = {}
@@ -382,7 +383,6 @@ class PipelineSerializer(AccessControlSerializer,
                 revision_name = updated_driver.revision_name
                 revision_description = updated_driver.revision_desc
 
-
                 resource_map = {}
                 if new_dependency_ids:
                     # revised CR has new dependencies
@@ -394,7 +394,8 @@ class PipelineSerializer(AccessControlSerializer,
                         '\n---\n'.join([d.revision_desc for d in dependency_revisions])
                     )
                     resource_map = {d.coderesource_id: d for d in dependency_revisions}
-
+                if len(revision_name) > name_length:
+                    revision_name = revision_name[:name_length-3] + '...'
 
                 if new_driver_pk is not None or new_dependency_ids:
                     # Create a new Method from the updated driver and dependencies.

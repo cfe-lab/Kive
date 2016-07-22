@@ -19,7 +19,7 @@ var DatatypesTable = function($table, is_user_admin, $active_filters, $navigatio
     this.registerColumn("Name", datatype_link);
     this.registerColumn("Description", "description");
     this.registerColumn("Restricts", "restricts");
-    this.registerColumn("Date created", "date_created");
+    this.registerDateTimeColumn("Date created", "date_created");
 
     this.registerStandardColumn("user");
     this.registerStandardColumn("users_allowed");

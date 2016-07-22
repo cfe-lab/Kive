@@ -79,19 +79,25 @@ var permissions = (function() {
             this.registerColumn('Creator', 'user');
         }
         else if (columnName === "users_allowed") {
-            this.registerColumn(
-                'Users with access',
-                buildListCell,
-                'users_allowed');
+            this.registerColumn('Users with access', buildListCell, columnName);
         }
         else if (columnName === "groups_allowed") {
-            this.registerColumn(
-                'Groups with access',
-                buildListCell,
-                'groups_allowed');
+            this.registerColumn('Groups with access', buildListCell, columnName);
         }
     };
 
+    /**
+     * Register a column to be added to the table with a formatted date/time.
+     *
+     *  @param header: a string to label the column header
+     *  @param columnName: the name of the column to format
+     */
+    my.PermissionsTable.prototype.registerDateTimeColumn = function(
+            header,
+            columnName) {
+        this.registerColumn(header, buildDateTimeCell, columnName);
+    };
+    
     /**
      * Attach some error messages to a cell in the table.
      * 
@@ -363,6 +369,10 @@ var permissions = (function() {
             $ul.append($('<li/>').text(this));
         });
         $td.append($ul);
+    }
+    
+    function buildDateTimeCell($td, row, field_name) {
+        $td.text(my.formatDate(row[field_name]));
     }
     
     function clickLock(event) {
