@@ -40,10 +40,10 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
     this.registerColumn("Name", function($td, run) {
         var $name;
         if (run.id === undefined) {
-            $name = $('<span/>');
+            $name = $('<span>');
         }
         else {
-            $name = $('<a/>').attr("href", "/view_results/" + run.id);
+            $name = $('<a>').attr("href", "/view_results/" + run.id);
         }
         $td.append($name.text(run.display_name));
     });
@@ -52,7 +52,7 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
         this.registerColumn("Batch", function($td, run) {
             var $name;
             if (run.runbatch !== null) {
-                $name = $("<a/>").attr("href", "/runbatch/" + run.runbatch);
+                $name = $("<a>").attr("href", "/runbatch/" + run.runbatch);
                 if (! run.runbatch_name) {
                     $name.text("[batch " + run.runbatch + " (unnamed)]");
                 }
@@ -77,7 +77,7 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
     this.registerColumn(" ", function($td, run) {
 
         // A "rerun" link, accessible to anyone who can see this Run.
-        var $rerun_link = $("<a/>");
+        var $rerun_link = $("<a>");
         $rerun_link.attr("href", runsTable.create_url)
             .text("Rerun")
             .click({
@@ -91,14 +91,12 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
         }
         else if (run.run_progress.end === null &&
                 (runsTable.user === run.user || ! runsTable.is_locked)) {
-            var $stop_link = $("<a/>");
+            var $stop_link = $("<a>");
             $stop_link.attr("href", run.url)
                 .attr("run_id", run.id)
                 .text("Stop")
-                .click(this, clickStop);
-            $td.append(" (");
-            $td.append($stop_link);
-            $td.append(")");
+                .click(runsTable, clickStop);
+            $td.append(" (", $stop_link, ")");
         }
     });
 
@@ -197,7 +195,7 @@ RunsTable.prototype.extractRows = function(response) {
     $no_results.empty();
     if ('detail' in response) {
         $no_results.append($('<h2>Errors:</h2>'));
-        $no_results.append($('<p/>').text(response.detail));
+        $no_results.append($('<p>').text(response.detail));
     } else {
         runs = response.results;
         if (runs !== undefined && runs.length > 0) {
