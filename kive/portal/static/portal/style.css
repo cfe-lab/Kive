@@ -209,39 +209,6 @@ a[rel="prev"]:before {
     font-style: normal;
 }
 
-
-/* Navigation menu styles */
-nav { width: 25em; }
-nav ul {
-    list-style: none;
-    display: block;
-    padding: 0;
-    margin-left: -4em;
-}
-nav a:link {
-    display: block;
-    background-color: rgba(0,0,0,0.02);
-    text-decoration: inherit;
-    color: inherit;
-    padding: 1em 2em 1em 4em;
-    border-bottom: 1px solid #000;
-}
-nav a:visited { color: inherit; }
-nav a:link:hover {
-    background-color: rgba(68,170,238,0.2);
-    outline: none;
-}
-nav a:link:hover:before {
-    content: "\25B8";
-    float: left;
-    margin-left: -1.5em;
-    font-size: 1.2em;
-}
-nav li:first-child a { border-top: 1px solid #fff; }
-nav li:last-child a {  border-bottom: 1px solid #fff; }
-nav h4 { font-size: 1.2em; margin: 0; }
-nav .menu-description {   margin: .3em 0 0; }
-
 /* Form styles */
 input, textarea, select {
     font: inherit;

@@ -1,12 +1,17 @@
 <!-- Django template -->
 
 {% extends "portal/base.html" %}
-{% block title %}kive User Portal{% endblock %}
+{% block title %}kive for Users{% endblock %}
+
+{% block stylesheets %}
+<link rel="stylesheet" href="/static/portal/portal.css">
+{% endblock %}
 
 {% block content %}
 <a href="/" rel="prev">Return to homepage</a>
 
-<h2>User portal</h2>
+<img class="header-icon" src="/static/portal/user_icon.png">
+<h2>Users</h2>
 
 
 <nav><ul>

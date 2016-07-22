@@ -1,0 +1,115 @@
+/* Navigation menu styles */
+nav {
+    width: 38.2%;
+    min-width: 20em;
+    max-width: 80em;
+}
+nav ul {
+    list-style: none;
+    display: block;
+    padding: 0;
+    margin-left: -4em;
+}
+nav a:link {
+    display: block;
+    background-color: rgba(0,0,0,0.02);
+    text-decoration: inherit;
+    color: inherit;
+    padding: 1em 2em 1em 4em;
+    border-bottom: 1px solid #000;
+}
+nav a:visited { color: inherit; }
+nav a:link:hover {
+    background-color: rgba(68,170,238,0.2);
+    outline: none;
+}
+nav a:link:hover:before {
+    content: "\25B8";
+    float: left;
+    margin-left: -1.5em;
+    font-size: 1.2em;
+}
+nav img.menu-icon {
+    float: left;
+    margin-right: 1em;
+    margin-bottom: 1em;
+}
+nav li:first-child a { border-top: 1px solid #fff; }
+nav li:last-child a {  border-bottom: 1px solid #fff; }
+nav h4 { font-size: 1.2em; margin: 0; }
+nav .menu-description {   margin: .3em 0 0; }
+
+@media (min-height: 1080px) {
+    nav a:link {
+        padding-top: 4em;
+        padding-bottom: 4em;
+    }
+    nav h4, 
+    nav a:link:hover:before {
+        font-size: 1.8em;
+    }
+    nav p {
+        font-size: 1.2em;
+    }
+    nav img.menu-icon {
+        margin-bottom: 0;
+    }
+}
+@media (min-height: 800px) and (max-height: 1079px) {
+    nav a:link {
+        padding-top: 3em;
+        padding-bottom: 3em;
+    }
+}
+@media (max-height: 799px) {
+    nav a:link {
+        padding-top: 2em;
+        padding-bottom: 2em;
+    }
+}
+@media (min-width: 1600px) {
+    img.header-icon {
+        margin-left: 3em;
+    }
+    nav { width: 48em; }
+    nav a:link {
+        padding-left: 10em;
+        padding-right: 10em;
+    }
+}
+@media (min-width: 1280px) and (max-width: 1599px) {
+    img.header-icon {
+        margin-left: 1em;
+    }
+    nav { width: 36em; }
+    nav a:link {
+        padding-left: 8em;
+        padding-right: 8em;
+    }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+    img.header-icon {
+        margin-left: -2em;
+    }
+    nav { width: 30em; }
+    nav a:link {
+        padding-left: 5em;
+        padding-right: 5em;
+    }
+}
+@media (max-width: 1023px) {
+    html img.header-icon {
+        margin-right: .7em;
+    }
+    nav { width: 24em; }
+    nav a:link {
+        padding-left: 4em;
+        padding-right: 2em;
+    }
+}
+
+img.header-icon {
+    padding-top: .7em;
+    float: left;
+    margin-right: 1em;
+}
