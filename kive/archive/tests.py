@@ -3569,7 +3569,10 @@ class RunIncreasePermissionsNestedRunTests(TestCase):
         """
         Test granting permissions from a JSON input.
         """
-        perms_to_add = [[self.john.pk, self.ringo.pk], [groups.DEVELOPERS_PK]]
+        perms_to_add = [
+            [self.john.username, self.ringo.username],
+            [Group.objects.get(pk=groups.DEVELOPERS_PK).name]
+        ]
 
         self.run.increase_permissions_from_json(json.dumps(perms_to_add))
 
@@ -3633,7 +3636,7 @@ class RunIncreasePermissionsCustomCableTests(TestCase):
         """
         Test granting permissions from a JSON input.
         """
-        perms_to_add = [[kive_user().pk], [groups.DEVELOPERS_PK]]
+        perms_to_add = [[kive_user().username], [Group.objects.get(pk=groups.DEVELOPERS_PK).name]]
 
         self.run.increase_permissions_from_json(json.dumps(perms_to_add))
 

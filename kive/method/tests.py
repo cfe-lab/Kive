@@ -9,6 +9,7 @@ import shutil
 import tempfile
 import copy
 import unittest
+import re
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -234,6 +235,12 @@ class MethodTestCase(TestCase):
 
 class CodeResourceTests(MethodTestCase):
 
+    def setUp(self):
+        super(CodeResourceTests, self).setUp()
+        self.cr_filename_err_msg = ('Filename must contain only: alphanumeric characters; spaces; '
+                                    'and the characters -._(), '
+                                    'and cannot start with a space')
+
     def test_unicode(self):
         """
         unicode should return the codeResource name.
@@ -261,10 +268,13 @@ class CodeResourceTests(MethodTestCase):
         """
         Clean fails when CodeResource name isn't file-system valid
         """
-
         invalid_cr = CodeResource(name="test", filename="../test.py", description="desc", user=self.myUser)
         invalid_cr.save()
-        self.assertRaisesRegexp(ValidationError, "Invalid code resource filename", invalid_cr.clean_fields)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape(self.cr_filename_err_msg),
+            invalid_cr.clean_fields
+        )
 
     def test_invalid_name_starting_space_clean_bad(self):
         """
@@ -272,7 +282,11 @@ class CodeResourceTests(MethodTestCase):
         """
         invalid_cr = CodeResource(name="test", filename=" test.py", description="desc", user=self.myUser)
         invalid_cr.save()
-        self.assertRaisesRegexp(ValidationError, "Invalid code resource filename", invalid_cr.clean_fields)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape(self.cr_filename_err_msg),
+            invalid_cr.clean_fields
+        )
 
     def test_invalid_name_invalid_symbol_clean_bad(self):
         """
@@ -280,7 +294,11 @@ class CodeResourceTests(MethodTestCase):
         """
         invalid_cr = CodeResource(name="name", filename="test$.py", description="desc", user=self.myUser)
         invalid_cr.save()
-        self.assertRaisesRegexp(ValidationError, "Invalid code resource filename", invalid_cr.clean_fields)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape(self.cr_filename_err_msg),
+            invalid_cr.clean_fields
+        )
 
     def test_invalid_name_trailing_space_clean_bad(self):
         """
@@ -288,7 +306,11 @@ class CodeResourceTests(MethodTestCase):
         """
         invalid_cr = CodeResource(name="name", filename="test.py ", description="desc", user=self.myUser)
         invalid_cr.save()
-        self.assertRaisesRegexp(ValidationError, "Invalid code resource filename", invalid_cr.clean_fields)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape(self.cr_filename_err_msg),
+            invalid_cr.clean_fields
+        )
 
 
 class CodeResourceRevisionTests(MethodTestCase):

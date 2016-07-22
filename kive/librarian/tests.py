@@ -15,7 +15,7 @@ from StringIO import StringIO
 
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.test import TestCase
 from django.core.urlresolvers import reverse, resolve
 from django.core.files import File
@@ -361,7 +361,12 @@ Bob,tw3nty
         ic.stop()
 
         # Now, let's try to grant some permissions on self.singlet_dataset.
-        new_perms_json = json.dumps([[self.ringoUser.pk], [groups.DEVELOPERS_PK]])
+        new_perms_json = json.dumps(
+            [
+                [self.ringoUser.username],
+                [Group.objects.get(pk=groups.DEVELOPERS_PK).name]
+            ]
+        )
         self.singlet_dataset.increase_permissions_from_json(new_perms_json)
 
         self.assertTrue(self.singlet_dataset.users_allowed.filter(pk=self.ringoUser.pk).exists())

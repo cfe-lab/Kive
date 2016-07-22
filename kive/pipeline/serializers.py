@@ -165,10 +165,6 @@ class PipelineRevisionNumberGetter(object):
     due to changes in the internals of DRF, this probably will too.
     """
     def set_context(self, rev_num_field):
-        print(rev_num_field.parent.initial_data)
-        print('---')
-        print(rev_num_field.parent.initial_data.get("family"))
-        print('---')
         self.pipelinefamily = PipelineFamily.objects.get(
             name=rev_num_field.parent.initial_data.get("family")
         )
