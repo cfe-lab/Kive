@@ -265,13 +265,11 @@ var permissions = (function() {
                 rows = permissions_table.extractRows(response);
 
                 if (permissions_table.$navigation_links !== undefined) {
-                    permissions_table.$navigation_links.empty();
-
-                    permissions_table.$navigation_links.append(
+                    permissions_table.$navigation_links.html(
                         $('<span class="record_count"/>').text(response.count + " found")
                     );
 
-                    if (response.count > 0) {
+                    if (response.count > permissions_table.page_size) {
 
                         if ("previous" in response && response.previous !== null) {
                             permissions_table.$navigation_links.append(
