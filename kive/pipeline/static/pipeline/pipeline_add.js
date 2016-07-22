@@ -30,7 +30,9 @@ $(function() {
     };
 
     var showMenu = function(e) {
-        e && e.stopPropagation();
+        if (e) {
+            e.stopPropagation();
+        }
         var $this = $(this),
             menu = $($this.data('rel')),
             inputs, input, preview_canvas, i;
@@ -809,7 +811,7 @@ $(function() {
         if (canvasState.can_edit && canvasState.has_unsaved_changes) {
             return 'You have unsaved changes.';
         }
-    }
+    };
     
     pipelineCheckReadiness();
     
