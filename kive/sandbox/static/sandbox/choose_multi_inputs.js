@@ -37,6 +37,7 @@ $(function() {
     // some more vars
     scroll_content._top = scroll_content.css('top');
 
+    above_box.opened = false;
     above_box.hide = function() {
         scroll_content.animate({
             'top': scroll_content._top
@@ -47,6 +48,8 @@ $(function() {
             'height': '50px',
             'border-color': 'transparent',
             'background-color': 'transparent'
+        }, function() {
+            above_box.opened = false;
         }).addClass('hidden');
     };
     above_box.show = function(callback) {
@@ -65,7 +68,10 @@ $(function() {
             'height': this._height,
             'border-color': '#000',
             'background-color': '#eee'
-        }, callback).removeClass('hidden');
+        }, function() {
+            above_box.opened = true;
+            callback.call(_this);
+        }).removeClass('hidden');
     };
     above_box.showIfHidden = function(callback) {
         if (this.is('.hidden')) {
@@ -96,10 +102,15 @@ $(function() {
             available_space = set_dataset.wrapper.offset().top -
                 dst.$table.offset().top - dst.$table.outerHeight() + 10,
             rows = dst.$table.find("tbody tr"),
+            row_height = rows.eq(0).outerHeight(),
             rows_over, new_pg_size, current_item_number, new_pg;
 
+        if (!row_height) {
+            row_height = dst.$table.find("tfoot tr").outerHeight() || 10;
+        }
+
         if (available_space && rows.length) {
-            rows_over = Math.ceil(- available_space / rows.eq(0).outerHeight());
+            rows_over = Math.ceil(- available_space / row_height);
             new_pg_size = rows.length - rows_over;
 
             if (new_pg_size !== dst.page_size) {
@@ -107,6 +118,7 @@ $(function() {
                 new_pg = Math.floor(current_item_number / new_pg_size) + 1;
 
                 if (new_pg_size < 1) {
+                    rows.remove();
                     showPageError("There's no room in this window to show search results.", '.results-table-error');
                 } else {
                     $('.results-table-error').hide();
@@ -209,7 +221,7 @@ $(function() {
             var $tr = this.find('tr');
             if ($tr.length > 1) {
                 if ($tr.eq(-1).find('.receiving').length) {
-                    closeSearchDialog();
+                    above_box.hide();
                 }
                 $tr.eq(-1).remove();
             } else {
@@ -276,7 +288,6 @@ $(function() {
             underset,
             overset,
             d_scroll,
-            above_box_opened,
             search_table_loaded;
 
         // dialog_state will allow the dialog to have disjunct states according to which input is at hand.
@@ -334,9 +345,10 @@ $(function() {
                         // default filter set
                         dst.filterSet.add('uploaded', undefined, true);// 3rd arg = skip reload
                     }
+                    search_table_loaded = false;
                     dst.reloadTable(function() {
                         search_table_loaded = true;
-                        if (above_box_opened) {
+                        if (above_box.opened) {
                             dataset_search_table.checkOverflow();
                         }
                     });
@@ -457,7 +469,6 @@ $(function() {
             // but also moves with the correct final position of above_box.
             // moveInputSetDatasetButton();
             above_box.showIfHidden(function() {
-                above_box_opened = true;
                 if (search_table_loaded) {
                     dataset_search_table.checkOverflow();
                 }
@@ -468,20 +479,10 @@ $(function() {
         function closeSearchDialog() {
             var $receiving_button = $('button.receiving'),
                 $row = $receiving_button.closest('tr');
-
             $receiving_button.replaceWith(
                 uiFactory.plusButton( $receiving_button.data() )
             );
-
             dataset_input_table.removeClass('inactive');
-
-            if (
-                dataset_input_table.find('tr:not(:has(.input-dataset))').length > 1 &&
-                $row.find('.input-dataset').length === 0
-            ) {
-                $row.remove();
-            }
-
             dataset_search_dialog.fadeOut('fast');
             above_box.hide();
         }
@@ -579,6 +580,7 @@ $(function() {
 
         if (selected_vals.length > 0) {
             dataset_search_table.$table.removeClass('none-selected-error');
+            $(".results-table-error").hide();
 
             for (var i = 0; i < selected_vals.length; i++) {
                 selected_val = selected_vals.eq(i);
@@ -627,6 +629,8 @@ $(function() {
             }
         } else {
             dataset_search_table.$table.addClass('none-selected-error');
+            showPageError("Please select a dataset to add.", ".results-table-error");
+            return false;
         }
     };
     var toggleInputDatasetSelection = function(e) {

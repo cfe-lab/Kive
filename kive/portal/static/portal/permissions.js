@@ -261,8 +261,7 @@ var permissions = (function() {
         permissions_table.ajax_request = $.getJSON(
             permissions_table.list_url,
             query_params).done(function(response) {
-                var rows;
-                rows = permissions_table.extractRows(response);
+                var rows = permissions_table.extractRows(response);
 
                 if (permissions_table.$navigation_links !== undefined) {
                     permissions_table.$navigation_links.html(

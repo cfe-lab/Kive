@@ -1,3 +1,6 @@
+.hidden {
+  display: none; }
+
 h1 {
   position: fixed;
   z-index: 1;
