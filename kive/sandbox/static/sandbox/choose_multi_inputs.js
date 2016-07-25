@@ -36,6 +36,7 @@ $(function() {
 
     // some more vars
     scroll_content._top = scroll_content.css('top');
+    set_dataset.wrapper.css('width', $('.select_dataset').outerWidth());
 
     above_box.opened = false;
     above_box.hide = function() {
@@ -123,7 +124,6 @@ $(function() {
                 } else {
                     $('.results-table-error').hide();
                     dst.page = new_pg;
-
                     // check if a table reload is needed
                     if (new_pg_size < dst.page_size) {
                         // check if a table reload is already in progress
@@ -336,7 +336,7 @@ $(function() {
                     dst.input_index = input_index;
                     dst.input_name = name;
                     if (state.table !== undefined) {
-                        dst.page = state.table.page;
+                        dst.page = 1;
                         dataset_search_dialog.find('.search_results .active_filters')
                             .empty()
                             .append(state.table.filters)
@@ -432,8 +432,9 @@ $(function() {
         function showSearchDialog() {
             var $empty_input = $(this),
                 input_name = $empty_input.data('input-name'),
-                outgoing_input_name = dataset_search_dialog.fadeIn('fast').find('h2 em').text()
+                outgoing_input_name = dataset_search_dialog.find('h2 em').text()
             ;
+            $.fn.show.call(dataset_search_dialog);
 
             cellWidth = $empty_input.outerWidth();
 
