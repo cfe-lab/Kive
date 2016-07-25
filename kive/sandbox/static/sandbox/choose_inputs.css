@@ -76,7 +76,8 @@ html #inner_wrap {
     float: left;
     width: 12em; }
     .dataset-search-dlg .search_filters h4 {
-      margin-bottom: 0.5em; }
+      margin-bottom: 0.5em;
+      margin-top: 0.5em; }
     .dataset-search-dlg .search_filters select {
       display: block;
       width: 10em;
@@ -97,6 +98,10 @@ html #inner_wrap {
       vertical-align: bottom; }
     .dataset-search-dlg .search_results table tfoot td {
       text-align: center; }
+    .dataset-search-dlg .search_results table td {
+      padding: 0.35em; }
+      .dataset-search-dlg .search_results table td:first-child {
+        padding-left: 0; }
     .dataset-search-dlg .search_results table td.date {
       min-width: 5.5em; }
     .dataset-search-dlg .search_results table td.primary div {
