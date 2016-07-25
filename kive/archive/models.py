@@ -318,40 +318,40 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         By "ended" we mean Successful, Cancelled, Failed, or Quarantined.
         """
-        return self._runstate.pk in runstates.COMPLETE_STATE_PKS
+        return self._runstate_id in runstates.COMPLETE_STATE_PKS
 
     def is_pending(self):
-        return self._runstate.pk == runstates.PENDING_PK
+        return self._runstate_id == runstates.PENDING_PK
 
     def is_running(self):
-        return self._runstate.pk == runstates.RUNNING_PK
+        return self._runstate_id == runstates.RUNNING_PK
 
     def is_successful(self):
         """
         Checks if this Run is successful.
         """
-        return self._runstate.pk == runstates.SUCCESSFUL_PK
+        return self._runstate_id == runstates.SUCCESSFUL_PK
 
     def is_failed(self):
         """
         Checks if this Run is failed.
         """
-        return self._runstate.pk == runstates.FAILED_PK
+        return self._runstate_id == runstates.FAILED_PK
 
     def is_quarantined(self):
         """
         Checks if this Run is quarantined.
         """
-        return self._runstate.pk == runstates.QUARANTINED_PK
+        return self._runstate_id == runstates.QUARANTINED_PK
 
     def is_failing(self):
-        return self._runstate.pk == runstates.FAILING_PK
+        return self._runstate_id == runstates.FAILING_PK
 
     def is_cancelling(self):
-        return self._runstate.pk == runstates.CANCELLING_PK
+        return self._runstate_id == runstates.CANCELLING_PK
 
     def is_cancelled(self):
-        return self._runstate.pk == runstates.CANCELLED_PK
+        return self._runstate_id == runstates.CANCELLED_PK
 
     def get_state_name(self):
         return self._runstate.name
@@ -1032,43 +1032,43 @@ class RunComponent(stopwatch.models.Stopwatch):
         """
         True if RunComponent is pending; False otherwise.
         """
-        return self._runcomponentstate.pk == runcomponentstates.PENDING_PK
+        return self._runcomponentstate_id == runcomponentstates.PENDING_PK
 
     def is_running(self):
         """
         True if RunComponent is running; False otherwise.
         """
-        return self._runcomponentstate.pk == runcomponentstates.RUNNING_PK
+        return self._runcomponentstate_id == runcomponentstates.RUNNING_PK
 
     def is_successful(self):
         """
         True if RunComponent is successful; False otherwise.
         """
-        return self._runcomponentstate.pk == runcomponentstates.SUCCESSFUL_PK
+        return self._runcomponentstate_id == runcomponentstates.SUCCESSFUL_PK
 
     def is_cancelled(self):
         """
         True if RunComponent is cancelled; False otherwise.
         """
-        return self._runcomponentstate.pk == runcomponentstates.CANCELLED_PK
+        return self._runcomponentstate_id == runcomponentstates.CANCELLED_PK
 
     def is_failed(self):
         """
         True if RunComponent is failed; False otherwise.
         """
-        return self._runcomponentstate.pk == runcomponentstates.FAILED_PK
+        return self._runcomponentstate_id == runcomponentstates.FAILED_PK
 
     def is_quarantined(self):
         """
         True if RunComponent is quarantined; False otherwise.
         """
-        return self._runcomponentstate.pk == runcomponentstates.QUARANTINED_PK
+        return self._runcomponentstate_id == runcomponentstates.QUARANTINED_PK
 
     def is_complete(self):
         """
         True if this RunComponent is complete; false otherwise.
         """
-        return self._runcomponentstate.pk in runcomponentstates.COMPLETE_STATE_PKS
+        return self._runcomponentstate_id in runcomponentstates.COMPLETE_STATE_PKS
 
     def get_state_name(self):
         return self._runcomponentstate.name

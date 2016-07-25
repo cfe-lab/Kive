@@ -221,7 +221,8 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
                                      'runsteps__pipelinestep__transformation__pipeline',
                                      'pipeline__outcables',
                                      'runoutputcables__pipelineoutputcable',
-                                     'pipeline__steps')
+                                     'pipeline__steps',
+                                     'inputs__dataset')
 
     @staticmethod
     def _add_filter(queryset, key, value):

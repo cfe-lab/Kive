@@ -148,10 +148,10 @@ class Command(BaseCommand):
 
     def test_ajax(self):
         factory = APIRequestFactory()
-        path = reverse('pipeline-list')
+        path = reverse('run-status')
         view, _, _ = resolve(path)
         request = factory.get(
-            path + '?is_granted=true&filters%5B0%5D%5Bkey%5D=pipelinefamily_id&filters%5B0%5D%5Bval%5D=1&page_size=25')
+            path + '?is_granted=true&page_size=25')
         force_authenticate(request, user=kive_user())
         response = view(request).render()
         data = response.render().data
