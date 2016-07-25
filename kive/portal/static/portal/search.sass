@@ -1,0 +1,172 @@
+$submit_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRFREVJBAYL7Ozso6SmzM3Ob3BzgYKE////8GOoMQAAAAh0Uk5T/////////wDeg71ZAAAAaklEQVR42lSO0RbAMARDo6j//+ORtDubF1wRUFUOM+xVDNTqlhEHzDj3UGrg3U81mQDKVSlJS1MgzFxgC6wD3hXXHaQGI5BpF5YRbscMY3ZjE1TwVUAa7oV78JEm58R9zfILSH6gST4CDAA1OgRo8O828AAAAABJRU5ErkJggg=='
+$gear_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRF////xsbGu7u74+Pj6enp9PT0qKiorq6u7VtU0wAAAFpJREFUeNpkT0kOADEIUlH7/x+PdEszcmgJuCEyEWO4XBTVTJ2EpqVZFuq1oJ8PZg1tBZRFsgXwxxJ8zSPIXNiJvY28C78W9KF9bTusnX7CVbnHDRx54n8CDAB7ZwLNNKLfPAAAAABJRU5ErkJggg=='
+
+=submit-ctrl
+  background-repeat: no-repeat
+  background-position: 3px 3px
+  text-indent: -999em
+  overflow: hidden
+  font-size: 1.5em
+  margin: .5em 0
+=submit-btn
+  display: block
+  background-position: .6em 4px
+  background-image: url($submit_icon)
+=advanced-ctrl-btn
+  cursor: pointer
+  width: 24px
+  margin: 0
+  padding: 0
+  box-shadow: none
+  background-color: transparent
+  border-radius: 0
+  border: 0
+=offset-2px
+  position: relative
+  top: 2px
+
+.filter_ctrl
+  font-size: 0.8em
+  margin-bottom: .5em
+  float: left
+  select
+    margin-top: -1px
+    width: calc(100% - 9em)
+  h4
+    margin: .25em 0 .5em
+  input[type='text']
+    margin: .5em 1.5em .5em 0
+    width: 12em
+    display: block
+  input[type='submit']
+    +submit-ctrl
+    +submit-btn
+  input.ctrl
+    +submit-ctrl
+  .short-filter input
+    display: inline
+
+.dataset-search-dlg input
+  &[type='submit']
+    +submit-ctrl
+    +submit-btn
+  &.ctrl
+    +submit-ctrl
+
+a.remove
+  padding: .5em 0 .5em .5em
+  font-weight: bold
+  cursor: pointer
+  &:hover
+    color: #00f
+
+.short-filter input
+  /* Remove button padding in FF */
+  box-sizing: border-box
+  &::-moz-focus-inner
+    border: 0
+    padding: 0
+    margin: 0
+  &[type='submit']
+    +offset-2px
+    border: 1px solid #ccc
+    border-radius: 0 1em 1em 0
+    width: calc(16px + 1.1em)
+    background-position: .5em 4px
+    margin: 0 .5em 0 0
+  &[type='text']
+    width: 15.6em
+    margin: 0
+    border: 1px solid #ccc
+    background: #fff
+    padding: 4px
+    margin-right: -25px
+    line-height: 16px
+  &.advanced.ctrl
+    +advanced-ctrl-btn
+    +offset-2px
+    background-image: url($gear_icon)
+
+.filter
+  display: inline
+  white-space: nowrap
+  background-color: #eef4f4
+  border-radius: 15px
+  padding: .25em .8em
+  margin-right: .5em
+  font-size: .8em
+  .logic_gate
+    font-size: .8em
+    font-weight: bold
+    text-transform: uppercase
+  .field
+    @extend .logic_gate
+    color: rgba(0,0,0,.7)
+
+.results
+  padding: 0 0 1em
+  clear: left
+  table
+    border-collapse: collapse
+    min-width: 33%
+    caption
+      padding: .25em .5em
+      color: #bbb
+    tr
+      th
+        padding: .25em .5em
+        text-align: center
+        background-color: #eee
+        border-right: 1px solid #fff
+        &:last-child
+          border-right-width: 0
+      td
+        border: 1px solid #eee
+        background-color: #fff
+        border-width: 1px 0
+        padding: .25em .5em
+        vertical-align: middle
+        font-size: .9em
+        white-space: nowrap
+        max-width: none
+        &:first-child
+          padding-left: .5em
+      &:hover td
+        background-color: #ebf6fd
+      &.selected
+        &:hover td, td
+          background-color: #c7e6fa
+        select:focus
+          background-color: #fff
+      select
+        border: 0
+        margin: -3px
+        padding: 0
+        width: 100%
+        box-sizing: border-box
+        background-color: transparent
+      &:not(.selected) select
+        background-image: none
+
+.active_filters
+  padding: .2em 0 .75em
+  &:empty
+    display: none
+.advanced
+  .filter_ctrl
+    width: 14.8em
+    margin: 0 1em 0 0
+  .results
+    clear: none
+.advanced-filter
+  background-color: #fff
+  padding: .5em 0 0 .5em
+  border: 1px solid #ddd
+  display: none
+  .close.ctrl
+    +advanced-ctrl-btn
+    float: right
+    margin: 0 .5em
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRF////8tKmBAQLAEWd0vT/yZ9v6P//udP0gGzkJgAAADdJREFUeNq0TTkOACAMopTW//9YN8XVSMIA4QC+oQTE2DqYWsTpkNnWIYU7Idto36j2l0dMAQYAOMUAcmo6uwMAAAAASUVORK5CYII=')
+.dev_results
+  clear: left
