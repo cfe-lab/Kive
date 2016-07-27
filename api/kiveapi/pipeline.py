@@ -81,6 +81,7 @@ class PipelineFamily(object):
 
     def __init__(self, obj):
         try:
+            self.details = obj
             self.family_id = obj['id']
             self.name = obj['name']
             self.pipelines = [Pipeline(p, self.family_id) for p in obj['members']]

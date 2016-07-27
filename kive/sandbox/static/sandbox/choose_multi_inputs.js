@@ -702,12 +702,12 @@ $(function() {
         var focus_filter = $('.filter.focus'),
             filter_key = focus_filter.data('key'),
             filter_value = focus_filter.find('.value').text() || undefined,
-            right_key = e.keyCode == 39,
-            left_key = e.keyCode == 37,
-            backspace = e.keyCode == 8,
-            del = e.keyCode == 46,
-            esc = e.keyCode == 27,
-            tab = e.keyCode == 9,
+            right_key = e.keyCode === 39,
+            left_key = e.keyCode === 37,
+            backspace = e.keyCode === 8,
+            del = e.keyCode === 46,
+            esc = e.keyCode === 27,
+            tab = e.keyCode === 9,
             meaningful_key_pressed = right_key || left_key || backspace || del || esc || tab,
             next_el, prev_el
         ;
@@ -746,12 +746,12 @@ $(function() {
     };
     var searchInputKeyHandler = function(e) {
         var last_filter;
-        if (this.selectionStart == 0) {
+        if (this.selectionStart === 0) {
             last_filter = $('.active_filters .filter:last-child');
-            if (e.keyCode == 37) {// left
+            if (e.keyCode === 37) {// left
                 $(this).blur();
                 last_filter.addClass('focus');
-            } else if (e.keyCode == 8) {// backspace
+            } else if (e.keyCode === 8) {// backspace
                 dataset_search_table.filterSet.remove(
                     last_filter.data('key'),
                     last_filter.find('.value').text() || undefined

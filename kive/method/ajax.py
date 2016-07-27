@@ -15,7 +15,9 @@ from archive.views import _build_download_response
 from portal.views import admin_check
 
 
-class CodeResourceViewSet(RemovableModelViewSet, SearchableModelMixin):
+class CodeResourceViewSet(CleanCreateModelMixin,
+                          RemovableModelViewSet,
+                          SearchableModelMixin):
     """CodeResources define the code used in putting together Methods.
 
     Query parameters:
@@ -151,7 +153,9 @@ class CodeResourceRevisionViewSet(CleanCreateModelMixin, RemovableModelViewSet,
         raise APIException('Unknown filter key: {}'.format(key))
 
 
-class MethodFamilyViewSet(RemovableModelViewSet, SearchableModelMixin):
+class MethodFamilyViewSet(CleanCreateModelMixin,
+                          RemovableModelViewSet,
+                          SearchableModelMixin):
     """MethodFamilies are collections of Methods grouped by function.
 
     Query parameters:
