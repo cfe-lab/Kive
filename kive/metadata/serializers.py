@@ -1,10 +1,13 @@
 from rest_framework import serializers
+
+from django.contrib.auth.models import User, Group
+
 from kive.serializers import AccessControlSerializer
 from metadata.models import CompoundDatatype, Datatype, CompoundDatatypeMember,\
     AccessControl
 
 
-class DatatypeSerializer(AccessControlSerializer. serializers.ModelSerializer):
+class DatatypeSerializer(AccessControlSerializer, serializers.ModelSerializer):
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='datatype-removal-plan')
     restricts = serializers.StringRelatedField(many=True)
@@ -26,10 +29,22 @@ class DatatypeSerializer(AccessControlSerializer. serializers.ModelSerializer):
         )
 
 
+class CompoundDatatypeMemberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CompoundDatatypeMember
+        fields = (
+            "datatype",
+            "column_name",
+            "column_idx",
+            "blankable"
+        )
+
+
 class CompoundDatatypeSerializer(AccessControlSerializer, serializers.ModelSerializer):
     representation = serializers.SerializerMethodField()
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='compounddatatype-removal-plan')
+    members = CompoundDatatypeMemberSerializer(many=True, required=False)
 
     class Meta:
         model = CompoundDatatype
@@ -43,7 +58,7 @@ class CompoundDatatypeSerializer(AccessControlSerializer, serializers.ModelSeria
             'removal_plan',
             'absolute_url',
             'name',
-            'CDTMs'
+            'members'
         )
 
     def get_representation(self, obj):
@@ -54,17 +69,18 @@ class CompoundDatatypeSerializer(AccessControlSerializer, serializers.ModelSeria
         """
         Check that the indices and permissions are coherent.
         """
-        indices = sorted([x["column_idx"] for x in data["CDTMs"]])
+        members = data.get("members", [])
+        indices = sorted([x["column_idx"] for x in members])
         if indices != range(1, len(indices) + 1):
             raise serializers.ValidationError("Column indices must be consecutive starting from 1")
 
         errors = []
-        column_dts = [x["datatype"] for x in data["CDTMs"]]
+        column_dts = [x["datatype"] for x in members]
         prohibited_users, prohibited_groups = AccessControl.validate_restrict_access_raw(
             data["user"],
-            data["users_allowed"],
-            data["groups_allowed"],
-            [column_dts]
+            data.get("users_allowed", User.objects.none()),
+            data.get("groups_allowed", Group.objects.none()),
+            column_dts
         )
 
         errors.extend(["User {} cannot be granted access".format(x) for x in prohibited_users])
@@ -79,7 +95,7 @@ class CompoundDatatypeSerializer(AccessControlSerializer, serializers.ModelSeria
         """
         Create a CompoundDatatype from validated data.
         """
-        member_dictionaries = validated_data.pop("CDTMs", [])
+        member_dictionaries = validated_data.pop("members", [])
         users_allowed = validated_data.pop("users_allowed", [])
         groups_allowed = validated_data.pop("groups_allowed", [])
 
@@ -89,23 +105,7 @@ class CompoundDatatypeSerializer(AccessControlSerializer, serializers.ModelSeria
         cdt.groups_allowed.add(*groups_allowed)
 
         for member_dict in member_dictionaries:
-            member_dict.pop("compounddatatype", None)
             member = CompoundDatatypeMember(compounddatatype=cdt, **member_dict)
             member.save()
 
         return cdt
-
-
-class CompoundDatatypeMemberSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CompoundDatatypeMember
-        fields = (
-            "compounddatatype",
-            "datatype",
-            "column_name",
-            "column_idx",
-            "blankable"
-        )
-        extra_kwargs = {
-            "compounddatatype": {"required": False}
-        }

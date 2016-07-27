@@ -14,8 +14,10 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 
 from metadata.models import BasicConstraint, CompoundDatatype, Datatype, kive_user, everyone_group
 from librarian.models import Dataset
+from metadata.serializers import CompoundDatatypeSerializer
 from constants import CDTs, datatypes, groups
 import kive.testing_utils as tools
+from kive.tests import DuckContext
 
 
 samplecode_path = "../samplecode"
@@ -2550,6 +2552,49 @@ class CompoundDatatypeApiTests(TestCase):
         response = self.removal_view(request, pk=self.detail_pk)
         self.assertEquals(response.data['CompoundDatatypes'], 0)
 
+    def test_create(self):
+        """
+        Test creation of a CompoundDatatype using the API.
+        """
+        self.string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
+        cdt_dict = {
+            "name": "GoodCDT",
+            "members": [
+                {
+                    "column_idx": 1,
+                    "column_name": "col1",
+                    "datatype": self.string_dt.pk
+                },
+                {
+                    "column_idx": 2,
+                    "column_name": "col2",
+                    "datatype": self.string_dt.pk
+                }
+            ],
+            "groups_allowed": [everyone_group().name]
+        }
+
+        request = self.factory.post(self.list_path, cdt_dict, format="json")
+        force_authenticate(request, user=self.kive_user)
+        self.list_view(request)
+
+        # Probe the resulting method.
+        cdt = CompoundDatatype.objects.get(name=cdt_dict["name"])
+
+        self.assertEqual(cdt.name, cdt_dict["name"])
+        self.assertEqual(cdt.user, kive_user())
+        self.assertSetEqual(set(cdt.groups_allowed.all()), {everyone_group()})
+        self.assertFalse(cdt.users_allowed.exists())
+
+        self.assertEqual(cdt.members.count(), 2)
+        col1 = cdt.members.get(column_idx=1)
+        self.assertEqual(col1.column_name, cdt_dict["members"][0]["column_name"])
+        self.assertEqual(col1.datatype, self.string_dt)
+
+        col2 = cdt.members.get(column_idx=2)
+        self.assertEqual(col2.column_name, cdt_dict["members"][1]["column_name"])
+        self.assertEqual(col2.datatype, self.string_dt)
+
 
 class AccessControlTests(TestCase):
     """
@@ -2648,3 +2693,218 @@ class AccessControlTests(TestCase):
                                                                groups_qs=self.groups_to_intersect)
         self.assertSetEqual(set(self.users_to_intersect), set(users_qs))
         self.assertSetEqual(set(self.groups_to_intersect), set(groups_qs))
+
+
+class CompoundDatatypeSerializerTests(TestCase):
+
+    def setUp(self):
+        self.string_dt = Datatype.objects.get(pk=datatypes.STR_PK)
+        self.dt_no_permissions = Datatype(
+            user=kive_user(),
+            name="DatatypeNoPermissions",
+            description="Datatype with no added permissions"
+        )
+        self.dt_no_permissions.save()
+        self.dt_no_permissions.restricts.add(self.string_dt)
+
+        self.dt_developer_permissions = Datatype(
+            user=kive_user(),
+            name="DatatypeDeveloperPermissions",
+            description="Datatype that developers can access"
+        )
+        self.dt_developer_permissions.save()
+        self.dt_developer_permissions.restricts.add(self.string_dt)
+        self.dt_developer_permissions.groups_allowed.add(
+            Group.objects.get(pk=groups.DEVELOPERS_PK)
+        )
+
+        self.kive_context = DuckContext(user=kive_user())
+
+    def test_validate_empty(self):
+        """
+        Testing validation of a CDT with no members.
+        """
+        cdt_dict = {
+            "name": "EmptyCDT"
+        }
+        cdts = CompoundDatatypeSerializer(data=cdt_dict, context=self.kive_context)
+        self.assertTrue(cdts.is_valid())
+
+    def test_validate_no_permissions(self):
+        """
+        Testing validation of a good CDT serialization with no permissions granted.
+        """
+        cdt_dict = {
+            "name": "GoodCDT",
+            "members": [
+                {
+                    "column_idx": 1,
+                    "column_name": "col1",
+                    "datatype": self.string_dt.pk
+                },
+                {
+                    "column_idx": 2,
+                    "column_name": "col2",
+                    "datatype": self.string_dt.pk
+                }
+            ]
+        }
+        cdts = CompoundDatatypeSerializer(data=cdt_dict, context=self.kive_context)
+        self.assertTrue(cdts.is_valid())
+
+    def test_validate_good_permissions(self):
+        """
+        Testing validation of a good CDT serialization with some permissions granted.
+        """
+        cdt_dict = {
+            "name": "GoodCDT",
+            "members": [
+                {
+                    "column_idx": 1,
+                    "column_name": "col1",
+                    "datatype": self.string_dt.pk
+                },
+                {
+                    "column_idx": 2,
+                    "column_name": "col2",
+                    "datatype": self.string_dt.pk
+                }
+            ],
+            "users_allowed": [kive_user().username],
+            "groups_allowed": [everyone_group().name]
+        }
+        cdts = CompoundDatatypeSerializer(data=cdt_dict, context=self.kive_context)
+        self.assertTrue(cdts.is_valid())
+
+    def test_validate_bad_indices(self):
+        """
+        Validation fails if the indices are not consecutive from 1.
+        """
+        cdt_dict = {
+            "name": "BadIndicesCDT",
+            "members": [
+                {
+                    "column_idx": 1,
+                    "column_name": "col1",
+                    "datatype": self.string_dt.pk
+                },
+                {
+                    "column_idx": 3,
+                    "column_name": "col3bad",
+                    "datatype": self.string_dt.pk
+                }
+            ]
+        }
+        cdts = CompoundDatatypeSerializer(data=cdt_dict, context=self.kive_context)
+        self.assertFalse(cdts.is_valid())
+        self.assertListEqual(
+            cdts.errors["non_field_errors"],
+            ["Column indices must be consecutive starting from 1"]
+        )
+
+    def test_validate_bad_permissions(self):
+        """
+        Validation fails if the CDT permissions exceed those of its members.
+        """
+        new_group = Group(name="Interlopers")
+        new_group.save()
+
+        new_user = User.objects.create_user("NewUser", password="foo")
+
+        # A Datatype that new_group can access but new_user can't.
+        dt_no_new_user = Datatype(
+            user=kive_user(),
+            name="DatatypeNoNewUser",
+            description="No new users allowed"
+        )
+        dt_no_new_user.save()
+        dt_no_new_user.restricts.add(self.string_dt)
+        dt_no_new_user.groups_allowed.add(new_group)
+
+        # A Datatype that new_user can access but new_group can't.
+        dt_no_new_group = Datatype(
+            user=kive_user(),
+            name="DatatypeNoNewGroup",
+            description="No new groups allowed"
+        )
+        dt_no_new_group.save()
+        dt_no_new_group.restricts.add(self.string_dt)
+        dt_no_new_group.users_allowed.add(new_user)
+
+        cdt_dict = {
+            "name": "BadPermissionsCDT",
+            "members": [
+                {
+                    "column_idx": 1,
+                    "column_name": "col1",
+                    "datatype": self.dt_no_permissions.pk
+                },
+                {
+                    "column_idx": 2,
+                    "column_name": "col2",
+                    "datatype": self.string_dt.pk
+                },
+                {
+                    "column_idx": 3,
+                    "column_name": "col3",
+                    "datatype": dt_no_new_user.pk
+                },
+                {
+                    "column_idx": 4,
+                    "column_name": "col4",
+                    "datatype": dt_no_new_group.pk
+                }
+            ],
+            "users_allowed": [new_user.username],
+            "groups_allowed": [new_group.name]
+        }
+
+        cdts = CompoundDatatypeSerializer(data=cdt_dict, context=self.kive_context)
+        self.assertFalse(cdts.is_valid())
+        self.assertListEqual(
+            cdts.errors["non_field_errors"],
+            [
+                "User {} cannot be granted access".format(new_user.username),
+                "Group {} cannot be granted access".format(new_group.name)
+            ]
+        )
+
+    def test_create(self):
+        """
+        Test creation of a CompoundDatatype via deserialization.
+        """
+        cdt_dict = {
+            "name": "GoodCDT",
+            "members": [
+                {
+                    "column_idx": 1,
+                    "column_name": "col1",
+                    "datatype": self.string_dt.pk
+                },
+                {
+                    "column_idx": 2,
+                    "column_name": "col2",
+                    "datatype": self.string_dt.pk
+                }
+            ],
+            "groups_allowed": [everyone_group().name]
+        }
+
+        cdts = CompoundDatatypeSerializer(data=cdt_dict, context=self.kive_context)
+        self.assertTrue(cdts.is_valid())
+        cdt = cdts.save()
+
+        self.assertEqual(cdt.name, cdt_dict["name"])
+        self.assertEqual(cdt.user, kive_user())
+        self.assertSetEqual(set(cdt.groups_allowed.all()), {everyone_group()})
+        self.assertFalse(cdt.users_allowed.exists())
+
+        self.assertEqual(cdt.members.count(), 2)
+        col1 = cdt.members.get(column_idx=1)
+        self.assertEqual(col1.column_name, cdt_dict["members"][0]["column_name"])
+        self.assertEqual(col1.datatype, self.string_dt)
+
+        col2 = cdt.members.get(column_idx=2)
+        self.assertEqual(col2.column_name, cdt_dict["members"][1]["column_name"])
+        self.assertEqual(col2.datatype, self.string_dt)
+

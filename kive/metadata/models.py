@@ -357,7 +357,7 @@ def who_cannot_access(user, users_allowed, groups_allowed, acs):
         return set(), set()
 
     users_difference = all_users_allowed.difference(ac_users_allowed)
-    groups_difference = set(groups_allowed.all()).difference(ac_groups_allowed)
+    groups_difference = set(groups_allowed).difference(ac_groups_allowed)
     return users_difference, groups_difference
 
 
@@ -434,7 +434,7 @@ class AccessControl(models.Model):
         """
         # Trivial case: no objects to restrict.
         if len(acs) == 0:
-            return
+            return set(), set()
 
         extra_users, extra_groups = who_cannot_access(user, users_allowed, groups_allowed, acs)
         if len(extra_users) > 0:
