@@ -76,6 +76,8 @@ class CodeResourceViewSet(CleanCreateModelMixin,
                                    Q(filename__icontains=value))
         if key == 'name':
             return queryset.filter(name__icontains=value)
+        if key == 'filename':
+            return queryset.filter(filename__icontains=value)
         if key == 'description':
             return queryset.filter(description__icontains=value)
         if key == "user":

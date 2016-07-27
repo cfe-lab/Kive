@@ -85,6 +85,25 @@ class KiveAPI(Session):
             url = self.server_url + url
         return url
 
+    def _format_field_errors(self, fields, context=None):
+        if context is None:
+            context = []
+        messages = []
+        for field, errors in fields.iteritems():
+            context.append(field)
+            if isinstance(errors, list):
+                for error in errors:
+                    if isinstance(error, dict):
+                        messages.extend(self._format_field_errors(error,
+                                                                  context))
+                    else:
+                        messages.append('{}: {}'.format('.'.join(context),
+                                                        error))
+            else:
+                messages.append('{}: {}'.format('.'.join(context),
+                                                errors))
+        return messages
+
     def _validate_response(self, response, is_json=True):
         try:
             if not response.ok:
@@ -109,18 +128,7 @@ class KiveAPI(Session):
                 if response.status_code in (requests.codes['bad_request'],
                                             requests.codes['conflict']):
                     if is_json:
-                        json_fields = json_data.iteritems()
-                        field_error_messages = []
-                        for field, errors in json_fields:
-                            curr_msg = "{}: ".format(field)
-                            # errors is either a list of strings or a string, so we can't use join
-                            # all the time.
-                            if isinstance(errors, list):
-                                curr_msg += ', '.join(errors)
-                            else:
-                                curr_msg += errors
-                            field_error_messages.append(curr_msg)
-
+                        field_error_messages = self._format_field_errors(json_data)
                         message += ': '
                         message += '; '.join(field_error_messages)
                     raise KiveMalformedDataException(message)
