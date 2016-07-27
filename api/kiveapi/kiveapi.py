@@ -268,6 +268,35 @@ class KiveAPI(Session):
         data = self.get('@api_get_cdt', context={'cdt-id': cdt_id}).json()
         return CompoundDatatype(data)
 
+    def create_cdt(self, name, users=None, groups=None, members=None):
+        """
+        Create a CompoundDatatype.
+
+        :param name: The name of this CompoundDatatype
+        :param users: None or a list of user names that should be
+            allowed to access the CDT
+        :param groups: None or a list of group names that should be
+            allowed to access the CDT
+        :param members: A list of dictionaries defining the columns of the CDT,
+            each containing fields:
+             - "column_idx": an integer, 1 or greater
+             - "column_name": column header
+             - "datatype": primary key of the Datatype for this column
+             - "blankable": (optional) if True, this column accepts blank entries
+        :return: CompoundDatatype object
+        """
+        users_allowed = users or []
+        groups_allowed = groups or []
+
+        cdt_dict = {
+            "name": name,
+            "users_allowed": users_allowed,
+            "groups_allowed": groups_allowed,
+            "members": members
+        }
+        cdt = self.post("@api_get_cdts", json=cdt_dict, is_json=True).json()
+        return CompoundDatatype(cdt)
+
     def add_dataset(self, name, description, handle, cdt=None, users=None, groups=None,
                     externalfiledirectory=None, external_path=None):
         """
