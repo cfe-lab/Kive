@@ -745,9 +745,18 @@ $(function() {
         }
     };
     var searchInputKeyHandler = function(e) {
-        if (this.selectionStart == 0 && (e.keyCode == 37 || e.keyCode == 8)) {// left or backspace
-            $(this).blur();
-            $('.active_filters .filter:last-child').addClass('focus').focus();
+        var last_filter;
+        if (this.selectionStart == 0) {
+            last_filter = $('.active_filters .filter:last-child');
+            if (e.keyCode == 37) {// left
+                $(this).blur();
+                last_filter.addClass('focus');
+            } else if (e.keyCode == 8) {// backspace
+                dataset_search_table.filterSet.remove(
+                    last_filter.data('key'),
+                    last_filter.find('.value').text() || undefined
+                );
+            }
         }
         e.stopPropagation();
     };

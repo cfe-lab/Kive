@@ -91,7 +91,10 @@ html #inner_wrap
     .active_filters
       display: inline
       cursor: default
-      .filter 
+      .filter
+        &:last-child
+          margin-right: 0
+        +no-select
         display: inline-block
         white-space: normal
         font-size: 1em
