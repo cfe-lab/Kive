@@ -745,7 +745,7 @@ $(function() {
         }
     };
     var searchInputKeyHandler = function(e) {
-        if (this.selectionStart == 0 && (e.keyCode == 37 || e.keyCode == 8)) {// left or backspace
+        if (this.selectionStart === 0 && (e.keyCode === 37 || e.keyCode === 8)) {// left or backspace
             $(this).blur();
             $('.active_filters .filter:last-child').addClass('focus').focus();
         }
