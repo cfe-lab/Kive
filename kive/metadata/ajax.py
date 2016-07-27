@@ -9,7 +9,7 @@ from rest_framework import permissions
 from rest_framework.exceptions import APIException
 
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, StandardPagination, \
-    SearchableModelMixin
+    SearchableModelMixin, CleanCreateModelMixin
 from metadata.models import Datatype, get_builtin_types, CompoundDatatype, CompoundDatatypeMember
 from metadata.serializers import DatatypeSerializer, CompoundDatatypeSerializer
 
@@ -78,7 +78,9 @@ class DatatypeViewSet(RemovableModelViewSet, SearchableModelMixin):
         raise APIException('Unknown filter key: {}'.format(key))
 
 
-class CompoundDatatypeViewSet(RemovableModelViewSet, SearchableModelMixin):
+class CompoundDatatypeViewSet(RemovableModelViewSet,
+                              CleanCreateModelMixin,
+                              SearchableModelMixin):
     """Compound datatypes are used to define a CSV file format.
 
     Query parameters for the list view:

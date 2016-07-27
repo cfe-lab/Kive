@@ -427,41 +427,54 @@ class AccessControl(models.Model):
         """
         return who_cannot_access(self.user, self.users_allowed.all(), self.groups_allowed.all(), acs)
 
-    def validate_restrict_access(self, acs):
+    @staticmethod
+    def validate_restrict_access_raw(user, users_allowed, groups_allowed, acs):
         """
-        Checks whether access is restricted to those that can access all of the specified objects.
+        Checks that the specified permissions don't exceed those on the specified objects.
         """
         # Trivial case: no objects to restrict.
         if len(acs) == 0:
             return
 
+        extra_users, extra_groups = who_cannot_access(user, users_allowed, groups_allowed, acs)
+        if len(extra_users) > 0:
+            if len(extra_users) == 1 and user in extra_users:
+                # If this user has access via the groups allowed on all of the elements of acs,
+                # then we're OK.
+                if all([x.can_be_accessed(user) for x in acs]):
+                    extra_users = []
+
+        return extra_users, extra_groups
+
+    def validate_restrict_access(self, acs):
+        """
+        Checks whether access is restricted to those that can access all of the specified objects.
+        """
         # If this instance is not saved, then bail as we can't access users_allowed or groups_allowed.
         if not self.pk:
             return
 
-        extra_users, extra_groups = self.extra_users_groups(acs)
+        bad_users, bad_groups = AccessControl.validate_restrict_access_raw(
+            self.user,
+            self.users_allowed.all(),
+            self.groups_allowed.all(),
+            acs
+        )
+
         users_error = None
         groups_error = None
-        if len(extra_users) > 0:
-            access_OK = False
-            if len(extra_users) == 1 and self.user in extra_users:
-                # If this user has access via the groups allowed on all of the elements of acs,
-                # then we're OK.
-                if all([x.can_be_accessed(self.user) for x in acs]):
-                    access_OK = True
+        if len(bad_users) > 0:
+            users_error = ValidationError(
+                'User(s) %(users_str)s cannot be granted access',
+                code="extra_users",
+                params={"users_str": ", ".join([str(x) for x in bad_users])}
+            )
 
-            # FIXME sometime in the future this stuff should be converted to use gettext for translation!
-            if not access_OK:
-                users_error = ValidationError(
-                    'User(s) %(users_str)s cannot be granted access',
-                    code="extra_users",
-                    params={"users_str": ", ".join([str(x) for x in extra_users])}
-                )
-        if len(extra_groups) > 0:
+        if len(bad_groups) > 0:
             groups_error = ValidationError(
                 'Group(s) %(groups_str)s cannot be granted access',
                 code="extra_groups",
-                params={"groups_str": ", ".join([str(x) for x in extra_groups])}
+                params={"groups_str": ", ".join([str(x) for x in bad_groups])}
             )
 
         if users_error is not None and groups_error is not None:
