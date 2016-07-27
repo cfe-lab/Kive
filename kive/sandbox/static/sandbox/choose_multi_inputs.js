@@ -698,6 +698,59 @@ $(function() {
             );
         };
     })();
+    var filterKeyHandler = function(e) {
+        var focus_filter = $('.filter.focus'),
+            filter_key = focus_filter.data('key'),
+            filter_value = focus_filter.find('.value').text() || undefined,
+            right_key = e.keyCode == 39,
+            left_key = e.keyCode == 37,
+            backspace = e.keyCode == 8,
+            del = e.keyCode == 46,
+            esc = e.keyCode == 27,
+            tab = e.keyCode == 9,
+            meaningful_key_pressed = right_key || left_key || backspace || del || esc || tab,
+            next_el, prev_el
+        ;
+
+        if (focus_filter.length > 1) {
+            focus_filter.not(focus_filter.eq(0)).removeClass('.focus');
+            focus_filter = focus_filter.eq(0);
+        }
+        if (focus_filter.length && meaningful_key_pressed) {
+            focus_filter.removeClass('focus');
+            if (left_key || backspace) {
+                prev_el = focus_filter.prev();
+                (prev_el.length ? prev_el : focus_filter).addClass('focus');
+            } else if (right_key || del || tab) {
+                next_el = focus_filter.next();
+                if (!tab && next_el.length) {
+                    next_el.addClass('focus');
+                } else {
+                    $('.search_form input[type="text"]').focus();
+                    e.preventDefault();
+                }
+            }
+            if (backspace || del) {
+                dataset_search_table.filterSet.remove(filter_key, filter_value);
+                $('.search_filters select').each(function() {
+                    var $this = $(this);
+                    if ($this.data('filter-name') == filter_key) {
+                        $this.val("");
+                        return false;
+                    }
+                });
+                e.stopPropagation();
+                e.preventDefault();
+            }
+        }
+    };
+    var searchInputKeyHandler = function(e) {
+        if (this.selectionStart == 0 && (e.keyCode == 37 || e.keyCode == 8)) {// left or backspace
+            $(this).blur();
+            $('.active_filters .filter:last-child').addClass('focus').focus();
+        }
+        e.stopPropagation();
+    };
     var mainSubmitHandler = function(e) {
         e.preventDefault();
         var serialized_data = serialize();
@@ -990,29 +1043,38 @@ $(function() {
         if (permissions.widget.is(':visible')) {
             permissions.widget.toggle();
         }
+        $('.filter.focus').removeClass('focus');
     };
 
     $.getJSON('/api/datasets/?format=json', initUsersList);
 
-    $(document)            .scroll(   dataset_search_dialog.scrollButton                  )
-                            .click(   unfocusAll                                          );
-    $(window)              .resize(   dataset_search_dialog.scrollButton                  )
-                           .resize(   permissions.widget.autoPosition                     )
-                           .resize(   function() { dataset_search_table.checkOverflow(); })
-                           .resize(   function() { above_box.adjustSpacing();            })
-                           .scroll(   function(e) { dataset_input_table.scrollHeader(e); });
-    set_dataset.btn         .click(   addSelectedDatasetsToInput                          );
-    set_dataset.options_btn .click(   set_dataset.options_menu.show                       )
-                       .mouseleave(   set_dataset.options_menu.hide                       );
-    permissions.ctrl        .click(   permissions.widget.toggle                           )
-                            .click(   stopProp                                            );
-    permissions.widget      .click(   stopProp                                            );
-    above_box               .click(   stopProp                                            )
-        .find('.close.ctrl').click(   dataset_search_dialog.hide                          );
-    $('#date_added')       .change(   dateAddedFilterHandler                              );
-    $('#creator')          .change(   creatorFilterHandler                                );
-    $('#id_name')           .keyup(   setRunNamesPrefix                                   );
-    $('#run_pipeline')     .submit(   mainSubmitHandler                                   );
+    /**
+     * Event bindings
+     */
+    $(document)            .scroll ( dataset_search_dialog.scrollButton )
+                           .click  ( unfocusAll );
+    $(window)              .resize ( dataset_search_dialog.scrollButton )
+                           .resize ( permissions.widget.autoPosition )
+                           .resize ( function()  { dataset_search_table.checkOverflow(); })
+                           .resize ( function()  { above_box.adjustSpacing(); })
+                           .scroll ( function(e) { dataset_input_table.scrollHeader(e); });
+    body                   .keydown( filterKeyHandler );
+    set_dataset.btn        .click  ( addSelectedDatasetsToInput );
+    set_dataset.options_btn.click  ( set_dataset.options_menu.show )
+                        .mouseleave( set_dataset.options_menu.hide );
+    permissions.ctrl       .click  ( permissions.widget.toggle )
+                           .click  ( stopProp );
+    permissions.widget     .click  ( stopProp );
+    above_box              .click  ( stopProp )
+      .find('.close.ctrl') .click  ( dataset_search_dialog.hide );
+    $('#date_added')       .change ( dateAddedFilterHandler );
+    $('#creator')          .change ( creatorFilterHandler );
+    $('#id_name')          .keyup  ( setRunNamesPrefix );
+    $('#run_pipeline')     .submit ( mainSubmitHandler );
+
+    /**
+     * Delegated events
+     */
     below_box                 .on( 'click', 'input, textarea', stopProp                     );
     dataset_search_dialog     .on( 'submit','form',            submitDatasetSearch          )
       .find('.search_form').click(                             focusSearchField             );
@@ -1020,10 +1082,13 @@ $(function() {
                               .on( 'click', '.remove.ctrl',    removeDatasetFromInput       )
                               .on( 'click', '.select_dataset', dataset_search_dialog.show   );
     $('.search_results')      .on( 'click', 'tbody tr',        selectSearchResult           )
-                           .on( 'dblclick', 'tbody tr',        addSelectedDatasetsToInput   );
+                            .on('dblclick', 'tbody tr',        addSelectedDatasetsToInput   );
     set_dataset.options_menu  .on( 'click', 'li',              set_dataset.options_menu.choose );
+    $('.active_filters')      .on( 'click', '.filter',     function() { $(this).addClass('focus').siblings().removeClass('focus'); });
     $('#run_controls')        .on( 'click', '.add_run',    function() { dataset_input_table.addNewRunRow(); } )
                               .on( 'click', '.remove_run', function() { dataset_input_table.removeLastRunRow(); } );
+    $('.search_form input[type="text"]').keydown(searchInputKeyHandler)
+                           .focus( function() { $('.filter.focus').removeClass('focus'); });
 
     // Pack help text into an unobtrusive icon
     $('.helptext').each(function() {

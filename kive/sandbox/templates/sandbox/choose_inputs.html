@@ -47,10 +47,10 @@
 
             <div class="search_filters">
                 <h4>Filter results</h4>
-                <select name="creator" id="creator">
+                <select name="creator" id="creator" data-filter-name="user">
                     <option value="">Creator</option>
                 </select>
-                <select name="date_added" id="date_added">
+                <select name="date_added" id="date_added" data-filter-name="createdafter">
                     <option value="">Date Added</option>
                     <option value="day">Today</option>
                     <option value="week">This week</option>
@@ -62,9 +62,9 @@
                     <option value="t-7d">In the last week</option>
                     <option value="t-1m">In the last month</option>
                     <option value="t-1y">In the last year</option>
-                    <option value="custom" disabled>Custom...</option>
+                    <!-- <option value="custom" disabled>Custom...</option> -->
                 </select>
-                <select name="date_last_run" id="date_last_run">
+                <!-- <select name="date_last_run" id="date_last_run">
                     <option value="">Date Last Run</option>
                     <option value="day">Today</option>
                     <option value="week">This week</option>
@@ -77,7 +77,7 @@
                     <option value="t-1m">In the last month</option>
                     <option value="t-1y">In the last year</option>
                     <option value="custom" disabled>Custom...</option>
-                </select>
+                </select> -->
             </div>
 
             </form>
