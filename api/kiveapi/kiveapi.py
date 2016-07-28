@@ -102,6 +102,7 @@ class KiveAPI(Session):
             else:
                 messages.append('{}: {}'.format('.'.join(context),
                                                 errors))
+            context.pop()
         return messages
 
     def _validate_response(self, response, is_json=True):

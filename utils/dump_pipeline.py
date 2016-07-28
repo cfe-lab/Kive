@@ -108,6 +108,14 @@ def main():
         replace_structure(output_item, compound_datatypes)
     pipeline['outputs'].sort()
     dump['outputs'] = pipeline['outputs']
+    for outcable in pipeline['outcables']:
+        del outcable['pk']
+        del outcable['source']
+        if outcable['output_cdt']:
+            columns = compound_datatypes[outcable['output_cdt']]
+            outcable['output_cdt'] = columns
+    pipeline['outcables'].sort(key=itemgetter('output_idx'))
+    dump['outcables'] = pipeline['outcables']
     for step in pipeline['steps']:
         del step['x']
         del step['y']
