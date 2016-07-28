@@ -25,14 +25,19 @@ $(function() {
             dataset_search_dialog.find('table'),
             IS_USER_ADMIN,
             NaN, NaN,// these will be set later
-            dataset_search_dialog.find('.active_filters'),
+            dataset_search_dialog.find('.asf-active-filters'),
             dataset_search_dialog.find(".navigation_links")
+        ),
+        asf = new AjaxSearchFilter(
+            dataset_search_table,
+            dataset_search_dialog
         ),
         permissions = {
             widget: $("#permissions_widget"),
             ctrl: $("#permissions_ctrl")
         }
     ;
+    window.asf = asf;
 
     // some more vars
     scroll_content._top = scroll_content.css('top');
@@ -275,10 +280,6 @@ $(function() {
     var stopProp = function(e) {
         e.stopPropagation();
     };
-    var submitDatasetSearch = function(e) {
-        e.preventDefault();
-        dataset_search_table.filterSet.addFromForm(this);
-    };
 
     (function() {// extends dataset_search_dialog
         var dialog_state = {},
@@ -315,7 +316,7 @@ $(function() {
                         date_last_run: $('#date_last_run').val(),
                         table: {
                             page: dataset_search_table.page,
-                            filters: $('.search_results .active_filters', dlg).children().detach()
+                            filters: $('.asf-active-filters', dlg).children().detach()
                         }
                     };
                 }
@@ -337,7 +338,7 @@ $(function() {
                     dst.input_name = name;
                     if (state.table !== undefined) {
                         dst.page = 1;
-                        dataset_search_dialog.find('.search_results .active_filters')
+                        dataset_search_dialog.find('.asf-active-filters')
                             .empty()
                             .append(state.table.filters)
                         ;
@@ -698,68 +699,6 @@ $(function() {
             );
         };
     })();
-    var filterKeyHandler = function(e) {
-        var focus_filter = $('.filter.focus'),
-            filter_key = focus_filter.data('key'),
-            filter_value = focus_filter.find('.value').text() || undefined,
-            right_key = e.keyCode === 39,
-            left_key = e.keyCode === 37,
-            backspace = e.keyCode === 8,
-            del = e.keyCode === 46,
-            esc = e.keyCode === 27,
-            tab = e.keyCode === 9,
-            meaningful_key_pressed = right_key || left_key || backspace || del || esc || tab,
-            next_el, prev_el
-        ;
-
-        if (focus_filter.length > 1) {
-            focus_filter.not(focus_filter.eq(0)).removeClass('.focus');
-            focus_filter = focus_filter.eq(0);
-        }
-        if (focus_filter.length && meaningful_key_pressed) {
-            focus_filter.removeClass('focus');
-            if (left_key || backspace) {
-                prev_el = focus_filter.prev();
-                (prev_el.length ? prev_el : focus_filter).addClass('focus');
-            } else if (right_key || del || tab) {
-                next_el = focus_filter.next();
-                if (!tab && next_el.length) {
-                    next_el.addClass('focus');
-                } else {
-                    $('.search_form input[type="text"]').focus();
-                    e.preventDefault();
-                }
-            }
-            if (backspace || del) {
-                dataset_search_table.filterSet.remove(filter_key, filter_value);
-                $('.search_filters select').each(function() {
-                    var $this = $(this);
-                    if ($this.data('filter-name') == filter_key) {
-                        $this.val("");
-                        return false;
-                    }
-                });
-                e.stopPropagation();
-                e.preventDefault();
-            }
-        }
-    };
-    var searchInputKeyHandler = function(e) {
-        var last_filter;
-        if (this.selectionStart === 0) {
-            last_filter = $('.active_filters .filter:last-child');
-            if (e.keyCode === 37) {// left
-                $(this).blur();
-                last_filter.addClass('focus');
-            } else if (e.keyCode === 8) {// backspace
-                dataset_search_table.filterSet.remove(
-                    last_filter.data('key'),
-                    last_filter.find('.value').text() || undefined
-                );
-            }
-        }
-        e.stopPropagation();
-    };
     var mainSubmitHandler = function(e) {
         e.preventDefault();
         var serialized_data = serialize();
@@ -813,12 +752,6 @@ $(function() {
             };
         } else {
             return false;
-        }
-    };
-    var focusSearchField = function(e) {
-        // prevent this event from bubbling
-        if ( $(e.target).is('.search_form') ) {
-            $(this).find('input[type="text"]').trigger('focus');
         }
     };
     set_dataset.options_menu.show = function() {
@@ -1067,7 +1000,6 @@ $(function() {
                            .resize ( function()  { dataset_search_table.checkOverflow(); })
                            .resize ( function()  { above_box.adjustSpacing(); })
                            .scroll ( function(e) { dataset_input_table.scrollHeader(e); });
-    body                   .keydown( filterKeyHandler );
     set_dataset.btn        .click  ( addSelectedDatasetsToInput );
     set_dataset.options_btn.click  ( set_dataset.options_menu.show )
                         .mouseleave( set_dataset.options_menu.hide );
@@ -1085,82 +1017,14 @@ $(function() {
      * Delegated events
      */
     below_box                 .on( 'click', 'input, textarea', stopProp                     );
-    dataset_search_dialog     .on( 'submit','form',            submitDatasetSearch          )
-      .find('.search_form').click(                             focusSearchField             );
     dataset_input_table       .on( 'click', '.input-dataset',  toggleInputDatasetSelection  )
                               .on( 'click', '.remove.ctrl',    removeDatasetFromInput       )
                               .on( 'click', '.select_dataset', dataset_search_dialog.show   );
     $('.search_results')      .on( 'click', 'tbody tr',        selectSearchResult           )
                             .on('dblclick', 'tbody tr',        addSelectedDatasetsToInput   );
     set_dataset.options_menu  .on( 'click', 'li',              set_dataset.options_menu.choose );
-    $('.active_filters')      .on( 'click', '.filter',     function() { $(this).addClass('focus').siblings().removeClass('focus'); });
     $('#run_controls')        .on( 'click', '.add_run',    function() { dataset_input_table.addNewRunRow(); } )
                               .on( 'click', '.remove_run', function() { dataset_input_table.removeLastRunRow(); } );
-    $('.search_form input[type="text"]').keydown(searchInputKeyHandler)
-                           .focus( function() { $('.filter.focus').removeClass('focus'); });
-
-    // Pack help text into an unobtrusive icon
-    $('.helptext').each(function() {
-        var $this = $(this);
-        $this.wrapInner('<span class="fulltext">').prepend('<a rel="ctrl">?</a>');
-    });
-
-    $('a[rel="ctrl"]').on('click', function (e) {
-        var data = $(this).data(),
-            fulltext = data.fulltext,
-            left = '',
-            right = '',
-            top = '',
-            bottom = '';
-
-        if (e.pageX + data.width > document.body.scrollWidth) {
-            right = 0;
-        } else {
-            left = e.pageX;
-        }
-        if (e.pageY + data.height > document.body.scrollHeight) {
-            bottom = 0;
-        } else {
-            top = e.pageY;
-        }
-        fulltext.show()
-            .css({
-                top: top, 
-                left: left, 
-                right: right,
-                bottom: bottom,
-                'z-index': 999
-            })
-        ;
-        setTimeout(function() { 
-            fulltext.fadeOut(300); 
-        }, 5000);
-    }).each(function() {
-        var $this = $(this),
-            fulltext = $this.siblings('.fulltext').show(0);
-        function elementIsPosFixed(el) {
-            var fixed = false;
-            $(el).parents().addBack().each(function() {
-                fixed = $(this).css("position") === "fixed";
-                return !fixed;
-            });
-            return fixed;
-        }
-        if (elementIsPosFixed(fulltext)) {
-            fulltext.css('position', 'fixed');
-        }
-        $this.data({
-            width: fulltext.outerWidth(),
-            height: fulltext.outerHeight(),
-            fulltext: fulltext
-        });
-        fulltext
-            .hide(0)
-            .detach().appendTo('body')
-            .addClass('detached')
-            .click(function() { fulltext.hide(); })
-        ;
-    });
 
     $(window).scroll();
 });

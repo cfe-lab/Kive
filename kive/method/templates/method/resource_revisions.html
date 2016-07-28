@@ -6,22 +6,74 @@
 {% block title %}Revise a code resource{% endblock %}
 
 {% block javascript %}
-<!--<script src="/static/portal/jquery-2.0.3.min.js"></script>-->
-<!--<script src="/static/method/resource_add.js"></script>-->
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-    <script src="/static/method/resource_revisions.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
+    <script src="/static/portal/edit_details.js"></script>
 
     <script type="text/javascript">
+    
     var is_admin = {{ is_admin|lower }},
         is_owner = {{ is_owner|lower }};
-    $(function(){
-        resource_revisions_main(is_admin, $("#coderesourcerevisions"), {{coderesource.pk}},
-                                $("#active_filters"), $(".navigation_links"))
+
+    $(function() {
+        noXSS();
+
+        var CodeResourceRevisionTable = function($table, is_user_admin, cr_pk,
+                                                 $active_filters, $navigation_links) {
+            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
+            this.list_url = "../../api/coderesourcerevisions/";
+            this.cr_pk = cr_pk;
+
+            var CRRTable = this;
+            this.filterSet = new permissions.FilterSet(
+                $active_filters,
+                function() {
+                    CRRTable.page = 1;
+                    CRRTable.reloadTable();
+                }
+            );
+            // This adds a filter for the current CodeResource.
+            var $cr_filter = this.filterSet.add("coderesource_id", this.cr_pk, true).hide();
+
+            this.registerColumn("#", "revision_number");
+            this.registerColumn("Name", function($td, revision) {
+                $("<a>").attr("href", revision.view_url).text(revision.display_name).appendTo($td);
+            });
+            this.registerColumn("", function($td, revision) {
+                $("<a>").attr("href", revision.absolute_url).text("Revise").appendTo($td);
+            });
+            this.registerColumn("Description", "revision_desc");
+            this.registerDateTimeColumn("Date", "revision_DateTime");
+            this.registerColumn("", function($td, revision) {
+                if (revision.content_file.length !== 0) {
+                    $('<a>').text('Download').attr('href', revision.download_url).appendTo($td);
+                }
+            });
+
+            this.registerStandardColumn("user");
+            this.registerStandardColumn("users_allowed");
+            this.registerStandardColumn("groups_allowed");
+        };
+        CodeResourceRevisionTable.prototype = Object.create(permissions.PermissionsTable.prototype);
+        CodeResourceRevisionTable.prototype.getQueryParams = function() {
+            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
+            params.filters = this.filterSet.getFilters();
+            return params;
+        };
+
+        var table = new CodeResourceRevisionTable(
+            $("#coderesourcerevisions"), 
+            is_admin, 
+            {{coderesource.pk}}, 
+            $('.asf-active-filters'),
+            $(".navigation_links")
+        );
+        table.reloadTable();
+        var asf = new AjaxSearchFilter(table, $('#asf'));
     });
     </script>
-    <script src="/static/portal/edit_details.js"></script>
 {% endblock %}
 
 {% block stylesheets %}
@@ -116,29 +168,30 @@
 
 <h3>Revisions:</h3>
 
-<div class="filter_ctrl">
-    <form class="short-filter">
-    <input name="smart" type="text"
-        ><input type="button" class="advanced ctrl" value="Advanced"
-        ><input type="submit" value="Filter">
+<div id="asf">
+    <form class="asf-form">
+        <div class="asf-main-search">
+            <div class="asf-active-filters"></div>
+            <input type="text" name="smart" class="asf-search-field">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <input type="submit" value="Filter" class="asf-search-button">
+        </div>
     </form>
-
-    <form class="advanced-filter">
-    <h4>Advanced search</h4>
-    <table>
-    <tr>
-        <td><label>Name<input name="name" type="text"/></label></td>
-        <td><label>Description<input name="description" type="text"/></label></td>
-    </tr>
-    <tr>
-        <td><label>Creator<input name="user" type="text"/></label></td>
-    </tr>
-    </table>
-    <input type="submit" value="Filter"/>
+    <form class="asf-advanced-form">
+        <input type="button" class="advanced ctrl" value="Advanced">
+        <h4>Advanced search</h4>
+        <div class="asf-field-container">
+            <label>Name</label> <input name="name" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Description</label> <input name="description" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Creator</label> <input name="user" type="text" class="asf-search-fixed-field">
+        </div>
+        <input type="submit" value="Filter" class="asf-search-button">
     </form>
 </div>
-
-<div id="active_filters"></div>
 
 <div class="navigation_links"></div>
 

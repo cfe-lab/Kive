@@ -11,16 +11,86 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-    <script src="/static/librarian/datasets.js"></script>
-
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
     <script type="text/javascript">
-        $(function(){
-            // var $preload_data = $('#preload_data');
-            // $preload_data.detach();
-            datasets.main({{ is_user_admin|lower }});
-        });
-    </script>
+    $(function(){
+        "use strict";
+        
+        var is_user_admin = {{ is_user_admin|lower }};
+        noXSS();
 
+        var DatasetsTable = function($table, is_user_admin, $active_filters, $navigation_links) {
+            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
+            this.list_url = "/api/datasets/";
+
+            var datasetsTable = this;
+            this.filterSet = new permissions.FilterSet(
+                $active_filters,
+                function() {
+                    datasetsTable.page = 1;
+                    datasetsTable.reloadTable();
+                    sessionStorage.setItem(
+                            'datasetFilters',
+                            datasetsTable.filterSet.getPairs());
+                }
+            );
+
+            this.registerColumn("Name", function($td, dataset) {
+                $('<a>').text(dataset.name).attr('href', '/dataset_view/' + dataset.id).appendTo($td);
+            });
+            this.registerColumn("Description", function($td, dataset) {
+                $.each(dataset.description.split('\n'), function(_, txt){
+                    $td.append(txt, '<br>');
+                });
+            });
+            this.registerColumn("Created", function($td, row) {
+                $td.text(permissions.formatDate(row.date_created));
+            });
+            this.registerColumn("File Size", function($td, dataset) {
+                var content = "<em>missing</em>";
+                if (dataset.has_data) {
+                    content = dataset.filesize_display;
+                } else if (dataset.is_redacted) {
+                    content = "<em>redacted</em>";
+                }
+                $td.append(content);
+            });
+            this.registerColumn("", function($td, dataset) {
+                if (dataset.has_data) {
+                    $('<a>').text('Download').attr('href', dataset.download_url).appendTo($td);
+                }
+            });
+
+            this.registerStandardColumn("user");
+            this.registerStandardColumn("users_allowed");
+            this.registerStandardColumn("groups_allowed");
+        };
+        DatasetsTable.prototype = Object.create(permissions.PermissionsTable.prototype);
+        DatasetsTable.prototype.getQueryParams = function() {
+            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
+            params.filters = this.filterSet.getFilters();
+            sessionStorage.setItem('datasetPage', this.page);
+            return params;
+        };
+
+        var table = new DatasetsTable(
+            $('#datasets'),
+            is_user_admin,
+            $(".asf-active-filters"),
+            $(".navigation_links")),
+            pairs = sessionStorage.getItem('datasetFilters'),
+            storedPage = 1;
+        if (pairs === null) {
+            table.filterSet.add('uploaded');
+        } else {
+            storedPage = parseInt(sessionStorage.getItem('datasetPage') || storedPage);
+            table.filterSet.setFromPairs(pairs);
+        }
+        table.page = storedPage;
+        table.reloadTable();
+        var asf = new AjaxSearchFilter(table, $("#asf"));
+    });
+    </script>
 {% endblock %}
 
 {% block stylesheets %}
@@ -29,7 +99,6 @@
 {% endblock %}
 
 {% block content %}
-
 
 <a href="usr.html" rel="prev">Back to user's portal</a>
 
@@ -41,52 +110,44 @@
     <a href="/datasets_add_archive" class="button">+&ensp;<span class="button-lbl">Add Datasets From Archive</span></a>
 </div>
 
-<div class="filter_ctrl">
-    <form class="short-filter">
-    <input name="name" type="text"
-        ><input type="button" class="advanced ctrl" value="Advanced"
-        ><input type="submit" value="Filter">
+<div id="asf">
+    <form class="asf-form">
+        <div class="asf-main-search">
+            <div class="asf-active-filters"></div>
+            <input type="text" name="name" class="asf-search-field">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <input type="submit" value="Filter" class="asf-search-button">
+        </div>
     </form>
-
-    <form class="advanced-filter">
-    <h4>Advanced search</h4>
-    <table>
-    <tr>
-        <td><label>Name<input name="name" type="text"/></label></td>
-        <td><label>Description<input name="description" type="text"/></label></td>
-    </tr>
-    <tr>
-        <td><label>Creator<input name="user" type="text"/></label></td>
-        <td><label><input
-            name="uploaded"
-            type="checkbox"/>Uploaded</label></td>
-    </tr>
-    <tr>
-        <td>
-            <label>Created after<input
-                name="createdafter"
-                type="text"
-                class="datetime"/></label>
-        </td>
-        <td>
-            <label>Created before<input
-            name="createdbefore"
-            type="text"
-            class="datetime"/></label>
-        </td>
-    </tr>
-    </table>
-    <input type="submit" value="Filter"/>
+    <form class="asf-advanced-form">
+        <input type="button" class="advanced ctrl" value="Advanced">
+        <h4>Advanced search</h4>
+        <div class="asf-field-container">
+            <label>Name</label> <input name="name" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Description</label> <input name="description" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Creator</label> <input name="user" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Created after</label> <input name="createdafter" type="text" class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Created before</label> <input name="createdbefore" type="text" class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Uploaded</label> <input name="uploaded" type="checkbox" class="asf-search-fixed-field">
+        </div>
+        <input type="submit" value="Filter" class="asf-search-button">
     </form>
 </div>
-
-<div id="active_filters"></div>
 
 <div class="navigation_links"></div>
 
 <div class="results">
-    <table id="datasets">
-    </table>
+    <table id="datasets"></table>
 </div>
 
 {% endblock %}

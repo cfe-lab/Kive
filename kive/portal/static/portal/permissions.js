@@ -574,6 +574,9 @@ var permissions = (function() {
             }
             if ($field.is('.datetime')) {
                 value = my.formatDate(value);
+                if (value === undefined || value === null) {
+                    return;
+                }
             }
             addFilter(
                     filterSet,

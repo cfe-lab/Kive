@@ -3,14 +3,22 @@
  */
 $submit_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRFREVJBAYL7Ozso6SmzM3Ob3BzgYKE////8GOoMQAAAAh0Uk5T/////////wDeg71ZAAAAaklEQVR42lSO0RbAMARDo6j//+ORtDubF1wRUFUOM+xVDNTqlhEHzDj3UGrg3U81mQDKVSlJS1MgzFxgC6wD3hXXHaQGI5BpF5YRbscMY3ZjE1TwVUAa7oV78JEm58R9zfILSH6gST4CDAA1OgRo8O828AAAAABJRU5ErkJggg=='
 $gear_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRF////xsbGu7u74+Pj6enp9PT0qKiorq6u7VtU0wAAAFpJREFUeNpkT0kOADEIUlH7/x+PdEszcmgJuCEyEWO4XBTVTJ2EpqVZFuq1oJ8PZg1tBZRFsgXwxxJ8zSPIXNiJvY28C78W9KF9bTusnX7CVbnHDRx54n8CDAB7ZwLNNKLfPAAAAABJRU5ErkJggg=='
+$close_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRF////8tKmBAQLAEWd0vT/yZ9v6P//udP0gGzkJgAAADdJREFUeNq0TTkOACAMopTW//9YN8XVSMIA4QC+oQTE2DqYWsTpkNnWIYU7Idto36j2l0dMAQYAOMUAcmo6uwMAAAAASUVORK5CYII='
 
-=submit-ctrl
+=no-select
+  -webkit-touch-callout: none
+  -webkit-user-select: none
+  -khtml-user-select: none
+  -moz-user-select: none
+  -ms-user-select: none
+  user-select: none
+=icon-btn
   background-repeat: no-repeat
   background-position: 3px 3px
   text-indent: -999em
   overflow: hidden
   font-size: 1.5em
-  margin: .5em 0
+  // margin: .5em 0
 =submit-btn
   display: block
   background-position: .6em 4px
@@ -28,33 +36,87 @@ $gear_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TA
   position: relative
   top: 2px
 
-.filter_ctrl
-  font-size: 0.8em
+.filter_ctrl,
+.asf-form
+  min-width: 550px
   margin-bottom: .5em
-  float: left
   select
     margin-top: -1px
     width: calc(100% - 9em)
   h4
     margin: .25em 0 .5em
   input[type='text']
-    margin: .5em 1.5em .5em 0
+    margin: .25em 0
     width: 12em
-    display: block
   input[type='submit']
-    +submit-ctrl
+    +icon-btn
     +submit-btn
   input.ctrl
-    +submit-ctrl
+    +icon-btn
   .short-filter input
     display: inline
 
-.dataset-search-dlg input
-  &[type='submit']
-    +submit-ctrl
+.search_form,
+.asf-main-search
+  border: 1px solid #ccc
+  background-color: #fff
+  margin: 
+    bottom: .5em
+    right: 1em
+  padding: .2em .5em
+  cursor: text
+  position: relative
+  box-sizing: border-box
+  .active_filters,
+  .asf-active-filters
+    display: inline
+    cursor: default
+    .filter,
+    .asf-filter
+      &:last-child
+        margin-right: 0
+      +no-select
+      display: inline-block
+      white-space: normal
+      // font-size: 1em
+      margin-bottom: .25em
+  input[type='submit']
+    +icon-btn
     +submit-btn
-  &.ctrl
-    +submit-ctrl
+  input.ctrl
+    +icon-btn
+  input[type="text"]
+    border: 0
+    // font-size: 1em
+    margin-bottom: .25em
+  /* Remove button padding in FF */
+  input::-moz-focus-inner
+    border: 0
+    padding: 0
+    margin: 0
+  input.advanced.ctrl
+    position: absolute
+    right: 2.5em
+    bottom: .17em
+    +advanced-ctrl-btn
+    background-image: url($gear_icon)
+  .search_button,
+  .asf-search-button
+    position: absolute
+    right: .25em
+    bottom: .17em
+    margin: 0
+    cursor: pointer
+
+.asf-advanced-form
+  display: none
+
+// asf-form
+//   asf-main-search
+//     asf-active-filters
+//     asf-search-field
+//     asf-search-button
+
 
 a.remove
   padding: .5em 0 .5em .5em
@@ -63,32 +125,6 @@ a.remove
   &:hover
     color: #00f
 
-.short-filter input
-  /* Remove button padding in FF */
-  box-sizing: border-box
-  &::-moz-focus-inner
-    border: 0
-    padding: 0
-    margin: 0
-  &[type='submit']
-    +offset-2px
-    border: 1px solid #ccc
-    border-radius: 0 1em 1em 0
-    width: calc(16px + 1.1em)
-    background-position: .5em 4px
-    margin: 0 .5em 0 0
-  &[type='text']
-    width: 15.6em
-    margin: 0
-    border: 1px solid #ccc
-    background: #fff
-    padding: 4px
-    margin-right: -25px
-    line-height: 16px
-  &.advanced.ctrl
-    +advanced-ctrl-btn
-    +offset-2px
-    background-image: url($gear_icon)
 
 .filter
   display: inline
@@ -99,13 +135,14 @@ a.remove
   border-radius: 15px
   padding: .25em .8em
   margin-right: .5em
-  font-size: .8em
+  // font-size: .8em
   .logic_gate
     font-size: .8em
     font-weight: bold
     text-transform: uppercase
   .field
     @extend .logic_gate
+    padding-right: .25em
     color: rgba(0,0,0,.7)
 
 .results
@@ -153,25 +190,60 @@ a.remove
       &:not(.selected) select
         background-image: none
 
-.active_filters
+.asf-active-filters
   padding: .2em 0 .75em
   &:empty
     display: none
-.advanced
-  .filter_ctrl
-    width: 14.8em
-    margin: 0 1em 0 0
-  .results
-    clear: none
-.advanced-filter
+.asf-advanced-form
   background-color: #fff
-  padding: .5em 0 0 .5em
+  padding: .5em 0 1em 1em
   border: 1px solid #ddd
+  box-sizing: border-box
+  position: relative
   display: none
-  .close.ctrl
+  h4 
+    margin-top: .25em
+    margin-bottom: .75em
+    font-style: italic
+  .asf-field-container
+    width: 49%
+    display: inline-block
+    label
+      display: inline-block
+      padding: .25em 0
+      &:after 
+        content: ":"
+    input 
+      float: right
+      margin:
+        right: 1em
+        bottom: -1px
+      width: calc(100% - 8em)
+      &[type="checkbox"]
+        margin:
+          top: .5em
+          right: 1.75em
+  .advanced.ctrl
+    +icon-btn
     +advanced-ctrl-btn
-    float: right
-    margin: 0 .5em
-    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRF////8tKmBAQLAEWd0vT/yZ9v6P//udP0gGzkJgAAADdJREFUeNq0TTkOACAMopTW//9YN8XVSMIA4QC+oQTE2DqYWsTpkNnWIYU7Idto36j2l0dMAQYAOMUAcmo6uwMAAAAASUVORK5CYII=')
+    position: absolute
+    right: .5em
+    background-image: url($gear_icon)
+  .asf-search-button
+    display: block
+    margin-top: .5em
+    box-sizing: border-box
+    cursor: pointer
+  .asf-active-filters
+    padding: 1em 0 0
 .dev_results
   clear: left
+
+
+@media (max-height: 1000px) and (min-height: 701px)
+  .asf-main-search
+    .filter 
+      margin-bottom: .2em
+    .asf-search-field
+      margin-bottom: .1em
+    margin-bottom: .2em

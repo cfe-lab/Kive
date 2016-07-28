@@ -9,15 +9,55 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-    <script src="/static/method/method_families.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
+    <script src="/static/portal/helptext.js"></script>
 
     <script type="text/javascript">
-        $(function(){
-            methodfamilies_main({{ is_user_admin|lower }},
-                    $("#methodfamilies"),
-                    $("#active_filters"),
-                    $(".navigation_links"));
-        });
+
+    $(function(){
+        noXSS();
+
+        var MethodFamiliesTable = function($table, is_user_admin, $active_filters, $navigation_links) {
+            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
+            this.list_url = "api/methodfamilies/";
+
+            var mfTable = this;
+            this.filterSet = new permissions.FilterSet(
+                $active_filters,
+                function() {
+                    mfTable.page = 1;
+                    mfTable.reloadTable();
+                }
+            );
+
+            this.registerColumn("Family", function($td, method_family) {
+                var $a = $("<a>").attr("href", method_family.absolute_url).text(method_family.name);
+                $td.append($a);
+            });
+            this.registerColumn("Description", "description");
+            this.registerColumn("# revisions", "num_revisions");
+
+            this.registerStandardColumn("user");
+            this.registerStandardColumn("users_allowed");
+            this.registerStandardColumn("groups_allowed");
+        };
+        MethodFamiliesTable.prototype = Object.create(permissions.PermissionsTable.prototype);
+        MethodFamiliesTable.prototype.getQueryParams = function() {
+            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
+            params.filters = this.filterSet.getFilters();
+            return params;
+        };
+
+        var table = new MethodFamiliesTable(
+            $("#methodfamilies"),
+            {{ is_user_admin|lower }},
+            $(".asf-active-filters"),
+            $(".navigation_links")
+        );
+        table.reloadTable();
+        var asf = new AjaxSearchFilter(table, $("#asf"));
+    });
+
     </script>
 
 {% endblock %}
@@ -38,35 +78,36 @@ A MethodFamily is a collection of Methods that share a certain function
 in common.
 </p>
 
-<div class="filter_ctrl">
-    <form class="short-filter">
-    <input name="smart" type="text"
-        ><input type="button" class="advanced ctrl" value="Advanced"
-        ><input type="submit" value="Filter">
+<div id="asf">
+    <form class="asf-form">
+        <div class="asf-main-search">
+            <div class="asf-active-filters"></div>
+            <input type="text" name="smart" class="asf-search-field">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <input type="submit" value="Filter" class="asf-search-button">
+        </div>
     </form>
-
-    <form class="advanced-filter">
-    <h4>Advanced search</h4>
-    <table>
-    <tr>
-        <td><label>Name<input name="name" type="text"/></label></td>
-        <td><label>Description<input name="description" type="text"/></label></td>
-    </tr>
-    <tr>
-        <td><label>Creator<input name="user" type="text"/></label></td>
-    </tr>
-    </table>
-    <input type="submit" value="Filter"/>
+    <form class="asf-advanced-form">
+        <input type="button" class="advanced ctrl" value="Advanced">
+        <h4>Advanced search</h4>
+        <div class="asf-field-container">
+            <label>Name</label> <input name="name" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Description</label> <input name="description" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Creator</label> <input name="user" type="text" class="asf-search-fixed-field">
+        </div>
+        <input type="submit" value="Filter" class="asf-search-button">
     </form>
 </div>
 
-<div id="active_filters"></div>
-
 <div class="navigation_links"></div>
 
-    <div class="dev_results">
-<table id="methodfamilies"></table>
-    </div>
+<div class="dev_results">
+    <table id="methodfamilies"></table>
+</div>
 
 <a href="/method_new">Create a new method family</a>
 

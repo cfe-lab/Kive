@@ -9,13 +9,55 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-    <script src="/static/method/resources.js"></script>
-
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
+    <script src="/static/portal/helptext.js"></script>
     <script type="text/javascript">
-        $(function(){
-            resources_main($("#coderesources"), {{ is_user_admin|lower }},
-                    $("#active_filters"), $(".navigation_links"));
-        });
+
+    $(function(){
+        var CodeResourceTable = function($table, is_user_admin, $active_filters, $navigation_links) {
+            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
+            this.list_url = "api/coderesources/";
+
+            var codeResourceTable = this;
+            this.filterSet = new permissions.FilterSet(
+                $active_filters,
+                function() {
+                    codeResourceTable.page = 1;
+                    codeResourceTable.reloadTable();
+                }
+            );
+
+            this.registerColumn("Name", function($td, coderesource) {
+                var $a = $("<a>").attr("href", coderesource.absolute_url).text(coderesource.name);
+                $td.append($a);
+            });
+            this.registerColumn("Description", "description");
+            this.registerColumn("Filename", "filename");
+            this.registerColumn("# of revisions", "num_revisions");
+            this.registerDateTimeColumn("Last revision date", "last_revision_date");
+
+            this.registerStandardColumn("user");
+            this.registerStandardColumn("users_allowed");
+            this.registerStandardColumn("groups_allowed");
+        };
+        CodeResourceTable.prototype = Object.create(permissions.PermissionsTable.prototype);
+        CodeResourceTable.prototype.getQueryParams = function() {
+            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
+            params.filters = this.filterSet.getFilters();
+            return params;
+        };
+
+        noXSS();
+        var table = new CodeResourceTable(
+            $("#coderesources"),
+            {{ is_user_admin|lower }},
+            $(".asf-active-filters"),
+            $(".navigation_links")
+        );
+        table.reloadTable();
+        var asf = new AjaxSearchFilter(table, $("#asf"));
+    });
+
     </script>
 {% endblock %}
 
@@ -45,35 +87,39 @@ in the following table.
     <p>You do not have access to the CodeResource with id={{ no_access }}.</p>
 {% endif %}
 
-<div class="filter_ctrl">
-    <form class="short-filter">
-    <input name="smart" type="text"
-        ><input type="button" class="advanced ctrl" value="Advanced"
-        ><input type="submit" value="Filter">
-    </form>
 
-    <form class="advanced-filter">
-    <h4>Advanced search</h4>
-    <table>
-    <tr>
-        <td><label>Name<input name="name" type="text"/></label></td>
-        <td><label>Description<input name="description" type="text"/></label></td>
-    </tr>
-    <tr>
-        <td><label>Filename<input name="filename" type="text"/></label></td>
-        <td><label>Creator<input name="user" type="text"/></label></td>
-    </tr>
-    </table>
-    <input type="submit" value="Filter"/>
+<div id="asf">
+    <form class="asf-form">
+        <div class="asf-main-search">
+            <div class="asf-active-filters"></div>
+            <input type="text" name="smart" class="asf-search-field">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <input type="submit" value="Filter" class="asf-search-button">
+        </div>
+    </form>
+    <form class="asf-advanced-form">
+        <input type="button" class="advanced ctrl" value="Advanced">
+        <h4>Advanced search</h4>
+        <div class="asf-field-container">
+            <label>Name</label> <input name="name" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Description</label> <input name="description" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Filename</label> <input name="filename" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Creator</label> <input name="user" type="text" class="asf-search-fixed-field">
+        </div>
+        <input type="submit" value="Filter" class="asf-search-button">
     </form>
 </div>
 
-<div id="active_filters"></div>
-
 <div class="navigation_links"></div>
 
-    <div class="dev_results">
-<table id="coderesources"></table>
-    </div>
+<div class="dev_results">
+    <table id="coderesources"></table>
+</div>
 
 {% endblock %}

@@ -9,24 +9,61 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-    <script src="/static/metadata/datatypes.js"></script>
-
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
     <script type="text/javascript">
 
     $(function() {
-        // For table rows that start with a link, clicking the row should click the link.
-        var links = $('td:first-child > a:first-child:last-child');
-        links.closest('tr').css('cursor', 'pointer').on('click', function() {
-            $('td > a', this)[0].click();
-        }).on('mouseover mouseout', function() {
-            $(this).toggleClass('hover');
+        noXSS();
+
+        var DatatypesTable = function($table, is_user_admin, $active_filters, $navigation_links) {
+            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
+            this.list_url = "api/datatypes/";
+
+            var datatypesTable = this;
+            this.filterSet = new permissions.FilterSet(
+                $active_filters,
+                function() {
+                    datatypesTable.page = 1;
+                    datatypesTable.reloadTable();
+                }
+            );
+
+            this.registerColumn("Name", function($td, datatype) {
+                $("<a>").attr("href", datatype.absolute_url).text(datatype.name).appendTo($td);
+            });
+            this.registerColumn("Description", "description");
+            this.registerColumn("Restricts", "restricts");
+            this.registerDateTimeColumn("Date created", "date_created");
+
+            this.registerStandardColumn("user");
+            this.registerStandardColumn("users_allowed");
+            this.registerStandardColumn("groups_allowed");
+        };
+        DatatypesTable.prototype = Object.create(permissions.PermissionsTable.prototype);
+        DatatypesTable.prototype.getQueryParams = function() {
+            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
+            params.filters = this.filterSet.getFilters();
+            return params;
+        };
+
+        var table = new DatatypesTable(
+            $("#datatypes"),
+            {{ is_user_admin|lower }},
+            $('.asf-active-filters'),
+            $(".navigation_links")
+        );
+        table.reloadTable();
+        var asf = new AjaxSearchFilter(table, $('#asf'));
+
+        // For table rows that *start* with a link, clicking the row should click the link.
+        var link_selector = 'td:first-child > a:first-child:last-child';
+        $('#datatypes').on('click', 'tr', function() {
+            $(this).find(link_selector)[0].click();
+        }).on('mouseover', 'tr', function() {
+            var $this = $(this).has(link_selector);
+            $this.css('cursor', 'pointer');
         });
-
-        datatypes_main($("#datatypes"), {{ is_user_admin|lower }},
-                       $("#active_filters"), $(".navigation_links"));
     });
-
-    // var table = new DatatypesTable($table, is_user_admin, $active_filters, $navigation_links);
 
     </script>
 {% endblock %}
@@ -44,34 +81,35 @@
 
 <a href="/datatype_add" class="button">+&ensp;<span class="button-lbl">Add new</span></a>
 
-<div class="filter_ctrl">
-    <form class="short-filter">
-    <input name="smart" type="text"
-        ><input type="button" class="advanced ctrl" value="Advanced"
-        ><input type="submit" value="Filter">
+<div id="asf" style="margin-top:1em">
+    <form class="asf-form">
+        <div class="asf-main-search">
+            <div class="asf-active-filters"></div>
+            <input type="text" name="smart" class="asf-search-field">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <input type="submit" value="Filter" class="asf-search-button">
+        </div>
     </form>
-
-    <form class="advanced-filter">
-    <h4>Advanced search</h4>
-    <table>
-    <tr>
-        <td><label>Name<input name="name" type="text"/></label></td>
-        <td><label>Description<input name="description" type="text"/></label></td>
-    </tr>
-    <tr>
-        <td><label>Creator<input name="user" type="text"/></label></td>
-    </tr>
-    </table>
-    <input type="submit" value="Filter"/>
+    <form class="asf-advanced-form">
+        <input type="button" class="advanced ctrl" value="Advanced">
+        <h4>Advanced search</h4>
+        <div class="asf-field-container">
+            <label>Name</label> <input name="name" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Description</label> <input name="description" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Creator</label> <input name="user" type="text" class="asf-search-fixed-field">
+        </div>
+        <input type="submit" value="Filter" class="asf-search-button">
     </form>
 </div>
 
-<div id="active_filters"></div>
-
 <div class="navigation_links"></div>
 
-    <div class="dev_results">
-<table id="datatypes"></table>
-    </div>
+<div class="dev_results">
+    <table id="datatypes"></table>
+</div>
 
 {% endblock %}

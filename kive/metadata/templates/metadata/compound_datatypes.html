@@ -9,9 +9,68 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-    <script src="/static/metadata/compound_datatypes.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
     <script type="text/javascript">
-        var is_user_admin = {{ is_user_admin|lower }};
+
+    $(function(){ 
+        // Security stuff to prevent cross-site scripting.
+        noXSS();
+
+        var CompoundDatatypesTable = function($table, is_user_admin, $active_filters, $navigation_links) {
+            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
+
+            var CDTTable = this;
+            this.filterSet = new permissions.FilterSet(
+                $active_filters,
+                function() {
+                    CDTTable.page = 1;
+                    CDTTable.reloadTable();
+                }
+            );
+
+            this.list_url = "api/compounddatatypes/";
+            this.registerColumn("Name", function($td, cdt) {
+                var $a = $("<a/>").attr("href", cdt.absolute_url).text(cdt.name);
+                $td.append($a);
+            });
+            this.registerColumn("Scheme", "representation");
+
+            this.registerStandardColumn("user");
+            this.registerStandardColumn("users_allowed");
+            this.registerStandardColumn("groups_allowed");
+        };
+        CompoundDatatypesTable.prototype = Object.create(
+            permissions.PermissionsTable.prototype);
+
+        CompoundDatatypesTable.prototype.getQueryParams = function() {
+            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
+            params.filters = this.filterSet.getFilters();
+            return params;
+        };
+
+        CompoundDatatypesTable.prototype.buildTable = function(rows) {
+            permissions.PermissionsTable.prototype.buildTable.apply(this, [rows]);
+        };
+        
+        var table = new CompoundDatatypesTable(
+            $('#compounddatatypes'),
+            {{ is_user_admin|lower }},
+            $(".asf-active-filters"),
+            $(".navigation_links")
+        );
+        table.reloadTable();
+        var asf = new AjaxSearchFilter(table, $('#asf'));
+
+        // For table rows that *start* with a link, clicking the row should click the link.
+        var link_selector = 'td:first-child > a:first-child:last-child';
+        $('#compounddatatypes').on('click', 'tr', function() {
+            $(this).find(link_selector)[0].click();
+        }).on('mouseover', 'tr', function() {
+            var $this = $(this).has(link_selector);
+            $this.css('cursor', 'pointer');
+        });
+    });
+
     </script>
 {% endblock %}
 
@@ -31,39 +90,39 @@
 A compound datatype is an ordered set of datatypes, describing the expected structure of a data set that would act as the input or output of a Method.
 </p>
 
-<div class="filter_ctrl">
-    <form class="short-filter">
-    <input name="smart" type="text"
-        ><input type="button" class="advanced ctrl" value="Advanced"
-        ><input type="submit" value="Filter">
+<div id="asf">
+    <form class="asf-form">
+        <div class="asf-main-search">
+            <div class="asf-active-filters"></div>
+            <input type="text" name="smart" class="asf-search-field">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <input type="submit" value="Filter" class="asf-search-button">
+        </div>
     </form>
-
-    <form class="advanced-filter">
-    <h4>Advanced search</h4>
-    <table>
-    <tr>
-        <td><label>Name<input name="name" type="text"/></label></td>
-    </tr>
-    <tr>
-        <td><label>Column name<input name="column_name" type="text"/></label></td>
-        <td><label>Datatype<input name="datatype" type="text"/></label></td>
-    </tr>
-    <tr>
-        <td><label>Creator<input name="user" type="text"/></label></td>
-    </tr>
-    </table>
-    <input type="submit" value="Filter"/>
+    <form class="asf-advanced-form">
+        <input type="button" class="advanced ctrl" value="Advanced">
+        <h4>Advanced search</h4>
+        <div class="asf-field-container">
+            <label>Name</label> <input name="name" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Creator</label> <input name="user" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Column name</label> <input name="column_name" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Datatype</label> <input name="datatype" type="text" class="asf-search-fixed-field">
+        </div>
+        <input type="submit" value="Filter" class="asf-search-button">
     </form>
 </div>
 
-<div id="active_filters"></div>
-
 <div class="navigation_links"></div>
 
-    <div class="dev_results">
-<table id="compounddatatypes">
-</table>
-    </div>
+<div class="dev_results">
+    <table id="compounddatatypes"></table>
+</div>
 
 
 {% endblock %}

@@ -9,15 +9,112 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-    <script src="/static/pipeline/pipelines.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
 
     <script type="text/javascript">
     var is_owner = {{ is_owner|lower }},
         is_admin = {{ is_admin|lower }};
 
     $(function(){
-        pipelines.main(is_admin, $("#pipelines"), {{ family.pk }},
-                       $("#active_filters"), $(".navigation_links"));
+        "use strict";
+        noXSS();
+            
+        function published_version($td, pipeline, data) {
+            var $button_group = $('<div class="button-group">'),
+                $input = $('<input type="submit" value="Publish">'),
+                $pipeline_pk_input = $('<input>', {
+                    type: 'hidden',
+                    name: "pipeline_pk",
+                    value: pipeline.id
+                }),
+                $action_input = $('<input type="hidden" name="action" value="publish">');
+            
+            if (pipeline.published) {
+                $button_group.html('<input type="button" class="left-button" disabled value="Published">');
+                $action_input.val("unpublish");
+                $input.val("×").addClass('right-button close-button');
+            }
+            $button_group.append($pipeline_pk_input, $action_input, $input);
+
+            $('<form class="publish">').submit(function(e) {
+                e.preventDefault();
+                $.ajax({
+                    type: "PATCH",
+                    url: "/api/pipelines/"  + pipeline.id + "/",
+                    data: { published: ($action_input.val() !== "unpublish") },
+                    datatype: "json",
+                    success: function() { data.table.reloadTable(); }
+                }).fail(function(data) {
+                    $('.errortext').text('API error ' + data.status + ': ' + data.responseJSON.detail);
+                });
+            }).append($button_group).appendTo($td);
+        }
+
+        var PipelineTable = function($table, is_user_admin, family_pk, $active_filters, $navigation_links) {
+            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
+            this.list_url = "../../api/pipelines/";
+            this.family_pk = family_pk;
+
+            var plTable = this;
+            this.filterSet = new permissions.FilterSet(
+                $active_filters,
+                function() {
+                    plTable.page = 1;
+                    plTable.reloadTable();
+                }
+            );
+            // This adds a filter for the current CodeResource.
+            var $pf_filter = this.filterSet.add("pipelinefamily_id", this.family_pk, true);
+            $pf_filter.hide();
+
+            this.registerColumn("Name", function ($td, pipeline) {
+                var $a = $("<a/>").attr("href", pipeline.view_url);
+                if (pipeline.revision_name === '') {
+                    $a.text(pipeline.revision_number + ': ').append('<span class="placeholder">anonymous</span>');
+                } else {
+                    $a.text(pipeline.display_name);
+                }
+                $td.append($a);
+            });
+            this.registerColumn("", function pipeline_revise_link($td, pipeline) {
+                var $a = $("<a/>").attr("href", pipeline.absolute_url).text("Revise");
+                $td.append($a);
+            });
+            this.registerColumn("Description", function($td, pipeline) {
+                if (pipeline.revision_desc && pipeline.revision_desc !== '') {
+                    $td.append(pipeline.revision_desc);
+                } else {
+                    $td.append('<span class="placeholder">(none)</span>');
+                }
+            });
+            this.registerColumn(
+                "Published version",
+                published_version,
+                {
+                    family_pk: family_pk,
+                    table: this
+                });
+
+            this.registerStandardColumn("user");
+            this.registerStandardColumn("users_allowed");
+            this.registerStandardColumn("groups_allowed");
+        };
+        PipelineTable.prototype = Object.create(permissions.PermissionsTable.prototype);
+        PipelineTable.prototype.getQueryParams = function() {
+            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
+            params.filters = this.filterSet.getFilters();
+            return params;
+        };
+
+        var table = new PipelineTable(
+            $("#pipelines"),
+            is_admin,
+            {{ family.pk }},
+            $('.asf-active-filters'),
+            $(".navigation_links")
+        );
+        table.reloadTable();
+        var asf = new AjaxSearchFilter(table, $('#asf'));
     });
     </script>
     <script src="/static/portal/edit_details.js"></script>
@@ -117,35 +214,36 @@
 Click on 'Revise' link to revise the corresponding pipeline, or click 'Add new pipeline' to add a pipeline without specifying a parent revision.
 </p>
 
-<div class="filter_ctrl">
-    <form class="short-filter">
-    <input name="smart" type="text"
-        ><input type="button" class="advanced ctrl" value="Advanced"
-        ><input type="submit" value="Filter">
+<div id="asf">
+    <form class="asf-form">
+        <div class="asf-main-search">
+            <div class="asf-active-filters"></div>
+            <input type="text" name="smart" class="asf-search-field">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <input type="submit" value="Filter" class="asf-search-button">
+        </div>
     </form>
-
-    <form class="advanced-filter">
-    <h4>Advanced search</h4>
-    <table>
-    <tr>
-        <td><label>Name<input name="name" type="text"/></label></td>
-        <td><label>Description<input name="description" type="text"/></label></td>
-    </tr>
-    <tr>
-        <td><label>Creator<input name="user" type="text"/></label></td>
-    </tr>
-    </table>
-    <input type="submit" value="Filter"/>
+    <form class="asf-advanced-form">
+        <input type="button" class="advanced ctrl" value="Advanced">
+        <h4>Advanced search</h4>
+        <div class="asf-field-container">
+            <label>Name</label> <input name="name" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Description</label> <input name="description" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Creator</label> <input name="user" type="text" class="asf-search-fixed-field">
+        </div>
+        <input type="submit" value="Filter" class="asf-search-button">
     </form>
 </div>
 
-<div id="active_filters"></div>
-
 <div class="navigation_links"></div>
 
-    <div class="dev_results">
-        <table id="pipelines"></table>
-    </div>
+<div class="dev_results">
+    <table id="pipelines"></table>
+</div>
 
 <a href="/pipeline_add/{{ family.pk }}" class="button">+&ensp;<span class="button-lbl">Add a new pipeline</span></a>
 

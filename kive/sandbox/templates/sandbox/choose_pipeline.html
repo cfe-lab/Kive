@@ -6,32 +6,122 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
 	<script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
     <script src="/static/pipeline/jsBezier-0.6.js"></script>
     <script src="/static/pipeline/drydock_objects.js"></script>
     <script src="/static/pipeline/drydock.js"></script>
     <script src="/static/pipeline/pipeline_load.js"></script>
-    <script src="/static/sandbox/choose_pipeline.js"></script>
     <script type="text/javascript">
-$(function() {
-    // Security stuff to prevent cross-site scripting.
-    noXSS();
 
-    var $table = $('#pipeline_families'),
-        is_user_admin = false; // Never show admin tools on this page
-    
-    var table = new choose_pipeline.PipelineFamiliesTable(
-            $table,
-            is_user_admin,
-            $('#active_filters'),
-            $(".navigation_links")
-    );
-    table.reloadTable();
+    $(function() {
+        "use strict";
 
-    $('form.short-filter').submit(function(e) {
-        e.preventDefault();
-        table.filterSet.addFromForm(this);
+        noXSS();
+        var IS_USER_ADMIN = false; // Never show admin tools on this page
+        
+        var PipelineFamiliesTable = function($table, is_user_admin, $active_filters, $navigation_links) {
+            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
+            this.list_url = "/api/pipelinefamilies/";
+            var pipelineFamiliesTable = this;
+
+            this.filterSet = new permissions.FilterSet(
+                    $active_filters,
+                    function() {
+                        pipelineFamiliesTable.page = 1;
+                        pipelineFamiliesTable.reloadTable();
+                    });
+            this.registerColumn("Pipeline Family", "name");
+            this.registerColumn("Thumbnail", buildThumbnail);
+            this.registerColumn("Revision", buildMembers);
+
+            this.registerStandardColumn("user");
+            this.registerStandardColumn("users_allowed");
+            this.registerStandardColumn("groups_allowed");
+        };
+        PipelineFamiliesTable.prototype = Object.create(
+                permissions.PermissionsTable.prototype);
+        PipelineFamiliesTable.prototype.getQueryParams = function() {
+            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
+            params.filters = this.filterSet.getFilters();
+            return params;
+        };
+        PipelineFamiliesTable.prototype.buildTable = function(rows) {
+            permissions.PermissionsTable.prototype.buildTable.call(this, rows);
+            this.drawThumbnails();
+        };
+        PipelineFamiliesTable.prototype.drawThumbnails = function() {
+            this.$table.find('select').each(function() { drawThumbnail(this); });
+        };
+        
+        function drawThumbnail(select) {
+            var $select = $(select),
+                $canvas = $select.closest('tr').find('canvas'),
+                canvas = $canvas[0];
+            $.ajax({
+                type: "GET",
+                url: "/api/pipelines/" + $select.val(),
+                datatype: "json",
+                success: function(result) {
+                    var cs = new drydock.CanvasState(canvas);
+                    var pipeline = new Pipeline(cs);
+                    cs.setScale(0.12);
+                    cs.enable_labels = false;
+                    pipeline.load(result);
+                    pipeline.draw();
+                }
+            });
+        }
+
+        function buildThumbnail($td, row) {
+            $td.addClass('preview-canvas');
+            $('<canvas class="preview" width="120" height="90">' +
+                    'Warning: Kive does not support your web browser.</canvas>')
+                    .appendTo($td);
+        }
+        
+        function buildMembers($td, row) {
+            var $form = $('<form method="GET" action="choose_inputs">'),
+                $select = $('<select name="pipeline">'),
+                already_have_one_selected = false,
+                i, member, $option;
+
+            if (row.members.length === 0) {
+                $option = $("<option>")
+                    .attr("disabled", true)
+                    .text("No published versions");
+                $select.append($option).appendTo($form);
+            } else {
+                for (i = 0; i < row.members.length; i++) {
+                    member = row.members[i];
+                    $option = $('<option>').attr('value', member.id);
+                    if (member.published) {
+                        $option.text(member.display_name);
+                        if (!already_have_one_selected) {
+                            $option.attr('selected', true);
+                            already_have_one_selected = true;
+                        }
+                    } else {
+                        // De-emphasize this.
+                        $option.text("(" + member.display_name + ")");
+                    }
+                    $select.append($option);
+                }
+                $select.change(function() { drawThumbnail(this); });
+                $form.append($select, '&nbsp;<input type="submit" value="Choose">');
+            }
+            $td.append($form);
+        }
+
+        var table = new PipelineFamiliesTable(
+                $('#pipeline_families'),
+                IS_USER_ADMIN,
+                $('.asf-active-filters'),
+                $(".navigation_links")
+        );
+        table.reloadTable();
+        var asf = new AjaxSearchFilter(table);
     });
-});
+
     </script>
 {% endblock %}
 
@@ -48,21 +138,21 @@ $(function() {
 <h2>Analysis</h2>
 
 <p>
-Select a pipeline
+Please select a pipeline you would like to run on this page.
 </p>
 
-<div class="filter_ctrl">
-    <form class="short-filter">
-        <input name="smart" type="text"><input type="submit" value="Filter">
-    </form>
-</div>
-<div id="active_filters"></div>
+<form class="asf-form">
+    <div class="asf-main-search">
+        <div class="asf-active-filters"></div>
+        <input type="text" name="smart" class="asf-search-field">
+        <input type="submit" value="Filter" class="asf-search-button">
+    </div>
+</form>
 
 <div class="navigation_links"></div>
 
 <div class="results2">
-    <table id="pipeline_families">
-    </table>
+    <table id="pipeline_families"></table>
 </div>
 
 <div class="errortext">{{ error_msg }}</div>

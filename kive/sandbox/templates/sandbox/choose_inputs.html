@@ -7,6 +7,8 @@
     <script src="/static/portal/moment.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
+    <script src="/static/portal/helptext.js"></script>
     <script src="/static/sandbox/jq_color_anim.min.js"></script>
     <script src="/static/sandbox/choose_inputs.js"></script>
     <script src="/static/sandbox/choose_multi_inputs.js"></script>
@@ -37,12 +39,12 @@
 
         <div class="search_results">
 
-            <form>
+            <form class="asf-form">
 
-            <div class="search_form">
-                <div class="active_filters"></div>
-                <input type="text" name="smart">
-                <input type="submit" class="search_button">
+            <div class="asf-main-search">
+                <div class="asf-active-filters"></div>
+                <input type="text" name="smart" class="asf-search-field">
+                <input type="submit" class="asf-search-button">
             </div>
 
             <div class="search_filters">

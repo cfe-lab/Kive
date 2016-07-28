@@ -6,13 +6,37 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
     <script src="/static/sandbox/runs_table.js"></script>
-    <script src="/static/sandbox/runs.js"></script>
     <script src="/static/sandbox/jq_color_anim.min.js"></script>
 
     <script type="text/javascript">
-        var user = "{{ user.get_username }}",
-            is_user_admin = {{ is_user_admin|lower }};
+    "use strict";
+    var user = "{{ user.get_username }}",
+        is_user_admin = {{ is_user_admin|lower }},
+        pollingInterval = 1000, // milliseconds
+        runsTable;
+
+    $(function(){ // wait for page to finish loading before executing jQuery code
+        // Security stuff to prevent cross-site scripting.
+        noXSS();
+        
+        runsTable = new RunsTable(
+            $('#runs'),
+            user,
+            is_user_admin,
+            $('.no_results'),
+            null,
+            $('.asf-active-filters'),
+            $(".navigation_links")
+        );
+        var storedPage = parseInt(sessionStorage.getItem('runPage') || 1);
+        runsTable.filterSet.setFromPairs(sessionStorage.getItem('runFilters'));
+        runsTable.page = storedPage;
+        runsTable.reloadTable();
+        var asf = new AjaxSearchFilter(runsTable, $('#asf'));
+    });
+
     </script>
 {% endblock %}
 
@@ -26,71 +50,61 @@
 <a href="usr.html" rel="prev">Back to user portal</a>
 
 <h2>Runs</h2>
-    <div class="filter_ctrl">
-        <form class="short-filter">
-        <input name="name" type="text"
-            ><input type="button" class="advanced ctrl" value="Advanced"
-            ><input type="submit" value="Filter">
-        </form>
-        
-        <form class="advanced-filter">
+
+<div id="asf">
+    <form class="asf-form">
+        <div class="asf-main-search">
+            <div class="asf-active-filters"></div>
+            <input type="text" name="name" class="asf-search-field">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <input type="submit" value="Filter" class="asf-search-button">
+        </div>
+    </form>
+    <form class="asf-advanced-form">
+        <input type="button" class="advanced ctrl" value="Advanced">
         <h4>Advanced search</h4>
-        <table>
-        <tr>
-            <td><label>Name<input name="name" type="text"/></label></td>
-        </tr>
-        <tr>
-            <td><label>Creator<input name="user" type="text"/></label></td>
-            <td><label><input
-                name="active"
-                type="checkbox"/>Is active</label></td>
-        </tr>
-        <tr>
-            <td><label>Started after<input
-                name="startafter"
-                type="text"
-                class="datetime"/></label>
-            <td><label>Started before<input
-                name="startbefore"
-                type="text"
-                class="datetime"/></label>
-        </tr>
-        <tr>
-            <td><label>Ended after<input
-                name="endafter"
-                type="text"
-                class="datetime"/></label>
-            <td><label>Ended before<input
-                name="endbefore"
-                type="text"
-                class="datetime"/></label>
-        </tr>
-        <tr>
-            <td><label>Batch name<input
-                name="batch_name"
-                type="text"/></label>
-            <td><label>Batch ID<input
-                name="batch_pk"
-                type="text"/></label>
-        </tr>
-        </table>
-        <input type="submit" value="Filter"/>
-        </form>
-    </div>
+        <div class="asf-field-container">
+            <label>Name</label> <input name="name" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Creator</label> <input name="user" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Started after</label> <input name="startafter" type="text" class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Started before</label> <input name="startbefore" type="text" class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Ended after</label> <input name="endafter" type="text" class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Ended before</label> <input name="endbefore" type="text" class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Batch name</label> <input name="batch_name" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Batch ID</label> <input name="batch_pk" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Is active</label> <input name="active" type="checkbox" class="asf-search-fixed-field">
+        </div>
+        <input type="submit" value="Filter" class="asf-search-button">
+    </form>
+</div>
 
-    <div id="active_filters"></div>
+<div class="navigation_links"></div>
 
-    <div class="navigation_links"></div>
+<div class="results">
+    <table id="runs">
+        <caption>showing all matching runs</caption>
+    </table>
+</div>
 
-    <div class="results">
-        <table id="runs">
-                <caption>showing all matching runs</caption>
-        </table>
-    </div>
-
-    <div class="no_results">
-        <strong>No matching runs were found.</strong>
-    </div>
+<div class="no_results">
+    <strong>No matching runs were found.</strong>
+</div>
 
     
 {% endblock %}

@@ -9,18 +9,63 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-    <script src="/static/method/methods.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
+    <script src="/static/portal/edit_details.js"></script>
 
     <script type="text/javascript">
-    var is_owner = {{ is_owner|lower }},
-        is_admin = {{ is_admin|lower }};
 
-    $(function(){
-        methods_main(is_admin, $("#methods"), {{ family.pk }},
-                     $("#active_filters"), $(".navigation_links"));
+    var is_admin = {{ is_admin|lower }},
+        is_owner = {{ is_owner|lower }};
+
+    $(function() {
+        noXSS();
+
+        var MethodTable = function($table, is_user_admin, family_pk, $active_filters, $navigation_links) {
+            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
+            this.list_url = "../../api/methods/";
+            this.family_pk = family_pk;
+
+            var MethodTable = this;
+            this.filterSet = new permissions.FilterSet(
+                $active_filters,
+                function() {
+                    MethodTable.page = 1;
+                    MethodTable.reloadTable();
+                }
+            );
+            // This adds a filter for the current MethodFamily.
+            var $mf_filter = this.filterSet.add("methodfamily_id", family_pk, true).hide();
+
+            this.registerColumn("Name", function($td, method) {
+                $("<a>").attr("href", method.view_url).text(method.display_name).appendTo($td);
+            });
+            this.registerColumn("", function($td, method) {
+                $("<a>").attr("href", method.absolute_url).text("Revise").appendTo($td);
+            });
+            this.registerColumn("Description", "revision_desc");
+
+            this.registerStandardColumn("user");
+            this.registerStandardColumn("users_allowed");
+            this.registerStandardColumn("groups_allowed");
+        };
+        MethodTable.prototype = Object.create(permissions.PermissionsTable.prototype);
+        MethodTable.prototype.getQueryParams = function() {
+            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
+            params.filters = this.filterSet.getFilters();
+            return params;
+        };
+
+        var table = new MethodTable(
+            $("#methods"),
+            is_admin,
+            {{ family.pk }},
+            $(".asf-active-filters"),
+            $(".navigation_links")
+        );
+        table.reloadTable();
+        var asf = new AjaxSearchFilter(table, $("#asf"));
     });
     </script>
-    <script src="/static/portal/edit_details.js"></script>
 {% endblock %}
 
 {% block stylesheets %}
@@ -113,32 +158,35 @@
 
 {{ family_form.errors }}
 
-<p style="font-style: italic; color: gray">
+<p>
 Click on the method name to view the method and make edits to metadata,
     click on 'Revise' link to revise the corresponding method, or
     click 'Add new method' to add a method without specifying a parent
     revision.
 </p>
 
-<div class="filter_ctrl">
-    <form class="short-filter">
-    <input name="smart" type="text"
-        ><input type="button" class="advanced ctrl" value="Advanced"
-        ><input type="submit" value="Filter">
+<div id="asf">
+    <form class="asf-form">
+        <div class="asf-main-search">
+            <div class="asf-active-filters"></div>
+            <input type="text" name="smart" class="asf-search-field">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <input type="submit" value="Filter" class="asf-search-button">
+        </div>
     </form>
-
-    <form class="advanced-filter">
-    <h4>Advanced search</h4>
-    <table>
-    <tr>
-        <td><label>Name<input name="name" type="text"/></label></td>
-        <td><label>Description<input name="description" type="text"/></label></td>
-    </tr>
-    <tr>
-        <td><label>Creator<input name="user" type="text"/></label></td>
-    </tr>
-    </table>
-    <input type="submit" value="Filter"/>
+    <form class="asf-advanced-form">
+        <input type="button" class="advanced ctrl" value="Advanced">
+        <h4>Advanced search</h4>
+        <div class="asf-field-container">
+            <label>Name</label> <input name="name" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Description</label> <input name="description" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Creator</label> <input name="user" type="text" class="asf-search-fixed-field">
+        </div>
+        <input type="submit" value="Filter" class="asf-search-button">
     </form>
 </div>
 

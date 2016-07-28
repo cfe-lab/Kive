@@ -6,17 +6,97 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-    <script type="text/javascript">
-        var is_user_admin = {{ is_user_admin|lower }},
-            runbatch_pk = {{ runbatch.pk }},
-            user = "{{ user.get_username }}",
-            is_owner = {{ is_owner|lower }};
-        var is_admin = is_user_admin;
-    </script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
     <script src="/static/sandbox/runs_table.js"></script>
-    <script src="/static/sandbox/runbatch.js"></script>
     <script src="/static/sandbox/jq_color_anim.min.js"></script>
     <script src="/static/portal/edit_details.js"></script>
+    <script type="text/javascript">
+        "use strict";
+        var is_admin = {{ is_user_admin|lower }},
+            runbatch_pk = {{ runbatch.pk }},
+            user = "{{ user.get_username }}",
+            is_owner = {{ is_owner|lower }},
+            pollingInterval = 1000, // milliseconds
+            runsTable;
+
+        $(function(){ // wait for page to finish loading before executing jQuery code
+            // Security stuff to prevent cross-site scripting.
+            noXSS();
+
+            var $permissions_widget = $("#permissions_widget"),
+                $users_widget = $("#id_permissions_0"),
+                $groups_widget = $("#id_permissions_1"),
+                $edit_link_div = $("#edit_permissions"),
+                $loading_msg = $("#loading_message"),
+                $edit_link = $("a", $edit_link_div);
+
+            if (is_owner || is_admin) {
+                $loading_msg.hide();
+                $permissions_widget.hide();
+                $edit_link.click(fillPermissionsForm);
+                fillPermissionsForm.call($edit_link);
+            }
+
+            function fillPermissionsForm(e) {
+                if (e) e.preventDefault();
+
+                $edit_link_div.hide();
+                $loading_msg.show();
+
+                // Retrieve the list of eligible users and groups that we can add permissions to.
+                $.getJSON($(this).attr("href")).done(
+                    function (response) {
+                        // The response should be a list of two lists, where the first list is
+                        // eligible users and the second list is eligible groups.
+                        // Both lists should be of 2-tuples (pk, username|groupname).
+                        $.each(response.users, function() {
+                            $("<option>")
+                                .attr("value", this.id)
+                                .text(this.username)
+                                .appendTo($users_widget);
+                        });
+
+                        $.each(response.groups, function() {
+                            $("<option>")
+                                .attr("value", this.id)
+                                .text(this.name)
+                                .appendTo($groups_widget);
+                        });
+
+                        $loading_msg.hide();
+                        $permissions_widget.show()
+                            .find('.permissions-widget').trigger('sync');
+                    }
+                ).fail(
+                    function (request) {
+                        var detail = (
+                                request.responseJSON ?
+                                request.responseJSON.detail :
+                                "Error while finding eligible users and groups"
+                        );
+                        $loading_msg.text(detail);
+                    }
+                );
+            }
+
+            runsTable = new RunsTable(
+                $('#runs'),
+                user,
+                is_admin,
+                $('.no_results'),
+                runbatch_pk,
+                $('.asf-active-filters'),
+                $(".navigation_links")
+            );
+
+            var storedPage = parseInt(sessionStorage.getItem('batchPage_' + runbatch_pk) || 1);
+            runsTable.filterSet.setFromPairs(sessionStorage.getItem('batchFilters_' + runbatch_pk));
+            runsTable.page = storedPage;
+            runsTable.reloadTable();
+            var asf = new AjaxSearchFilter(runsTable, $('#asf'));
+        });
+
+    </script>
 {% endblock %}
 
 {% block stylesheets %}
@@ -41,7 +121,7 @@
 <h2> {{ runbatch.name }} </h2>
 
 {% if not is_owner and is_user_admin %}
-    <div id="lock"><img src=""/></div>
+    <div id="lock"><img src=""></div>
 {% endif %}
 
 <h3>Details</h3>
@@ -122,62 +202,54 @@
 {{ runbatch_form.errors }}
 
 <h3>Runs</h3>
-    <div class="filter_ctrl">
-        <form class="short-filter">
-        <input name="name" type="text"
-            ><input type="button" class="advanced ctrl" value="Advanced"
-            ><input type="submit" value="Filter">
-        </form>
 
-        <form class="advanced-filter">
+<div id="asf">
+    <form class="asf-form">
+        <div class="asf-main-search">
+            <div class="asf-active-filters"></div>
+            <input type="text" name="name" class="asf-search-field">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <input type="submit" value="Filter" class="asf-search-button">
+        </div>
+    </form>
+    <form class="asf-advanced-form">
+        <input type="button" class="advanced ctrl" value="Advanced">
         <h4>Advanced search</h4>
-        <table>
-        <tr>
-            <td><label>Name<input name="name" type="text"/></label></td>
-        </tr>
-        <tr>
-            <td><label>Creator<input name="user" type="text"/></label></td>
-            <td><label><input
-                name="active"
-                type="checkbox"/>Is active</label></td>
-        </tr>
-        <tr>
-            <td><label>Started after<input
-                name="startafter"
-                type="text"
-                class="datetime"/></label>
-            <td><label>Started before<input
-                name="startbefore"
-                type="text"
-                class="datetime"/></label>
-        </tr>
-        <tr>
-            <td><label>Ended after<input
-                name="endafter"
-                type="text"
-                class="datetime"/></label>
-            <td><label>Ended before<input
-                name="endbefore"
-                type="text"
-                class="datetime"/></label>
-        </tr>
-        </table>
-        <input type="submit" value="Filter"/>
-        </form>
-    </div>
+        <div class="asf-field-container">
+            <label>Name</label> <input name="name" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Creator</label> <input name="user" type="text" class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Started after</label> <input name="startafter" type="text" class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Started before</label> <input name="startbefore" type="text" class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Ended after</label> <input name="endafter" type="text" class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Ended before</label> <input name="endbefore" type="text" class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label>Is active</label> <input name="active" type="checkbox" class="asf-search-fixed-field">
+        </div>
+        <input type="submit" value="Filter" class="asf-search-button">
+    </form>
+</div>
 
-    <div id="active_filters"></div>
+<div class="navigation_links"></div>
 
-    <div class="navigation_links"></div>
+<div class="results">
+    <table id="runs">
+            <caption>showing all matching runs</caption>
+    </table>
+</div>
 
-    <div class="results">
-        <table id="runs">
-                <caption>showing all matching runs</caption>
-        </table>
-    </div>
-
-    <div class="no_results">
-        <strong>No matching runs were found.</strong>
-    </div>
+<div class="no_results">
+    <strong>No matching runs were found.</strong>
+</div>
 
 {% endblock %}
