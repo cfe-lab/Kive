@@ -1,7 +1,7 @@
 (function() {
     "use strict";
     
-    describe("Pipeline Families table for sandbox", function() {
+    xdescribe("Pipeline Families table for sandbox", function() {
         beforeEach(function() {
             this.$table = $('<table>');
             this.$navigation_links = $("<div/>");
@@ -102,20 +102,5 @@
             expect($cells.eq(0).text()).toBe('some_dataset.csv');
         });
         
-        it('should respond to click on any field', function() {
-            var table = new choose_inputs.DatasetsTable(
-                    this.$table,
-                    this.is_user_admin,
-                    this.input_index,
-                    this.compounddatatype_id);
-            table.image_path = "portal/static/portal/img";
-            table.buildTable(this.rows);
-            
-            var $row = this.$table.find('tr').eq(1),
-                $radio = $row.find('input');
-
-            $row.click();
-            expect($radio.is(':checked')).toBe(true, 'checked');
-        });
     });
 })();

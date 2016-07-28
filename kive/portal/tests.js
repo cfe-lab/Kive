@@ -64,8 +64,10 @@
             this.filterSet.add("age", "23");
             var filters = this.filterSet.getFilters();
             
-            expect(filters).toEqual([{ key: "age", val: "23" },
-                                     { key: "name", val: "Bob" }]);
+            expect(filters).toEqual(
+                jasmine.arrayContaining([{ key: "age", val: "23" },
+                                     { key: "name", val: "Bob" }])
+            );
             expect(this.changeCount).toBe(2, 'change count');
         });
         
@@ -74,8 +76,10 @@
             this.filterSet.add("name", "Jim");
             var filters = this.filterSet.getFilters();
             
-            expect(filters).toEqual([{ key: "name", val: "Jim" },
-                                     { key: "name", val: "Bob" }]);
+            expect(filters).toEqual(
+                jasmine.arrayContaining([{ key: "name", val: "Jim" },
+                                     { key: "name", val: "Bob" }])
+            );
         });
         
         it("should ignore exact duplicate", function() {
@@ -122,8 +126,10 @@
                 
                 var filters = this.filterSet.getFilters();
                 
-                expect(filters).toEqual([{ key: "name", val: "Bob" },
-                                         { key: "age", val: "23" }]);
+                expect(filters).toEqual(
+                    jasmine.arrayContaining([{ key: "name", val: "Bob" },
+                                         { key: "age", val: "23" }])
+                );
                 expect(this.changeCount).toBe(1, 'change count');
             });
             
@@ -132,8 +138,10 @@
                 
                 var filters = this.filterSet.getFilters();
                 
-                expect(filters).toEqual([{ key: "name", val: "Bob" },
-                                         { key: "age", val: "23" }]);
+                expect(filters).toEqual(
+                    jasmine.arrayContaining([{ key: "name", val: "Bob" },
+                                         { key: "age", val: "23" }])
+                );
                 expect(this.changeCount).toBe(1, 'change count');
             });
             
@@ -143,8 +151,10 @@
                 
                 var filters = this.filterSet.getFilters();
                 
-                expect(filters).toEqual([{ key: "name", val: "Bob" },
-                                         { key: "age", val: "23" }]);
+                expect(filters).toEqual(
+                    jasmine.arrayContaining([{ key: "name", val: "Bob" },
+                                         { key: "age", val: "23" }])
+                );
                 expect(this.changeCount).toBe(2, 'change count');
             });
             
@@ -172,7 +182,7 @@
                 
                 var pairs = this.filterSet.getPairs();
                 
-                expect(pairs).toEqual('name=Bob&age=23');
+                expect(['name=Bob&age=23', 'age=23&name=Bob']).toContain(pairs);
             });
             
             it("should build empty pairs string", function() {
@@ -189,8 +199,10 @@
                 
                 var filters = this.filterSet.getFilters();
                 
-                expect(filters).toEqual([{ key: "name", val: "Tom & Jerry" },
-                                         { key: "comment", val: "1=2" }]);
+                expect(filters).toEqual(
+                    jasmine.arrayContaining([{ key: "name", val: "Tom & Jerry" },
+                                         { key: "comment", val: "1=2" }])
+                );
             });
             
             it("should add boolean filter from a checkbox", function() {

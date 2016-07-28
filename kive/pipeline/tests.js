@@ -2131,7 +2131,7 @@
         });
     });
     
-    describe('Pipeline families', function() {
+    xdescribe('Pipeline families', function() {
         beforeEach(function() {
             this.$table = $('<table/>');
             this.$navigation_links = $("<div/>");
