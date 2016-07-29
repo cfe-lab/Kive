@@ -9,29 +9,14 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
+    <script src="/static/metadata/DatatypesTable.js"></script>
     <script src="/static/portal/ajaxsearchfilter.js"></script>
     <script type="text/javascript">
 
     $(function() {
         noXSS();
 
-        var DatatypesTable = function($table, is_user_admin, $navigation_links) {
-            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
-            this.list_url = "api/datatypes/";
-
-            this.registerColumn("Name", function($td, datatype) {
-                $("<a>").attr("href", datatype.absolute_url).text(datatype.name).appendTo($td);
-            });
-            this.registerColumn("Description", "description");
-            this.registerColumn("Restricts", "restricts");
-            this.registerDateTimeColumn("Date created", "date_created");
-            this.registerStandardColumn("user");
-            this.registerStandardColumn("users_allowed");
-            this.registerStandardColumn("groups_allowed");
-        };
-        DatatypesTable.prototype = Object.create(permissions.PermissionsTable.prototype);
-
-        var table = new DatatypesTable(
+        var table = new permissions.DatatypesTable(
             $("#datatypes"),
             {{ is_user_admin|lower }},
             $(".navigation_links")

@@ -21,7 +21,7 @@ $(function() {
             options_btn: $('#insert_many_dataset'),
             options_menu: $('#insert_many_menu')
         },
-        dataset_search_table = new choose_inputs.DatasetsTable(
+        dataset_search_table = new permissions.DatasetsTable(
             dataset_search_dialog.find('table'),
             IS_USER_ADMIN,
             dataset_search_dialog.find(".navigation_links")
@@ -30,7 +30,7 @@ $(function() {
             dataset_search_table,
             dataset_search_dialog
         ),
-        permissions = {
+        $permissions = {
             widget: $("#permissions_widget"),
             ctrl: $("#permissions_ctrl")
         }
@@ -912,21 +912,21 @@ $(function() {
         }, '.run-name');
     })();
 
-    permissions.widget.toggle = function() {
-        $.fn.toggle.call(permissions.widget);//call prototype's toggle function
-        permissions.ctrl.toggleClass("active");
-        permissions.widget.autoPosition();
+    $permissions.widget.toggle = function() {
+        $.fn.toggle.call($permissions.widget);//call prototype's toggle function
+        $permissions.ctrl.toggleClass("active");
+        $permissions.widget.autoPosition();
     };
-    permissions.widget.autoPosition = function() {
+    $permissions.widget.autoPosition = function() {
         var left = '', right = '',
-            ctrl_left = permissions.ctrl.offset().left;
-        if (permissions.widget.is(':visible')) {
-            if (ctrl_left + permissions.widget.outerWidth() > window.innerWidth) {
+            ctrl_left = $permissions.ctrl.offset().left;
+        if ($permissions.widget.is(':visible')) {
+            if (ctrl_left + $permissions.widget.outerWidth() > window.innerWidth) {
                 right = 0;
             } else {
                 left = ctrl_left;
             }
-            permissions.widget.css({
+            $permissions.widget.css({
                 right: right,
                 left: left,
                 bottom: below_box.outerHeight()
@@ -936,8 +936,8 @@ $(function() {
 
     var unfocusAll = function() {
         dataset_input_table.deselectAll();
-        if (permissions.widget.is(':visible')) {
-            permissions.widget.toggle();
+        if ($permissions.widget.is(':visible')) {
+            $permissions.widget.toggle();
         }
         $('.filter.focus').removeClass('focus');
     };
@@ -950,16 +950,16 @@ $(function() {
     $(document)            .scroll ( dataset_search_dialog.scrollButton )
                            .click  ( unfocusAll );
     $(window)              .resize ( dataset_search_dialog.scrollButton )
-                           .resize ( permissions.widget.autoPosition )
+                           .resize ( $permissions.widget.autoPosition )
                            .resize ( function()  { dataset_search_table.checkOverflow(); })
                            .resize ( function()  { above_box.adjustSpacing(); })
                            .scroll ( function(e) { dataset_input_table.scrollHeader(e); });
     set_dataset.btn        .click  ( addSelectedDatasetsToInput );
     set_dataset.options_btn.click  ( set_dataset.options_menu.show )
                         .mouseleave( set_dataset.options_menu.hide );
-    permissions.ctrl       .click  ( permissions.widget.toggle )
+    $permissions.ctrl       .click  ( $permissions.widget.toggle )
                            .click  ( stopProp );
-    permissions.widget     .click  ( stopProp );
+    $permissions.widget     .click  ( stopProp );
     above_box              .click  ( stopProp )
       .find('.close.ctrl') .click  ( dataset_search_dialog.hide );
     $('#date_added')       .change ( dateAddedFilterHandler );

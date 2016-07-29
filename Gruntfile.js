@@ -7,22 +7,22 @@ module.exports = function(grunt) {
     pkg: grunt.file.readJSON('package.json'),
     jshint: {
         files: [
-            "kive/tests.js",
-            "kive/archive/*.js",
-            "kive/pipeline/static/pipeline/drydock.js",
-            "kive/pipeline/static/pipeline/drydock_objects.js",
-            "kive/pipeline/static/pipeline/pipeline_families.js",
-            "kive/pipeline/static/pipeline/pipeline_revise.js",
-            "kive/pipeline/static/pipeline/pipeline_load.js",
-            "kive/pipeline/static/pipeline/pipelines.js",
-            "kive/portal/static/portal/permissions.js",
-            "kive/sandbox/static/sandbox/choose*.js"
+            "kive/*.js",
+            "kive/**/*.js"
         ],
         options: {
 //          curly: true,
 //          eqeqeq: true,
           freeze: true,
           futurehostile: true,
+          ignores: [
+            "kive/**/*.min.js",
+            "kive/**/*.pack.js",
+            "kive/**/imagediff.js",
+            "kive/**/jsil8n.js",
+            "kive/**/jasmine.js",
+            "kive/**/noxss.js"
+          ],
 //          maxdepth: 6,
           maxerr: 20,
 //          nocomma: true,
@@ -30,7 +30,10 @@ module.exports = function(grunt) {
 //          undef: true,
 //          unused: true,
           globals: {
-            jQuery: true
+            jQuery: true,
+            "$": true,
+            "window": true,
+            "permissions": true
           }
         }
     },

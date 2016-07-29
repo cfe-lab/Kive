@@ -11,7 +11,7 @@
     <script src="/static/sandbox/jq_color_anim.min.js"></script>
 
     <script type="text/javascript">
-    
+
     var user = "{{ user.get_username }}",
         is_user_admin = {{ is_user_admin|lower }},
         pollingInterval = 1000; // milliseconds
@@ -20,7 +20,7 @@
         // Security stuff to prevent cross-site scripting.
         noXSS();
         
-        var runsTable = new RunsTable(
+        var runsTable = new permissions.RunsTable(
             $('#runs'),
             user,
             is_user_admin,

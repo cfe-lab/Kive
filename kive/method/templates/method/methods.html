@@ -9,6 +9,7 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
+    <script src="/static/method/MethodTable.js"></script>
     <script src="/static/portal/ajaxsearchfilter.js"></script>
     <script src="/static/portal/edit_details.js"></script>
 
@@ -20,24 +21,7 @@
     $(function() {
         noXSS();
 
-        var MethodTable = function($table, is_user_admin, $navigation_links) {
-            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
-            this.list_url = "../../api/methods/";
-
-            this.registerColumn("Name", function($td, method) {
-                $("<a>").attr("href", method.view_url).text(method.display_name).appendTo($td);
-            });
-            this.registerColumn("", function($td, method) {
-                $("<a>").attr("href", method.absolute_url).text("Revise").appendTo($td);
-            });
-            this.registerColumn("Description", "revision_desc");
-            this.registerStandardColumn("user");
-            this.registerStandardColumn("users_allowed");
-            this.registerStandardColumn("groups_allowed");
-        };
-        MethodTable.prototype = Object.create(permissions.PermissionsTable.prototype);
-
-        var table = new MethodTable(
+        var table = new permissions.MethodTable(
             $("#methods"),
             is_admin,
             $(".navigation_links")
@@ -47,7 +31,7 @@
         table.filterSet.add("methodfamily_id", {{ family.pk }}, true).hide();
         asf.reloadTable();
     });
-    
+
     </script>
 {% endblock %}
 

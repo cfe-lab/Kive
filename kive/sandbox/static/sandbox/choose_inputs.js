@@ -1,43 +1,19 @@
-var choose_inputs = (function() {
+(function(permissions) {
     "use strict";
-    var my = {};
-    
-    function buildName($td, row) {
-        var inner_div = $('<div>').text(row.name);
-        $td.append(inner_div).addClass('primary').data('id', row.id);
-    }
-    function buildDateCreated($td, row) {
-        $td.text(permissions.formatDate(row.date_created)).addClass('date');
-    }
 
-    function buildFileSize($td, dataset) {
-        var el = $('<em>');
-        if (dataset.has_data) {
-            el = dataset.filesize_display;
-        } else if (dataset.is_redacted) {
-            el.text('redacted');
-        } else {
-            el.text('missing');
-        }
-        $td.append(el);
-    }
-
-    my.DatasetsTable = function($table, is_user_admin, $navigation_links) {
+    permissions.DatasetsTable = function($table, is_user_admin, $navigation_links) {
         permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
         this.list_url = "/api/datasets/";
-
         this.registerColumn("Name", buildName);
         this.registerColumn("Date", buildDateCreated);
         this.registerColumn("File Size (B)", buildFileSize);
         this.registerStandardColumn("user");
         this.registerStandardColumn("users_allowed");
         this.registerStandardColumn("groups_allowed");
-
         this.page_size = 8;
     };
-    my.DatasetsTable.prototype = Object.create(permissions.PermissionsTable.prototype);
- 
-    my.DatasetsTable.prototype.extractRows = function(response) {
+    permissions.DatasetsTable.prototype = Object.create(permissions.PermissionsTable.prototype);
+    permissions.DatasetsTable.prototype.extractRows = function(response) {
         var datasets = [],
             caption,
             count;
@@ -60,10 +36,10 @@ var choose_inputs = (function() {
         this.setCaption(caption);
         return datasets;
     };
-    my.DatasetsTable.prototype.getMaxYPosition = function() {
+    permissions.DatasetsTable.prototype.getMaxYPosition = function() {
         return window.innerHeight;
     };
-    my.DatasetsTable.prototype.checkOverflow = function() {
+    permissions.DatasetsTable.prototype.checkOverflow = function() {
         var dataset_table = this,
             available_space = this.getMaxYPosition() -
                 this.$table.offset().top - this.$table.outerHeight() + 10,
@@ -113,5 +89,22 @@ var choose_inputs = (function() {
         }
     };
 
-    return my;
-}());
+    function buildName($td, row) {
+        var inner_div = $('<div>').text(row.name);
+        $td.append(inner_div).addClass('primary').data('id', row.id);
+    }
+    function buildDateCreated($td, row) {
+        $td.text(permissions.formatDate(row.date_created)).addClass('date');
+    }
+    function buildFileSize($td, dataset) {
+        var el = $('<em>');
+        if (dataset.has_data) {
+            el = dataset.filesize_display;
+        } else if (dataset.is_redacted) {
+            el.text('redacted');
+        } else {
+            el.text('missing');
+        }
+        $td.append(el);
+    }
+})(permissions);

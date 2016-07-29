@@ -74,7 +74,6 @@ var permissions = (function() {
      *  @param columnName: "user", "users_allowed", or "groups_allowed"
      */
     my.PermissionsTable.prototype.registerStandardColumn = function(columnName) {
-
         if (columnName === "user") {
             this.registerColumn('Creator', 'user');
         }
@@ -96,6 +95,28 @@ var permissions = (function() {
             header,
             columnName) {
         this.registerColumn(header, buildDateTimeCell, columnName);
+    };
+
+    /**
+     * Register a column which is a label with a link.
+     *
+     *  @param header: a string to label the column header
+     *  @param base_url: the first part of the URL of the link
+     *  @param label_field: the property of the item which provides the label
+     *  @param url_field: the property of the item which provides the rest of the URL
+     */
+    my.PermissionsTable.prototype.registerLinkColumn = function(
+            header,
+            base_url,
+            label_field,
+            url_field) {
+        label_field = label_field || "name";
+        url_field = url_field || "id";
+        this.registerColumn(header, function($td, item) {
+            $('<a>').text(item[label_field])
+                .attr('href', base_url + item[url_field])
+                .appendTo($td);
+        });
     };
     
     /**

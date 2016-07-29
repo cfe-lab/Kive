@@ -104,19 +104,19 @@ var AjaxSearchFilter = (function(permissions) {
 	    if (table.ajax_request !== undefined) {
 	    	table.ajax_request.complete(trackTableWidth);
 	    }
-	};
+	}
     function focusSearchField(e) {
         // prevent this event from bubbling
         if ( $(e.target).is(asf.main_search) ) {
             asf.search_field.focus();
         }
-    };
+    }
     function focusOnThis() {
     	$(this).addClass('focus').siblings().removeClass('focus');
-    };
+    }
     function unfocusFilters() {
     	$('.filter.focus').removeClass('focus');
-    };
+    }
 	function filterKeyHandler(e) {
         var focus_filter = $('.filter.focus'),
             filter_key = focus_filter.data('key'),
@@ -165,7 +165,7 @@ var AjaxSearchFilter = (function(permissions) {
                 e.preventDefault();
             }
         }
-    };
+    }
     function searchInputKeyHandler(e) {
         var last_filter;
         if (this.selectionStart === 0) {
@@ -184,7 +184,7 @@ var AjaxSearchFilter = (function(permissions) {
             }
         }
         e.stopPropagation();
-    };
+    }
 
 
     return init;

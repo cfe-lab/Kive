@@ -9,6 +9,7 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
+    <script src="/static/method/CodeResourceRevisionTable.js"></script>
     <script src="/static/portal/ajaxsearchfilter.js"></script>
     <script src="/static/portal/edit_details.js"></script>
 
@@ -20,31 +21,7 @@
     $(function() {
         noXSS();
 
-        var CodeResourceRevisionTable = function($table, is_user_admin, $navigation_links) {
-            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
-            this.list_url = "../../api/coderesourcerevisions/";
-
-            this.registerColumn("#", "revision_number");
-            this.registerColumn("Name", function($td, revision) {
-                $("<a>").attr("href", revision.view_url).text(revision.display_name).appendTo($td);
-            });
-            this.registerColumn("", function($td, revision) {
-                $("<a>").attr("href", revision.absolute_url).text("Revise").appendTo($td);
-            });
-            this.registerColumn("Description", "revision_desc");
-            this.registerDateTimeColumn("Date", "revision_DateTime");
-            this.registerColumn("", function($td, revision) {
-                if (revision.content_file.length !== 0) {
-                    $('<a>').text('Download').attr('href', revision.download_url).appendTo($td);
-                }
-            });
-            this.registerStandardColumn("user");
-            this.registerStandardColumn("users_allowed");
-            this.registerStandardColumn("groups_allowed");
-        };
-        CodeResourceRevisionTable.prototype = Object.create(permissions.PermissionsTable.prototype);
-
-        var table = new CodeResourceRevisionTable(
+        var table = new permissions.CodeResourceRevisionTable(
             $("#coderesourcerevisions"), 
             is_admin,
             $(".navigation_links")

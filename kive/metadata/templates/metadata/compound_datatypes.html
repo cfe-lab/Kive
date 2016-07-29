@@ -9,34 +9,15 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
+    <script src="/static/metadata/CompoundDatatypesTable.js"></script>
     <script src="/static/portal/ajaxsearchfilter.js"></script>
     <script type="text/javascript">
 
     $(function(){ 
         // Security stuff to prevent cross-site scripting.
         noXSS();
-
-        var CompoundDatatypesTable = function($table, is_user_admin, $navigation_links) {
-            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
-
-            this.list_url = "api/compounddatatypes/";
-            this.registerColumn("Name", function($td, cdt) {
-                var $a = $("<a/>").attr("href", cdt.absolute_url).text(cdt.name);
-                $td.append($a);
-            });
-            this.registerColumn("Scheme", "representation");
-            this.registerStandardColumn("user");
-            this.registerStandardColumn("users_allowed");
-            this.registerStandardColumn("groups_allowed");
-        };
-        CompoundDatatypesTable.prototype = Object.create(
-            permissions.PermissionsTable.prototype);
-
-        CompoundDatatypesTable.prototype.buildTable = function(rows) {
-            permissions.PermissionsTable.prototype.buildTable.apply(this, [rows]);
-        };
         
-        var table = new CompoundDatatypesTable(
+        var table = new permissions.CompoundDatatypesTable(
             $('#compounddatatypes'),
             {{ is_user_admin|lower }},
             $(".navigation_links")

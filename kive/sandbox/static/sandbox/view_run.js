@@ -16,7 +16,7 @@ $(function() {
         timer,
         timerInterval = 1000,
         pipeline = new Pipeline(canvasState),
-        $msg = $('#run_status');
+        $msg = $('#run_status')
     ;
 
     // Methods
@@ -34,7 +34,7 @@ $(function() {
         if (use_anim) {
             this.prepend('<img src="/static/sandbox/preload.gif"> &nbsp;');
         }
-    }
+    };
     function grabStatus() {
         if (timer === undefined) {
             timer = setInterval(grabStatus, timerInterval);

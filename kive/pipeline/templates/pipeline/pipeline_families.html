@@ -6,32 +6,13 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
+    <script src="/static/pipeline/PipelineFamiliesTable.js"></script>
     <script src="/static/portal/ajaxsearchfilter.js"></script>
     <script type="text/javascript">
 
     $(function(){
         noXSS();
-        
-        var PipelineFamiliesTable = function($table, is_user_admin, $active_filters, $navigation_links) {
-            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
-            this.list_url = "api/pipelinefamilies/";
-
-            this.registerColumn("Family", function ($td, pipeline_family) {
-                $("<a>").attr("href", pipeline_family.absolute_url).text(pipeline_family.name).appendTo($td);
-            });
-            this.registerColumn("Description", "description");
-            this.registerColumn("# revisions", "num_revisions");
-            this.registerColumn("Published version", function ($td, pipeline_family) {
-                $td.text(pipeline_family.published_version_display_name || "None");
-            });
-
-            this.registerStandardColumn("user");
-            this.registerStandardColumn("users_allowed");
-            this.registerStandardColumn("groups_allowed");
-        };
-        PipelineFamiliesTable.prototype = Object.create(permissions.PermissionsTable.prototype);
-
-        var table = new PipelineFamiliesTable(
+        var table = new permissions.PipelineFamiliesTable(
             $("#pipelinefamilies"),
             {{ is_user_admin|lower }},
             $('.asf-active-filters'),

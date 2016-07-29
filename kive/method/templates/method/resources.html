@@ -9,32 +9,15 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
+    <script src="/static/method/CodeResourceTable.js"></script>
     <script src="/static/portal/ajaxsearchfilter.js"></script>
     <script src="/static/portal/helptext.js"></script>
     <script type="text/javascript">
 
     $(function(){
         noXSS();
-        var CodeResourceTable = function($table, is_user_admin, $navigation_links) {
-            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
-            this.list_url = "api/coderesources/";
 
-            this.registerColumn("Name", function($td, coderesource) {
-                var $a = $("<a>").attr("href", coderesource.absolute_url).text(coderesource.name);
-                $td.append($a);
-            });
-            this.registerColumn("Description", "description");
-            this.registerColumn("Filename", "filename");
-            this.registerColumn("# of revisions", "num_revisions");
-            this.registerDateTimeColumn("Last revision date", "last_revision_date");
-
-            this.registerStandardColumn("user");
-            this.registerStandardColumn("users_allowed");
-            this.registerStandardColumn("groups_allowed");
-        };
-        CodeResourceTable.prototype = Object.create(permissions.PermissionsTable.prototype);
-
-        var table = new CodeResourceTable(
+        var table = new permissions.CodeResourceTable(
             $("#coderesources"),
             {{ is_user_admin|lower }},
             $(".navigation_links")

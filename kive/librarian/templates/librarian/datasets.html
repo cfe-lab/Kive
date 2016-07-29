@@ -11,54 +11,14 @@
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
+    <script src="/static/librarian/DatasetsTable.js"></script>
     <script src="/static/portal/ajaxsearchfilter.js"></script>
     <script type="text/javascript">
     $(function(){
-        "use strict";
-        
         var is_user_admin = {{ is_user_admin|lower }};
         noXSS();
 
-        var DatasetsTable = function($table, is_user_admin, $navigation_links) {
-            permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
-            this.list_url = "/api/datasets/";
-
-            this.session_filters_key = "datasetFilters";
-            this.session_page_key = "datasetPage";
-
-            this.registerColumn("Name", function($td, dataset) {
-                $('<a>').text(dataset.name).attr('href', '/dataset_view/' + dataset.id).appendTo($td);
-            });
-            this.registerColumn("Description", function($td, dataset) {
-                $.each(dataset.description.split('\n'), function(_, txt){
-                    $td.append(txt, '<br>');
-                });
-            });
-            this.registerColumn("Created", function($td, row) {
-                $td.text(permissions.formatDate(row.date_created));
-            });
-            this.registerColumn("File Size", function($td, dataset) {
-                var content = "<em>missing</em>";
-                if (dataset.has_data) {
-                    content = dataset.filesize_display;
-                } else if (dataset.is_redacted) {
-                    content = "<em>redacted</em>";
-                }
-                $td.append(content);
-            });
-            this.registerColumn("", function($td, dataset) {
-                if (dataset.has_data) {
-                    $('<a>').text('Download').attr('href', dataset.download_url).appendTo($td);
-                }
-            });
-
-            this.registerStandardColumn("user");
-            this.registerStandardColumn("users_allowed");
-            this.registerStandardColumn("groups_allowed");
-        };
-        DatasetsTable.prototype = Object.create(permissions.PermissionsTable.prototype);
-
-        var table = new DatasetsTable(
+        var table = new permissions.DatasetsTable(
                 $('#datasets'),
                 is_user_admin,
                 $(".navigation_links")
