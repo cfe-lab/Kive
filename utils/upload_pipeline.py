@@ -14,7 +14,7 @@ from urlparse import urlparse
 from glob import glob
 from operator import attrgetter
 from kiveapi.pipeline import PipelineFamily, Pipeline
-from itertools import count
+from itertools import count, chain
 from constants import maxlengths
 
 
@@ -101,6 +101,56 @@ class CodeResourceRequest(object):
         CodeResourceRequest.existing[self.name] = self.code_resource_revision
 
 
+class CompoundDatatypeRequest(object):
+    datatypes = {}  # {name: id}
+    existing = {}  # {representation: request}
+    new_requests = set()
+
+    @classmethod
+    def load_existing(cls, kive):
+        """ Load all the existing compound datatypes. """
+        response = kive.get('/api/datatypes')
+        for datatype in response.json():
+            cls.datatypes[datatype['name']] = datatype['id']
+        for compound_datatype in kive.get_cdts():
+            representation = compound_datatype.raw['representation']
+            request = cls(representation)
+            request.compound_datatype = compound_datatype.raw
+            cls.existing[representation] = request
+
+    @classmethod
+    def load(cls, kive, representation):
+        request = cls.existing.get(representation, None)
+        if request is None:
+            request = cls(representation)
+            cls.existing[representation] = request
+            cls.new_requests.add(request)
+        return request
+
+    def __init__(self, representation):
+        self.representation = representation
+        self.members = []
+        stripped = representation.strip('()')
+        for i, member_representation in enumerate(stripped.split(', '), start=1):
+            name, type_name = member_representation.split(': ')
+            is_blankable = type_name[-1] == '?'
+            if is_blankable:
+                type_name = type_name[:-1]
+            datatype_id = CompoundDatatypeRequest.datatypes[type_name]
+            self.members.append(dict(datatype=datatype_id,
+                                     column_name=name,
+                                     column_idx=i,
+                                     blankable=is_blankable))
+        self.compound_datatype = None
+
+    def create(self, kive, groups):
+        if self.compound_datatype is None:
+            self.compound_datatype = kive.create_cdt(name=self.representation,
+                                                     members=self.members,
+                                                     users=[],
+                                                     groups=groups)
+
+
 def choose_folder():
     dump_folders = sorted(os.path.dirname(folder)
                           for folder in glob('dump/*/pipeline.json'))
@@ -153,12 +203,23 @@ def create_pipeline_family(kive, family_name, groups):
     return pipeline_family
 
 
+def load_pipeline(kive, pipeline_config):
+    for config in chain(pipeline_config['inputs'], pipeline_config['outputs']):
+        structure = config['structure']
+        if structure is not None:
+            CompoundDatatypeRequest.load(kive, structure['compounddatatype'])
+
+
 def create_pipeline(kive, pipeline_family, pipeline_config, steps):
     groups = pipeline_family.details['groups_allowed']
     inputs = []
     for old_input in pipeline_config['inputs']:
         new_input = dict(old_input)
-        new_input['structure'] = None  # TODO: Add structure
+        structure = new_input['structure']
+        if structure is not None:
+            request = CompoundDatatypeRequest.load(kive,
+                                                   structure['compounddatatype'])
+            structure['compounddatatype'] = request.compound_datatype['id']
         inputs.append(new_input)
     step_data = []
     for step in steps:
@@ -169,14 +230,26 @@ def create_pipeline(kive, pipeline_family, pipeline_config, steps):
     outcables = []
     for i, old_cable in enumerate(pipeline_config['outcables']):
         new_cable = dict(old_cable)
-        new_cable['output_cdt'] = None  # TODO: Add structure
+        compound_datatype = new_cable['output_cdt']
+        if compound_datatype is not None:
+            request = CompoundDatatypeRequest.load(kive, compound_datatype)
+            new_cable['output_cdt'] = request.compound_datatype['id']
         new_cable['x'] = new_cable['y'] = i
         outcables.append(new_cable)
+    outputs = []
+    for old_output in pipeline_config['outputs']:
+        new_output = dict(old_output)
+        structure = new_output['structure']
+        if structure is not None:
+            request = CompoundDatatypeRequest.load(kive,
+                                                   structure['compounddatatype'])
+            structure['compounddatatype'] = request.compound_datatype['id']
+        outputs.append(new_output)
     response = kive.post('@api_pipelines',
                          json=dict(family=pipeline_family.name,
                                    inputs=inputs,
                                    steps=step_data,
-                                   # outputs=outputs,
+                                   outputs=outputs,
                                    outcables=outcables,
                                    users_allowed=[],
                                    groups_allowed=groups))
@@ -213,6 +286,22 @@ def load_steps(kive, folder, pipeline_family, groups):
         step.name = step_config['name']
         step.dependencies = list(
             find_dependencies(kive, folder, transformation['driver']))
+        step.inputs = []
+        for input_config in step_config['inputs']:
+            if input_config['structure'] is None:
+                request = None
+            else:
+                representation = input_config['structure']['compounddatatype']
+                request = CompoundDatatypeRequest.load(kive, representation)
+            step.inputs.append((input_config, request))
+        step.outputs = []
+        for output_config in step_config['outputs']:
+            if output_config['structure'] is None:
+                request = None
+            else:
+                representation = output_config['structure']['compounddatatype']
+                request = CompoundDatatypeRequest.load(kive, representation)
+            step.outputs.append((output_config, request))
         if old_pipeline:
             for old_step in old_pipeline.details['steps']:
                 if old_step['name'] == step.name:
@@ -250,12 +339,18 @@ def create_methods(kive, steps, revision_name):
                 step.method_family = response.json()
         if step.method is None:
             transformation = step.config['transformation']
-            inputs = step.config['inputs']
-            for inp in inputs:
-                inp['structure'] = None  # TODO: load structures
-            outputs = step.config['outputs']
-            for out in outputs:
-                out['structure'] = None  # TODO: load structures
+            inputs = []
+            for input_config, request in step.inputs:
+                if request is not None:
+                    new_id = request.compound_datatype['id']
+                    input_config['structure']['compounddatatype'] = new_id
+                inputs.append(input_config)
+            outputs = []
+            for output_config, request in step.outputs:
+                if request is not None:
+                    new_id = request.compound_datatype['id']
+                    output_config['structure']['compounddatatype'] = new_id
+                outputs.append(output_config)
             dependencies = []
             for dependency in step.dependencies:
                 new_revision = dependency['requirement'].code_resource_revision
@@ -294,20 +389,35 @@ def main():
     groups = raw_input('Groups allowed? [Everyone] ') or 'Everyone'
     groups = groups.split(',')
 
+    CompoundDatatypeRequest.load_existing(kive)
     steps, pipeline_config = load_steps(kive, folder, pipeline_family, groups)
+    load_pipeline(kive, pipeline_config)
     print('Uploading {!r} to {} for {}.'.format(folder, pipeline_family, groups))
     for i, step in enumerate(steps, start=1):
         print '  {}: {}'.format(i, step.driver.get_display())
         for dependency in step.dependencies:
             print '     ' + dependency['requirement'].get_display()
+    new_compound_datatypes = [request.representation
+                              for request in CompoundDatatypeRequest.new_requests]
+    new_compound_datatypes.sort()
+    print('New compound datatypes:')
+    print('\n'.join(new_compound_datatypes))
     revision_name = raw_input('Enter a revision name, or leave blank to abort: ')
     if not revision_name:
         return
 
+    for request in CompoundDatatypeRequest.new_requests:
+        request.create(kive, groups)
     create_code_resources(kive, steps, revision_name)
     create_methods(kive, steps, revision_name)
     pipeline_family = create_pipeline_family(kive, pipeline_family, groups)
     create_pipeline(kive, pipeline_family, pipeline_config, steps)
     print('Done.')
 
-main()
+if __name__ == '__main__':
+    main()
+elif __name__ == '__live_coding__':
+    CompoundDatatypeRequest.datatypes = dict(integer=1,
+                                             float=2)
+    request = CompoundDatatypeRequest(
+        "(count: integer, fwdq: float?, revq: float?)")
