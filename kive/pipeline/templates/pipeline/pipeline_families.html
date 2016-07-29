@@ -10,20 +10,11 @@
     <script type="text/javascript">
 
     $(function(){
-        "use strict";
+        noXSS();
         
         var PipelineFamiliesTable = function($table, is_user_admin, $active_filters, $navigation_links) {
             permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
             this.list_url = "api/pipelinefamilies/";
-
-            var pfTable = this;
-            this.filterSet = new permissions.FilterSet(
-                $active_filters,
-                function() {
-                    pfTable.page = 1;
-                    pfTable.reloadTable();
-                }
-            );
 
             this.registerColumn("Family", function ($td, pipeline_family) {
                 $("<a>").attr("href", pipeline_family.absolute_url).text(pipeline_family.name).appendTo($td);
@@ -39,13 +30,6 @@
             this.registerStandardColumn("groups_allowed");
         };
         PipelineFamiliesTable.prototype = Object.create(permissions.PermissionsTable.prototype);
-        PipelineFamiliesTable.prototype.getQueryParams = function() {
-            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
-            params.filters = this.filterSet.getFilters();
-            return params;
-        };
-        
-        noXSS();
 
         var table = new PipelineFamiliesTable(
             $("#pipelinefamilies"),

@@ -16,8 +16,8 @@
         is_admin = {{ is_admin|lower }};
 
     $(function(){
-        "use strict";
         noXSS();
+        var family_pk = {{ family.pk }};
             
         function published_version($td, pipeline, data) {
             var $button_group = $('<div class="button-group">'),
@@ -50,22 +50,10 @@
             }).append($button_group).appendTo($td);
         }
 
-        var PipelineTable = function($table, is_user_admin, family_pk, $active_filters, $navigation_links) {
+        var PipelineTable = function($table, is_user_admin, family_pk, $navigation_links) {
             permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
             this.list_url = "../../api/pipelines/";
             this.family_pk = family_pk;
-
-            var plTable = this;
-            this.filterSet = new permissions.FilterSet(
-                $active_filters,
-                function() {
-                    plTable.page = 1;
-                    plTable.reloadTable();
-                }
-            );
-            // This adds a filter for the current CodeResource.
-            var $pf_filter = this.filterSet.add("pipelinefamily_id", this.family_pk, true);
-            $pf_filter.hide();
 
             this.registerColumn("Name", function ($td, pipeline) {
                 var $a = $("<a/>").attr("href", pipeline.view_url);
@@ -77,8 +65,7 @@
                 $td.append($a);
             });
             this.registerColumn("", function pipeline_revise_link($td, pipeline) {
-                var $a = $("<a/>").attr("href", pipeline.absolute_url).text("Revise");
-                $td.append($a);
+                $("<a>").attr("href", pipeline.absolute_url).text("Revise").appendTo($td);
             });
             this.registerColumn("Description", function($td, pipeline) {
                 if (pipeline.revision_desc && pipeline.revision_desc !== '') {
@@ -100,21 +87,18 @@
             this.registerStandardColumn("groups_allowed");
         };
         PipelineTable.prototype = Object.create(permissions.PermissionsTable.prototype);
-        PipelineTable.prototype.getQueryParams = function() {
-            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
-            params.filters = this.filterSet.getFilters();
-            return params;
-        };
 
         var table = new PipelineTable(
             $("#pipelines"),
             is_admin,
-            {{ family.pk }},
-            $('.asf-active-filters'),
+            family_pk,
             $(".navigation_links")
         );
-        table.reloadTable();
         var asf = new AjaxSearchFilter(table, $('#asf'));
+
+        // This adds a filter for the current CodeResource.
+        table.filterSet.add("pipelinefamily_id", family_pk, true).hide();
+        asf.reloadTable();
     });
     </script>
     <script src="/static/portal/edit_details.js"></script>

@@ -20,22 +20,9 @@
     $(function() {
         noXSS();
 
-        var CodeResourceRevisionTable = function($table, is_user_admin, cr_pk,
-                                                 $active_filters, $navigation_links) {
+        var CodeResourceRevisionTable = function($table, is_user_admin, $navigation_links) {
             permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
             this.list_url = "../../api/coderesourcerevisions/";
-            this.cr_pk = cr_pk;
-
-            var CRRTable = this;
-            this.filterSet = new permissions.FilterSet(
-                $active_filters,
-                function() {
-                    CRRTable.page = 1;
-                    CRRTable.reloadTable();
-                }
-            );
-            // This adds a filter for the current CodeResource.
-            var $cr_filter = this.filterSet.add("coderesource_id", this.cr_pk, true).hide();
 
             this.registerColumn("#", "revision_number");
             this.registerColumn("Name", function($td, revision) {
@@ -51,27 +38,23 @@
                     $('<a>').text('Download').attr('href', revision.download_url).appendTo($td);
                 }
             });
-
             this.registerStandardColumn("user");
             this.registerStandardColumn("users_allowed");
             this.registerStandardColumn("groups_allowed");
         };
         CodeResourceRevisionTable.prototype = Object.create(permissions.PermissionsTable.prototype);
-        CodeResourceRevisionTable.prototype.getQueryParams = function() {
-            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
-            params.filters = this.filterSet.getFilters();
-            return params;
-        };
 
         var table = new CodeResourceRevisionTable(
             $("#coderesourcerevisions"), 
-            is_admin, 
-            {{coderesource.pk}}, 
-            $('.asf-active-filters'),
+            is_admin,
             $(".navigation_links")
         );
-        table.reloadTable();
         var asf = new AjaxSearchFilter(table, $('#asf'));
+
+        // This adds a filter for the current CodeResource.
+        table.filterSet.add("coderesource_id", {{coderesource.pk}}, true).hide();
+
+        asf.reloadTable();
     });
     </script>
 {% endblock %}

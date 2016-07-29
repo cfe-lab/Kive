@@ -1,34 +1,16 @@
 "use strict";
 
-/*
- */
-
-var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, $active_filters, $navigation_links) {
+var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, $navigation_links) {
     permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
     this.$no_results = $no_results;
     var runsTable = this;
 
     this.user = user;
-
     this.session_filters_key = runbatch_pk === null ? "runFilters" : "batchFilters_" + runbatch_pk;
-    this.session_page_key = runbatch_pk === null? "runPage" : "batchPage_" + runbatch_pk;
-
-    this.filterSet = new permissions.FilterSet(
-            $active_filters,
-            function() {
-                runsTable.page = 1;
-                runsTable.reloadTable();
-                sessionStorage.setItem(
-                    this.session_filters_key,
-                    runsTable.filterSet.getPairs()
-                );
-            });
-
+    this.session_page_key = runbatch_pk === null ? "runPage" : "batchPage_" + runbatch_pk;
     this.runbatch_pk = runbatch_pk;
-
     this.list_url = "/api/runs/status/";
     this.reload_interval = pollingInterval;
-
     this.create_url = "/api/runs/";
 
     this.registerColumn("Status", function($td, run) {
@@ -36,7 +18,6 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
                 .attr('href', '/view_run/' + run.id)
                 .text(run.run_progress.status));
     });
-
     this.registerColumn("Name", function($td, run) {
         var $name;
         if (run.id === undefined) {
@@ -70,7 +51,6 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
     this.registerColumn("End", function($td, run) {
         $td.text(run.run_progress.end || '-');
     });
-
     this.registerStandardColumn("user");
 
     // This is a stop/rerun column.
@@ -88,8 +68,7 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
 
         if (run.stopped_by !== null) {
             $td.append(" (Stopped by user " + run.stopped_by + ")");
-        }
-        else if (run.run_progress.end === null &&
+        } else if (run.run_progress.end === null &&
                 (runsTable.user === run.user || ! runsTable.is_locked)) {
             var $stop_link = $("<a>");
             $stop_link.attr("href", run.url)
@@ -108,18 +87,16 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
         event.preventDefault();
         var stop_message = "Are you sure you want to stop this run?";
         if (window.confirm(stop_message)) {
-            $.ajax(
-                {
-                    url: run_url,
-                    method: "PATCH",
-                    data: {
-                        is_stop_requested: true
-                    },
-                    success: function () {
-                        run_table.reloadTable();
-                    }
+            $.ajax({
+                url: run_url,
+                method: "PATCH",
+                data: {
+                    is_stop_requested: true
+                },
+                success: function() {
+                    run_table.reloadTable();
                 }
-            ).fail(
+            }).fail(
                 function (request) {
                     var response = request.responseJSON,
                         detail = (
@@ -140,25 +117,23 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
 
         event.preventDefault();
 
-        $.ajax(
-            {
-                url: run_table.create_url,
-                method: "POST",
-                data: JSON.stringify({
-                    pipeline: run.pipeline,
-                    name: run.name,
-                    description: run.description,
-                    users_allowed: run.users_allowed,
-                    groups_allowed: run.groups_allowed,
-                    inputs: run.inputs
-                }),
-                contentType: "application/json",
-                processData: false,
-                success: function () {
-                    run_table.reloadTable();
-                }
+        $.ajax({
+            url: run_table.create_url,
+            method: "POST",
+            data: JSON.stringify({
+                pipeline: run.pipeline,
+                name: run.name,
+                description: run.description,
+                users_allowed: run.users_allowed,
+                groups_allowed: run.groups_allowed,
+                inputs: run.inputs
+            }),
+            contentType: "application/json",
+            processData: false,
+            success: function () {
+                run_table.reloadTable();
             }
-        ).fail(
+        }).fail(
             function (request) {
                 var response = request.responseJSON,
                     detail = (
@@ -171,31 +146,11 @@ var RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, 
 };
 RunsTable.prototype = Object.create(permissions.PermissionsTable.prototype);
 
-RunsTable.prototype.getQueryParams = function() {
-    var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
-    params.filters = this.filterSet.getFilters();
-    sessionStorage.setItem(this.session_page_key, this.page);
-
-    if (this.runbatch_pk !== null) {
-        // Filter for the current RunBatch.
-        params.filters.push(
-            {
-                key: "batch_pk",
-                val: this.runbatch_pk
-            }
-        );
-    }
-
-    return params;
-};
-
 RunsTable.prototype.extractRows = function(response) {
     var $no_results = this.$no_results,
         runs;
-    $no_results.empty();
     if ('detail' in response) {
-        $no_results.append($('<h2>Errors:</h2>'));
-        $no_results.append($('<p>').text(response.detail));
+        $no_results.html('<h2>Errors:</h2><p>' + response.detail + '</p>');
     } else {
         runs = response.results;
         if (runs !== undefined && runs.length > 0) {

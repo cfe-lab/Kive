@@ -15,18 +15,9 @@
     $(function() {
         noXSS();
 
-        var DatatypesTable = function($table, is_user_admin, $active_filters, $navigation_links) {
+        var DatatypesTable = function($table, is_user_admin, $navigation_links) {
             permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
             this.list_url = "api/datatypes/";
-
-            var datatypesTable = this;
-            this.filterSet = new permissions.FilterSet(
-                $active_filters,
-                function() {
-                    datatypesTable.page = 1;
-                    datatypesTable.reloadTable();
-                }
-            );
 
             this.registerColumn("Name", function($td, datatype) {
                 $("<a>").attr("href", datatype.absolute_url).text(datatype.name).appendTo($td);
@@ -34,26 +25,19 @@
             this.registerColumn("Description", "description");
             this.registerColumn("Restricts", "restricts");
             this.registerDateTimeColumn("Date created", "date_created");
-
             this.registerStandardColumn("user");
             this.registerStandardColumn("users_allowed");
             this.registerStandardColumn("groups_allowed");
         };
         DatatypesTable.prototype = Object.create(permissions.PermissionsTable.prototype);
-        DatatypesTable.prototype.getQueryParams = function() {
-            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
-            params.filters = this.filterSet.getFilters();
-            return params;
-        };
 
         var table = new DatatypesTable(
             $("#datatypes"),
             {{ is_user_admin|lower }},
-            $('.asf-active-filters'),
             $(".navigation_links")
         );
-        table.reloadTable();
         var asf = new AjaxSearchFilter(table, $('#asf'));
+        asf.reloadTable();
 
         // For table rows that *start* with a link, clicking the row should click the link.
         var link_selector = 'td:first-child > a:first-child:last-child';

@@ -1,4 +1,8 @@
-var AjaxSearchFilter = (function() {
+/**
+ * AjaxSearchFilter
+ * @requires permissions classes (PermissionsTable and FilterSet)
+ */
+var AjaxSearchFilter = (function(permissions) {
 	var table, asf;
 
 	var init = function(_table, $asf) {
@@ -14,12 +18,36 @@ var AjaxSearchFilter = (function() {
 		this.search_button = $('.asf-search-button', this.main_search);
 
     	table = _table;
+    	var use_session_storage = table.hasOwnProperty("session_filters_key") && 
+    			table.hasOwnProperty("session_page_key");
     	asf = this;
 	    this.activateEvents();
 
 	    if (table.ajax_request !== undefined) {
 	    	table.ajax_request.complete(trackTableWidth);
 	    }
+
+        table.filterSet = new permissions.FilterSet(
+            this.active_filters,
+            function() {
+                table.page = 1;
+                table.reloadTable();
+                if (use_session_storage) {
+	                sessionStorage.setItem(
+	                    table.session_filters_key,
+	                    table.filterSet.getPairs()
+	                );
+                }
+            }
+        );
+        table.getQueryParams = function() {
+            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
+            params.filters = this.filterSet.getFilters();
+            if (use_session_storage) {
+			    sessionStorage.setItem(table.session_page_key, table.page);
+            }
+            return params;
+        };
     };
     init.prototype.activateEvents = function() {
 	    $('body')          .on( 'keydown', filterKeyHandler );
@@ -44,6 +72,12 @@ var AjaxSearchFilter = (function() {
 	    this.main_search   .off( 'click', focusSearchField );
 	    $('.advanced.ctrl').off( 'click', toggleAdvancedSearch );
 	    this.advanced_form.find('.close.ctrl').off( 'click', toggleAdvancedSearch );
+    };
+    init.prototype.reloadTable = function() {
+    	table.reloadTable();
+	    if (table.ajax_request !== undefined) {
+	    	table.ajax_request.complete(trackTableWidth);
+	    }
     };
 
     function trackTableWidth() {
@@ -154,4 +188,4 @@ var AjaxSearchFilter = (function() {
 
 
     return init;
-})();
+})(permissions);

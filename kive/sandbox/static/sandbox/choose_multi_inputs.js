@@ -24,8 +24,6 @@ $(function() {
         dataset_search_table = new choose_inputs.DatasetsTable(
             dataset_search_dialog.find('table'),
             IS_USER_ADMIN,
-            NaN, NaN,// these will be set later
-            dataset_search_dialog.find('.asf-active-filters'),
             dataset_search_dialog.find(".navigation_links")
         ),
         asf = new AjaxSearchFilter(
@@ -37,11 +35,14 @@ $(function() {
             ctrl: $("#permissions_ctrl")
         }
     ;
-    window.asf = asf;
 
     // some more vars
     scroll_content._top = scroll_content.css('top');
     set_dataset.wrapper.css('width', $('.select_dataset').outerWidth());
+
+    dataset_search_table.getMaxYPosition = function() {
+        return set_dataset.wrapper.offset().top;
+    };
 
     above_box.opened = false;
     above_box.hide = function() {
@@ -100,54 +101,6 @@ $(function() {
         if (!this.hasClass('hidden')) {
             scroll_content.css('top', dataset_input_table._top);
             this.css('height', this._height);
-        }
-    };
-
-    dataset_search_table.checkOverflow = function() {
-        var dst = this,
-            available_space = set_dataset.wrapper.offset().top -
-                dst.$table.offset().top - dst.$table.outerHeight() + 10,
-            rows = dst.$table.find("tbody tr"),
-            row_height = rows.eq(0).outerHeight(),
-            rows_over, new_pg_size, current_item_number, new_pg;
-
-        if (!row_height) {
-            row_height = dst.$table.find("tfoot tr").outerHeight() || 10;
-        }
-
-        if (available_space && rows.length) {
-            rows_over = Math.ceil(- available_space / row_height);
-            new_pg_size = rows.length - rows_over;
-
-            if (new_pg_size !== dst.page_size) {
-                current_item_number = dst.page_size * (dst.page - 1);
-                new_pg = Math.floor(current_item_number / new_pg_size) + 1;
-
-                if (new_pg_size < 1) {
-                    rows.remove();
-                    showPageError("There's no room in this window to show search results.", '.results-table-error');
-                } else {
-                    $('.results-table-error').hide();
-                    dst.page = new_pg;
-                    // check if a table reload is needed
-                    if (new_pg_size < dst.page_size) {
-                        // check if a table reload is already in progress
-                        if (dst.ajax_request === undefined) {
-                            // prune rows without doing a table reload
-                            rows.slice(new_pg_size).remove();
-                            dst.page_size = new_pg_size;
-                        } else {
-                            // if a table reload is in progress, check overflow again when it's complete.
-                            dst.ajax_request.done(function() {
-                                dataset_search_table.checkOverflow();
-                            });
-                        }
-                    } else {
-                        dst.page_size = new_pg_size;
-                        dst.reloadTable();
-                    }
-                } 
-            }
         }
     };
 
@@ -345,6 +298,7 @@ $(function() {
                     } else {
                         // default filter set
                         dst.filterSet.add('uploaded', undefined, true);// 3rd arg = skip reload
+                        dst.filterSet.add('cdt', compounddatatype_id, true).hide();
                     }
                     search_table_loaded = false;
                     dst.reloadTable(function() {

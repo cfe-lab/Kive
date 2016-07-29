@@ -11,30 +11,28 @@
     <script src="/static/sandbox/jq_color_anim.min.js"></script>
 
     <script type="text/javascript">
-    "use strict";
+    
     var user = "{{ user.get_username }}",
         is_user_admin = {{ is_user_admin|lower }},
-        pollingInterval = 1000, // milliseconds
-        runsTable;
+        pollingInterval = 1000; // milliseconds
 
     $(function(){ // wait for page to finish loading before executing jQuery code
         // Security stuff to prevent cross-site scripting.
         noXSS();
         
-        runsTable = new RunsTable(
+        var runsTable = new RunsTable(
             $('#runs'),
             user,
             is_user_admin,
             $('.no_results'),
             null,
-            $('.asf-active-filters'),
             $(".navigation_links")
         );
         var storedPage = parseInt(sessionStorage.getItem('runPage') || 1);
+        var asf = new AjaxSearchFilter(runsTable, $('#asf'));
         runsTable.filterSet.setFromPairs(sessionStorage.getItem('runFilters'));
         runsTable.page = storedPage;
-        runsTable.reloadTable();
-        var asf = new AjaxSearchFilter(runsTable, $('#asf'));
+        asf.reloadTable();
     });
 
     </script>

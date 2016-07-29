@@ -15,36 +15,23 @@
 
     $(function() {
         "use strict";
-
         noXSS();
+
         var IS_USER_ADMIN = false; // Never show admin tools on this page
         
-        var PipelineFamiliesTable = function($table, is_user_admin, $active_filters, $navigation_links) {
+        var PipelineFamiliesTable = function($table, is_user_admin, $navigation_links) {
             permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
             this.list_url = "/api/pipelinefamilies/";
-            var pipelineFamiliesTable = this;
 
-            this.filterSet = new permissions.FilterSet(
-                    $active_filters,
-                    function() {
-                        pipelineFamiliesTable.page = 1;
-                        pipelineFamiliesTable.reloadTable();
-                    });
             this.registerColumn("Pipeline Family", "name");
             this.registerColumn("Thumbnail", buildThumbnail);
             this.registerColumn("Revision", buildMembers);
-
             this.registerStandardColumn("user");
             this.registerStandardColumn("users_allowed");
             this.registerStandardColumn("groups_allowed");
         };
         PipelineFamiliesTable.prototype = Object.create(
                 permissions.PermissionsTable.prototype);
-        PipelineFamiliesTable.prototype.getQueryParams = function() {
-            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
-            params.filters = this.filterSet.getFilters();
-            return params;
-        };
         PipelineFamiliesTable.prototype.buildTable = function(rows) {
             permissions.PermissionsTable.prototype.buildTable.call(this, rows);
             this.drawThumbnails();
@@ -71,14 +58,12 @@
                 }
             });
         }
-
         function buildThumbnail($td, row) {
             $td.addClass('preview-canvas');
             $('<canvas class="preview" width="120" height="90">' +
                     'Warning: Kive does not support your web browser.</canvas>')
                     .appendTo($td);
         }
-        
         function buildMembers($td, row) {
             var $form = $('<form method="GET" action="choose_inputs">'),
                 $select = $('<select name="pipeline">'),
@@ -115,11 +100,10 @@
         var table = new PipelineFamiliesTable(
                 $('#pipeline_families'),
                 IS_USER_ADMIN,
-                $('.asf-active-filters'),
                 $(".navigation_links")
         );
-        table.reloadTable();
         var asf = new AjaxSearchFilter(table);
+        asf.reloadTable();
     });
 
     </script>

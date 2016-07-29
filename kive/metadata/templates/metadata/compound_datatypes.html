@@ -16,17 +16,8 @@
         // Security stuff to prevent cross-site scripting.
         noXSS();
 
-        var CompoundDatatypesTable = function($table, is_user_admin, $active_filters, $navigation_links) {
+        var CompoundDatatypesTable = function($table, is_user_admin, $navigation_links) {
             permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
-
-            var CDTTable = this;
-            this.filterSet = new permissions.FilterSet(
-                $active_filters,
-                function() {
-                    CDTTable.page = 1;
-                    CDTTable.reloadTable();
-                }
-            );
 
             this.list_url = "api/compounddatatypes/";
             this.registerColumn("Name", function($td, cdt) {
@@ -34,19 +25,12 @@
                 $td.append($a);
             });
             this.registerColumn("Scheme", "representation");
-
             this.registerStandardColumn("user");
             this.registerStandardColumn("users_allowed");
             this.registerStandardColumn("groups_allowed");
         };
         CompoundDatatypesTable.prototype = Object.create(
             permissions.PermissionsTable.prototype);
-
-        CompoundDatatypesTable.prototype.getQueryParams = function() {
-            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
-            params.filters = this.filterSet.getFilters();
-            return params;
-        };
 
         CompoundDatatypesTable.prototype.buildTable = function(rows) {
             permissions.PermissionsTable.prototype.buildTable.apply(this, [rows]);
@@ -55,11 +39,10 @@
         var table = new CompoundDatatypesTable(
             $('#compounddatatypes'),
             {{ is_user_admin|lower }},
-            $(".asf-active-filters"),
             $(".navigation_links")
         );
-        table.reloadTable();
         var asf = new AjaxSearchFilter(table, $('#asf'));
+        asf.reloadTable();
 
         // For table rows that *start* with a link, clicking the row should click the link.
         var link_selector = 'td:first-child > a:first-child:last-child';

@@ -17,45 +17,27 @@
     $(function(){
         noXSS();
 
-        var MethodFamiliesTable = function($table, is_user_admin, $active_filters, $navigation_links) {
+        var MethodFamiliesTable = function($table, is_user_admin, $navigation_links) {
             permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
             this.list_url = "api/methodfamilies/";
-
-            var mfTable = this;
-            this.filterSet = new permissions.FilterSet(
-                $active_filters,
-                function() {
-                    mfTable.page = 1;
-                    mfTable.reloadTable();
-                }
-            );
-
             this.registerColumn("Family", function($td, method_family) {
-                var $a = $("<a>").attr("href", method_family.absolute_url).text(method_family.name);
-                $td.append($a);
+                $("<a>").attr("href", method_family.absolute_url).text(method_family.name).appendTo($td);
             });
             this.registerColumn("Description", "description");
             this.registerColumn("# revisions", "num_revisions");
-
             this.registerStandardColumn("user");
             this.registerStandardColumn("users_allowed");
             this.registerStandardColumn("groups_allowed");
         };
         MethodFamiliesTable.prototype = Object.create(permissions.PermissionsTable.prototype);
-        MethodFamiliesTable.prototype.getQueryParams = function() {
-            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
-            params.filters = this.filterSet.getFilters();
-            return params;
-        };
 
         var table = new MethodFamiliesTable(
             $("#methodfamilies"),
             {{ is_user_admin|lower }},
-            $(".asf-active-filters"),
             $(".navigation_links")
         );
-        table.reloadTable();
         var asf = new AjaxSearchFilter(table, $("#asf"));
+        asf.reloadTable();
     });
 
     </script>

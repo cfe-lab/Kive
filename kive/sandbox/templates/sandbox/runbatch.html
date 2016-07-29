@@ -85,15 +85,16 @@
                 is_admin,
                 $('.no_results'),
                 runbatch_pk,
-                $('.asf-active-filters'),
                 $(".navigation_links")
             );
+            var asf = new AjaxSearchFilter(runsTable, $('#asf'));
 
             var storedPage = parseInt(sessionStorage.getItem('batchPage_' + runbatch_pk) || 1);
             runsTable.filterSet.setFromPairs(sessionStorage.getItem('batchFilters_' + runbatch_pk));
+            runsTable.filterSet.remove('batch_pk');
+            runsTable.filterSet.add('batch_pk', runbatch_pk).hide();
             runsTable.page = storedPage;
-            runsTable.reloadTable();
-            var asf = new AjaxSearchFilter(runsTable, $('#asf'));
+            asf.reloadTable();
         });
 
     </script>

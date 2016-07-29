@@ -20,21 +20,9 @@
     $(function() {
         noXSS();
 
-        var MethodTable = function($table, is_user_admin, family_pk, $active_filters, $navigation_links) {
+        var MethodTable = function($table, is_user_admin, $navigation_links) {
             permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
             this.list_url = "../../api/methods/";
-            this.family_pk = family_pk;
-
-            var MethodTable = this;
-            this.filterSet = new permissions.FilterSet(
-                $active_filters,
-                function() {
-                    MethodTable.page = 1;
-                    MethodTable.reloadTable();
-                }
-            );
-            // This adds a filter for the current MethodFamily.
-            var $mf_filter = this.filterSet.add("methodfamily_id", family_pk, true).hide();
 
             this.registerColumn("Name", function($td, method) {
                 $("<a>").attr("href", method.view_url).text(method.display_name).appendTo($td);
@@ -43,28 +31,23 @@
                 $("<a>").attr("href", method.absolute_url).text("Revise").appendTo($td);
             });
             this.registerColumn("Description", "revision_desc");
-
             this.registerStandardColumn("user");
             this.registerStandardColumn("users_allowed");
             this.registerStandardColumn("groups_allowed");
         };
         MethodTable.prototype = Object.create(permissions.PermissionsTable.prototype);
-        MethodTable.prototype.getQueryParams = function() {
-            var params = permissions.PermissionsTable.prototype.getQueryParams.call(this);
-            params.filters = this.filterSet.getFilters();
-            return params;
-        };
 
         var table = new MethodTable(
             $("#methods"),
             is_admin,
-            {{ family.pk }},
-            $(".asf-active-filters"),
             $(".navigation_links")
         );
-        table.reloadTable();
         var asf = new AjaxSearchFilter(table, $("#asf"));
+        // This adds a filter for the current MethodFamily.
+        table.filterSet.add("methodfamily_id", {{ family.pk }}, true).hide();
+        asf.reloadTable();
     });
+    
     </script>
 {% endblock %}
 
