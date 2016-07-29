@@ -18,7 +18,7 @@ from itertools import count
 from constants import maxlengths
 
 
-class PipelineStep(object):
+class PipelineStepRequest(object):
     def __init__(self, json_config):
         self.config = json_config
         self.name = None
@@ -39,6 +39,66 @@ class PipelineStep(object):
             '/api/coderesources/?filters[0][key]=name&filters[0][val]={}'.format(
                 self.code_resource_revision['coderesource']))
         self.code_resource = response.json()[0]
+
+
+class CodeResourceRequest(object):
+    existing = {}  # {name: code_resource_revision}
+
+    def __init__(self, kive, folder, config):
+        self.kive = kive
+        self.config = config
+        self.name = self.config['coderesource']['filename']
+        self.path = os.path.join(folder, self.name)
+        self.code_resource = self.code_resource_revision = None
+        assert os.path.isfile(self.path), self.path
+
+    def get_display(self):
+        return self.name
+
+    def upload(self, revision_name):
+        """ Upload a code resource and code resource revision, if needed.
+
+        Sets self.code_resource_revision to hold the JSON configuration, and
+        adds it to CodeResourceRequest.existing.
+        """
+        existing_config = CodeResourceRequest.existing.get(self.name, None)
+        if existing_config is not None:
+            self.code_resource_revision = existing_config
+            return
+        code_resource_config = self.config['coderesource']
+        for copy_num in count(start=1):
+            if self.code_resource is not None:
+                break
+            name = self.name
+            if copy_num > 1:
+                suffix = ' ({})'.format(copy_num)
+                name = name[:maxlengths.MAX_NAME_LENGTH-len(suffix)]
+                name += suffix
+            response = self.kive.get(
+                '/api/coderesources/?filters[0][key]=name&filters[0][val]=' +
+                name)
+            if not any(match['name'] == name for match in response.json()):
+                response = self.kive.post(
+                    '/api/coderesources/',
+                    json=dict(name=name,
+                              filename=self.name,
+                              users_allowed=code_resource_config['users_allowed'],
+                              groups_allowed=code_resource_config['groups_allowed']))
+                self.code_resource = response.json()
+        if self.code_resource_revision is None:
+            with open(self.path, 'rb') as f:
+                response = self.kive.post('/api/stagedfiles/',
+                                          files=dict(uploaded_file=f))
+            staged_file = response.json()
+            response = self.kive.post(
+                '/api/coderesourcerevisions/',
+                json=dict(coderesource=self.code_resource['name'],
+                          revision_name=revision_name,
+                          staged_file=staged_file['pk'],
+                          users_allowed=self.config['users_allowed'],
+                          groups_allowed=self.config['groups_allowed']))
+            self.code_resource_revision = response.json()
+        CodeResourceRequest.existing[self.name] = self.code_resource_revision
 
 
 def choose_folder():
@@ -106,11 +166,6 @@ def create_pipeline(kive, pipeline_family, pipeline_config, steps):
                               name=step.config['name'],
                               cables_in=step.config['cables_in'],
                               step_num=step.config['step_num']))
-#     outputs = []
-#     for old_output in pipeline_config['outputs']:
-#         new_output = dict(old_output)
-#         new_output['structure'] = None  # TODO: Add structure
-#         outputs.append(new_output)
     outcables = []
     for i, old_cable in enumerate(pipeline_config['outcables']):
         new_cable = dict(old_cable)
@@ -129,6 +184,18 @@ def create_pipeline(kive, pipeline_family, pipeline_config, steps):
     return pipeline
 
 
+def find_dependencies(kive, folder, revision_config):
+    for dependency in revision_config['dependencies']:
+        old_requirement = dependency['requirement']
+        new_dependency = dict(dependency)
+        new_dependency['requirement'] = CodeResourceRequest(kive,
+                                                            folder,
+                                                            old_requirement)
+        yield new_dependency
+        for child in find_dependencies(kive, folder, old_requirement):
+            yield child
+
+
 def load_steps(kive, folder, pipeline_family, groups):
     with open(os.path.join(folder, 'pipeline.json'), 'rU') as pipeline_file:
         pipeline_config = json.load(pipeline_file)
@@ -138,55 +205,28 @@ def load_steps(kive, folder, pipeline_family, groups):
         old_pipeline = None
     steps = []
     for step_config in pipeline_config['steps']:
-        step = PipelineStep(step_config)
+        step = PipelineStepRequest(step_config)
         step.users_allowed = []
         step.groups_allowed = groups
         transformation = step_config['transformation']
-        step.filename = transformation['driver']['coderesource']['filename']
-        step.path = os.path.join(folder, step.filename)
+        step.driver = CodeResourceRequest(kive, folder, transformation['driver'])
         step.name = step_config['name']
+        step.dependencies = list(
+            find_dependencies(kive, folder, transformation['driver']))
         if old_pipeline:
             for old_step in old_pipeline.details['steps']:
                 if old_step['name'] == step.name:
                     step.load(kive, old_step)
                     break
-        assert os.path.isfile(step.path), step.path
         steps.append(step)
     return steps, pipeline_config
 
 
 def create_code_resources(kive, steps, revision_name):
     for step in steps:
-        for copy_num in count(start=1):
-            if step.code_resource is not None:
-                break
-            name = step.name
-            if copy_num > 1:
-                suffix = ' ({})'.format(copy_num)
-                name = name[:maxlengths.MAX_NAME_LENGTH-len(suffix)]
-                name += suffix
-            response = kive.get(
-                '/api/coderesources/?filters[0][key]=name&filters[0][val]=' +
-                name)
-            if not any(match['name'] == name for match in response.json()):
-                response = kive.post('/api/coderesources/',
-                                     json=dict(name=name,
-                                               filename=step.filename,
-                                               users_allowed=step.users_allowed,
-                                               groups_allowed=step.groups_allowed))
-                step.code_resource = response.json()
-        if step.code_resource_revision is None:
-            with open(step.path, 'rb') as f:
-                response = kive.post('/api/stagedfiles/',
-                                     files=dict(uploaded_file=f))
-            staged_file = response.json()
-            response = kive.post('/api/coderesourcerevisions/',
-                                 json=dict(coderesource=step.code_resource['name'],
-                                           revision_name=revision_name,
-                                           staged_file=staged_file['pk'],
-                                           users_allowed=step.users_allowed,
-                                           groups_allowed=step.groups_allowed))
-            step.code_resource_revision = response.json()
+        step.driver.upload(revision_name)
+        for dependency in step.dependencies:
+            dependency['requirement'].upload(revision_name)
 
 
 def create_methods(kive, steps, revision_name):
@@ -216,14 +256,21 @@ def create_methods(kive, steps, revision_name):
             outputs = step.config['outputs']
             for out in outputs:
                 out['structure'] = None  # TODO: load structures
+            dependencies = []
+            for dependency in step.dependencies:
+                new_revision = dependency['requirement'].code_resource_revision
+                dependencies.append(dict(requirement=new_revision['id'],
+                                         path=dependency['depPath'],
+                                         filename=dependency['depFileName']))
             response = kive.post('/api/methods/',
                                  json=dict(revision_name=revision_name,
                                            family=step.method_family['name'],
-                                           driver=step.code_resource_revision['id'],
+                                           driver=step.driver.code_resource_revision['id'],
                                            reusable=transformation['reusable'],
                                            threads=transformation['threads'],
                                            inputs=inputs,
                                            outputs=outputs,
+                                           dependencies=dependencies,
                                            users_allowed=step.users_allowed,
                                            groups_allowed=step.groups_allowed))
             step.method = response.json()
@@ -249,8 +296,10 @@ def main():
 
     steps, pipeline_config = load_steps(kive, folder, pipeline_family, groups)
     print('Uploading {!r} to {} for {}.'.format(folder, pipeline_family, groups))
-    print('\n'.join('  {}: {}'.format(i, step.name)
-                    for i, step in enumerate(steps, start=1)))
+    for i, step in enumerate(steps, start=1):
+        print '  {}: {}'.format(i, step.driver.get_display())
+        for dependency in step.dependencies:
+            print '     ' + dependency['requirement'].get_display()
     revision_name = raw_input('Enter a revision name, or leave blank to abort: ')
     if not revision_name:
         return
@@ -260,146 +309,5 @@ def main():
     pipeline_family = create_pipeline_family(kive, pipeline_family, groups)
     create_pipeline(kive, pipeline_family, pipeline_config, steps)
     print('Done.')
-#     for pipeline in pipelines[:5]:
-#         print '{}, id {}'.format(pipeline, pipeline.pipeline_id)
-#     pipeline_request = raw_input("Enter pipeline id to dump, or 'm' for more:")
-#     if pipeline_request == 'm':
-#         for pipeline in pipelines[5:]:
-#             print '{}, id {}'.format(pipeline, pipeline.pipeline_id)
-#         pipeline_request = raw_input("Enter pipeline id to dump:")
-#     pipeline_id = int(pipeline_request)
-#     dump_folder = 'utils/dump/{}_pipeline{}'.format(hostname, pipeline_id)
-#
-#     if not os.path.isdir(dump_folder):
-#         os.makedirs(dump_folder)
-#
-#     compound_datatypes = {}  # {id: columns}
-#     for compound_datatype in kive.get_cdts():
-#         columns = compound_datatype.name
-#         compound_datatypes[compound_datatype.cdt_id] = columns
-#     code_resources = {}  # {id: {'filename': filename}}
-#     for code_resource in kive.get('/api/coderesources/').json():
-#         dump = {}
-#         for field in ('groups_allowed', 'users_allowed', 'filename'):
-#             dump[field] = code_resource[field]
-#         code_resources[code_resource['name']] = dump
-#     code_resource_revisions = {}  # {id: revision}
-#     for revision in kive.get('/api/coderesourcerevisions/').json():
-#         code_resource_revisions[revision['id']] = CodeResourceRevision(
-#             revision,
-#             code_resources)
-#     for revision in code_resource_revisions.itervalues():
-#         for dependency in revision['dependencies']:
-#             requirement = code_resource_revisions[dependency['requirement']]
-#             dependency['requirement'] = requirement
-#         revision['dependencies'].sort(
-#             key=lambda dep: (dep['depPath'],
-#                              dep['depFileName'],
-#                              dep['requirement']['coderesource']['filename']))
-#     methods = {}  # {id: method}
-#     for method in kive.get('/api/methods/').json():
-#         dump = {'driver': code_resource_revisions[method['driver']]}
-#         for field in ('groups_allowed',
-#                       'users_allowed',
-#                       'reusable',
-#                       'threads'):
-#             dump[field] = method[field]
-#         methods[method['id']] = dump
-#
-#     used_revisions = set()
-#     pipeline_wrapper = kive.get_pipeline(pipeline_id)
-#     pipeline = pipeline_wrapper.details
-#     print 'Dumping {}.'.format(pipeline_wrapper)
-#     dump = {}
-#     for input_item in pipeline['inputs']:
-#         del input_item['x']
-#         del input_item['y']
-#         replace_structure(input_item, compound_datatypes)
-#     dump['inputs'] = pipeline['inputs']
-#     for output_item in pipeline['outputs']:
-#         del output_item['x']
-#         del output_item['y']
-#         del output_item['dataset_idx']
-#         replace_structure(output_item, compound_datatypes)
-#     pipeline['outputs'].sort()
-#     dump['outputs'] = pipeline['outputs']
-#     for step in pipeline['steps']:
-#         del step['x']
-#         del step['y']
-#         for cable in step['cables_in']:
-#             del cable['dest']
-#             del cable['source']
-#         for input_item in step['inputs']:
-#             replace_structure(input_item, compound_datatypes)
-#         for output_item in step['outputs']:
-#             replace_structure(output_item, compound_datatypes)
-#         del step['transformation_family']
-#         step['transformation'] = methods[step['transformation']]
-#         step['transformation']['driver'].collect_revisions(used_revisions)
-#     dump['steps'] = pipeline['steps']
-#
-#     pipeline_filename = 'pipeline.json'
-#     with open(os.path.join(dump_folder, pipeline_filename), 'w') as f:
-#         json.dump(dump, f, indent=4, sort_keys=True)
-#
-#     filename_counts = Counter()
-#     for revision in used_revisions:
-#         filename = revision['coderesource']['filename']
-#         filename_counts[filename] += 1
-#         response = kive.get(revision.url, is_json=False, stream=True)
-#         deadline = datetime.now() + timedelta(seconds=10)
-#         is_complete = True
-#         with open(os.path.join(dump_folder, filename), 'w') as f:
-#             for block in response.iter_content():
-#                 f.write(block)
-#                 if datetime.now() > deadline:
-#                     is_complete = False
-#                     break
-#         if not is_complete:
-#             os.remove(os.path.join(dump_folder, filename))
-#             with open(os.path.join(dump_folder, filename + '_timed_out'), 'w'):
-#                 pass
-#     duplicate_filenames = [filename
-#                            for filename, count in filename_counts.iteritems()
-#                            if count > 1]
-#     if duplicate_filenames:
-#         raise RuntimeError('Multiple versions found: ' +
-#                            ', '.join(duplicate_filenames))
-#
-#     print 'Dumped {}.'.format(pipeline_wrapper)
-#
-#
-# class CodeResourceRevision(dict):
-#     def __init__(self, data, code_resources):
-#         for field in ('groups_allowed',
-#                       'users_allowed',
-#                       'MD5_checksum',
-#                       'dependencies'):
-#             self[field] = data[field]
-#         self['coderesource'] = code_resources[data['coderesource']]
-#         self.id = data['id']
-#         self.url = data['download_url']
-#
-#     def __hash__(self):
-#         return hash(self.id)
-#
-#     def __eq__(self, other):
-#         return self.id == other.id
-#
-#     def collect_revisions(self, used_revisions):
-#         """ Collect all the related code resource revisions, including self.
-#
-#         @param used_revisions: a set of resource revision ids
-#         """
-#         used_revisions.add(self)
-#         for dependency in self['dependencies']:
-#             dependency['requirement'].collect_revisions(used_revisions)
-#
-#
-# def replace_structure(item, compound_datatypes):
-#     structure = item['structure']
-#     if structure:
-#         columns = compound_datatypes[structure['compounddatatype']]
-#         structure['compounddatatype'] = columns
 
 main()
