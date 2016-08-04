@@ -4,6 +4,7 @@ from django.core.files import File
 from rest_framework import serializers
 
 from method.models import Method, MethodDependency, MethodFamily, CodeResource, CodeResourceRevision
+from transformation.models import XputStructure
 from transformation.serializers import TransformationInputSerializer, TransformationOutputSerializer
 from kive.serializers import AccessControlSerializer
 import portal.models
@@ -285,7 +286,8 @@ class MethodSerializer(AccessControlSerializer,
 
             curr_xput = xput_manager.create(**xput_data)
             if structure_data is not None:
-                curr_xput.structure.create(**structure_data)
+                new_structure = XputStructure(transf_xput=curr_xput, **structure_data)
+                new_structure.save()
 
         for input_data in inputs:
             create_xput(input_data, method.inputs)
