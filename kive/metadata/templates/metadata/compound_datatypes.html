@@ -27,7 +27,7 @@
 
         // For table rows that *start* with a link, clicking the row should click the link.
         var link_selector = 'td:first-child > a:first-child:last-child';
-        $('#compounddatatypes').on('click', 'tr', function() {
+        $('#compounddatatypes').on('click', 'tbody tr', function() {
             $(this).find(link_selector)[0].click();
         }).on('mouseover', 'tr', function() {
             var $this = $(this).has(link_selector);

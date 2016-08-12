@@ -437,6 +437,7 @@ var permissions = (function() {
         var $a = $(this),
             permissions_table = event.data;
         event.preventDefault();
+        event.stopPropagation();
         $.getJSON(
                 $a.attr('plan'),
                 {},
