@@ -197,8 +197,8 @@ def pipeline_revise(request, id):
     if four_oh_four:
         raise Http404("ID {} cannot be accessed".format(id))
 
-    parent_users_allowed = [x.pk for x in parent_revision.users_allowed.all()]
-    parent_groups_allowed = [x.pk for x in parent_revision.groups_allowed.all()]
+    parent_users_allowed = [x.username for x in parent_revision.users_allowed.all()]
+    parent_groups_allowed = [x.name for x in parent_revision.groups_allowed.all()]
     acf = metadata.forms.AccessControlForm(
         initial={
             "permissions": [parent_users_allowed, parent_groups_allowed]

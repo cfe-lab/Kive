@@ -63,7 +63,7 @@ Once you have set up your production server, this is how to deploy a new release
     Javascript tests by opening `kive/SpecRunner.html`, and run all the Django
     unit tests.
     
-    ./manage.py test --settings kive.test_settings_pg
+    ./manage.py test --settings kive.settings_test_pg
 
 2. Check if the kiveapi package needs to update its version number by looking
    for new commits in the `/api` folder.

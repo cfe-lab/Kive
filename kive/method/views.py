@@ -288,8 +288,8 @@ def resource_revision_add(request, id):
 
     # Having reached here, we know that this CR is being revised.  Return a form pre-populated
     # with default info.
-    parent_users_allowed = [x.pk for x in parent_revision.users_allowed.all()]
-    parent_groups_allowed = [x.pk for x in parent_revision.groups_allowed.all()]
+    parent_users_allowed = [x.username for x in parent_revision.users_allowed.all()]
+    parent_groups_allowed = [x.name for x in parent_revision.groups_allowed.all()]
     crv_form = CodeResourceRevisionForm(
         initial={
             "permissions": [parent_users_allowed, parent_groups_allowed]
@@ -913,8 +913,8 @@ def method_revise(request, id):
     else:
         # initialize forms with values of parent Method
         family_form = MethodFamilyForm({"name": family.name, "description": family.description})
-        parent_users_allowed = [x.pk for x in parent_revision.users_allowed.all()]
-        parent_groups_allowed = [x.pk for x in parent_revision.groups_allowed.all()]
+        parent_users_allowed = [x.username for x in parent_method.users_allowed.all()]
+        parent_groups_allowed = [x.name for x in parent_method.groups_allowed.all()]
         method_revise_form = MethodReviseForm(
             initial={
                 "revision_desc": parent_method.revision_desc,
