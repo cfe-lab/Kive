@@ -148,7 +148,7 @@ class CompoundDatatypeRequest(object):
             self.compound_datatype = kive.create_cdt(name=self.representation,
                                                      members=self.members,
                                                      users=[],
-                                                     groups=groups)
+                                                     groups=groups).raw
 
 
 def choose_folder():
@@ -210,7 +210,7 @@ def load_pipeline(kive, pipeline_config):
             CompoundDatatypeRequest.load(kive, structure['compounddatatype'])
 
 
-def create_pipeline(kive, pipeline_family, pipeline_config, steps):
+def create_pipeline(kive, pipeline_family, revision_name, pipeline_config, steps):
     groups = pipeline_family.details['groups_allowed']
     inputs = []
     for old_input in pipeline_config['inputs']:
@@ -247,6 +247,7 @@ def create_pipeline(kive, pipeline_family, pipeline_config, steps):
         outputs.append(new_output)
     response = kive.post('@api_pipelines',
                          json=dict(family=pipeline_family.name,
+                                   revision_name=revision_name,
                                    inputs=inputs,
                                    steps=step_data,
                                    outputs=outputs,
@@ -411,7 +412,7 @@ def main():
     create_code_resources(kive, steps, revision_name)
     create_methods(kive, steps, revision_name)
     pipeline_family = create_pipeline_family(kive, pipeline_family, groups)
-    create_pipeline(kive, pipeline_family, pipeline_config, steps)
+    create_pipeline(kive, pipeline_family, revision_name, pipeline_config, steps)
     print('Done.')
 
 if __name__ == '__main__':

@@ -3,7 +3,7 @@
     permissions.CodeResourceTable = function($table, is_user_admin, $navigation_links) {
         permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
         this.list_url = "api/coderesources/";
-        this.registerLinkColumn("Name", "", "name", "view_url");
+        this.registerLinkColumn("Name", "", "name", "absolute_url");
         this.registerColumn("Description", "description");
         this.registerColumn("Filename", "filename");
         this.registerColumn("# of revisions", "num_revisions");
