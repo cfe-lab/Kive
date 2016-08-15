@@ -1,6 +1,5 @@
 (function(permissions) {//dependent on PermissionsTable class
 	"use strict";
-
     permissions.PipelineTable = function($table, is_user_admin, family_pk, $navigation_links) {
         permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
         this.list_url = "../../api/pipelines/";

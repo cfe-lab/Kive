@@ -37,7 +37,6 @@ $(function() {
             menu = $($this.data('rel')),
             inputs, input, preview_canvas, i;
 
-        console.log($this);
         $('#id_ctrl_nav li').not(this).removeClass('clicked');
         $this.addClass('clicked');
         $('.ctrl_menu', '#pipeline_ctrl').hide();

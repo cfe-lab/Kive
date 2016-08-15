@@ -1,6 +1,5 @@
 (function(permissions) {//dependent on PermissionsTable class
     "use strict";
-
     permissions.RunsTable = function($table, user, is_user_admin, $no_results, runbatch_pk, $navigation_links) {
         permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
         this.$no_results = $no_results;

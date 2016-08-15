@@ -1,6 +1,5 @@
 (function(permissions) {//dependent on PermissionsTable class
     "use strict";
-
     permissions.OutputsTable = function($table, is_user_admin, run_id) {
         permissions.PermissionsTable.call(this, $table, is_user_admin);
         var outputsTable = this;

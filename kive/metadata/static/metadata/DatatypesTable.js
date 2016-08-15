@@ -3,7 +3,6 @@
     permissions.DatatypesTable = function($table, is_user_admin, $navigation_links) {
         permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
         this.list_url = "api/datatypes/";
-
         this.registerLinkColumn("Name", "", "name", "absolute_url");
         this.registerColumn("Description", "description");
         this.registerColumn("Restricts", "restricts");

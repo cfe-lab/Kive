@@ -140,9 +140,13 @@ $(function() {
                 header_is_visible = header.is(':visible'),
                 header_top = 4;
 
+            /*
+            */
             if (above_box.hasClass('hidden')) {
                 header_top = this.closest('table').offset().top - h1.outerHeight();
             }
+            /*
+            */
 
             if ($(window).scrollTop() > header_top) {
                 if (!header_is_visible) {
@@ -160,11 +164,17 @@ $(function() {
                 $('.run-name[name="run_name[' + new_run_ix + ']"]').length > 0;
                 new_run_ix++
             );
+
+            /*
+            */
             row = uiFactory.pipelineInputRow()
                 .find('.run-name')
                     .attr('name', 'run_name[' + new_run_ix + ']')
                 .end()
             ;
+            /*
+            */
+            
             if (this.hasOwnProperty('auto_fill')) {
                 for (i = 0; (cell_index = this.auto_fill[i]); i++) {
                     row.children('td:nth-child(' + cell_index + ')').replaceWith(
@@ -484,18 +494,12 @@ $(function() {
             }
         };
     })();
-    var initUsersList = function(datasets) {
-        var users = [];
-
-        for (var i=0, dataset; (dataset = datasets[i]); i++) {
-            if (users.indexOf(dataset.user) == -1) {
-                users.push(dataset.user);
-            }
-        }
-        for (i=0; i < users.length; i++) {
-            users[i] = $('<option>').attr('value', users[i]).text(users[i]);
-        }
-        $('#creator').append(users);
+    var initUsersList = function(users) {
+        var user_opts = users.map(function(user) {
+            return $('<option>').attr('value', user.username).text(user.username);
+        });
+        $('#creator').append(user_opts)
+            .change(creatorFilterHandler);
     };
     var selectSearchResult = function(e) {
         var $this = $(this),
@@ -942,7 +946,7 @@ $(function() {
         $('.filter.focus').removeClass('focus');
     };
 
-    $.getJSON('/api/datasets/?format=json', initUsersList);
+    $.getJSON('/api/users/?format=json', initUsersList);
 
     /**
      * Event bindings
@@ -957,13 +961,12 @@ $(function() {
     set_dataset.btn        .click  ( addSelectedDatasetsToInput );
     set_dataset.options_btn.click  ( set_dataset.options_menu.show )
                         .mouseleave( set_dataset.options_menu.hide );
-    $permissions.ctrl       .click  ( $permissions.widget.toggle )
+    $permissions.ctrl      .click  ( $permissions.widget.toggle )
                            .click  ( stopProp );
-    $permissions.widget     .click  ( stopProp );
+    $permissions.widget    .click  ( stopProp );
     above_box              .click  ( stopProp )
       .find('.close.ctrl') .click  ( dataset_search_dialog.hide );
     $('#date_added')       .change ( dateAddedFilterHandler );
-    $('#creator')          .change ( creatorFilterHandler );
     $('#id_name')          .keyup  ( setRunNamesPrefix );
     $('#run_pipeline')     .submit ( mainSubmitHandler );
 
