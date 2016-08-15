@@ -37,6 +37,7 @@ router.register(r'pipelines', PipelineViewSet)
 router.register(r'runs', RunViewSet)
 router.register(r'runbatches', RunBatchViewSet)
 router.register(r'stagedfiles', portal.ajax.StagedFileViewSet)
+router.register(r'users', portal.ajax.UserViewSet)
 
 urlpatterns = [
     # '',
