@@ -84,7 +84,7 @@
         });
         
         it('should build table', function() {
-            var table = new choose_inputs.DatasetsTable(
+            var table = new permissions.DatasetsTable(
                     this.$table,
                     this.is_user_admin,
                     this.input_index,
