@@ -443,6 +443,7 @@ class Dataset(metadata.models.AccessControl):
         """
         :return int: size of dataset_file in bytes
         """
+        data_handle = None
         try:
             data_handle = self.get_open_file_handle()
             if data_handle is None:
@@ -471,7 +472,18 @@ class Dataset(metadata.models.AccessControl):
         that once existed, as a coherence check.
         """
         # Recompute the MD5, see if it equals what is already stored
-        return self.MD5_checksum == self.compute_md5()
+        new_md5 = self.compute_md5()
+        if self.MD5_checksum != new_md5:
+            if self.dataset_file:
+                filename = self.dataset_file.name
+            else:
+                filename = self.external_absolute_path()
+            self.logger.warn('MD5 mismatch for %s: expected %s, but was %s.',
+                             filename,
+                             self.MD5_checksum,
+                             new_md5)
+            return False
+        return True
 
     def has_data(self):
         """
