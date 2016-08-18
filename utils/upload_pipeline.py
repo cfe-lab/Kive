@@ -23,7 +23,11 @@ class PipelineStepRequest(object):
         self.config = json_config
         self.name = None
         self.code_resource = self.code_resource_revision = None
-        self.method_family = self.method = None
+        self.method_family = self.method = self.old_method = None
+
+    def get_code_resource_revision(self, kive, id):
+        response = kive.get('/api/coderesourcerevisions/{}'.format(id))
+        return response.json()
 
     def load(self, kive, old_step):
         response = kive.get('/api/methodfamilies/{}'.format(
@@ -31,14 +35,23 @@ class PipelineStepRequest(object):
         self.method_family = response.json()
         response = kive.get('/api/methods/{}'.format(
             old_step['transformation']))
-        self.method = response.json()
-        response = kive.get('/api/coderesourcerevisions/{}'.format(
-            self.method['driver']))
-        self.code_resource_revision = response.json()
-        response = kive.get(
-            '/api/coderesources/?filters[0][key]=name&filters[0][val]={}'.format(
-                self.code_resource_revision['coderesource']))
-        self.code_resource = response.json()[0]
+        self.old_method = response.json()
+        self.old_method['driver'] = self.get_code_resource_revision(
+            kive,
+            self.old_method['driver'])
+        self.driver.check_for_changes(self.old_method['driver'])
+        old_dependencies = {}  # {filename: dependency}
+        for old_dependency in self.old_method['dependencies']:
+            old_revision_id = old_dependency['requirement']
+            old_revision = self.get_code_resource_revision(kive, old_revision_id)
+            resource_name = old_revision['coderesource']
+            old_dependency['requirement'] = old_revision
+            old_dependencies[resource_name] = old_dependency
+        for new_dependency in self.dependencies:
+            old_dependency = old_dependencies.get(
+                new_dependency['requirement'].name)
+            new_dependency['requirement'].check_for_changes(
+                old_dependency['requirement'])
 
 
 class CodeResourceRequest(object):
@@ -53,7 +66,22 @@ class CodeResourceRequest(object):
         assert os.path.isfile(self.path), self.path
 
     def get_display(self):
-        return self.name
+        display = self.name
+        if self.code_resource_revision is not None:
+            display += ' (unchanged)'
+        return display
+
+    def check_for_changes(self, old_revision):
+        existing_config = CodeResourceRequest.existing.get(self.name, None)
+        if existing_config is not None:
+            self.code_resource_revision = existing_config
+            return
+        old_md5 = old_revision['MD5_checksum']
+        new_md5 = self.config['MD5_checksum']
+        if new_md5 == old_md5:
+            self.code_resource_revision = old_revision
+            CodeResourceRequest.existing[self.name] = old_revision
+        self.code_resource = dict(name=old_revision['coderesource'])
 
     def upload(self, revision_name):
         """ Upload a code resource and code resource revision, if needed.
@@ -274,7 +302,8 @@ def load_steps(kive, folder, pipeline_family, groups):
     with open(os.path.join(folder, 'pipeline.json'), 'rU') as pipeline_file:
         pipeline_config = json.load(pipeline_file)
     try:
-        old_pipeline = pipeline_family.latest()
+        old_pipeline_id = pipeline_family.latest().pipeline_id
+        old_pipeline = kive.get_pipeline(old_pipeline_id)
     except AttributeError:
         old_pipeline = None
     steps = []
@@ -411,7 +440,8 @@ def main():
         request.create(kive, groups)
     create_code_resources(kive, steps, revision_name)
     create_methods(kive, steps, revision_name)
-    pipeline_family = create_pipeline_family(kive, pipeline_family, groups)
+    if not isinstance(pipeline_family, PipelineFamily):
+        pipeline_family = create_pipeline_family(kive, pipeline_family, groups)
     create_pipeline(kive, pipeline_family, revision_name, pipeline_config, steps)
     print('Done.')
 

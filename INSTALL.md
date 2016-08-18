@@ -25,7 +25,10 @@ Installing Python
 
 Source code or binaries for Python can be obtained from the official website,
 [python.org](www.python.org).  Most *nix distributions (including OS X) come
-with some version of Python.
+with some version of Python. CentOS 6.7 requires you to install Python 2.7 as
+a software collection.
+
+    scl enable python27 bash
 
 The fleet workers launch very slowly on compute nodes with a network file
 system. They will launch much faster if you run the fleet within a Python
@@ -37,12 +40,12 @@ virtualenv as follows:
     sudo su kiveuser
     curl -O https://pypi.python.org/packages/source/v/virtualenv/virtualenv-X.Y.Z.tar.gz
     tar xzf virtualenv-X.Y.Z.tar.gz
-    python virtualenv-X.Y.Z/virtualenv.py bootstrap
-    rm -rf virtualenv-X.Y.Z
-    # Install virtualenv into the bootstrap
-    bootstrap/bin/pip install virtualenv-X.Y.Z.tar.gz
+    python virtualenv-X.Y.Z/virtualenv.py vbootstrap
+    # Install virtualenv into the bootstrap virtual environment
+    vbootstrap/bin/pip install virtualenv-X.Y.Z.tar.gz
+    rm -rf virtualenv-X.Y.Z virtualenv-X.Y.Z.tar.gz
     # Now create a virtualenv just for Kive fleet workers.
-    sudo bootstrap/bin/virtualenv vkive
+    vbootstrap/bin/virtualenv vkive
     # Start using the virtualenv
     source vkive/bin/activate
 
@@ -238,6 +241,16 @@ Just directly install the mpi4py library with
     sudo apt-get install python-mpi4py
 
 This will automatically install the necessary components of OpenMPI.
+
+### CentOS 6.7
+Install `mpi4py` into the `vkive` virtual environment using `pip`.
+
+    pip install mpi4py
+
+There are several versions of MPI available as modules. The only version
+currently compatible with `mpi4py` is 1.6.5.
+
+    module load openmpi/gnu/1.6.5
 
 Project structure
 -----------------
