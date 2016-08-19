@@ -6,9 +6,6 @@
         this.registerLinkColumn("Family", "", "name", "absolute_url");
         this.registerColumn("Description", "description");
         this.registerColumn("# revisions", "num_revisions");
-        this.registerColumn("Published version", function ($td, pipeline_family) {
-            $td.text(pipeline_family.published_version_display_name || "None");
-        });
         this.registerStandardColumn("user");
         this.registerStandardColumn("users_allowed");
         this.registerStandardColumn("groups_allowed");

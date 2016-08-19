@@ -141,6 +141,10 @@ Once you have set up your production server, this is how to deploy a new release
 
         sudo /usr/sbin/apachectl restart
 
+    On CentOS 6, the software collections make it a bit different:
+
+        sudo service httpd24-httpd restart
+
 11. Update the Kive API library if needed.
 
         cd /usr/local/share/Kive/api

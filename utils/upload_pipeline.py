@@ -211,7 +211,9 @@ def choose_family(kive):
     print('Choose a pipeline family from {}:'.format(hostname))
     for i, family in enumerate(pipeline_families, start=1):
         print('  {}: {}'.format(i, family.name))
-    family_name = raw_input('Enter the number or a new family name:')
+    family_name = ''
+    while not family_name:
+        family_name = raw_input('Enter the number or a new family name:')
     pipeline_family = None
     try:
         pipeline_family = pipeline_families[int(family_name)-1]
