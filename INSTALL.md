@@ -160,10 +160,22 @@ The database server should already have been started when you installed
 postgresql, and will be automatically restarted on reboot. If you need
 to start or restart the server, see `man pg_ctlcluster`.
 
+#### Installing on CentOS 6
+
+CentOS 6 provides PostgreSQL 8.4 via `yum`.  Once the package is installed, 
+to start the service, run the following with root privileges using `sudo`:
+
+    service postgresql initdb  # this creates /var/lib/pgsql
+    chkconfig postgresql on  # configures Postgres to run on startup
+    /etc/init.d/postgresql start
+
+#### Initial configuration
+
 The postgresql data directory will have been put in a default place,
-likely `/var/lib/postgresql/9.3/main`. You can figure out where the data
-directory is by typing `show data_directory;` into the postgres prompt.
-Don't worry about creating a database yet, that will get done later on.
+likely `/var/lib/postgresql/9.3/main` on Ubuntu or `/var/lib/pgsql/data` 
+on CentOS. You can figure out where the data directory is by typing 
+`show data_directory;` into the postgres prompt. Don't worry about 
+creating a database yet, that will get done later on.
 
 Typically Postgres caps the number of simultaneous database connections
   at 100.  This can be a problem if you intend to run more than 100 worker
@@ -311,7 +323,9 @@ On a Mac, the PostgreSQL database defaults to accept connections from any user,
 so you are finished creating the database.  On Ubuntu or CentOS, however, the default is to only accept
 connections from system users. To allow the kive database user to connect,
 you have to change the [authentication setting][pg_hba] in PostgreSQL's
-configuration file. Replace 9.3 with whichever version you have.
+configuration file. Replace the location of the `pg_hba.conf` file with the location
+of the file on your system: e.g. on CentOS 6 this file is typically in PostgreSQL's
+data directory.
 
     sudo vi /etc/postgresql/9.3/main/pg_hba.conf
     # Add the following line before the default for user postgres or all
@@ -547,9 +561,14 @@ code on a developer workstation.
 1. If you are running Kive as a production server with Apache, (re-)deploy the
     static files by running the following command.  If you are running Kive as a
     development server on your workstation, then there is no need to collect
-    static files and you can skip to step 2.
+    static files and you can skip to step 2.  On Ubuntu, the command to run is
 
         sudo LD_LIBRARY_PATH=:/usr/local/lib ./manage.py collectstatic
+        
+    On CentOS 6, if you are using the Software Collections version of Python 2.7,
+     you can run
+     
+        sudo scl enable python27 "./manage.py collectstatic"
 
 2. Clear and re-populate the database with the following command:
 
