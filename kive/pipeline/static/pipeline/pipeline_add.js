@@ -678,12 +678,15 @@ $(function() {
             if(!is_new) {
                 submitPipelineAjax($('#id_family_pk').val(), form_data);
             } else { // Pushing a new family
-                submitPipelineFamilyAjax({
-                    users_allowed: users_allowed,
-                    groups_allowed: groups_allowed,
-                    name: family.name.val(),
-                    description: family.desc.val()
-                });
+                submitPipelineFamilyAjax(
+                    {
+                        users_allowed: users_allowed,
+                        groups_allowed: groups_allowed,
+                        name: family.name.val(),
+                        description: family.desc.val()
+                    },
+                    form_data
+                );
             }
         };// end exposed function - everything that follows is closed over
             
@@ -743,14 +746,14 @@ $(function() {
                 }
             });
         }
-        function submitPipelineFamilyAjax(form_data) {
+        function submitPipelineFamilyAjax(family_form_data, pipeline_form_data) {
             $.ajax({
                 type: "POST",
                 url: '/api/pipelinefamilies/',
-                data: JSON.stringify(form_data),
+                data: JSON.stringify(family_form_data),
                 contentType: "application/json"// data will not be parsed correctly without this
             }).success(function(result) {
-                submitPipelineAjax(result.id, form_data);
+                submitPipelineAjax(result.id, pipeline_form_data);
             }).error(function(xhr, status, error) {
                 var json = xhr.responseJSON,
                     serverErrors = json && json.non_field_errors || [];

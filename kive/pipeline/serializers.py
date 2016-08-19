@@ -159,7 +159,7 @@ class PipelineOutputCableSerializer(serializers.ModelSerializer):
 # This is analogous to CRRevisionNumberGetter.
 class PipelineRevisionNumberGetter(object):
     """
-    Handles retrieving the default revision number for a new Method.
+    Handles retrieving the default revision number for a new Pipeline.
 
     This is completely analogous to CRRevisionNumberGetter, and if that breaks
     due to changes in the internals of DRF, this probably will too.
