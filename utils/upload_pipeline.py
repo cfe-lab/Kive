@@ -29,6 +29,31 @@ class PipelineStepRequest(object):
         response = kive.get('/api/coderesourcerevisions/{}'.format(id))
         return response.json()
 
+    def has_xput_changes(self, old_xputs, new_xputs, kive):
+        if len(old_xputs) != len(new_xputs):
+            return True
+        for old_xput, new_xput in zip(old_xputs, new_xputs):
+            if (old_xput['dataset_idx'] != new_xput['dataset_idx'] or
+                    old_xput['dataset_name'] != new_xput['dataset_name']):
+                return True
+            old_structure = old_xput['structure']
+            new_structure = new_xput['structure']
+            if (old_structure is None) != (new_structure is None):
+                return True
+            if old_structure is not None:
+                if (old_structure['min_row'] != new_structure['min_row'] or
+                        old_structure['max_row'] != new_structure['max_row']):
+                    return True
+                old_compound_datatype_id = old_structure['compounddatatype']
+                old_compound_datatype = kive.get_cdt(old_compound_datatype_id)
+                if old_compound_datatype.name != new_structure['compounddatatype']:
+                    return True
+        return False
+
+    def get_display(self):
+        suffix = '' if self.method is None else ' (existing method)'
+        return self.driver.get_display() + suffix
+
     def load(self, kive, old_step):
         response = kive.get('/api/methodfamilies/{}'.format(
             old_step['transformation_family']))
@@ -39,7 +64,7 @@ class PipelineStepRequest(object):
         self.old_method['driver'] = self.get_code_resource_revision(
             kive,
             self.old_method['driver'])
-        self.driver.check_for_changes(self.old_method['driver'])
+        has_changes = self.driver.check_for_changes(self.old_method['driver'])
         old_dependencies = {}  # {filename: dependency}
         for old_dependency in self.old_method['dependencies']:
             old_revision_id = old_dependency['requirement']
@@ -50,8 +75,21 @@ class PipelineStepRequest(object):
         for new_dependency in self.dependencies:
             old_dependency = old_dependencies.get(
                 new_dependency['requirement'].name)
-            new_dependency['requirement'].check_for_changes(
+            has_changes |= new_dependency['requirement'].check_for_changes(
                 old_dependency['requirement'])
+        checked_attributes = 'reusable threads users_allowed groups_allowed'.split()
+        new_method = self.config['transformation']
+        for attribute in checked_attributes:
+            has_changes = (has_changes or
+                           new_method[attribute] != self.old_method[attribute])
+        has_changes = has_changes or self.has_xput_changes(self.old_method['inputs'],
+                                                           self.config['inputs'],
+                                                           kive)
+        has_changes = has_changes or self.has_xput_changes(self.old_method['outputs'],
+                                                           self.config['outputs'],
+                                                           kive)
+        if not has_changes:
+            self.method = self.old_method
 
 
 class CodeResourceRequest(object):
@@ -72,16 +110,23 @@ class CodeResourceRequest(object):
         return display
 
     def check_for_changes(self, old_revision):
+        """ Check if the code resource revision is different from the old one.
+
+        :param old_revision: old one to compare to
+        :return: True if there are changes.
+        """
+        self.code_resource = dict(name=old_revision['coderesource'])
         existing_config = CodeResourceRequest.existing.get(self.name, None)
         if existing_config is not None:
             self.code_resource_revision = existing_config
-            return
+            return False
         old_md5 = old_revision['MD5_checksum']
         new_md5 = self.config['MD5_checksum']
         if new_md5 == old_md5:
             self.code_resource_revision = old_revision
             CodeResourceRequest.existing[self.name] = old_revision
-        self.code_resource = dict(name=old_revision['coderesource'])
+            return False
+        return True
 
     def upload(self, revision_name):
         """ Upload a code resource and code resource revision, if needed.
@@ -426,7 +471,7 @@ def main():
     load_pipeline(kive, pipeline_config)
     print('Uploading {!r} to {} for {}.'.format(folder, pipeline_family, groups))
     for i, step in enumerate(steps, start=1):
-        print '  {}: {}'.format(i, step.driver.get_display())
+        print '  {}: {}'.format(i, step.get_display())
         for dependency in step.dependencies:
             print '     ' + dependency['requirement'].get_display()
     new_compound_datatypes = [request.representation
