@@ -248,112 +248,103 @@ class DeepNestedRunBuilder(FixtureBuilder):
         Manager.execute_pipeline(self.user_bob, p_top, [self.dataset_words], groups_allowed=[everyone_group()])
 
 
+
 class RestoreReusableDatasetBuilder(FixtureBuilder):
+    """
+    This builder creates two 'Sums and Products' pipelines and 
+    executes them both.
+
+    The following python scripts are loaded as methods of the pipelines:
+    method/shuffled_sums_and_products-method.py
+    method/total_sums-method.py
+    method/total_prods-method.py
+
+    The following two csv files are read as input datasets:
+    method/pairs-01.csv
+    method/pairs-02.csv
+
+
+    """
+
     def get_name(self):
         return 'restore_reusable_dataset.json'
 
+
+    def _rdfilelst(self,fnamelst):
+        """Given a list of filenames, return the 
+        contents of each file as a string.
+        An exception is raised upon any error.
+        """
+        rlst=[]
+        for fn in fnamelst:
+            try:
+                f=open(fn,"r")
+            except:
+                print "open failed on '%s'"%fn
+                raise
+            try:
+                rlst.append(f.read())
+            except:
+                print "read failed on '%s'"%fn
+                raise
+            f.close()
+        return rlst
+
     def build(self):
+        """
+        a) Create two pipelines
+        b) Create two data sets from existing files.
+        c) Run pipeline i on dataset i for i=1,2.
+        """
+        #a) create two pipelines
         user = User.objects.first()
-        pipeline1, _pipeline2 = self.create_pipelines(user)
+        pipelinelst = self.create_pipelines(user)
 
-        DATASET_CONTENT = """\
-x,y
-0,1
-2,3
-4,5
-6,7
-8,9
-"""
-        dataset_file = ContentFile(DATASET_CONTENT)
-        dataset = Dataset(user=user,
-                          name="pairs",
-                          MD5_checksum=compute_md5(dataset_file))
-        dataset.dataset_file.save(name='pairs.csv', content=dataset_file)
-        dataset.save()
-        dataset.clean()
-        dataset.grant_everyone_access()
+        #b) create two datasets from existing files.
+        tklst=["pairs-01","pairs-02"]
+        datalst=self._rdfilelst(["method/%s.csv"%tk for tk in tklst])
 
-        run = Manager.execute_pipeline(user=user, pipeline=pipeline1, inputs=[dataset]).get_last_run()
-        run.collect_garbage()  # Delete sandbox directories
+        datasetlst=[]
+        for dataname,datacontent in zip(tklst,datalst):
+            ds_file = ContentFile(datacontent)
+            dset = Dataset(user=user,
+                           name=dataname,
+                           MD5_checksum=compute_md5(ds_file))
+            dset.dataset_file.save(name='%s.csv'%dataname,
+                                   content=ds_file)
+            dset.save()
+            dset.clean()
+            dset.grant_everyone_access()
+            datasetlst.append(dset)
+
+        #c) run the two pipelines
+        assert len(datasetlst)==len(pipelinelst),\
+            "dataset/pipeline lsts are inconsistent"
+
+        for pl,ds in zip(pipelinelst,datasetlst):
+            run = Manager.execute_pipeline(user=user, 
+                                           pipeline=pl,
+                                           inputs=[ds]).get_last_run()
+            #SCO -- this crashes because run==None
+            #SCO -- the pipeline is successfully executed, however
+            #run.collect_garbage()  # Delete sandbox directories
+
 
     def create_pipelines(self, user):
         """ Create two pipelines: sums_only and sums_and_products.
 
         @return: (pipeline1, pipeline2)
         """
-        SHUFFLED_SUMS_AND_PRODUCTS_SOURCE = """\
-#! /usr/bin/env python
-
-from argparse import FileType, ArgumentParser
-import csv
-import os
-from random import shuffle
-
-parser = ArgumentParser(
-    description="Takes CSV with (x,y), outputs CSV with (x+y),(x*y)");
-parser.add_argument("input_csv",
-                    type=FileType('rU'),
-                    help="CSV containing (x,y) pairs");
-parser.add_argument("output_csv",
-                    type=FileType('wb'),
-                    help="CSV containing (x+y,xy) pairs");
-args = parser.parse_args();
-
-reader = csv.DictReader(args.input_csv);
-writer = csv.DictWriter(args.output_csv,
-                        ['sum', 'product'],
-                        lineterminator=os.linesep)
-writer.writeheader()
-
-rows = list(reader)
-shuffle(rows) # Makes this version reusable, but not deterministic
-for row in rows:
-    x = int(row['x'])
-    y = int(row['y'])
-    writer.writerow(dict(sum=x+y, product=x*y))
-"""
-        TOTAL_SOURCE_TEMPLATE = """\
-#!/usr/bin/env python
-
-from argparse import FileType, ArgumentParser
-import csv
-from operator import itemgetter
-import os
-
-parser = ArgumentParser(description='Calculate the total of a column.');
-parser.add_argument("input_csv",
-                    type=FileType('rU'),
-                    help="CSV containing (sum,product) pairs");
-parser.add_argument("output_csv",
-                    type=FileType('wb'),
-                    help="CSV containing one (sum,product) pair");
-args = parser.parse_args();
-
-reader = csv.DictReader(args.input_csv);
-writer = csv.DictWriter(args.output_csv,
-                        ['sum', 'product'],
-                        lineterminator=os.linesep)
-writer.writeheader()
-
-# Copy first row unchanged
-for row in reader:
-    writer.writerow(row)
-    break
-
-sum_total = 0
-product_total = 0
-writer.writerow(dict(sum=sum_total, product=product_total))
-"""
-        total_sums_source = TOTAL_SOURCE_TEMPLATE.replace(
-            "sum_total = 0",
-            "sum_total = sum(map(int, map(itemgetter('sum'), reader)))")
-        total_products_source = TOTAL_SOURCE_TEMPLATE.replace(
-            "product_total = 0",
-            "product_total = sum(map(int, map(itemgetter('product'), reader)))")
+        strlst=self._rdfilelst(["method/shuffled_sums_and_products-method.py",
+                                "method/total_sums-method.py",
+                                "method/total_prods-method.py"])
+        shuffled_sums_and_products_source,\
+            total_sums_source,\
+            total_products_source = strlst
 
         sums_and_products = self.create_method(
             'sums_and_products',
-            SHUFFLED_SUMS_AND_PRODUCTS_SOURCE,
+            shuffled_sums_and_products_source,
             user,
             ['pairs'],
             ['sums_and_products'])
@@ -376,6 +367,7 @@ writer.writerow(dict(sum=sum_total, product=product_total))
             family.clean()
             family.grant_everyone_access()
 
+            #make pipeline1
             pipeline1 = family.members.create(revision_name='sums only',
                                               user=user)
             pipeline1.clean()
@@ -396,6 +388,7 @@ writer.writerow(dict(sum=sum_total, product=product_total))
                                pipeline1.outputs.first()])
             pipeline1.complete_clean()
 
+            #make pipeline2
             pipeline2 = family.members.create(revision_name='sums and products',
                                               revision_parent=pipeline1,
                                               user=user)
@@ -419,16 +412,20 @@ writer.writerow(dict(sum=sum_total, product=product_total))
                                step2_3,
                                pipeline2.outputs.last()])
             pipeline2.complete_clean()
+
+        assert pipeline1!=None,"pipeline 1 is NONE!"
+        assert pipeline2!=None,"pipeline 2 is NONE!"
+
         return pipeline1, pipeline2
 
     def set_position(self, objects):
         n = len(objects)
-        for i, object in enumerate(objects, 1):
-            object.x = object.y = float(i)/(n+1)
-            object.save()
+        for i, obj in enumerate(objects, 1):
+            obj.x = obj.y = float(i)/(n+1)
+            obj.save()
 
     def create_cable(self, source, dest):
-        """ Create a cable between to pipeline objects.
+        """ Create a cable between two pipeline objects.
 
         @param source: either a PipelineStep or one of the pipeline's
         TransformationInput objects for the cable to use as a source.
@@ -518,6 +515,106 @@ writer.writerow(dict(sum=sum_total, product=product_total))
             revision.grant_everyone_access()
         resource.clean()
         return revision
+
+
+
+class ScoClustalDemo(RestoreReusableDatasetBuilder):
+    """This Builder creates one simple pipeline.
+    The pipeline has one method which runs an external
+    python script called method/simpleclustalw-method.py .
+    That script calls an executable called clustalw.
+    The clustalw program performs a multiple sequence alignment
+    on a set of sequences which must all be in one 
+    file (e.g. in FASTA format).
+
+    This builder also creates an input example file called
+    method/clustalw-nuc.data. This file is provided with the
+    clustalw program in the Debian/Ubuntu clustalw package
+    and has been copied from there.
+
+    Under ubuntu, the clustalw package must be installed
+    for this demo to work.
+    """
+    def get_name(self):
+        return 'sco_clustal_demo-001.json'
+
+    def build(self):
+        """
+        a) Create a simple clustalw pipeline.
+        b) Set up an example input file.
+        c) execute the pipeline.
+        """
+        user = User.objects.first()
+        #a) create the single pipeline
+        pipeline1 = self.create_pipelines(user)
+
+        #b) create the input dataset by reading an existing data file.
+        #Is there a more elegant way of doing this?
+        datafname="method/clustalw-nuc.data"
+        with open(datafname,"ro") as f:
+            datastr=f.read()
+        dataset_file = ContentFile(datastr)
+        dataset = Dataset(user=user,
+                          name="nuc.dat",
+                          MD5_checksum=compute_md5(dataset_file))
+        dataset.dataset_file.save(name='clustalw-nuc.dat', content=dataset_file)
+        dataset.save()
+        dataset.clean()
+        dataset.grant_everyone_access()
+        #c) execute and clean up
+        run = Manager.execute_pipeline(user=user, pipeline=pipeline1,
+                                       inputs=[dataset]).get_last_run()
+        #SCO This crashes because run==None. The pipeline is however
+        #SCO successfully executed.
+        #run.collect_garbage()  # Delete sandbox directories
+
+
+    def create_pipelines(self, user):
+        """ Create one pipeline with one method for running clustalw.
+        @return: pipeline1
+        """
+        #Read an external python script into a string which is passed
+        #into create_method.
+        scrname="method/simpleclustalw-method.py"
+        with open(scrname,"ro") as f:
+            scrstr=f.read()
+
+        clustalmeth = self.create_method(
+            'clustalw',
+            scrstr,
+            user,
+            ['inputseq'],
+            ['outputseq'])
+        clustalmeth.reusable = Method.REUSABLE
+        clustalmeth.save()
+        clustalmeth.clean()
+
+        #now create a pipeline family with a single pipeline
+        with transaction.atomic():
+            family = PipelineFamily(name='clustalpipeline', user=user)
+            family.save()
+            family.clean()
+            family.grant_everyone_access()
+
+            pipeline1 = family.members.create(revision_name='1.0',
+                                              user=user)
+            pipeline1.clean()
+            pipeline1.grant_everyone_access()
+
+            self.next_step_num = 1
+            self.next_output_num = 1
+            input1 = pipeline1.inputs.create(dataset_name='inputseq',
+                                             dataset_idx=1)
+            step1_1 = self.create_step(pipeline1, clustalmeth, input1)
+            self.create_cable(step1_1, pipeline1)
+            pipeline1.create_outputs()
+            self.set_position([input1,
+                               step1_1,
+                               pipeline1.outputs.first()])
+            pipeline1.complete_clean()
+
+        return pipeline1
+
 
 
 class RemovalTestEnvironmentBuilder(FixtureBuilder):
@@ -820,6 +917,14 @@ class FindDatasetsBuilder(FixtureBuilder):
 class Command(BaseCommand):
     help = "Update test fixtures by running scripts and dumping test data."
 
+    def scohandle(self, *args, **options):
+        RestoreReusableDatasetBuilder().run()
+        ScoClustalDemo().run()
+
+        #ExecuteTestsBuilder().run()
+        #FindDatasetsBuilder().run()
+
+
     def handle(self, *args, **options):
         EMSandboxTestEnvironmentBuilder().run()
         ArchiveTestEnvironmentBuilder().run()
@@ -835,5 +940,7 @@ class Command(BaseCommand):
         RestoreReusableDatasetBuilder().run()
         ExecuteTestsBuilder().run()
         FindDatasetsBuilder().run()
+        ScoClustalDemo().run()
+
 
         self.stdout.write('Done.')
