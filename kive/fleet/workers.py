@@ -715,7 +715,7 @@ class Manager(object):
                 return False
         return True
 
-    def find_new_runs(self):
+    def find_new_runs(self, time_to_stop):
         # Look for new jobs to run.  We will also
         # build in a delay here so we don't clog up the database.
         mgr_logger.debug("Looking for new runs....")
@@ -748,6 +748,10 @@ class Manager(object):
 
             mgr_logger.debug("Task queue: {}".format(self.task_queue))
             mgr_logger.debug("Active sandboxes: {}".format(self.active_sandboxes))
+
+            if time.time() > time_to_stop:
+                # We stop, to avoid possible starvation if new tasks are continually added.
+                return
 
     def find_stopped_runs(self):
         """
@@ -881,7 +885,7 @@ class Manager(object):
             if not self.wait_for_polling(time_to_poll):
                 return
 
-            self.find_new_runs()
+            self.find_new_runs(time_to_poll)
             if time_to_purge is None or time_to_poll > time_to_purge:
                 self.purge_sandboxes()
                 Dataset.purge()
