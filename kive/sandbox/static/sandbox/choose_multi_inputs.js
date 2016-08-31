@@ -689,6 +689,8 @@ $(function() {
             ).fail(function(xhr) {
                 showPageError(xhr.responseText, '.pipeline-error', true);
             });
+        } else {
+            showPageError("Please complete the inputs table or remove any unwanted runs before continuing.", '.pipeline-error')
         }
     };
     var serialize = function(e) {
