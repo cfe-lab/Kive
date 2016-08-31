@@ -234,7 +234,6 @@ html #inner_wrap {
     -ms-user-select: none;
     user-select: none;
     display: block;
-    cursor: pointer;
     text-align: center;
     font-weight: normal;
     padding: 0.25em 1em; }
@@ -293,16 +292,20 @@ html #inner_wrap {
     #dataset_input_table tbody td .run-name {
       padding: 1.85em 0.25em 1.85em 1em; }
   #dataset_input_table tfoot td {
-    text-align: right; }
-    #dataset_input_table tfoot td label {
-      font-size: 0.8em;
-      font-style: italic; }
-    #dataset_input_table tfoot td green-button {
-      width: 100%;
-      font-size: 1.5em;
-      box-sizing: border-box;
-      margin-bottom: 1px; }
-  #dataset_input_table button {
+    text-align: right;
+    padding: 1.5em 0; }
+    #dataset_input_table tfoot td:hover {
+      background-color: transparent; }
+    #dataset_input_table tfoot td a.button {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      padding: 0.25em 1em;
+      font-weight: normal; }
+  #dataset_input_table tbody button {
     background-color: #22b24c;
     color: white;
     font-weight: bold;
@@ -312,7 +315,7 @@ html #inner_wrap {
     width: 100%;
     font-size: 2.5em;
     line-height: 1.5em; }
-    #dataset_input_table button:focus {
+    #dataset_input_table tbody button:focus {
       outline: none;
       cursor: pointer; }
   #dataset_input_table .inactive button {

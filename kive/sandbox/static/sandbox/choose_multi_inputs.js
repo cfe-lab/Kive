@@ -995,8 +995,8 @@ $(function() {
     $('.search_results')      .on( 'click', 'tbody tr',        selectSearchResult           )
                             .on('dblclick', 'tbody tr',        addSelectedDatasetsToInput   );
     set_dataset.options_menu  .on( 'click', 'li',              set_dataset.options_menu.choose );
-    $('#run_controls')        .on( 'click', '.add_run',    function() { dataset_input_table.addNewRunRow(); } )
-                              .on( 'click', '.remove_run', function() { dataset_input_table.removeLastRunRow(); } );
+    $('.add_run')             .on( 'click',                function() { dataset_input_table.addNewRunRow(); } )
+    $('#run_controls')        .on( 'click', '.remove_run', function() { dataset_input_table.removeLastRunRow(); } );
 
     $(window).scroll();
 });
