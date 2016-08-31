@@ -40,6 +40,11 @@ $(function() {
     scroll_content._top = scroll_content.css('top');
     set_dataset.wrapper.css('width', $('.select_dataset').outerWidth());
 
+    // prevent `asf` from retrieving outer width of dataset_search_table
+    // none of its business for this page!
+    // since we have a fixed fluid layout on this page, that bit of cleverness is not wanted.
+    dataset_search_table.$table.outerWidth = function() { return; };
+
     dataset_search_table.getMaxYPosition = function() {
         return set_dataset.wrapper.offset().top;
     };
@@ -120,13 +125,15 @@ $(function() {
             var in_tb = dataset_input_table.closest('table'),
                 header_row = in_tb.find('thead tr');
             return in_tb.clone()// <table>
+                .css("margin-left", 0)
                 .wrap('<div>').parent()// <div>
                 .addClass('fixed-header')
                 .css({
                     height: header_row.outerHeight() + 1,
                     top: h1.outerHeight(),
                     left: in_tb.offset().left,
-                    width: in_tb.outerWidth()
+                    width: in_tb.outerWidth(),
+                    'margin-left': '3em'
                 })
                 .insertBefore(in_tb)
             ;
@@ -239,6 +246,11 @@ $(function() {
             $('.selected', this).removeClass('selected');
             $('.remove.ctrl', this).remove();
         };
+        dataset_input_table.checkHeaderWidth = function() {
+            if (this.hasOwnProperty("$fixed_header")) {
+                this.$fixed_header.css('width', this.closest('table').outerWidth());
+            }
+        }
     })();
     var stopProp = function(e) {
         e.stopPropagation();
@@ -955,6 +967,7 @@ $(function() {
                            .click  ( unfocusAll );
     $(window)              .resize ( dataset_search_dialog.scrollButton )
                            .resize ( $permissions.widget.autoPosition )
+                           .resize ( function()  { dataset_input_table.checkHeaderWidth(); })
                            .resize ( function()  { dataset_search_table.checkOverflow(); })
                            .resize ( function()  { above_box.adjustSpacing(); })
                            .scroll ( function(e) { dataset_input_table.scrollHeader(e); });
