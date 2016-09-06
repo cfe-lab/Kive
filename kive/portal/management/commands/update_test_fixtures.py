@@ -80,7 +80,7 @@ class FixtureBuilder(object):
         os.remove(before_filename)
         os.remove(after_filename)
 
-        # If any files were created at this time, we have to stash them in the appropriate place.
+        #If any files were created at this time, we have to stash them in the appropriate place.
         targets = [
             method.models.CodeResourceRevision.UPLOAD_DIR,
             Dataset.UPLOAD_DIR,
@@ -102,6 +102,26 @@ class FixtureBuilder(object):
             # ... in with the new.
             if os.path.isdir(target_path):
                 shutil.copytree(target_path, fixture_files_path)
+
+    def _rdfilelst(self, fnamelst):
+        """Given a list of filenames, return the
+        contents of each file as a string.
+        An exception is raised upon any error.
+        """
+        rlst = []
+        for fn in fnamelst:
+            try:
+                f = open(fn, "r")
+            except:
+                print "open failed on '%s'" % fn
+                raise
+            try:
+                rlst.append(f.read())
+            except:
+                print "read failed on '%s'" % fn
+                raise
+            f.close()
+        return rlst
 
     def dump_all_data(self, filename):
         with open(filename, "w") as fixture_file:
@@ -153,6 +173,179 @@ class FixtureBuilder(object):
             for field, value in dump_object['fields'].iteritems():
                 if value is not None and field in field_names:
                     dump_object['fields'][field] = date_map[value]
+
+    def create_cable(self, source, dest):
+        """ Create a cable between two pipeline objects.
+
+        @param source: either a PipelineStep or one of the pipeline's
+        TransformationInput objects for the cable to use as a source.
+        @param dest: either a PipelineStep or the Pipeline for the cable to use
+        as a destination.
+        """
+        try:
+            source_output = source.transformation.outputs.first()
+            source_step_num = source.step_num
+        except AttributeError:
+            # must be a pipeline input
+            source_output = source
+            source_step_num = 0
+
+        try:
+            cable = dest.cables_in.create(dest=dest.transformation.inputs.first(),
+                                          source=source_output,
+                                          source_step=source_step_num)
+        except AttributeError:
+            # must be a pipeline output
+            cable = dest.create_raw_outcable(source.name,
+                                             self.next_output_num,
+                                             source.step_num,
+                                             source_output)
+            self.next_output_num += 1
+        return cable
+
+    def create_step(self, pipeline, method, input_source):
+        """ Create a pipeline step.
+
+        @param method: the method for the step to run
+        @param input_source: either a pipeline input or another step that this
+        step will use for its input.
+        """
+        step = pipeline.steps.create(transformation=method,
+                                     name=method.family.name,
+                                     step_num=self.next_step_num)
+        self.create_cable(input_source, step)
+        step.clean()
+        self.next_step_num += 1
+        return step
+
+    def create_method_from_string(self, name, source, user, input_names, output_names, dep_lst):
+        """ Create a method and code_resource_revision from source code held in a string.
+
+        @param name: the name of the method as it will appear in Kive.
+        @param source: source code held in a string
+        @param input_names: list of strings to name raw inputs
+        @param output_names: list of strings to name raw outputs
+        @param dep_lst: a list of tuples: (code_res_rev, pathstr, filestr) 
+        defining the set of code resources this method depends on.
+        @return: a new Method object that has been saved
+
+        """
+        with transaction.atomic():
+            code_res_rev = self.create_code_resource(name, name+".py", source, user)
+            return self.create_method_from_resource(name, code_res_rev, user,
+                                                    input_names, output_names, dep_lst)
+
+    def create_method_from_resource(self, methname, code_res_rev,
+                                    user, input_names, output_names, dep_lst):
+        """ Create a method from a CodeResourceRevision
+
+        @param name: the name of the method as it will appear in Kive
+        @param fname: file name  containing source code
+        @param input_names: list of strings to name raw inputs
+        @param output_names: list of strings to name raw outputs
+        @param dep_lst: a list of code resources on which this code is dependent.
+
+        @return: a new Method object that has been saved
+
+        NOTE: also see create_method_file(), which reads a source string from
+        a specified file.
+        """
+        with transaction.atomic():
+            family = MethodFamily(name=methname, user=user)
+            family.save()
+            family.clean()
+            family.grant_everyone_access()
+            method = family.members.create(revision_name='first',
+                                           driver=code_res_rev,
+                                           user=user)
+            method.save()
+            for i, input_name in enumerate(input_names, 1):
+                method.inputs.create(dataset_name=input_name, dataset_idx=i)
+            for i, output_name in enumerate(output_names, 1):
+                method.outputs.create(dataset_name=output_name, dataset_idx=i)
+            for dep_resource, p, f in dep_lst:
+                method.dependencies.create(method=method,
+                                           requirement=dep_resource,
+                                           path=p, filename=f)
+            method.clean()
+            method.grant_everyone_access()
+            return method
+
+    def create_code_resource(self, name, filename, source, user):
+        """ Create a new code resource.
+        @param name: the name of the new code resource
+        @param filename: the filename of the resource
+        @param source: source code held in a string
+        @param user:   the user
+
+        @return: a new CodeResourceRevision object that has been saved
+        """
+        with transaction.atomic():
+            resource = CodeResource(name=name, filename=filename, user=user)
+            resource.save()
+            resource.clean()
+            resource.grant_everyone_access()
+
+            revision = CodeResourceRevision(coderesource=resource, user=user)
+            revision.content_file.save(filename, ContentFile(source), save=False)
+            revision.clean()  # calculates md5
+            revision.save()
+            revision.grant_everyone_access()
+        resource.clean()
+        return revision
+
+    def read_dep_resource(self, user, rootdir, resname):
+        """ Create a new code resource from file, returning it as a
+        CodeResourceRevision instance.
+
+        @param user: the current user
+        @param rootdir: the name of the root directory in which to search for the source
+        code file.
+        @param resname: the name of the resource.
+
+        NOTE: the resname may be a qualified import (E.g. a.b.c).
+        In this case, this routine will attempt to load  the file rootdir/a/b/c.py
+        """
+
+        #determine the filename of the file in the sandbox
+        nlst = resname.split(".")
+        #the extension is assumed to by .py, unless we explicitly give the .json
+        #extension
+        lasty = nlst.pop()
+        if lasty == "json":
+            fname = nlst.pop() + ".json"
+        else:
+            fname = lasty + ".py"
+        sandbox_path = "/".join(nlst)
+        #avoid a leading / if the path is empty
+        if sandbox_path != "":
+            sandbox_name = sandbox_path + "/" + fname
+        else:
+            sandbox_name = fname
+
+        #the name of the file to read to get the source code
+        readfilename = rootdir + "/" + sandbox_name
+        with open(readfilename, "r") as f:
+            srcstr = f.read()
+
+        #NOTE: we want to create resources with a filename that is INDEPENDENT
+        #of directories. So, we do NOT use the sandbox name in creating the code resource,
+        #but we do pass this path back up.
+        #This means that we may not have duplicate filenames.
+        #---
+        #res = self.create_code_resource(resname, sandbox_name, srcstr, user)
+        res = self.create_code_resource(resname, fname, srcstr, user)
+
+        return (res, sandbox_path, fname)
+
+    def set_position(self, objlst):
+        """Set the x, y screen coordinates of the objects in the list
+        along a diagonal line (top left to bottom right)
+        """
+        n = len(objlst)
+        for i, obj in enumerate(objlst, 1):
+            obj.x = obj.y = float(i)/(n+1)
+            obj.save()
 
 
 class EMSandboxTestEnvironmentBuilder(FixtureBuilder):
@@ -248,126 +441,134 @@ class DeepNestedRunBuilder(FixtureBuilder):
         Manager.execute_pipeline(self.user_bob, p_top, [self.dataset_words], groups_allowed=[everyone_group()])
 
 
-
 class RestoreReusableDatasetBuilder(FixtureBuilder):
-    """
-    This builder creates two 'Sums and Products' pipelines and 
-    executes them both.
-
-    The following python scripts are loaded as methods of the pipelines:
-    method/shuffled_sums_and_products-method.py
-    method/total_sums-method.py
-    method/total_prods-method.py
-
-    The following two csv files are read as input datasets:
-    method/pairs-01.csv
-    method/pairs-02.csv
-
-
-    """
-
     def get_name(self):
         return 'restore_reusable_dataset.json'
 
-
-    def _rdfilelst(self,fnamelst):
-        """Given a list of filenames, return the 
-        contents of each file as a string.
-        An exception is raised upon any error.
-        """
-        rlst=[]
-        for fn in fnamelst:
-            try:
-                f=open(fn,"r")
-            except:
-                print "open failed on '%s'"%fn
-                raise
-            try:
-                rlst.append(f.read())
-            except:
-                print "read failed on '%s'"%fn
-                raise
-            f.close()
-        return rlst
-
     def build(self):
-        """
-        a) Create two pipelines
-        b) Create two data sets from existing files.
-        c) Run pipeline i on dataset i for i=1,2.
-        """
-        #a) create two pipelines
         user = User.objects.first()
-        pipelinelst = self.create_pipelines(user)
+        pipeline1, _pipeline2 = self.create_pipelines(user)
 
-        #b) create two datasets from existing files.
-        tklst=["pairs-01","pairs-02"]
-        datalst=self._rdfilelst(["method/%s.csv"%tk for tk in tklst])
+        DATASET_CONTENT = """\
+x,y
+0,1
+2,3
+4,5
+6,7
+8,9
+"""
+        dataset_file = ContentFile(DATASET_CONTENT)
+        dataset = Dataset(user=user,
+                          name="pairs",
+                          MD5_checksum=compute_md5(dataset_file))
+        dataset.dataset_file.save(name='pairs.csv', content=dataset_file)
+        dataset.save()
+        dataset.clean()
+        dataset.grant_everyone_access()
 
-        datasetlst=[]
-        for dataname,datacontent in zip(tklst,datalst):
-            ds_file = ContentFile(datacontent)
-            dset = Dataset(user=user,
-                           name=dataname,
-                           MD5_checksum=compute_md5(ds_file))
-            dset.dataset_file.save(name='%s.csv'%dataname,
-                                   content=ds_file)
-            dset.save()
-            dset.clean()
-            dset.grant_everyone_access()
-            datasetlst.append(dset)
-
-        #c) run the two pipelines
-        assert len(datasetlst)==len(pipelinelst),\
-            "dataset/pipeline lsts are inconsistent"
-
-        for pl,ds in zip(pipelinelst,datasetlst):
-            run = Manager.execute_pipeline(user=user, 
-                                           pipeline=pl,
-                                           inputs=[ds]).get_last_run()
-            #SCO -- this crashes because run==None
-            #SCO -- the pipeline is successfully executed, however
-            #run.collect_garbage()  # Delete sandbox directories
-
+        run = Manager.execute_pipeline(user=user, pipeline=pipeline1, inputs=[dataset]).get_last_run()
+        run.collect_garbage()  # Delete sandbox directories
 
     def create_pipelines(self, user):
         """ Create two pipelines: sums_only and sums_and_products.
 
         @return: (pipeline1, pipeline2)
         """
-        strlst=self._rdfilelst(["method/shuffled_sums_and_products-method.py",
-                                "method/total_sums-method.py",
-                                "method/total_prods-method.py"])
-        shuffled_sums_and_products_source,\
-            total_sums_source,\
-            total_products_source = strlst
+        SHUFFLED_SUMS_AND_PRODUCTS_SOURCE = """\
+#! /usr/bin/env python
 
-        sums_and_products = self.create_method(
+from argparse import FileType, ArgumentParser
+import csv
+import os
+from random import shuffle
+
+parser = ArgumentParser(
+    description="Takes CSV with (x,y), outputs CSV with (x+y),(x*y)");
+parser.add_argument("input_csv",
+                    type=FileType('rU'),
+                    help="CSV containing (x,y) pairs");
+parser.add_argument("output_csv",
+                    type=FileType('wb'),
+                    help="CSV containing (x+y,xy) pairs");
+args = parser.parse_args();
+
+reader = csv.DictReader(args.input_csv);
+writer = csv.DictWriter(args.output_csv,
+                        ['sum', 'product'],
+                        lineterminator=os.linesep)
+writer.writeheader()
+
+rows = list(reader)
+shuffle(rows) # Makes this version reusable, but not deterministic
+for row in rows:
+    x = int(row['x'])
+    y = int(row['y'])
+    writer.writerow(dict(sum=x+y, product=x*y))
+"""
+        TOTAL_SOURCE_TEMPLATE = """\
+#!/usr/bin/env python
+
+from argparse import FileType, ArgumentParser
+import csv
+from operator import itemgetter
+import os
+
+parser = ArgumentParser(description='Calculate the total of a column.');
+parser.add_argument("input_csv",
+                    type=FileType('rU'),
+                    help="CSV containing (sum,product) pairs");
+parser.add_argument("output_csv",
+                    type=FileType('wb'),
+                    help="CSV containing one (sum,product) pair");
+args = parser.parse_args();
+
+reader = csv.DictReader(args.input_csv);
+writer = csv.DictWriter(args.output_csv,
+                        ['sum', 'product'],
+                        lineterminator=os.linesep)
+writer.writeheader()
+
+# Copy first row unchanged
+for row in reader:
+    writer.writerow(row)
+    break
+
+sum_total = 0
+product_total = 0
+writer.writerow(dict(sum=sum_total, product=product_total))
+"""
+        total_sums_source = TOTAL_SOURCE_TEMPLATE.replace(
+            "sum_total = 0",
+            "sum_total = sum(map(int, map(itemgetter('sum'), reader)))")
+        total_products_source = TOTAL_SOURCE_TEMPLATE.replace(
+            "product_total = 0",
+            "product_total = sum(map(int, map(itemgetter('product'), reader)))")
+
+        sums_and_products = self.create_method_from_string(
             'sums_and_products',
-            shuffled_sums_and_products_source,
+            SHUFFLED_SUMS_AND_PRODUCTS_SOURCE,
             user,
             ['pairs'],
             ['sums_and_products'])
         sums_and_products.reusable = Method.REUSABLE
         sums_and_products.save()
         sums_and_products.clean()
-        total_sums = self.create_method('total_sums',
-                                        total_sums_source,
-                                        user,
-                                        ['sums_and_products'],
-                                        ['total_sums'])
-        total_products = self.create_method('total_products',
-                                            total_products_source,
-                                            user,
-                                            ['sums_and_products'],
-                                            ['total_products'])
+        total_sums = self.create_method_from_string('total_sums',
+                                                    total_sums_source,
+                                                    user,
+                                                    ['sums_and_products'],
+                                                    ['total_sums'])
+        total_products = self.create_method_from_string('total_products',
+                                                        total_products_source,
+                                                        user,
+                                                        ['sums_and_products'],
+                                                        ['total_products'])
         with transaction.atomic():
             family = PipelineFamily(name='sums and products', user=user)
             family.save()
             family.clean()
             family.grant_everyone_access()
 
-            #make pipeline1
             pipeline1 = family.members.create(revision_name='sums only',
                                               user=user)
             pipeline1.clean()
@@ -388,7 +589,6 @@ class RestoreReusableDatasetBuilder(FixtureBuilder):
                                pipeline1.outputs.first()])
             pipeline1.complete_clean()
 
-            #make pipeline2
             pipeline2 = family.members.create(revision_name='sums and products',
                                               revision_parent=pipeline1,
                                               user=user)
@@ -412,209 +612,321 @@ class RestoreReusableDatasetBuilder(FixtureBuilder):
                                step2_3,
                                pipeline2.outputs.last()])
             pipeline2.complete_clean()
-
-        assert pipeline1!=None,"pipeline 1 is NONE!"
-        assert pipeline2!=None,"pipeline 2 is NONE!"
-
         return pipeline1, pipeline2
 
-    def set_position(self, objects):
-        n = len(objects)
-        for i, obj in enumerate(objects, 1):
-            obj.x = obj.y = float(i)/(n+1)
-            obj.save()
 
-    def create_cable(self, source, dest):
-        """ Create a cable between two pipeline objects.
-
-        @param source: either a PipelineStep or one of the pipeline's
-        TransformationInput objects for the cable to use as a source.
-        @param dest: either a PipelineStep or the Pipeline for the cable to use
-        as a destination.
-        """
-        try:
-            source_output = source.transformation.outputs.first()
-            source_step_num = source.step_num
-        except AttributeError:
-            # must be a pipeline input
-            source_output = source
-            source_step_num = 0
-
-        try:
-            cable = dest.cables_in.create(dest=dest.transformation.inputs.first(),
-                                          source=source_output,
-                                          source_step=source_step_num)
-        except AttributeError:
-            # must be a pipeline output
-            cable = dest.create_raw_outcable(source.name,
-                                             self.next_output_num,
-                                             source.step_num,
-                                             source_output)
-            self.next_output_num += 1
-        return cable
-
-    def create_step(self, pipeline, method, input_source):
-        """ Create a pipeline step.
-
-        @param method: the method for the step to run
-        @param input_source: either a pipeline input or another step that this
-        step will use for its input.
-        """
-        step = pipeline.steps.create(transformation=method,
-                                     name=method.family.name,
-                                     step_num=self.next_step_num)
-        self.create_cable(input_source, step)
-        step.clean()
-        self.next_step_num += 1
-        return step
-
-    def create_method(self, name, source, user, input_names, output_names):
-        """ Create a method.
-
-        @param source: source code
-        @param input_names: list of strings to name raw inputs
-        @param output_names: list of strings to name raw outputs
-        @return: a new Method object that has been saved
-        """
-        with transaction.atomic():
-            code_resource_revision = self.create_code_resource(name, source, user)
-            family = MethodFamily(name=name, user=user)
-            family.save()
-            family.clean()
-            family.grant_everyone_access()
-
-            method = family.members.create(revision_name='first',
-                                           driver=code_resource_revision,
-                                           user=user)
-            method.save()
-            for i, input_name in enumerate(input_names, 1):
-                method.inputs.create(dataset_name=input_name, dataset_idx=i)
-            for i, output_name in enumerate(output_names, 1):
-                method.outputs.create(dataset_name=output_name, dataset_idx=i)
-            method.clean()
-            method.grant_everyone_access()
-            return method
-
-    def create_code_resource(self, name, source, user):
-        """ Create a new code resource.
-
-        @param source: source code
-        @return: a new CodeResourceRevision object that has been saved
-        """
-        with transaction.atomic():
-            filename = name+'.py'
-            resource = CodeResource(name=name, filename=filename, user=user)
-            resource.save()
-            resource.clean()
-            resource.grant_everyone_access()
-
-            revision = CodeResourceRevision(coderesource=resource, user=user)
-            revision.content_file.save(filename, ContentFile(source), save=False)
-            revision.clean()  # calculates md5
-            revision.save()
-            revision.grant_everyone_access()
-        resource.clean()
-        return revision
-
-
-
-class ScoClustalDemo(RestoreReusableDatasetBuilder):
-    """This Builder creates one simple pipeline.
-    The pipeline has one method which runs an external
-    python script called method/simpleclustalw-method.py .
-    That script calls an executable called clustalw.
-    The clustalw program performs a multiple sequence alignment
-    on a set of sequences which must all be in one 
-    file (e.g. in FASTA format).
-
-    This builder also creates an input example file called
-    method/clustalw-nuc.data. This file is provided with the
-    clustalw program in the Debian/Ubuntu clustalw package
-    and has been copied from there.
-
-    Under ubuntu, the clustalw package must be installed
-    for this demo to work.
-    """
+class DemoBuilder(FixtureBuilder):
     def get_name(self):
-        return 'sco_clustal_demo-001.json'
+        return 'demo2.json'
 
     def build(self):
-        """
-        a) Create a simple clustalw pipeline.
-        b) Set up an example input file.
-        c) execute the pipeline.
-        """
         user = User.objects.first()
-        #a) create the single pipeline
         pipeline1 = self.create_pipelines(user)
 
-        #b) create the input dataset by reading an existing data file.
-        #Is there a more elegant way of doing this?
-        datafname="method/clustalw-nuc.data"
-        with open(datafname,"ro") as f:
-            datastr=f.read()
-        dataset_file = ContentFile(datastr)
+        DATASET_CONTENT = """\
+x,y
+0,1
+2,3
+4,5
+6,7
+8,9
+"""
+        dataset_file = ContentFile(DATASET_CONTENT)
         dataset = Dataset(user=user,
-                          name="nuc.dat",
+                          name="pairs",
                           MD5_checksum=compute_md5(dataset_file))
-        dataset.dataset_file.save(name='clustalw-nuc.dat', content=dataset_file)
+        dataset.dataset_file.save(name='pairs.csv', content=dataset_file)
         dataset.save()
         dataset.clean()
         dataset.grant_everyone_access()
-        #c) execute and clean up
-        run = Manager.execute_pipeline(user=user, pipeline=pipeline1,
-                                       inputs=[dataset]).get_last_run()
-        #SCO This crashes because run==None. The pipeline is however
-        #SCO successfully executed.
-        #run.collect_garbage()  # Delete sandbox directories
 
+        run = Manager.execute_pipeline(user=user, pipeline=pipeline1, inputs=[dataset]).get_last_run()
+        run.collect_garbage()  # Delete sandbox directories
 
     def create_pipelines(self, user):
-        """ Create one pipeline with one method for running clustalw.
-        @return: pipeline1
+        """ Create two pipelines: sums_only and sums_and_products.
+
+        @return: (pipeline1, pipeline2)
         """
-        #Read an external python script into a string which is passed
-        #into create_method.
-        scrname="method/simpleclustalw-method.py"
-        with open(scrname,"ro") as f:
-            scrstr=f.read()
+        fname = "../samplecode/script_1_sum_and_products.py"
+        with open(fname, "r") as f:
+            sumsprodsrc = f.read()
 
-        clustalmeth = self.create_method(
-            'clustalw',
-            scrstr,
+        sums_and_products = self.create_method_from_string(
+            'sums_and_products',
+            sumsprodsrc,
             user,
-            ['inputseq'],
-            ['outputseq'])
-        clustalmeth.reusable = Method.REUSABLE
-        clustalmeth.save()
-        clustalmeth.clean()
-
-        #now create a pipeline family with a single pipeline
+            ['pairs'],
+            ['sums_and_products'])
+        sums_and_products.reusable = Method.REUSABLE
+        sums_and_products.save()
+        sums_and_products.clean()
         with transaction.atomic():
-            family = PipelineFamily(name='clustalpipeline', user=user)
+            family = PipelineFamily(name='sums and products', user=user)
             family.save()
             family.clean()
             family.grant_everyone_access()
 
-            pipeline1 = family.members.create(revision_name='1.0',
+            pipeline1 = family.members.create(revision_name='sums and products',
                                               user=user)
             pipeline1.clean()
             pipeline1.grant_everyone_access()
 
             self.next_step_num = 1
             self.next_output_num = 1
-            input1 = pipeline1.inputs.create(dataset_name='inputseq',
+            input1 = pipeline1.inputs.create(dataset_name='pairs',
                                              dataset_idx=1)
-            step1_1 = self.create_step(pipeline1, clustalmeth, input1)
+            step1_1 = self.create_step(pipeline1, sums_and_products, input1)
             self.create_cable(step1_1, pipeline1)
             pipeline1.create_outputs()
             self.set_position([input1,
                                step1_1,
                                pipeline1.outputs.first()])
             pipeline1.complete_clean()
-
         return pipeline1
 
+
+class MiCallDemoBuilder(FixtureBuilder):
+
+    def __init__(self):
+        self.src_dir = "../samplecode/MiCallDemo"
+
+    def get_name(self):
+        return 'micalldemo.json'
+
+    def create_internal_cable(self, srcobj, src_outpnum, dststep, dst_inpnum):
+        """Create a cable between a source's output and a destination step's input.
+        srcobj: either PipelineStep OR a pipeline's TransformationInput
+        object (the pipeline's input)
+
+        dstobj: a PipelineStep
+
+        NOTE: the source and destination numbers are 1-based.
+        """
+        try:
+            # see if we can get the outputs of the src
+            #srclst=srcobj.transformation.sorted_outputs
+            srclst = srcobj.outputs
+            #print "SRC ST: LEN ", len(srclst), src_outpnum
+            src_output = srclst[src_outpnum-1]
+            src_stepnum = srcobj.step_num
+        except AttributeError:
+            #we are connecting from a pipeline input
+            #we need a TranformationInput object of this pipeline
+            #print "SRC: PLI"
+            src_output = srcobj
+            src_stepnum = 0
+
+        try:
+            #are we connecting to a step?
+            dstlst = dststep.transformation.sorted_inputs
+            dst_input = dstlst[dst_inpnum-1]
+            #print "DST ST: LEN ", len(dstlst), dst_inpnum
+            cable = dststep.cables_in.create(source=src_output,
+                                             source_step=src_stepnum,
+                                             dest=dst_input)
+        except AttributeError:
+            print "Connecting to a destination step failed "
+            raise
+
+        return cable
+
+    def create_PL_output(self, pipeline, stepobj, step_outpnum, ploutname, ploutnum):
+        """Create a pipeline output cable for a step's output.
+        NOTE: ploutname must be unique within a pipeline.
+        """
+        srclst = stepobj.outputs
+        src_output = srclst[step_outpnum-1]
+        stepnum = stepobj.step_num
+        #print "PLOUT:", ploutname, ploutnum
+        return pipeline.create_raw_outcable(ploutname, ploutnum,
+                                            stepnum, src_output)
+
+    def build(self):
+        """Create a pipeline, then generate two data sets as
+        input to the pipeline.
+        Then execute the pipeline.
+        """
+        user = User.objects.first()
+        pipeline1 = self.create_pipelines(user)
+
+        #First, read the two data sets
+        tklst = ["1234A-V3LOOP_S1_L001_R1_001.fastq",
+                 "1234A-V3LOOP_S1_L001_R2_001.fastq"]
+        datalst = self._rdfilelst(["%s/%s" % (self.src_dir, tk) for tk in tklst])
+        datasetlst = []
+        for dataname, datacontent in zip(tklst, datalst):
+            ds_file = ContentFile(datacontent)
+            dset = Dataset(user=user,
+                           name=dataname,
+                           MD5_checksum=compute_md5(ds_file))
+            dset.dataset_file.save(name=dataname, content=ds_file)
+            dset.save()
+            dset.clean()
+            dset.grant_everyone_access()
+            datasetlst.append(dset)
+
+        #now execute the pipeline
+        run = Manager.execute_pipeline(user=user,
+                                       pipeline=pipeline1,
+                                       inputs=datasetlst).get_last_run()
+
+        #assert run is not None, "MiCallDemoBuilder: last run is None"
+        #run.collect_garbage()  # Delete sandbox directories
+
+    def create_pipelines(self, user):
+        """ Create a MiCall pipeline
+
+        @return: (pipeline1)
+        """
+        #files that are required for individual modules
+        loggingdeps = ["micall.core.__init__", "micall.core.miseq_logging"]
+        configdeps = ["micall.core.__init__", "micall.core.project_config",
+                      "micall.core.project_scoring.json", "micall.core.projects.json"]
+        #dependencies for the micall.utils.externals module
+        externaldeps = ["micall.__init__", "micall.utils.__init__", "micall.utils.externals"]
+        #dependencies for the micall.utils.translation module
+        translationdeps = ["micall.__init__", "micall.utils.__init__", "micall.utils.translation"]
+
+        sam2alndeps = ["micall.core.__init__", "micall.core.sam2aln"]
+
+        #now the pipeline step dependencies
+        prelim_deplst = loggingdeps + configdeps + externaldeps
+        remap__deplst = loggingdeps + configdeps + externaldeps + \
+                        translationdeps + sam2alndeps + ["micall.core.prelim_map"]
+        sam2al_deplst = []
+        aln2co_deplst = loggingdeps + configdeps + translationdeps
+
+        #NOTE: The order of this list is significant: the order determines
+        #the step number in the pipeline. A step number i must read all of its inputs
+        #from a step number < i or a pipeline input.
+        #(stepname, codefile, inputlst, outputlst, deplist)
+        #NOTE: the codefile is stored here without the .py extension
+        methlst = [("prelim", "micall.core.prelim_map",
+                    ["forward", "reverse"], ["prelim_out"],
+                    frozenset(prelim_deplst)),
+                   ("remap", "micall.core.remap",
+                    ["forward", "reverse", "prelim_out"],
+                    ["remap_csv", "remap_counts", "remap_conseq",
+                     "unmappedfor", "unmappedrev"],
+                    frozenset(remap__deplst)),
+                   ("sam2aln", "micall.core.sam2aln",
+                    ["remap_csv"],
+                    ["aligned", "conseq_insertions", "failed_read"],
+                    frozenset(sam2al_deplst)),
+                   ("aln2counts", "micall.core.aln2counts",
+                    ["aligned"],
+                    ["nuc", "amino", "coord_ins", "conseq", "failed_align",
+                     "nuc_variants"],
+                    frozenset(aln2co_deplst))]
+
+        #need the union of all code resources: start with main code, then add code dependencies
+        allcodeset = set([k[1] for k in methlst])
+        for cset in [k[4] for k in methlst]:
+            allcodeset |= cset
+        codedct = dict([(dp, self.read_dep_resource(user, self.src_dir, dp)) for dp in allcodeset])
+
+        #create all of the methods and keep them in a dictionary
+        methdct = {}
+        #also create output name and input name lookup dicts
+        outpnamedct = {}
+        inpnamedct = {}
+        for methname, methfile, inputs, outputs, depset in methlst:
+            newmeth = methdct[methname] = self.create_method_from_resource(methname,
+                                                                           codedct[methfile][0],
+                                                                           user,
+                                                                           inputs, outputs,
+                                                                           [codedct[dpname] for dpname in depset])
+            newmeth.reusable = Method.REUSABLE
+            newmeth.save()
+            newmeth.clean()
+            #
+            for n, opname in enumerate(outputs, 1):
+                if opname in outpnamedct:
+                    raise Exception, "Output names are not unique!"
+                outpnamedct[opname] = (methname, n)
+
+            #NOTE: input names are not unique globally, only at the method level:
+            #therefore have a separate dict for each method
+            inpnamedct[methname] = dict(enumerate(outputs, 1))
+
+        #we now have our methods and have made sure that each one can fulfill
+        #its inputs from a pipeline input or a previous step.
+        #now build the pipeline:
+        #a) each method is turned into a pipeline step
+        #b) the cables are connected between steps
+        #c) connect output cables to all step outputs not accounted for (i.e. 'dangling')
+        with transaction.atomic():
+            family = PipelineFamily(name='MiCallDemo', user=user)
+            family.save()
+            family.clean()
+            family.grant_everyone_access()
+
+            pipeline1 = family.members.create(revision_name='MiCall Demo 2016-09',
+                                              user=user)
+            pipeline1.clean()
+            pipeline1.grant_everyone_access()
+
+            self.next_output_num = 1
+            #this pipeline has two inputs
+            input1 = pipeline1.inputs.create(dataset_name='forward', dataset_idx=1)
+            input2 = pipeline1.inputs.create(dataset_name='reverse', dataset_idx=2)
+
+            stepdct = {}
+            for stepnum, methname in enumerate([k[0] for k in methlst], 1):
+                mymeth = methdct[methname]
+                newstep = stepdct[methname] = pipeline1.steps.create(transformation=mymeth,
+                                                                     name=mymeth.family.name,
+                                                                     step_num=stepnum)
+                newstep.clean()
+
+            #go through the steps in order, wiring up all inputs
+            #keep track of all unresolved inputs
+            missing_inp_set = set([])
+            #keep track of outputs that are not connected to other steps as inputs.
+            #we assume that these are pipeline outputs.
+            #create set of all output names, then strike them off as we connect outputs up
+            dangling_outp_set = set(["forward", "reverse"])
+            for opset in [set(k[3]) for k in methlst]:
+                dangling_outp_set |= opset
+
+            curinpdct = {"forward": (input1, 0), "reverse": (input2, 0)}
+            for methname, inplst, outplst in [(k[0], k[2], k[3]) for k in methlst]:
+                #satisfy all input requirements of this step by name matching
+                curstep = stepdct[methname]
+                for curinpnum, curinpname in enumerate(inplst, 1):
+                    if curinpname in curinpdct:
+                        src_obj, src_outpnum = curinpdct[curinpname]
+                        #print "%10s: CABLE from  '%s':'%d' to  '%s':'%d' " % (curinpname,
+                        #                                                      src_obj, src_outpnum,
+                        #                                                      methname, curinpnum)
+                        self.create_internal_cable(src_obj, src_outpnum, curstep, curinpnum)
+                        if curinpname in dangling_outp_set:
+                            dangling_outp_set.remove(curinpname)
+                    else:
+                        missing_inp_set.add(curinpname)
+                #--now add this step's outputs to the list of possible inputs for the next step
+                for outpnum, outpname in enumerate(outplst, 1):
+                    assert curinpdct.get(outpname, None) is None, "Data source names are not unique!"
+                    curinpdct[outpname] = (curstep, outpnum)
+
+            #--missing_inp_set must be empty, or we have a problem
+            if len(missing_inp_set) != 0:
+                print ", ".join(missing_inp_set)
+                assert False, "MiCallDemo: failed to create pipeline. Missing inputs:"
+
+            #all dangling outputs are assumed to be pipeline outputs
+            for opnum, opname in enumerate(dangling_outp_set, 1):
+                methname, stepoutpnum = outpnamedct[opname]
+                self.create_PL_output(pipeline1, stepdct[methname], stepoutpnum, opname, opnum)
+
+            pipeline1.create_outputs()
+
+            self.set_position([input1, input2] +
+                              [stepdct[k[0]] for k in methlst] +
+                              [pipeline1.outputs.first()])
+            pipeline1.complete_clean()
+        return pipeline1
 
 
 class RemovalTestEnvironmentBuilder(FixtureBuilder):
@@ -917,30 +1229,23 @@ class FindDatasetsBuilder(FixtureBuilder):
 class Command(BaseCommand):
     help = "Update test fixtures by running scripts and dumping test data."
 
-    def scohandle(self, *args, **options):
-        RestoreReusableDatasetBuilder().run()
-        ScoClustalDemo().run()
-
-        #ExecuteTestsBuilder().run()
-        #FindDatasetsBuilder().run()
-
-
     def handle(self, *args, **options):
-        EMSandboxTestEnvironmentBuilder().run()
-        ArchiveTestEnvironmentBuilder().run()
-        ArchiveNoRunsTestEnvironmentBuilder().run()
-        DeepNestedRunBuilder().run()
-        SimpleRunBuilder().run()
-        RemovalTestEnvironmentBuilder().run()
-        RunApiTestsEnvironmentBuilder().run()
-        RunComponentTooManyChecksEnvironmentBuilder().run()
-        RunPipelinesRecoveringReusedStepEnvironmentBuilder().run()
-        ExecuteResultTestsRMEnvironmentBuilder().run()
-        ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
-        RestoreReusableDatasetBuilder().run()
-        ExecuteTestsBuilder().run()
-        FindDatasetsBuilder().run()
-        ScoClustalDemo().run()
-
+        # EMSandboxTestEnvironmentBuilder().run()
+        # ArchiveTestEnvironmentBuilder().run()
+        # ArchiveNoRunsTestEnvironmentBuilder().run()
+        # DeepNestedRunBuilder().run()
+        # SimpleRunBuilder().run()
+        # RemovalTestEnvironmentBuilder().run()
+        # RunApiTestsEnvironmentBuilder().run()
+        # RunComponentTooManyChecksEnvironmentBuilder().run()
+        # RunPipelinesRecoveringReusedStepEnvironmentBuilder().run()
+        # ExecuteResultTestsRMEnvironmentBuilder().run()
+        # ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
+        # RestoreReusableDatasetBuilder().run()
+        # ExecuteTestsBuilder().run()
+        # FindDatasetsBuilder().run()
+        #DemoBuilder().run()
+        MiCallDemoBuilder().run()
+        #RestoreReusableDatasetBuilder().run()
 
         self.stdout.write('Done.')
