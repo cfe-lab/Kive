@@ -225,7 +225,7 @@ class FixtureBuilder(object):
         @param source: source code held in a string
         @param input_names: list of strings to name raw inputs
         @param output_names: list of strings to name raw outputs
-        @param dep_lst: a list of tuples: (code_res_rev, pathstr, filestr) 
+        @param dep_lst: a list of tuples: (code_res_rev, pathstr, filestr)
         defining the set of code resources this method depends on.
         @return: a new Method object that has been saved
 
@@ -303,19 +303,16 @@ class FixtureBuilder(object):
         code file.
         @param resname: the name of the resource.
 
-        NOTE: the resname may be a qualified import (E.g. a.b.c).
+        NOTE: the resname may be a qualified import (E.g. a.b.c.py).
         In this case, this routine will attempt to load  the file rootdir/a/b/c.py
         """
 
         #determine the filename of the file in the sandbox
         nlst = resname.split(".")
-        #the extension is assumed to by .py, unless we explicitly give the .json
-        #extension
-        lasty = nlst.pop()
-        if lasty == "json":
-            fname = nlst.pop() + ".json"
-        else:
-            fname = lasty + ".py"
+        assert len(nlst) >= 2, "resname is too short!"
+        #the extension must always be added back on to the filename
+        ext = nlst.pop()
+        fname = nlst.pop() + ".%s" % ext
         sandbox_path = "/".join(nlst)
         #avoid a leading / if the path is empty
         if sandbox_path != "":
@@ -779,47 +776,68 @@ class MiCallDemoBuilder(FixtureBuilder):
 
         @return: (pipeline1)
         """
-        #files that are required for individual modules
-        loggingdeps = ["micall.core.__init__", "micall.core.miseq_logging"]
-        configdeps = ["micall.core.__init__", "micall.core.project_config",
+        #various package dependencies
+        micall_deps = ["micall.__init__.py"]
+        micall_core_deps = micall_deps + ["micall.core.__init__.py"]
+        micall_utils_deps = micall_deps + ["micall.utils.__init__.py"]
+        micall_g2p_deps = micall_deps + ["micall.g2p.__init__.py"]
+
+        #files that are required for individual driver modules
+        loggingdeps = micall_core_deps + ["micall.core.miseq_logging.py"]
+        configdeps = micall_core_deps + \
+                     ["micall.core.project_config.py",
                       "micall.core.project_scoring.json", "micall.core.projects.json"]
         #dependencies for the micall.utils.externals module
-        externaldeps = ["micall.__init__", "micall.utils.__init__", "micall.utils.externals"]
+        externaldeps = micall_utils_deps + ["micall.utils.externals.py"]
         #dependencies for the micall.utils.translation module
-        translationdeps = ["micall.__init__", "micall.utils.__init__", "micall.utils.translation"]
+        translationdeps = micall_utils_deps + ["micall.utils.translation.py"]
 
-        sam2alndeps = ["micall.core.__init__", "micall.core.sam2aln"]
+        sam2alndeps = micall_core_deps + ["micall.core.sam2aln.py"]
+        aln2countsdeps = loggingdeps + configdeps + translationdeps + ["micall.core.aln2counts.py"]
 
+        g2pdeps = micall_g2p_deps + \
+                  ["micall.g2p.pssm_lib.py", "micall.g2p.g2p_fpr.txt", "micall.g2p.g2p.matrix"]
         #now the pipeline step dependencies
         prelim_deplst = loggingdeps + configdeps + externaldeps
         remap__deplst = loggingdeps + configdeps + externaldeps + \
-                        translationdeps + sam2alndeps + ["micall.core.prelim_map"]
+                        translationdeps + sam2alndeps + ["micall.core.prelim_map.py"]
         sam2al_deplst = []
         aln2co_deplst = loggingdeps + configdeps + translationdeps
 
+        sam_g2p_deplst = translationdeps + sam2alndeps + g2pdeps
+
+        #coverage_deplst = loggingdeps + configdeps + aln2countsdeps
+        coverage_deplst = configdeps + aln2countsdeps
         #NOTE: The order of this list is significant: the order determines
         #the step number in the pipeline. A step number i must read all of its inputs
         #from a step number < i or a pipeline input.
         #(stepname, codefile, inputlst, outputlst, deplist)
         #NOTE: the codefile is stored here without the .py extension
-        methlst = [("prelim", "micall.core.prelim_map",
+        methlst = [("prelim", "micall.core.prelim_map.py",
                     ["forward", "reverse"], ["prelim_out"],
                     frozenset(prelim_deplst)),
-                   ("remap", "micall.core.remap",
+                   ("remap", "micall.core.remap.py",
                     ["forward", "reverse", "prelim_out"],
                     ["remap_csv", "remap_counts", "remap_conseq",
                      "unmappedfor", "unmappedrev"],
                     frozenset(remap__deplst)),
-                   ("sam2aln", "micall.core.sam2aln",
+                   ("sam2aln", "micall.core.sam2aln.py",
                     ["remap_csv"],
                     ["aligned", "conseq_insertions", "failed_read"],
                     frozenset(sam2al_deplst)),
-                   ("aln2counts", "micall.core.aln2counts",
+                   ("aln2counts", "micall.core.aln2counts.py",
                     ["aligned"],
                     ["nuc", "amino", "coord_ins", "conseq", "failed_align",
                      "nuc_variants"],
-                    frozenset(aln2co_deplst))]
-
+                    frozenset(aln2co_deplst)),
+                   ("sam_g2p", "micall.g2p.sam_g2p.py",
+                    ["remap_csv", "nuc"],
+                    ["g2p", "g2p_summary"],
+                    frozenset(sam_g2p_deplst)),
+                   ("coverage_plots", "micall.core.coverage_plots.py",
+                    ["amino"],
+                    ["coverage_scores_csv", "coverage_maps_tar"],
+                    frozenset(coverage_deplst))]
         #need the union of all code resources: start with main code, then add code dependencies
         allcodeset = set([k[1] for k in methlst])
         for cset in [k[4] for k in methlst]:
