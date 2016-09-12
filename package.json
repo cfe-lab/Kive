@@ -9,20 +9,59 @@
     "shelljs": "^0.5.1",
     "jshint": "^2.8.0"
   },
+  "dependencies": {
+    "sass": "^0.5.0",
+    "typescript": "^1.8.10"
+  },
+  "scripts": {
+    "install": "tsc && sass --update kive/"
+  },
   "description": "Kive ====",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cfe-lab/Kive.git"
   },
   "contributors": [
-    { "name" : "Art F.Y. Poon", "email" : "artpoon@gmail.com", "url": ""},
-    { "name" : "Richard H. Liang", "email" : "", "url": ""},
-    { "name" : "Eric Martin", "email" : "", "url": ""},
-    { "name" : "Rosemary M. McCloskey", "email" : "", "url": ""},
-    { "name" : "James Nakagawa", "email" : "", "url": ""},
-    { "name" : "T. Nguyen", "email" : "", "url": ""},
-    { "name" : "Don Kirkby", "email" : "", "url": ""},
-    { "name" : "Joshua Horacsek", "email" : "", "url": ""}
+    {
+      "name": "Art F.Y. Poon",
+      "email": "artpoon@gmail.com",
+      "url": ""
+    },
+    {
+      "name": "Richard H. Liang",
+      "email": "",
+      "url": ""
+    },
+    {
+      "name": "Eric Martin",
+      "email": "",
+      "url": ""
+    },
+    {
+      "name": "Rosemary M. McCloskey",
+      "email": "",
+      "url": ""
+    },
+    {
+      "name": "James Nakagawa",
+      "email": "",
+      "url": ""
+    },
+    {
+      "name": "T. Nguyen",
+      "email": "",
+      "url": ""
+    },
+    {
+      "name": "Don Kirkby",
+      "email": "",
+      "url": ""
+    },
+    {
+      "name": "Joshua Horacsek",
+      "email": "",
+      "url": ""
+    }
   ],
   "license": "BSD-3-Clause",
   "bugs": {
