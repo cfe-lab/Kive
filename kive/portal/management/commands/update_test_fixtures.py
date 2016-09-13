@@ -80,7 +80,7 @@ class FixtureBuilder(object):
         os.remove(before_filename)
         os.remove(after_filename)
 
-        #If any files were created at this time, we have to stash them in the appropriate place.
+        # If any files were created at this time, we have to stash them in the appropriate place.
         targets = [
             method.models.CodeResourceRevision.UPLOAD_DIR,
             Dataset.UPLOAD_DIR,
@@ -103,24 +103,29 @@ class FixtureBuilder(object):
             if os.path.isdir(target_path):
                 shutil.copytree(target_path, fixture_files_path)
 
+    def fillpathset(self, orgset):
+        """ Given a set of directory name strings, create a new set of strings that contains
+        the intermediate directory names as well as the original strings.
+        E.g.
+        input: ( 'micall/core', micall/bla/goo', 'micall/utils' )
+        output:
+        ( 'micall/core', micall/bla/goo', 'micall/utils', 'micall', 'micall/bla' )
+        """
+        newset = set()
+        for pathname in orgset:
+            clst = pathname.split(os.sep)
+            for n in range(len(clst)):
+                newset.add(os.path.join(*clst[:n+1]))
+        return newset
+
     def _rdfilelst(self, fnamelst):
-        """Given a list of filenames, return the
-        contents of each file as a string.
-        An exception is raised upon any error.
+        """Given a list of file names, return a list of strings, where
+        each string is the contents of that file.
         """
         rlst = []
         for fn in fnamelst:
-            try:
-                f = open(fn, "r")
-            except:
-                print "open failed on '%s'" % fn
-                raise
-            try:
+            with open(fn, "r") as f:
                 rlst.append(f.read())
-            except:
-                print "read failed on '%s'" % fn
-                raise
-            f.close()
         return rlst
 
     def dump_all_data(self, filename):
@@ -218,7 +223,9 @@ class FixtureBuilder(object):
         self.next_step_num += 1
         return step
 
-    def create_method_from_string(self, name, source, user, input_names, output_names, dep_lst):
+    def create_method_from_string(self, name, source, user,
+                                  input_names, output_names,
+                                  dep_lst=[], init_code_resource=None):
         """ Create a method and code_resource_revision from source code held in a string.
 
         @param name: the name of the method as it will appear in Kive.
@@ -227,16 +234,22 @@ class FixtureBuilder(object):
         @param output_names: list of strings to name raw outputs
         @param dep_lst: a list of tuples: (code_res_rev, pathstr, filestr)
         defining the set of code resources this method depends on.
+        @param init_code_resource: the code resource of the __init__.py code that
+        will be copied into each package directory.
         @return: a new Method object that has been saved
 
         """
+        if (init_code_resource is None) and len(dep_lst) > 0:
+            raise RuntimeError("non-empty dependency list requires an __init__ code resource.")
         with transaction.atomic():
             code_res_rev = self.create_code_resource(name, name+".py", source, user)
             return self.create_method_from_resource(name, code_res_rev, user,
-                                                    input_names, output_names, dep_lst)
+                                                    input_names, output_names,
+                                                    dep_lst, init_code_resource)
 
     def create_method_from_resource(self, methname, code_res_rev,
-                                    user, input_names, output_names, dep_lst):
+                                    user, input_names, output_names, dep_lst,
+                                    init_code_resource):
         """ Create a method from a CodeResourceRevision
 
         @param name: the name of the method as it will appear in Kive
@@ -244,7 +257,10 @@ class FixtureBuilder(object):
         @param input_names: list of strings to name raw inputs
         @param output_names: list of strings to name raw outputs
         @param dep_lst: a list of code resources on which this code is dependent.
-
+        The list contains a 3-tuple: (resource, path (string), filename (string))
+        The path consists of an os.sep ('/') separated string.
+        @param init_code_resource: the code resource of the __init__.py code that
+        will be copied into each package directory. This argument may be None.
         @return: a new Method object that has been saved
 
         NOTE: also see create_method_file(), which reads a source string from
@@ -267,6 +283,14 @@ class FixtureBuilder(object):
                 method.dependencies.create(method=method,
                                            requirement=dep_resource,
                                            path=p, filename=f)
+            # must now determine all subdirectories (package names) used by the dependencies
+            # of this method, so as to install __init__.py files into them
+            if init_code_resource is not None:
+                for packname in self.fillpathset(frozenset([k[1] for k in dep_lst])):
+                    method.dependencies.create(method=method,
+                                               requirement=init_code_resource,
+                                               path=packname,
+                                               filename="__init__.py")
             method.clean()
             method.grant_everyone_access()
             return method
@@ -301,37 +325,37 @@ class FixtureBuilder(object):
         @param user: the current user
         @param rootdir: the name of the root directory in which to search for the source
         code file.
-        @param resname: the name of the resource.
-
-        NOTE: the resname may be a qualified import (E.g. a.b.c.py).
-        In this case, this routine will attempt to load  the file rootdir/a/b/c.py
+        @param resname: the name of the python module to read in.
+        @returns: (code_res_rev, pathname, filename), where pathname and filename are
+        strings.
+        NOTE: the resname may be a qualified import (E.g. a.b.c.py), using periods
+        to denote module boundary names.
+        In this case, this routine will attempt to load  the file 'rootdir/a/b/c.py',
+        and the pathname and filename returned would be 'a/b' and 'c.py', respectively.
         """
-
-        #determine the filename of the file in the sandbox
-        nlst = resname.split(".")
-        assert len(nlst) >= 2, "resname is too short!"
-        #the extension must always be added back on to the filename
+        # determine the filename of the file in the sandbox
+        nlst = [s.strip() for s in resname.split(".")]
+        if len(nlst) < 2:
+            raise RuntimeError("resname is too short: " + resname)
+        # remove the last two elements of the list, concatenate them with an intermediate period
+        # and call this new string the filename.
         ext = nlst.pop()
-        fname = nlst.pop() + ".%s" % ext
-        sandbox_path = "/".join(nlst)
-        #avoid a leading / if the path is empty
-        if sandbox_path != "":
-            sandbox_name = sandbox_path + "/" + fname
-        else:
-            sandbox_name = fname
-
-        #the name of the file to read to get the source code
-        readfilename = rootdir + "/" + sandbox_name
+        fname = "%s.%s" % (nlst.pop(), ext)
+        sandbox_path = os.path.join(*nlst)
+        # the name of the file to read to get the source code
+        readfilename = os.path.join(rootdir, sandbox_path, fname)
         with open(readfilename, "r") as f:
             srcstr = f.read()
 
-        #NOTE: we want to create resources with a filename that is INDEPENDENT
-        #of directories. So, we do NOT use the sandbox name in creating the code resource,
-        #but we do pass this path back up.
-        #This means that we may not have duplicate filenames.
-        #---
-        #res = self.create_code_resource(resname, sandbox_name, srcstr, user)
-        res = self.create_code_resource(resname, fname, srcstr, user)
+        # NOTE: we create resources with a file name that is INDEPENDENT of the directory name.
+        # So, we do NOT use sandbox_path in creating the code resource,
+        # i.e. resource names use the file name only.
+        # This means that we may not have duplicate file names, even if they normally reside
+        # in different sub-directories.
+        # However, we do pass the sandbox_path back up from this routine, because when
+        # we later create method dependencies, we have to know where in the file system the
+        # imported code dependency has to reside at run-time.
+        res = self.create_code_resource(fname, fname, srcstr, user)
 
         return (res, sandbox_path, fname)
 
@@ -613,12 +637,73 @@ writer.writerow(dict(sum=sum_total, product=product_total))
 
 
 class DemoBuilder(FixtureBuilder):
+    """This demo includes two pipelines:
+    a) sums and products
+    b) MiCallDemo
+    """
+
+    def __init__(self):
+        # source code for the MiCallDemo is copied from this directory
+        self.src_dir = os.path.join("..", "samplecode", "MiCallDemo")
+
     def get_name(self):
         return 'demo2.json'
 
+    def create_internal_cable(self, srcobj, src_outpnum, dststep, dst_inpnum):
+        """Create a cable between a source's output and a destination step's input.
+        srcobj: either PipelineStep OR a pipeline's TransformationInput
+        object (the pipeline's input)
+
+        dstobj: a PipelineStep
+
+        NOTE: the source and destination numbers are 1-based.
+        """
+        try:
+            # see if we can get the outputs of the src
+            # srclst=srcobj.transformation.sorted_outputs
+            srclst = srcobj.outputs
+            src_output = srclst[src_outpnum-1]
+            src_stepnum = srcobj.step_num
+        except AttributeError:
+            # we are connecting from a pipeline input
+            # we need a TranformationInput object of this pipeline
+            src_output = srcobj
+            src_stepnum = 0
+
+        try:
+            # are we connecting to a step?
+            dstlst = dststep.transformation.sorted_inputs
+            dst_input = dstlst[dst_inpnum-1]
+            cable = dststep.cables_in.create(source=src_output,
+                                             source_step=src_stepnum,
+                                             dest=dst_input)
+        except AttributeError:
+            print "Connecting to a destination step failed "
+            raise
+
+        return cable
+
+    def create_PL_output(self, pipeline, stepobj, step_outpnum, ploutname, ploutnum):
+        """Create a pipeline output cable for a step's output.
+        NOTE: ploutname must be unique within a pipeline.
+        """
+        srclst = stepobj.outputs
+        src_output = srclst[step_outpnum-1]
+        stepnum = stepobj.step_num
+        return pipeline.create_raw_outcable(ploutname, ploutnum,
+                                            stepnum, src_output)
+
     def build(self):
+        """Create and run two pipelines:
+        a) Sums and Products
+        b) MiCall Demo
+        """
+        self.build_SP()
+        self.build_MC()
+
+    def build_SP(self):
         user = User.objects.first()
-        pipeline1 = self.create_pipelines(user)
+        pipeline1 = self.create_SP_pipelines(user)
 
         DATASET_CONTENT = """\
 x,y
@@ -640,12 +725,11 @@ x,y
         run = Manager.execute_pipeline(user=user, pipeline=pipeline1, inputs=[dataset]).get_last_run()
         run.collect_garbage()  # Delete sandbox directories
 
-    def create_pipelines(self, user):
-        """ Create two pipelines: sums_only and sums_and_products.
-
-        @return: (pipeline1, pipeline2)
+    def create_SP_pipelines(self, user):
+        """ Create a pipeline: sums_and_products.
+        @return: pipeline1
         """
-        fname = "../samplecode/script_1_sum_and_products.py"
+        fname = os.path.join("..", "samplecode", "script_1_sum_and_products.py")
         with open(fname, "r") as f:
             sumsprodsrc = f.read()
 
@@ -682,75 +766,18 @@ x,y
             pipeline1.complete_clean()
         return pipeline1
 
-
-class MiCallDemoBuilder(FixtureBuilder):
-
-    def __init__(self):
-        self.src_dir = "../samplecode/MiCallDemo"
-
-    def get_name(self):
-        return 'micalldemo.json'
-
-    def create_internal_cable(self, srcobj, src_outpnum, dststep, dst_inpnum):
-        """Create a cable between a source's output and a destination step's input.
-        srcobj: either PipelineStep OR a pipeline's TransformationInput
-        object (the pipeline's input)
-
-        dstobj: a PipelineStep
-
-        NOTE: the source and destination numbers are 1-based.
-        """
-        try:
-            # see if we can get the outputs of the src
-            #srclst=srcobj.transformation.sorted_outputs
-            srclst = srcobj.outputs
-            #print "SRC ST: LEN ", len(srclst), src_outpnum
-            src_output = srclst[src_outpnum-1]
-            src_stepnum = srcobj.step_num
-        except AttributeError:
-            #we are connecting from a pipeline input
-            #we need a TranformationInput object of this pipeline
-            #print "SRC: PLI"
-            src_output = srcobj
-            src_stepnum = 0
-
-        try:
-            #are we connecting to a step?
-            dstlst = dststep.transformation.sorted_inputs
-            dst_input = dstlst[dst_inpnum-1]
-            #print "DST ST: LEN ", len(dstlst), dst_inpnum
-            cable = dststep.cables_in.create(source=src_output,
-                                             source_step=src_stepnum,
-                                             dest=dst_input)
-        except AttributeError:
-            print "Connecting to a destination step failed "
-            raise
-
-        return cable
-
-    def create_PL_output(self, pipeline, stepobj, step_outpnum, ploutname, ploutnum):
-        """Create a pipeline output cable for a step's output.
-        NOTE: ploutname must be unique within a pipeline.
-        """
-        srclst = stepobj.outputs
-        src_output = srclst[step_outpnum-1]
-        stepnum = stepobj.step_num
-        #print "PLOUT:", ploutname, ploutnum
-        return pipeline.create_raw_outcable(ploutname, ploutnum,
-                                            stepnum, src_output)
-
-    def build(self):
-        """Create a pipeline, then generate two data sets as
-        input to the pipeline.
-        Then execute the pipeline.
+    def build_MC(self):
+        """Create a MiCall pipeline
+        Generate two data sets as input to the pipeline.
+        Execute the pipeline.
         """
         user = User.objects.first()
-        pipeline1 = self.create_pipelines(user)
+        pipeline1 = self.create_MC_pipelines(user)
 
-        #First, read the two data sets
+        # First, read the two data sets
         tklst = ["1234A-V3LOOP_S1_L001_R1_001.fastq",
                  "1234A-V3LOOP_S1_L001_R2_001.fastq"]
-        datalst = self._rdfilelst(["%s/%s" % (self.src_dir, tk) for tk in tklst])
+        datalst = self._rdfilelst([os.path.join(self.src_dir, tk) for tk in tklst])
         datasetlst = []
         for dataname, datacontent in zip(tklst, datalst):
             ds_file = ContentFile(datacontent)
@@ -763,41 +790,35 @@ class MiCallDemoBuilder(FixtureBuilder):
             dset.grant_everyone_access()
             datasetlst.append(dset)
 
-        #now execute the pipeline
+        # now execute the pipeline
         run = Manager.execute_pipeline(user=user,
                                        pipeline=pipeline1,
                                        inputs=datasetlst).get_last_run()
+        run.collect_garbage()  # Delete sandbox directories
 
-        #assert run is not None, "MiCallDemoBuilder: last run is None"
-        #run.collect_garbage()  # Delete sandbox directories
-
-    def create_pipelines(self, user):
-        """ Create a MiCall pipeline
+    def create_MC_pipelines(self, user):
+        """ Create a MiCall Demo pipeline.
 
         @return: (pipeline1)
         """
-        #various package dependencies
-        micall_deps = ["micall.__init__.py"]
-        micall_core_deps = micall_deps + ["micall.core.__init__.py"]
-        micall_utils_deps = micall_deps + ["micall.utils.__init__.py"]
-        micall_g2p_deps = micall_deps + ["micall.g2p.__init__.py"]
+        # various package dependencies
+        # NOTE: The SINGLE __init__.py file is handled as a special case in the dependencies.
+        init_file_name = "micall.__init__.py"
 
-        #files that are required for individual driver modules
-        loggingdeps = micall_core_deps + ["micall.core.miseq_logging.py"]
-        configdeps = micall_core_deps + \
-                     ["micall.core.project_config.py",
+        # files that are required for individual driver modules
+        loggingdeps = ["micall.core.miseq_logging.py"]
+        configdeps = ["micall.core.project_config.py",
                       "micall.core.project_scoring.json", "micall.core.projects.json"]
-        #dependencies for the micall.utils.externals module
-        externaldeps = micall_utils_deps + ["micall.utils.externals.py"]
-        #dependencies for the micall.utils.translation module
-        translationdeps = micall_utils_deps + ["micall.utils.translation.py"]
+        # dependencies for the micall.utils.externals module
+        externaldeps = ["micall.utils.externals.py"]
+        # dependencies for the micall.utils.translation module
+        translationdeps = ["micall.utils.translation.py"]
 
-        sam2alndeps = micall_core_deps + ["micall.core.sam2aln.py"]
+        sam2alndeps = ["micall.core.sam2aln.py"]
         aln2countsdeps = loggingdeps + configdeps + translationdeps + ["micall.core.aln2counts.py"]
 
-        g2pdeps = micall_g2p_deps + \
-                  ["micall.g2p.pssm_lib.py", "micall.g2p.g2p_fpr.txt", "micall.g2p.g2p.matrix"]
-        #now the pipeline step dependencies
+        g2pdeps = ["micall.g2p.pssm_lib.py", "micall.g2p.g2p_fpr.txt", "micall.g2p.g2p.matrix"]
+        # now the pipeline step dependencies
         prelim_deplst = loggingdeps + configdeps + externaldeps
         remap__deplst = loggingdeps + configdeps + externaldeps + \
                         translationdeps + sam2alndeps + ["micall.core.prelim_map.py"]
@@ -806,13 +827,11 @@ class MiCallDemoBuilder(FixtureBuilder):
 
         sam_g2p_deplst = translationdeps + sam2alndeps + g2pdeps
 
-        #coverage_deplst = loggingdeps + configdeps + aln2countsdeps
         coverage_deplst = configdeps + aln2countsdeps
-        #NOTE: The order of this list is significant: the order determines
-        #the step number in the pipeline. A step number i must read all of its inputs
-        #from a step number < i or a pipeline input.
-        #(stepname, codefile, inputlst, outputlst, deplist)
-        #NOTE: the codefile is stored here without the .py extension
+        # NOTE: The order of this list is significant: the order determines
+        # the step number in the pipeline. A step number i must read all of its inputs
+        # from a step number < i or a pipeline input.
+        # (stepname, codefile, inputlst, outputlst, deplist)
         methlst = [("prelim", "micall.core.prelim_map.py",
                     ["forward", "reverse"], ["prelim_out"],
                     frozenset(prelim_deplst)),
@@ -838,15 +857,14 @@ class MiCallDemoBuilder(FixtureBuilder):
                     ["amino"],
                     ["coverage_scores_csv", "coverage_maps_tar"],
                     frozenset(coverage_deplst))]
-        #need the union of all code resources: start with main code, then add code dependencies
-        allcodeset = set([k[1] for k in methlst])
-        for cset in [k[4] for k in methlst]:
-            allcodeset |= cset
+        # need the union of all code resources
+        allcodeset = set([init_file_name] + [k[1] for k in methlst]).union(*[k[4] for k in methlst])
         codedct = dict([(dp, self.read_dep_resource(user, self.src_dir, dp)) for dp in allcodeset])
 
-        #create all of the methods and keep them in a dictionary
+        init_code_resource = codedct[init_file_name][0]
+        # create all of the methods and keep them in a dictionary
         methdct = {}
-        #also create output name and input name lookup dicts
+        # also create output name and input name lookup dicts
         outpnamedct = {}
         inpnamedct = {}
         for methname, methfile, inputs, outputs, depset in methlst:
@@ -854,26 +872,27 @@ class MiCallDemoBuilder(FixtureBuilder):
                                                                            codedct[methfile][0],
                                                                            user,
                                                                            inputs, outputs,
-                                                                           [codedct[dpname] for dpname in depset])
+                                                                           [codedct[dpname] for dpname in depset],
+                                                                           init_code_resource)
             newmeth.reusable = Method.REUSABLE
             newmeth.save()
             newmeth.clean()
             #
             for n, opname in enumerate(outputs, 1):
                 if opname in outpnamedct:
-                    raise Exception, "Output names are not unique!"
+                    raise RuntimeError("Output names are not unique!")
                 outpnamedct[opname] = (methname, n)
 
-            #NOTE: input names are not unique globally, only at the method level:
-            #therefore have a separate dict for each method
+            # NOTE: input names are not unique globally, only at the method level:
+            # therefore have a separate dict for each method
             inpnamedct[methname] = dict(enumerate(outputs, 1))
 
-        #we now have our methods and have made sure that each one can fulfill
-        #its inputs from a pipeline input or a previous step.
-        #now build the pipeline:
-        #a) each method is turned into a pipeline step
-        #b) the cables are connected between steps
-        #c) connect output cables to all step outputs not accounted for (i.e. 'dangling')
+        # we now have our methods and have made sure that each one can fulfil
+        # its inputs from a pipeline input or a previous step.
+        # now build the pipeline:
+        # a) each method is turned into a pipeline step
+        # b) the cables are connected between steps
+        # c) connect output cables to all step outputs not accounted for (i.e. 'dangling')
         with transaction.atomic():
             family = PipelineFamily(name='MiCallDemo', user=user)
             family.save()
@@ -886,7 +905,7 @@ class MiCallDemoBuilder(FixtureBuilder):
             pipeline1.grant_everyone_access()
 
             self.next_output_num = 1
-            #this pipeline has two inputs
+            # this pipeline has two inputs
             input1 = pipeline1.inputs.create(dataset_name='forward', dataset_idx=1)
             input2 = pipeline1.inputs.create(dataset_name='reverse', dataset_idx=2)
 
@@ -898,42 +917,38 @@ class MiCallDemoBuilder(FixtureBuilder):
                                                                      step_num=stepnum)
                 newstep.clean()
 
-            #go through the steps in order, wiring up all inputs
-            #keep track of all unresolved inputs
-            missing_inp_set = set([])
-            #keep track of outputs that are not connected to other steps as inputs.
-            #we assume that these are pipeline outputs.
-            #create set of all output names, then strike them off as we connect outputs up
-            dangling_outp_set = set(["forward", "reverse"])
-            for opset in [set(k[3]) for k in methlst]:
-                dangling_outp_set |= opset
-
+            # go through the steps in order, wiring up all inputs
+            # keep track of all unresolved inputs
+            missing_inp_set = set()
+            # Also keep track of outputs that are not connected to other steps as inputs.
+            # Create set of all output names, then strike them off as we connect outputs up.
+            # If we have any of these left over once we have connected all steps, we assume
+            # that the remaining 'dangling' outputs are pipeline outputs.
+            dangling_outp_set = set(["forward", "reverse"]).union(*[set(k[3]) for k in methlst])
             curinpdct = {"forward": (input1, 0), "reverse": (input2, 0)}
             for methname, inplst, outplst in [(k[0], k[2], k[3]) for k in methlst]:
-                #satisfy all input requirements of this step by name matching
+                # satisfy all input requirements of this step by name matching
                 curstep = stepdct[methname]
                 for curinpnum, curinpname in enumerate(inplst, 1):
                     if curinpname in curinpdct:
                         src_obj, src_outpnum = curinpdct[curinpname]
-                        #print "%10s: CABLE from  '%s':'%d' to  '%s':'%d' " % (curinpname,
-                        #                                                      src_obj, src_outpnum,
-                        #                                                      methname, curinpnum)
                         self.create_internal_cable(src_obj, src_outpnum, curstep, curinpnum)
                         if curinpname in dangling_outp_set:
                             dangling_outp_set.remove(curinpname)
                     else:
                         missing_inp_set.add(curinpname)
-                #--now add this step's outputs to the list of possible inputs for the next step
+                # --now add this step's outputs to the list of possible inputs for the next step
                 for outpnum, outpname in enumerate(outplst, 1):
-                    assert curinpdct.get(outpname, None) is None, "Data source names are not unique!"
+                    if outpname in curinpdct:
+                        raise RuntimeError("Data source names are not unique!")
                     curinpdct[outpname] = (curstep, outpnum)
 
-            #--missing_inp_set must be empty, or we have a problem
-            if len(missing_inp_set) != 0:
-                print ", ".join(missing_inp_set)
-                assert False, "MiCallDemo: failed to create pipeline. Missing inputs:"
+            # --missing_inp_set must be empty, or we have failed to account for all inputs
+            if missing_inp_set:
+                raise RuntimeError("MiCallDemo: failed to create pipeline. Missing inputs:" +
+                                   ", ".join(missing_inp_set))
 
-            #all dangling outputs are assumed to be pipeline outputs
+            # all dangling outputs are assumed to be pipeline outputs
             for opnum, opname in enumerate(dangling_outp_set, 1):
                 methname, stepoutpnum = outpnamedct[opname]
                 self.create_PL_output(pipeline1, stepdct[methname], stepoutpnum, opname, opnum)
@@ -1074,7 +1089,8 @@ class RunComponentTooManyChecksEnvironmentBuilder(FixtureBuilder):
 
 class RunPipelinesRecoveringReusedStepEnvironmentBuilder(FixtureBuilder):
     """
-    Setting up and running two pipelines, where the second one reuses and then recovers a step from the first.
+    Setting up and running two pipelines, where the second one reuses and
+    then recovers a step from the first.
     """
 
     def get_name(self):
@@ -1263,7 +1279,6 @@ class Command(BaseCommand):
         ExecuteTestsBuilder().run()
         FindDatasetsBuilder().run()
         DemoBuilder().run()
-        MiCallDemoBuilder().run()
         RestoreReusableDatasetBuilder().run()
 
         self.stdout.write('Done.')
