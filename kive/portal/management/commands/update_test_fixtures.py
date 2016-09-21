@@ -647,7 +647,7 @@ class DemoBuilder(FixtureBuilder):
         self.src_dir = os.path.join("..", "samplecode", "MiCallDemo")
 
     def get_name(self):
-        return 'demo2.json'
+        return 'demo.json'
 
     def create_internal_cable(self, srcobj, src_outpnum, dststep, dst_inpnum):
         """Create a cable between a source's output and a destination step's input.
