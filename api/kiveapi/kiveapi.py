@@ -306,12 +306,28 @@ class KiveAPI(Session):
         cdt = self.post("@api_get_cdts", json=cdt_dict, is_json=True).json()
         return CompoundDatatype(cdt)
 
-    def add_dataset(self, name, description, handle, cdt=None, users=None, groups=None,
-                    externalfiledirectory=None, external_path=None):
-        """
-        Adds a dataset to kive under the user associated
-        with the token.
+    def add_dataset(self,
+                    name,
+                    description,
+                    handle=None,
+                    cdt=None,
+                    users=None,
+                    groups=None,
+                    externalfiledirectory=None,
+                    external_path=None):
+        """ Adds a dataset to kive.
 
+        :param str name: a name for the dataset
+        :param str description: a description of the dataset
+        :param handle: an open file object with the dataset contents, or None
+            for external datasets
+        :param cdt: a CompoundDatatype object, or None for a raw dataset
+        :param list users: a list of user names that will have access
+        :param list groups: a list of group names that will have access
+        :param str externalfiledirectory: name of an external file directory,
+            or None for internal datasets
+        :param str external_path: path relative to external file directory,
+            or None for internal datasets
         :return: Dataset object
         """
         users_allowed = users or []

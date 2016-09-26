@@ -40,6 +40,11 @@ $(function() {
     scroll_content._top = scroll_content.css('top');
     set_dataset.wrapper.css('width', $('.select_dataset').outerWidth());
 
+    // prevent `asf` from retrieving outer width of dataset_search_table
+    // none of its business for this page!
+    // since we have a fixed fluid layout on this page, that bit of cleverness is not wanted.
+    dataset_search_table.$table.outerWidth = function() { return; };
+
     dataset_search_table.getMaxYPosition = function() {
         return set_dataset.wrapper.offset().top;
     };
@@ -120,13 +125,15 @@ $(function() {
             var in_tb = dataset_input_table.closest('table'),
                 header_row = in_tb.find('thead tr');
             return in_tb.clone()// <table>
+                .css("margin-left", 0)
                 .wrap('<div>').parent()// <div>
                 .addClass('fixed-header')
                 .css({
                     height: header_row.outerHeight() + 1,
                     top: h1.outerHeight(),
                     left: in_tb.offset().left,
-                    width: in_tb.outerWidth()
+                    width: in_tb.outerWidth(),
+                    'margin-left': '3em'
                 })
                 .insertBefore(in_tb)
             ;
@@ -238,6 +245,11 @@ $(function() {
         dataset_input_table.deselectAll = function() {
             $('.selected', this).removeClass('selected');
             $('.remove.ctrl', this).remove();
+        };
+        dataset_input_table.checkHeaderWidth = function() {
+            if (this.hasOwnProperty("$fixed_header")) {
+                this.$fixed_header.css('width', this.closest('table').outerWidth());
+            }
         };
     })();
     var stopProp = function(e) {
@@ -677,6 +689,8 @@ $(function() {
             ).fail(function(xhr) {
                 showPageError(xhr.responseText, '.pipeline-error', true);
             });
+        } else {
+            showPageError("Please complete the inputs table or remove any unwanted runs before continuing.", '.pipeline-error');
         }
     };
     var serialize = function(e) {
@@ -955,6 +969,7 @@ $(function() {
                            .click  ( unfocusAll );
     $(window)              .resize ( dataset_search_dialog.scrollButton )
                            .resize ( $permissions.widget.autoPosition )
+                           .resize ( function()  { dataset_input_table.checkHeaderWidth(); })
                            .resize ( function()  { dataset_search_table.checkOverflow(); })
                            .resize ( function()  { above_box.adjustSpacing(); })
                            .scroll ( function(e) { dataset_input_table.scrollHeader(e); });
@@ -980,8 +995,8 @@ $(function() {
     $('.search_results')      .on( 'click', 'tbody tr',        selectSearchResult           )
                             .on('dblclick', 'tbody tr',        addSelectedDatasetsToInput   );
     set_dataset.options_menu  .on( 'click', 'li',              set_dataset.options_menu.choose );
-    $('#run_controls')        .on( 'click', '.add_run',    function() { dataset_input_table.addNewRunRow(); } )
-                              .on( 'click', '.remove_run', function() { dataset_input_table.removeLastRunRow(); } );
+    $('.add_run')             .on( 'click',                function() { dataset_input_table.addNewRunRow(); } );
+    $('#run_controls')        .on( 'click', '.remove_run', function() { dataset_input_table.removeLastRunRow(); } );
 
     $(window).scroll();
 });
