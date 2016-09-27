@@ -463,6 +463,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         # Check if dependencies conflict with each other.
         dependency_paths = self.list_all_filepaths()
         if len(set(dependency_paths)) != len(dependency_paths):
+            dependency_paths.sort()
             raise ValidationError("Conflicting dependencies (full list: {})".format(dependency_paths))
 
         # Check that permissions are coherent.
