@@ -327,9 +327,9 @@ class CodeResourceRevision(metadata.models.AccessControl):
                     dependant.method.build_removal_plan(removal_plan)
                 )
 
-        for method in self.methods.all():
-            if method not in removal_plan["Methods"]:
-                update_removal_plan(removal_plan, method.build_removal_plan(removal_plan))
+        for meth in self.methods.all():
+            if meth not in removal_plan["Methods"]:
+                update_removal_plan(removal_plan, meth.build_removal_plan(removal_plan))
 
         return removal_plan
 
@@ -647,50 +647,23 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         if log:
             log.start(save=True)
 
+        is_terminated = False
         return_code = None
         try:
             method_popen = self.invoke_code(run_path, input_paths, output_paths)
-        except OSError:
+        except OSError, oserror:
+            return_code = oserror.errno
+            method_popen = None
+            self.logger.debug('OSError return code is %d' % return_code)
             for stream in error_streams:
                 traceback.print_exc(file=stream)
-            return_code = -1
 
-        is_terminated = False
         # Successful execution.
         if return_code is None:
-            err_thread = threading.Thread(
-                target=self._poll_stream,
-                args=(method_popen.stderr, 'stderr', error_streams))
-            err_thread.start()
-            out_thread = threading.Thread(
-                target=self._poll_stream,
-                args=(method_popen.stdout, 'stdout', output_streams))
-            out_thread.start()
-
-            if stop_execution_callback is None:
-                return_code = method_popen.wait()
-            else:
-                # While periodically checking for a STOP message, we
-                # monitor the progress of method_popen.
-                while method_popen.returncode is None:
-                    if stop_execution_callback() is not None:
-                        # We have received a STOP message.  Terminate method_popen.
-                        method_popen.terminate()
-                        return_code = -2
-                        is_terminated = True
-                        break
-
-                    time.sleep(settings.SLEEP_SECONDS)
-                    method_popen.poll()
-                if not is_terminated:
-                    return_code = method_popen.returncode
-
-            # Having stopped one way or another, make sure we capture the rest of the output.
-            err_thread.join()
-            out_thread.join()
-
-        for stream in output_streams + error_streams:
-            stream.flush()
+            return_code, is_terminated = self._wait_by_threading(method_popen,
+                                                                 output_streams,
+                                                                 error_streams,
+                                                                 stop_execution_callback)
 
         with transaction.atomic():
             if log:
@@ -715,6 +688,59 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
         if is_terminated:
             raise StopExecution("Execution of method {} was stopped.".format(self))
+
+    def _wait_by_blocking(self, method_popen, output_streams,
+                          error_streams, stop_execution_callback):
+
+        stdout_data, stderr_data = method_popen.communicate()
+        for s in output_streams:
+            s.write(stdout_data)
+            s.flush()
+        for s in error_streams:
+            s.write(stderr_data)
+            s.flush()
+
+        is_terminated = False
+        return_code = method_popen.returncode
+
+        return return_code, is_terminated
+
+    def _wait_by_threading(self, method_popen, output_streams,
+                           error_streams, stop_execution_callback):
+        is_terminated = False
+        err_thread = threading.Thread(
+            target=self._poll_stream,
+            args=(method_popen.stderr, 'stderr', error_streams))
+        err_thread.start()
+        out_thread = threading.Thread(
+            target=self._poll_stream,
+            args=(method_popen.stdout, 'stdout', output_streams))
+        out_thread.start()
+
+        if stop_execution_callback is None:
+            return_code = method_popen.wait()
+        else:
+            # While periodically checking for a STOP message, we
+            # monitor the progress of method_popen.
+            while method_popen.returncode is None:
+                if stop_execution_callback() is not None:
+                    # We have received a STOP message.  Terminate method_popen.
+                    method_popen.terminate()
+                    return_code = -2
+                    is_terminated = True
+                    break
+
+                time.sleep(settings.SLEEP_SECONDS)
+                method_popen.poll()
+            if not is_terminated:
+                return_code = method_popen.returncode
+
+        err_thread.join()
+        out_thread.join()
+        # Having stopped one way or another, make sure we capture the rest of the output.
+        for stream in output_streams + error_streams:
+            stream.flush()
+        return return_code, is_terminated
 
     def invoke_code(self, run_path, input_paths, output_paths,
                     ssh_sandbox_worker_account=settings.KIVE_SANDBOX_WORKER_ACCOUNT):
@@ -774,33 +800,18 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         # The code to be executed sits in
         # [run_path]/[driver.coderesource.name],
         # and is executable.
-        code_to_run = os.path.join(
-            run_path,
-            self.driver.coderesource.filename
-        )
+        cmd_lst = [self.driver.coderesource.filename] + input_paths + output_paths
+        return self._launch_the_code(cmd_lst, run_path, ssh_sandbox_worker_account)
 
-        if ssh_sandbox_worker_account:
-            # We have to first cd into the appropriate directory before executing the command.
-            ins_and_outs = '"{}"'.format(input_paths[0]) if len(input_paths) > 0 else ""
-            for input_path in input_paths[1:] + output_paths:
-                ins_and_outs += ' "{}"'.format(input_path)
-            full_command = '"{}" {}'.format(code_to_run, ins_and_outs)
-            ssh_command = 'cd "{}" && {}'.format(run_path, full_command)
-
-            kive_sandbox_worker_preamble = [
-                "ssh",
-                "{}@localhost".format(ssh_sandbox_worker_account)
-            ]
-            command = kive_sandbox_worker_preamble + [ssh_command]
-
+    def _launch_the_code(self, cmdlst, pathstr, ssh_worker):
+        act_cmdstr = "cd %s && %s" % (pathstr, " ".join(cmdlst))
+        if ssh_worker:
+            cclst = ["/usr/bin/ssh", "%s@localhost" % ssh_worker, "/bin/bash -c '%s'" % act_cmdstr]
         else:
-            command = [code_to_run] + input_paths + output_paths
-
-        self.logger.debug("subprocess.Popen({})".format(command))
-        code_popen = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                      cwd=run_path)
-
-        return code_popen
+            cclst = ["/bin/bash", "-c", "%s" % act_cmdstr]
+        print "SCOLOG '%s'" % " ".join(cclst)
+        self.logger.debug("subprocess.Popen({})".format(cclst))
+        return subprocess.Popen(cclst, shell=False)
 
     def is_identical(self, other):
         """Is this Method identical to another one?"""
@@ -930,9 +941,9 @@ class MethodFamily(transformation.models.TransformationFamily):
         removal_plan = empty_removal_plan()
         removal_plan["MethodFamilies"].add(self)
 
-        for method in self.members.all():
-            if method not in removal_plan["Methods"]:
-                update_removal_plan(removal_plan, method.build_removal_plan(removal_plan))
+        for meth in self.members.all():
+            if meth not in removal_plan["Methods"]:
+                update_removal_plan(removal_plan, meth.build_removal_plan(removal_plan))
 
         return removal_plan
 
