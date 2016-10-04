@@ -526,7 +526,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         for line in source_stream:
             # drops \n
             self.logger.debug('%s: %s', source_name, line.rstrip().decode('utf-8'))
-
             for stream in dest_streams:
                 stream.write(line)
 
@@ -647,24 +646,24 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         if log:
             log.start(save=True)
 
-        is_terminated = False
-        return_code = None
+        method_popen = None
         try:
             method_popen = self.invoke_code(run_path, input_paths, output_paths)
         except OSError, oserror:
-            return_code = oserror.errno
             method_popen = None
-            self.logger.debug('OSError return code is %d' % return_code)
+            self.logger.debug('OSError return code is %d' % oserror.errno)
             for stream in error_streams:
                 traceback.print_exc(file=stream)
 
-        # Successful execution.
-        if return_code is None:
-            return_code, is_terminated = self._wait_by_threading(method_popen,
-                                                                 output_streams,
-                                                                 error_streams,
-                                                                 stop_execution_callback)
-
+        if method_popen is None:
+            # an OS error
+            return_code = -1
+        else:
+            # Successful invocation, now wait for the step to finish or be terminated.
+            return_code = self._wait_by_threading(method_popen,
+                                                  output_streams,
+                                                  error_streams,
+                                                  stop_execution_callback)
         with transaction.atomic():
             if log:
                 log.stop(save=True, clean=True)
@@ -686,12 +685,13 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 details_to_fill.clean()
                 details_to_fill.save()
 
-        if is_terminated:
-            raise StopExecution("Execution of method {} was stopped.".format(self))
-
     def _wait_by_blocking(self, method_popen, output_streams,
                           error_streams, stop_execution_callback):
-
+        """ This is a drop-in replacement for _wait_by_threading (see below),
+        which however, does not use Threads to wait for the subprocess.Popen process
+        to terminate.
+        Instead, it uses Popen.communicate()
+        """
         stdout_data, stderr_data = method_popen.communicate()
         for s in output_streams:
             s.write(stdout_data)
@@ -699,15 +699,15 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         for s in error_streams:
             s.write(stderr_data)
             s.flush()
-
-        is_terminated = False
-        return_code = method_popen.returncode
-
-        return return_code, is_terminated
+        return method_popen.returncode
 
     def _wait_by_threading(self, method_popen, output_streams,
                            error_streams, stop_execution_callback):
-        is_terminated = False
+        if method_popen.stderr is None:
+            raise RuntimeError("stderr is None")
+        if method_popen.stdout is None:
+            raise RuntimeError("stdout is None")
+
         err_thread = threading.Thread(
             target=self._poll_stream,
             args=(method_popen.stderr, 'stderr', error_streams))
@@ -717,30 +717,30 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             args=(method_popen.stdout, 'stdout', output_streams))
         out_thread.start()
 
-        if stop_execution_callback is None:
-            return_code = method_popen.wait()
+        # While periodically checking for a STOP message, we
+        # monitor the progress of method_popen.
+        is_running = True
+        do_stop = False
+        while is_running and not do_stop:
+            time.sleep(settings.SLEEP_SECONDS)
+            method_popen.poll()
+            is_running = method_popen.returncode is None
+            do_stop = (stop_execution_callback is not None) and (stop_execution_callback() is not None)
+        if do_stop:
+            # We have received a STOP message.  Terminate method_popen.
+            method_popen.terminate()
+            return_code = -2
         else:
-            # While periodically checking for a STOP message, we
-            # monitor the progress of method_popen.
-            while method_popen.returncode is None:
-                if stop_execution_callback() is not None:
-                    # We have received a STOP message.  Terminate method_popen.
-                    method_popen.terminate()
-                    return_code = -2
-                    is_terminated = True
-                    break
-
-                time.sleep(settings.SLEEP_SECONDS)
-                method_popen.poll()
-            if not is_terminated:
-                return_code = method_popen.returncode
-
+            return_code = method_popen.returncode
         err_thread.join()
         out_thread.join()
         # Having stopped one way or another, make sure we capture the rest of the output.
         for stream in output_streams + error_streams:
             stream.flush()
-        return return_code, is_terminated
+
+        if do_stop:
+            raise StopExecution("Execution of method {} was stopped.".format(self))
+        return return_code
 
     def invoke_code(self, run_path, input_paths, output_paths,
                     ssh_sandbox_worker_account=settings.KIVE_SANDBOX_WORKER_ACCOUNT):
@@ -804,14 +804,22 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         return self._launch_the_code(cmd_lst, run_path, ssh_sandbox_worker_account)
 
     def _launch_the_code(self, cmdlst, pathstr, ssh_worker):
+        """ Execute the commands in cmdlst from the directory pathstr
+        either locally using /bin/bash or, if ssh_worker is provided, remotely
+        using /usr/bin/ssh.
+
+        Return the output from subprocess.Popen()
+        """
         act_cmdstr = "cd %s && %s" % (pathstr, " ".join(cmdlst))
         if ssh_worker:
             cclst = ["/usr/bin/ssh", "%s@localhost" % ssh_worker, "/bin/bash -c '%s'" % act_cmdstr]
         else:
             cclst = ["/bin/bash", "-c", "%s" % act_cmdstr]
-        print "SCOLOG '%s'" % " ".join(cclst)
         self.logger.debug("subprocess.Popen({})".format(cclst))
-        return subprocess.Popen(cclst, shell=False)
+        return subprocess.Popen(cclst, shell=False,
+                                stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
 
     def is_identical(self, other):
         """Is this Method identical to another one?"""

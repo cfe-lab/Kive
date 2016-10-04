@@ -455,7 +455,12 @@ class Manager(object):
 
         # Mark this task as having finished.
         just_finished = self.tasks_in_progress.pop(lord_rank)
-        assert task_finished == just_finished["task"]
+        # SCO: replaced this assert with some logging information
+        # for debugging, and an exception
+        # assert task_finished == just_finished["task"]
+        if task_finished != just_finished["task"]:
+            mgr_logger.error("Manager Error: '%s'  vs '%s'", task_finished, just_finished["task"])
+            raise RuntimeError("Manager: Unexpected Task Error!")
         curr_sdbx = self.active_sandboxes[task_finished.top_level_run]
         task_execute_info = curr_sdbx.get_task_info(task_finished)
 
