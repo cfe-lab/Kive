@@ -49,8 +49,8 @@ var pipeline = (function(exports){
         var self = this,
             pipeline_outputs = [],
             pipeline_inputs = [],
-            canvas_x_ratio = 1.0/self.canvasState.canvas.width,
-            canvas_y_ratio = 1.0/self.canvasState.canvas.height,
+            canvas_x_ratio = 1.0 / self.canvasState.canvas.width,
+            canvas_y_ratio = 1.0 / self.canvasState.canvas.height,
             is_trivial = true; // This is a trivial modification until we hit a non trivial
             // modification
 
@@ -307,7 +307,7 @@ var pipeline = (function(exports){
         // Over each input for the pipeline
         $.each(self.pipeline.inputs, function(_, node) {
 
-            // Node has no structure => no CDT, so it's raw
+            // BaseNode has no structure => no CDT, so it's raw
             if (node.structure === null) {
                 self.canvasState.addShape(new drydock_objects.RawNode(
                     node.x * canvas_x_ratio,

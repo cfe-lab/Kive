@@ -1,3 +1,19 @@
+import { CanvasWrapper, Nodes } from "./static/pipeline/drydock_objects";
+import { CanvasState } from "./static/pipeline/drydock";
+declare var $: any;
+declare var it:any;
+declare var expect: any;
+declare var describe: any;
+declare var imagediff: any;
+declare var beforeEach: any;
+declare var describe: any;
+declare var xdescribe: any;
+declare var fail: any;
+declare var jasmine: any;
+declare var afterEach: any;
+declare var Pipeline: any;
+declare var pipeline_families: any;
+
 (function() {
     "use strict";
     
@@ -8,8 +24,8 @@
             jasmine.addMatchers(imagediff.jasmine);
             this.rawCanvas = imagediff.createCanvas(width, height);
             this.expectedRawCanvas = imagediff.createCanvas(width, height);
-            this.canvas = new drydock_objects.CanvasWrapper(this.rawCanvas);
-            this.expectedCanvas = new drydock_objects.CanvasWrapper(
+            this.canvas = new CanvasWrapper(this.rawCanvas);
+            this.expectedCanvas = new CanvasWrapper(
                     this.expectedRawCanvas);
             this.ctx = this.canvas.ctx;
             this.expectedCanvas.ctx.fillStyle = "white";
@@ -140,7 +156,7 @@
                 var r = 5,
                     parent = this,
                     attract = 3;
-                this.magnet = new drydock_objects.Magnet(parent, r, attract);
+                this.magnet = new Nodes.Magnet(parent, r, attract);
                 this.magnet.x = 100;
                 this.magnet.y = 10;
                 this.magnet.label = 'example';
@@ -245,7 +261,7 @@
                 var x = 100,
                     y = 40,
                     label = 'example';
-                this.node = new drydock_objects.OutputNode(x, y, label);
+                this.node = new Nodes.OutputNode(x, y, label);
             });
             
             it('should draw', function() {
@@ -257,10 +273,9 @@
                 this.expectedCanvas.ctx.globalAlpha = 0.35;
                 this.expectedCanvas.drawEllipse({x: 100, y: 27.5, rx: 20, ry: 10});
                 this.expectedCanvas.ctx.globalAlpha = 1;
-                var magnet = new drydock_objects.Magnet();
+                var magnet = new Nodes.Magnet(null);
                 magnet.x = 88;
                 magnet.y = 27.5;
-                magnet.r = 5;
                 magnet.draw(this.expectedCanvas.ctx);
                 
                 this.node.draw(this.ctx);
@@ -281,10 +296,9 @@
                 this.expectedCanvas.ctx.globalAlpha = 0.35;
                 this.expectedCanvas.drawEllipse({x: 100, y: 27.5, rx: 20, ry: 10});
                 this.expectedCanvas.ctx.globalAlpha = 1;
-                var magnet = new drydock_objects.Magnet();
+                var magnet = new Nodes.Magnet(null);
                 magnet.x = 88;
                 magnet.y = 27.5;
-                magnet.r = 5;
                 magnet.draw(this.expectedCanvas.ctx);
                 
                 this.node.status = 'CLEAR';
@@ -300,10 +314,9 @@
                 this.expectedCanvas.ctx.globalAlpha = 0.35;
                 this.expectedCanvas.drawEllipse({x: 100, y: 27.5, rx: 20, ry: 10});
                 this.expectedCanvas.ctx.globalAlpha = 1;
-                var magnet = new drydock_objects.Magnet();
+                var magnet = new Nodes.Magnet(null);
                 magnet.x = 88;
                 magnet.y = 27.5;
-                magnet.r = 5;
                 magnet.draw(this.expectedCanvas.ctx);
                 
                 this.node.found_md5 = true;
@@ -351,8 +364,8 @@
                 var sourceParent = {},
                     r = 5,
                     attract = 3,
-                    source = new drydock_objects.Magnet(sourceParent, r, attract),
-                    connector = new drydock_objects.Connector(source);
+                    source = new Nodes.Magnet(sourceParent, r, attract),
+                    connector = new Nodes.Connector(source);
                 source.x = 50;
                 source.y = 10;
                 source.label = "example";
@@ -396,7 +409,7 @@
                 var x = 100,
                     y = 40,
                     label = 'example';
-                this.node = new drydock_objects.RawNode(x, y, label);
+                this.node = new Nodes.RawNode(x, y, label);
             });
             
             it('should draw', function() {
@@ -408,10 +421,9 @@
                 this.expectedCanvas.ctx.globalAlpha = 0.35;
                 this.expectedCanvas.drawEllipse({x: 100, y: 27.5, rx: 20, ry: 10});
                 this.expectedCanvas.ctx.globalAlpha = 1;
-                var magnet = new drydock_objects.Magnet();
+                var magnet = new Nodes.Magnet(null);
                 magnet.x = 110;
                 magnet.y = 45;
-                magnet.r = 5;
                 magnet.draw(this.expectedCanvas.ctx);
                 
                 this.node.draw(this.ctx);
@@ -472,7 +484,7 @@
                     y = 40,
                     label = 'example';
                 this.expected_cdt_pk = 1234;
-                this.node = new drydock_objects.CdtNode(
+                this.node = new Nodes.CdtNode(
                         this.expected_cdt_pk,
                         x,
                         y,
@@ -507,10 +519,9 @@
                 this.expectedCanvas.ctx.globalAlpha = 0.35;
                 this.expectedCanvas.ctx.fill();
                 this.expectedCanvas.ctx.globalAlpha = 1.0;
-                var magnet = new drydock_objects.Magnet();
+                var magnet = new Nodes.Magnet(null);
                 magnet.x = 113;
                 magnet.y = 45.625;
-                magnet.r = 5;
                 magnet.draw(this.expectedCanvas.ctx);
                 
                 this.node.draw(this.ctx);
@@ -587,7 +598,7 @@
                     inputs = [{dataset_idx: 1,dataset_name: "in", structure: {compounddatatype: 7} }],
                     outputs = [{dataset_idx: 1,dataset_name: "out",structure: {compounddatatype: 7}}];
                     
-                this.node = new drydock_objects.MethodNode(
+                this.node = new Nodes.MethodNode(
                         method_pk,
                         family_pk,
                         x,
@@ -652,10 +663,9 @@
                 this.expectedCanvas.ctx.restore();
                 
                 // in magnet
-                var magnet = new drydock_objects.Magnet();
+                var magnet = new Nodes.Magnet(null);
                 magnet.x = 150;
                 magnet.y = 15;
-                magnet.r = 5;
                 magnet.draw(this.expectedCanvas.ctx);
                 
                 // out magnet
@@ -684,7 +694,7 @@
                 this.expectedCanvas.ctx.stroke();
                 this.node.draw(this.expectedCanvas.ctx);
                 // // in magnet
-                // var magnet = new drydock_objects.Magnet();
+                // var magnet = new Nodes.Magnet(null);
                 // magnet.x = 150;
                 // magnet.y = 15;
                 // magnet.r = 5;
@@ -712,17 +722,16 @@
                 this.node.draw(this.expectedCanvas.ctx);
                 // source magnet
                 var sourceParent = {label: "in"},
-                    source = new drydock_objects.Magnet(sourceParent);
+                    source = new Nodes.Magnet(sourceParent);
                 source.x = 50;
                 source.y = 10;
                 source.label = "in";
                 
                 // in magnet
-                var in_magnet = new drydock_objects.Magnet(),
-                    expectedCable = new drydock_objects.Connector(source);
+                var in_magnet = new Nodes.Magnet(null),
+                    expectedCable = new Nodes.Connector(source);
                 in_magnet.x = 150;
                 in_magnet.y = 15;
-                in_magnet.r = 5;
                 in_magnet.label = "in";
                 expectedCable.dest = in_magnet;
                 in_magnet.connected.push(expectedCable);
@@ -730,7 +739,7 @@
                 expectedCable.drawLabel(this.expectedCanvas.ctx);
                 
                 // // out magnet
-                // var out_magnet = new drydock_objects.Magnet();
+                // var out_magnet = new Nodes.Magnet(null);
                 // out_magnet.x = 188.97114317029974;
                 // out_magnet.y = 57.5;
                 // out_magnet.r = 5;
@@ -738,7 +747,7 @@
                 // out_magnet.isOutput = true;
                 // out_magnet.highlight(this.expectedCanvas.ctx);
                 
-                var actualCable = new drydock_objects.Connector(source);
+                var actualCable = new Nodes.Connector(source);
                 actualCable.dest = this.node.in_magnets[0];
                 this.node.in_magnets[0].connected.push(actualCable);
                 this.node.draw(this.ctx);
@@ -756,13 +765,13 @@
                 this.node.draw(this.expectedCanvas.ctx);
                 // dest magnet
                 var destParent = {label: "out"},
-                dest = new drydock_objects.Magnet(destParent);
+                dest = new Nodes.Magnet(destParent);
                 dest.x = 250;
                 dest.y = 75;
                 dest.label = "out";
                 
                 // // in magnet
-                // var in_magnet = new drydock_objects.Magnet();
+                // var in_magnet = new Nodes.Magnet(null);
                 // in_magnet.x = 150;
                 // in_magnet.y = 15;
                 // in_magnet.r = 5;
@@ -770,11 +779,10 @@
                 // in_magnet.highlight(this.expectedCanvas.ctx);
                 
                 // out magnet
-                var out_magnet = new drydock_objects.Magnet(this.node),
-                    expectedCable = new drydock_objects.Connector(out_magnet);
+                var out_magnet = new Nodes.Magnet(this.node),
+                    expectedCable = new Nodes.Connector(out_magnet);
                 out_magnet.x = 188.97114317029974;
                 out_magnet.y = 57.5;
-                out_magnet.r = 5;
                 out_magnet.label = "out";
                 out_magnet.isOutput = true;
                 expectedCable.dest = dest;
@@ -782,7 +790,7 @@
                 expectedCable.draw(this.expectedCanvas.ctx);
                 expectedCable.drawLabel(this.expectedCanvas.ctx);
                 
-                var actualCable = new drydock_objects.Connector(
+                var actualCable = new Nodes.Connector(
                         this.node.out_magnets[0]);
                 actualCable.dest = dest;
                 this.node.out_magnets[0].connected.push(actualCable);
@@ -800,10 +808,10 @@
                 this.expectedCanvas.ctx.stroke();
                 this.node.draw(this.expectedCanvas.ctx);
                 // dest magnet
-                var expectedOutput = new drydock_objects.OutputNode(250, 75, "out");
+                var expectedOutput = new Nodes.OutputNode(250, 75, "out");
                 
                 // // in magnet
-                // var in_magnet = new drydock_objects.Magnet();
+                // var in_magnet = new Nodes.Magnet(null);
                 // in_magnet.x = 150;
                 // in_magnet.y = 15;
                 // in_magnet.r = 5;
@@ -811,8 +819,8 @@
                 // in_magnet.highlight(this.expectedCanvas.ctx);
                 
                 // out magnet
-                var out_magnet = new drydock_objects.Magnet(this.node),
-                expectedCable = new drydock_objects.Connector(out_magnet);
+                var out_magnet = new Nodes.Magnet(this.node),
+                expectedCable = new Nodes.Connector(out_magnet);
                 out_magnet.x = 188.97114317029974;
                 out_magnet.y = 57.5;
                 out_magnet.r = 5;
@@ -825,9 +833,9 @@
                 expectedCable.draw(this.expectedCanvas.ctx);
                 expectedCable.drawLabel(this.expectedCanvas.ctx);
                 
-                var actualCable = new drydock_objects.Connector(
+                var actualCable = new Nodes.Connector(
                     this.node.out_magnets[0]),
-                    actualOutput = new drydock_objects.OutputNode(250, 75, "out");
+                    actualOutput = new Nodes.OutputNode(250, 75, "out");
                 actualCable.dest = actualOutput.in_magnets[0];
                 this.node.out_magnets[0].connected.push(actualCable);
                 this.node.draw(this.ctx);
@@ -892,15 +900,15 @@
                     attract = 3;
                 this.sourceParent = {};
                 this.destParent = {};
-                this.source = new drydock_objects.Magnet(this.sourceParent, r, attract);
+                this.source = new Nodes.Magnet(this.sourceParent, r, attract);
                 this.source.x = 50;
                 this.source.y = 10;
                 this.source.label = 'example';
-                this.dest = new drydock_objects.Magnet(this.destParent, r, attract);
+                this.dest = new Nodes.Magnet(this.destParent, r, attract);
                 this.dest.x = 150;
                 this.dest.y = 15;
                 this.dest.label = 'example';
-                this.connector = new drydock_objects.Connector(this.source);
+                this.connector = new Nodes.Connector(this.source);
                 this.connector.x = 150;
                 this.connector.y = 15;
             });
@@ -1143,7 +1151,7 @@
                     canvas_height = 150;
                 this.expectedRawCanvas.width = canvas_width;
                 this.rawCanvas.width = canvas_width;
-                this.zone = new drydock_objects.OutputZone(
+                this.zone = new Nodes.OutputZone(
                         canvas_width,
                         canvas_height);
             });
@@ -1175,10 +1183,10 @@
         
         describe("CanvasState", function() {
             beforeEach(function() {
-                this.state = new drydock.CanvasState(this.rawCanvas);
+                this.state = new CanvasState(this.rawCanvas);
                 
-                this.expectedInput = new drydock_objects.RawNode(30, 50, "in");
-                this.actualInput = new drydock_objects.RawNode(30, 50, "in");
+                this.expectedInput = new Nodes.RawNode(30, 50, "in");
+                this.actualInput = new Nodes.RawNode(30, 50, "in");
                 this.state.addShape(this.actualInput).has_unsaved_changes = false;
             });
             
@@ -1234,7 +1242,7 @@
                     this.methodInputs = [{dataset_idx: 1, dataset_name: "i1: in", structure: null}];
                     this.methodOutputs = [{dataset_idx: 1, dataset_name: "out", structure: {compounddatatype: 17}}];
 
-                    this.expectedMethod = new drydock_objects.MethodNode(
+                    this.expectedMethod = new Nodes.MethodNode(
                             this.methodId,
                             this.methodFamilyId,
                             100,
@@ -1243,7 +1251,7 @@
                             "example",
                             this.methodInputs,
                             this.methodOutputs);
-                    this.actualMethod = new drydock_objects.MethodNode(
+                    this.actualMethod = new Nodes.MethodNode(
                             this.methodId,
                             this.methodFamilyId,
                             100,
@@ -1252,12 +1260,12 @@
                             "example",
                             this.methodInputs,
                             this.methodOutputs);
-                    this.expectedConnector = new drydock_objects.Connector(
+                    this.expectedConnector = new Nodes.Connector(
                             this.expectedMethod.out_magnets[0]);
-                    this.expectedOutputZone = new drydock_objects.OutputZone(
+                    this.expectedOutputZone = new Nodes.OutputZone(
                             this.expectedRawCanvas.width,
                             this.expectedRawCanvas.height);
-                    this.expectedOutput = new drydock_objects.OutputNode(
+                    this.expectedOutput = new Nodes.OutputNode(
                             250,
                             76,
                             "out");
@@ -1877,7 +1885,7 @@
                 
                 describe('and connector', function() {
                     beforeEach(function() {
-                        this.actualConnector = new drydock_objects.Connector(
+                        this.actualConnector = new Nodes.Connector(
                                 this.actualInput.out_magnets[0]);
                         this.actualInput.out_magnets[0].connected.push(
                                 this.actualConnector);
@@ -2023,12 +2031,12 @@
                                 y = 100,
                                 output_name = 'result.csv',
                                 output_id = 17;
-                            this.output = new drydock_objects.OutputNode(
+                            this.output = new Nodes.OutputNode(
                                     x,
                                     y,
                                     output_name,
                                     output_id);
-                            var connector = new drydock_objects.Connector(
+                            var connector = new Nodes.Connector(
                                     this.actualMethod.out_magnets[0]);
                             this.actualMethod.out_magnets[0].connected.push(
                                     connector);
@@ -2076,7 +2084,7 @@
                                 fill = "#999",
                                 old_method_name = "example",
                                 method_name = old_method_name + " (new)",
-                                method = new drydock_objects.MethodNode(
+                                method = new Nodes.MethodNode(
                                         this.methodId,
                                         this.methodFamilyId,
                                         0,
@@ -2109,7 +2117,7 @@
                                 fill = "#999",
                                 inputs = [],
                                 outputs = [],
-                                extra_method = new drydock_objects.MethodNode(
+                                extra_method = new Nodes.MethodNode(
                                     method_id,
                                     family_id,
                                     200,
@@ -2181,15 +2189,16 @@
 
             jasmine.addMatchers(imagediff.jasmine);
             this.rawCanvas = imagediff.createCanvas(width, height);
-            this.canvas = new drydock_objects.CanvasWrapper(this.rawCanvas);
-            this.canvasState = new drydock.CanvasState(this.rawCanvas);
+            this.canvas = new CanvasWrapper(this.rawCanvas);
+            this.canvasState = new CanvasState(this.rawCanvas);
 
             this.api_pipeline = {"id":25,"url":"http://127.0.0.1:8000/api/pipelines/25/", "family_pk": 2, "family":"Test","revision_name":"","revision_desc":"Carl Sagan's science slam-jam","revision_number":3,"revision_parent":24,"revision_DateTime":"2015-06-10T19:36:31.570191Z","user":"kive","users_allowed":[],"groups_allowed":[],"inputs":[{"dataset_name":"input2","dataset_idx":1,"x":0.15,"y":0.15,"structure":{'compounddatatype':9, min_row:null, max_row:null }},{"dataset_name":"input1","dataset_idx":2,"x":0.05,"y":0.3,"structure":null}],"outputs":[{"dataset_name":"unmapped2_fastq","dataset_idx":1,"x":0.637772562280456,"y":0.633208895290869,"structure":null},{"dataset_name":"unmapped1_fastq","dataset_idx":2,"x":0.637772562280456,"y":0.633208895290869,"structure":null},{"dataset_name":"remap_conseq","dataset_idx":3,"x":0.637772562280456,"y":0.633208895290869,"structure":{"compounddatatype":10,"min_row":null,"max_row":null}},{"dataset_name":"remap","dataset_idx":4,"x":0.637772562280456,"y":0.633208895290869,"structure":{"compounddatatype":8,"min_row":null,"max_row":null}},{"dataset_name":"remap_counts","dataset_idx":5,"x":0.637772562280456,"y":0.633208895290869,"structure":{"compounddatatype":9,"min_row":null,"max_row":null}}],"steps":[{"transformation":4,"transformation_family":3,"step_num":1,"outputs_to_delete":[],"x":0.344662650584514,"y":0.5,"name":"prelim_map.py","cables_in":[{"source_step":0,"source":143,"source_dataset_name":"input1","dest":7,"dest_dataset_name":"fastq1","custom_wires":[],"keep_output":false},{"source_step":0,"source":142,"source_dataset_name":"input2","dest":8,"dest_dataset_name":"fastq2","custom_wires":[],"keep_output":false}],"outputs":[{"dataset_name":"prelim","dataset_idx":1,"x":0.0,"y":0.0,"structure":{"compounddatatype":7,"min_row":null,"max_row":null}}],"inputs":[{"dataset_name":"fastq1","dataset_idx":1,"x":0.0,"y":0.0,"structure":null},{"dataset_name":"fastq2","dataset_idx":2,"x":0.0,"y":0.0,"structure":null}]},{"transformation":5,"transformation_family":4,"step_num":2,"outputs_to_delete":[],"x":0.450583501602465,"y":0.257130788000083,"name":"remap.py","cables_in":[{"source_step":0,"source":143,"source_dataset_name":"input1","dest":10,"dest_dataset_name":"fastq1","custom_wires":[],"keep_output":false},{"source_step":0,"source":142,"source_dataset_name":"input2","dest":11,"dest_dataset_name":"fastq2","custom_wires":[],"keep_output":false},{"source_step":1,"source":9,"source_dataset_name":"prelim","dest":12,"dest_dataset_name":"prelim","custom_wires":[],"keep_output":false}],"outputs":[{"dataset_name":"remap","dataset_idx":1,"x":0.0,"y":0.0,"structure":{"compounddatatype":8,"min_row":null,"max_row":null}},{"dataset_name":"remap_counts","dataset_idx":2,"x":0.0,"y":0.0,"structure":{"compounddatatype":9,"min_row":null,"max_row":null}},{"dataset_name":"remap_conseq","dataset_idx":3,"x":0.0,"y":0.0,"structure":{"compounddatatype":10,"min_row":null,"max_row":null}},{"dataset_name":"unmapped1_fastq","dataset_idx":4,"x":0.0,"y":0.0,"structure":null},{"dataset_name":"unmapped2_fastq","dataset_idx":5,"x":0.0,"y":0.0,"structure":null}],"inputs":[{"dataset_name":"fastq1","dataset_idx":1,"x":0.0,"y":0.0,"structure":null},{"dataset_name":"fastq2","dataset_idx":2,"x":0.0,"y":0.0,"structure":null},{"dataset_name":"prelim","dataset_idx":3,"x":0.0,"y":0.0,"structure":{"compounddatatype":7,"min_row":null,"max_row":null}}]}],"outcables":[{"pk":128,"output_idx":1,"output_name":"unmapped2_fastq","output_cdt":null,"source_step":2,"source":55,"source_dataset_name":"unmapped2_fastq","custom_wires":[]},{"pk":129,"output_idx":2,"output_name":"unmapped1_fastq","output_cdt":null,"source_step":2,"source":54,"source_dataset_name":"unmapped1_fastq","custom_wires":[]},{"pk":130,"output_idx":3,"output_name":"remap_conseq","output_cdt":10,"source_step":2,"source":15,"source_dataset_name":"remap_conseq","custom_wires":[]},{"pk":131,"output_idx":4,"output_name":"remap","output_cdt":8,"source_step":2,"source":13,"source_dataset_name":"remap","custom_wires":[]},{"pk":132,"output_idx":5,"output_name":"remap_counts","output_cdt":9,"source_step":2,"source":14,"source_dataset_name":"remap_counts","custom_wires":[]}],"removal_plan":"http://127.0.0.1:8000/api/pipelines/25/removal_plan/"};
 
             // Throw some more functions into the CanvasState object
-            // Dirty hack for now TODO: move this into CanvasState
+            // Dirty hack for now
+            // @todo move this into CanvasState
 
-            drydock.CanvasState.prototype.isConnectedTo = function(node1, node2) {
+            CanvasState.prototype.isConnectedTo = function(node1, node2) {
                 var connections = this.connectors;
                 for(var i = 0; i < connections.length; i++)
                     if ((connections[i].source.parent == node1 && connections[i].dest.parent == node2) ||
@@ -2603,7 +2612,7 @@
             });
         });
         
-        function loadAndSerialize(canvasState, api_pipeline, additional_args){
+        function loadAndSerialize(canvasState, api_pipeline, additional_args?){
             var pipeline = loadApiPipeline(canvasState, api_pipeline);
             pipeline.draw();
             return pipeline.serialize(additional_args);

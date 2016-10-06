@@ -262,16 +262,29 @@ export class CanvasWrapper {
 type CanvasState = any;
 
 export namespace Nodes {
-    interface NodeInterface {
+
+    export interface CanvasObject {
         draw(ctx: CanvasRenderingContext2D): void;
         doDown(cs: CanvasState, e: Event): void;
+        contains(x: number, y: number, pad?: number): boolean;
+        isNode(): boolean;
+        isMethodNode(): boolean;
+        isInputNode(): boolean;
+        isCdtNode(): boolean;
+        isRawNode(): boolean;
+        isOutputNode(): boolean;
+        isMagnet(): boolean;
+        isConnector(): boolean;
+        isOutputZone(): boolean;
+    }
+
+    export interface Node extends CanvasObject {
         highlight(ctx: CanvasRenderingContext2D): void;
-        contains(x: number, y: number): boolean;
         getVertices(): Point[];
         getLabel(): NodeLabel;
         deleteFrom(cs: CanvasState): void;
         unlightMagnets(): void;
-        getMouseTarget(x: number, y: number, skip_check: boolean): Magnet|Node|this;
+        getMouseTarget(x: number, y: number, skip_check: boolean): BaseNode|Magnet;
         x: number;
         y: number;
         dx: number;
@@ -317,7 +330,7 @@ export namespace Nodes {
      * A base class for all nodes. (RawNode, CdtNode, MethodNode, OutputNode)
      * Doesn't do much yet.
      */
-    export class Node {
+    class BaseNode {
         affects_exec_order = false;
         in_magnets: Magnet[];
         out_magnets: Magnet[];
@@ -344,7 +357,7 @@ export namespace Nodes {
                 magnet.acceptingConnector = false;
             }
         }
-        getMouseTarget(mx: number, my: number, skip_check: boolean): Node|Magnet {
+        getMouseTarget(mx: number, my: number, skip_check: boolean): BaseNode|Magnet {
             if (skip_check || this.contains(mx,my)) {
                 // are we clicking on a magnet?
                 for (let magnet of this.out_magnets.concat(this.in_magnets)) {
@@ -378,15 +391,27 @@ export namespace Nodes {
             } else {
                 canvasState.selection = [ this ];
             }
-        };
+        }
+        isNode() {
+            return true;
+        }
+        isOutputZone() {
+            return false;
+        }
+        isMagnet() {
+            return false;
+        }
+        isConnector() {
+            return false;
+        }
     }
     
     /**
      * A base class for both cylindrical nodes: RawNode and OutputNode.
      */
-    class CylinderNode extends Node {
+    class CylinderNode extends BaseNode {
         /*
-        Node rendered as a cylinder.
+        BaseNode rendered as a cylinder.
          */
         dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
         dy = 0;
@@ -517,15 +542,15 @@ export namespace Nodes {
         }
     }
 
-    export class RawNode extends CylinderNode implements NodeInterface {
+    export class RawNode extends CylinderNode implements Node {
         /*
-        Node representing an unstructured (raw) datatype.
+        BaseNode representing an unstructured (raw) datatype.
          */
         fill = "#8D8";
         found_fill = "blue";
         inset = 10; // distance of magnet from center
 
-        constructor(public x, public y, public label, public input_index) {
+        constructor(public x, public y, public label, public input_index?) {
             super(x, y, label);
             this.magnetOffset = {x: 10, y: this.r2/2};
             // Input node always has one magnet
@@ -534,10 +559,26 @@ export namespace Nodes {
             ];
         };
 
+        isInputNode() {
+            return true;
+        }
+        isRawNode() {
+            return true;
+        }
+        isOutputNode() {
+            return false;
+        }
+        isMethodNode() {
+            return false;
+        }
+        isCdtNode() {
+            return false;
+        }
+
         deleteFrom = deleteFromTemplate;
     }
 
-    export class CdtNode extends Node implements NodeInterface {
+    export class CdtNode extends BaseNode implements Node {
         dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
         dy = 0;
         w = 45;
@@ -551,10 +592,10 @@ export namespace Nodes {
         found_md5: boolean;
 
         /*
-        Node represents a Compound Datatype (CSV structured data).
+        BaseNode represents a Compound Datatype (CSV structured data).
         Rendered as a square shape.
          */
-        constructor(public pk, public x, public y, public label, public input_index) {
+        constructor(public pk, public x, public y, public label, public input_index?) {
             super();
             this.out_magnets = [
                 new Magnet(this, 5, 2, "white", this.pk, this.label, null, true, pk)
@@ -662,6 +703,23 @@ export namespace Nodes {
                     this.y + this.dy - this.h/2 - this.offset,
                     this.has_unsaved_changes && '*');
         }
+
+        isInputNode() {
+            return true;
+        }
+        isRawNode() {
+            return false;
+        }
+        isCdtNode() {
+            return true;
+        }
+        isOutputNode() {
+            return false;
+        }
+        isMethodNode() {
+            return false;
+        }
+
         deleteFrom = deleteFromTemplate;
     }
 
@@ -681,7 +739,7 @@ export namespace Nodes {
      * @param status: describes progress during a run, possible values are the
      *  keys in statusColorMap
      */
-    export class MethodNode extends Node implements NodeInterface {
+    export class MethodNode extends BaseNode implements Node {
 
         dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
         dy = 0;
@@ -705,16 +763,18 @@ export namespace Nodes {
         constructor (
                 public pk,
                 public family,// can be passed from database
-                public x = 0,
-                public y = 0,
+                public x,
+                public y,
                 public fill,
                 public label,
                 public inputs,
                 public outputs,
-                public status,// Members for instances of methods in runs
+                public status?,// Members for instances of methods in runs
                 public outputs_to_delete = []
             ) {
             super();
+            this.x = x || 0;
+            this.y = y || 0;
             this.n_inputs = Object.keys(inputs).length;
             this.n_outputs = Object.keys(outputs).length;
             this.h = Math.max(this.n_inputs, this.n_outputs) * this.spacing;
@@ -948,7 +1008,7 @@ export namespace Nodes {
         };
         
         doDown (cs, e) {
-            Node.prototype.doDown.call(this, cs, e);
+            BaseNode.prototype.doDown.call(this, cs, e);
             document.getElementById('id_method_button').setAttribute('value', 'Revise Method');
         };
         
@@ -976,6 +1036,22 @@ export namespace Nodes {
             }
             return is_fully_connected;
         };
+
+        isInputNode() {
+            return false;
+        }
+        isRawNode() {
+            return false;
+        }
+        isCdtNode() {
+            return false;
+        }
+        isOutputNode() {
+            return false;
+        }
+        isMethodNode() {
+            return true;
+        }
         
         deleteFrom (cs) {
             var magnets = this.in_magnets.concat(this.out_magnets);
@@ -991,9 +1067,9 @@ export namespace Nodes {
         };
     }
     
-    export class Magnet {
+    export class Magnet implements CanvasObject {
         /*
-        A Magnet is the attachment point for a Node (shape) given a
+        A Magnet is the attachment point for a BaseNode (shape) given a
         Connector.  It is always contained within a shape.
         x and y coordinates will be set by parent object draw().
          */
@@ -1006,10 +1082,10 @@ export namespace Nodes {
 
         constructor(
                 public parent,
-                public r,
-                public attract,
+                public r = 5,
+                public attract = 5,
                 public fill = '#fff',
-                public cdt,
+                public cdt?,
                 public label = '',
                 public offset = 5,
                 public isOutput = false,
@@ -1081,9 +1157,37 @@ export namespace Nodes {
                 this.acceptingConnector = false;
             }
         }
+
+        isNode() {
+            return false;
+        }
+        isInputNode() {
+            return false;
+        }
+        isRawNode() {
+            return false;
+        }
+        isCdtNode() {
+            return false;
+        }
+        isOutputNode() {
+            return false;
+        }
+        isMethodNode() {
+            return false;
+        }
+        isMagnet() {
+            return true;
+        }
+        isOutputZone() {
+            return false;
+        }
+        isConnector() {
+            return false;
+        }
     }
     
-    export class Connector {
+    export class Connector implements CanvasObject {
         /*
         A Connector is a line drawn between two Magnets.
         Actions:
@@ -1354,11 +1458,12 @@ export namespace Nodes {
         //     ctx.fill();
         // };
 
-        contains (mx, my, pad) {
+        contains (mx, my, pad = 5) {
             // Uses library jsBezier to accomplish certain tasks.
             // Since precise bezier distance is expensive to compute, we start by
             // running a faster algorithm to see if mx,my is outside the rectangle
             // given by the beginning, end, and control points (plus padding).
+
             this.calculateCurve();
             var ys = [ this.y, this.fromY, this.ctrl1.y, this.ctrl2.y ],
                 xs = [ this.x, this.fromX, this.ctrl1.x, this.ctrl2.x ],
@@ -1398,6 +1503,34 @@ export namespace Nodes {
                     cs.selection = [];
                 }
             }
+        }
+
+        isNode() {
+            return false;
+        }
+        isInputNode() {
+            return false;
+        }
+        isRawNode() {
+            return false;
+        }
+        isCdtNode() {
+            return false;
+        }
+        isOutputNode() {
+            return false;
+        }
+        isMethodNode() {
+            return false;
+        }
+        isMagnet() {
+            return false;
+        }
+        isOutputZone() {
+            return false;
+        }
+        isConnector() {
+            return true;
         }
 
         deleteFrom = function(cs) {
@@ -1476,7 +1609,7 @@ export namespace Nodes {
             };
         }());
 
-        constructor(public node: Node, status) {
+        constructor(public node: BaseNode, status) {
             this.setStatus(status);
             this.x = node.x + node.w/2;
             this.y = node.y - node.h/2;
@@ -1497,7 +1630,7 @@ export namespace Nodes {
         };
     }
 
-    export class OutputZone {
+    export class OutputZone implements CanvasObject {
         dy = 0;
         dx = 0;
         x: number;
@@ -1570,11 +1703,46 @@ export namespace Nodes {
             }
             return vertices;
         }
+
+        doDown() {
+            // does nothing
+        }
+        deleteFrom() {
+            // can't delete this object
+        }
+
+        isNode() {
+            return false;
+        }
+        isInputNode() {
+            return false;
+        }
+        isRawNode() {
+            return false;
+        }
+        isCdtNode() {
+            return false;
+        }
+        isOutputNode() {
+            return false;
+        }
+        isMethodNode() {
+            return false;
+        }
+        isMagnet() {
+            return false;
+        }
+        isOutputZone() {
+            return true;
+        }
+        isConnector() {
+            return false;
+        }
     }
 
-    export class OutputNode extends CylinderNode implements NodeInterface {
+    export class OutputNode extends CylinderNode implements Node {
         /*
-         Node representing an output.
+         BaseNode representing an output.
          */
         fill = "#d40";
         defaultFill = "#d40";
@@ -1623,6 +1791,22 @@ export namespace Nodes {
         }
         debug(ctx: CanvasRenderingContext2D) {
             this.in_magnets[0].connected[0].debug(ctx);
+        }
+
+        isInputNode() {
+            return false;
+        }
+        isRawNode() {
+            return false;
+        }
+        isCdtNode() {
+            return false;
+        }
+        isOutputNode() {
+            return true;
+        }
+        isMethodNode() {
+            return false;
         }
     }
 }

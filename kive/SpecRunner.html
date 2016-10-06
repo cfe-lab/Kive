@@ -14,13 +14,15 @@
   <script src="portal/js/imagediff.js"></script>
 
   <!-- include source files here... -->
+  <script src="../node_modules/core-js/client/core.min.js"></script>
+  <script src="../node_modules/systemjs/dist/system.js"></script>
   <script src="portal/static/portal/jquery-2.0.3.min.js"></script>
   <script src="portal/static/portal/noxss.js"></script>
   <script src="portal/static/portal/permissions.js"></script>
   <script src="librarian/static/librarian/md5.js"></script>
-  <script src="pipeline/static/pipeline/jsBezier-0.6.js"></script>
-  <script src="pipeline/static/pipeline/drydock_objects.js"></script>
-  <script src="pipeline/static/pipeline/drydock.js"></script>
+  <!--<script src="pipeline/static/pipeline/bezier.js"></script>-->
+  <!--<script src="pipeline/static/pipeline/drydock_objects.js"></script>-->
+  <!--<script src="pipeline/static/pipeline/drydock.js"></script>-->
   <!-- <script src="pipeline/static/pipeline/pipeline_families.js"></script> -->
   <script src="pipeline/static/pipeline/pipeline_load.js"></script>
   <script src="sandbox/static/sandbox/choose_inputs.js"></script>
@@ -29,7 +31,23 @@
   <!-- include test files here... -->
   <script src="portal/tests.js"></script>
   <script src="librarian/tests.js"></script>
-  <script src="pipeline/tests.js"></script>
+  <script>
+    System.config({
+      paths: {
+        // paths serve as alias
+        'npm:': 'node_modules/'
+      },
+      // packages tells the System loader how to load when no filename and/or no extension
+      packages: {
+        pipeline: {
+          format: 'register',
+          main: './tests.js',
+          defaultExtension: 'js'
+        }
+      }
+    });
+    System.import('pipeline');
+  </script>
   <script src="sandbox/tests.js"></script>
 
 </head>

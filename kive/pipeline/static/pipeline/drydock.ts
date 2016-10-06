@@ -11,7 +11,7 @@ import { Nodes } from "./drydock_objects";
 import { Point, Rectangle } from "./ShapeTypes";
 declare var $: any;
 
-class CanvasState {
+export class CanvasState {
     /**
      * HTML5 Canvas interface for assembling pipelines.
      * 
@@ -74,17 +74,17 @@ class CanvasState {
 
     static method_node_queue: Nodes.MethodNode[] = [];
     
-    constructor(private canvas, interval) {
+    constructor(private canvas, interval?) {
         /*
         keeps track of canvas state (mouse drag, etc.)
          */
     
         // initialize "class"
-        this.width = this.canvas.width;
+        this.width  = this.canvas.width;
         this.height = this.canvas.height;
-        this.pos_y = this.canvas.offsetTop;
-        this.pos_x = this.canvas.offsetLeft;
-        this.ctx = this.canvas.getContext('2d');
+        this.pos_y  = this.canvas.offsetTop;
+        this.pos_x  = this.canvas.offsetLeft;
+        this.ctx    = this.canvas.getContext('2d');
 
         function getStyle(css, name): number {
             var value = css.getPropertyValue(name);
@@ -136,7 +136,7 @@ class CanvasState {
         this.valid = false;
     }
     
-    getMouseTarget (mx: number, my: number): Nodes.Node|Nodes.Magnet|Nodes.Connector {
+    getMouseTarget (mx: number, my: number): Nodes.CanvasObject {
         var shapes = this.shapes,
             connectors = this.connectors;
     
@@ -199,7 +199,7 @@ class CanvasState {
             // are we carrying a shape or Connector?
             for (let sel of this.selection) {
                 // are we carrying a connector?
-                if (sel instanceof Nodes.Connector) {
+                if (sel.isConnector()) {
                     if (this.can_edit) {
                         // reset to allow mouse to disengage Connector from a magnet
                         sel.x = mouse.x;
@@ -250,18 +250,18 @@ class CanvasState {
                     // if execution order is ambiguous, the tiebreaker is the y-position.
                     // dragging a method node needs to calculate this in real-time.
                     this.exec_order_may_have_changed |= this.exec_order_is_ambiguous && sel.affects_exec_order;
-                    this.input_order_may_have_changed |= +(sel instanceof Nodes.CdtNode || sel instanceof Nodes.RawNode);
+                    this.input_order_may_have_changed |= +(sel.isInputNode());
                 }
             }
             
             this.dragstart = mouse;
         }
         
-        let was_highlighted = this.mouse_highlight instanceof Nodes.Magnet;
+        let was_highlighted = this.mouse_highlight.isMagnet();
         this.mouse_highlight = null;
         for (let shape of this.shapes) {
             let magnet = shape.getMouseTarget(mouse.x, mouse.y);
-            if (magnet instanceof Nodes.Magnet && 
+            if (magnet.isMagnet() &&
                     magnet.connected.length === 0) {
                 if (magnet !== this.mouse_highlight) {
                     this.mouse_highlight = magnet;
@@ -350,10 +350,10 @@ class CanvasState {
         // * If `node` -is- the next method in exec_order, insert all the method nodes that were deferred.
         var queue = CanvasState.method_node_queue; // queue is a static variable that persists across function calls
         if (list.indexOf(node) === -1) {
-            if (node instanceof Nodes.MethodNode &&
+            if (node.isMethodNode() &&
                 typeof exec_order !== 'undefined' &&
-                exec_order.indexOf(node) > -1) {
-                let method_list = list.filter(node => node instanceof Nodes.MethodNode);
+                exec_order.indexOf(<Nodes.MethodNode>node) > -1) {
+                let method_list = list.filter(node => node.isMethodNode());
                 if (exec_order.length <= method_list.length) {
                     console.error("Unexpected number of methods in method_nodes.");
                 }
@@ -371,10 +371,10 @@ class CanvasState {
                     }
                 } else {
                     // Not the method node next in exec_order. Reserve it until we find the right node.
-                    queue.push(node);
+                    queue.push(<Nodes.MethodNode>node);
                 }
             }
-            else if (node instanceof Nodes.OutputNode) {
+            else if (node.isOutputNode()) {
                 // Output nodes are not relevant to execution order.
                 list.push(node);
             }
@@ -418,8 +418,7 @@ class CanvasState {
         for (let in_magnet of node.out_magnets) {
             for (let connected of in_magnet.connected) {
                 let connected_input = connected.source.parent;
-                if ((connected_input instanceof Nodes.RawNode ||
-                    connected_input instanceof Nodes.CdtNode) &&
+                if ((connected_input.isInputNode()) &&
                     CanvasState.matrixIndexOf(node_order, connected_input) == null
                 ) {
                     list.push(connected_input);
@@ -556,7 +555,7 @@ class CanvasState {
      * 
      * @param axis: a string from ["x", "y", "iso_x", "iso_y", "iso_z"]
      */
-    alignSelection (axis:"x"|"y"|"iso_x"|"iso_y"|"iso_z"): void {
+    alignSelection (axis: string): void {
         /* @todo
          * if nodes are too close together then they will collide and then get pushed back out.
          * when this "push back out" happens, it should happen -only- on the axis of alignment.
@@ -584,7 +583,7 @@ class CanvasState {
                 o.y -= diff.y;
             }
         };
-        if (sel instanceof Array && sel.length > 0 && getCoord.hasOwnProperty(axis)) {
+        if (Array.isArray(sel) && sel.length > 0 && getCoord.hasOwnProperty(axis)) {
             let coords = [];
             for (let sel_ of sel) {
                 coords.push(getCoord[axis](sel_));
@@ -737,10 +736,10 @@ class CanvasState {
         
         this.dragging = false;
         
-        if (this.selection[0] instanceof Nodes.Connector) {
+        if (this.selection[0] && this.selection[0].isConnector()) {
             let connector = this.selection[0];
 
-            if (connector.dest instanceof Nodes.Magnet) {
+            if (connector.dest && connector.dest.isMagnet()) {
                 // connector has been linked to an in-magnet
                 // update source magnet
                 if (connector.source.connected.indexOf(connector) < 0) {
@@ -758,7 +757,7 @@ class CanvasState {
             
                 if (this.outputZone.contains(connector.x, connector.y)) {
                     // Connector drawn into output zone
-                    if (!(connector.source.parent instanceof Nodes.MethodNode)) {
+                    if (!(connector.source.parent.isMethodNode())) {
                         // disallow Connectors from data node directly to end-zone
                         let index = this.connectors.indexOf(connector);
                         this.connectors.splice(index, 1);
@@ -824,27 +823,21 @@ class CanvasState {
             };
     
         // Edit mode can popup the context menu to delete and edit nodes
-        if (this.can_edit && sel[0] instanceof Nodes.Node) {
+        if (this.can_edit && sel[0].isNode()) {
             showMenu();
             if (sel.length > 1 || 
-                    sel[0] instanceof Nodes.RawNode ||
-                    sel[0] instanceof Nodes.CdtNode) {
+                    sel[0].isInputNode()) {
                 $('.edit', mcm).hide();
             }
         } else if (sel.length == 1) {
             // Otherwise, we're read only, so only popup the context menu for outputs with datasets
-            if ((sel[0] instanceof Nodes.OutputNode ||
-                 sel[0] instanceof Nodes.CdtNode ||
-                 sel[0] instanceof Nodes.RawNode) &&
+            if ((sel[0].isInputNode() || sel[0].isOutputNode()) &&
                 sel[0].dataset_id) {
 
                // Context menu for pipeline outputs
                showMenu();
                $('.step_node', mcm).hide();
-            }
-            else if (sel[0] instanceof Nodes.MethodNode &&
-                     sel[0].log_id) {
-
+            } else if (sel[0].isMethodNode() && sel[0].log_id) {
                // Context menu for pipeline steps
                showMenu();
                $('.dataset_node', mcm).hide();
@@ -856,13 +849,13 @@ class CanvasState {
     
     addShape(shape: Nodes.Node): Nodes.Node {
         this.shapes.push(shape);
-        if (shape instanceof Nodes.MethodNode) {
+        if (shape.isMethodNode()) {
             this.methods.push(shape);
             this.testExecutionOrder();
-        } else if (shape instanceof Nodes.CdtNode || shape instanceof Nodes.RawNode) {
+        } else if (shape.isInputNode()) {
             this.inputs.push(shape);
             this.inputs.sort(Geometry.isometricSort);
-        } else if (shape instanceof Nodes.OutputNode) {
+        } else if (shape.isOutputNode()) {
             this.outputs.push(shape);
         }
         shape.has_unsaved_changes = 1;
@@ -1089,8 +1082,8 @@ class CanvasState {
         var draggingFromMethodOut = (
                 this.dragging &&
                 sel.length == 1 &&
-                sel[0] instanceof Nodes.Connector &&
-                sel[0].source.parent instanceof Nodes.MethodNode);
+                sel[0].isConnector() &&
+                sel[0].source.parent.isMethodNode() );
         
         // draw output end-zone -when- dragging a connector from a MethodNode
         if (draggingFromMethodOut && this.can_edit) {
