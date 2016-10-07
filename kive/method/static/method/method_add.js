@@ -1,4 +1,5 @@
 $(document).ready(function(){ // wait for page to finish loading before executing jQuery code
+    "use strict";
 
     noXSS();
 
@@ -121,20 +122,22 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         function () {
             numberOfInputForms += 1;
             i = numberOfInputForms - 1; // 0-indexing
-            htmlStr = "<tr>";
-            htmlStr += "<td>"+numberOfInputForms+"</td>";
+            var $inputRow = $('<tr>'),
+                $select;
+            $inputRow.append("<td>"+numberOfInputForms+"</td>");
 
-            htmlStr += "<td><input id=\"id_dataset_name_in_" + i + "\" maxlength=\"128\" name=\"dataset_name_in_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "<td><select id=\"id_compounddatatype_in_" + i + "\" name=\"compounddatatype_in_" + i + "\">";
+            $inputRow.append("<td><input id=\"id_dataset_name_in_" + i + "\" maxlength=\"128\" name=\"dataset_name_in_" + i + "\" type=\"text\" /></td>");
+            $select = $("<select id=\"id_compounddatatype_in_" + i + "\" name=\"compounddatatype_in_" + i + "\">");
             for (var j = 0; j < io_cdt_options.length; j++) {
-                htmlStr += "<option value=\"" + io_cdt_options[j].value + "\">" + io_cdt_options[j].text + "</option>";
+                $select.append($('<option>')
+                        .attr('value', io_cdt_options[j].value)
+                        .text(io_cdt_options[j].text));
             }
-            htmlStr += "</select></td>";
-            htmlStr += "<td><input id=\"id_min_row_in_" + i + "\" class=\"shortIntField\" name=\"min_row_in_" + i + "\" type=\"number\" /></td>";
-            htmlStr += "<td><input id=\"id_max_row_in_" + i + "\" class=\"shortIntField\" name=\"max_row_in_" + i + "\" type=\"number\" /></td>";
-            htmlStr += "</tr>";
+            $inputRow.append($('<td>').append($select));
+            $inputRow.append("<td><input id=\"id_min_row_in_" + i + "\" class=\"shortIntField\" name=\"min_row_in_" + i + "\" type=\"number\" /></td>");
+            $inputRow.append("<td><input id=\"id_max_row_in_" + i + "\" class=\"shortIntField\" name=\"max_row_in_" + i + "\" type=\"number\" /></td>");
 
-            $('#extraInputForms').find('tr:last').after(htmlStr);
+            $('#extraInputForms').find('tr:last').after($inputRow);
         }
     );
     $("#removeInputForm").click(
@@ -164,20 +167,22 @@ $(document).ready(function(){ // wait for page to finish loading before executin
         function () {
             numberOfOutputForms += 1;
             i = numberOfOutputForms - 1; // 0-indexing
-            htmlStr = "<tr>";
-            htmlStr += "<td>"+numberOfOutputForms+"</td>";
+            var $outputRow = $('<tr>'),
+                $select;
+            $outputRow.append("<td>"+numberOfOutputForms+"</td>");
 
-            htmlStr += "<td><input id=\"id_dataset_name_out_" + i + "\" maxlength=\"128\" name=\"dataset_name_out_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "<td><select id=\"id_compounddatatype_out_" + i + "\" name=\"compounddatatype_out_" + i + "\">";
+            $outputRow.append("<td><input id=\"id_dataset_name_out_" + i + "\" maxlength=\"128\" name=\"dataset_name_out_" + i + "\" type=\"text\" /></td>");
+            $select = $("<select id=\"id_compounddatatype_out_" + i + "\" name=\"compounddatatype_out_" + i + "\">");
             for (var j = 0; j < io_cdt_options.length; j++) {
-                htmlStr += "<option value=\"" + io_cdt_options[j].value + "\">" + io_cdt_options[j].text + "</option>";
+                $select.append($('<option>')
+                        .attr('value', io_cdt_options[j].value)
+                        .text(io_cdt_options[j].text));
             }
-            htmlStr += "</select></td>";
-            htmlStr += "<td><input id=\"id_min_row_out_" + i + "\" class=\"shortIntField\" name=\"min_row_out_" + i + "\" type=\"number\" /></td>";
-            htmlStr += "<td><input id=\"id_max_row_out_" + i + "\" class=\"shortIntField\" name=\"max_row_out_" + i + "\" type=\"number\" /></td>";
-            htmlStr += "</tr>";
+            $outputRow.append($('<td>').append($select));
+            $outputRow.append("<td><input id=\"id_min_row_out_" + i + "\" class=\"shortIntField\" name=\"min_row_out_" + i + "\" type=\"number\" /></td>");
+            $outputRow.append("<td><input id=\"id_max_row_out_" + i + "\" class=\"shortIntField\" name=\"max_row_out_" + i + "\" type=\"number\" /></td>");
 
-            $('#extraOutputForms').find('tr:last').after(htmlStr);
+            $('#extraOutputForms').find('tr:last').after($outputRow);
         }
     );
     $("#removeOutputForm").click(
