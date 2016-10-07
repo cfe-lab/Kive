@@ -723,7 +723,7 @@ x,y
         dataset.grant_everyone_access()
 
         run = Manager.execute_pipeline(user=user, pipeline=pipeline1, inputs=[dataset]).get_last_run()
-        run.collect_garbage()  # Delete sandbox directories
+        # run.collect_garbage()  # Delete sandbox directories
 
     def create_SP_pipelines(self, user):
         """ Create a pipeline: sums_and_products.
@@ -794,7 +794,7 @@ x,y
         run = Manager.execute_pipeline(user=user,
                                        pipeline=pipeline1,
                                        inputs=datasetlst).get_last_run()
-        run.collect_garbage()  # Delete sandbox directories
+        # run.collect_garbage()  # Delete sandbox directories
 
     def create_MC_pipelines(self, user):
         """ Create a MiCall Demo pipeline.
@@ -1263,7 +1263,7 @@ class FindDatasetsBuilder(FixtureBuilder):
 class Command(BaseCommand):
     help = "Update test fixtures by running scripts and dumping test data."
 
-    def handle(self, *args, **options):
+    def bighandle(self, *args, **options):
         EMSandboxTestEnvironmentBuilder().run()
         ArchiveTestEnvironmentBuilder().run()
         ArchiveNoRunsTestEnvironmentBuilder().run()
@@ -1282,3 +1282,8 @@ class Command(BaseCommand):
         RestoreReusableDatasetBuilder().run()
 
         self.stdout.write('Done.')
+
+    def handle(self, *args, **options):
+        # RunApiTestsEnvironmentBuilder().run()
+        ExecuteDiscardedIntermediateTestsRMEnvironmentBuilder().run()
+        DemoBuilder().run()

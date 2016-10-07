@@ -788,7 +788,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         for output_path in output_paths:
             self.logger.debug("Confirming output path doesn't exist: {}".format(output_path))
             can_create, reason = file_access_utils.can_create_new_file(output_path)
-
             if not can_create:
                 raise ValueError(reason)
 
@@ -800,26 +799,32 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         # The code to be executed sits in
         # [run_path]/[driver.coderesource.name],
         # and is executable.
-        cmd_lst = [self.driver.coderesource.filename] + input_paths + output_paths
-        return self._launch_the_code(cmd_lst, run_path, ssh_sandbox_worker_account)
+        code_to_run = os.path.join(
+            run_path,
+            self.driver.coderesource.filename
+        )
 
-    def _launch_the_code(self, cmdlst, pathstr, ssh_worker):
-        """ Execute the commands in cmdlst from the directory pathstr
-        either locally using /bin/bash or, if ssh_worker is provided, remotely
-        using /usr/bin/ssh.
+        if ssh_sandbox_worker_account:
+            # We have to first cd into the appropriate directory before executing the command.
+            ins_and_outs = '"{}"'.format(input_paths[0]) if len(input_paths) > 0 else ""
+            for input_path in input_paths[1:] + output_paths:
+                ins_and_outs += ' "{}"'.format(input_path)
+            full_command = '"{}" {}'.format(code_to_run, ins_and_outs)
+            ssh_command = 'cd "{}" && {}'.format(run_path, full_command)
 
-        Return the output from subprocess.Popen()
-        """
-        act_cmdstr = "cd %s && %s" % (pathstr, " ".join(cmdlst))
-        if ssh_worker:
-            cclst = ["/usr/bin/ssh", "%s@localhost" % ssh_worker, "/bin/bash -c '%s'" % act_cmdstr]
+            kive_sandbox_worker_preamble = [
+                "ssh",
+                "{}@localhost".format(ssh_sandbox_worker_account)
+            ]
+            command = kive_sandbox_worker_preamble + [ssh_command]
+
         else:
-            cclst = ["/bin/bash", "-c", "%s" % act_cmdstr]
-        self.logger.debug("subprocess.Popen({})".format(cclst))
-        return subprocess.Popen(cclst, shell=False,
-                                stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
+            command = [code_to_run] + input_paths + output_paths
+
+        self.logger.debug("subprocess.Popen({})".format(command))
+        code_popen = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                      cwd=run_path)
+        return code_popen
 
     def is_identical(self, other):
         """Is this Method identical to another one?"""

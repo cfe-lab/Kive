@@ -12,7 +12,7 @@
         "fields": {
             "_redacted": null, 
             "_runcomponentstate": 3, 
-            "end_time": "2000-01-01T00:00:33Z", 
+            "end_time": "2000-01-01T00:00:32Z", 
             "execrecord": 2, 
             "reused": false, 
             "start_time": "2000-01-01T00:00:31Z"
@@ -36,7 +36,7 @@
         "fields": {
             "_redacted": null, 
             "_runcomponentstate": 3, 
-            "end_time": "2000-01-01T00:00:32Z", 
+            "end_time": "2000-01-01T00:00:31Z", 
             "execrecord": 1, 
             "reused": false, 
             "start_time": "2000-01-01T00:00:31Z"
@@ -63,7 +63,7 @@
             "end_time": "2000-01-01T00:00:35Z", 
             "execrecord": 5, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:35Z"
+            "start_time": "2000-01-01T00:00:34Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 5
@@ -110,7 +110,7 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:32Z", 
+            "end_time": "2000-01-01T00:00:31Z", 
             "invoking_record": 3, 
             "record": 3, 
             "start_time": "2000-01-01T00:00:31Z"
@@ -140,10 +140,10 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:34Z", 
+            "end_time": "2000-01-01T00:00:33Z", 
             "invoking_record": 2, 
             "record": 2, 
-            "start_time": "2000-01-01T00:00:34Z"
+            "start_time": "2000-01-01T00:00:33Z"
         }, 
         "model": "archive.execlog", 
         "pk": 4
@@ -590,16 +590,16 @@
     }, 
     {
         "fields": {
-            "x": 0.857142857142857, 
-            "y": 0.857142857142857
+            "x": 0.571428571428571, 
+            "y": 0.571428571428571
         }, 
         "model": "transformation.transformationxput", 
         "pk": 10
     }, 
     {
         "fields": {
-            "x": 0.571428571428571, 
-            "y": 0.571428571428571
+            "x": 0.857142857142857, 
+            "y": 0.857142857142857
         }, 
         "model": "transformation.transformationxput", 
         "pk": 11
@@ -687,8 +687,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 2, 
-            "dataset_name": "total_products", 
+            "dataset_idx": 1, 
+            "dataset_name": "total_sums", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -696,8 +696,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 1, 
-            "dataset_name": "total_sums", 
+            "dataset_idx": 2, 
+            "dataset_name": "total_products", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -707,7 +707,7 @@
         "fields": {
             "_runstate": 3, 
             "description": "", 
-            "end_time": "2000-01-01T00:00:36Z", 
+            "end_time": "2000-01-01T00:00:35Z", 
             "groups_allowed": [], 
             "name": "", 
             "parent_runstep": null, 
@@ -715,10 +715,10 @@
             "pipeline": 4, 
             "purged": true, 
             "runbatch": null, 
-            "sandbox_path": "/home/walter/kivemediaroot/Sandboxes/userkive_run1_onLKyM", 
+            "sandbox_path": "/home/walter/kivemediaroot/Sandboxes/userkive_run1_cpoMvh", 
             "start_time": "2000-01-01T00:00:31Z", 
             "stopped_by": null, 
-            "time_queued": "2016-09-21T22:36:33.724Z", 
+            "time_queued": "2016-09-28T19:35:07.846Z", 
             "user": 1, 
             "users_allowed": []
         }, 
@@ -730,7 +730,7 @@
             "MD5_checksum": "e093c9eac5d0cae832d4e2071ccfdc5f", 
             "_redacted": false, 
             "dataset_file": "Datasets/2016_09/pairs.csv", 
-            "date_created": "2000-01-01T00:00:01Z", 
+            "date_created": "2000-01-01T00:00:00Z", 
             "description": "", 
             "external_path": "", 
             "externalfiledirectory": null, 
@@ -747,11 +747,11 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "e784b65f491c95955a13709f9c53dc6e", 
+            "MD5_checksum": "43ad5876489b0b5e83192139ced4a642", 
             "_redacted": false, 
             "dataset_file": "", 
             "date_created": "2000-01-01T00:00:32Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-09-21 22:37:03.947560+00:00 by kive\nrun: 1\nuser: kive\nstep: 1\noutput: sums_and_products", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-09-28 19:35:38.035366+00:00 by kive\nrun: 1\nuser: kive\nstep: 1\noutput: sums_and_products", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 1, 
@@ -765,11 +765,11 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "e237ca8bb33ea0dd3f8d6bb8d1ede977", 
+            "MD5_checksum": "6dc476f01f77ab2aa13e3e5a6291edf1", 
             "_redacted": false, 
             "dataset_file": "Datasets/2016_09/step2_total_sums.raw", 
             "date_created": "2000-01-01T00:00:34Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-09-21 22:37:03.947560+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-09-28 19:35:38.035366+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 2, 
