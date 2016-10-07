@@ -323,7 +323,7 @@ def datasets_add_archive(request):
             else:
                 # TODO: change this
                 c.update({'archiveAddDatasetForm': archive_add_dataset_form})
-                return HttpResponse(t.render(c))
+                return HttpResponse(t.render(c, request))
 
             # New datasets added, generate a response
             archive_display_results = []

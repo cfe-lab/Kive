@@ -67,7 +67,7 @@ def datatype_add(request):
 
         if bail_now:
             c.update({'datatype_form': dform, 'int_con_form': icform, 'str_con_form': scform})
-            return HttpResponse(t.render(c))
+            return HttpResponse(t.render(c, request))
 
         Python_type = Python_type.pop()
         # At this point we know all the fields are valid.
