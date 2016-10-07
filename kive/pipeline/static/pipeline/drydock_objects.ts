@@ -107,7 +107,7 @@ export class CanvasWrapper {
             this.ctx.font = 'bold 10pt Lato, sans-serif';
             this.ctx.textBaseline = 'alphabetic';
             textFill = '#aaa';
-            rectArgs = undefined;
+            // rectArgs = undefined;
             break;
         case 'in-magnet':
             this.ctx.font = '9pt Lato, sans-serif';
@@ -392,6 +392,24 @@ export namespace Nodes {
                 canvasState.selection = [ this ];
             }
         }
+
+        isConnectedTo(node: Node) {
+            var magnetConnectors = magnet => magnet.connected;
+            // may contain duplicates, but that's ok
+            var connectors = [].concat(
+                ...this.in_magnets.map(magnetConnectors),
+                ...this.out_magnets.map(magnetConnectors),
+                ...node.in_magnets.map(magnetConnectors),
+                ...node.out_magnets.map(magnetConnectors)
+            );
+
+            for (let connector of connectors) {
+                if ((connector.source.parent === this && connector.dest.parent === node) ||
+                    (connector.source.parent === node && connector.dest.parent === this))
+                    return true;
+            }
+        }
+
         isNode() {
             return true;
         }
@@ -538,7 +556,7 @@ export namespace Nodes {
                     this.label,
                     this.x + this.dx,
                     this.y + this.dy - this.h/2 - this.offset,
-                    this.has_unsaved_changes && '*');
+                    this.has_unsaved_changes ? '*' : '');
         }
     }
 
@@ -701,7 +719,7 @@ export namespace Nodes {
                     this.label,
                     this.x + this.dx,
                     this.y + this.dy - this.h/2 - this.offset,
-                    this.has_unsaved_changes && '*');
+                    this.has_unsaved_changes ? '*' : '');
         }
 
         isInputNode() {
@@ -775,6 +793,8 @@ export namespace Nodes {
             super();
             this.x = x || 0;
             this.y = y || 0;
+            this.fill = fill || '#999';
+            this.label = label || '';
             this.n_inputs = Object.keys(inputs).length;
             this.n_outputs = Object.keys(outputs).length;
             this.h = Math.max(this.n_inputs, this.n_outputs) * this.spacing;
@@ -1004,12 +1024,15 @@ export namespace Nodes {
                     this.label,
                     this.x + this.dx + this.scoop/4,
                     this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset,
-                    this.has_unsaved_changes && '*');
+                    this.has_unsaved_changes ? '*' : '');
         };
         
         doDown (cs, e) {
-            BaseNode.prototype.doDown.call(this, cs, e);
-            document.getElementById('id_method_button').setAttribute('value', 'Revise Method');
+            super.doDown(cs, e);
+            var method_button = document.getElementById('id_method_button');
+            if (method_button) {
+                method_button.setAttribute('value', 'Revise Method');
+            }
         };
         
         updateSignal (status) {

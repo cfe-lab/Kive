@@ -257,11 +257,11 @@ export class CanvasState {
             this.dragstart = mouse;
         }
         
-        let was_highlighted = this.mouse_highlight.isMagnet();
+        let was_highlighted = this.mouse_highlight && this.mouse_highlight.isMagnet();
         this.mouse_highlight = null;
         for (let shape of this.shapes) {
             let magnet = shape.getMouseTarget(mouse.x, mouse.y);
-            if (magnet.isMagnet() &&
+            if (magnet && magnet.isMagnet() &&
                     magnet.connected.length === 0) {
                 if (magnet !== this.mouse_highlight) {
                     this.mouse_highlight = magnet;
@@ -491,17 +491,6 @@ export class CanvasState {
                 for (let i of layer_length) {
                     let node = node_order[j][i];
 
-
-                    // static isoTo2D(iso_x:number, iso_y:number): Point {
-                    //     // inverse of [ isometricXCoord, isometricYCoord ]
-                    //     return {
-                    //         x: (iso_y + iso_x) / 1.154700538,
-                    //         y: (iso_y - iso_x) / 2
-                    //     };
-                    // };
-
-                    // node.x = (y_spacing * j + x_spacing * (i - layer_length/2) + node_order[j].center_x) / 1.154700538;
-                    // node.y = (y_spacing * j - x_spacing * (i - layer_length/2) - node_order[j].center_x) / 2;// + y_drop * j;
                     let node_coords = Geometry.isoTo2D(
                         x_spacing * (i - layer_length/2) + node_order[j].center_x,
                         y_spacing * j
@@ -526,7 +515,7 @@ export class CanvasState {
                     var avg = Geometry.averagePoint(layer_out_magnets);
                     node_order[j+1].center_x = Geometry.isometricXCoord(avg.x, avg.y);
                     if ( isNaN(node_order[j+1].center_x) ) {
-                        console.error("Autolayout failed!", layer_out_magnets, num_magnets);
+                        console.error("Autolayout failed!", layer_out_magnets, num_magnets, j);
                     }
                 }
             }
@@ -1148,11 +1137,12 @@ export class CanvasState {
             // Highlight (label) the object (usually a magnet);
             this.mouse_highlight.highlight(ctx);
         }
-        
-        this.ctx.fillStyle = "#fff";
-        this.ctx.globalCompositeOperation = 'destination-over';
-        this.ctx.fillRect(0, 0, this.width / this.scale, this.height / this.scale);
-        this.ctx.globalCompositeOperation = 'source-over';
+
+        /* Creates a white background */
+        // this.ctx.fillStyle = "#fff";
+        // this.ctx.globalCompositeOperation = 'destination-over';
+        // this.ctx.fillRect(0, 0, this.width / this.scale, this.height / this.scale);
+        // this.ctx.globalCompositeOperation = 'source-over';
         
         ctx.restore();
         this.valid = true;
@@ -1177,7 +1167,6 @@ export class CanvasState {
         } else {
             this.labelFns.methods = this.labelFns._methods;
         }
-        this.labelFns.inputs = this.labelFns.outputs;// treatment is identical to outputs (unordered)
 
         // prepare all labels
         let labels = [];
