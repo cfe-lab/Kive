@@ -19,6 +19,7 @@ kive/timing.txt
 api/results
 # Ignore nodeJS modules
 node_modules/
+typings/
 
 # Generated files and backup files
 *~
@@ -35,3 +36,11 @@ utils/dump
 .DS_Store
 TEST-*
 
+# Generated JS & CSS map files
+*.js.map
+*.css.map
+.sass-cache/
+
+# Specific generated JS files
+kive/pipeline/tests.js
+kive/sandbox/static/sandbox/view_run.js

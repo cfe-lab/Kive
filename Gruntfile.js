@@ -5,6 +5,16 @@ module.exports = function(grunt) {
   // Project configuration.
   grunt.initConfig({
     pkg: grunt.file.readJSON('package.json'),
+    tslint: {
+          options: {
+              configuration: "tslint.json"
+          },
+          files: {
+              src: [
+                  "kive/**/*.ts"
+              ]
+          }
+    },
     jshint: {
         files: [
             "kive/*.js",
@@ -21,14 +31,11 @@ module.exports = function(grunt) {
             "kive/**/imagediff.js",
             "kive/**/jsil8n.js",
             "kive/**/jasmine.js",
+            "kive/**/system.js",
             "kive/**/noxss.js"
           ],
-//          maxdepth: 6,
           maxerr: 20,
-//          nocomma: true,
           nonbsp: true,
-//          undef: true,
-//          unused: true,
           globals: {
             jQuery: true,
             "$": true,
@@ -85,7 +92,8 @@ module.exports = function(grunt) {
   var plugins = [
     'grunt-contrib-uglify',
     'grunt-contrib-jshint',
-    'grunt-regex-replace'
+    'grunt-regex-replace',
+    "grunt-tslint"
   ];
   for (var i = 0; i < plugins.length; i++) {
     grunt.loadNpmTasks(plugins[i]);

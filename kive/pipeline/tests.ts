@@ -1,19 +1,12 @@
 import { CanvasWrapper, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet, Connector } from "./static/pipeline/drydock_objects";
 import { CanvasState } from "./static/pipeline/drydock";
 import { Pipeline } from "./static/pipeline/pipeline_load";
+import "jasmine";
+import 'jasmine-html';
+import 'jasmine-boot';
 declare var $: any;
 declare var imagediff: any;
 declare var pipeline_families: any;
-
-declare var jasmine: any;
-declare var it:any;
-declare var expect: any;
-declare var describe: any;
-declare var beforeEach: any;
-declare var describe: any;
-declare var xdescribe: any;
-declare var fail: any;
-declare var afterEach: any;
 
 (function() {
     "use strict";
@@ -1657,7 +1650,7 @@ declare var afterEach: any;
                         dir: 0
                     });
                     // connector
-                    //this.expectedConnector.dest = this.expectedOutput.in_magnets[0];
+                    // this.expectedConnector.dest = this.expectedOutput.in_magnets[0];
                     this.expectedConnector.x = 212.22454411432548;
                     this.expectedConnector.y = 128.43284081528475;
                     this.expectedCanvas.ctx.globalAlpha = 0.75;
@@ -2137,6 +2130,140 @@ declare var afterEach: any;
                     });
                 });
             });
+
+            describe("private methods supporting autolayout", function() {
+                /***********/
+                class CanvasStateBackdoor extends CanvasState {
+                    static getPrivateMethods() {
+                        return this.exposeHelperFnsForTesting();
+                    }
+                }
+                var backdoor = CanvasStateBackdoor.getPrivateMethods();
+                var ar = [
+                    [],
+                    [1,2,3,4,5],
+                    [6],
+                    [],
+                    [7,8,9,10,11,12,13,14],
+                    [15]
+                ];
+                var method1 = new MethodNode(0, 0, 0, 0, '#000', '',
+                    [
+                        { structure: null, dataset_id: 0, dataset_name: ''},
+                        { structure: null, dataset_id: 1, dataset_name: ''}
+                    ],
+                    [
+                        { structure: null, dataset_id: 0, dataset_name: ''},
+                        { structure: null, dataset_id: 1, dataset_name: ''}
+                    ]
+                );
+                var method2 = new MethodNode(0, 0, 0, 0, '#000', '',
+                    [
+                        { structure: null, dataset_id: 0, dataset_name: ''},
+                        { structure: null, dataset_id: 1, dataset_name: ''},
+                        { structure: null, dataset_id: 2, dataset_name: ''}
+                    ],
+                    [
+                        { structure: null, dataset_id: 0, dataset_name: ''}
+                    ]
+                );
+                var input1 = new RawNode(0, 0);
+                var input2 = new RawNode(0, 0);
+                var output1 = new OutputNode(0, 0, '');
+
+                var connector1 = new Connector(method1.out_magnets[0]);
+                connector1.dest = method2.in_magnets[0];
+                method2.in_magnets[0].connected = [ connector1 ];
+
+                var connector2 = new Connector(method1.out_magnets[0]);
+                connector2.dest = method2.in_magnets[1];
+                method2.in_magnets[1].connected = [ connector2 ];
+
+                var connector3 = new Connector(method1.out_magnets[1]);
+                connector3.dest = output1.in_magnets[0];
+                output1.in_magnets[0].connected = [ connector3 ];
+
+                var connector4 = new Connector(input1.out_magnets[0]);
+                connector4.dest = method2.in_magnets[2];
+                method2.in_magnets[2].connected = [ connector4 ];
+
+                method1.out_magnets[0].connected = [ connector1, connector2 ];
+                method1.out_magnets[1].connected = [ connector3 ];
+                input1.out_magnets[0].connected = [ connector4 ];
+                /***********/
+
+
+                it("should calculate a matrix's flattened length", function() {
+                    var expected_length = 15;
+                    var actual_length = backdoor.matrixTotalLength(ar);
+                    expect(actual_length).toBe(expected_length);
+                });
+
+                it("should find the index of a value in a matrix", function() {
+                    expect(backdoor.matrixIndexOf(ar, 8)).toEqual([4, 1]);
+                    expect(backdoor.matrixIndexOf(ar, 1)).toEqual([1, 0]);
+                    expect(backdoor.matrixIndexOf(ar, 16)).toBeNull();
+                });
+
+                it("should find the connected nodes of a node's out magnets", function() {
+                    var list = [];
+                    backdoor.addConnectedNodesOut(method1, list);
+                    expect(list).toContain(method2);
+                    expect(list).toContain(output1);
+                    expect(list.length).toBe(2);
+                });
+
+                it("should find the connected input nodes of a node's in magnets", function() {
+                    var list = [];
+                    // @todo: test the third argument as well to ensure duplicate inputs are not added
+                    backdoor.addConnectedInputNodesIn(method2, list, [[]]);
+                    expect(list).toContain(input1);
+                    expect(list).not.toContain(method1);
+                    expect(list.length).toBe(1);
+                });
+
+                xit("should insert a node into a layer safely", function() {
+                    // @todo: implement this
+
+                    // insertIntoLayer(node: Node, exec_order: MethodNode[], list:Node[]): Node[] {
+                    //     // Insert a node into a list in a "smart" way.
+                    //     // * Checks for duplicate entries
+                    //     // * If `node` is a method which is not the next method in exec_order, insertion is deferred
+                    //     // * If `node` -is- the next method in exec_order, insert all the method nodes that were deferred.
+                    //     var queue = CanvasState.method_node_queue; // queue is a static variable that persists across function calls
+                    //     if (list.indexOf(node) === -1) {
+                    //         if (CanvasState.isMethodNode(node) &&
+                    //             exec_order.indexOf(<MethodNode>node) > -1) {
+                    //             let method_list = list.filter(node => node.isMethodNode());
+                    //             if (exec_order.length <= method_list.length) {
+                    //                 console.error("Unexpected number of methods in method_nodes.");
+                    //             }
+                    //             if (exec_order[method_list.length] === node) {
+                    //                 // We've found the method node we're looking for.
+                    //                 list.push(node);
+                    //                 method_list.push(node);
+                    //
+                    //                 // Clear the queue. Make sure we maintain exec_order.
+                    //                 while (queue.length) {
+                    //                     let i = queue.indexOf(exec_order[method_list.length]);
+                    //                     list.push(queue[i]);
+                    //                     method_list.push(queue[i]);
+                    //                     queue.splice(i, 1);
+                    //                 }
+                    //             } else {
+                    //                 // Not the method node next in exec_order. Reserve it until we find the right node.
+                    //                 queue.push(<MethodNode>node);
+                    //             }
+                    //         }
+                    //         else if (node.isOutputNode()) {
+                    //             // Output nodes are not relevant to execution order.
+                    //             list.push(node);
+                    //         }
+                    //     }
+                    //     return list;
+                    // }
+                });
+            });
         });
     });
     
@@ -2469,7 +2596,7 @@ declare var afterEach: any;
             expect('Suppress SPEC HAS NO EXPECTATIONS').toBeDefined();
         });
 
-        function loadApiPipeline(canvasState, pipeline){
+        function loadApiPipeline(canvasState, pipeline) {
             var ppln = new Pipeline(canvasState);
             ppln.load(pipeline);
             return ppln;
@@ -2870,7 +2997,7 @@ declare var afterEach: any;
             });
         });
         
-        function loadAndSerialize(canvasState, api_pipeline, additional_args?){
+        function loadAndSerialize(canvasState, api_pipeline, additional_args?) {
             var pipeline = loadApiPipeline(canvasState, api_pipeline);
             pipeline.draw();
             return pipeline.serialize(additional_args);

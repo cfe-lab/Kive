@@ -153,7 +153,7 @@ export class Geometry {
             return Geometry.isometricSort(x1.x, x1.y, y1.x, y1.y);
         }
 
-        var y_diff = (x1 - x2) * 0.577350269 + y1 - y2; //tan(pi/6) = 1/sqrt(3) ~ 0.577350269
+        var y_diff = (x1 - x2) * 0.577350269 + y1 - y2; // tan(pi/6) = 1/sqrt(3) ~ 0.577350269
         if (y_diff > fuzz) {
             return 1;
         } else if (y_diff < -fuzz) {

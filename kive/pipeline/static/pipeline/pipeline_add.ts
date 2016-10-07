@@ -272,8 +272,7 @@ $(function() {
     var linkParentCheckbox = function() {
         var siblings = $(this).siblings('input').add(this),
             checked_inputs = siblings.filter(':checked').length,
-            prop_obj: {indeterminate: boolean, checked?: boolean} =
-                    { indeterminate: false };
+            prop_obj: {indeterminate: boolean, checked?: boolean} = { indeterminate: false };
 
         if (checked_inputs < siblings.length && checked_inputs > 0) {
             prop_obj.indeterminate = true;
@@ -363,7 +362,7 @@ $(function() {
             dt_error.innerHTML = "";
             var this_pk = $('#id_select_cdt', this).val(); // primary key
             
-            if (this_pk === ""){
+            if (this_pk === "") {
                 shape = new RawNode(pos.left, pos.top, node_label);
             } else {
                 shape = new CdtNode(

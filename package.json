@@ -6,8 +6,10 @@
     "grunt-contrib-jshint": "^0.11.2",
     "grunt-contrib-uglify": "^0.9.1",
     "grunt-regex-replace": "^0.2.6",
+    "grunt-tslint": "^3.2.1",
+    "jshint": "^2.8.0",
     "shelljs": "^0.5.1",
-    "jshint": "^2.8.0"
+    "tslint": "^3.15.1"
   },
   "dependencies": {
     "core-js": "^2.4.1",

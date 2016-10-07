@@ -73,7 +73,7 @@ export class CanvasState {
     $dialog: any;
 
     static method_node_queue: MethodNode[] = [];
-    
+
     constructor(public canvas, interval?) {
         /*
         keeps track of canvas state (mouse drag, etc.)
@@ -423,6 +423,16 @@ export class CanvasState {
             }
         }
     }
+    protected static exposeHelperFnsForTesting() {
+        return {
+            matrixTotalLength:        CanvasState.matrixTotalLength,
+            matrixIndexOf:            CanvasState.matrixIndexOf,
+            addConnectedNodesOut:     CanvasState.addConnectedNodesOut,
+            addConnectedInputNodesIn: CanvasState.addConnectedInputNodesIn,
+            insertIntoLayer:          CanvasState.insertIntoLayer
+        };
+    }
+
     autoLayout(): void {
         if (!this.exec_order) {
             return;

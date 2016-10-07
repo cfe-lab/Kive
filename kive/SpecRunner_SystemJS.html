@@ -14,17 +14,29 @@
   <script src="portal/js/imagediff.js"></script>
 
   <!-- include source files here... -->
+  <script src="portal/static/portal/core.min.js"></script>
+  <script src="portal/static/portal/system.js"></script>
+  <script src="portal/static/portal/system.config.js"></script>
   <script src="portal/static/portal/jquery-2.0.3.min.js"></script>
   <script src="portal/static/portal/noxss.js"></script>
-  <script src="portal/static/portal/permissions.js"></script>
-  <script src="librarian/static/librarian/md5.js"></script>
-  <script src="sandbox/static/sandbox/choose_inputs.js"></script>
-  <script src="sandbox/static/sandbox/PipelineRunTable.js"></script>
 
   <!-- include test files here... -->
-  <script src="portal/tests.js"></script>
-  <script src="librarian/tests.js"></script>
-  <script src="sandbox/tests.js"></script>
+  <script>
+    System.config({
+      // packages tells the System loader how to load when no filename and/or no extension
+      packages: {
+        pipeline: {
+          format: 'register',
+          main: './tests.js',
+          defaultExtension: 'js'
+        }
+      }
+    });
+    System.import('pipeline').then(function() {
+      console.log('yes');
+      window.onload();
+    });
+  </script>
 
 </head>
 

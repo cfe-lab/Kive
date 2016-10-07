@@ -418,7 +418,7 @@ class BaseNode {
         this.setMagnetPosition();
     }
     setMagnetPosition() {
-        //placeholder - child classes must set
+        // placeholder - child classes must set
     }
 
     isNode() {
@@ -989,8 +989,8 @@ export class MethodNode extends BaseNode implements Node {
              // sin30 = 0.5 (this is trivial)
                 magnet_radius = this.in_magnets[0].r,
                 magnet_margin = 6,
-                dmc = magnet_radius + magnet_margin,// distance from magnet centre to edge
-                c2c = dmc + magnet_radius,//centre 2 centre of adjacent magnets
+                dmc = magnet_radius + magnet_margin, // distance from magnet centre to edge
+                c2c = dmc + magnet_radius, // centre 2 centre of adjacent magnets
                 cosdmc = cos30 * dmc,
                 ipy = cy - this.stack,
                 input_plane_len  = (this.n_inputs * c2c + magnet_margin) / 2,
@@ -1157,7 +1157,7 @@ export class Magnet implements CanvasObject {
             } else {
                 this.parent.doDown(cs, e); // select magnet's parent instead
             }
-        } else if (e.shiftKey && cs.selection.length !== 0 || !cs.can_edit){
+        } else if (e.shiftKey && cs.selection.length !== 0 || !cs.can_edit) {
             // out magnet that can't create a connector
             this.parent.doDown(cs, e);
         } else {
