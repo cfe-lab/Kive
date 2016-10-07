@@ -796,6 +796,8 @@ def _method_creation_helper(request, method_family=None):
             request.POST, creating_user, family=method_family)
         if not _method_forms_check_valid(family_form, method_form, dep_forms, input_form_tuples, output_form_tuples):
             # Bail out now if there are any problems.
+            if not dep_forms:
+                dep_forms = [MethodDependencyForm(user=creating_user, auto_id='id_%s_0')]
             c.update(
                 {
                     'family_form': family_form,
