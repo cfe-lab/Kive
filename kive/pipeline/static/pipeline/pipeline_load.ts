@@ -51,46 +51,20 @@ export class Pipeline {
          * API.
          */
 
-        var self = this,
-            pipeline_outputs = [],
-            pipeline_inputs = [],
-            canvas_x_ratio = 1.0 / self.canvasState.width,
-            canvas_y_ratio = 1.0 / self.canvasState.height,
+        var pipeline_outputs = this.canvasState.getOutputNodes(),
+            pipeline_inputs = this.canvasState.getInputNodes(),
+            canvas_x_ratio = 1.0 / this.canvasState.width,
+            canvas_y_ratio = 1.0 / this.canvasState.height,
             // This is a trivial modification until we hit a non trivial
             // @todo: This variable is not used. Why?
             is_trivial = true;
         // modification
 
-        // TODO: Move check graph integrity out of Pipeline and into CanvasState
-
         // Check graph integrity
-        for (let shape of self.canvasState.shapes) {
-            if (shape instanceof Nodes.MethodNode) {
-                let num_connections = 0;
-                for (let magnet of shape.out_magnets) {
-                    num_connections += magnet.connected.length;
-                }
-                if (num_connections === 0) {
-                    throw 'MethodNode with unused outputs';
-                }
-            }
-            else if (shape instanceof Nodes.OutputNode) {
-                pipeline_outputs.push(shape);
-            }
-            else if (shape instanceof Nodes.CdtNode || shape instanceof Nodes.RawNode) {
-                pipeline_inputs.push(shape);
-
-                // all CDtNodes or RawNodes (inputs) should feed into a MethodNode and have only one magnet
-                if (shape.out_magnets.length !== 1)
-                    throw 'Invalid amount of magnets for output node!';
-
-                // is this magnet connected?
-                if (shape.out_magnets[0].connected.length === 0)
-                    throw 'Unconnected input node';
-            }
-            else {
-                throw 'Unknown node type encountered!';
-            }
+        try {
+            this.canvasState.checkIntegrity();
+        } catch(e) {
+            console.error(e);
         }
 
         // Sort inputs and outputs by their isometric position, left-to-right, top-to-bottom
@@ -133,7 +107,7 @@ export class Pipeline {
         });
 
         // MethodNodes are now sorted live, prior to pipeline submission —JN
-        var sorted_elements = self.canvasState.getSteps();
+        var sorted_elements = this.canvasState.getSteps();
 
         // Add arguments for input cabling
         $.each(sorted_elements, function(idx, step) {

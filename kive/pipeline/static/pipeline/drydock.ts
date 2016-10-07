@@ -7,7 +7,7 @@
  */
 "use strict";
 import { Geometry } from "./geometry";
-import { Nodes } from "./drydock_objects";
+import { CanvasObject, Node, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet } from "./drydock_objects";
 import { Point, Rectangle } from "./ShapeTypes";
 declare var $: any;
 
@@ -66,13 +66,13 @@ export class CanvasState {
     ctx: CanvasRenderingContext2D;
     htmlTop:number;
     htmlLeft: number;
-    outputZone: Nodes.OutputZone;
+    outputZone: OutputZone;
     can_edit: boolean;
 
-    mouse_highlight: Nodes.Magnet;
+    mouse_highlight: Magnet;
     $dialog: any;
 
-    static method_node_queue: Nodes.MethodNode[] = [];
+    static method_node_queue: MethodNode[] = [];
     
     constructor(private canvas, interval?) {
         /*
@@ -106,7 +106,7 @@ export class CanvasState {
         this.htmlTop = html.offsetTop;
         this.htmlLeft = html.offsetLeft;
     
-        this.outputZone = new Nodes.OutputZone(this.width, this.height);
+        this.outputZone = new OutputZone(this.width, this.height);
         
         // events
         var interval_fn = () => {
@@ -136,7 +136,7 @@ export class CanvasState {
         this.valid = false;
     }
     
-    getMouseTarget (mx: number, my: number): Nodes.CanvasObject {
+    getMouseTarget (mx: number, my: number): CanvasObject {
         var shapes = this.shapes,
             connectors = this.connectors;
     
@@ -343,7 +343,7 @@ export class CanvasState {
     /*
      * Helper functions for CanvasState.autoLayout.
      */
-    private static insertIntoLayer(node: Nodes.Node, exec_order: Nodes.MethodNode[], list: Nodes.Node[]): Nodes.Node[] {
+    private static insertIntoLayer(node: Node, exec_order: MethodNode[], list: Node[]): Node[] {
         // Insert a node into a list in a "smart" way.
         // * Checks for duplicate entries
         // * If `node` is a method which is not the next method in exec_order, insertion is deferred
@@ -352,7 +352,7 @@ export class CanvasState {
         if (list.indexOf(node) === -1) {
             if (node.isMethodNode() &&
                 typeof exec_order !== 'undefined' &&
-                exec_order.indexOf(<Nodes.MethodNode>node) > -1) {
+                exec_order.indexOf(<MethodNode>node) > -1) {
                 let method_list = list.filter(node => node.isMethodNode());
                 if (exec_order.length <= method_list.length) {
                     console.error("Unexpected number of methods in method_nodes.");
@@ -371,7 +371,7 @@ export class CanvasState {
                     }
                 } else {
                     // Not the method node next in exec_order. Reserve it until we find the right node.
-                    queue.push(<Nodes.MethodNode>node);
+                    queue.push(<MethodNode>node);
                 }
             }
             else if (node.isOutputNode()) {
@@ -400,7 +400,7 @@ export class CanvasState {
         }
         return null;
     }
-    private static addConnectedNodes(node: Nodes.Node, list: Nodes.Node[]): void {
+    private static addConnectedNodes(node: Node, list: Node[]): void {
         // Follow a node's output cables to their connected nodes.
         // Insert these nodes in order into `list`.
         // Do not insert any duplicates into `list`.
@@ -412,7 +412,7 @@ export class CanvasState {
             }
         }
     }
-    private static addConnectedNodesReverse(node: Nodes.Node, list: Nodes.Node[], node_order: Nodes.Node[][]): void {
+    private static addConnectedNodesReverse(node: Node, list: Node[], node_order: Node[][]): void {
         // Reflexively insert input nodes into `list`.
         // Do not insert any duplicates into `list`.
         for (let in_magnet of node.out_magnets) {
@@ -587,7 +587,7 @@ export class CanvasState {
         }
     }
     
-    private static pushShapesApart(shape1: Nodes.Node|Nodes.OutputZone, shape2: Nodes.Node|Nodes.OutputZone, bias: number, bounds: Rectangle): void {
+    private static pushShapesApart(shape1: Node|OutputZone, shape2: Node|OutputZone, bias: number, bounds: Rectangle): void {
         let step = 5;
         // Drawing a line between the two objects' centres, move the centre 
         // of mySel to extend this line while keeping the same angle.
@@ -653,7 +653,7 @@ export class CanvasState {
         shape1.dy = my_y - shape1.y;
         shape2.dy = sh_y - shape2.y;
     }
-    detectCollisions (myShape: Nodes.Node|Nodes.OutputZone, bias?: number) {
+    detectCollisions (myShape: Node|OutputZone, bias?: number) {
         var followups = [],
             vertices = myShape.getVertices(),
             shapes_plus = this.shapes.concat(this.outputZone),
@@ -725,10 +725,10 @@ export class CanvasState {
         
         this.dragging = false;
         
-        if (this.selection[0] && this.selection[0].isConnector()) {
+        if (CanvasState.isConnector(this.selection[0])) {
             let connector = this.selection[0];
 
-            if (connector.dest && connector.dest.isMagnet()) {
+            if (CanvasState.isMagnet(connector.dest)) {
                 // connector has been linked to an in-magnet
                 // update source magnet
                 if (connector.source.connected.indexOf(connector) < 0) {
@@ -753,7 +753,7 @@ export class CanvasState {
                         this.selection = [];
                     } else {
                         // valid Connector, assign non-null value
-                        let new_output_label = this.uniqueNodeName(connector.source.label, Nodes.OutputNode);
+                        let new_output_label = this.uniqueNodeName(connector.source.label, OutputNode);
                         let out_node = connector.spawnOutputNode(new_output_label);
                         this.detectCollisions(out_node);
                         this.addShape(out_node);
@@ -812,21 +812,20 @@ export class CanvasState {
             };
     
         // Edit mode can popup the context menu to delete and edit nodes
-        if (this.can_edit && sel[0].isNode()) {
+        if (this.can_edit && CanvasState.isNode(sel[0])) {
             showMenu();
-            if (sel.length > 1 || 
-                    sel[0].isInputNode()) {
+            if (sel.length > 1 || CanvasState.isInputNode(sel[0])) {
                 $('.edit', mcm).hide();
             }
         } else if (sel.length == 1) {
             // Otherwise, we're read only, so only popup the context menu for outputs with datasets
-            if ((sel[0].isInputNode() || sel[0].isOutputNode()) &&
+            if ((CanvasState.isInputNode(sel[0]) || CanvasState.isOutputNode(sel[0])) &&
                 sel[0].dataset_id) {
 
                // Context menu for pipeline outputs
                showMenu();
                $('.step_node', mcm).hide();
-            } else if (sel[0].isMethodNode() && sel[0].log_id) {
+            } else if (CanvasState.isMethodNode(sel[0]) && sel[0].log_id) {
                // Context menu for pipeline steps
                showMenu();
                $('.dataset_node', mcm).hide();
@@ -836,7 +835,7 @@ export class CanvasState {
         e.preventDefault();
     }
     
-    addShape(shape: Nodes.Node): Nodes.Node {
+    addShape(shape: Node): Node {
         this.shapes.push(shape);
         if (shape.isMethodNode()) {
             this.methods.push(shape);
@@ -853,7 +852,7 @@ export class CanvasState {
         return shape;
     };
     
-    private static migrateConnectors(from_node: Nodes.MethodNode, to_node: Nodes.MethodNode): void {
+    private static migrateConnectors(from_node: MethodNode, to_node: MethodNode): void {
         var migrateInputs  = migrateFnUsing('inputs',  'in_magnets',  'dest',   'push'),
             migrateOutputs = migrateFnUsing('outputs', 'out_magnets', 'source', 'unshift');
 
@@ -892,7 +891,7 @@ export class CanvasState {
         }
     }
     
-    replaceMethod (old_method: Nodes.MethodNode, new_method: Nodes.MethodNode): boolean {
+    replaceMethod (old_method: MethodNode, new_method: MethodNode): boolean {
         var was_fully_connected = old_method.isFullyConnected();
         new_method.x = old_method.x;
         new_method.y = old_method.y;
@@ -903,7 +902,7 @@ export class CanvasState {
         return was_fully_connected !== new_method.isFullyConnected();
     }
     
-    findNodeByLabel (label: string): Nodes.Node {
+    findNodeByLabel (label: string): Node {
         var found;
         for (let shape of this.shapes) {
             if (shape.label == label) {
@@ -916,7 +915,7 @@ export class CanvasState {
         return found;
     }
 
-    private static phaseOrderMethods(methods: Nodes.MethodNode[]): Nodes.MethodNode[][] {
+    private static phaseOrderMethods(methods: MethodNode[]): MethodNode[][] {
         /*
          gather method nodes which have no method-node parents
          set as phase 0
@@ -1225,23 +1224,23 @@ export class CanvasState {
         this.has_unsaved_changes = 1;
     }
     
-    findMethodNode (method_pk: number): Nodes.MethodNode {
+    findMethodNode (method_pk: number): MethodNode {
         for (let method of this.methods) {
             if (method.pk == method_pk) {
                 return method;
             }
         }
         return null;
-    };
+    }
     
-    findOutputNode (pk: number): Nodes.OutputNode {
+    findOutputNode (pk: number): OutputNode {
         for (let output of this.outputs) {
             if (output.pk == pk) {
                 return output;
             }
         }
         return null;
-    };
+    }
 
     findInputNode (input_index) {
         for (let input of this.inputs) {
@@ -1250,6 +1249,74 @@ export class CanvasState {
             }
         }
         return null;
-    };
+    }
+
+    getOutputNodes(): OutputNode[] {
+        return this.outputs;
+    }
+
+    getInputNodes(): (CdtNode|RawNode)[] {
+        return this.inputs;
+    }
+
+    getMethodNodes(): MethodNode[] {
+        return this.methods;
+    }
+
+    static isNode(node: CanvasObject) {
+        return node && node.isNode && node.isNode();
+    }
+    static isInputNode(node: CanvasObject) {
+        return node && node.isInputNode && node.isInputNode();
+    }
+    static isCdtNode(node: CanvasObject) {
+        return node && node.isCdtNode && node.isCdtNode();
+    }
+    static isRawNode(node: CanvasObject) {
+        return node && node.isRawNode && node.isRawNode();
+    }
+    static isOutputNode(node: CanvasObject) {
+        return node && node.isOutputNode && node.isOutputNode();
+    }
+    static isMethodNode(node: CanvasObject) {
+        return node && node.isMethodNode && node.isMethodNode();
+    }
+    static isConnector(obj: CanvasObject) {
+        return obj && obj.isConnector && obj.isConnector();
+    }
+    static isMagnet(obj: CanvasObject) {
+        return obj && obj.isMagnet && obj.isMagnet();
+    }
+    static isOutputZone(obj: CanvasObject) {
+        return obj && obj.isOutputZone && obj.isOutputZone();
+    }
+
+    checkIntegrity() {
+        for (let shape of this.shapes) {
+            if (CanvasState.isNode(shape)) {
+                if (CanvasState.isMethodNode(shape)) {
+                    let num_connections = 0;
+                    for (let magnet of shape.out_magnets) {
+                        num_connections += magnet.connected.length;
+                    }
+                    if (num_connections === 0) {
+                        throw 'MethodNode with unused outputs';
+                    }
+                } else if (CanvasState.isInputNode(shape)) {
+                    // all CDtNodes or RawNodes (inputs) should feed into a MethodNode and have only one magnet
+                    if (shape.out_magnets.length !== 1) {
+                        throw 'Invalid amount of magnets for output node!';
+                    }
+
+                    // is this magnet connected?
+                    if (shape.out_magnets[0].connected.length === 0) {
+                        throw 'Unconnected input node';
+                    }
+                }
+            } else {
+                throw 'Unknown node type encountered!';
+            }
+        }
+    }
 
 }
