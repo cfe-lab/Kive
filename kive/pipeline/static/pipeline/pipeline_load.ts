@@ -1,7 +1,7 @@
 "use strict";
 
 import { Geometry } from "./geometry";
-import { Nodes } from "./drydock_objects";
+import { MethodNode, CdtNode, RawNode, OutputNode, Connector } from "./drydock_objects";
 import { CanvasState } from "./drydock";
 declare var $: any;
 
@@ -88,7 +88,7 @@ export class Pipeline {
             var structure = null;
 
             // Setup the compound datatype
-            if (input instanceof Nodes.CdtNode) {
+            if (CanvasState.isCdtNode(input)) {
                 structure = {
                     compounddatatype: input.pk,
                     min_row: null,
@@ -151,7 +151,7 @@ export class Pipeline {
                 form_data.steps[idx].cables_in[cable_idx] = {
                     source_dataset_name: connector.source.label,
                     dest_dataset_name: connector.dest.label,
-                    source_step: source instanceof Nodes.MethodNode ? sorted_elements.indexOf(source)+1 : 0,
+                    source_step: CanvasState.isMethodNode(source) ? sorted_elements.indexOf(source) + 1 : 0,
                     keep_output: false, // in the future this can be more flexible
                     custom_wires: [] // no wires for a raw cable
                 };
@@ -207,9 +207,7 @@ export class Pipeline {
 
         // Mark all the inputs as complete
         $.each(self.canvasState.shapes, function(_, shape){
-            if ( shape instanceof Nodes.RawNode ||
-                shape instanceof Nodes.CdtNode) {
-
+            if ( CanvasState.isInputNode(shape) ) {
                 shape.status = 'CLEAR';
             }
         });
@@ -227,7 +225,7 @@ export class Pipeline {
         $.each(runstat.output_progress, function(output_pk, output) {
             var shape = self.canvasState.findOutputNode(parseInt(output_pk));
 
-            if (shape instanceof Nodes.OutputNode) {
+            if (CanvasState.isOutputNode(shape)) {
                 shape.status = output.status;
                 shape.dataset_id = output.dataset_id;
                 shape.md5 = output.md5;
@@ -241,8 +239,7 @@ export class Pipeline {
         $.each(runstat.inputs, function(input_pk, output) {
             var shape = self.canvasState.findInputNode(parseInt(input_pk));
 
-            if (shape instanceof Nodes.RawNode ||
-                shape instanceof Nodes.CdtNode) {
+            if ( CanvasState.isInputNode(shape) ) {
                 shape.dataset_id = output.dataset_id;
                 shape.md5 = output.md5;
 
@@ -286,7 +283,7 @@ export class Pipeline {
 
             // BaseNode has no structure => no CDT, so it's raw
             if (node.structure === null) {
-                self.canvasState.addShape(new Nodes.RawNode(
+                self.canvasState.addShape(new RawNode(
                     node.x * canvas_x_ratio,
                     node.y * canvas_y_ratio,
                     node.dataset_name,
@@ -294,7 +291,7 @@ export class Pipeline {
                 ));
             }
             else {
-                self.canvasState.addShape(new Nodes.CdtNode(
+                self.canvasState.addShape(new CdtNode(
                     node.structure.compounddatatype,
                     node.x * canvas_x_ratio,
                     node.y * canvas_y_ratio,
@@ -323,7 +320,7 @@ export class Pipeline {
         // Over each pipeline step
         $.each(self.pipeline.steps, function() {
             var node = this,
-                method_node = new Nodes.MethodNode(
+                method_node = new MethodNode(
                     node.transformation,
                     node.transformation_family,
                     node.x * canvas_x_ratio,
@@ -365,7 +362,7 @@ export class Pipeline {
 
                     // Find the source for this
                     $.each(self.canvasState.shapes, function() {
-                        if (!(this instanceof Nodes.MethodNode) &&
+                        if (!CanvasState.isMethodNode(this) &&
                             this.label === cable.source_dataset_name) {
                             source = this;
                             return false; // break
@@ -379,7 +376,7 @@ export class Pipeline {
                     }
 
                     // data nodes only have one out-magnet, so use 0-index
-                    connector = new Nodes.Connector(source.out_magnets[0]);
+                    connector = new Connector(source.out_magnets[0]);
 
                     // connect other end of cable to the MethodNode
                     connector.x = magnet.x;
@@ -400,7 +397,7 @@ export class Pipeline {
                     $.each(source.out_magnets, function(){
 
                         if (this.label === cable.source_dataset_name) {
-                            connector = new Nodes.Connector(this);
+                            connector = new Connector(this);
                             connector.x = magnet.x;
                             connector.y = magnet.y;
                             connector.dest = magnet;
@@ -444,8 +441,8 @@ export class Pipeline {
                     }
                     let output = output_in_list[0];
 
-                    let connector = new Nodes.Connector(magnet),
-                        output_node = new Nodes.OutputNode(
+                    let connector = new Connector(magnet),
+                        output_node = new OutputNode(
                             output.x * canvas_x_ratio,
                             output.y * canvas_y_ratio,
                             outcable.output_name,
@@ -488,7 +485,7 @@ export class Pipeline {
                 new_method = old_method;
                 any_mismatch = false;
             } else {
-                new_method = new Nodes.MethodNode(
+                new_method = new MethodNode(
                     update.method.id,
                     update.method.family_id,
                     0,// x

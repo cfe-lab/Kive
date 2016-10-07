@@ -488,7 +488,7 @@ export class CanvasState {
                 let layer_out_magnets = [];
                 node_order[j].center_x = node_order[j].center_x || 0;
             
-                for (let i of layer_length) {
+                for (let i = 0; i < layer_length; i++) {
                     let node = node_order[j][i];
 
                     let node_coords = Geometry.isoTo2D(

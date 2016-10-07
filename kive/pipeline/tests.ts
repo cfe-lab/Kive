@@ -1,4 +1,4 @@
-import { CanvasWrapper, Nodes } from "./static/pipeline/drydock_objects";
+import { CanvasWrapper, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet, Connector } from "./static/pipeline/drydock_objects";
 import { CanvasState } from "./static/pipeline/drydock";
 import { Pipeline } from "./static/pipeline/pipeline_load";
 declare var $: any;
@@ -157,7 +157,7 @@ declare var afterEach: any;
                 var r = 5,
                     parent = this,
                     attract = 3;
-                this.magnet = new Nodes.Magnet(parent, r, attract);
+                this.magnet = new Magnet(parent, r, attract);
                 this.magnet.x = 100;
                 this.magnet.y = 10;
                 this.magnet.label = 'example';
@@ -262,7 +262,7 @@ declare var afterEach: any;
                 var x = 100,
                     y = 40,
                     label = 'example';
-                this.node = new Nodes.OutputNode(x, y, label);
+                this.node = new OutputNode(x, y, label);
             });
             
             it('should draw', function() {
@@ -274,7 +274,7 @@ declare var afterEach: any;
                 this.expectedCanvas.ctx.globalAlpha = 0.35;
                 this.expectedCanvas.drawEllipse({x: 100, y: 27.5, rx: 20, ry: 10});
                 this.expectedCanvas.ctx.globalAlpha = 1;
-                var magnet = new Nodes.Magnet(null);
+                var magnet = new Magnet(null);
                 magnet.x = 88;
                 magnet.y = 27.5;
                 magnet.draw(this.expectedCanvas.ctx);
@@ -297,7 +297,7 @@ declare var afterEach: any;
                 this.expectedCanvas.ctx.globalAlpha = 0.35;
                 this.expectedCanvas.drawEllipse({x: 100, y: 27.5, rx: 20, ry: 10});
                 this.expectedCanvas.ctx.globalAlpha = 1;
-                var magnet = new Nodes.Magnet(null);
+                var magnet = new Magnet(null);
                 magnet.x = 88;
                 magnet.y = 27.5;
                 magnet.draw(this.expectedCanvas.ctx);
@@ -315,7 +315,7 @@ declare var afterEach: any;
                 this.expectedCanvas.ctx.globalAlpha = 0.35;
                 this.expectedCanvas.drawEllipse({x: 100, y: 27.5, rx: 20, ry: 10});
                 this.expectedCanvas.ctx.globalAlpha = 1;
-                var magnet = new Nodes.Magnet(null);
+                var magnet = new Magnet(null);
                 magnet.x = 88;
                 magnet.y = 27.5;
                 magnet.draw(this.expectedCanvas.ctx);
@@ -365,8 +365,8 @@ declare var afterEach: any;
                 var sourceParent = {},
                     r = 5,
                     attract = 3,
-                    source = new Nodes.Magnet(sourceParent, r, attract),
-                    connector = new Nodes.Connector(source);
+                    source = new Magnet(sourceParent, r, attract),
+                    connector = new Connector(source);
                 source.x = 50;
                 source.y = 10;
                 source.label = "example";
@@ -410,7 +410,7 @@ declare var afterEach: any;
                 var x = 100,
                     y = 40,
                     label = 'example';
-                this.node = new Nodes.RawNode(x, y, label);
+                this.node = new RawNode(x, y, label);
             });
             
             it('should draw', function() {
@@ -422,7 +422,7 @@ declare var afterEach: any;
                 this.expectedCanvas.ctx.globalAlpha = 0.35;
                 this.expectedCanvas.drawEllipse({x: 100, y: 27.5, rx: 20, ry: 10});
                 this.expectedCanvas.ctx.globalAlpha = 1;
-                var magnet = new Nodes.Magnet(null);
+                var magnet = new Magnet(null);
                 magnet.x = 110;
                 magnet.y = 45;
                 magnet.draw(this.expectedCanvas.ctx);
@@ -485,7 +485,7 @@ declare var afterEach: any;
                     y = 40,
                     label = 'example';
                 this.expected_cdt_pk = 1234;
-                this.node = new Nodes.CdtNode(
+                this.node = new CdtNode(
                         this.expected_cdt_pk,
                         x,
                         y,
@@ -520,7 +520,7 @@ declare var afterEach: any;
                 this.expectedCanvas.ctx.globalAlpha = 0.35;
                 this.expectedCanvas.ctx.fill();
                 this.expectedCanvas.ctx.globalAlpha = 1.0;
-                var magnet = new Nodes.Magnet(null);
+                var magnet = new Magnet(null);
                 magnet.x = 113;
                 magnet.y = 45.625;
                 magnet.draw(this.expectedCanvas.ctx);
@@ -599,7 +599,7 @@ declare var afterEach: any;
                     inputs = [{dataset_idx: 1,dataset_name: "in", structure: {compounddatatype: 7} }],
                     outputs = [{dataset_idx: 1,dataset_name: "out",structure: {compounddatatype: 7}}];
                     
-                this.node = new Nodes.MethodNode(
+                this.node = new MethodNode(
                         method_pk,
                         family_pk,
                         x,
@@ -664,7 +664,7 @@ declare var afterEach: any;
                 this.expectedCanvas.ctx.restore();
                 
                 // in magnet
-                var magnet = new Nodes.Magnet(null);
+                var magnet = new Magnet(null);
                 magnet.x = 150;
                 magnet.y = 15;
                 magnet.draw(this.expectedCanvas.ctx);
@@ -695,7 +695,7 @@ declare var afterEach: any;
                 this.expectedCanvas.ctx.stroke();
                 this.node.draw(this.expectedCanvas.ctx);
                 // // in magnet
-                // var magnet = new Nodes.Magnet(null);
+                // var magnet = new Magnet(null);
                 // magnet.x = 150;
                 // magnet.y = 15;
                 // magnet.r = 5;
@@ -723,14 +723,14 @@ declare var afterEach: any;
                 this.node.draw(this.expectedCanvas.ctx);
                 // source magnet
                 var sourceParent = {label: "in"},
-                    source = new Nodes.Magnet(sourceParent);
+                    source = new Magnet(sourceParent);
                 source.x = 50;
                 source.y = 10;
                 source.label = "in";
                 
                 // in magnet
-                var in_magnet = new Nodes.Magnet(null),
-                    expectedCable = new Nodes.Connector(source);
+                var in_magnet = new Magnet(null),
+                    expectedCable = new Connector(source);
                 in_magnet.x = 150;
                 in_magnet.y = 15;
                 in_magnet.label = "in";
@@ -740,7 +740,7 @@ declare var afterEach: any;
                 expectedCable.drawLabel(this.expectedCanvas.ctx);
                 
                 // // out magnet
-                // var out_magnet = new Nodes.Magnet(null);
+                // var out_magnet = new Magnet(null);
                 // out_magnet.x = 188.97114317029974;
                 // out_magnet.y = 57.5;
                 // out_magnet.r = 5;
@@ -748,7 +748,7 @@ declare var afterEach: any;
                 // out_magnet.isOutput = true;
                 // out_magnet.highlight(this.expectedCanvas.ctx);
                 
-                var actualCable = new Nodes.Connector(source);
+                var actualCable = new Connector(source);
                 actualCable.dest = this.node.in_magnets[0];
                 this.node.in_magnets[0].connected.push(actualCable);
                 this.node.draw(this.ctx);
@@ -766,13 +766,13 @@ declare var afterEach: any;
                 this.node.draw(this.expectedCanvas.ctx);
                 // dest magnet
                 var destParent = {label: "out"},
-                dest = new Nodes.Magnet(destParent);
+                dest = new Magnet(destParent);
                 dest.x = 250;
                 dest.y = 75;
                 dest.label = "out";
                 
                 // // in magnet
-                // var in_magnet = new Nodes.Magnet(null);
+                // var in_magnet = new Magnet(null);
                 // in_magnet.x = 150;
                 // in_magnet.y = 15;
                 // in_magnet.r = 5;
@@ -780,8 +780,8 @@ declare var afterEach: any;
                 // in_magnet.highlight(this.expectedCanvas.ctx);
                 
                 // out magnet
-                var out_magnet = new Nodes.Magnet(this.node),
-                    expectedCable = new Nodes.Connector(out_magnet);
+                var out_magnet = new Magnet(this.node),
+                    expectedCable = new Connector(out_magnet);
                 out_magnet.x = 188.97114317029974;
                 out_magnet.y = 57.5;
                 out_magnet.label = "out";
@@ -791,7 +791,7 @@ declare var afterEach: any;
                 expectedCable.draw(this.expectedCanvas.ctx);
                 expectedCable.drawLabel(this.expectedCanvas.ctx);
                 
-                var actualCable = new Nodes.Connector(
+                var actualCable = new Connector(
                         this.node.out_magnets[0]);
                 actualCable.dest = dest;
                 this.node.out_magnets[0].connected.push(actualCable);
@@ -809,10 +809,10 @@ declare var afterEach: any;
                 this.expectedCanvas.ctx.stroke();
                 this.node.draw(this.expectedCanvas.ctx);
                 // dest magnet
-                var expectedOutput = new Nodes.OutputNode(250, 75, "out");
+                var expectedOutput = new OutputNode(250, 75, "out");
                 
                 // // in magnet
-                // var in_magnet = new Nodes.Magnet(null);
+                // var in_magnet = new Magnet(null);
                 // in_magnet.x = 150;
                 // in_magnet.y = 15;
                 // in_magnet.r = 5;
@@ -820,8 +820,8 @@ declare var afterEach: any;
                 // in_magnet.highlight(this.expectedCanvas.ctx);
                 
                 // out magnet
-                var out_magnet = new Nodes.Magnet(this.node),
-                expectedCable = new Nodes.Connector(out_magnet);
+                var out_magnet = new Magnet(this.node),
+                expectedCable = new Connector(out_magnet);
                 out_magnet.x = 188.97114317029974;
                 out_magnet.y = 57.5;
                 out_magnet.r = 5;
@@ -834,9 +834,9 @@ declare var afterEach: any;
                 expectedCable.draw(this.expectedCanvas.ctx);
                 expectedCable.drawLabel(this.expectedCanvas.ctx);
                 
-                var actualCable = new Nodes.Connector(
+                var actualCable = new Connector(
                     this.node.out_magnets[0]),
-                    actualOutput = new Nodes.OutputNode(250, 75, "out");
+                    actualOutput = new OutputNode(250, 75, "out");
                 actualCable.dest = actualOutput.in_magnets[0];
                 this.node.out_magnets[0].connected.push(actualCable);
                 this.node.draw(this.ctx);
@@ -901,15 +901,15 @@ declare var afterEach: any;
                     attract = 3;
                 this.sourceParent = {};
                 this.destParent = {};
-                this.source = new Nodes.Magnet(this.sourceParent, r, attract);
+                this.source = new Magnet(this.sourceParent, r, attract);
                 this.source.x = 50;
                 this.source.y = 10;
                 this.source.label = 'example';
-                this.dest = new Nodes.Magnet(this.destParent, r, attract);
+                this.dest = new Magnet(this.destParent, r, attract);
                 this.dest.x = 150;
                 this.dest.y = 15;
                 this.dest.label = 'example';
-                this.connector = new Nodes.Connector(this.source);
+                this.connector = new Connector(this.source);
                 this.connector.x = 150;
                 this.connector.y = 15;
             });
@@ -1152,7 +1152,7 @@ declare var afterEach: any;
                     canvas_height = 150;
                 this.expectedRawCanvas.width = canvas_width;
                 this.rawCanvas.width = canvas_width;
-                this.zone = new Nodes.OutputZone(
+                this.zone = new OutputZone(
                         canvas_width,
                         canvas_height);
             });
@@ -1186,8 +1186,8 @@ declare var afterEach: any;
             beforeEach(function() {
                 this.state = new CanvasState(this.rawCanvas);
                 
-                this.expectedInput = new Nodes.RawNode(30, 50, "in");
-                this.actualInput = new Nodes.RawNode(30, 50, "in");
+                this.expectedInput = new RawNode(30, 50, "in");
+                this.actualInput = new RawNode(30, 50, "in");
                 this.state.addShape(this.actualInput).has_unsaved_changes = false;
             });
             
@@ -1243,7 +1243,7 @@ declare var afterEach: any;
                     this.methodInputs = [{dataset_idx: 1, dataset_name: "i1: in", structure: null}];
                     this.methodOutputs = [{dataset_idx: 1, dataset_name: "out", structure: {compounddatatype: 17}}];
 
-                    this.expectedMethod = new Nodes.MethodNode(
+                    this.expectedMethod = new MethodNode(
                             this.methodId,
                             this.methodFamilyId,
                             100,
@@ -1252,7 +1252,7 @@ declare var afterEach: any;
                             "example",
                             this.methodInputs,
                             this.methodOutputs);
-                    this.actualMethod = new Nodes.MethodNode(
+                    this.actualMethod = new MethodNode(
                             this.methodId,
                             this.methodFamilyId,
                             100,
@@ -1261,12 +1261,12 @@ declare var afterEach: any;
                             "example",
                             this.methodInputs,
                             this.methodOutputs);
-                    this.expectedConnector = new Nodes.Connector(
+                    this.expectedConnector = new Connector(
                             this.expectedMethod.out_magnets[0]);
-                    this.expectedOutputZone = new Nodes.OutputZone(
+                    this.expectedOutputZone = new OutputZone(
                             this.expectedRawCanvas.width,
                             this.expectedRawCanvas.height);
-                    this.expectedOutput = new Nodes.OutputNode(
+                    this.expectedOutput = new OutputNode(
                             250,
                             76,
                             "out");
@@ -1886,7 +1886,7 @@ declare var afterEach: any;
                 
                 describe('and connector', function() {
                     beforeEach(function() {
-                        this.actualConnector = new Nodes.Connector(
+                        this.actualConnector = new Connector(
                                 this.actualInput.out_magnets[0]);
                         this.actualInput.out_magnets[0].connected.push(
                                 this.actualConnector);
@@ -2032,12 +2032,12 @@ declare var afterEach: any;
                                 y = 100,
                                 output_name = 'result.csv',
                                 output_id = 17;
-                            this.output = new Nodes.OutputNode(
+                            this.output = new OutputNode(
                                     x,
                                     y,
                                     output_name,
                                     output_id);
-                            var connector = new Nodes.Connector(
+                            var connector = new Connector(
                                     this.actualMethod.out_magnets[0]);
                             this.actualMethod.out_magnets[0].connected.push(
                                     connector);
@@ -2085,7 +2085,7 @@ declare var afterEach: any;
                                 fill = "#999",
                                 old_method_name = "example",
                                 method_name = old_method_name + " (new)",
-                                method = new Nodes.MethodNode(
+                                method = new MethodNode(
                                         this.methodId,
                                         this.methodFamilyId,
                                         0,
@@ -2118,7 +2118,7 @@ declare var afterEach: any;
                                 fill = "#999",
                                 inputs = [],
                                 outputs = [],
-                                extra_method = new Nodes.MethodNode(
+                                extra_method = new MethodNode(
                                     method_id,
                                     family_id,
                                     200,

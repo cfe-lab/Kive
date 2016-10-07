@@ -406,6 +406,7 @@ class BaseNode {
                 (connector.source.parent === node && connector.dest.parent === this))
                 return true;
         }
+        return false;
     }
 
     isNode() {
@@ -418,6 +419,21 @@ class BaseNode {
         return false;
     }
     isConnector() {
+        return false;
+    }
+    isInputNode() {
+        return false;
+    }
+    isRawNode() {
+        return false;
+    }
+    isCdtNode() {
+        return false;
+    }
+    isOutputNode() {
+        return false;
+    }
+    isMethodNode() {
         return false;
     }
 }
@@ -581,15 +597,6 @@ export class RawNode extends CylinderNode implements Node {
     isRawNode() {
         return true;
     }
-    isOutputNode() {
-        return false;
-    }
-    isMethodNode() {
-        return false;
-    }
-    isCdtNode() {
-        return false;
-    }
 
     deleteFrom = deleteFromTemplate;
 }
@@ -723,17 +730,8 @@ export class CdtNode extends BaseNode implements Node {
     isInputNode() {
         return true;
     }
-    isRawNode() {
-        return false;
-    }
     isCdtNode() {
         return true;
-    }
-    isOutputNode() {
-        return false;
-    }
-    isMethodNode() {
-        return false;
     }
 
     deleteFrom = deleteFromTemplate;
@@ -1058,18 +1056,6 @@ export class MethodNode extends BaseNode implements Node {
         return is_fully_connected;
     };
 
-    isInputNode() {
-        return false;
-    }
-    isRawNode() {
-        return false;
-    }
-    isCdtNode() {
-        return false;
-    }
-    isOutputNode() {
-        return false;
-    }
     isMethodNode() {
         return true;
     }
@@ -1763,7 +1749,7 @@ export class OutputZone implements CanvasObject {
 
 export class OutputNode extends CylinderNode implements Node {
     /*
-     BaseNode representing an output.
+     Node representing an output.
      */
     fill = "#d40";
     defaultFill = "#d40";
@@ -1813,20 +1799,7 @@ export class OutputNode extends CylinderNode implements Node {
     debug(ctx: CanvasRenderingContext2D) {
         this.in_magnets[0].connected[0].debug(ctx);
     }
-
-    isInputNode() {
-        return false;
-    }
-    isRawNode() {
-        return false;
-    }
-    isCdtNode() {
-        return false;
-    }
     isOutputNode() {
         return true;
-    }
-    isMethodNode() {
-        return false;
     }
 }
