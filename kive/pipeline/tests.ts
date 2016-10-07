@@ -1,8 +1,8 @@
 import { CanvasWrapper, Nodes } from "./static/pipeline/drydock_objects";
 import { CanvasState } from "./static/pipeline/drydock";
+import { Pipeline } from "./static/pipeline/pipeline_load";
 declare var $: any;
 declare var imagediff: any;
-declare var Pipeline: any;
 declare var pipeline_families: any;
 
 declare var jasmine: any;

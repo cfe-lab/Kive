@@ -1772,7 +1772,7 @@ export namespace Nodes {
         found_fill = "blue";
         inset = 12; // distance of magnet from center
         in_magnets: Magnet[];
-
+        run_id: number;
         // Marks whether or not this node
         // was being searched for and was found
         // (when doing an md5 lookup)
