@@ -2662,7 +2662,7 @@ declare var afterEach: any;
                         }
                     }];
                   
-                pipeline.applyStepUpdates(step_updates);
+                pipeline.applyStepRevisions(step_updates);
                 var new_method = this.canvasState.findNodeByLabel('prelim_map.py');
                 expect(new_method.pk).toBe(new_method_id);
             });
@@ -2693,7 +2693,7 @@ declare var afterEach: any;
                         }
                     }];
                   
-                pipeline.applyStepUpdates(step_updates);
+                pipeline.applyStepRevisions(step_updates);
                 var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
                 var no_updates_found_method = this.canvasState.findNodeByLabel('remap.py');
                 expect(updated_method.update_signal.status).toBe('updated');
@@ -2727,7 +2727,7 @@ declare var afterEach: any;
                         }
                     }];
                   
-                pipeline.applyStepUpdates(step_updates);
+                pipeline.applyStepRevisions(step_updates);
                 var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
                 expect(updated_method.update_signal.status).toBe('updated with issues');
             });
@@ -2758,7 +2758,7 @@ declare var afterEach: any;
                         }
                     }];
                   
-                pipeline.applyStepUpdates(step_updates);
+                pipeline.applyStepRevisions(step_updates);
                 var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
                 expect(updated_method.update_signal.status).toBe('updated with issues');
             });
@@ -2793,7 +2793,7 @@ declare var afterEach: any;
                         }
                     }];
                   
-                pipeline.applyStepUpdates(step_updates);
+                pipeline.applyStepRevisions(step_updates);
                 var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
                 expect(updated_method.update_signal.status).toBe('updated with issues');
             });
@@ -2828,7 +2828,7 @@ declare var afterEach: any;
                         }
                     }];
                   
-                pipeline.applyStepUpdates(step_updates);
+                pipeline.applyStepRevisions(step_updates);
                 var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
                 expect(updated_method.update_signal.status).toBe('updated with issues');
             });
@@ -2842,7 +2842,7 @@ declare var afterEach: any;
                             revision_name: "new feature"
                         }
                     }];
-                pipeline.applyStepUpdates(step_updates);
+                pipeline.applyStepRevisions(step_updates);
                 
                 var new_method = this.canvasState.findNodeByLabel('prelim_map.py');
                 
@@ -2860,7 +2860,7 @@ declare var afterEach: any;
                         revision_name: "new feature"
                     }]
                 }];
-                pipeline.applyStepUpdates(step_updates);
+                pipeline.applyStepRevisions(step_updates);
                 
                 var new_method = this.canvasState.findNodeByLabel('prelim_map.py');
                 

@@ -282,6 +282,7 @@ export interface Node extends CanvasObject {
     getLabel(): NodeLabel;
     deleteFrom(cs: CanvasState): void;
     unlightMagnets(): void;
+    setMagnetPosition(): void;
     getMouseTarget(x: number, y: number, skip_check: boolean): BaseNode|Magnet;
     x: number;
     y: number;
@@ -409,6 +410,17 @@ class BaseNode {
         return false;
     }
 
+    setCoordsFromIso(x: number, y: number) {
+        let coords = Geometry.isoTo2D(x, y);
+        this.x = coords.x;
+        this.y = coords.y;
+        this.dx = this.dy = 0;
+        this.setMagnetPosition();
+    }
+    setMagnetPosition() {
+        //placeholder - child classes must set
+    }
+
     isNode() {
         return true;
     }
@@ -521,10 +533,14 @@ class CylinderNode extends BaseNode {
         canvas.drawEllipse(top_ellipse);
         ctx.globalAlpha = 1.0;
         // draw magnet
+        this.setMagnetPosition();
+        var magnet = this.in_magnets[0] || this.out_magnets[0];
+        magnet.draw(ctx);
+    }
+    setMagnetPosition() {
         var magnet = this.in_magnets[0] || this.out_magnets[0];
         magnet.x = this.x + this.dx + this.magnetOffset.x;
         magnet.y = this.y + this.dy + this.magnetOffset.y;
-        magnet.draw(ctx);
     }
     highlight(ctx: CanvasRenderingContext2D) {
         var canvas = new CanvasWrapper(undefined, ctx);
@@ -659,10 +675,13 @@ export class CdtNode extends BaseNode implements Node {
         ctx.globalAlpha = 1.0;
 
         // draw magnet
+        this.setMagnetPosition();
+        this.out_magnets[0].draw(ctx);
+    }
+    setMagnetPosition() {
         var out_magnet = this.out_magnets[0];
-        out_magnet.x = cx + this.inset;
-        out_magnet.y = cy + this.w/8;
-        out_magnet.draw(ctx);
+        out_magnet.x = this.x + this.dx + this.inset;
+        out_magnet.y = this.y + this.dy + this.w/8;
     }
     getVertices(): Point[] {
         var cx = this.x + this.dx,
@@ -875,33 +894,8 @@ export class MethodNode extends BaseNode implements Node {
         ctx.globalAlpha = 1.0;
 
         // draw magnets
-        var cx = this.x + this.dx,
-            cy = this.y + this.dy,
-            cos30 = Math.sqrt(3)/2,
-         // sin30 = 0.5 (this is trivial)
-            magnet_margin = 6,
-            y_inputs = cy - this.stack,
-            x_outputs = cx + this.scoop * cos30,
-            y_outputs = cy + this.scoop * 0.5,
-            c2c = this.in_magnets[0].r * 2 + magnet_margin,
-            ipl  = (this.in_magnets.length  * c2c + magnet_margin) / 2,// distance from magnet centre to edge
-            magnet,
-            pos;
-
-        this.input_plane_len = ipl;
-
-        for (let i = 0, len = this.in_magnets.length; i < len; i++) {
-            magnet = this.in_magnets[i];
-            pos = i - len/2 + 0.5;
-            magnet.x = cx + pos * cos30 * c2c;
-            magnet.y = y_inputs - pos * c2c/2;
-            magnet.draw(ctx);
-        }
-        for (let i = 0, len = this.out_magnets.length; i < len; i++) {
-            magnet = this.out_magnets[i];
-            pos = i - len/2 + 0.5;
-            magnet.x = x_outputs + pos * cos30 * c2c;
-            magnet.y = y_outputs - pos * c2c/2;
+        this.setMagnetPosition();
+        for (let magnet of this.in_magnets.concat(this.out_magnets)) {
             magnet.draw(ctx);
         }
 
@@ -922,6 +916,31 @@ export class MethodNode extends BaseNode implements Node {
             ctx.stroke();
             ctx.restore();
         }
+    }
+
+    setMagnetPosition() {
+        let magnet, pos;
+        let cx = this.x + this.dx,
+            cy = this.y + this.dy,
+            cos30 = Math.sqrt(3)/2,
+            magnet_margin = 6,
+            c2c = this.in_magnets[0].r * 2 + magnet_margin,
+            y_inputs = cy - this.stack,
+            x_outputs = cx + this.scoop * cos30,
+            y_outputs = cy + this.scoop * 0.5;
+        for (let i = 0, len = this.in_magnets.length; i < len; i++) {
+            magnet = this.in_magnets[i];
+            pos = (i - len/2 + 0.5) * c2c;
+            magnet.x = cx + pos * cos30;
+            magnet.y = y_inputs - pos/2;
+        }
+        for (let i = 0, len = this.out_magnets.length; i < len; i++) {
+            magnet = this.out_magnets[i];
+            pos = (i - len/2 + 0.5) * c2c;
+            magnet.x = x_outputs + pos * cos30;
+            magnet.y = y_outputs - pos/2;
+        }
+
     }
 
     highlight (ctx: CanvasRenderingContext2D) {
@@ -1010,6 +1029,7 @@ export class MethodNode extends BaseNode implements Node {
             this.prevX = cx;
             this.prevY = cy;
             this.vertices = vertices;
+            this.input_plane_len = input_plane_len;
         }
 
         return this.vertices;

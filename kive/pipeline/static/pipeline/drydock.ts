@@ -343,15 +343,14 @@ export class CanvasState {
     /*
      * Helper functions for CanvasState.autoLayout.
      */
-    private static insertIntoLayer(node: Node, exec_order: MethodNode[], list: Node[]): Node[] {
+    private static insertIntoLayer(node: Node, exec_order: MethodNode[], list:Node[]): Node[] {
         // Insert a node into a list in a "smart" way.
         // * Checks for duplicate entries
         // * If `node` is a method which is not the next method in exec_order, insertion is deferred
         // * If `node` -is- the next method in exec_order, insert all the method nodes that were deferred.
         var queue = CanvasState.method_node_queue; // queue is a static variable that persists across function calls
         if (list.indexOf(node) === -1) {
-            if (node.isMethodNode() &&
-                typeof exec_order !== 'undefined' &&
+            if (CanvasState.isMethodNode(node) &&
                 exec_order.indexOf(<MethodNode>node) > -1) {
                 let method_list = list.filter(node => node.isMethodNode());
                 if (exec_order.length <= method_list.length) {
@@ -400,7 +399,7 @@ export class CanvasState {
         }
         return null;
     }
-    private static addConnectedNodes(node: Node, list: Node[]): void {
+    private static addConnectedNodesOut(node: Node, list: Node[]): void {
         // Follow a node's output cables to their connected nodes.
         // Insert these nodes in order into `list`.
         // Do not insert any duplicates into `list`.
@@ -412,17 +411,15 @@ export class CanvasState {
             }
         }
     }
-    private static addConnectedNodesReverse(node: Node, list: Node[], node_order: Node[][]): void {
+    private static addConnectedInputNodesIn(node: Node, list: Node[], node_order: Node[][]): void {
         // Reflexively insert input nodes into `list`.
         // Do not insert any duplicates into `list`.
-        for (let in_magnet of node.out_magnets) {
-            for (let connected of in_magnet.connected) {
-                let connected_input = connected.source.parent;
-                if ((connected_input.isInputNode()) &&
-                    CanvasState.matrixIndexOf(node_order, connected_input) == null
-                ) {
-                    list.push(connected_input);
-                }
+        for (let in_magnet of node.in_magnets) {
+            let connected_input = in_magnet.connected[0].source.parent;
+            if (connected_input.isInputNode() &&
+                CanvasState.matrixIndexOf(node_order, connected_input) === null
+            ) {
+                list.push(connected_input);
             }
         }
     }
@@ -430,92 +427,76 @@ export class CanvasState {
         if (!this.exec_order) {
             return;
         }
-        
-        var x_spacing = 60,
-            y_spacing = 130,
-            // z_drop = 20,// not implemented yet. intent is for nodes to cascade down into each other like a series of waterfalls!
-            layer = [],
-            max_layer = this.exec_order[0].length,
-            magnets_in_order = [],
-            original_input_order = this.inputs.map(x => x);
-        
-        for (let i = 1; i < this.exec_order.length; i++) {
-            if (this.exec_order[i].length > max_layer) {
-                max_layer = this.exec_order[i].length;
-            }
-        }
-        
-        // First two layers are relatively easy.
-        // Layer 1 is exec_order[0]. (Potentially with more input nodes which will be found later)
-        // Layer 0 is any input node leading to exec_order[0].
-        for (let layer1node of this.exec_order[0]) {
-            magnets_in_order = magnets_in_order.concat(layer1node.in_magnets);
-        }
-        for (let magnet of magnets_in_order) {
-            for (let connected of magnet.connected) {
-                let node = connected.source.parent;
-                if (layer.indexOf(node) === -1) {
-                    layer.push(node);
-                }
-            }
-        }
 
         interface NodeOrderArray<T> extends Array<T> {
             center_x?: number
         }
-        let node_order:NodeOrderArray<any> = [ layer ];
-        node_order.push(this.exec_order[0]);
         
-        for (let i in this.exec_order) {
-            let connected_nodes_in_order = [];
-            for (let this_node of this.exec_order[i]) {
-                CanvasState.addConnectedNodes(this_node, connected_nodes_in_order);// connected_nodes_in_order will be added to here
-                CanvasState.addConnectedNodesReverse(this_node, node_order[node_order.length - 2], node_order);// node_order[node_order.length - 2] will be added to here
+        let x_spacing = 60,
+            y_spacing = 130,
+            // z_drop = 20,// not implemented yet. intent is for nodes to cascade down into each other like a series of waterfalls!
+            l1_inmagnets_in_order = this.exec_order[0].reduce(
+                (prev, curr) => prev.concat(curr.in_magnets), []
+            ),
+            // First two layers are relatively easy.
+            // Layer 1 is exec_order[0]. (Potentially with more input nodes which will be found later)
+            node_order:NodeOrderArray<any> = [ [], this.exec_order[0] ],
+            original_input_order = this.inputs.map(x => x);
+
+        // Layer 0 is any input node leading to exec_order[0].
+        for (let magnet of l1_inmagnets_in_order) {
+            let node = magnet.connected[0].source.parent;
+            if (node_order[0].indexOf(node) === -1) {
+                node_order[0].push(node);
             }
-            let layer = [];
+        }
+
+        for (let i = 0; i < this.exec_order.length; i++) {
+            let connected_nodes_in_order = [],
+                layer = [];
+            for (let node of this.exec_order[i]) {
+                // all nodes connected to out magnets will be added to connected_nodes_in_order
+                CanvasState.addConnectedNodesOut(node, connected_nodes_in_order);
+                // node_order[node_order.length - 2] will be added to node_order
+                CanvasState.addConnectedInputNodesIn(node, node_order[node_order.length - 2], node_order);
+            }
             for (let connected_node of connected_nodes_in_order) {
-                CanvasState.insertIntoLayer(connected_node, this.exec_order[i+1], layer);// `layer` will be added to here
+                layer = CanvasState.insertIntoLayer(connected_node, this.exec_order[i+1], layer);// `layer` will be added to here
             }
             node_order.push(layer);
+
+            // console.log('exec layer ' + i);
+            // console.table(node_order.map( e1 => e1.map( e2 => e2.label ) ));
         }
-        
-        //x: x * 0.577350269 - y - i * spacing == 0
-        //y: x * 0.577350269 + y - j * spacing == 0
-        
+
         $(this.canvas).fadeOut({ complete: () => {
             for (let j = 0; j < node_order.length; j++) {
                 let layer_length = node_order[j].length;
-                let layer_out_magnets = [];
-                node_order[j].center_x = node_order[j].center_x || 0;
+                let layer = node_order[j];
+                layer.center_x = layer.center_x || 0;
             
                 for (let i = 0; i < layer_length; i++) {
-                    let node = node_order[j][i];
-
-                    let node_coords = Geometry.isoTo2D(
-                        x_spacing * (i - layer_length/2) + node_order[j].center_x,
+                    layer[i].setCoordsFromIso(
+                        x_spacing * (i - layer_length/2) + layer.center_x,
                         y_spacing * j
                     );
-                    node.x = node_coords.x;
-                    node.y = node_coords.y;
-                    node.dx = node.dy = 0;
-                
-                    if (isNaN(node.x) || isNaN(node.y) ) {
-                        console.error("Autolayout failed!");
-                    }
-                
-                    if (node.out_magnets.length > 0) {
-                        node.draw(this.ctx);// needed to update magnet coords
-                        layer_out_magnets = layer_out_magnets.concat(node.out_magnets);
-                    }
                 }
-            
+
+                let layer_out_magnets = layer.reduce(
+                    (prev, curr) => prev.concat(curr.out_magnets), []
+                );
+
                 // the isometric X centre of the layer after this one will be aligned with the centre of the magnets leading to its nodes.
                 if (j !== node_order.length - 1) {
-                    let num_magnets = layer_out_magnets.length;
-                    var avg = Geometry.averagePoint(layer_out_magnets);
+                    let avg = Geometry.averagePoint(layer_out_magnets);
                     node_order[j+1].center_x = Geometry.isometricXCoord(avg.x, avg.y);
                     if ( isNaN(node_order[j+1].center_x) ) {
-                        console.error("Autolayout failed!", layer_out_magnets, num_magnets, j);
+                        console.error("Autolayout failed!");
+                        // console.error({
+                        //     "ordered nodes": node_order,
+                        //     layer: j,
+                        //     "outmagnets of layer": layer_out_magnets
+                        // });
                     }
                 }
             }
