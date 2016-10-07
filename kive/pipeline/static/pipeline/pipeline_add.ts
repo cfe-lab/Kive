@@ -1,7 +1,104 @@
-// place in global namespace to access from other files
-var canvas, canvasState;
+"use strict";
 
+import { MethodNode, CdtNode, RawNode, OutputNode } from "./drydock_objects";
+import { CanvasState } from "./drydock";
+import { Pipeline } from "./pipeline_load";
+import { PipelineReviser } from "./pipeline_revise";
+declare var $:any;
+declare var noXSS:Function;
+
+$.fn.extend({
+    val_: function(str) {
+        // wrapper function for changing <input> values with added checks. replaces .val().
+
+        if (typeof str == 'undefined') {
+            if (this.val() == $('label[for="' + this[0].id +'"]', '#pipeline_ctrl').html()) {
+                return "";
+            } else {
+                return this.val();
+            }
+        } else {
+            this.val(str);
+            if (this.is('input, textarea') && this.closest('#pipeline_ctrl').length > 0) {
+                var data_lbl = this.data('label'),
+                    lbl;
+                if (typeof data_lbl !== 'undefined') {
+                    lbl = data_lbl;
+                } else {
+                    lbl = $('label[for="' + this[0].id +'"]', '#pipeline_ctrl');
+                    if (lbl.length === 0) {
+                        return this;
+                    } else {
+                        lbl = lbl.html();
+                    }
+                    this.data('label', lbl);
+                }
+                if (str === lbl) {
+                    this.addClass('input-label');
+                } else {
+                    this.removeClass('input-label');
+                }
+            }
+            return this;
+        }
+    },
+    draggable: function(opt) {
+        opt = $.extend({ handle: '', cursor: 'normal' }, opt);
+        var $el = opt.handle === '' ? this : this.find(opt.handle);
+
+        $el.find('input, select, textarea').on('mousedown', function(e) {
+            e.stopPropagation();
+        });
+
+        $el.css('cursor', opt.cursor).on("mousedown", function(e) {
+            var $drag;
+            if (opt.handle === '') {
+                $drag = $(this).addClass('draggable');
+            } else {
+                $drag = $(this).addClass('active-handle').parent().addClass('draggable');
+            }
+
+            if (typeof opt.start == 'function') {
+                opt.start(this);
+            }
+
+            $drag.data('z', $drag.data('z') || $drag.css('z-index'));
+
+            var z = $drag.data('z'),
+                pos = $drag.offset(),
+                pos_y = pos.top - e.pageY,
+                pos_x = pos.left - e.pageX;
+
+            $drag.css('z-index', 1000).parents().off('mousemove mouseup').on("mousemove", function(e) {
+                $('.draggable').offset({
+                    top:  e.pageY + pos_y,
+                    left: e.pageX + pos_x
+                });
+            }).on("mouseup", function() {
+                $(this).removeClass('draggable').css('z-index', z);
+            });
+
+            e.preventDefault(); // disable selection
+        }).on("mouseup", function() {
+            if (opt.handle === "") {
+                $(this).removeClass('draggable');
+            } else {
+                $(this).removeClass('active-handle').parent().removeClass('draggable');
+            }
+            if (typeof opt.stop == 'function') {
+                opt.stop(this);
+            }
+        });
+
+        return $el;
+    }
+});
+
+
+export var canvasState;
 $(function() {
+    var canvas;
+
     noXSS();
 
     /*
@@ -18,7 +115,7 @@ $(function() {
         canvasHeight = canvas.height = window.innerHeight - $(canvas).offset().top - 5,
         redrawInterval = 50; // ms
     
-    canvasState = new drydock.CanvasState(canvas, redrawInterval);
+    canvasState = new CanvasState(canvas, redrawInterval);
     
     var pipelineCheckReadiness = function() {
         var $btn = $('#id_submit_button');
@@ -72,7 +169,7 @@ $(function() {
         for (i = 0; i < canvasState.shapes.length; i++) {
             shape = canvasState.shapes[i];
             if (shape == out_node) continue;
-            if (shape instanceof drydock_objects.OutputNode && shape.label == label) {
+            if (shape instanceof OutputNode && shape.label == label) {
                 $('#output_name_error').show();
                 return false;
             }
@@ -101,9 +198,9 @@ $(function() {
             ctx = preview_canvas.getContext('2d');
             ctx.clearRect(0, 0, preview_canvas.width, preview_canvas.height);
             if (this.value === '') {
-                (new drydock_objects.RawNode(preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
+                (new RawNode(preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
             } else {
-                (new drydock_objects.CdtNode(this.value, preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
+                (new CdtNode(this.value, preview_canvas.width/2, preview_canvas.height/2)).draw(ctx);
             }
         }
         e.stopPropagation();
@@ -128,7 +225,7 @@ $(function() {
                     n_inputs  = Object.keys(result.inputs).length * 8 + 14;
                 
                 preview_canvas.height = (n_outputs + n_inputs) / 2 + 55;
-                (new drydock_objects.MethodNode(
+                (new MethodNode(
                     val,
                     null,// family
                     // Ensures node is centred perfectly on the preview canvas
@@ -175,7 +272,8 @@ $(function() {
     var linkParentCheckbox = function() {
         var siblings = $(this).siblings('input').add(this),
             checked_inputs = siblings.filter(':checked').length,
-            prop_obj = { indeterminate: false };
+            prop_obj: {indeterminate: boolean, checked?: boolean} =
+                    { indeterminate: false };
 
         if (checked_inputs < siblings.length && checked_inputs > 0) {
             prop_obj.indeterminate = true;
@@ -250,8 +348,8 @@ $(function() {
         // check for duplicate names
         for (var i = 0; i < canvasState.shapes.length; i++) {
             shape = canvasState.shapes[i];
-            if ((shape instanceof drydock_objects.RawNode ||
-                    shape instanceof drydock_objects.CdtNode) &&
+            if ((shape instanceof RawNode ||
+                    shape instanceof CdtNode) &&
                     shape.label === node_label) {
                 dt_error.innerHTML = 'That name has already been used.';
                 return false;
@@ -266,9 +364,9 @@ $(function() {
             var this_pk = $('#id_select_cdt', this).val(); // primary key
             
             if (this_pk === ""){
-                shape = new drydock_objects.RawNode(pos.left, pos.top, node_label);
+                shape = new RawNode(pos.left, pos.top, node_label);
             } else {
-                shape = new drydock_objects.CdtNode(
+                shape = new CdtNode(
                         parseInt(this_pk),
                         pos.left,
                         pos.top,
@@ -299,7 +397,7 @@ $(function() {
         var createOrReplaceMethodNode = function(result) {
             var inputs = result.inputs,
                 outputs = result.outputs,
-                method = new drydock_objects.MethodNode(
+                method = new MethodNode(
                         mid, 
                         method_family.val(), 
                         pos.left,
@@ -413,7 +511,7 @@ $(function() {
     };
 
     var documentResizeHandler = (function() {
-        var resize_timeout = false,
+        var resize_timeout = 0,
             endDocumentResize = function() {
                 canvasState.valid = false;
                 for (var i = 0, shape; (shape = canvasState.shapes[i]); i++) {
@@ -466,7 +564,7 @@ $(function() {
             if (action == 'edit' && sel.length == 1) {
                 sel = sel[0];
                 
-                if (sel instanceof drydock_objects.MethodNode) {
+                if (sel instanceof MethodNode) {
                     /*
                         Open the edit dialog (rename, method selection, colour picker...)
                     */
@@ -543,7 +641,7 @@ $(function() {
                         };
                     })(sel) );
                 }
-                else if (sel instanceof drydock_objects.OutputNode) {
+                else if (CanvasState.isOutputNode(sel)) {
                     /*
                         Open the renaming dialog
                     */
@@ -563,28 +661,26 @@ $(function() {
             }
             if (action == 'display') {
                 sel = sel[0];
-                if(sel instanceof drydock_objects.OutputNode || sel instanceof drydock_objects.CdtNode ||
-                   sel instanceof drydock_objects.RawNode) {
-                    window.location = '/dataset_view/' + sel.dataset_id + '?run_id=' + sel.run_id + "&view_run";
+                if(CanvasState.isNode(sel) && !CanvasState.isMethodNode(sel)) {
+                    window.location.href = '/dataset_view/' + sel.dataset_id + '?run_id=' + sel.run_id + "&view_run";
                 }
             }
             if (action == 'download') {
                 sel = sel[0];
-                if(sel instanceof drydock_objects.OutputNode || sel instanceof drydock_objects.CdtNode ||
-                   sel instanceof drydock_objects.RawNode) {
-                    window.location = '/dataset_download/' + sel.dataset_id+ "&view_run";
+                if(CanvasState.isNode(sel) && !CanvasState.isMethodNode(sel)) {
+                    window.location.href = '/dataset_download/' + sel.dataset_id+ "&view_run";
                 }
             }
             if (action == 'viewlog') {
                 sel = sel[0];
-                if(sel instanceof drydock_objects.MethodNode) {
-                    window.location = '/stdout_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
+                if (CanvasState.isMethodNode(sel)) {
+                    window.location.href = '/stdout_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
                 }
             }
             if (action == 'viewerrorlog') {
                 sel = sel[0];
-                if(sel instanceof drydock_objects.MethodNode) {
-                    window.location = '/stderr_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
+                if (CanvasState.isMethodNode(sel)) {
+                    window.location.href = '/stderr_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
                 }
             }
         }
@@ -665,7 +761,8 @@ $(function() {
             };
 
             try {
-                window.pipeline_revision = window.pipeline_revision || new Pipeline(canvasState);
+                // window.pipeline_revision = window.pipeline_revision || new Pipeline(canvasState);
+                let pipeline_revision = new Pipeline(canvasState);
 
                 // TODO: data cleaning should either be within pipeline_revision.serialize 
                 // or within this context but probably not both.
@@ -816,12 +913,20 @@ $(function() {
     };
     
     pipelineCheckReadiness();
+
+    let initialData = $("#initial_data").text();
+    if (initialData.length) {
+        let loader = new PipelineReviser(initialData);
+        loader.load(canvasState);
+        loader.setUpdateCtrl($('#id_update'));
+        loader.setRevertCtrl($('#id_revert'));
+    }
     
     // de-activate double-click selection of text on page
     canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
     canvas.addEventListener('mousedown',   function(e) { canvasState.doDown(e); }, true);
     canvas.addEventListener('mousemove',   function(e) { canvasState.doMove(e); }, true);
-    canvas.addEventListener('mouseup',     function(e) { canvasState.doUp(e); pipelineCheckReadiness(e); }, true);
+    canvas.addEventListener('mouseup',     function(e) { canvasState.doUp(e); pipelineCheckReadiness(); }, true);
     canvas.addEventListener('contextmenu', function(e) { canvasState.contextMenu(e); }, true);
     
     canvasState.old_width = canvasWidth;
@@ -876,7 +981,7 @@ $(function() {
     /*
     ------------------------------------------------------------------------------------
     */
-    
+
     $('.ctrl_menu').draggable();
     
     $('#id_revision_desc')
@@ -917,92 +1022,5 @@ $(function() {
                 .text('Keep typing!')
         )
     ;
+
 });// end of document.ready()
-
-
-jQuery.fn.extend({
-    val_: function(str) {
-        // wrapper function for changing <input> values with added checks. replaces .val().
-        
-        if (typeof str == 'undefined') {
-            if (this.val() == $('label[for="' + this[0].id +'"]', '#pipeline_ctrl').html()) {
-                return "";
-            } else {
-                return this.val();
-            }
-        } else {
-            this.val(str);
-            if (this.is('input, textarea') && this.closest('#pipeline_ctrl').length > 0) {
-                var data_lbl = this.data('label'),
-                    lbl;
-                if (typeof data_lbl !== 'undefined') {
-                    lbl = data_lbl;
-                } else {
-                    lbl = $('label[for="' + this[0].id +'"]', '#pipeline_ctrl');
-                    if (lbl.length === 0) {
-                        return this;
-                    } else {
-                        lbl = lbl.html();
-                    }
-                    this.data('label', lbl);
-                }
-                if (str === lbl) {
-                    this.addClass('input-label');
-                } else {
-                    this.removeClass('input-label');
-                }
-            }
-            return this;
-        }
-    },
-    draggable: function(opt) {
-        opt = $.extend({ handle: '', cursor: 'normal' }, opt);
-        var $el = opt.handle === '' ? this : this.find(opt.handle);
-        
-        $el.find('input, select, textarea').on('mousedown', function(e) {
-            e.stopPropagation();
-        });
-        
-        $el.css('cursor', opt.cursor).on("mousedown", function(e) {
-            var $drag;
-            if (opt.handle === '') {
-                $drag = $(this).addClass('draggable');
-            } else {
-                $drag = $(this).addClass('active-handle').parent().addClass('draggable');
-            }
-
-            if (typeof opt.start == 'function') {
-                opt.start(this);
-            }
-            
-            $drag.data('z', $drag.data('z') || $drag.css('z-index'));
-            
-            var z = $drag.data('z'),
-                pos = $drag.offset(),
-                pos_y = pos.top - e.pageY,
-                pos_x = pos.left - e.pageX;
-            
-            $drag.css('z-index', 1000).parents().off('mousemove mouseup').on("mousemove", function(e) {
-                $('.draggable').offset({
-                    top:  e.pageY + pos_y,
-                    left: e.pageX + pos_x
-                });
-            }).on("mouseup", function() {
-                $(this).removeClass('draggable').css('z-index', z);
-            });
-            
-            e.preventDefault(); // disable selection
-        }).on("mouseup", function() {
-            if (opt.handle === "") {
-                $(this).removeClass('draggable');
-            } else {
-                $(this).removeClass('active-handle').parent().removeClass('draggable');
-            }
-            if (typeof opt.stop == 'function') {
-                opt.stop(this);
-            }
-        });
-        
-        return $el;
-    }
-});

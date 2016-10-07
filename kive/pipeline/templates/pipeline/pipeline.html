@@ -7,13 +7,13 @@
 
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/pipeline/jsBezier-0.6.js"></script>
     <script src="/static/portal/noxss.js"></script>
-    <script src="/static/pipeline/drydock_objects.js"></script>
-    <script src="/static/pipeline/drydock.js"></script>
-    <script src="/static/pipeline/pipeline_add.js"></script>
-    <script src="/static/pipeline/pipeline_load.js"></script>
-    <script src="/static/pipeline/pipeline_revise.js"></script>
+    <script src="/static/portal/core.min.js"></script>
+    <script src="/static/portal/system.js"></script>
+    <script src="/static/portal/system.config.js"></script>
+    <script>
+        System.import('/static/pipeline');
+    </script>
 
     <script type="text/javascript">
 $(function() {
@@ -134,7 +134,7 @@ $(function() {
         <div id="id_view_ctrl" class="ctrl_menu">
             <h3>View Options</h3>
             
-            <label for="show_order">Show order of steps:</label>
+            <label>Show order of steps:</label>
             <div class="form-inline-opts">
             <input type="radio" name="show_order" value="always"> Always&emsp;
             <input type="radio" name="show_order" value="never"> Never&emsp;

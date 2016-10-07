@@ -74,7 +74,7 @@ export class CanvasState {
 
     static method_node_queue: MethodNode[] = [];
     
-    constructor(private canvas, interval?) {
+    constructor(public canvas, interval?) {
         /*
         keeps track of canvas state (mouse drag, etc.)
          */

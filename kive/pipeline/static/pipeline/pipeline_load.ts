@@ -467,7 +467,27 @@ export class Pipeline {
         }
     }
 
-    applyStepUpdates(updates) {
+    findNewStepRevisions() {
+        var pipeline = this,
+            pipeline_id = pipeline.pipeline.id,
+            steps = pipeline.canvasState.getSteps();
+
+        for (let step of steps) {
+            step.updateSignal("update in progress");
+        }
+        pipeline.canvasState.valid = false;
+
+        $.getJSON("/api/pipelines/" + pipeline_id + "/step_updates/").done(
+            updates => pipeline.applyStepRevisions(updates)
+        ).fail(() => {
+            for (let step of steps) {
+                step.updateSignal("unavailable");
+            }
+            pipeline.canvasState.valid = false;
+        });
+    }
+
+    applyStepRevisions(updates) {
         var pipeline = this,
             steps = pipeline.canvasState.getSteps(),
             updated_step_nums = updates.map(update => update.step_num - 1);

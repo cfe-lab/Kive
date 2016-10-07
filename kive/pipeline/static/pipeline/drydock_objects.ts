@@ -582,7 +582,7 @@ export class RawNode extends CylinderNode implements Node {
     found_fill = "blue";
     inset = 10; // distance of magnet from center
 
-    constructor(public x, public y, public label, public input_index?) {
+    constructor(public x, public y, public label = "", public input_index?) {
         super(x, y, label);
         this.magnetOffset = {x: 10, y: this.r2/2};
         // Input node always has one magnet
@@ -618,7 +618,7 @@ export class CdtNode extends BaseNode implements Node {
     BaseNode represents a Compound Datatype (CSV structured data).
     Rendered as a square shape.
      */
-    constructor(public pk, public x, public y, public label, public input_index?) {
+    constructor(public pk, public x, public y, public label = "", public input_index?) {
         super();
         this.out_magnets = [
             new Magnet(this, 5, 2, "white", this.pk, this.label, null, true, pk)

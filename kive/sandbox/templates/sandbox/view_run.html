@@ -8,14 +8,11 @@
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
-    <script src="/static/pipeline/jsBezier-0.6.js"></script>
-
-    <script src="/static/pipeline/drydock_objects.js"></script>
-    <script src="/static/pipeline/drydock.js"></script>
-
-    <script src="/static/pipeline/pipeline_add.js"></script>
-    <script src="/static/pipeline/pipeline_load.js"></script>
-    <script src="/static/sandbox/view_run.js"></script>
+    <script src="/static/portal/system.js"></script>
+    <script src="/static/portal/system.config.js"></script>
+    <script>
+        System.import('/static/sandbox');
+    </script>
 {% endblock %}
 
 {% block stylesheets %}
