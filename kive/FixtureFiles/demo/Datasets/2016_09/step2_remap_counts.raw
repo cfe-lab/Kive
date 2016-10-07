@@ -1,0 +1,6 @@
+type,count,filtered_count,seed_dist,other_dist,other_seed
+raw,20,,,,
+prelim HIV1B-env-seed,20,20,,,
+remap-1 HIV1B-env-seed,20,,,,
+remap-final HIV1B-env-seed,20,,,,
+unmapped,0,,,,

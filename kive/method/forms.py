@@ -233,11 +233,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
     threads = forms.IntegerField(min_value=1, initial=1,
                                  help_text="Number of threads used during execution")
 
-    confirm_shebang = forms.BooleanField(label="Override a missing shebang?",
-                                         help_text="Click to override a missing shebang in the code resource",
-                                         initial=False,
-                                         required=False)
-
 
 class MethodForm(MethodReviseForm):
     """
