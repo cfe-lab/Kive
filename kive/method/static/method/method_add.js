@@ -69,30 +69,30 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     $("#addDependencyForm").click(function() {
         numberOfDepForms += 1;
         i = numberOfDepForms - 1; // zero-based index
-        var htmlStr = '<tr>\n';
-        htmlStr += '<td><select class="coderesource" id="id_coderesource_' + i + '" name="coderesource_' + i + '">\n';
+        var $dependencyRow = $('<tr>'),
+            $select = $('<select class="coderesource" id="id_coderesource_' + i + '" name="coderesource_' + i + '">');
 
         for (var j = 0; j < dep_coderesource_options.length; j++) {
-            htmlStr += '<option value="' + dep_coderesource_options[j].value + '">' +
-                dep_coderesource_options[j].text + '</option>\n';
+            $select.append($('<option>')
+                    .attr('value', dep_coderesource_options[j].value)
+                    .text(dep_coderesource_options[j].text));
         }
 
-        htmlStr += (
-                '</select></td>\n' +
+        $dependencyRow.append($('<td>').append($select));
+        $dependencyRow.append(
                 '<td><select class="revisions" id="id_revisions_' + i + '" ' +
                 'name="revisions_' + i + '">\n' +
                 '<option value="" selected="selected">--- select a ' +
                 'CodeResource first ---</option></select></td>\n');
 
         // generate char fields
-        htmlStr += (
+        $dependencyRow.append(
                 '<td><input id="id_path_' + i + '" maxlength="255" ' +
                 'name="path_' + i + '" type="text"></td>\n' +
                 '<td><input id="id_filename_' + i + '" maxlength="255" ' +
-                'name="filename_' + i + '" type="text"></td>\n' +
-                '</tr>\n');
+                'name="filename_' + i + '" type="text"></td>\n');
 
-        $('#dependencyForms').find('tr:last').after(htmlStr);
+        $('#dependencyForms').find('tr:last').after($dependencyRow);
 
     });
 
