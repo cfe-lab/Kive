@@ -1025,7 +1025,11 @@ export class CanvasState {
         if ( ! this.exec_order) {
             this.testExecutionOrder();
         }
-        return this.exec_order.reduce((a,b) => a.concat(b), []);
+        if ( ! this.exec_order) {
+            return this.getMethodNodes(); // unordered list
+        } else {
+            return this.exec_order.reduce((a,b) => a.concat(b), []); // ordered list
+        }
     }
     
     clear(): void {
@@ -1252,6 +1256,15 @@ export class CanvasState {
 
     getMethodNodes(): MethodNode[] {
         return this.methods;
+    }
+    
+    static isUniqueName(list: Node[], name: string) {
+      for (let shape of list) {
+        if (shape.label === name) {
+          return false;
+        }
+      }
+      return true;
     }
 
     static isNode(node: CanvasObject) {
