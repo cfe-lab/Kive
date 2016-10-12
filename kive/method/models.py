@@ -34,6 +34,7 @@ import threading
 import logging
 import shutil
 import time
+import random
 
 
 @python_2_unicode_compatible
@@ -646,15 +647,27 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         if log:
             log.start(save=True)
 
+        SSH_ERROR = 255
+        MAX_TRY = 5
+        itry = 0
+        dunnit = False
         method_popen = None
-        try:
-            method_popen = self.invoke_code(run_path, input_paths, output_paths)
-        except OSError, oserror:
-            method_popen = None
-            self.logger.debug('OSError return code is %d' % oserror.errno)
-            for stream in error_streams:
-                traceback.print_exc(file=stream)
-
+        # NOTE: we only retry invoking code iff the error code is an ssh error.
+        while itry < MAX_TRY and not dunnit:
+            itry += 1
+            dunnit = True
+            try:
+                method_popen = self.invoke_code(run_path, input_paths, output_paths)
+            except OSError as oserror:
+                method_popen = None
+                self.logger.warning('attempt %d: OSError return code is %d' % (itry, oserror.errno))
+                for stream in error_streams:
+                    traceback.print_exc(file=stream)
+                if oserror.errno == SSH_ERROR:
+                    dunnit = False
+                    # the ssh probably timed out: wait for a random amount of time and retry.
+                    time.sleep(random.random() * itry * 10.0)
+        # if the invocation failed for any reason, bail
         if method_popen is None:
             # an OS error
             return_code = -1
@@ -817,14 +830,13 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 "{}@localhost".format(ssh_sandbox_worker_account)
             ]
             command = kive_sandbox_worker_preamble + [ssh_command]
-
         else:
             command = [code_to_run] + input_paths + output_paths
-
         self.logger.debug("subprocess.Popen({})".format(command))
-        code_popen = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                      cwd=run_path)
-        return code_popen
+        return subprocess.Popen(command, shell=False,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                cwd=run_path)
 
     def is_identical(self, other):
         """Is this Method identical to another one?"""
