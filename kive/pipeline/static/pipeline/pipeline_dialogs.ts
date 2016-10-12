@@ -3,20 +3,42 @@ import { RawNode, CdtNode, MethodNode, OutputNode } from "./drydock_objects";
 import { CanvasState } from "./drydock";
 declare var $: any;
 
+/**
+ * Base class for UI dialogs on the pipeline assembly canvas.
+ * UI is used to set pipeline metadata, add new nodes, and access other controls.
+ */
 export class Dialog {
+    
+    /**
+     * @param jqueryRef
+     *      The root element of the dialog as a jQuery object.
+     * @param activator
+     *      The primary UI control for activating the dialog.
+     */
     constructor(public jqueryRef, public activator) {
         activator.click( () => this.show() );
     }
     
+    /**
+     * Opens the dialog
+     */
     show() {
         this.activator.addClass('clicked');
         this.jqueryRef.show().css('left', this.activator.offset().left);
         this.focusFirstEmptyInput();
     }
+    
+    /**
+     * Closes the dialog
+     */
     hide() {
         this.activator.removeClass('clicked');
         this.jqueryRef.hide();
     }
+    
+    /**
+     * Focuses the first unfilled input field
+     */
     focusFirstEmptyInput() {
         this.jqueryRef.find('input, select').each(function() {
             if (this.value === '') {
@@ -25,18 +47,44 @@ export class Dialog {
             }
         });
     }
-    reset() {}
-}
-class PipelineFamilyDialog extends Dialog {
     
+    /**
+     * Clears all inputs
+     * Child classes should extend this functionality.
+     */
+    reset() {
+        this.jqueryRef.find('input, select').val('');
+    }
 }
-class PipelineDialog extends Dialog {
-    
-}
+
+/**
+ * Currently no functionality added on top of normal dialog. This may change in the future.
+ */
+// class PipelineFamilyDialog extends Dialog {
+//
+// }
+
+/**
+ * Currently no functionality added on top of normal dialog. This may change in the future.
+ */
+// class PipelineDialog extends Dialog {
+//
+// }
+
+/**
+ * Middle-base class for dialogs incorporating a Node preview canvas.
+ */
 class NodePreviewDialog extends Dialog {
     protected preview_canvas: HTMLCanvasElement;
     protected is_modal = true;
-
+    
+    /**
+     * NodePreviewDialogs have a <canvas> element and are draggable.
+     * @param jqueryRef
+     *      The root element of the dialog as a jQuery object.
+     * @param activator
+     *      The primary UI control for activating the dialog.
+     */
     constructor(jqueryRef, activator) {
         super(jqueryRef, activator);
         if (jqueryRef.draggable) {
@@ -46,9 +94,16 @@ class NodePreviewDialog extends Dialog {
         this.preview_canvas.width = jqueryRef.innerWidth();
         this.preview_canvas.height = 60;
     }
-
-    translateToOtherCanvas(otherCanvasState) {
-        let pos = $(this.preview_canvas).offset();
+    
+    /**
+     * Converts the coords of the preview canvas to the coords of another CanvasState.
+     * @param otherCanvasState
+     *      the other canvas to translate the node's coords to.
+     * @returns {{left: number, top: number}}
+     *      the coords that should give an identical page position on otherCanvasState.
+     */
+    translateToOtherCanvas(otherCanvasState: CanvasState) {
+        let pos: {left: number, top: number} = $(this.preview_canvas).offset();
         if (this.preview_canvas && pos) {
             pos.left += this.preview_canvas.width  / 2 - otherCanvasState.canvas.offsetLeft;
             pos.top  += this.preview_canvas.height / 2 - otherCanvasState.canvas.offsetTop;
@@ -58,24 +113,76 @@ class NodePreviewDialog extends Dialog {
         }
         return pos;
     }
-
+    
+    /**
+     * Sync the preview canvas with dialog inputs.
+     * This base class does nothing. Child classes must implement.
+     */
     triggerPreviewRefresh(): void { }
     
+    /**
+     * Show the dialog.
+     * NodePreviewDialogs are modal, so they are not positioned relative to their activator.
+     */
     show() {
-        this.activator.addClass('clicked');
-        this.jqueryRef.show().css( {
-            'top': 300,
-            'left': 300
+        super.show();
+        this.jqueryRef.css({
+            top: 300,
+            left: 300
         });
-        this.focusFirstEmptyInput();
         this.triggerPreviewRefresh();
     }
+    
+    /**
+     * Reset the preview canvas and clear all inputs (via super)
+     */
+    reset() {
+        super.reset();
+        // this has the side-effect of clearing the canvas.
+        this.clearPreview();
+    }
+    
+    /**
+     * Clear canvas
+     */
+    clearPreview() {
+        this.preview_canvas.width = this.preview_canvas.width;
+    }
 }
+
+/**
+ * Dialog for adding new InputNodes to canvas.
+ * Includes name and compound datatype.
+ */
 export class InputDialog extends NodePreviewDialog {
+    /*
+     * Shorthand HTML Template pasted here for convenience.
+     * It is not guaranteed to be current.
+     * Indentation takes the place of closing tags.
+
+    <div #id_input_ctrl .ctrl_menu>
+        <canvas>
+        <h3>Inputs</h3>
+        <form>
+            <input #id_datatype_name type="text">
+            <select #id_select_cdt .select-label>
+                <!-- compound data type <option>s -->
+            <input #id_cdt_button type="submit" value="Add Input">
+            <div #id_dt_error .errortext>
+
+    */
     private $datatype_name;
     private $select_cdt;
     private $error;
-
+    
+    /**
+     * In addition to the NodePreviewDialog functionality,
+     * InputDialog will wire up all the necessary template elements.
+     * @param jqueryRef
+     *      The root element of the dialog as a jQuery object.
+     * @param activator
+     *      The primary UI control for activating the dialog.
+     */
     constructor(jqueryRef, activator) {
         super(jqueryRef, activator);
         let dialog = this;
@@ -84,29 +191,47 @@ export class InputDialog extends NodePreviewDialog {
         this.$select_cdt = $('#id_select_cdt');
         this.$select_cdt.change(function(e) {
             e.stopPropagation();
-            dialog.drawPreviewCanvas(this.value);
+            dialog.triggerPreviewRefresh();
         });
     }
-
+    
+    /**
+     * Update the preview canvas.
+     */
     triggerPreviewRefresh() {
-        this.$select_cdt.change();
+        this.drawPreviewCanvas();
     }
     
-    drawPreviewCanvas (node_pk?: string): void {
-        node_pk = node_pk || this.$select_cdt.val();
+    /**
+     * Creates a node object based on the dialog state.
+     * Coords default to 0, 0 and label is an empty string.
+     * @returns {RawNode|CdtNode}
+     */
+    generateNode(): RawNode|CdtNode {
+        let pk = parseInt(this.$select_cdt.val(), 10); // primary key
+        return isNaN(pk) ? new RawNode(0, 0) : new CdtNode(pk, 0, 0);
+    }
+    
+    /**
+     * Draws the node on the preview canvas.
+     */
+    drawPreviewCanvas (): void {
         let ctx = this.preview_canvas.getContext('2d');
         let w = this.preview_canvas.width;
         let h = this.preview_canvas.height;
-        let node = node_pk === '' ?
-            new RawNode(w / 2, h / 2) :
-            new CdtNode(node_pk, w / 2, h / 2);
         ctx.clearRect(0, 0, w, h);
+        let node = this.generateNode();
+        node.x = w / 2;
+        node.y = h / 2;
         node.draw(ctx);
     }
     
-    submit(e, canvasState) {
-        e.preventDefault(); // stop default form submission behaviour
-        
+    /**
+     * Adds a new node to canvasState based on the InputDialog state. Calculates the corresponding coordinate position,
+     * checks for name uniqueness, and detects shape collisions. If successful the dialog is reset and closed.
+     * @param canvasState
+     */
+    submit(canvasState: CanvasState) {
         let pos = this.translateToOtherCanvas(canvasState);
         
         // check for empty and duplicate names
@@ -117,11 +242,11 @@ export class InputDialog extends NodePreviewDialog {
         } else if (!CanvasState.isUniqueName(canvasState.getInputNodes(), node_label)) {
             this.$error.text('That name has already been used.');
         } else {
-            let pk = parseInt(this.$select_cdt.val(), 10); // primary key
-            let shape = isNaN(pk) ?
-                new RawNode(pos.left, pos.top, node_label) :
-                new CdtNode(pk, pos.left, pos.top, node_label);
-
+            let shape = this.generateNode();
+            shape.x = pos.left;
+            shape.y = pos.top;
+            shape.label = node_label;
+            
             canvasState.addShape(shape);
             // Second arg: Upon collision, move new shape 0% and move existing objects 100%
             canvasState.detectCollisions(shape, 0);
@@ -130,46 +255,105 @@ export class InputDialog extends NodePreviewDialog {
             this.hide();
         }
     }
-
+    
+    /**
+     * Clears the dialog state.
+     */
     reset() {
         super.reset();
         this.$error.text('');
     }
 }
 
-class ColourPicker {
-
-    private $hidden_input;
-    private $menu;
-    private $pick;
-        
-    constructor() {
-        var picker = this;
-        this.$hidden_input = $('#id_select_colour');
-        this.$menu = $('#colour_picker_menu');
-        this.$pick = $('#colour_picker_pick');
-
-        this.$pick.click( () => this.show() );
-        this.$menu.on('click', 'div', function() {
+/**
+ * Singleton UI for picking a colour.
+ */
+var colourPicker = (function() {
+    /**
+     * Template pasted here for convenience.
+     
+     <input #id_select_colour type="hidden">
+     <div #colour_picker_menu>
+     <div .colour_picker_colour style="background-color: #999;">
+     <!-- ... more colours ... -->
+     <div #colour_picker_pick .colour_picker_colour style="background-color: #999;">
+     
+     */
+    // Private members
+    var $hidden_input = $('#id_select_colour');
+    var $pick = $('#colour_picker_pick').click( () => picker.show() );
+    var $menu = $('#colour_picker_menu')
+        .on('click', 'div', function() {
             picker.pick($(this).css('background-color'));
         });
-    }
 
-    show() {
-        var pos = this.$pick.position();
-        this.$menu.css({ top: pos.top + 20, left: pos.left }).show();
-    }
-    pick(colour) {
-        this.$pick.css('background-color', colour);
-        this.$hidden_input.val(colour);
-        this.$menu.hide();
-    }
-    val() {
-        return this.$hidden_input.val();
-    }
-}
+    // Exposed methods
+    var picker = {
+    
+        /**
+         * colourPicker.show
+         * Displays the available choices.
+         */
+        show: function() {
+            var pos = $pick.position();
+            $menu.css({ top: pos.top + 20, left: pos.left }).show();
+        },
+    
+        /**
+         * colourPicker.pick
+         * Sets the current colour choice.
+         * @param colour
+         *      the colour to choose as a hexadecimal string.
+         */
+        pick: function(colour) {
+            $pick.css('background-color', colour);
+            $hidden_input.val(colour);
+            $menu.hide();
+        },
+    
+        /**
+         * colourPicker.val
+         * @return the currently picked colour
+         */
+        val: () => $hidden_input.val()
+    };
+    return picker;
+})();
 
 export class MethodDialog extends NodePreviewDialog {
+    /*
+     * Shorthand HTML Template pasted here for convenience.
+     * It is not guaranteed to be current.
+     * Indentation takes the place of closing tags.
+
+    <div #id_method_ctrl .ctrl_menu>
+        <canvas>
+        <h3>Methods</h3>
+        <form>
+            <input #id_select_colour type="hidden">
+            <div #colour_picker_menu>
+                <div .colour_picker_colour style="background-color: #999;">
+                <!-- ... more colours ... -->
+            <div .colour_picker_colour #colour_picker_pick style="background-color: #999;">
+
+            <input #id_method_name type="text" placeholder="Label">
+
+            <select #id_select_method_family>
+                <!-- ... method families ... -->
+            <div #id_method_revision_field>
+                <select #id_select_method>
+                    <!-- populated by ajax transaction -->
+
+            <div #id_method_delete_outputs_field>
+                <input #id_method_delete_outputs type="checkbox" checked>
+                <label for="id_method_delete_outputs">Save intermediate outputs of this step</label>
+                <div .expand_outputs_ctrl>▸ List outputs</div>
+                <fieldset #id_method_delete_outputs_details>
+                    <!-- ... <input type="checkbox"> ... -->
+
+            <input #id_method_button type="submit" value="Add Method">
+            <div #id_method_error .errortext>
+    */
 
     private $delete_outputs;
     private $delete_outputs_details;
@@ -183,11 +367,22 @@ export class MethodDialog extends NodePreviewDialog {
     private colour_picker;
     public add_or_revise: string = "add";
     private editing_node: MethodNode;
+    private methodInputs: any[];
+    private methodOutputs: any[];
     
+    /**
+     * In addition to the NodePreviewDialog functionality, MethodDialog will wire up all the necessary template
+     * elements. It also sets event watchers on UI which is internal to the dialog. Finally, it initializes the method
+     * revisions menu which is an asynchronous event.
+     * @param jqueryRef
+     *      The root element of the dialog as a jQuery object.
+     * @param activator
+     *      The primary UI control for activating the dialog.
+     */
     constructor(jqueryRef, activator) {
         super(jqueryRef, activator);
         
-        this.colour_picker = new ColourPicker();
+        this.colour_picker = colourPicker; // pre-assembled object - note no "new"
         this.$delete_outputs = $('#id_method_delete_outputs');
         this.$delete_outputs_details = $('#id_method_delete_outputs_details');
         this.$submit_button = $('#id_method_button');
@@ -196,36 +391,68 @@ export class MethodDialog extends NodePreviewDialog {
         this.$select_method_family = $('#id_select_method_family');
         this.$input_name = $('#id_method_name');
         this.$error = $('#id_method_error');
-        this.$expand_outputs_ctrl = $('.expand_outputs_ctrl', this.jqueryRef)
+        this.$expand_outputs_ctrl = $('.expand_outputs_ctrl', this.jqueryRef);
 
         let dialog = this;
         this.$select_method.change( function() {
-            dialog.methodSelectMenuHook(this.value);
+            dialog.triggerPreviewRefresh()
         });
         this.$select_method_family.change( function() {
             dialog.updateMethodRevisionsMenu(this.value);
         });
-        this.$delete_outputs.change( () => dialog.linkChildCheckboxes() )
-        this.$expand_outputs_ctrl.click( () => dialog.childCheckboxVisibilityCtrl() )
-        this.$delete_outputs_details.on('change',  '.method_delete_outputs', () => dialog.linkParentCheckbox() );
+        this.$delete_outputs.change(
+            () => dialog.linkChildCheckboxes()
+        );
+        this.$delete_outputs_details.on('change', '.method_delete_outputs',
+            () => dialog.linkParentCheckbox()
+        );
+        this.$expand_outputs_ctrl.click(
+            () => dialog.showHideChildCheckboxes()
+        );
 
         this.updateMethodRevisionsMenu(this.$select_method_family.val());
         this.linkChildCheckboxes();
-
-        this.preview_canvas.width = jqueryRef.innerWidth();
     }
-
+    
+    /**
+     * Update the preview canvas based on the dialog state.
+     */
     triggerPreviewRefresh() {
-        this.$select_method.change();
+        let value = this.$select_method.val();
+        if (value) {
+            // Update preview picture of node to show the appropriate MethodNode
+            // use AJAX to retrieve Revision inputs and outputs
+            $.getJSON("/api/methods/" + value + "/").done(result => {
+                if (!result) {
+                    console.error("Couldn't find PK", result);
+                }
+                this.methodInputs = result.inputs;
+                this.methodOutputs = result.outputs;
+                this.drawPreviewCanvas(result, this.colour_picker.val());
+                this.updateOutputsFieldsetList(result.outputs);
+            });
+        }
     }
-
+    
+    /**
+     * Align the dialog to a given coord. Anchor point is top center.
+     * @param x
+     *      The x-coordinate.
+     * @param y
+     *      The y-coordinate.
+     */
     align(x, y) {
         this.jqueryRef.css({
             left: x - this.preview_canvas.width/2,
             top: y
         })
     }
-
+    
+    /**
+     * Loads a MethodNode into the MethodDialog so that the user may edit.
+     * @param node
+     *      The MethodNode to revise.
+     */
     load(node: MethodNode) {
         this.reset();
         this.$select_method_family.val(node.family);
@@ -266,7 +493,7 @@ export class MethodDialog extends NodePreviewDialog {
             this.jqueryRef.find('input').prop('disabled', false);
 
             // wait for AJAX to populate drop-down before selecting option
-            this.$revision_field.find('select').val(node.pk);
+            this.$select_method.val(node.pk);
             this.$input_name.val(node.label).select();
             this.$delete_outputs_details.find('input').each(function() {
                 $(this).prop('checked', -1 === node.outputs_to_delete.indexOf(this.value) );
@@ -274,11 +501,13 @@ export class MethodDialog extends NodePreviewDialog {
             this.linkParentCheckbox();
         })
     }
-
-    show() {
-        super.show();
-    }
-    linkParentCheckbox() {
+    
+    /**
+     * Update the "save/delete outputs" checkbox to reflect the more granular child checkboxes' state.
+     * If all are unchecked, parent will be unchecked; if all checked, parent will be checked; in all other cases,
+     * parent will be set to "indeterminate".
+     */
+    private linkParentCheckbox() {
         var siblings = this.$delete_outputs_details.find('input'),
             checked_inputs = siblings.filter(':checked').length,
             prop_obj: {indeterminate: boolean, checked?: boolean} = { indeterminate: false };
@@ -291,12 +520,19 @@ export class MethodDialog extends NodePreviewDialog {
         this.$delete_outputs.prop(prop_obj);
     }
     
-    linkChildCheckboxes() {
+    /**
+     * Update the granular "save/delete a specified output" checkboxes to reflect the more general parent checkbox.
+     * Child checkboxes take on the parent's value.
+     */
+    private linkChildCheckboxes() {
         this.$delete_outputs_details.find('input')
             .prop('checked', this.$delete_outputs.is(':checked'));
     }
     
-    childCheckboxVisibilityCtrl() {
+    /**
+     * Toggle the visibility of the $delete_outputs_details group.
+     */
+    private showHideChildCheckboxes() {
         if (this.$delete_outputs_details.is(':visible')) {
             this.hideChildCheckboxes();
         } else {
@@ -304,45 +540,55 @@ export class MethodDialog extends NodePreviewDialog {
             this.$expand_outputs_ctrl.text('▾ Hide list');
         }
     }
-    hideChildCheckboxes() {
+    
+    /**
+     * Hide the $delete_outputs_details group.
+     */
+    private hideChildCheckboxes() {
         this.$delete_outputs_details.hide();
         this.$expand_outputs_ctrl.text('▸ List outputs');
     }
     
+    /**
+     * Update the revisions menu.
+     * @param mf_id
+     *      The method family ID
+     * @returns
+     *      A jQuery Deferred object
+     */
     updateMethodRevisionsMenu(mf_id) {
         if (mf_id !== '') {
-            this.$revision_field.show().focus();
-            return $.getJSON(
-                "/api/methodfamilies/" + mf_id + "/methods/",
-                result => {
-                    var option_elements = result.map(revision =>
-                        $("<option>", {
-                            value: revision.id,
-                            title: revision.revision_desc
-                        }).text(
-                            revision.revision_number + ': ' + revision.revision_name
-                        )
-                    );
-                    this.$select_method
-                        .show()
-                        .empty()
-                        .append(option_elements)
-                        .change();
-                }
-            );
+            // this.$revision_field.show().focus();
+            let request = $.getJSON("/api/methodfamilies/" + mf_id + "/methods/");
+            request.done(result => {
+                let option_elements = result.map(revision =>
+                    $("<option>", {
+                        value: revision.id,
+                        title: revision.revision_desc
+                    }).text(
+                        revision.revision_number + ': ' + revision.revision_name
+                    )
+                );
+                this.$select_method.show().empty()
+                    .append(option_elements);
+                this.triggerPreviewRefresh();
+            });
+            return request;
         }
-        this.$revision_field.hide();
+        // this.$revision_field.hide();
         return $.Deferred().reject(); // No method family chosen, never loads.
     }
     
-    updateOutputsFieldsetList (outputs: any[], fieldset_element, checkbox_element): void {
-        /*
-         * Update outputs fieldset list
-         */
-        fieldset_element.empty();
-        checkbox_element.prop('checked', true);
+    /**
+     * Update outputs fieldset list.
+     * @param outputs
+     *      An array of the method's outputs. <exact type unknown>
+     *      Each includes object properties dataset_idx and dataset_name.
+     */
+    updateOutputsFieldsetList (outputs: any[]): void {
+        this.$delete_outputs.prop('checked', true);
         for (let output of outputs) {
-            fieldset_element.append(
+            this.$delete_outputs_details.append(
                 $('<input>', {
                     type: 'checkbox',
                     name: 'dont_delete_outputs',
@@ -359,32 +605,16 @@ export class MethodDialog extends NodePreviewDialog {
         }
     }
     
-    methodSelectMenuHook(value) {
-        if (value) {
-            // Update preview picture of node to show the appropriate MethodNode
-            // use AJAX to retrieve Revision inputs and outputs
-            $.getJSON("/api/methods/" + value + "/").done(result => {
-                if (!result) {
-                    console.error("Couldn't find PK", result);
-                }
-                this.drawPreviewCanvas(
-                    result,
-                    this.colour_picker.val()
-                );
-                this.updateOutputsFieldsetList(
-                    result.outputs,
-                    this.$delete_outputs_details,
-                    this.$delete_outputs
-                );
-            });
-        }
-    }
-    
+    /**
+     * Given data from the REST API, draw a MethodNode on the preview canvas.
+     * @param api_method_result
+     * @param colour
+     */
     drawPreviewCanvas (api_method_result?, colour?: string): void {
-        let ctx = this.preview_canvas.getContext('2d');
-        ctx.clearRect(0, 0, this.preview_canvas.width, this.preview_canvas.height);
-        var n_outputs = Object.keys(api_method_result.outputs).length * 8,
-            n_inputs  = Object.keys(api_method_result.inputs).length * 8 + 14;
+        let n_outputs = Object.keys(api_method_result.outputs).length * 8;
+        let n_inputs  = Object.keys(api_method_result.inputs).length * 8 + 14;
+    
+        this.clearPreview();
     
         this.preview_canvas.height = (n_outputs + n_inputs) / 2 + 55;
         (new MethodNode(
@@ -396,17 +626,22 @@ export class MethodDialog extends NodePreviewDialog {
             (
                 Math.max(0, n_outputs - n_inputs + 48) -
                 Math.max(0, n_outputs - n_inputs - 42)
-            ) * 0.4330127,// x
-            n_inputs / 2 + 20,// y
+            ) * 0.4330127, // x
+            n_inputs / 2 + 20, // y
             colour,
             null,// label
             api_method_result.inputs,
             api_method_result.outputs
-        )).draw(ctx);
+        )).draw(this.preview_canvas.getContext('2d'));
     }
-
-
-    produceMethodNode(id, family, x, y, colour, label, inputs, outputs) {
+    
+    /**
+     * Wrapper for the MethodNode constructor that will also set MethodNode.outputs_to_delete based on the dialog state.
+     * @todo See if MethodDialog.drawPreviewCanvas can use this function. (currently only MethodDialog.submit does)
+     * @params See MethodNode documentation.
+     * @returns MethodNode
+     */
+    produceMethodNode(id, family, x, y, colour, label, inputs, outputs): MethodNode {
         let method = new MethodNode(
             id, family, x, y, colour, label, inputs, outputs
         );
@@ -423,28 +658,29 @@ export class MethodDialog extends NodePreviewDialog {
         return method;
     }
     
-    submit(e, canvasState) {
-        e.preventDefault(); // stop default form submission behaviour
-    
-        // this.$revision_field = $('#id_method_revision_field');
-        
-        let select_method_family = this.$select_method_family;
-        let select_method = this.$select_method;
+    /**
+     * Adds the MethodNode represented by the current state to the supplied CanvasState.
+     * @param canvasState
+     *      The CanvasState to add the MethodNode to.
+     */
+    submit(canvasState: CanvasState) {
         let node_label = this.$input_name.val(); // pk of method
-        let method_id = select_method.val();
+        let method_id = this.$select_method.val();
+        let family_id = this.$select_method_family.val();
         let pos = this.translateToOtherCanvas(canvasState);
         
-        // locally-defined function has access to all variables in parent function scope
-        let createOrReplaceMethodNode = result => {
+        
+        if (method_id && family_id && node_label) {
+            // user selected valid Method Revision
             var method = this.produceMethodNode(
-                    method_id,
-                    select_method_family.val(),
-                    pos.left,
-                    pos.top,
-                    this.colour_picker.val(),
-                    node_label,
-                    result.inputs,
-                    result.outputs
+                method_id,
+                this.$select_method_family.val(),
+                pos.left,
+                pos.top,
+                this.colour_picker.val(),
+                node_label,
+                this.methodInputs,
+                this.methodOutputs
             );
             if (this.add_or_revise == 'add') {
                 // create new MethodNode
@@ -457,29 +693,23 @@ export class MethodDialog extends NodePreviewDialog {
             }
             this.hide();
             this.reset();
-        };
-        
-        if (method_id !== undefined && select_method_family.val() !== '') {
-            // user selected valid Method Revision
-            if (node_label !== '') {
-                // use AJAX to retrieve Revision inputs and outputs
-                $.getJSON("/api/methods/" + method_id + "/")
-                    .done(createOrReplaceMethodNode);
-            } else {
-                // required field
-                this.$error.text("Label is required");
-                this.$input_name.focus();
-            }
+        } else if (!node_label) {
+            // required field
+            this.$error.text("Label is required");
+            this.$input_name.focus();
         } else {
-            this.$error.text("Select a Method");
-            if (select_method.is(':visible')) {
-                select_method.focus();
+            this.$error.text("Select a method");
+            if (family_id) {
+                this.$select_method.focus();
             } else {
-                select_method_family.focus();
+                this.$select_method_family.focus();
             }
         }
     }
     
+    /**
+     * Clears all fields and private variables for future use.
+     */
     reset() {
         let ctx = this.preview_canvas.getContext('2d');
         ctx.clearRect(0, 0, this.preview_canvas.width, this.preview_canvas.height);
@@ -491,30 +721,64 @@ export class MethodDialog extends NodePreviewDialog {
         ).change();
         this.setToAdd();
         this.editing_node = null;
+        this.methodInputs = null;
+        this.methodOutputs = null;
     }
-
+    
+    /**
+     * Sets the dialog to add a new method on submit.
+     */
     setToAdd() {
         this.$submit_button.val('Add Method');
         this.add_or_revise = "add";
     }
-
-    setToRevise() {
+    
+    /**
+     * Sets the dialog to replace a method on submit rather than create a new one.
+     */
+    private setToRevise() {
         this.$submit_button.val('Revise Method');
         this.add_or_revise = "revise";
     }
 }
+
 export class OutputDialog extends NodePreviewDialog {
+    /*
+     * Shorthand HTML Template pasted here for convenience.
+     * It is not guaranteed to be current.
+     * Indentation takes the place of closing tags.
+
+    <div #id_output_ctrl .ctrl_menu>
+        <canvas>
+        <h3>Outputs</h3>
+        <form>
+            <input #id_output_name type="text">
+            <input #id_output_button type="submit" value="OK">
+            <div #id_output_error .errortext>
+
+     */
     private $error;
     private $output_name;
     private paired_node: OutputNode;
     
+    /**
+     * In addition to the NodePreviewDialog functionality, OutputDialog will wire up all the necessary template
+     * elements.
+     * @param jqueryRef
+     *      The root element of the dialog as a jQuery object.
+     * @param activator
+     *      The primary UI control for activating the dialog.
+     */
     constructor(jqueryRef, activator) {
         super(jqueryRef, activator);
         this.$error = $("#id_output_error");
         this.$output_name = $('#id_output_name');
         this.drawPreviewCanvas();
     }
-
+    
+    /**
+     * Draws an OutputNode on the preview canvas. No need to check the details, all OutputNodes look the same.
+     */
     drawPreviewCanvas(): void {
         let ctx = this.preview_canvas.getContext('2d');
         let w = this.preview_canvas.width;
@@ -523,52 +787,90 @@ export class OutputDialog extends NodePreviewDialog {
         ctx.clearRect(0, 0, w, h);
         node.draw(ctx);
     }
-
+    
+    /**
+     * Load an existing OutputNode so that we can rename it.
+     * @param node
+     *      The OutputNode to edit
+     */
     load(node: OutputNode): void {
         this.reset();
         this.paired_node = node;
         this.$output_name.val(node.label).select(); // default value
     }
-
-    align(x, y): void {
+    
+    /**
+     * Align the dialog to a given coord. Anchor point is center of the dialog.
+     * @param x
+     *      The x-coordinate.
+     * @param y
+     *      The y-coordinate.
+     */
+    align(x: number, y: number): void {
         this.jqueryRef.css({
             left: x - this.jqueryRef.width()  / 2,
             top:  y - this.jqueryRef.height() / 2
         });
     }
     
-    submit(e, canvasState: CanvasState) {
-        // override ENTER key, click Create output button on form
-        e.preventDefault();
+    /**
+     * Renames the OutputNode.
+     * @param canvasState
+     *      The CanvasState to operate on (currently only used to trigger a redraw)
+     */
+    submit(canvasState: CanvasState) {
         var label = this.$output_name.val();
         if (this.paired_node.label == label) {
+            /* No change */
             this.hide();
             this.reset();
         } else if (CanvasState.isUniqueName(canvasState.getOutputNodes(), label)) {
+            /* Name is changed and valid */
             this.paired_node.label = label;
-            canvasState.selection = [ this.paired_node ];
+            // canvasState.selection = [ this.paired_node ];
             canvasState.valid = false;
             this.hide();
             this.reset();
         } else {
+            /* Non-unique name entered */
             this.$error.html('<img src="/static/pipeline/warning_icon.png"> That name has already been used.');
         }
     }
-
+    
+    /**
+     * Clears all inputs and private members for future use.
+     */
     reset() {
         this.$output_name.val('');
         this.$error.empty();
+        this.paired_node = null;
     }
     
-    cancel(canvasState) {
+    /**
+     * Closes the dialog and removes the working from the CanvasState.
+     * (Assumes the user got here by dragging an Connector into the canvasState's OutputZone.
+     * @param canvasState
+     */
+    cancel(canvasState: CanvasState) {
         this.hide();
-        this.$error.hide();
-        canvasState.connectors.pop();
-        canvasState.valid = false;
+        this.reset();
+        if (this.paired_node) {
+            canvasState.connectors.pop();
+            canvasState.valid = false;
+        }
     }
 }
+
+/**
+ * Dialog controlling how to arrange and display Nodes on the canvasState.
+ */
 export class ViewDialog extends Dialog {
-    changeExecOrderDisplayOption (canvasState) {
+    
+    /**
+     * Change whether canvasState shows order numbers on MethodNodes.
+     * @param canvasState
+     */
+    changeExecOrderDisplayOption (canvasState: CanvasState) {
         var $this = $(this),
             val = $this.val(),
             val_map = { always: true, never: false, ambiguous: undefined };
@@ -577,5 +879,6 @@ export class ViewDialog extends Dialog {
             canvasState.force_show_exec_order = val_map[val];
             canvasState.valid = false;
         }
-    };
+    }
+    
 }
