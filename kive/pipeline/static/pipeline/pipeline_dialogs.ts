@@ -53,7 +53,7 @@ export class Dialog {
      * Child classes should extend this functionality.
      */
     reset() {
-        this.jqueryRef.find('input, select').not("[type='submit']").val('');
+        this.jqueryRef.find('input, select').not("[type='submit'],[type='button']").val('');
     }
     
     /**
