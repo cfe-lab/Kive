@@ -7,7 +7,7 @@
  */
 "use strict";
 import { Geometry } from "./geometry";
-import { CanvasObject, Node, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet } from "./drydock_objects";
+import { CanvasObject, Node, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet, Connector } from "./drydock_objects";
 import { Point, Rectangle } from "./ShapeTypes";
 declare var $: any;
 
@@ -1284,31 +1284,31 @@ export class CanvasState {
       return true;
     }
 
-    static isNode(node: CanvasObject) {
+    static isNode(node: CanvasObject): node is Node {
         return node && node.isNode && node.isNode();
     }
-    static isInputNode(node: CanvasObject) {
+    static isInputNode(node: CanvasObject): node is CdtNode|RawNode {
         return node && node.isInputNode && node.isInputNode();
     }
-    static isCdtNode(node: CanvasObject) {
+    static isCdtNode(node: CanvasObject): node is CanvasObject  {
         return node && node.isCdtNode && node.isCdtNode();
     }
-    static isRawNode(node: CanvasObject) {
+    static isRawNode(node: CanvasObject): node is RawNode {
         return node && node.isRawNode && node.isRawNode();
     }
-    static isOutputNode(node: CanvasObject) {
+    static isOutputNode(node: CanvasObject): node is OutputNode {
         return node && node.isOutputNode && node.isOutputNode();
     }
-    static isMethodNode(node: CanvasObject) {
+    static isMethodNode(node: CanvasObject): node is MethodNode {
         return node && node.isMethodNode && node.isMethodNode();
     }
-    static isConnector(obj: CanvasObject) {
+    static isConnector(obj: CanvasObject): obj is Connector {
         return obj && obj.isConnector && obj.isConnector();
     }
-    static isMagnet(obj: CanvasObject) {
+    static isMagnet(obj: CanvasObject): obj is Magnet {
         return obj && obj.isMagnet && obj.isMagnet();
     }
-    static isOutputZone(obj: CanvasObject) {
+    static isOutputZone(obj: CanvasObject): obj is OutputZone {
         return obj && obj.isOutputZone && obj.isOutputZone();
     }
 
