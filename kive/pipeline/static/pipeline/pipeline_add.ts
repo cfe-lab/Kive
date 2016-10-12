@@ -168,140 +168,59 @@ $(function() {
 
     var chooseContextMenuOption = function(e) {
         e.stopPropagation();
-
-        var $this = $(this),
-            sel = canvasState.selection;
-        
-        // if there's a current node selected on the canvas
-        if (sel && sel.length > 0) {
-            var action = $this.data('action');
-            
-            if (action == 'edit' && sel.length == 1) {
-                sel = sel[0];
-                
-                if (CanvasState.isMethodNode(sel)) {
-                    /*
-                        Open the edit dialog (rename, method selection, colour picker...)
-                    */
-                    var menu = $('#id_method_ctrl').show().addClass('modal_dialog'),
-                        preview_canvas = $('canvas', menu)[0],
-                        inputs_width = sel.n_inputs * 4 + 7,
-                        outputs_width = sel.n_outputs * 4 + 24;
-
-                    preview_canvas.width = menu.innerWidth();
-                    menu.css({
-                        top:  sel.y + sel.dy - inputs_width + canvas.offsetTop - 29,
-                        left: sel.x + sel.dx - preview_canvas.width/2 + 0.8660254 * Math.min(Math.max(outputs_width - inputs_width, 0), 45) + canvas.offsetLeft - 9
-                    });
-                    $('#id_select_colour', menu).val(sel.fill);
-                    $('#colour_picker_pick', menu).css('background-color', sel.fill);
-
-                    if ($('#id_method_delete_outputs_details', menu).is(':visible')) {
-                        $('#id_method_delete_outputs_field .expand_outputs_ctrl', menu).trigger('click');
-                    }
-
-                    $('#id_select_method_family').val(sel.family);
-                    console.log('context menu method revisions trigger');
-                    var request = method_dialog.updateMethodRevisionsMenu(sel.family); // trigger ajax
-                    if (sel.new_code_resource_revision || (sel.new_dependencies && sel.new_dependencies.length > 0)) {
-                        request.done(function() {
-                            var name = "[";
-                            if (sel.new_code_resource_revision) {
-                                name += "driver updated (" + sel.new_code_resource_revision.revision_name + ")";
-                                if (sel.new_dependencies && sel.new_dependencies.length > 0) {
-                                    name += "; ";
-                                }
-                            }
-                            if (sel.new_dependencies && sel.new_dependencies.length > 0) {
-                                name += "dependencies updated (";
-                                for (var i = 0; i < sel.new_dependencies.length; i++) {
-                                    if (i > 0) {
-                                        name += ", ";
-                                    }
-                                    name += sel.new_dependencies[i].revision_name;
-                                }
-                                name += ")";
-                            }
-                            name += "]";
-
-                            $('<option>', { value: sel.pk })
-                                .text('new: ' + name)
-                                .prependTo($("#id_select_method", menu));
-                        });
-                    }
-                    
-                    // disable forms while ajax is loading
-                    $('input', menu).prop('disabled', true);
-
-                    // #id_method_revision_field is always populated via ajax.
-                    // it will run this event exactly twice before killing it.
-                    // first we execute, then we kill.
-                    $(document).on('ajaxComplete', (function(method) {
-                        var counter = 0;
-                        return function() {
-                            // only act on the second time this is called.
-                            if (2 !== ++counter) return;
-                            // don't run it a third time.
-                            $(document).off('ajaxComplete');
-                            $('input', menu).prop('disabled', false);
-
-                            var checkboxes = $('#id_method_delete_outputs_details input', menu);
-                            // wait for AJAX to populate drop-down before selecting option
-                            $('#id_method_revision_field select', menu).val(method.pk);
-                            $('#id_method_name', menu).val(method.label).select();
-                            checkboxes.each(function() {
-                                $(this).prop('checked', -1 === method.outputs_to_delete.indexOf(this.value) );
-                            });
-                            method_dialog.linkParentCheckbox();
-                        };
-                    })(sel) );
-                }
-                else if (CanvasState.isOutputNode(sel)) {
-                    /*
-                        Open the renaming dialog
-                    */
-                    output_dialog.show();
-                    output_dialog.align(
-                        sel.x + sel.dx + canvas.offsetLeft,
-                        sel.y + sel.dy + canvas.offsetTop - sel.h/2 - sel.offset
-                    );
-                    console.log(
-                        sel.x, sel.dx, canvas.offsetLeft);
-                    console.log(
-                        sel.y, sel.dy, canvas.offsetTop, sel.h/2, sel.offset
-                    );
-                    output_dialog.setPairedNode(sel);
-                }
-            }
-            if (action == 'delete') {
-                canvasState.deleteObject();
-            }
-            if (action == 'display') {
-                sel = sel[0];
-                if(CanvasState.isNode(sel) && !CanvasState.isMethodNode(sel)) {
-                    window.location.href = '/dataset_view/' + sel.dataset_id + '?run_id=' + sel.run_id + "&view_run";
-                }
-            }
-            if (action == 'download') {
-                sel = sel[0];
-                if(CanvasState.isNode(sel) && !CanvasState.isMethodNode(sel)) {
-                    window.location.href = '/dataset_download/' + sel.dataset_id+ "&view_run";
-                }
-            }
-            if (action == 'viewlog') {
-                sel = sel[0];
-                if (CanvasState.isMethodNode(sel)) {
-                    window.location.href = '/stdout_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
-                }
-            }
-            if (action == 'viewerrorlog') {
-                sel = sel[0];
-                if (CanvasState.isMethodNode(sel)) {
-                    window.location.href = '/stderr_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
-                }
-            }
-        }
         $('.context_menu').hide();
+
+        var sel = canvasState.selection;
+        var action = $(this).data('action');
+        
+        // if there's not a current node selected on the canvas
+        if (!sel || sel.length === 0) {
+            return;
+        }
+
+        if (action == 'delete') {
+            canvasState.deleteObject();
+            return;
+        }
+
+        // actions on one node only
+        sel = sel[0];
+
+        switch (action) {
+
+        case 'edit':
+            if (CanvasState.isMethodNode(sel) || CanvasState.isOutputNode(sel)) {
+                // For methods, open the edit dialog (rename, method selection, colour picker...)
+                // For outputs, open the renaming dialog
+                let dialog = CanvasState.isMethodNode(sel) ? method_dialog : output_dialog;
+                var coords = canvasState.getAbsoluteCoordsOfNode(sel);
+                dialog.show();
+                dialog.align(coords.x, coords.y);
+                dialog.load(sel);
+            }
+        break;
+        case 'display':
+            if (CanvasState.isNode(sel) && !CanvasState.isMethodNode(sel)) {
+                window.location.href = '/dataset_view/' + sel.dataset_id + '?run_id=' + sel.run_id + "&view_run";
+            }
+        break;
+        case 'download':
+            if (CanvasState.isNode(sel) && !CanvasState.isMethodNode(sel)) {
+                window.location.href = '/dataset_download/' + sel.dataset_id+ "&view_run";
+            }
+        break;
+        case 'viewlog':
+            if (CanvasState.isMethodNode(sel)) {
+                window.location.href = '/stdout_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
+            }
+        break;
+        case 'viewerrorlog':
+            if (CanvasState.isMethodNode(sel)) {
+                window.location.href = '/stderr_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
+            }
+        break;
+
+        }
     };
 
     var submitPipeline = (function() {

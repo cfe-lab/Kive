@@ -787,6 +787,11 @@ export class MethodNode extends BaseNode implements Node {
     n_inputs: number;
     n_outputs: number;
     h: number;
+
+    /* @todo: figure out what these are */
+    new_dependencies;
+    new_code_resource_revision;
+
     private input_plane_len;
     private vertices: Point[];
     private prevX: number;

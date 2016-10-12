@@ -337,9 +337,6 @@ export class CanvasState {
         this.valid = false;
     };
 
-
-
-
     /*
      * Helper functions for CanvasState.autoLayout.
      */
@@ -1256,6 +1253,26 @@ export class CanvasState {
 
     getMethodNodes(): MethodNode[] {
         return this.methods;
+    }
+
+    /**
+     * Absolute coordinates of the node's top edge, center.
+     */
+    getAbsoluteCoordsOfNode(node: any): {x: number, y: number} {
+        let canvas = this.canvas;
+        if (CanvasState.isMethodNode(node)) {
+            let inputs_width = node.n_inputs * 4 + 7;
+            let outputs_width = node.n_outputs * 4 + 24;
+            return {
+                x: node.x + node.dx + 0.8660254 * Math.min(Math.max(outputs_width - inputs_width, 0), 45) + canvas.offsetLeft - 9,
+                y: node.y + node.dy - inputs_width + canvas.offsetTop - 29
+            };
+        } else if (CanvasState.isInputNode(node) || CanvasState.isOutputNode(node)) {
+            return {
+                x: node.x + node.dx + canvas.offsetLeft,
+                y: node.y + node.dy + canvas.offsetTop - node.h/2 - node.offset
+            };
+        }
     }
     
     static isUniqueName(list: Node[], name: string) {

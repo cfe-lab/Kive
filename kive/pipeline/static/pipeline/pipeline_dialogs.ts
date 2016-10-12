@@ -1,6 +1,6 @@
 
-import {RawNode, CdtNode, MethodNode, OutputNode} from "./drydock_objects";
-import {CanvasState} from "./drydock";
+import { RawNode, CdtNode, MethodNode, OutputNode } from "./drydock_objects";
+import { CanvasState } from "./drydock";
 declare var $: any;
 
 export class Dialog {
@@ -182,6 +182,7 @@ export class MethodDialog extends NodePreviewDialog {
     private $expand_outputs_ctrl;
     private colour_picker;
     public add_or_revise: string = "add";
+    private editing_node: MethodNode;
     
     constructor(jqueryRef, activator) {
         super(jqueryRef, activator);
@@ -201,22 +202,81 @@ export class MethodDialog extends NodePreviewDialog {
         this.$select_method.change( function() {
             dialog.methodSelectMenuHook(this.value);
         });
-        this.$select_method_family.change( function() { console.log(this, this.value); dialog.updateMethodRevisionsMenu(this.value); } )
+        this.$select_method_family.change( function() {
+            dialog.updateMethodRevisionsMenu(this.value);
+        });
         this.$delete_outputs.change( () => dialog.linkChildCheckboxes() )
         this.$expand_outputs_ctrl.click( () => dialog.childCheckboxVisibilityCtrl() )
         this.$delete_outputs_details.on('change',  '.method_delete_outputs', () => dialog.linkParentCheckbox() );
 
         this.updateMethodRevisionsMenu(this.$select_method_family.val());
         this.linkChildCheckboxes();
+
+        this.preview_canvas.width = jqueryRef.innerWidth();
     }
 
     triggerPreviewRefresh() {
         this.$select_method.change();
     }
 
+    align(x, y) {
+        this.jqueryRef.css({
+            left: x - this.preview_canvas.width/2,
+            top: y
+        })
+    }
+
+    load(node: MethodNode) {
+        this.reset();
+        this.$select_method_family.val(node.family);
+        this.colour_picker.pick(node.fill);
+        this.setToRevise();
+        this.editing_node = node;
+
+        let request = this.updateMethodRevisionsMenu(node.family); // trigger ajax
+
+        // disable forms while ajax is loading
+        this.jqueryRef.find('input').prop('disabled', true);
+
+        request.done(() => {
+            /**
+             * @todo
+             * Move this logic somewhere else (and find out what it does)
+             */
+            if (node.new_code_resource_revision || (node.new_dependencies && node.new_dependencies.length > 0)) {
+                let msgs = [];
+                if (node.new_code_resource_revision) {
+                    msgs.push('driver updated (' + 
+                        node.new_code_resource_revision.revision_name + 
+                        ')');
+                }
+                if (node.new_dependencies && node.new_dependencies.length > 0) {
+                    msgs.push('dependencies updated (' + 
+                        node.new_dependencies.map(el => el.revision_name).join(', ') + 
+                        ')');
+                }
+
+                let opt = $('<option>')
+                    .val(node.pk)
+                    .text('new: ' + '[' + msgs.join('; ') + ']');
+
+                this.$select_method.prepend(opt);
+            }
+
+            this.jqueryRef.find('input').prop('disabled', false);
+
+            // wait for AJAX to populate drop-down before selecting option
+            this.$revision_field.find('select').val(node.pk);
+            this.$input_name.val(node.label).select();
+            this.$delete_outputs_details.find('input').each(function() {
+                $(this).prop('checked', -1 === node.outputs_to_delete.indexOf(this.value) );
+            });
+            this.linkParentCheckbox();
+        })
+    }
+
     show() {
         super.show();
-        this.setToAdd();
     }
     linkParentCheckbox() {
         var siblings = this.$delete_outputs_details.find('input'),
@@ -238,12 +298,15 @@ export class MethodDialog extends NodePreviewDialog {
     
     childCheckboxVisibilityCtrl() {
         if (this.$delete_outputs_details.is(':visible')) {
-            this.$delete_outputs_details.hide();
-            this.$expand_outputs_ctrl.text('▸ List outputs');
+            this.hideChildCheckboxes();
         } else {
             this.$delete_outputs_details.show();
             this.$expand_outputs_ctrl.text('▾ Hide list');
         }
+    }
+    hideChildCheckboxes() {
+        this.$delete_outputs_details.hide();
+        this.$expand_outputs_ctrl.text('▸ List outputs');
     }
     
     updateMethodRevisionsMenu(mf_id) {
@@ -342,21 +405,6 @@ export class MethodDialog extends NodePreviewDialog {
         )).draw(ctx);
     }
 
-    placeMethodOnCanvasState(method, canvasState) {
-        if (this.add_or_revise == 'add') {
-            // create new MethodNode
-            canvasState.addShape(method);
-        } else {
-            // replace the selected MethodNode
-            // if user clicks anywhere else, MethodNode is deselected
-            // and Methods menu closes
-            
-            // draw new node over old node
-            var old_node = canvasState.selection[0];
-            canvasState.replaceMethod(old_node, method);
-            canvasState.selection = [ method ];
-        }
-    }
 
     produceMethodNode(id, family, x, y, colour, label, inputs, outputs) {
         let method = new MethodNode(
@@ -398,7 +446,15 @@ export class MethodDialog extends NodePreviewDialog {
                     result.inputs,
                     result.outputs
             );
-            this.placeMethodOnCanvasState(method, canvasState);
+            if (this.add_or_revise == 'add') {
+                // create new MethodNode
+                canvasState.addShape(method);
+            } else {
+                // replace the selected MethodNode
+                // draw new node over old node
+                canvasState.replaceMethod(this.editing_node, method);
+                canvasState.selection = [ method ];
+            }
             this.hide();
             this.reset();
         };
@@ -425,12 +481,16 @@ export class MethodDialog extends NodePreviewDialog {
     }
     
     reset() {
+        let ctx = this.preview_canvas.getContext('2d');
+        ctx.clearRect(0, 0, this.preview_canvas.width, this.preview_canvas.height);
         this.$error.text('');
         this.$input_name.val('');
+        this.hideChildCheckboxes();
         this.$select_method_family.val(
             this.$select_method_family.children('option').eq(0).val()
         ).change();
         this.setToAdd();
+        this.editing_node = null;
     }
 
     setToAdd() {
@@ -464,7 +524,7 @@ export class OutputDialog extends NodePreviewDialog {
         node.draw(ctx);
     }
 
-    setPairedNode(node: OutputNode): void {
+    load(node: OutputNode): void {
         this.reset();
         this.paired_node = node;
         this.$output_name.val(node.label).select(); // default value
