@@ -53,7 +53,15 @@ export class Dialog {
      * Child classes should extend this functionality.
      */
     reset() {
-        this.jqueryRef.find('input, select').val('');
+        this.jqueryRef.find('input, select').not("[type='submit']").val('');
+    }
+    
+    /**
+     * Resets and hides all in one.
+     */
+    cancel() {
+        this.reset();
+        this.hide();
     }
 }
 
@@ -286,6 +294,7 @@ var colourPicker = (function() {
         .on('click', 'div', function() {
             picker.pick($(this).css('background-color'));
         });
+    var callback: Function = () => {};
 
     // Exposed methods
     var picker = {
@@ -309,13 +318,20 @@ var colourPicker = (function() {
             $pick.css('background-color', colour);
             $hidden_input.val(colour);
             $menu.hide();
+            callback(colour);
         },
     
         /**
          * colourPicker.val
          * @return the currently picked colour
          */
-        val: () => $hidden_input.val()
+        val: () => $hidden_input.val(),
+    
+        /**
+         * colourPicker.setCallback
+         * set a function to execute when a colour is picked.
+         */
+        setCallback: (cb: Function) => { callback = cb; }
     };
     return picker;
 })();
@@ -358,7 +374,8 @@ export class MethodDialog extends NodePreviewDialog {
     private $delete_outputs;
     private $delete_outputs_details;
     private $submit_button;
-    private $revision_field;
+    // Tentatively removed since it doesn't seem to do anything.
+    // private $revision_field;
     private $select_method;
     private $select_method_family;
     private $input_name;
@@ -386,7 +403,7 @@ export class MethodDialog extends NodePreviewDialog {
         this.$delete_outputs = $('#id_method_delete_outputs');
         this.$delete_outputs_details = $('#id_method_delete_outputs_details');
         this.$submit_button = $('#id_method_button');
-        this.$revision_field = $('#id_method_revision_field');
+        // this.$revision_field = $('#id_method_revision_field');
         this.$select_method = $("#id_select_method");
         this.$select_method_family = $('#id_select_method_family');
         this.$input_name = $('#id_method_name');
@@ -395,7 +412,10 @@ export class MethodDialog extends NodePreviewDialog {
 
         let dialog = this;
         this.$select_method.change( function() {
-            dialog.triggerPreviewRefresh()
+            dialog.triggerPreviewRefresh();
+        });
+        colourPicker.setCallback( function() {
+            dialog.triggerPreviewRefresh();
         });
         this.$select_method_family.change( function() {
             dialog.updateMethodRevisionsMenu(this.value);
@@ -429,7 +449,7 @@ export class MethodDialog extends NodePreviewDialog {
                 this.methodInputs = result.inputs;
                 this.methodOutputs = result.outputs;
                 this.drawPreviewCanvas(result, this.colour_picker.val());
-                this.updateOutputsFieldsetList(result.outputs);
+                this.setOutputsFieldsetList(result.outputs);
             });
         }
     }
@@ -580,15 +600,17 @@ export class MethodDialog extends NodePreviewDialog {
     }
     
     /**
-     * Update outputs fieldset list.
+     * Sets the outputs fieldset list.
      * @param outputs
      *      An array of the method's outputs. <exact type unknown>
      *      Each includes object properties dataset_idx and dataset_name.
      */
-    updateOutputsFieldsetList (outputs: any[]): void {
+    setOutputsFieldsetList (outputs: any[]): void {
         this.$delete_outputs.prop('checked', true);
+        this.$delete_outputs_details.empty();
+        let elements = [];
         for (let output of outputs) {
-            this.$delete_outputs_details.append(
+            elements.push(
                 $('<input>', {
                     type: 'checkbox',
                     name: 'dont_delete_outputs',
@@ -603,6 +625,7 @@ export class MethodDialog extends NodePreviewDialog {
                 $('<br>')
             );
         }
+        this.$delete_outputs_details.append(elements);
     }
     
     /**
@@ -668,7 +691,6 @@ export class MethodDialog extends NodePreviewDialog {
         let method_id = this.$select_method.val();
         let family_id = this.$select_method_family.val();
         let pos = this.translateToOtherCanvas(canvasState);
-        
         
         if (method_id && family_id && node_label) {
             // user selected valid Method Revision
@@ -851,10 +873,9 @@ export class OutputDialog extends NodePreviewDialog {
      * (Assumes the user got here by dragging an Connector into the canvasState's OutputZone.
      * @param canvasState
      */
-    cancel(canvasState: CanvasState) {
-        this.hide();
-        this.reset();
-        if (this.paired_node) {
+    cancel(canvasState?: CanvasState) {
+        super.cancel();
+        if (this.paired_node && canvasState) {
             canvasState.connectors.pop();
             canvasState.valid = false;
         }

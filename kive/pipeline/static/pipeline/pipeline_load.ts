@@ -259,9 +259,7 @@ export class Pipeline {
          */
 
         this.canvasState.testExecutionOrder();
-        for (var i = 0; i < this.canvasState.shapes.length; i++) {
-            this.canvasState.detectCollisions(this.canvasState.shapes[i], 0.5);
-        }
+        this.canvasState.detectAllCollisions();
         this.canvasState.draw();
     }
 

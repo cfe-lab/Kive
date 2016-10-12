@@ -1,6 +1,6 @@
 "use strict";
 
-import { MethodNode, CdtNode, RawNode} from "./drydock_objects";
+import {MethodNode, CdtNode, RawNode, OutputNode} from "./drydock_objects";
 import { CanvasState } from "./drydock";
 import { Pipeline } from "./pipeline_load";
 import { PipelineReviser } from "./pipeline_revise";
@@ -61,7 +61,6 @@ $.fn.extend({
     }
 });
 
-
 export var canvasState;
 $(function() {
     var canvas;
@@ -76,150 +75,169 @@ $(function() {
     */
     
     // initialize animated canvas
+    let REDRAW_INTERVAL = 50; // ms
     canvas = document.getElementById('pipeline_canvas');
     canvas.width  = window.innerWidth;
     canvas.height = window.innerHeight - $(canvas).offset().top - 5;
-    let REDRAW_INTERVAL = 50; // ms
-    
     canvasState = new CanvasState(canvas, REDRAW_INTERVAL);
-    canvasState.old_width = canvas.width;
-    canvasState.old_height = canvas.height;
+    
+    let $submit_btn = $('#id_submit_button');
+    let parent_revision_id;
     
     var pipelineCheckReadiness = function() {
-        var $btn = $('#id_submit_button');
-        if (!!canvasState.exec_order) {// exec_order is a 2D array if pipeline is executable, otherwise false
-            $btn.addClass('pipeline-ready').removeClass('pipeline-not-ready');
-        } else {
-            $btn.removeClass('pipeline-ready').addClass('pipeline-not-ready');
+        let is = 'pipeline-not-ready';
+        let isnt = 'pipeline-ready';
+        if (canvasState.isComplete()) {// exec_order is a 2D array if pipeline is executable, otherwise false
+            [is, isnt] = [isnt, is]; // swap variables
         }
+        $submit_btn.addClass(is).removeClass(isnt);
     };
 
-    var documentKeyHandler = function(e) {
+    function documentKeyHandler(e: KeyboardEvent) {
+        let backspace = e.which === 8;
+        let del = e.which === 46;
+        let esc = e.which === 27;
         // backspace or delete key also removes selected object
-        if ([8,46].indexOf(e.which) > -1 && !$(e.target).is("input, textarea")) {
+        if ((backspace || del) && !targetIsDialog(e)) {
             // prevent backspace from triggering browser to navigate back one page
             e.preventDefault();
             if (canvasState.selection) {
                 canvasState.deleteObject();
-                var menus = $('.ctrl_menu, .context_menu, .modal_dialog').filter(':visible');
-                menus.trigger('cancel');
-                $('#id_ctrl_nav li').add(menus).removeClass('clicked');
             }
             pipelineCheckReadiness();
         }
         
         // escape key closes menus
         else if (e.which == 27) {
-            $('#id_ctrl_nav').find('li').removeClass('clicked');
-            $('.ctrl_menu:visible').trigger('cancel');
+            for (let dialog of dialogs) {
+                dialog.cancel();
+            }
             canvasState.selection = [];
             canvasState.valid = false;
         }
-    };
-
-    var documentClickHandler = function(e) {
-        var menus = $('.ctrl_menu, .context_menu, .modal_dialog').filter(':visible');
-        if ($(e.target).closest(menus).length === 0) {
-            menus.trigger('cancel');
-            $('#id_ctrl_nav').find('li').add(menus).removeClass('clicked');
+    }
+    
+    function targetIsDialog(e: Event): boolean {
+        for (let dialog of dialogs) {
+            if ($(e.target).closest(dialog.jqueryRef).length !== 0) {
+                return true;
+            }
         }
-    };
+        return false;
+    }
+
+    function documentClickHandler(e: MouseEvent) {
+        for (let dialog of dialogs) {
+            if (!targetIsDialog(e)) {
+                dialog.cancel();
+            }
+        }
+    }
 
     var documentResizeHandler = (function() {
-        var resize_timeout = 0,
-            endDocumentResize = function() {
-                canvasState.valid = false;
-                for (var i = 0, shape; (shape = canvasState.shapes[i]); i++) {
-                    shape.dx = shape.dy = 0;
-                    canvasState.detectCollisions(shape);
-                }
-                canvasState.outputZone.alignWithCanvas(canvas.width, canvas.height);
-            }
-        ;
+        var resize_timeout = 0;
+        
+        function endDocumentResize() {
+            canvasState.valid = false;
+            canvasState.outputZone.alignWithCanvas(canvas.width, canvas.height);
+            canvasState.detectAllCollisions();
+        }
 
         return function() {
-            var shape, i, scale_x, scale_y;
-
             canvasState.width  = canvas.width  = window.innerWidth;
             canvasState.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
             
-            scale_x = canvas.width  / canvasState.old_width;
-            scale_y = canvas.height / canvasState.old_height;
+            let scale_x = canvas.width  / canvasState.old_width;
+            let scale_y = canvas.height / canvasState.old_height;
                 
-            if (scale_x == 1 && scale_y == 1) {
+            if (scale_x === 1 && scale_y === 1) {
                 return;
             }
-            
-            for (i = 0; (shape = canvasState.shapes[i]); i++) {
-                shape.x *= scale_x;
-                shape.y *= scale_y;
-                shape.dx *= scale_x;
-                shape.dy *= scale_y;
+            if (scale_x !== 1) {
+                for (let shape of canvasState.shapes) {
+                    shape.x  *= scale_x;
+                    shape.dx *= scale_x;
+                }
+            }
+            if (scale_y !== 1) {
+                for (let shape of canvasState.shapes) {
+                    shape.y  *= scale_y;
+                    shape.dy *= scale_y;
+                }
             }
             
             canvasState.old_width = canvas.width;
             canvasState.old_height = canvas.height;
             canvasState.valid = false;
-
+            
+            // Collision detection is computationally expensive, so
+            // deferred until 0.5s have passed without further resizing.
             clearTimeout(resize_timeout);
             resize_timeout = setTimeout(endDocumentResize, 500);
         };
     })();
 
-    var chooseContextMenuOption = function(e) {
+    var chooseContextMenuOption: (e: Event) => void = function (e) {
         e.stopPropagation();
         $('.context_menu').hide();
-
+    
         var sel = canvasState.selection;
         var action = $(this).data('action');
-        
+    
         // if there's not a current node selected on the canvas
         if (!sel || sel.length === 0) {
             return;
         }
-
+    
         if (action == 'delete') {
             canvasState.deleteObject();
             return;
         }
-
+    
         // actions on one node only
-        sel = sel[0];
-
+        let sel0 = sel[0];
+    
         switch (action) {
-
-        case 'edit':
-            if (CanvasState.isMethodNode(sel) || CanvasState.isOutputNode(sel)) {
-                // For methods, open the edit dialog (rename, method selection, colour picker...)
-                // For outputs, open the renaming dialog
-                let dialog = CanvasState.isMethodNode(sel) ? method_dialog : output_dialog;
-                var coords = canvasState.getAbsoluteCoordsOfNode(sel);
-                dialog.show();
-                dialog.align(coords.x, coords.y);
-                dialog.load(sel);
-            }
-        break;
-        case 'display':
-            if (CanvasState.isNode(sel) && !CanvasState.isMethodNode(sel)) {
-                window.location.href = '/dataset_view/' + sel.dataset_id + '?run_id=' + sel.run_id + "&view_run";
-            }
-        break;
-        case 'download':
-            if (CanvasState.isNode(sel) && !CanvasState.isMethodNode(sel)) {
-                window.location.href = '/dataset_download/' + sel.dataset_id+ "&view_run";
-            }
-        break;
-        case 'viewlog':
-            if (CanvasState.isMethodNode(sel)) {
-                window.location.href = '/stdout_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
-            }
-        break;
-        case 'viewerrorlog':
-            if (CanvasState.isMethodNode(sel)) {
-                window.location.href = '/stderr_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
-            }
-        break;
-
+        
+            case 'edit':
+                if (CanvasState.isMethodNode(sel0) || CanvasState.isOutputNode(sel0)) {
+                    // For methods, open the edit dialog (rename, method selection, colour picker...)
+                    // For outputs, open the renaming dialog
+                    var coords = canvasState.getAbsoluteCoordsOfNode(sel0);
+                    if (CanvasState.isMethodNode(sel0)) {
+                        let dialog = method_dialog;
+                        dialog.show();
+                        dialog.align(coords.x, coords.y);
+                        dialog.load(sel0);
+                    } else {
+                        let dialog = output_dialog;
+                        dialog.show();
+                        dialog.align(coords.x, coords.y);
+                        dialog.load(sel0);
+                    }
+                }
+                break;
+            case 'display':
+                if (CanvasState.isNode(sel0) && !CanvasState.isMethodNode(sel0)) {
+                    window.location.href = '/dataset_view/' + sel0.dataset_id + '?run_id=' + sel0.run_id + "&view_run";
+                }
+                break;
+            case 'download':
+                if (CanvasState.isNode(sel0) && !CanvasState.isMethodNode(sel0)) {
+                    window.location.href = '/dataset_download/' + sel0.dataset_id + "&view_run";
+                }
+                break;
+            case 'viewlog':
+                if (CanvasState.isMethodNode(sel0)) {
+                    window.location.href = '/stdout_view/' + sel0.log_id + '?run_id=' + sel0.run_id + "&view_run";
+                }
+                break;
+            case 'viewerrorlog':
+                if (CanvasState.isMethodNode(sel0)) {
+                    window.location.href = '/stderr_view/' + sel0.log_id + '?run_id=' + sel0.run_id + "&view_run";
+                }
+                break;
+        
         }
     };
 
@@ -234,8 +252,10 @@ $(function() {
 
             $submit_error.empty();
 
-            var is_new = e.data.action == "new",
-                is_revision = e.data.action == "revise",
+            var action = $('#id_pipeline_action').val();
+
+            var is_new = action == "new",
+                is_revision = action == "revise",
                 // arguments to initialize new Pipeline Family
                 family = {
                     name: $('#id_family_name'),  // hidden input if revision
@@ -245,15 +265,10 @@ $(function() {
                     name: $('#id_revision_name'),
                     desc: $('#id_revision_desc')
                 },
-                users_allowed = [],
-                groups_allowed = [];
-
-            $("#id_permissions_0").find("option:selected").each(function() {
-                users_allowed.push($(this).text());
-            });
-            $("#id_permissions_1").find("option:selected").each(function() {
-                groups_allowed.push($(this).text());
-            });
+                users_allowed  = $("#id_permissions_0").find("option:selected").get()
+                    .map(el => this.textContent),
+                groups_allowed = $("#id_permissions_1").find("option:selected").get()
+                    .map(el => this.textContent);
             
             // Form validation
             if (is_new) {
@@ -281,7 +296,7 @@ $(function() {
                 // arguments to add first pipeline revision
                 revision_name: revision.name.val(),
                 revision_desc: revision.desc.val(),
-                revision_parent: is_revision ? JSON.parse($("#initial_data").text()).id : null,
+                revision_parent: is_revision ? parent_revision_id : null,
                 published: $('#published').prop('checked'),
 
                 // Canvas information to store in the Pipeline object.
@@ -301,16 +316,16 @@ $(function() {
                 return;
             }
 
-            console.log(form_data);
-            return;
+            // console.log(form_data);
+            // return;
 
             if(!is_new) {
                 submitPipelineAjax($('#id_family_pk').val(), form_data);
             } else { // Pushing a new family
                 submitPipelineFamilyAjax(
                     {
-                        users_allowed: users_allowed,
-                        groups_allowed: groups_allowed,
+                        users_allowed,
+                        groups_allowed,
                         name: family.name.val(),
                         description: family.desc.val()
                     },
@@ -328,7 +343,7 @@ $(function() {
                 }
                 new_context += field;
                 
-                for (var i = 0; i < value.length; i++) {
+                for (let i = 0; i < value.length; i++) {
                     var item = value[i];
                     if (typeof(item) === "string") {
                         errors.push(new_context + ": " + item);
@@ -356,7 +371,7 @@ $(function() {
                 data: JSON.stringify(form_data),
                 contentType: "application/json"// data will not be parsed correctly without this
             }).success(function() {
-                $('#id_submit_error').empty().hide();
+                // $('#id_submit_error').empty().hide();
                 $(window).off('beforeunload');
                 window.location.href = '/pipelines/' + family_pk;
             }).error(function(xhr, status, error) {
@@ -390,17 +405,16 @@ $(function() {
                 if (serverErrors.length === 0) {
                     serverErrors = xhr.status + " - " + error;
                 }
-
                 submitError(serverErrors);
             });
         }
     })();
 
-    var checkForUnsavedChanges = function() {
+    function checkForUnsavedChanges() {
         if (canvasState.can_edit && canvasState.has_unsaved_changes) {
             return 'You have unsaved changes.';
         }
-    };
+    }
     
     pipelineCheckReadiness();
 
@@ -410,6 +424,7 @@ $(function() {
         loader.load(canvasState);
         loader.setUpdateCtrl($('#id_update'));
         loader.setRevertCtrl($('#id_revert'));
+        parent_revision_id = JSON.parse(initialData).id;
     }
     
     // de-activate double-click selection of text on page
@@ -470,11 +485,12 @@ $(function() {
     var method_dialog   =  new MethodDialog( $('#id_method_ctrl'), $ctrl_nav.find("li[data-rel='#id_method_ctrl']") );
     var output_dialog   =  new OutputDialog( $('#id_output_ctrl'), $ctrl_nav.find("li[data-rel='#id_output_ctrl']") );
     var view_dialog     =    new ViewDialog( $('#id_view_ctrl'),   $ctrl_nav.find("li[data-rel='#id_view_ctrl']")   );
+    var dialogs = [ pipeline_family_dialog, pipeline_dialog, input_dialog, method_dialog, output_dialog, view_dialog ];
 
     // Handle jQuery-UI Dialog spawned for output cable
-    $('form', '#id_output_ctrl') .submit( function(e) { output_dialog.submit(e, canvasState); } );
-    $('form', '#id_input_ctrl')  .submit( function(e) {  input_dialog.submit(e, canvasState); } );
-    $('form', '#id_method_ctrl') .submit( function(e) { method_dialog.submit(e, canvasState); } );
+    $('form', '#id_output_ctrl') .submit( function(e) { e.preventDefault(); output_dialog.submit(canvasState); } );
+    $('form', '#id_input_ctrl')  .submit( function(e) { e.preventDefault();  input_dialog.submit(canvasState); } );
+    $('form', '#id_method_ctrl') .submit( function(e) { e.preventDefault(); method_dialog.submit(canvasState); } );
     
     /*
     EVENT BINDINGS TABLE
@@ -482,21 +498,19 @@ $(function() {
      ELEMENT                         EVENT       (SELECTOR)  FUNCTION CALLBACK
     ------------------------------------------------------------------------------------
     */
-    $(window)                    .on('resize',               documentResizeHandler)
-                                 .on('beforeunload',         checkForUnsavedChanges);
-    $(document)                  .on('keydown',              documentKeyHandler)
-                                 .on('mousedown',            documentClickHandler)
-                                 // this one is set separately so that it can be disabled separately
-                                 .on('cancel', '.ctrl_menu', function() { $(this).hide(); })
-                                 // do not combine this line with the previous
-                                 .on('cancel', '.context_menu, .modal_dialog', function() { $(this).hide(); });
-    $('#id_pipeline_new_form')   .submit({ action: "new" },    submitPipeline);
-    $('#id_pipeline_add_form')   .submit({ action: "add" },    submitPipeline);
-    $('#id_pipeline_revise_form').submit({ action: "revise" }, submitPipeline);
-    $('.context_menu')           .on('click', 'li',            chooseContextMenuOption);    // when a context menu option is clicked
-    $('#autolayout_btn')         .click(               function() { canvasState.autoLayout(); } );
-    $('.align-btn')              .click(               function() { canvasState.alignSelection($(this).data('axis')); });
-    $('.form-inline-opts')       .on('click', 'input', function() { view_dialog.changeExecOrderDisplayOption(canvasState); } );
+    $(window)  .on('resize',               documentResizeHandler)
+               .on('beforeunload',         checkForUnsavedChanges);
+    $(document).on('keydown',              documentKeyHandler)
+               .on('mousedown',            documentClickHandler)
+               // this one is set separately so that it can be disabled separately
+               .on('cancel', '.ctrl_menu', function() { $(this).hide(); })
+               // do not combine this line with the previous
+               .on('cancel', '.context_menu, .modal_dialog', function() { $(this).hide(); });
+    $('#id_pipeline_form').submit(submitPipeline);
+    $('.context_menu').on('click', 'li', chooseContextMenuOption);    // when a context menu option is clicked
+    $('#autolayout_btn').click(() => canvasState.autoLayout() );
+    $('.align-btn').click( function() { canvasState.alignSelection($(this).data('axis')); });
+    $('.form-inline-opts').on('click', 'input', () => view_dialog.changeExecOrderDisplayOption(canvasState) );
     /*
     ------------------------------------------------------------------------------------
     */

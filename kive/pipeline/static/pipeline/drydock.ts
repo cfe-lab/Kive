@@ -58,9 +58,11 @@ export class CanvasState {
     // options
     selectionColor = '#7bf';
     selectionWidth = 2;
-
+    
     width: number;
     height: number;
+    old_width: number;
+    old_height: number;
     pos_x: number;
     pos_y: number;
     ctx: CanvasRenderingContext2D;
@@ -78,10 +80,8 @@ export class CanvasState {
         /*
         keeps track of canvas state (mouse drag, etc.)
          */
-    
-        // initialize "class"
-        this.width  = this.canvas.width;
-        this.height = this.canvas.height;
+        this.old_width  = this.width  = this.canvas.width;
+        this.old_height = this.height = this.canvas.height;
         this.pos_y  = this.canvas.offsetTop;
         this.pos_x  = this.canvas.offsetLeft;
         this.ctx    = this.canvas.getContext('2d');
@@ -641,6 +641,7 @@ export class CanvasState {
         shape1.dy = my_y - shape1.y;
         shape2.dy = sh_y - shape2.y;
     }
+    
     detectCollisions (myShape: Node|OutputZone, bias?: number) {
         var followups = [],
             vertices = myShape.getVertices(),
@@ -693,6 +694,15 @@ export class CanvasState {
         
         for (let followup of followups) {
             this.detectCollisions(followup, bias);
+        }
+    }
+    
+    detectAllCollisions(fromBasePosition: boolean = false, bias: number = 0.5): void {
+        for (let shape of this.shapes) {
+            if (fromBasePosition) {
+                shape.dx = shape.dy = 0;
+            }
+            this.detectCollisions(shape, bias);
         }
     }
     
@@ -1311,7 +1321,20 @@ export class CanvasState {
     static isOutputZone(obj: CanvasObject): obj is OutputZone {
         return obj && obj.isOutputZone && obj.isOutputZone();
     }
-
+    
+    /**
+     * Converts checkIntegrity into a simple yes-or-no with errors ignored.
+     * @returns {boolean}
+     */
+    isComplete(): boolean {
+        try {
+            this.checkIntegrity();
+        } catch(e) {
+            return false;
+        }
+        return true;
+    }
+    
     checkIntegrity() {
         for (let shape of this.shapes) {
             if (CanvasState.isNode(shape)) {
@@ -1326,12 +1349,22 @@ export class CanvasState {
                 } else if (CanvasState.isInputNode(shape)) {
                     // all CDtNodes or RawNodes (inputs) should feed into a MethodNode and have only one magnet
                     if (shape.out_magnets.length !== 1) {
-                        throw 'Invalid amount of magnets for output node!';
+                        throw 'Invalid amount of magnets for input node!';
                     }
-
+    
                     // is this magnet connected?
                     if (shape.out_magnets[0].connected.length === 0) {
                         throw 'Unconnected input node';
+                    }
+                } else if (CanvasState.isOutputNode(shape)) {
+                    // all outputs should come from a MethodNode and have only one magnet
+                    if (shape.in_magnets.length !== 1) {
+                        throw 'Invalid amount of magnets for output node!';
+                    }
+    
+                    // is this magnet connected?
+                    if (shape.in_magnets[0].connected.length === 0) {
+                        throw 'Unconnected output node';
                     }
                 }
             } else {
