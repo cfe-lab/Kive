@@ -3,8 +3,7 @@
 import { Geometry } from "./geometry";
 import { MethodNode, CdtNode, RawNode, OutputNode, Connector } from "./drydock_objects";
 import { CanvasState } from "./drydock";
-declare var $: any;
-
+import 'jquery';
 
 /**
  * Convert between API calls and CanvasState object.
@@ -84,9 +83,10 @@ export class Pipeline {
         form_data.outcables = [];
 
         // Construct the input updates
-        $.each(pipeline_inputs, function(idx, input){
-            var structure = null;
-
+        for (let idx = 0; idx < pipeline_inputs.length; idx++) {
+            let input = pipeline_inputs[idx];
+            let structure = null;
+    
             // Setup the compound datatype
             if (CanvasState.isCdtNode(input)) {
                 structure = {
@@ -95,7 +95,7 @@ export class Pipeline {
                     max_row: null
                 };
             }
-
+    
             // Slap this input into the form data
             form_data.inputs[idx] = {
                 structure: structure,
@@ -104,7 +104,7 @@ export class Pipeline {
                 x: input.x * canvas_x_ratio,
                 y: input.y * canvas_y_ratio,
             };
-        });
+        }
 
         // MethodNodes are now sorted live, prior to pipeline submission —JN
         var sorted_elements = this.canvasState.getSteps();
@@ -552,7 +552,7 @@ export class Pipeline {
             type: "PATCH",
             url: this.API_URL + family_pk,
             data: { published_version: this.pipeline.id },
-            datatype: "json",
+            dataType: "json",
             success: result => {
                 this.pipeline.is_published_version = true;
                 callback(result);
@@ -572,7 +572,7 @@ export class Pipeline {
             type: "PATCH",
             url: this.API_URL + family_pk,
             data: { published_version: null },
-            datatype: "json",
+            dataType: "json",
             success: result => {
                 this.pipeline.is_published_version = false;
                 callback(result);

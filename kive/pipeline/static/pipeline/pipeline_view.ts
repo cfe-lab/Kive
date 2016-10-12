@@ -1,6 +1,6 @@
 import { Pipeline } from "./pipeline_load";
 import { canvasState } from "./pipeline_add";
-declare var $: any;
+import 'jquery';
 
 let pipeline_dict_raw = $("#pipeline_dict").text();
 let pipeline_dict;

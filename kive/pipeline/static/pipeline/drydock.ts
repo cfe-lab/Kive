@@ -9,7 +9,7 @@
 import { Geometry } from "./geometry";
 import { CanvasObject, Node, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet, Connector } from "./drydock_objects";
 import { Point, Rectangle } from "./ShapeTypes";
-declare var $: any;
+import 'jquery';
 
 export class CanvasState {
     /**
@@ -1300,7 +1300,7 @@ export class CanvasState {
     static isInputNode(node: CanvasObject): node is CdtNode|RawNode {
         return node && node.isInputNode && node.isInputNode();
     }
-    static isCdtNode(node: CanvasObject): node is CanvasObject  {
+    static isCdtNode(node: CanvasObject): node is CdtNode  {
         return node && node.isCdtNode && node.isCdtNode();
     }
     static isRawNode(node: CanvasObject): node is RawNode {

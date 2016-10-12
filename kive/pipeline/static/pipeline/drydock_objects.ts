@@ -8,7 +8,7 @@ import { Point, Circle, Ellipse, TextParams, Rectangle } from "./ShapeTypes";
 import { Bezier } from "./bezier";
 import { Geometry } from "./geometry";
 import { CanvasState } from "./drydock";
-declare var $:any;
+import 'jquery';
 
 export class CanvasWrapper {
     

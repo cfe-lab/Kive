@@ -1,6 +1,6 @@
 import { Pipeline } from "./pipeline_load";
 import { CanvasState } from "./drydock";
-declare var $: any;
+import 'jquery';
 declare var noXSS: any;
 
 export class PipelineReviser {

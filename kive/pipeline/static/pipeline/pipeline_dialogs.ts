@@ -1,7 +1,7 @@
 
 import { RawNode, CdtNode, MethodNode, OutputNode } from "./drydock_objects";
 import { CanvasState } from "./drydock";
-declare var $: any;
+import 'jquery';
 
 /**
  * Base class for UI dialogs on the pipeline assembly canvas.
@@ -98,7 +98,7 @@ class NodePreviewDialog extends Dialog {
         if (jqueryRef.draggable) {
             jqueryRef.draggable();
         }
-        this.preview_canvas = $('canvas', jqueryRef)[0];
+        this.preview_canvas = <HTMLCanvasElement>$('canvas', jqueryRef)[0];
         this.preview_canvas.width = jqueryRef.innerWidth();
         this.preview_canvas.height = 60;
     }
@@ -596,7 +596,7 @@ export class MethodDialog extends NodePreviewDialog {
             return request;
         }
         // this.$revision_field.hide();
-        return $.Deferred().reject(); // No method family chosen, never loads.
+        return $.ajax({}).fail(); // No method family chosen, never loads.
     }
     
     /**

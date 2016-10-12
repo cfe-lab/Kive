@@ -1,12 +1,13 @@
 "use strict";
 
-import {MethodNode, CdtNode, RawNode, OutputNode} from "./drydock_objects";
 import { CanvasState } from "./drydock";
 import { Pipeline } from "./pipeline_load";
 import { PipelineReviser } from "./pipeline_revise";
 import { Dialog, InputDialog, MethodDialog, OutputDialog, ViewDialog } from "./pipeline_dialogs";
-declare var $:any;
+import 'jquery';
 declare var noXSS:Function;
+
+// console.log($);
 
 $.fn.extend({
     draggable: function(opt) {
@@ -93,7 +94,7 @@ $(function() {
         $submit_btn.addClass(is).removeClass(isnt);
     };
 
-    function documentKeyHandler(e: KeyboardEvent) {
+    function documentKeyHandler(e: JQueryKeyEventObject) {
         let backspace = e.which === 8;
         let del = e.which === 46;
         let esc = e.which === 27;
@@ -126,7 +127,7 @@ $(function() {
         return false;
     }
 
-    function documentClickHandler(e: MouseEvent) {
+    function documentClickHandler(e: JQueryMouseEventObject) {
         for (let dialog of dialogs) {
             if (!targetIsDialog(e)) {
                 dialog.cancel();
@@ -370,11 +371,11 @@ $(function() {
                 url: '/api/pipelines/',
                 data: JSON.stringify(form_data),
                 contentType: "application/json"// data will not be parsed correctly without this
-            }).success(function() {
+            }).done(function() {
                 // $('#id_submit_error').empty().hide();
                 $(window).off('beforeunload');
                 window.location.href = '/pipelines/' + family_pk;
-            }).error(function(xhr, status, error) {
+            }).fail(function(xhr, status, error) {
                 var json = xhr.responseJSON,
                     errors = [];
                 
@@ -396,9 +397,9 @@ $(function() {
                 url: '/api/pipelinefamilies/',
                 data: JSON.stringify(family_form_data),
                 contentType: "application/json"// data will not be parsed correctly without this
-            }).success(function(result) {
+            }).done(function(result) {
                 submitPipelineAjax(result.id, pipeline_form_data);
-            }).error(function(xhr, status, error) {
+            }).fail(function(xhr, status, error) {
                 var json = xhr.responseJSON,
                     serverErrors = json && json.non_field_errors || [];
                 
@@ -498,10 +499,10 @@ $(function() {
      ELEMENT                         EVENT       (SELECTOR)  FUNCTION CALLBACK
     ------------------------------------------------------------------------------------
     */
-    $(window)  .on('resize',               documentResizeHandler)
+    $(window)  .resize(documentResizeHandler)
                .on('beforeunload',         checkForUnsavedChanges);
-    $(document).on('keydown',              documentKeyHandler)
-               .on('mousedown',            documentClickHandler)
+    $(document).keydown(documentKeyHandler)
+               .mousedown(documentClickHandler)
                // this one is set separately so that it can be disabled separately
                .on('cancel', '.ctrl_menu', function() { $(this).hide(); })
                // do not combine this line with the previous
