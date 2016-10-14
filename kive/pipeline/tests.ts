@@ -4,9 +4,49 @@ import { Pipeline } from "./static/pipeline/pipeline_load";
 import "jasmine";
 import 'jasmine-html';
 import 'jasmine-boot';
-declare var $: any;
+import 'jquery';
 declare var imagediff: any;
 declare var pipeline_families: any;
+
+/**
+ *  Ugh, none of these work.
+ */
+// declare namespace jasmine {
+//     interface Matchers {
+//         toImageDiffEqual<T>(a: T, b: T): boolean;
+//     }
+// }
+// namespace jasmine {
+//     interface Matchers {
+//         toImageDiffEqual<T>(a: T, b: T): boolean;
+//     }
+// }
+// interface Matchers {
+//     toImageDiffEqual<T>(a: T, b: T): boolean;
+// }
+// declare interface Matchers {
+//     toImageDiffEqual<T>(a: T, b: T): boolean;
+// }
+// module jasmine {
+//     interface Matchers {
+//         toImageDiffEqual<T>(a: T, b: T): boolean;
+//     }
+// }
+// declare module jasmine {
+//     interface Matchers {
+//         toImageDiffEqual<T>(a: T, b: T): boolean;
+//     }
+// }
+// namespace jasmine {
+//     declare interface Matchers {
+//         toImageDiffEqual<T>(a: T, b: T): boolean;
+//     }
+// }
+// module jasmine {
+//     declare interface Matchers {
+//         toImageDiffEqual<T>(a: T, b: T): boolean;
+//     }
+// }
 
 (function() {
     "use strict";

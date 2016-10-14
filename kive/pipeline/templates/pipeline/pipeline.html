@@ -47,8 +47,13 @@ $(function() {
 
     <!-- CANVAS -->
     <div>
-    <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
-    <div id="method_context_menu" class="context_menu"><ul><li data-action="edit" class="edit">Edit</li><li data-action="delete" class="delete">Delete</li></ul></div>
+        <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
+        <div id="method_context_menu" class="context_menu">
+            <ul>
+                <li data-action="edit" class="edit">Edit</li>
+                <li data-action="delete" class="delete">Delete</li>
+            </ul>
+        </div>
     </div>
 
     <!-- Method selector -->
@@ -56,24 +61,21 @@ $(function() {
         <ul id="id_ctrl_nav">
             <li data-rel="#id_family_ctrl">Family</li>
             <li data-rel="#id_meta_ctrl">Pipeline</li>
-            <li data-rel="#id_input_ctrl" class="new_ctrl">Add Input</li>
-            <li data-rel="#id_method_ctrl" class="new_ctrl">Add Method</li>
+            <li data-rel="#id_add_ctrl"><span class="icon">+</span><span class="longname"> Add Node</span></li>
+            <!--<li data-rel="#id_input_ctrl" class="new_ctrl">Add Input</li>-->
+            <!--<li data-rel="#id_method_ctrl" class="new_ctrl">Add Method</li>-->
             <li data-rel="#id_view_ctrl">View</li>
         </ul>
 
         <form id="id_pipeline_form" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
-        {% if parent_revision %}
-        <input id="id_pipeline_action" value="revise" type="hidden">
-        {% elif family %}
-        <input id="id_pipeline_action" value="add" type="hidden">
-        {% else %}
-        <input id="id_pipeline_action" value="new" type="hidden">
-        {% endif %}
+            {% if parent_revision %}
+            <input id="id_pipeline_action" value="revise" type="hidden">
+            {% elif family %}
+            <input id="id_pipeline_action" value="add" type="hidden">
+            {% else %}
+            <input id="id_pipeline_action" value="new" type="hidden">
+            {% endif %}
             <div id="form_ctrl">
-                {% if parent_revision %}
-                <input type="button" id="id_revert" value="Revert">
-                <input type="button" id="id_update" value="Check for Updates">
-                {% endif %}
                 <input type="submit" id="id_submit_button" value="Submit">
                 <div class="indicator-light"> </div>
                 <div class="errortext" id="id_submit_error"></div>
@@ -84,6 +86,15 @@ $(function() {
         </form>
 
         {% include 'pipeline/pipeline_view_dialog.tpl.html'   with dlg_id="id_view_ctrl"   %}
+
+        <div id="id_add_ctrl" class="ctrl_menu">
+            <ul>
+                <li data-rel="#id_input_ctrl">New Input</li>
+                <li data-rel="#id_method_ctrl">New Method</li>
+                <li data-rel="#id_output_ctrl">New Output</li>
+            </ul>
+        </div>
+
         {% include 'pipeline/pipeline_input_dialog.tpl.html'  with dlg_id="id_input_ctrl"  %}
         {% include 'pipeline/pipeline_method_dialog.tpl.html' with dlg_id="id_method_ctrl" %}
         {% include 'pipeline/pipeline_output_dialog.tpl.html' with dlg_id="id_output_ctrl" %}

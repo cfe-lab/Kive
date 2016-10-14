@@ -16,5 +16,10 @@
         <img src="/static/pipeline/iso_z_icon.png" class="image-button align-btn" data-axis="iso_z">
     </div>
 
-    <input type="button" value="Automatically arrange nodes" id="autolayout_btn">
+    {% if parent_revision %}
+    <button id="id_revert">Revert</button>
+    <button id="id_update">Check for Updates</button>
+    {% endif %}
+
+    <button id="autolayout_btn">Automatically arrange nodes</button>
 </div>

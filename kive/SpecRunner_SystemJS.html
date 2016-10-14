@@ -8,16 +8,11 @@
   <link rel="shortcut icon" type="image/png" href="portal/js/jasmine-2.3.4/jasmine_favicon.png">
   <link rel="stylesheet" href="portal/js/jasmine-2.3.4/jasmine.css">
 
-  <script src="portal/js/jasmine-2.3.4/jasmine.js"></script>
-  <script src="portal/js/jasmine-2.3.4/jasmine-html.js"></script>
-  <script src="portal/js/jasmine-2.3.4/boot.js"></script>
-  <script src="portal/js/imagediff.js"></script>
-
   <!-- include source files here... -->
+  <!--<script src="portal/js/imagediff.js"></script>-->
   <script src="portal/static/portal/core.min.js"></script>
   <script src="portal/static/portal/system.js"></script>
-  <script src="portal/static/portal/system.config.js"></script>
-  <script src="portal/static/portal/jquery-2.0.3.min.js"></script>
+  <script src="portal/js/system-tests.config.js"></script>
   <script src="portal/static/portal/noxss.js"></script>
 
   <!-- include test files here... -->
@@ -27,13 +22,12 @@
       packages: {
         pipeline: {
           format: 'register',
-          main: './tests.js',
+          main: './dialog.tests.js',
           defaultExtension: 'js'
         }
       }
     });
-    System.import('pipeline').then(function() {
-      console.log('yes');
+    System.import('pipeline').then(function(res1) {
       window.onload();
     });
   </script>
@@ -41,5 +35,6 @@
 </head>
 
 <body>
+
 </body>
 </html>

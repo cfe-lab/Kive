@@ -63,6 +63,16 @@ export class Dialog {
         this.reset();
         this.hide();
     }
+    
+    validateInitialization() {
+        for (let propertyName in this) {
+            if (propertyName[0] === "$" && this[propertyName].constructor === $) {
+                if (this[propertyName].length === 0) {
+                    throw "Error in dialog: could not find " + this[propertyName].selector + " in template";
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -99,7 +109,7 @@ class NodePreviewDialog extends Dialog {
             jqueryRef.draggable();
         }
         this.preview_canvas = <HTMLCanvasElement>$('canvas', jqueryRef)[0];
-        this.preview_canvas.width = jqueryRef.innerWidth();
+        this.preview_canvas.width = jqueryRef.width();
         this.preview_canvas.height = 60;
     }
     
@@ -110,7 +120,7 @@ class NodePreviewDialog extends Dialog {
      * @returns {{left: number, top: number}}
      *      the coords that should give an identical page position on otherCanvasState.
      */
-    translateToOtherCanvas(otherCanvasState: CanvasState) {
+    protected translateToOtherCanvas(otherCanvasState: CanvasState) {
         let pos: {left: number, top: number} = $(this.preview_canvas).offset();
         if (this.preview_canvas && pos) {
             pos.left += this.preview_canvas.width  / 2 - otherCanvasState.canvas.offsetLeft;
@@ -126,7 +136,7 @@ class NodePreviewDialog extends Dialog {
      * Sync the preview canvas with dialog inputs.
      * This base class does nothing. Child classes must implement.
      */
-    triggerPreviewRefresh(): void { }
+    protected triggerPreviewRefresh(): void { }
     
     /**
      * Show the dialog.
@@ -153,7 +163,7 @@ class NodePreviewDialog extends Dialog {
     /**
      * Clear canvas
      */
-    clearPreview() {
+    protected clearPreview() {
         this.preview_canvas.width = this.preview_canvas.width;
     }
 }
@@ -374,8 +384,6 @@ export class MethodDialog extends NodePreviewDialog {
     private $delete_outputs;
     private $delete_outputs_details;
     private $submit_button;
-    // Tentatively removed since it doesn't seem to do anything.
-    // private $revision_field;
     private $select_method;
     private $select_method_family;
     private $input_name;
@@ -403,7 +411,6 @@ export class MethodDialog extends NodePreviewDialog {
         this.$delete_outputs = $('#id_method_delete_outputs');
         this.$delete_outputs_details = $('#id_method_delete_outputs_details');
         this.$submit_button = $('#id_method_button');
-        // this.$revision_field = $('#id_method_revision_field');
         this.$select_method = $("#id_select_method");
         this.$select_method_family = $('#id_select_method_family');
         this.$input_name = $('#id_method_name');
@@ -437,7 +444,7 @@ export class MethodDialog extends NodePreviewDialog {
     /**
      * Update the preview canvas based on the dialog state.
      */
-    triggerPreviewRefresh() {
+    protected triggerPreviewRefresh() {
         let value = this.$select_method.val();
         if (value) {
             // Update preview picture of node to show the appropriate MethodNode
@@ -576,7 +583,7 @@ export class MethodDialog extends NodePreviewDialog {
      * @returns
      *      A jQuery Deferred object
      */
-    updateMethodRevisionsMenu(mf_id) {
+    private updateMethodRevisionsMenu(mf_id) {
         if (mf_id !== '') {
             // this.$revision_field.show().focus();
             let request = $.getJSON("/api/methodfamilies/" + mf_id + "/methods/");
@@ -605,7 +612,7 @@ export class MethodDialog extends NodePreviewDialog {
      *      An array of the method's outputs. <exact type unknown>
      *      Each includes object properties dataset_idx and dataset_name.
      */
-    setOutputsFieldsetList (outputs: any[]): void {
+    private setOutputsFieldsetList (outputs: any[]): void {
         this.$delete_outputs.prop('checked', true);
         this.$delete_outputs_details.empty();
         let elements = [];
@@ -633,7 +640,7 @@ export class MethodDialog extends NodePreviewDialog {
      * @param api_method_result
      * @param colour
      */
-    drawPreviewCanvas (api_method_result?, colour?: string): void {
+    private drawPreviewCanvas (api_method_result?, colour?: string): void {
         let n_outputs = Object.keys(api_method_result.outputs).length * 8;
         let n_inputs  = Object.keys(api_method_result.inputs).length * 8 + 14;
     
@@ -664,7 +671,7 @@ export class MethodDialog extends NodePreviewDialog {
      * @params See MethodNode documentation.
      * @returns MethodNode
      */
-    produceMethodNode(id, family, x, y, colour, label, inputs, outputs): MethodNode {
+    private produceMethodNode(id, family, x, y, colour, label, inputs, outputs): MethodNode {
         let method = new MethodNode(
             id, family, x, y, colour, label, inputs, outputs
         );
@@ -750,7 +757,7 @@ export class MethodDialog extends NodePreviewDialog {
     /**
      * Sets the dialog to add a new method on submit.
      */
-    setToAdd() {
+    private setToAdd() {
         this.$submit_button.val('Add Method');
         this.add_or_revise = "add";
     }

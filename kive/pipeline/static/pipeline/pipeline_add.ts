@@ -7,8 +7,6 @@ import { Dialog, InputDialog, MethodDialog, OutputDialog, ViewDialog } from "./p
 import 'jquery';
 declare var noXSS:Function;
 
-// console.log($);
-
 $.fn.extend({
     draggable: function(opt) {
         opt = $.extend({ handle: '', cursor: 'normal' }, opt);
@@ -98,6 +96,7 @@ $(function() {
         let backspace = e.which === 8;
         let del = e.which === 46;
         let esc = e.which === 27;
+        
         // backspace or delete key also removes selected object
         if ((backspace || del) && !targetIsDialog(e)) {
             // prevent backspace from triggering browser to navigate back one page
@@ -109,10 +108,11 @@ $(function() {
         }
         
         // escape key closes menus
-        else if (e.which == 27) {
+        else if (esc) {
             for (let dialog of dialogs) {
                 dialog.cancel();
             }
+            $('.context_menu').trigger('cancel');
             canvasState.selection = [];
             canvasState.valid = false;
         }
@@ -124,6 +124,9 @@ $(function() {
                 return true;
             }
         }
+        if ($(e.target).closest($('.context_menu')).length !== 0) {
+            return true;
+        }
         return false;
     }
 
@@ -132,6 +135,7 @@ $(function() {
             if (!targetIsDialog(e)) {
                 dialog.cancel();
             }
+            $('.context_menu').trigger('cancel');
         }
     }
 
@@ -482,11 +486,17 @@ $(function() {
     var $ctrl_nav = $("#id_ctrl_nav");
     var pipeline_family_dialog = new Dialog( $('#id_family_ctrl'), $ctrl_nav.find("li[data-rel='#id_family_ctrl']") );
     var pipeline_dialog =        new Dialog( $('#id_meta_ctrl'),   $ctrl_nav.find("li[data-rel='#id_meta_ctrl']")   );
-    var input_dialog    =   new InputDialog( $('#id_input_ctrl'),  $ctrl_nav.find("li[data-rel='#id_input_ctrl']")  );
-    var method_dialog   =  new MethodDialog( $('#id_method_ctrl'), $ctrl_nav.find("li[data-rel='#id_method_ctrl']") );
-    var output_dialog   =  new OutputDialog( $('#id_output_ctrl'), $ctrl_nav.find("li[data-rel='#id_output_ctrl']") );
+    var add_menu        =        new Dialog( $('#id_add_ctrl'),    $ctrl_nav.find("li[data-rel='#id_add_ctrl']")    );
+    
+    add_menu.jqueryRef.click('li', function() {
+        add_menu.hide();
+    });
+    
+    var input_dialog    =   new InputDialog( $('#id_input_ctrl'),  $("li[data-rel='#id_input_ctrl']")  );
+    var method_dialog   =  new MethodDialog( $('#id_method_ctrl'), $("li[data-rel='#id_method_ctrl']") );
+    var output_dialog   =  new OutputDialog( $('#id_output_ctrl'), $("li[data-rel='#id_output_ctrl']") );
     var view_dialog     =    new ViewDialog( $('#id_view_ctrl'),   $ctrl_nav.find("li[data-rel='#id_view_ctrl']")   );
-    var dialogs = [ pipeline_family_dialog, pipeline_dialog, input_dialog, method_dialog, output_dialog, view_dialog ];
+    var dialogs = [ pipeline_family_dialog, pipeline_dialog, input_dialog, method_dialog, output_dialog, view_dialog, add_menu ];
 
     // Handle jQuery-UI Dialog spawned for output cable
     $('form', '#id_output_ctrl') .submit( function(e) { e.preventDefault(); output_dialog.submit(canvasState); } );
