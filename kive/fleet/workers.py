@@ -14,6 +14,7 @@ import glob
 import shutil
 import Queue
 import socket
+import inspect
 
 from django.db import connection
 from django.conf import settings
@@ -241,6 +242,9 @@ class Manager(object):
         # A queue of recently-completed runs, to a maximum specified by history.
         self.history_queue = deque(maxlen=history)
 
+        # A queue of functions to call during idle time.
+        self.idle_job_queue = deque()
+
     def _startup(self):
         """
         Set up/register the workers and prepare to run.
@@ -352,6 +356,45 @@ class Manager(object):
         self.sandboxes_shutting_down.discard(sandbox)
         if self.history_queue.maxlen > 0:
             self.history_queue.append(sandbox)
+
+    def _add_idletask(self, newidletask):
+        """Add a task for the manager to perform during her idle time.
+        The newidletask must be a function that accepts a single argument of
+        type comparable to time.time() and returns nothing.
+        The argument provides the time limit after which a task must return from its
+        task. For example, the structure of an idle task would typically be:
+        def my_idle_task(time_to_stop):
+           something_todo = True
+           while (time.time() < time_to_stop and something_todo:
+              do a small amount of work
+              something_todo = checkwork()
+        
+        """
+        try:
+            argspecs = inspect.getargspec(newidletask)
+        except TypeError:
+            raise RuntimeError("add_idletask: Expecting a function as a task")
+        func_isok = (len(argspecs.args) == 1 and argspecs.varargs is None
+                     and argspecs.keywords is None
+                     and argspecs.defaults is None)
+        if func_isok:
+            self.idle_job_queue.append(newidletask)
+        else:
+            print "argspecs", argspecs
+            raise RuntimeError("add_idletask: idle task function must have exactly one argument")
+
+    def _do_idle_tasks(self, time_limit):
+        """Perform registered idle tasks once each, or until time runs out.
+        Idle tasks are called in a round-robin fashion.
+        """
+        num_tasks = len(self.idle_job_queue)
+        num_done = 0
+        while (time.time() < time_limit) and num_done < num_tasks:
+            mgr_logger.info("Running an idle task..")
+            jobtodo = self.idle_job_queue[0]
+            jobtodo(time_limit)
+            self.idle_job_queue.rotate(1)
+            num_done += 1
 
     def assign_task(self, sandbox, task):
         """
@@ -681,6 +724,12 @@ class Manager(object):
         return workers_freed
 
     def assign_tasks(self, time_to_poll):
+        """ Look for tasks to do in the task_queue and farm them out to workers.
+        Do this until there are no tasks left, all workers are busy,
+        or until our time is up as determined by time_to_poll.
+
+        Return True iff no error occurred in doing this.
+        """
         # We can't use a for loop over the task queue because assign_task
         # may add to the queue.
         while len(self.task_queue) > 0 and time.time() < time_to_poll:
@@ -704,6 +753,11 @@ class Manager(object):
         return True
 
     def wait_for_polling(self, time_to_poll):
+        """ Check to see whether any workers are finished.
+        Return either when a worker does finish, or when time is up as defined by time_to_poll.
+
+        Return True iff no error occurred in doing this.
+        """
         while time.time() < time_to_poll:
             if self.interface.probe_for_finished_worker():
                 lord_rank, result_pk = self.interface.receive_finished()
@@ -713,7 +767,6 @@ class Manager(object):
                 except WorkerFailedException as e:
                     mgr_logger.error(e.error_msg)
                     return False
-
             try:
                 time.sleep(settings.SLEEP_SECONDS)
             except KeyboardInterrupt:
@@ -877,16 +930,26 @@ class Manager(object):
         """
         Poll the database for new jobs, and handle running of sandboxes.
         """
+        ext_check_interval = datetime.timedelta(days=settings.EXTERNAL_FILE_CHECK_DAYS,
+                                                hours=settings.EXTERNAL_FILE_CHECK_HOURS,
+                                                minutes=settings.EXTERNAL_FILE_CHECK_MINUTES)
+        if ext_check_interval > datetime.timedelta():
+            self._add_idletask(lambda t: Dataset.idle_externalcheck(t))
+
         time_to_purge = None
         while True:
             self.find_stopped_runs()
 
             time_to_poll = time.time() + settings.FLEET_POLLING_INTERVAL
+            # Start some tasks that are in the queue
             if not self.assign_tasks(time_to_poll):
                 return
+            # Some jobs in the queue have been started:
+            # if we have time, do some idle tasks until time_to_poll and
+            # then check and see if anything has finished.
+            if time.time() < time_to_poll:
+                self._do_idle_tasks(time_to_poll)
 
-            # Everything in the queue has been started, so we check and see if
-            # anything has finished.
             if not self.wait_for_polling(time_to_poll):
                 return
 

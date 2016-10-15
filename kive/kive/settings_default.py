@@ -236,6 +236,16 @@ FLEET_PURGING_INTERVAL = 3600  # in seconds
 # Shorter sleep makes worker more responsive, generates more load when idle.
 SLEEP_SECONDS = 0.1
 
+# External files are held on a remote file system beyond Kive's control; When the
+# Kive Manager is idle, she will periodically check to see whether these files still
+# exist where they were when they were added to the system.
+# If a file is found to be missing, an error is issued via the logging system.
+# Here, set how often each external file should be checked
+# Setting these variables to zero will disable the checking system.
+EXTERNAL_FILE_CHECK_DAYS = 0
+EXTERNAL_FILE_CHECK_HOURS = 0
+EXTERNAL_FILE_CHECK_MINUTES = 0
+
 
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
