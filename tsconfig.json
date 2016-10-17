@@ -8,6 +8,7 @@
         "sourceMap": true
     },
     "exclude": [
-        "node_modules"
+        "node_modules",
+        "kive/portal/js/imagediff.d.ts"
     ]
 }

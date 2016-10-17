@@ -17,6 +17,7 @@ kive/timing.dat
 kive/timing.dot
 kive/timing.txt
 api/results
+
 # Ignore nodeJS modules
 node_modules/
 typings/
@@ -43,4 +44,5 @@ TEST-*
 
 # Specific generated JS files
 kive/pipeline/tests.js
+kive/pipeline/tests/*.js
 kive/sandbox/static/sandbox/view_run.js

@@ -1,23 +1,18 @@
 "use strict";
 
-// import { CanvasWrapper, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet, Connector } from "./static/pipeline/drydock_objects";
-// import { CanvasState } from "./static/pipeline/drydock";
-// import { Pipeline } from "./static/pipeline/pipeline_load";
-import { MethodDialog } from "./static/pipeline/pipeline_dialogs";
+import { MethodDialog } from "../static/pipeline/pipeline_dialogs";
 import "jasmine";
 import 'jasmine-html';
-import 'jasmine-boot';
 import 'jquery';
 import 'jasmine-jquery';
 import 'imagediff';
-declare var imagediff: any;
 
 describe("MethodDialog class", function() {
     
     var dlg;
-    jasmine.getFixtures().fixturesPath = '/kive/pipeline/templates/pipeline';
+    jasmine.getFixtures().fixturesPath = '/templates/pipeline';
     jasmine.getFixtures().preload('./pipeline_method_dialog.tpl.html');
-    jasmine.getStyleFixtures().fixturesPath = '/kive/pipeline/static/pipeline';
+    jasmine.getStyleFixtures().fixturesPath = '/static/pipeline';
     jasmine.getStyleFixtures().preload('./drydock.css');
     
     /* Mock API server call responses by overloading jQuery's getJSON method */
@@ -250,7 +245,7 @@ describe("MethodDialog class", function() {
         expect($('#id_select_method').find('option').length).toBeGreaterThan(0);
     
         var sam2aln = new Image();
-        sam2aln.src = "/kive/pipeline/test_assets/sam2aln_node.png";
+        sam2aln.src = "/pipeline/test_assets/sam2aln_node.png";
         sam2aln.onload = function() {
             expect(canvas).toImageDiffEqual(sam2aln);
             done();
