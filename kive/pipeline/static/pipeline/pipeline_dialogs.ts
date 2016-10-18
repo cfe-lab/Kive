@@ -4,6 +4,63 @@ import { CanvasState } from "./drydock";
 import 'jquery';
 
 /**
+ * Mini jQuery plugin to make dialogs draggable.
+ */
+$.fn.extend({
+    draggable: function(opt) {
+        opt = $.extend({ handle: '', cursor: 'normal' }, opt);
+        var $el = opt.handle === '' ? this : this.find(opt.handle);
+        
+        $el.find('input, select, textarea').on('mousedown', function(e) {
+            e.stopPropagation();
+        });
+        
+        $el.css('cursor', opt.cursor).on("mousedown", function(e) {
+            var $drag;
+            if (opt.handle === '') {
+                $drag = $(this).addClass('draggable');
+            } else {
+                $drag = $(this).addClass('active-handle').parent().addClass('draggable');
+            }
+            
+            if (typeof opt.start == 'function') {
+                opt.start(this);
+            }
+            
+            $drag.data('z', $drag.data('z') || $drag.css('z-index'));
+            
+            var z = $drag.data('z'),
+                pos = $drag.offset(),
+                pos_y = pos.top - e.pageY,
+                pos_x = pos.left - e.pageX;
+            
+            $drag.css('z-index', 1000).parents().off('mousemove mouseup').on("mousemove", function(e) {
+                $('.draggable').offset({
+                    top:  e.pageY + pos_y,
+                    left: e.pageX + pos_x
+                });
+            }).on("mouseup", function() {
+                $(this).removeClass('draggable').css('z-index', z);
+            });
+            
+            e.preventDefault(); // disable selection
+        }).on("mouseup", function() {
+            if (opt.handle === "") {
+                $(this).removeClass('draggable');
+            } else {
+                $(this).removeClass('active-handle').parent().removeClass('draggable');
+            }
+            if (typeof opt.stop == 'function') {
+                opt.stop(this);
+            }
+        });
+        
+        return $el;
+    }
+});
+
+
+/**
  * Base class for UI dialogs on the pipeline assembly canvas.
  * UI is used to set pipeline metadata, add new nodes, and access other controls.
  */

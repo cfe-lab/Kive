@@ -52,7 +52,7 @@
         <a href="/runs" rel="prev"> Back to runs </a>
     {% endif %}
 
-    <div class="pipeline_rdonly_ctrl ctrl_menu">
+    <div class="pipeline_rdonly_ctrl">
         <h4>
             {% if run.description != "" %}
             <span title="{{ run.description }}">
@@ -98,15 +98,4 @@
     <input type="hidden" id="run_pipeline_id" value="{{run.pipeline.id}}">
     <input type="hidden" id="run_md5" value="{{ md5 }}">
 
-    <!-- These are here because drydock expects them, todo, remove these and refactor the code so as not to need them -->
-    <select id="id_pipeline_select" style="display:none"></select>
-    <input type="submit" id="id_method_button" value="Add Method" style="display:none">
-    <div id="dialog_form">
-        <form id="id_output_name_form">
-            <label for="output_name">Output name</label>
-            <input type="text" name="output_name" id="output_name" class="text">
-            <input type="submit" id="output_submit" value="OK">
-            <div id="output_name_error"><img src="/static/pipeline/warning_icon.png"> That name has already been used.</div>
-        </form>
-    </div>
 {% endblock %}

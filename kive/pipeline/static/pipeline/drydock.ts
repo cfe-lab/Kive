@@ -7,7 +7,7 @@
  */
 "use strict";
 import { Geometry } from "./geometry";
-import { CanvasObject, Node, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet, Connector } from "./drydock_objects";
+import { CanvasObject, CNode, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet, Connector } from "./drydock_objects";
 import { Point, Rectangle } from "./ShapeTypes";
 import 'jquery';
 
@@ -340,7 +340,7 @@ export class CanvasState {
     /*
      * Helper functions for CanvasState.autoLayout.
      */
-    private static insertIntoLayer(node: Node, exec_order: MethodNode[], list:Node[]): Node[] {
+    private static insertIntoLayer(node: CNode, exec_order: MethodNode[], list:CNode[]): CNode[] {
         // Insert a node into a list in a "smart" way.
         // * Checks for duplicate entries
         // * If `node` is a method which is not the next method in exec_order, insertion is deferred
@@ -396,7 +396,7 @@ export class CanvasState {
         }
         return null;
     }
-    private static addConnectedNodesOut(node: Node, list: Node[]): void {
+    private static addConnectedNodesOut(node: CNode, list: CNode[]): void {
         // Follow a node's output cables to their connected nodes.
         // Insert these nodes in order into `list`.
         // Do not insert any duplicates into `list`.
@@ -408,7 +408,7 @@ export class CanvasState {
             }
         }
     }
-    private static addConnectedInputNodesIn(node: Node, list: Node[], node_order: Node[][]): void {
+    private static addConnectedInputNodesIn(node: CNode, list: CNode[], node_order: CNode[][]): void {
         // Reflexively insert input nodes into `list`.
         // Do not insert any duplicates into `list`.
         for (let in_magnet of node.in_magnets) {
@@ -575,7 +575,7 @@ export class CanvasState {
         }
     }
     
-    private static pushShapesApart(shape1: Node|OutputZone, shape2: Node|OutputZone, bias: number, bounds: Rectangle): void {
+    private static pushShapesApart(shape1: CNode|OutputZone, shape2: CNode|OutputZone, bias: number, bounds: Rectangle): void {
         let step = 5;
         // Drawing a line between the two objects' centres, move the centre 
         // of mySel to extend this line while keeping the same angle.
@@ -642,7 +642,7 @@ export class CanvasState {
         shape2.dy = sh_y - shape2.y;
     }
     
-    detectCollisions (myShape: Node|OutputZone, bias?: number) {
+    detectCollisions (myShape: CNode|OutputZone, bias?: number) {
         var followups = [],
             vertices = myShape.getVertices(),
             shapes_plus = this.shapes.concat(this.outputZone),
@@ -808,7 +808,7 @@ export class CanvasState {
                 mcm.show().css({ top: e.pageY, left: e.pageX });
                 $('li', mcm).show();
             };
-    
+        
         // Edit mode can popup the context menu to delete and edit nodes
         if (this.can_edit && CanvasState.isNode(sel[0])) {
             showMenu();
@@ -833,7 +833,7 @@ export class CanvasState {
         e.preventDefault();
     }
     
-    addShape(shape: Node): Node {
+    addShape(shape: CNode): CNode {
         this.shapes.push(shape);
         if (shape.isMethodNode()) {
             this.methods.push(shape);
@@ -900,7 +900,7 @@ export class CanvasState {
         return was_fully_connected !== new_method.isFullyConnected();
     }
     
-    findNodeByLabel (label: string): Node {
+    findNodeByLabel (label: string): CNode {
         var found;
         for (let shape of this.shapes) {
             if (shape.label == label) {
@@ -1285,7 +1285,7 @@ export class CanvasState {
         }
     }
     
-    static isUniqueName(list: Node[], name: string) {
+    static isUniqueName(list: CNode[], name: string) {
       for (let shape of list) {
         if (shape.label === name) {
           return false;
@@ -1294,31 +1294,31 @@ export class CanvasState {
       return true;
     }
 
-    static isNode(node: CanvasObject): node is Node {
+    static isNode(node: any): node is CNode {
         return node && node.isNode && node.isNode();
     }
-    static isInputNode(node: CanvasObject): node is CdtNode|RawNode {
+    static isInputNode(node: any): node is CdtNode|RawNode {
         return node && node.isInputNode && node.isInputNode();
     }
-    static isCdtNode(node: CanvasObject): node is CdtNode  {
+    static isCdtNode(node: any): node is CdtNode  {
         return node && node.isCdtNode && node.isCdtNode();
     }
-    static isRawNode(node: CanvasObject): node is RawNode {
+    static isRawNode(node: any): node is RawNode {
         return node && node.isRawNode && node.isRawNode();
     }
-    static isOutputNode(node: CanvasObject): node is OutputNode {
+    static isOutputNode(node: any): node is OutputNode {
         return node && node.isOutputNode && node.isOutputNode();
     }
-    static isMethodNode(node: CanvasObject): node is MethodNode {
+    static isMethodNode(node: any): node is MethodNode {
         return node && node.isMethodNode && node.isMethodNode();
     }
-    static isConnector(obj: CanvasObject): obj is Connector {
+    static isConnector(obj: any): obj is Connector {
         return obj && obj.isConnector && obj.isConnector();
     }
-    static isMagnet(obj: CanvasObject): obj is Magnet {
+    static isMagnet(obj: any): obj is Magnet {
         return obj && obj.isMagnet && obj.isMagnet();
     }
-    static isOutputZone(obj: CanvasObject): obj is OutputZone {
+    static isOutputZone(obj: any): obj is OutputZone {
         return obj && obj.isOutputZone && obj.isOutputZone();
     }
     

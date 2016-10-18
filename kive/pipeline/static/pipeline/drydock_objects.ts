@@ -276,7 +276,7 @@ export interface CanvasObject {
     isOutputZone(): boolean;
 }
 
-export interface Node extends CanvasObject {
+export interface CNode extends CanvasObject {
     highlight(ctx: CanvasRenderingContext2D): void;
     getVertices(): Point[];
     getLabel(): NodeLabel;
@@ -296,6 +296,10 @@ export interface Node extends CanvasObject {
     out_magnets: Magnet[];
     affects_exec_order: boolean;
     has_unsaved_changes: number;
+    
+    /* @todo: investigate where these came from */
+    dataset_id?: any;
+    run_id?: any;
 }
 
 const statusColorMap = {
@@ -392,7 +396,7 @@ class BaseNode {
         }
     }
 
-    isConnectedTo(node: Node) {
+    isConnectedTo(node: CNode) {
         var magnetConnectors = magnet => magnet.connected;
         // may contain duplicates, but that's ok
         var connectors = [].concat(
@@ -590,7 +594,7 @@ class CylinderNode extends BaseNode {
     }
 }
 
-export class RawNode extends CylinderNode implements Node {
+export class RawNode extends CylinderNode implements CNode {
     /*
     BaseNode representing an unstructured (raw) datatype.
      */
@@ -617,7 +621,7 @@ export class RawNode extends CylinderNode implements Node {
     deleteFrom = deleteFromTemplate;
 }
 
-export class CdtNode extends BaseNode implements Node {
+export class CdtNode extends BaseNode implements CNode {
     dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
     dy = 0;
     w = 45;
@@ -772,7 +776,7 @@ export class CdtNode extends BaseNode implements Node {
  * @param status: describes progress during a run, possible values are the
  *  keys in statusColorMap
  */
-export class MethodNode extends BaseNode implements Node {
+export class MethodNode extends BaseNode implements CNode {
 
     dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
     dy = 0;
@@ -791,6 +795,8 @@ export class MethodNode extends BaseNode implements Node {
     /* @todo: figure out what these are */
     new_dependencies;
     new_code_resource_revision;
+    log_id;
+    run_id;
 
     private input_plane_len;
     private vertices: Point[];
@@ -1089,8 +1095,9 @@ export class MethodNode extends BaseNode implements Node {
         var magnets = this.in_magnets.concat(this.out_magnets);
         // delete Connectors
         for (let magnet of magnets) {
-            for (let connected of magnet.connected.reverse()) {// this loop done in reverse so that deletions do not re-index the array
-                connected.deleteFrom(cs);
+            // this loop done in reverse so that deletions do not re-index the array
+            for (let i = magnet.connected.length - 1; i >= 0; i--) {
+                magnet.connected[i].deleteFrom(cs);
             }
         }
         // remove MethodNode from list and any attached Connectors
@@ -1772,9 +1779,9 @@ export class OutputZone implements CanvasObject {
     }
 }
 
-export class OutputNode extends CylinderNode implements Node {
+export class OutputNode extends CylinderNode implements CNode {
     /*
-     Node representing an output.
+     CNode representing an output.
      */
     fill = "#d40";
     defaultFill = "#d40";
