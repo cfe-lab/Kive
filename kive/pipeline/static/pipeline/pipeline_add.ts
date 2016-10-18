@@ -208,9 +208,9 @@ $('form', '#id_input_ctrl')  .submit( function(e) { e.preventDefault();  input_d
 $('form', '#id_method_ctrl') .submit( function(e) { e.preventDefault(); method_dialog.submit(canvasState); } );
 
 canvas.addEventListener("new_output", function(e: CustomEvent) {
-    let node = e.detail.out_node;
-    // console.log('receiving event...', node);
     // spawn dialog for output label
+    let node = e.detail.out_node;
+    output_dialog.makeImmune(); // hack to get around the document.click event closing this right away
     output_dialog.show();
     output_dialog.align(node.x + node.dx, node.y + node.dy);
     output_dialog.load(node);

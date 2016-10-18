@@ -882,15 +882,13 @@ export class OutputDialog extends NodePreviewDialog {
         this.drawPreviewCanvas();
     }
     
-    show() {
-        super.show();
-        console.log('showing');
-    }
-    
-    hide() {
-        super.hide();
-        console.log('hiding');
-        console.trace();
+    /* The following is a hack to get around inconvenient document.click event timing. */
+    cancel_: any;
+    makeImmune() {
+        this.cancel_ = this.cancel;
+        this.cancel = function() {
+            this.cancel = this.cancel_;
+        }
     }
     
     /**
@@ -928,7 +926,6 @@ export class OutputDialog extends NodePreviewDialog {
             left: x - this.jqueryRef.innerWidth()  / 2,
             top:  y - parseInt(this.jqueryRef.css('padding-top'), 10)
         });
-        console.log('align', x, y);
     }
     
     /**
