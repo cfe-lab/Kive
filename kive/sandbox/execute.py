@@ -1719,7 +1719,7 @@ class Sandbox:
 
                 # Cancel the other RunSICs for this step.
                 for rsic in curr_RS.RSICs.exclude(pk__in=completed_cable_pks):
-                    rsic.cancel_pending(save=True)
+                    rsic.cancel(save=True)
 
                 # Update state variables.
                 curr_RS.refresh_from_db()
