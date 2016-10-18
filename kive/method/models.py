@@ -34,6 +34,7 @@ import threading
 import logging
 import shutil
 import time
+import random
 
 
 @python_2_unicode_compatible
@@ -327,9 +328,9 @@ class CodeResourceRevision(metadata.models.AccessControl):
                     dependant.method.build_removal_plan(removal_plan)
                 )
 
-        for method in self.methods.all():
-            if method not in removal_plan["Methods"]:
-                update_removal_plan(removal_plan, method.build_removal_plan(removal_plan))
+        for meth in self.methods.all():
+            if meth not in removal_plan["Methods"]:
+                update_removal_plan(removal_plan, meth.build_removal_plan(removal_plan))
 
         return removal_plan
 
@@ -526,7 +527,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         for line in source_stream:
             # drops \n
             self.logger.debug('%s: %s', source_name, line.rstrip().decode('utf-8'))
-
             for stream in dest_streams:
                 stream.write(line)
 
@@ -647,51 +647,36 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         if log:
             log.start(save=True)
 
-        return_code = None
-        try:
-            method_popen = self.invoke_code(run_path, input_paths, output_paths)
-        except OSError:
-            for stream in error_streams:
-                traceback.print_exc(file=stream)
+        SSH_ERROR = 255
+        MAX_TRY = 5
+        itry = 0
+        dunnit = False
+        method_popen = None
+        # NOTE: we only retry invoking code iff the error code is an ssh error.
+        while itry < MAX_TRY and not dunnit:
+            itry += 1
+            dunnit = True
+            try:
+                method_popen = self.invoke_code(run_path, input_paths, output_paths)
+            except OSError as oserror:
+                method_popen = None
+                self.logger.warning('attempt %d: OSError return code is %d' % (itry, oserror.errno))
+                for stream in error_streams:
+                    traceback.print_exc(file=stream)
+                if oserror.errno == SSH_ERROR:
+                    dunnit = False
+                    # the ssh probably timed out: wait for a random amount of time and retry.
+                    time.sleep(random.random() * itry * 10.0)
+        # if the invocation failed for any reason, bail
+        if method_popen is None:
+            # an OS error
             return_code = -1
-
-        is_terminated = False
-        # Successful execution.
-        if return_code is None:
-            err_thread = threading.Thread(
-                target=self._poll_stream,
-                args=(method_popen.stderr, 'stderr', error_streams))
-            err_thread.start()
-            out_thread = threading.Thread(
-                target=self._poll_stream,
-                args=(method_popen.stdout, 'stdout', output_streams))
-            out_thread.start()
-
-            if stop_execution_callback is None:
-                return_code = method_popen.wait()
-            else:
-                # While periodically checking for a STOP message, we
-                # monitor the progress of method_popen.
-                while method_popen.returncode is None:
-                    if stop_execution_callback() is not None:
-                        # We have received a STOP message.  Terminate method_popen.
-                        method_popen.terminate()
-                        return_code = -2
-                        is_terminated = True
-                        break
-
-                    time.sleep(settings.SLEEP_SECONDS)
-                    method_popen.poll()
-                if not is_terminated:
-                    return_code = method_popen.returncode
-
-            # Having stopped one way or another, make sure we capture the rest of the output.
-            err_thread.join()
-            out_thread.join()
-
-        for stream in output_streams + error_streams:
-            stream.flush()
-
+        else:
+            # Successful invocation, now wait for the step to finish or be terminated.
+            return_code = self._wait_by_threading(method_popen,
+                                                  output_streams,
+                                                  error_streams,
+                                                  stop_execution_callback)
         with transaction.atomic():
             if log:
                 log.stop(save=True, clean=True)
@@ -713,8 +698,62 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 details_to_fill.clean()
                 details_to_fill.save()
 
-        if is_terminated:
+    def _wait_by_blocking(self, method_popen, output_streams,
+                          error_streams, stop_execution_callback):
+        """ This is a drop-in replacement for _wait_by_threading (see below),
+        which however, does not use Threads to wait for the subprocess.Popen process
+        to terminate.
+        Instead, it uses Popen.communicate()
+        """
+        stdout_data, stderr_data = method_popen.communicate()
+        for s in output_streams:
+            s.write(stdout_data)
+            s.flush()
+        for s in error_streams:
+            s.write(stderr_data)
+            s.flush()
+        return method_popen.returncode
+
+    def _wait_by_threading(self, method_popen, output_streams,
+                           error_streams, stop_execution_callback):
+        if method_popen.stderr is None:
+            raise RuntimeError("stderr is None")
+        if method_popen.stdout is None:
+            raise RuntimeError("stdout is None")
+
+        err_thread = threading.Thread(
+            target=self._poll_stream,
+            args=(method_popen.stderr, 'stderr', error_streams))
+        err_thread.start()
+        out_thread = threading.Thread(
+            target=self._poll_stream,
+            args=(method_popen.stdout, 'stdout', output_streams))
+        out_thread.start()
+
+        # While periodically checking for a STOP message, we
+        # monitor the progress of method_popen.
+        is_running = True
+        do_stop = False
+        while is_running and not do_stop:
+            time.sleep(settings.SLEEP_SECONDS)
+            method_popen.poll()
+            is_running = method_popen.returncode is None
+            do_stop = (stop_execution_callback is not None) and (stop_execution_callback() is not None)
+        if do_stop:
+            # We have received a STOP message.  Terminate method_popen.
+            method_popen.terminate()
+            return_code = -2
+        else:
+            return_code = method_popen.returncode
+        err_thread.join()
+        out_thread.join()
+        # Having stopped one way or another, make sure we capture the rest of the output.
+        for stream in output_streams + error_streams:
+            stream.flush()
+
+        if do_stop:
             raise StopExecution("Execution of method {} was stopped.".format(self))
+        return return_code
 
     def invoke_code(self, run_path, input_paths, output_paths,
                     ssh_sandbox_worker_account=settings.KIVE_SANDBOX_WORKER_ACCOUNT):
@@ -762,7 +801,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         for output_path in output_paths:
             self.logger.debug("Confirming output path doesn't exist: {}".format(output_path))
             can_create, reason = file_access_utils.can_create_new_file(output_path)
-
             if not can_create:
                 raise ValueError(reason)
 
@@ -792,15 +830,13 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 "{}@localhost".format(ssh_sandbox_worker_account)
             ]
             command = kive_sandbox_worker_preamble + [ssh_command]
-
         else:
             command = [code_to_run] + input_paths + output_paths
-
         self.logger.debug("subprocess.Popen({})".format(command))
-        code_popen = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                      cwd=run_path)
-
-        return code_popen
+        return subprocess.Popen(command, shell=False,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                cwd=run_path)
 
     def is_identical(self, other):
         """Is this Method identical to another one?"""
@@ -930,9 +966,9 @@ class MethodFamily(transformation.models.TransformationFamily):
         removal_plan = empty_removal_plan()
         removal_plan["MethodFamilies"].add(self)
 
-        for method in self.members.all():
-            if method not in removal_plan["Methods"]:
-                update_removal_plan(removal_plan, method.build_removal_plan(removal_plan))
+        for meth in self.members.all():
+            if meth not in removal_plan["Methods"]:
+                update_removal_plan(removal_plan, meth.build_removal_plan(removal_plan))
 
         return removal_plan
 

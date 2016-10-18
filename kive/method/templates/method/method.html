@@ -75,7 +75,18 @@ Revise method '{{ parent.revision_name }}' in family '{{ family.name }}'
             <br/>
         </td>
     </tr>
-
+    {% if show_shebang_button == True %}
+    <tr>
+      <th> {{ method_form.confirm_shebang.label }} </th>
+      <td>
+	<div class="helptext">{{method_form.confirm_shebang.help_text }} </div>
+	  {{ method_form.confirm_shebang }}
+	<br/>
+        <div class="errortext">{{ method_form.confirm_shebang.errors }}</div>
+        <br/>
+      </td>
+     </tr>
+     {% endif %}
     <tr>
         <th>{{ method_form.reusable.label }}</th>
         <td colspan="3">
