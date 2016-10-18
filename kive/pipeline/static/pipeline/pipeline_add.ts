@@ -17,7 +17,7 @@ export var contextMenu = new CanvasContextMenu('.context_menu', canvasState);
 
 // de-activate double-click selection of text on page
 CanvasListeners.initMouseListeners(canvasState);
-CanvasListeners.initContextMenuListener(canvasState);
+CanvasListeners.initContextMenuListener(canvasState, contextMenu);
 CanvasListeners.initKeyListeners(canvasState);
 CanvasListeners.initResizeListeners(canvasState);
 
@@ -41,7 +41,6 @@ $('.helptext', 'form').each(function() {
 
 
 
-
 var submitPipeline = (function() {
     var $submit_error = $('#id_submit_error');
     return function(e) {
@@ -50,91 +49,62 @@ var submitPipeline = (function() {
          */
         
         e.preventDefault(); // override form submit action
+        clearErrors();
+    
+        let action = $('#id_pipeline_action').val();
+        let is_new = action == "new";
         
-        $submit_error.empty();
-        
-        var action = $('#id_pipeline_action').val();
-        
-        var is_new = action == "new",
-            is_revision = action == "revise",
-            // arguments to initialize new Pipeline Family
-            family = {
-                name: $('#id_family_name'),  // hidden input if revision
-                desc: $('#id_family_desc')
-            },
-            revision = {
-                name: $('#id_revision_name'),
-                desc: $('#id_revision_desc')
-            },
-            users_allowed  = $("#id_permissions_0").find("option:selected").get()
-                .map(el => this.textContent),
-            groups_allowed = $("#id_permissions_1").find("option:selected").get()
-                .map(el => this.textContent);
-        
-        // Form validation
-        if (is_new) {
-            if (family.name.val() === '') {
-                pipeline_family_dialog.show();
-                family.name.addClass('submit-error-missing').focus();
-                submitError('Pipeline family must be named');
-                return;
-            }
-            family.name.add(family.desc).removeClass('submit-error-missing');
-        }
-        
-        revision.desc.add(revision.name).removeClass('submit-error-missing');
-        
-        // Now we're ready to start
-        // TODO: We should really push this into the Pipeline class
-        var form_data = {
-            users_allowed,
-            groups_allowed,
-            
-            // There is no PipelineFamily yet; we're going to create one.
-            family: family.name.val(),
-            family_desc: family.desc.val(),
-            
-            // arguments to add first pipeline revision
-            revision_name: revision.name.val(),
-            revision_desc: revision.desc.val(),
-            revision_parent: is_revision ? parent_revision_id : null,
-            published: $('#published').prop('checked'),
-            
-            // Canvas information to store in the Pipeline object.
-            canvas_width: canvasState.width,
-            canvas_height: canvasState.height
-        };
+        let form_data;
+        let pipeline;
         
         try {
-            // window.pipeline_revision = window.pipeline_revision || new Pipeline(canvasState);
-            let pipeline_revision = new Pipeline(canvasState);
-            
-            // TODO: data cleaning should either be within pipeline_revision.serialize
+            pipeline = new Pipeline(canvasState);
+            pipeline.setMetadata(
+                action,
+                $('#id_family_name').val(),
+                $('#id_family_desc').val(),
+                $('#id_revision_name').val(),
+                $('#id_revision_desc').val(),
+                parent_revision_id,
+                $('#published').prop('checked'),
+                $("#id_permissions_0").find("option:selected").get().map(el => el.textContent),
+                $("#id_permissions_1").find("option:selected").get().map(el => el.textContent)
+            );
+        } catch(e) {
+            pipeline_family_dialog.show();
+            $('#id_family_name').addClass('submit-error-missing').focus();
+            submitError(e);
+            return;
+        }
+        
+        try {
+            // TODO: data cleaning should either be within pipeline.serialize
             // or within this context but probably not both.
-            form_data = pipeline_revision.serialize(form_data);
+            form_data = pipeline.serialize();
         } catch(error) {
             submitError(error);
             return;
         }
         
-        // console.log(form_data);
-        // return;
-        
-        if(!is_new) {
+        if (!is_new) {
             submitPipelineAjax($('#id_family_pk').val(), form_data);
         } else { // Pushing a new family
-            submitPipelineFamilyAjax(
-                {
-                    users_allowed,
-                    groups_allowed,
-                    name: family.name.val(),
-                    description: family.desc.val()
-                },
-                form_data
-            );
+            submitPipelineFamilyAjax({
+                users_allowed: form_data.users_allowed,
+                groups_allowed: form_data.groups_allowed,
+                name: form_data.family,
+                description: form_data.family_desc
+            }).done(function(result) {
+                submitPipelineAjax(result.id, form_data);
+            });
         }
+        
     };// end exposed function - everything that follows is closed over
     
+    function clearErrors() {
+        $submit_error.empty();
+        $('#id_family_name, #id_family_desc, #id_revision_name, #id_revision_desc').removeClass('submit-error-missing');
+    }
     function buildErrors(context, json, errors) {
         for (var field in json) {
             var value = json[field],
@@ -166,13 +136,12 @@ var submitPipeline = (function() {
         $submit_error.show();
     }
     function submitPipelineAjax(family_pk, form_data) {
-        $.ajax({
+        return $.ajax({
             type: "POST",
             url: '/api/pipelines/',
             data: JSON.stringify(form_data),
-            contentType: "application/json"// data will not be parsed correctly without this
+            contentType: "application/json" // data will not be parsed correctly without this
         }).done(function() {
-            // $('#id_submit_error').empty().hide();
             $(window).off('beforeunload');
             window.location.href = '/pipelines/' + family_pk;
         }).fail(function(xhr, status, error) {
@@ -191,14 +160,12 @@ var submitPipeline = (function() {
             }
         });
     }
-    function submitPipelineFamilyAjax(family_form_data, pipeline_form_data) {
-        $.ajax({
+    function submitPipelineFamilyAjax(family_form_data) {
+        return $.ajax({
             type: "POST",
             url: '/api/pipelinefamilies/',
             data: JSON.stringify(family_form_data),
-            contentType: "application/json"// data will not be parsed correctly without this
-        }).done(function(result) {
-            submitPipelineAjax(result.id, pipeline_form_data);
+            contentType: "application/json" // data will not be parsed correctly without this
         }).fail(function(xhr, status, error) {
             var json = xhr.responseJSON,
                 serverErrors = json && json.non_field_errors || [];
@@ -219,17 +186,17 @@ $('#id_pipeline_form').submit(submitPipeline);
  *
  */
 var $ctrl_nav = $("#id_ctrl_nav");
-var $add_menu = $('#id_add_ctrl')
+var $add_menu = $('#id_add_ctrl');
+var $view_menu = $('#id_view_ctrl');
+
 var pipeline_family_dialog = new Dialog( $('#id_family_ctrl'), $ctrl_nav.find("li[data-rel='#id_family_ctrl']") );
                              new Dialog( $('#id_meta_ctrl'),   $ctrl_nav.find("li[data-rel='#id_meta_ctrl']")   );
+                         new ViewDialog( $view_menu,           $ctrl_nav.find("li[data-rel='#id_view_ctrl']")   );
+
 var add_menu        =        new Dialog( $add_menu,            $ctrl_nav.find("li[data-rel='#id_add_ctrl']")    );
 var input_dialog    =   new InputDialog( $('#id_input_ctrl'),  $add_menu.find("li[data-rel='#id_input_ctrl']")  );
 var method_dialog   =  new MethodDialog( $('#id_method_ctrl'), $add_menu.find("li[data-rel='#id_method_ctrl']") );
 var output_dialog   =  new OutputDialog( $('#id_output_ctrl'), $add_menu.find("li[data-rel='#id_output_ctrl']") );
-var view_dialog     =    new ViewDialog( $('#id_view_ctrl'),   $ctrl_nav.find("li[data-rel='#id_view_ctrl']")   );
-// var dialogs = [
-//     pipeline_family_dialog, input_dialog, method_dialog, output_dialog, view_dialog, add_menu
-// ];
 
 $add_menu.click('li', function() {
     add_menu.hide();
@@ -240,15 +207,24 @@ $('form', '#id_output_ctrl') .submit( function(e) { e.preventDefault(); output_d
 $('form', '#id_input_ctrl')  .submit( function(e) { e.preventDefault();  input_dialog.submit(canvasState); } );
 $('form', '#id_method_ctrl') .submit( function(e) { e.preventDefault(); method_dialog.submit(canvasState); } );
 
-$('.form-inline-opts').on('click', 'input',
-    () => view_dialog.changeExecOrderDisplayOption(canvasState)
-);
-$('#autolayout_btn').click(
+canvas.addEventListener("new_output", function(e: CustomEvent) {
+    let node = e.detail.out_node;
+    // console.log('receiving event...', node);
+    // spawn dialog for output label
+    output_dialog.show();
+    output_dialog.align(node.x + node.dx, node.y + node.dy);
+    output_dialog.load(node);
+}, false);
+
+$view_menu.find('.show-order-grp').on('click', '.show-order', function() {
+    ViewDialog.changeExecOrderDisplayOption(canvasState, this.value);
+});
+$view_menu.find('.align-btn-grp').on('click', '.align-btn', function() {
+    ViewDialog.alignCanvasSelection(canvasState, $(this).data('axis'));
+});
+$view_menu.find('#autolayout_btn').click(
     () => canvasState.autoLayout()
 );
-$('.align-btn').click(function() {
-    canvasState.alignSelection($(this).data('axis'));
-});
 
 /******/
 
@@ -259,21 +235,22 @@ $('.align-btn').click(function() {
  */
 contextMenu.registerAction('delete', function(sel) { canvasState.deleteObject(); });
 contextMenu.registerAction('edit', function(sel) {
-    if (CanvasState.isMethodNode(sel) || CanvasState.isOutputNode(sel)) {
-        // For methods, open the edit dialog (rename, method selection, colour picker...)
-        // For outputs, open the renaming dialog
-        var coords = canvasState.getAbsoluteCoordsOfNode(sel);
-        if (CanvasState.isMethodNode(sel)) {
-            let dialog = method_dialog;
-            dialog.show();
-            dialog.align(coords.x, coords.y);
-            dialog.load(sel);
-        } else {
-            let dialog = output_dialog;
-            dialog.show();
-            dialog.align(coords.x, coords.y);
-            dialog.load(sel);
-        }
+    var coords = canvasState.getAbsoluteCoordsOfNode(sel);
+    
+    // For methods, open the edit dialog (rename, method selection, colour picker...)
+    if (CanvasState.isMethodNode(sel)) {
+        let dialog = method_dialog;
+        dialog.show();
+        dialog.align(coords.x, coords.y);
+        dialog.load(sel);
+    }
+
+    // For outputs, open the renaming dialog
+    else if (CanvasState.isOutputNode(sel)) {
+        let dialog = output_dialog;
+        dialog.show();
+        dialog.align(coords.x, coords.y);
+        dialog.load(sel);
     }
 });
 

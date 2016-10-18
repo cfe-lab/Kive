@@ -12,9 +12,49 @@ export class Pipeline {
 
     pipeline: any = null;
     private API_URL = "/api/pipelinefamilies/";
+    
+    private metadata: any;
 
     // Pipeline constructor
     constructor(private canvasState: CanvasState) {
+    }
+    
+    setMetadata(action: string, family: string, family_desc: string,
+                revision_name: string, revision_desc: string,
+                parent_revision_id: number, published: boolean,
+                users_allowed: string[], groups_allowed: string[]) {
+    
+        // @todo: check to make sure all arguments exist
+        // @todo: action can also be 'add' when pipeline family exists with 0 revisions
+        if (action == "new" && family === '') {
+            throw 'Pipeline family must be named';
+        }
+        
+        this.metadata = {
+            users_allowed,
+            groups_allowed,
+    
+            // There is no PipelineFamily yet; we're going to create one.
+            family,
+            family_desc,
+    
+            // arguments to add first pipeline revision
+            revision_name,
+            revision_desc,
+            revision_parent: action === 'revise' ? parent_revision_id : null,
+            published,
+    
+            // Canvas information to store in the Pipeline object.
+            canvas_width: this.canvasState.width,
+            canvas_height: this.canvasState.height
+        };
+    }
+    getMetadata() {
+        var obj = {};
+        for (let key in this.metadata) {
+            obj[key] = this.metadata[key];
+        }
+        return obj;
     }
 
     load(pipeline) {
@@ -77,7 +117,7 @@ export class Pipeline {
         }
 
         // Now we're ready to start
-        form_data = form_data || {};
+        form_data = this.metadata ? this.getMetadata() : {};
         form_data.steps = [];
         form_data.inputs = [];
         form_data.outcables = [];

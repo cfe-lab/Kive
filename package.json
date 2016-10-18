@@ -11,13 +11,13 @@
     "jasmine-jquery": "^2.1.1",
     "jshint": "^2.8.0",
     "shelljs": "^0.5.1",
-    "tslint": "^3.15.1"
+    "tslint": "^3.15.1",
+    "typescript": "^2.0.3"
   },
   "dependencies": {
     "core-js": "^2.4.1",
     "sass": "^0.5.0",
-    "systemjs": "^0.19.39",
-    "typescript": "^1.8.10"
+    "systemjs": "^0.19.39"
   },
   "scripts": {
     "install": "tsc && sass --update kive/"

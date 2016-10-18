@@ -46,3 +46,4 @@ TEST-*
 kive/pipeline/tests.js
 kive/pipeline/tests/*.js
 kive/sandbox/static/sandbox/view_run.js
+kive/sandbox/static/sandbox/PipelineRunTable.js

@@ -46,10 +46,10 @@ export class CanvasState {
     dragoffy = 0;
 
     exec_order: MethodNode[][] = [];
-    exec_order_is_ambiguous: number = null;
-    exec_order_may_have_changed = 0;
-    input_order_may_have_changed = 0;
-    force_show_exec_order: number;
+    exec_order_is_ambiguous: boolean;
+    exec_order_may_have_changed: boolean;
+    input_order_may_have_changed: boolean;
+    force_show_exec_order: boolean;
     has_unsaved_changes = 0;
 
     collisions = 0;
@@ -110,11 +110,11 @@ export class CanvasState {
         var interval_fn = () => {
             if (this.exec_order_may_have_changed) {
                 this.disambiguateExecutionOrder();
-                this.exec_order_may_have_changed = 0;
+                this.exec_order_may_have_changed = false;
             }
             if (this.input_order_may_have_changed) {
                 this.inputs.sort(Geometry.isometricSort);
-                this.input_order_may_have_changed = 0;
+                this.input_order_may_have_changed = false;
             }
             if (!this.valid) {
                 this.draw();
@@ -155,34 +155,43 @@ export class CanvasState {
         return null;
     }
     
-    doDown (e) {
+    /**
+     * If a node or connector was clicked, select it.
+     * If nothing was clicked, de-select everything.
+     *
+     * Shift key enables the following behaviour:
+     * - If a previously selected node was clicked, de-select it.
+     * - If a non-selected node was clicked, select it.
+     * - If nothing was clicked, leave selection as-is (do nothing).
+     *
+     * @param e The mouse event object.
+     */
+    doDown (e: MouseEvent) {
         var pos = this.getPos(e),
-            mx = pos.x, my = pos.y,
-            mySel = this.getMouseTarget(mx, my);
-        
+            mySel = this.getMouseTarget(pos.x, pos.y),
+            selection = this.selection;
+    
         if (mySel === null) {
             if (!e.shiftKey) {
                 // nothing clicked
                 this.selection = [];
                 this.valid = false;
-                let method_button = document.getElementById('id_method_button');
-                if (method_button) {
-                    method_button.setAttribute('value', 'Add Method');
-                }
             }
-            return false;
+        } else {
+            // Check if object is already selected (or if shift key is held)
+            if (e.shiftKey ||
+                    CanvasState.isMagnet(mySel) ||
+                    CanvasState.isSelectable(mySel) &&
+                    selection.indexOf(mySel) === -1) {
+                mySel.doDown(this, e);
+            }
+            this.dragstart = pos;
+            this.dragging = true;
+            this.valid = false; // activate canvas
         }
-        
-        // Check if object is already selected (or if shift key is held)
-        if (e.shiftKey || CanvasState.isNode(mySel) && this.selection.indexOf(mySel) == -1) {
-            mySel.doDown(this, e);
-        }
-        this.dragstart = pos;
-        this.dragging = true;
-        this.valid = false; // activate canvas
     }
     
-    doMove (e): void {
+    doMove (e: MouseEvent): void {
         /*
          event handler for mouse motion over canvas
          */
@@ -217,7 +226,11 @@ export class CanvasState {
 
                             for (let in_magnet of shape.in_magnets) {
                                 // light up magnet
-                                if (in_magnet.connected.length === 0 && sel.source.cdt === in_magnet.cdt) {
+                                if (in_magnet.connected.length === 0 &&
+                                        (sel.source.cdt === in_magnet.cdt ||
+                                        // OutputNodes don't care about datatype.
+                                        CanvasState.isOutputNode(shape))
+                                    ) {
                                     in_magnet.acceptingConnector = true;
                                 }
                             }
@@ -226,7 +239,12 @@ export class CanvasState {
 
                             // does this in-magnet accept this CompoundDatatype?
                             // cdt is null if own_shape is a RawNode
-                            if (CanvasState.isMagnet(in_magnet) && sel.source.cdt === in_magnet.cdt) {
+                            if (CanvasState.isMagnet(in_magnet) &&
+                                    (sel.source.cdt === in_magnet.cdt ||
+                                    // OutputNodes don't care about datatype.
+                                    CanvasState.isOutputNode(shape)
+                                    )
+                                ) {
                                 in_magnet.tryAcceptConnector(sel);
                             }
                         }
@@ -244,15 +262,17 @@ export class CanvasState {
 
                     // if execution order is ambiguous, the tiebreaker is the y-position.
                     // dragging a method node needs to calculate this in real-time.
-                    this.exec_order_may_have_changed |= this.exec_order_is_ambiguous && sel.affects_exec_order;
-                    this.input_order_may_have_changed |= +(sel.isInputNode());
+                    this.exec_order_may_have_changed = this.exec_order_may_have_changed ||
+                            this.exec_order_is_ambiguous && sel.affects_exec_order;
+                    this.input_order_may_have_changed = this.input_order_may_have_changed ||
+                            CanvasState.isInputNode(sel);
                 }
             }
             
             this.dragstart = mouse;
         }
         
-        let was_highlighted = this.mouse_highlight && this.mouse_highlight.isMagnet();
+        let was_highlighted = CanvasState.isMagnet(this.mouse_highlight);
         this.mouse_highlight = null;
         for (let shape of this.shapes) {
             let magnet = shape.getMouseTarget(mouse.x, mouse.y);
@@ -521,6 +541,33 @@ export class CanvasState {
         }});
     };
     
+    
+    private static getCoord = {
+        x:     o => o.y,
+        y:     o => o.x,
+        iso_x: o => Geometry.isometricYCoord(o.x, o.y),
+        iso_y: o => Geometry.isometricXCoord(o.x, o.y)
+    };
+    private static setCoord = {
+        x:     (o, c) => { o.y = c; },
+        y:     (o, c) => { o.x = c; },
+        iso_x: (o, c) => {
+            let diff = Geometry.isoTo2D(
+                0,
+                Geometry.isometricYCoord(o.x, o.y) - c
+            );
+            o.x -= diff.x;
+            o.y -= diff.y;
+        },
+        iso_y: (o, c) => {
+            let diff = Geometry.isoTo2D(
+                Geometry.isometricXCoord(o.x, o.y) - c,
+                0
+            );
+            o.x -= diff.x;
+            o.y -= diff.y;
+        }
+    };
     /**
      * Align selected nodes along the named axis.
      * 
@@ -532,38 +579,19 @@ export class CanvasState {
          * when this "push back out" happens, it should happen -only- on the axis of alignment.
          */
         var sel = this.selection;
-        var getCoord = {
-            x:     o => o.y,
-            y:     o => o.x,
-            iso_z: o => o.x,
-            iso_y: o => Geometry.isometricXCoord(o.x, o.y),
-            iso_x: o => Geometry.isometricYCoord(o.x, o.y)
-        };
-        var setCoord = {
-            x:     (o,c) => { o.y = c; },
-            y:     (o,c) => { o.x = c; },
-            iso_z: (o,c) => { o.x = c; },
-            iso_y: (o,c) => {
-                let diff = Geometry.isoTo2D(Geometry.isometricXCoord(o.x, o.y) - c, 0);
-                o.x -= diff.x;
-                o.y -= diff.y;
-            },
-            iso_x: (o,c) => {
-                let diff = Geometry.isoTo2D(0, Geometry.isometricYCoord(o.x, o.y) - c);
-                o.x -= diff.x;
-                o.y -= diff.y;
-            }
-        };
-        if (Array.isArray(sel) && sel.length > 0 && getCoord.hasOwnProperty(axis)) {
-            let coords = [];
+        if (Array.isArray(sel) && sel.length && CanvasState.getCoord.hasOwnProperty(axis)) {
+            let center = sel.map(
+                    node => CanvasState.getCoord[axis](node)
+                ).reduce(
+                    (a, b) => a + b
+                ) / sel.length;
+            
             for (let sel_ of sel) {
-                coords.push(getCoord[axis](sel_));
-            }
-            let center = coords.reduce((a,b) => a+b) / coords.length;
-            for (let sel_ of sel) {
-                setCoord[axis](sel_, center);
-                sel_.dx = sel_.dy = 0;
-                this.detectCollisions(sel_);
+                if (CanvasState.isNode(sel_)) {
+                    CanvasState.setCoord[axis](sel_, center);
+                    sel_.dx = sel_.dy = 0;
+                    this.detectCollisions(sel_);
+                }
             }
             this.valid = false;
         }
@@ -700,9 +728,8 @@ export class CanvasState {
         }
     }
     
-    doUp (e?: Event): void {
+    doUp (e?: MouseEvent): void {
         this.valid = false;
-        this.$dialog = this.$dialog || $('#dialog_form');
         $(this.canvas).css("cursor", "auto");
         
         // Collision detection!
@@ -750,18 +777,13 @@ export class CanvasState {
                         let out_node = connector.spawnOutputNode(new_output_label);
                         this.detectCollisions(out_node);
                         this.addShape(out_node);
-    
-                        // spawn dialog for output label
-                        this.$dialog
-                            .data('node', out_node)
-                            .show()
-                            .css({
-                                left: out_node.x + out_node.dx - this.$dialog.width()/2,
-                                top:  out_node.y + out_node.dy
+                        
+                        // console.log('dispatching event...');
+                        this.canvas.dispatchEvent(
+                            new CustomEvent('new_output', {
+                                detail: { out_node }
                             })
-                        .find('#output_name')
-                            .val(new_output_label)
-                            .select(); // default value;
+                        );
                     }
                 } else {
                     // Connector not linked to anything - delete
@@ -794,39 +816,6 @@ export class CanvasState {
             }
         }
         return name;
-    }
-    
-    contextMenu (e) {
-        var mcm = $('#method_context_menu'),
-            sel = this.selection,
-            showMenu = () => {
-                mcm.show().css({ top: e.pageY, left: e.pageX });
-                $('li', mcm).show();
-            };
-        
-        // Edit mode can popup the context menu to delete and edit nodes
-        if (this.can_edit && CanvasState.isNode(sel[0])) {
-            showMenu();
-            if (sel.length > 1 || CanvasState.isInputNode(sel[0])) {
-                $('.edit', mcm).hide();
-            }
-        } else if (sel.length == 1) {
-            // Otherwise, we're read only, so only popup the context menu for outputs with datasets
-            let sel0 = sel[0];
-            if ((CanvasState.isInputNode(sel0) || CanvasState.isOutputNode(sel0)) &&
-                sel0.dataset_id) {
-
-               // Context menu for pipeline outputs
-               showMenu();
-               $('.step_node', mcm).hide();
-            } else if (CanvasState.isMethodNode(sel0) && sel0.log_id) {
-               // Context menu for pipeline steps
-               showMenu();
-               $('.dataset_node', mcm).hide();
-            }
-        }
-        this.doUp();
-        e.preventDefault();
     }
     
     addShape(shape: CNode): CNode {
@@ -990,7 +979,7 @@ export class CanvasState {
         
         if (this.exec_order) {
             this.checkAmbiguousExecutionOrder();
-            this.exec_order_may_have_changed |= this.exec_order_is_ambiguous;
+            this.exec_order_may_have_changed = this.exec_order_may_have_changed || this.exec_order_is_ambiguous;
         } else {
             // Pipeline is incomplete
             this.exec_order_is_ambiguous = null;
@@ -1008,7 +997,7 @@ export class CanvasState {
         // finds the maximum and takes its input as an array rather than an
         // argument list)
         // comparison operation 1< will be true if there is more than 1 step per phase.
-        this.exec_order_is_ambiguous = +(1 < Math.max(
+        this.exec_order_is_ambiguous = (1 < Math.max(
             ... this.exec_order.map(a => a.length)
         ));
     }
@@ -1055,10 +1044,10 @@ export class CanvasState {
         this.selection = [];
     }
     
+    /**
+     * Render pipeline objects to Canvas.
+     */
     draw(): void {
-        /*
-        Render pipeline objects to Canvas.
-         */
         var ctx = this.ctx,
             sel = this.selection;
         ctx.save();
@@ -1076,6 +1065,18 @@ export class CanvasState {
         if (draggingFromMethodOut && this.can_edit) {
             this.outputZone.draw(this.ctx);
         }
+    
+        // draw selection ring
+        if (sel.length > 0) {
+            ctx.strokeStyle = this.selectionColor;
+            ctx.lineWidth = this.selectionWidth * 2;
+            ctx.font = '9pt Lato, sans-serif';
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'center';
+            for (let sel_ of sel.filter(CanvasState.isNode)) {
+                sel_.highlight(ctx);
+            }
+        }
         
         // draw all shapes and magnets
         for (let shape of this.shapes) {
@@ -1088,16 +1089,24 @@ export class CanvasState {
             connector.draw(ctx);
         }
         ctx.globalAlpha = 1.0;
-
-        // draw selection ring
-        if (sel.length > 0) {
-            ctx.strokeStyle = this.selectionColor;
-            ctx.lineWidth = this.selectionWidth * 2;
-            ctx.font = '9pt Lato, sans-serif';
-            ctx.textBaseline = 'middle';
-            ctx.textAlign = 'center';
-            for (let sel_ of sel) {
-                sel_.highlight(ctx, this.dragging);
+    
+        // draw labels on connectors of selected nodes
+        ctx.fillStyle = '#aaa';
+        for (let connector of sel.filter(CanvasState.isNode)
+            .reduce((a, b: CNode)  => a.concat( b.in_magnets.concat(b.out_magnets) ), [])
+            .reduce((a, b: Magnet) => a.concat( b.connected                        ), [])
+            ) {
+            connector.drawLabel(ctx);
+        }
+    
+        // draw label if connector itself is selected (and connected)
+        ctx.strokeStyle = this.selectionColor;
+        ctx.lineWidth = this.selectionWidth * 2;
+        ctx.fillStyle = this.selectionColor;
+        for (let connector of sel.filter(CanvasState.isConnector)) {
+            (<Connector> connector).highlight(ctx);
+            if ((<Connector> connector).dest) {
+                (<Connector> connector).drawLabel(ctx);
             }
         }
 
@@ -1123,17 +1132,11 @@ export class CanvasState {
                 ctx.fillText(label.label, label.x, label.y);
             }
         }
-
+        
         if (this.mouse_highlight) {
             // Highlight (label) the object (usually a magnet);
             this.mouse_highlight.highlight(ctx);
         }
-
-        /* Creates a white background */
-        // this.ctx.fillStyle = "#fff";
-        // this.ctx.globalCompositeOperation = 'destination-over';
-        // this.ctx.fillRect(0, 0, this.width / this.scale, this.height / this.scale);
-        // this.ctx.globalCompositeOperation = 'source-over';
         
         ctx.restore();
         this.valid = true;
@@ -1141,22 +1144,30 @@ export class CanvasState {
 
     private labelFns = {
         inputs: function(l, _i) {
-            return "i" + (_i + 1) + l.suffix + ": " + l.label;
+            return "i" + (_i + 1) + (l.suffix || '') + ": " + l.label;
         },
-        _methods: function(l, _i) {
-            return "s" + (_i + 1) + l.suffix + ': ' + l.label;
+        methods: null,
+        methods_with_order: function(l, _i) {
+            return "s" + (_i + 1) + (l.suffix || '') + ': ' + l.label;
+        },
+        methods_without_order: function(l, _i) {
+            return (l.suffix ? l.suffix + ' ' : '') + l.label;
         },
         outputs: function(l) {
             return (l.suffix ? l.suffix + ' ' : '') + l.label;
-        },
-        methods: null
+        }
     };
     generateLabels () {
         // check if method node order is not needed
-        if (!this.force_show_exec_order && !this.exec_order_is_ambiguous) {
-            this.labelFns.methods = this.labelFns.outputs;// treatment is identical to outputs (unordered)
-        } else {
-            this.labelFns.methods = this.labelFns._methods;
+        let showXO = this.force_show_exec_order;
+        let showXOUndef = showXO === undefined;
+        
+        if (showXO === true ||
+                showXOUndef && this.exec_order_is_ambiguous) {
+            this.labelFns.methods = this.labelFns.methods_with_order;
+        } else if (showXO === false ||
+                showXOUndef && !this.exec_order_is_ambiguous) {
+            this.labelFns.methods = this.labelFns.methods_without_order;
         }
 
         // prepare all labels
@@ -1174,7 +1185,7 @@ export class CanvasState {
     
     getPos (e): Point {
         // returns an object with x, y coordinates defined
-        var element = this.canvas,
+        var element = <HTMLElement> this.canvas,
             offsetX = 0,
             offsetY = 0;
     
@@ -1289,20 +1300,26 @@ export class CanvasState {
     static isNode(node: any): node is CNode {
         return node && node.isNode && node.isNode();
     }
-    static isInputNode(node: any): node is CdtNode|RawNode {
-        return node && node.isInputNode && node.isInputNode();
-    }
     static isCdtNode(node: any): node is CdtNode  {
         return node && node.isCdtNode && node.isCdtNode();
     }
     static isRawNode(node: any): node is RawNode {
         return node && node.isRawNode && node.isRawNode();
     }
+    static isMethodNode(node: any): node is MethodNode {
+        return node && node.isMethodNode && node.isMethodNode();
+    }
     static isOutputNode(node: any): node is OutputNode {
         return node && node.isOutputNode && node.isOutputNode();
     }
-    static isMethodNode(node: any): node is MethodNode {
-        return node && node.isMethodNode && node.isMethodNode();
+    static isInputNode(node: any): node is CdtNode|RawNode {
+        return node && (CanvasState.isCdtNode(node) || CanvasState.isRawNode(node));
+    }
+    static isDataNode(node: any): node is CdtNode|RawNode|OutputNode {
+        return node && (CanvasState.isInputNode(node) || CanvasState.isOutputNode(node));
+    }
+    static isSelectable(obj: any): obj is CNode|Connector {
+        return obj && (CanvasState.isNode(obj) || CanvasState.isConnector(obj));
     }
     static isConnector(obj: any): obj is Connector {
         return obj && obj.isConnector && obj.isConnector();

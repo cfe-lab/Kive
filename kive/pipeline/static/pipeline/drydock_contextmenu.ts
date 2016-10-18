@@ -11,8 +11,10 @@ type ContextMenuAction = (sel: (Connector|CNode)|(Connector|CNode)[]) => void
 
 export class CanvasContextMenu {
     $menu: JQuery;
+    private actions: ContextMenuInterface = {};
+    private visible = false;
     
-    constructor(selector: string, cs: CanvasState) {
+    constructor(selector: string, private cs: CanvasState) {
         var menu = this;
         this.$menu = $(selector);
         this.$menu.on({
@@ -21,7 +23,7 @@ export class CanvasContextMenu {
             keydown:   (e: JQueryKeyEventObject)   => {
                 e.stopPropagation();
                 if (e.which === 27) { // esc
-                    menu.cancel();
+                    this.visible && menu.cancel();
                 }
             },
             click: function (e: JQueryMouseEventObject) {
@@ -33,20 +35,16 @@ export class CanvasContextMenu {
                 var action = $(this).data('action');
             
                 if (sel && sel.length) {
-                    // 'delete' is the only action that allows >1 node
-                    // if (action !== 'delete') {
-                    //     sel = sel[0];
-                    // }
                     if (menu.actions.hasOwnProperty(action)) {
                         menu.actions[action](
-                            action == 'delete' ? sel[0] : sel
+                            action == 'delete' ? sel : sel[0]
                         );
                     }
                 }
             }
         }, 'li');
     
-        $(document).click( () => this.cancel() );
+        $(document).click( () => { this.visible && this.cancel(); } );
     }
     
     registerAction(name: string, newAction: ContextMenuAction) {
@@ -57,8 +55,50 @@ export class CanvasContextMenu {
     
     cancel() {
         this.$menu.hide();
+        this.visible = false;
     }
     
-    actions: ContextMenuInterface = { };
+    hide() {
+        this.cancel();
+    }
+    
+    show(e) {
+        this.$menu.show().css({ top: e.pageY, left: e.pageX });
+        $('li', this.$menu).show();
+        this.visible = true;
+    }
+    
+    open(e) {
+        var sel = this.cs.selection;
+        e.preventDefault();
+        
+        this.visible && this.cancel();
+        
+        // Edit mode can popup the context menu to delete and edit nodes
+        if (this.cs.can_edit) {
+            if (CanvasState.isNode(sel[0])) {
+                this.show(e);
+                if (sel.length > 1 || CanvasState.isInputNode(sel[0])) {
+                    $('.edit', this.$menu).hide();
+                }
+            } else {
+                // @todo: Display menu to add nodes
+            }
+        } else if (sel.length == 1) {
+            // Otherwise, we're read only, so only popup the context menu for outputs with datasets
+            let sel0 = sel[0];
+            if (CanvasState.isDataNode(sel0) && sel0.dataset_id) {
+                // Context menu for pipeline outputs
+                this.show(e);
+                $('.step_node', this.$menu).hide();
+            } else if (CanvasState.isMethodNode(sel0) && sel0.log_id) {
+                // Context menu for pipeline steps
+                this.show(e);
+                $('.dataset_node', this.$menu).hide();
+            }
+        }
+        this.cs.doUp();
+    }
+    
     
 }

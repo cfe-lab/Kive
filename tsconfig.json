@@ -5,7 +5,10 @@
         "noImplicitAny": false,
         "removeComments": true,
         "preserveConstEnums": true,
-        "sourceMap": true
+        "sourceMap": true,
+        "paths": {
+            "pipeline/*": [ "/pipeline/static/pipeline/*" ]
+        }
     },
     "exclude": [
         "node_modules",

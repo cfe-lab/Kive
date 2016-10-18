@@ -310,10 +310,10 @@ const statusColorMap = {
         WAITING: 'yellow'
     };
 
-function removeFromArray<T>(array: Array<T>, obj: T) {
+function removeFromArray(array: Array<any>, obj: any) {
     array.splice(array.indexOf(obj), 1);
 }
-function deleteFromTemplate(cs) {
+function deleteFromTemplate(cs: CanvasState) {
     for (let out_magnet of this.out_magnets) {
         for (let connector of out_magnet.connected) {
             removeFromArray(cs.connectors, connector);
@@ -424,7 +424,7 @@ class BaseNode {
     setMagnetPosition() {
         // placeholder - child classes must set
     }
-    draw() {
+    draw(ctx: CanvasRenderingContext2D) {
         // placeholder - child classes must set
     }
 
@@ -551,16 +551,9 @@ class CylinderNode extends BaseNode {
     }
     highlight(ctx: CanvasRenderingContext2D) {
         var canvas = new CanvasWrapper(undefined, ctx);
-        // This line means that we are drawing "behind" the canvas now.
-        // We must set it back after we're done otherwise it'll be utter chaos.
-        ctx.globalCompositeOperation = 'destination-over';
-        // draw bottom ellipse
         canvas.strokeEllipse(this.getBottomEllipse());
-        // draw stack
         canvas.strokeRect(this.getStack());
-        // draw top ellipse
         canvas.strokeEllipse(this.getTopEllipse());
-        ctx.globalCompositeOperation = 'source-over';
     }
     contains (mx: number, my: number): boolean {
         // node is comprised of a rectangle and two ellipses
@@ -604,6 +597,7 @@ export class RawNode extends CylinderNode implements CNode {
     fill = "#8D8";
     found_fill = "blue";
     inset = 10; // distance of magnet from center
+    dataset_id: number;
 
     constructor(public x, public y, public label = "", public input_index?) {
         super(x, y, label);
@@ -636,6 +630,7 @@ export class CdtNode extends BaseNode implements CNode {
     in_magnets = [];
     out_magnets = [];
     found_md5: boolean;
+    dataset_id: number;
 
     /*
     BaseNode represents a Compound Datatype (CSV structured data).
@@ -712,7 +707,6 @@ export class CdtNode extends BaseNode implements CNode {
         var cx = this.x + this.dx,
             cy = this.y + this.dy;
 
-        ctx.globalCompositeOperation = 'destination-over';
         ctx.lineJoin = 'bevel';
 
         var w2 = this.w/2,
@@ -729,8 +723,6 @@ export class CdtNode extends BaseNode implements CNode {
         ctx.lineTo(cx - w2, cap);
         ctx.closePath();
         ctx.stroke();
-
-        ctx.globalCompositeOperation = 'source-over';
     }
     contains (mx, my) {
         /*
@@ -921,6 +913,7 @@ export class MethodNode extends BaseNode implements CNode {
         }
 
         // Highlight the method based on status.
+        // @todo Move this logic to the CanvasState.draw function.
         if (typeof this.status === 'string') {
             ctx.save();
             ctx.strokeStyle = statusColorMap[this.status] || 'black';
@@ -960,33 +953,11 @@ export class MethodNode extends BaseNode implements CNode {
 
     highlight (ctx: CanvasRenderingContext2D) {
         // highlight this node shape
-        ctx.globalCompositeOperation = 'destination-over';
-
-        // body
         this.buildBodyPath(ctx);
         ctx.stroke();
-        ctx.globalCompositeOperation = 'source-over';
-
-        // Any output nodes will also be highlighted.
-        for (let magnet of this.out_magnets) {
-            for (let connected of magnet.connected) {
-                if (CanvasState.isOutputNode(connected.dest.parent)) {
-                    connected.dest.parent.highlight(ctx);
-                }
-                // Draw label on cable.
-                connected.drawLabel(ctx);
-            }
-        }
-        for (let magnet of this.in_magnets) {
-            if (magnet.connected.length !== 0) {
-                magnet.connected[0].drawLabel(ctx);
-            }
-        }
     };
 
     contains (mx, my) {
-        // var shape = this.getVertices().filter( (_, i) => [ 1,2,3,8,4,5,6,10 ].includes(i) );
-        // return Geometry.inPolygon(mx, my, shape);
         var vertices = this.getVertices();
         return Geometry.inPolygon(mx, my,
             [ 1,2,3,8,4,5,6,10 ].map(i => vertices[i])
@@ -1060,10 +1031,6 @@ export class MethodNode extends BaseNode implements CNode {
 
     doDown (cs, e) {
         super.doDown(cs, e);
-        var method_button = document.getElementById('id_method_button');
-        if (method_button) {
-            method_button.setAttribute('value', 'Revise Method');
-        }
     };
 
     updateSignal (status) {
@@ -1164,7 +1131,7 @@ export class Magnet implements CanvasObject {
     contains (mx, my) {
         var dx = this.x - mx;
         var dy = this.y - my;
-        return Math.sqrt(dx*dx + dy*dy) <= this.r + this.attract;
+        return Math.sqrt(dx * dx + dy * dy) <= this.r + this.attract;
     }
     doDown (cs, e) {
         if (this.isInput) {
@@ -1198,6 +1165,10 @@ export class Magnet implements CanvasObject {
             this.connected = [ conn ];
             conn.dest = this;
             this.acceptingConnector = false;
+            // OutputNodes don't care about datatype.
+            if (CanvasState.isOutputNode(this.parent)) {
+                this.cdt = conn.source.cdt;
+            }
         }
     }
 
@@ -1246,7 +1217,7 @@ export class Connector implements CanvasObject {
         - if mouse NOT on CDT-matched in-magnet, delete Connector
      */
 
-    dest:Magnet = null;
+    dest: Magnet = null;
     source: Magnet;
     fromX: number;
     fromY: number;
@@ -1331,9 +1302,6 @@ export class Connector implements CanvasObject {
         ctx.moveTo(this.fromX, this.fromY);
         ctx.bezierCurveTo(this.ctrl1.x, this.ctrl1.y, this.ctrl2.x, this.ctrl2.y, this.x, this.y);
         ctx.stroke();
-        if (this.dest !== null) {
-            this.drawLabel(ctx);
-        }
     }
 
     // make an object in the format of bezier lib
@@ -1395,6 +1363,7 @@ export class Connector implements CanvasObject {
         this.dx = this.x - this.fromX;
         this.dy = this.y - this.fromY;
 
+        // only draw if it's long enough to contain the text
         if ( this.dx * this.dx + this.dy * this.dy > this.label_width * this.label_width / 0.49) {
             // determine the angle of the bezier at the midpoint
             var midpoint = Bezier.nearestPointOnCurve(
@@ -1408,10 +1377,8 @@ export class Connector implements CanvasObject {
             // set the bezier midpoint as the origin
             ctx.translate(midpoint.point.x, midpoint.point.y);
             ctx.rotate(midpointAngle);
-            ctx.fillStyle = '#aaa';
-
-            canvas.drawText(
-                {x: 0, y: 0, dir: 0, text: label, style: "connector"});
+            
+            canvas.drawText({x: 0, y: 0, dir: 0, text: label, style: "connector"});
             ctx.restore();
         }
     }
@@ -1814,15 +1781,12 @@ export class OutputNode extends CylinderNode implements CNode {
         }
 
         this.fill = this.defaultFill;
-        CylinderNode.prototype.draw.call(this, ctx);
+        super.draw(ctx);
     }
     highlight(ctx: CanvasRenderingContext2D) {
-        CylinderNode.prototype.highlight.call(this, ctx);
-        if (this.in_magnets.length && this.in_magnets[0].connected.length) {
-            this.in_magnets[0].connected[0].highlight(ctx);
-        }
+        super.highlight(ctx);
     }
-    deleteFrom(cs) {
+    deleteFrom(cs: CanvasState): void {
         // deleting an output node is the same as deleting the cable
         var connected_cable = this.in_magnets[0].connected;
         if (connected_cable.length > 0) {
@@ -1832,9 +1796,13 @@ export class OutputNode extends CylinderNode implements CNode {
             removeFromArray(cs.outputs, this);
         }
     }
-    debug(ctx: CanvasRenderingContext2D) {
-        this.in_magnets[0].connected[0].debug(ctx);
+    setLabel(label: string): void {
+        this.label = label;
+        this.in_magnets[0].label = label;
     }
+    // debug(ctx: CanvasRenderingContext2D) {
+    //     this.in_magnets[0].connected[0].debug(ctx);
+    // }
     isOutputNode() {
         return true;
     }

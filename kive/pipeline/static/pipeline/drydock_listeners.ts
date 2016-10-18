@@ -1,11 +1,12 @@
 import { CanvasState } from "./drydock";
+import {CanvasContextMenu} from "./drydock_contextmenu";
 
 export class CanvasListeners {
     static initMouseListeners(cs: CanvasState): void {
         cs.canvas.addEventListener('selectstart', e => { e.preventDefault(); return false; }, false);
-        cs.canvas.addEventListener('mousedown',   e => cs.doDown(e), true);
-        cs.canvas.addEventListener('mousemove',   e => cs.doMove(e), true);
-        cs.canvas.addEventListener('mouseup',     e => cs.doUp(e),   true);
+        cs.canvas.addEventListener('mousedown',   e => { cs.doDown(e); }, true);
+        cs.canvas.addEventListener('mousemove',   e => { cs.doMove(e); }, true);
+        cs.canvas.addEventListener('mouseup',     e => { cs.doUp(e); },   true);
     }
     static initKeyListeners(cs: CanvasState): void {
         document.addEventListener('keydown', function(e: KeyboardEvent) {
@@ -69,7 +70,7 @@ export class CanvasListeners {
             resize_timeout = setTimeout(endDocumentResize, 500);
         });
     }
-    static initContextMenuListener(cs: CanvasState): void {
-        cs.canvas.addEventListener('contextmenu', e => cs.contextMenu(e), true);
+    static initContextMenuListener(cs: CanvasState, contextMenu: CanvasContextMenu): void {
+        cs.canvas.addEventListener('contextmenu', e => contextMenu.open(e), true);
     }
 }

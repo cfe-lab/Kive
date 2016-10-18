@@ -66,6 +66,8 @@ $.fn.extend({
  */
 export class Dialog {
     
+    private visible = false;
+    
     /**
      * @param jqueryRef
      *      The root element of the dialog as a jQuery object.
@@ -73,23 +75,34 @@ export class Dialog {
      *      The primary UI control for activating the dialog.
      */
     constructor(public jqueryRef, public activator) {
-        activator.click( () => this.show() );
-        jqueryRef.on('click mousedown keydown', e => e.stopPropagation() )
+        activator.click( e => {
+            // open this one
+            this.show();
+            // do not bubble up (which would hit document.click again)
+            e.stopPropagation();
+        });
+        // capture mouse/key events
+        jqueryRef.on('click mousedown keydown', e => e.stopPropagation() );
+        // esc closes the dialog
         jqueryRef.on('keydown', e => {
             if (e.which === 27) { // esc
                 this.cancel();
             }
         });
-        $(document).click( () => this.cancel() );
+        // hide this menu if it's visible
+        $(document).click( () => { this.visible && this.cancel(); } );
     }
     
     /**
      * Opens the dialog
      */
     show() {
+        // close all other menus
+        $(document).click();
         this.activator.addClass('clicked');
         this.jqueryRef.show().css('left', this.activator.offset().left);
         this.focusFirstEmptyInput();
+        this.visible = true;
     }
     
     /**
@@ -98,6 +111,7 @@ export class Dialog {
     hide() {
         this.activator.removeClass('clicked');
         this.jqueryRef.hide();
+        this.visible = false;
     }
     
     /**
@@ -117,7 +131,7 @@ export class Dialog {
      * Child classes should extend this functionality.
      */
     reset() {
-        this.jqueryRef.find('input, select').not("[type='submit'],[type='button']").val('');
+        this.jqueryRef.find('input[type="text"], textarea, select').val('');
     }
     
     /**
@@ -289,9 +303,9 @@ export class InputDialog extends NodePreviewDialog {
      * Coords default to 0, 0 and label is an empty string.
      * @returns {RawNode|CdtNode}
      */
-    generateNode(): RawNode|CdtNode {
+    generateNode(label: string = ''): RawNode|CdtNode {
         let pk = parseInt(this.$select_cdt.val(), 10); // primary key
-        return isNaN(pk) ? new RawNode(0, 0) : new CdtNode(pk, 0, 0);
+        return isNaN(pk) ? new RawNode(0, 0, label) : new CdtNode(pk, 0, 0, label);
     }
     
     /**
@@ -324,10 +338,9 @@ export class InputDialog extends NodePreviewDialog {
         } else if (!CanvasState.isUniqueName(canvasState.getInputNodes(), node_label)) {
             this.$error.text('That name has already been used.');
         } else {
-            let shape = this.generateNode();
+            let shape = this.generateNode(node_label);
             shape.x = pos.left;
             shape.y = pos.top;
-            shape.label = node_label;
             
             canvasState.addShape(shape);
             // Second arg: Upon collision, move new shape 0% and move existing objects 100%
@@ -532,7 +545,7 @@ export class MethodDialog extends NodePreviewDialog {
      * @param y
      *      The y-coordinate.
      */
-    align(x, y) {
+    align(x: number, y: number): void {
         this.jqueryRef.css({
             left: x - this.preview_canvas.width/2,
             top: y
@@ -544,7 +557,7 @@ export class MethodDialog extends NodePreviewDialog {
      * @param node
      *      The MethodNode to revise.
      */
-    load(node: MethodNode) {
+    load(node: MethodNode): void {
         this.reset();
         this.$select_method_family.val(node.family);
         this.colour_picker.pick(node.fill);
@@ -869,6 +882,17 @@ export class OutputDialog extends NodePreviewDialog {
         this.drawPreviewCanvas();
     }
     
+    show() {
+        super.show();
+        console.log('showing');
+    }
+    
+    hide() {
+        super.hide();
+        console.log('hiding');
+        console.trace();
+    }
+    
     /**
      * Draws an OutputNode on the preview canvas. No need to check the details, all OutputNodes look the same.
      */
@@ -901,9 +925,10 @@ export class OutputDialog extends NodePreviewDialog {
      */
     align(x: number, y: number): void {
         this.jqueryRef.css({
-            left: x - this.jqueryRef.width()  / 2,
-            top:  y - this.jqueryRef.height() / 2
+            left: x - this.jqueryRef.innerWidth()  / 2,
+            top:  y - parseInt(this.jqueryRef.css('padding-top'), 10)
         });
+        console.log('align', x, y);
     }
     
     /**
@@ -913,20 +938,40 @@ export class OutputDialog extends NodePreviewDialog {
      */
     submit(canvasState: CanvasState) {
         var label = this.$output_name.val();
-        if (this.paired_node.label == label) {
-            /* No change */
-            this.hide();
-            this.reset();
-        } else if (CanvasState.isUniqueName(canvasState.getOutputNodes(), label)) {
-            /* Name is changed and valid */
-            this.paired_node.label = label;
-            // canvasState.selection = [ this.paired_node ];
-            canvasState.valid = false;
-            this.hide();
-            this.reset();
+        if (this.paired_node) {
+            if (this.paired_node.label == label) {
+                /* No change */
+                this.hide();
+                this.reset();
+            } else if (CanvasState.isUniqueName(canvasState.getOutputNodes(), label)) {
+                /* Name is changed and valid */
+                this.paired_node.setLabel(label);
+                canvasState.valid = false;
+                this.hide();
+                this.reset();
+            } else {
+                /* Non-unique name entered */
+                this.$error.html('<img src="/static/pipeline/warning_icon.png"> That name has already been used.');
+            }
         } else {
-            /* Non-unique name entered */
-            this.$error.html('<img src="/static/pipeline/warning_icon.png"> That name has already been used.');
+            let pos = this.translateToOtherCanvas(canvasState);
+    
+            // check for empty and duplicate names
+            let node_label = this.$output_name.val();
+            if (node_label === '') {
+                // required field
+                this.$error.text("Label is required.");
+            } else if (!CanvasState.isUniqueName(canvasState.getOutputNodes(), node_label)) {
+                this.$error.html('<img src="/static/pipeline/warning_icon.png"> That name has already been used.');
+            } else {
+                let shape = new OutputNode(pos.left, pos.top, node_label);
+                canvasState.addShape(shape);
+                // Second arg: Upon collision, move new shape 0% and move existing objects 100%
+                canvasState.detectCollisions(shape, 0);
+        
+                this.reset(); // reset text field
+                this.hide();
+            }
         }
     }
     
@@ -941,7 +986,7 @@ export class OutputDialog extends NodePreviewDialog {
     
     /**
      * Closes the dialog and removes the working from the CanvasState.
-     * (Assumes the user got here by dragging an Connector into the canvasState's OutputZone.
+     * (Assumes the user got here by dragging an Connector into the canvasState's OutputZone.)
      * @param canvasState
      */
     cancel(canvasState?: CanvasState) {
@@ -958,19 +1003,26 @@ export class OutputDialog extends NodePreviewDialog {
  */
 export class ViewDialog extends Dialog {
     
+    private static execOrderDisplayOptions = { always: true, never: false, ambiguous: undefined };
+    
     /**
      * Change whether canvasState shows order numbers on MethodNodes.
      * @param canvasState
      */
-    changeExecOrderDisplayOption (canvasState: CanvasState) {
-        var $this = $(this),
-            val = $this.val(),
-            val_map = { always: true, never: false, ambiguous: undefined };
-        
-        if ($this.is(':checked') && val_map.hasOwnProperty(val)) {
-            canvasState.force_show_exec_order = val_map[val];
+    static changeExecOrderDisplayOption (canvasState: CanvasState, value: string) {
+        if (ViewDialog.execOrderDisplayOptions.hasOwnProperty(value)) {
+            canvasState.force_show_exec_order = ViewDialog.execOrderDisplayOptions[value];
             canvasState.valid = false;
         }
+    }
+    
+    /**
+     * Align nodes along an axis.
+     * @param canvasState
+     * @param value
+     */
+    static alignCanvasSelection (canvasState: CanvasState, value: string) {
+        canvasState.alignSelection(value);
     }
     
 }
