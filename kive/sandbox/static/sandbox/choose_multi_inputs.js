@@ -250,7 +250,7 @@ $(function() {
             if (this.hasOwnProperty("$fixed_header")) {
                 this.$fixed_header.css('width', this.closest('table').outerWidth());
             }
-        }
+        };
     })();
     var stopProp = function(e) {
         e.stopPropagation();
@@ -690,7 +690,7 @@ $(function() {
                 showPageError(xhr.responseText, '.pipeline-error', true);
             });
         } else {
-            showPageError("Please complete the inputs table or remove any unwanted runs before continuing.", '.pipeline-error')
+            showPageError("Please complete the inputs table or remove any unwanted runs before continuing.", '.pipeline-error');
         }
     };
     var serialize = function(e) {
@@ -995,7 +995,7 @@ $(function() {
     $('.search_results')      .on( 'click', 'tbody tr',        selectSearchResult           )
                             .on('dblclick', 'tbody tr',        addSelectedDatasetsToInput   );
     set_dataset.options_menu  .on( 'click', 'li',              set_dataset.options_menu.choose );
-    $('.add_run')             .on( 'click',                function() { dataset_input_table.addNewRunRow(); } )
+    $('.add_run')             .on( 'click',                function() { dataset_input_table.addNewRunRow(); } );
     $('#run_controls')        .on( 'click', '.remove_run', function() { dataset_input_table.removeLastRunRow(); } );
 
     $(window).scroll();

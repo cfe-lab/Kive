@@ -65,18 +65,23 @@ class PipelineStepRequest(object):
             kive,
             self.old_method['driver'])
         has_changes = self.driver.check_for_changes(self.old_method['driver'])
+        response = kive.get('/api/coderesources/')
+        code_resource_filenames = {r['name']: r['filename']
+                                   for r in response.json()}
         old_dependencies = {}  # {filename: dependency}
         for old_dependency in self.old_method['dependencies']:
             old_revision_id = old_dependency['requirement']
             old_revision = self.get_code_resource_revision(kive, old_revision_id)
             resource_name = old_revision['coderesource']
+            resource_filename = code_resource_filenames[resource_name]
             old_dependency['requirement'] = old_revision
-            old_dependencies[resource_name] = old_dependency
+            old_dependencies[resource_filename] = old_dependency
         for new_dependency in self.dependencies:
             old_dependency = old_dependencies.get(
                 new_dependency['requirement'].name)
-            has_changes |= new_dependency['requirement'].check_for_changes(
-                old_dependency['requirement'])
+            has_changes |= (old_dependency is None or
+                            new_dependency['requirement'].check_for_changes(
+                                old_dependency['requirement']))
         checked_attributes = 'reusable threads users_allowed groups_allowed'.split()
         new_method = self.config['transformation']
         for attribute in checked_attributes:
@@ -341,8 +346,6 @@ def find_dependencies(kive, folder, revision_config):
                                                             folder,
                                                             old_requirement)
         yield new_dependency
-        for child in find_dependencies(kive, folder, old_requirement):
-            yield child
 
 
 def load_steps(kive, folder, pipeline_family, groups):
@@ -362,7 +365,7 @@ def load_steps(kive, folder, pipeline_family, groups):
         step.driver = CodeResourceRequest(kive, folder, transformation['driver'])
         step.name = step_config['name']
         step.dependencies = list(
-            find_dependencies(kive, folder, transformation['driver']))
+            find_dependencies(kive, folder, transformation))
         step.inputs = []
         for input_config in step_config['inputs']:
             if input_config['structure'] is None:
@@ -429,11 +432,21 @@ def create_methods(kive, steps, revision_name):
                     output_config['structure']['compounddatatype'] = new_id
                 outputs.append(output_config)
             dependencies = []
+            dependency_paths = set()
             for dependency in step.dependencies:
                 new_revision = dependency['requirement'].code_resource_revision
-                dependencies.append(dict(requirement=new_revision['id'],
-                                         path=dependency['depPath'],
-                                         filename=dependency['depFileName']))
+
+                # Skip duplicates caused by migrations.
+                filename = dependency['filename']
+                if not filename:
+                    filename = dependency['requirement'].config['coderesource']['filename']
+                dependency_path = os.path.normpath(
+                    os.path.join(dependency['path'], filename))
+                if dependency_path not in dependency_paths:
+                    dependencies.append(dict(requirement=new_revision['id'],
+                                             path=dependency['path'],
+                                             filename=dependency['filename']))
+                    dependency_paths.add(dependency_path)
             response = kive.post('/api/methods/',
                                  json=dict(revision_name=revision_name,
                                            family=step.method_family['name'],

@@ -7,6 +7,9 @@
 # STATIC_ROOT: set to the absolute path you wish to use on your system
 # KIVE_SANDBOX_WORKER_ACCOUNT: the user account used to run sandboxes
 # KIVE_PROCESSING_GROUP: group representing users that have access to the sandboxes
+# EMAIL_{HOST|PORT|HOST_USER|HOST_PASSWORD|USE_TLS|USE_SSL|TIMEOUT|SSL_KEYFILE|SSL_CERTFILE}:
+#    settings used for sending logged error messages via email to the administrators
+# ADMINS: system administrators
 
 
 DEBUG = True
@@ -14,6 +17,20 @@ DEBUG = True
 ADMINS = (
     # ('Your Name', 'your_email@example.com'),
 )
+
+# These are the default values; customize for your installation.
+# EMAIL_HOST = "localhost"
+# EMAIL_PORT = 25
+# SERVER_EMAIL = ""
+# EMAIL_HOST_USER = ""
+# EMAIL_HOST_PASSWORD = ""
+# EMAIL_USE_TLS = False
+# EMAIL_USE_SSL = False
+# EMAIL_TIMEOUT = None
+# EMAIL_SUBJECT_PREFIX = "[Kive] "
+# EMAIL_SSL_CERTFILE = None
+# EMAIL_SSL_KEYFILE = None
+# EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 AUTH_USER_MODEL = "auth.User"
 
