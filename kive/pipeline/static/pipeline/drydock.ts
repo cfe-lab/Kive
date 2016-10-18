@@ -2,14 +2,13 @@
  * drydock.js
  *   Implements HTML5 Canvas interface for assembling
  *   pipelines from datatype and method nodes.
- *   Based on the canvas interactivity example by Simon
- *   Sarris, HTML5 Unleashed (2014) Pearson Education Inc.
  */
 "use strict";
-import { Geometry } from "./geometry";
 import { CanvasObject, CNode, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet, Connector } from "./drydock_objects";
-import { Point, Rectangle } from "./ShapeTypes";
+import { Geometry, Point, Rectangle } from "./geometry";
 import 'jquery';
+
+export const REDRAW_INTERVAL = 50; // ms
 
 export class CanvasState {
     /**
@@ -34,20 +33,20 @@ export class CanvasState {
     enable_labels = true;
 
     valid = false; // if false, canvas will redraw everything
-    shapes = []; // collection of shapes to be drawn
-    methods = []; // collection of methods to be drawn (subset of shapes)
-    inputs = []; // collection of inputs to be drawn (subset of shapes)
-    outputs = []; // collection of outputs to be drawn (subset of shapes)
-    connectors = []; // collection of connectors between shapes
+    shapes: CNode[] = []; // collection of shapes to be drawn
+    methods: MethodNode[] = []; // collection of methods to be drawn (subset of shapes)
+    inputs: (CdtNode|RawNode)[] = []; // collection of inputs to be drawn (subset of shapes)
+    outputs: OutputNode[] = []; // collection of outputs to be drawn (subset of shapes)
+    connectors: Connector[] = []; // collection of connectors between shapes
     dragging = false; // if mouse drag
 
-    selection = []; // reference to active (selected) objects
+    selection: (CNode|Connector)[] = []; // reference to active (selected) objects
     dragstart = { x: 0, y: 0 }; // where in the object we clicked
     dragoffx = 0;
     dragoffy = 0;
 
-    exec_order = [];
-    exec_order_is_ambiguous:number = null;
+    exec_order: MethodNode[][] = [];
+    exec_order_is_ambiguous: number = null;
     exec_order_may_have_changed = 0;
     input_order_may_have_changed = 0;
     force_show_exec_order: number;
@@ -69,14 +68,13 @@ export class CanvasState {
     htmlTop:number;
     htmlLeft: number;
     outputZone: OutputZone;
-    can_edit: boolean;
 
     mouse_highlight: Magnet;
     $dialog: any;
 
     static method_node_queue: MethodNode[] = [];
-
-    constructor(public canvas, interval?) {
+    
+    constructor(public canvas: HTMLCanvasElement, public can_edit: boolean, interval?: number) {
         /*
         keeps track of canvas state (mouse drag, etc.)
          */
@@ -126,9 +124,6 @@ export class CanvasState {
         if (interval !== undefined) {
             setInterval(interval_fn, interval);
         }
-    
-        // Parameters on data-x
-        this.can_edit = $(canvas).data('editable') !== false;
     }
 
     setScale(factor: number): void {
@@ -179,7 +174,7 @@ export class CanvasState {
         }
         
         // Check if object is already selected (or if shift key is held)
-        if (e.shiftKey || this.selection.indexOf(mySel) == -1) {
+        if (e.shiftKey || CanvasState.isNode(mySel) && this.selection.indexOf(mySel) == -1) {
             mySel.doDown(this, e);
         }
         this.dragstart = pos;
@@ -199,7 +194,7 @@ export class CanvasState {
             // are we carrying a shape or Connector?
             for (let sel of this.selection) {
                 // are we carrying a connector?
-                if (sel.isConnector()) {
+                if (CanvasState.isConnector(sel)) {
                     if (this.can_edit) {
                         // reset to allow mouse to disengage Connector from a magnet
                         sel.x = mouse.x;
@@ -231,7 +226,7 @@ export class CanvasState {
 
                             // does this in-magnet accept this CompoundDatatype?
                             // cdt is null if own_shape is a RawNode
-                            if (in_magnet && sel.source.cdt === in_magnet.cdt) {
+                            if (CanvasState.isMagnet(in_magnet) && sel.source.cdt === in_magnet.cdt) {
                                 in_magnet.tryAcceptConnector(sel);
                             }
                         }
@@ -261,8 +256,7 @@ export class CanvasState {
         this.mouse_highlight = null;
         for (let shape of this.shapes) {
             let magnet = shape.getMouseTarget(mouse.x, mouse.y);
-            if (magnet && magnet.isMagnet() &&
-                    magnet.connected.length === 0) {
+            if (CanvasState.isMagnet(magnet) && magnet.connected.length === 0) {
                 if (magnet !== this.mouse_highlight) {
                     this.mouse_highlight = magnet;
                     this.valid = false;
@@ -645,7 +639,7 @@ export class CanvasState {
     detectCollisions (myShape: CNode|OutputZone, bias?: number) {
         var followups = [],
             vertices = myShape.getVertices(),
-            shapes_plus = this.shapes.concat(this.outputZone),
+            shapes_plus: (CNode|OutputZone)[] = [].concat(this.shapes, this.outputZone),
             canvas_bounds: Rectangle = {
                 x: 0,
                 y: 0,
@@ -715,7 +709,7 @@ export class CanvasState {
         // Note: algorithm now includes collisions with OutputZone.
         if (this.dragging) {
             for (let sel of this.selection) {
-                if (typeof sel.getVertices == 'function') {
+                if (CanvasState.isNode(sel)) {
                     this.detectCollisions(sel);
                 }
             }
@@ -723,8 +717,9 @@ export class CanvasState {
         
         this.dragging = false;
         
-        if (CanvasState.isConnector(this.selection[0])) {
-            let connector = this.selection[0];
+        let sel = this.selection[0];
+        if (CanvasState.isConnector(sel)) {
+            let connector = sel;
 
             if (CanvasState.isMagnet(connector.dest)) {
                 // connector has been linked to an in-magnet
@@ -817,13 +812,14 @@ export class CanvasState {
             }
         } else if (sel.length == 1) {
             // Otherwise, we're read only, so only popup the context menu for outputs with datasets
-            if ((CanvasState.isInputNode(sel[0]) || CanvasState.isOutputNode(sel[0])) &&
-                sel[0].dataset_id) {
+            let sel0 = sel[0];
+            if ((CanvasState.isInputNode(sel0) || CanvasState.isOutputNode(sel0)) &&
+                sel0.dataset_id) {
 
                // Context menu for pipeline outputs
                showMenu();
                $('.step_node', mcm).hide();
-            } else if (CanvasState.isMethodNode(sel[0]) && sel[0].log_id) {
+            } else if (CanvasState.isMethodNode(sel0) && sel0.log_id) {
                // Context menu for pipeline steps
                showMenu();
                $('.dataset_node', mcm).hide();
@@ -835,13 +831,13 @@ export class CanvasState {
     
     addShape(shape: CNode): CNode {
         this.shapes.push(shape);
-        if (shape.isMethodNode()) {
+        if (CanvasState.isMethodNode(shape)) {
             this.methods.push(shape);
             this.testExecutionOrder();
-        } else if (shape.isInputNode()) {
+        } else if (CanvasState.isInputNode(shape)) {
             this.inputs.push(shape);
             this.inputs.sort(Geometry.isometricSort);
-        } else if (shape.isOutputNode()) {
+        } else if (CanvasState.isOutputNode(shape)) {
             this.outputs.push(shape);
         }
         shape.has_unsaved_changes = 1;
@@ -1069,11 +1065,12 @@ export class CanvasState {
         this.clear();
         ctx.scale(this.scale, this.scale);
         
+        let sel0 = sel[0];
         var draggingFromMethodOut = (
                 this.dragging &&
                 sel.length == 1 &&
-                sel[0].isConnector() &&
-                sel[0].source.parent.isMethodNode() );
+                CanvasState.isConnector(sel0) &&
+                sel0.source.parent.isMethodNode() );
         
         // draw output end-zone -when- dragging a connector from a MethodNode
         if (draggingFromMethodOut && this.can_edit) {
@@ -1101,13 +1098,6 @@ export class CanvasState {
             ctx.textAlign = 'center';
             for (let sel_ of sel) {
                 sel_.highlight(ctx, this.dragging);
-            }
-        }
-        
-        // draw all update signals above shapes and connectors
-        for (let method of this.methods) {
-            if (method.update_signal) {
-                method.update_signal.draw(ctx);
             }
         }
 
@@ -1182,34 +1172,24 @@ export class CanvasState {
         return labels;
     }
     
-    initMouseListeners(): void {
-        this.canvas.addEventListener('selectstart', e => { e.preventDefault(); return false; }, false);
-        this.canvas.addEventListener('mousedown',   e => this.doDown(e), true);
-        this.canvas.addEventListener('mousemove',   e => this.doMove(e), true);
-        this.canvas.addEventListener('mouseup',     e => this.doUp(e),   true);
-    }
-    
     getPos (e): Point {
         // returns an object with x, y coordinates defined
-        var element = this.canvas, offsetX = 0, offsetY = 0, mx, my;
+        var element = this.canvas,
+            offsetX = 0,
+            offsetY = 0;
     
         if (typeof element.offsetParent !== 'undefined') {
             do {
                 offsetX += element.offsetLeft;
                 offsetY += element.offsetTop;
-            } while ((element = element.offsetParent));
+            } while (element = element.offsetParent);
         }
     
         offsetX += this.stylePaddingLeft + this.styleBorderLeft + this.htmlLeft;
         offsetY += this.stylePaddingTop + this.styleBorderTop + this.htmlTop;
     
-        mx = e.pageX - offsetX;
-        my = e.pageY - offsetY;
-    
-        if (this.scale !== 1) {
-            mx /= this.scale;
-            my /= this.scale;
-        }
+        let mx = (e.pageX - offsetX) / this.scale;
+        let my = (e.pageY - offsetY) / this.scale;
     
         return { x: mx, y: my };
     };

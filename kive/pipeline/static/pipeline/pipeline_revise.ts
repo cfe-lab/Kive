@@ -1,8 +1,11 @@
 import { Pipeline } from "./pipeline_load";
 import { CanvasState } from "./drydock";
 import 'jquery';
-declare var noXSS: any;
 
+/**
+ * @todo:
+ * Merge this file with pipeline_load.ts
+ */
 export class PipelineReviser {
     pipelineRaw: any;
     pipelineRevision: Pipeline;

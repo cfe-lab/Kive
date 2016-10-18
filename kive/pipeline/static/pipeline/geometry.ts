@@ -1,4 +1,5 @@
-import {Point, Rectangle, Ellipse} from "./ShapeTypes";
+import { Point, Rectangle, Ellipse } from "./ShapeTypes";
+export { Point, Rectangle, Ellipse } from "./ShapeTypes";
 export class Geometry {
 
     static inEllipse(m:Point, ellipse: Ellipse): boolean;

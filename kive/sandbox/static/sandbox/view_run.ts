@@ -1,43 +1,64 @@
-"user strict";
+"use strict";
 
-import { canvasState } from '/static/pipeline/pipeline_dashboard';
-import { Pipeline } from "/static/pipeline/pipeline_load";
+import { CanvasState, CanvasContextMenu, CanvasListeners, Pipeline, REDRAW_INTERVAL } from "/static/pipeline/pipeline_all";
 import 'jquery';
+import '/static/portal/noxss.js';
 
-var run_id = parseInt($('#run_id').val(), 10),
-    pipeline_id = parseInt($('#run_pipeline_id').val(), 10),
-    md5 = $('#run_md5').val(),
-    timer,
-    timerInterval = 1000,
-    pipeline = new Pipeline(canvasState);
+declare var noXSS: any;
+noXSS();
 
-// Methods
-var $msg = $('#run_status');
+const RUN_ID = parseInt($('#run_id').val(), 10);
+const PIPELINE_ID = parseInt($('#run_pipeline_id').val(), 10);
+const MD5 = $('#run_md5').val();
+const TIMER_INTERVAL = 1000;
+
+// initialize animated canvas
+let canvas = document.getElementById('pipeline_canvas') as HTMLCanvasElement;
+canvas.width  = window.innerWidth;
+canvas.height = window.innerHeight - $(canvas).offset().top - 5;
+
+var canvasState = new CanvasState(canvas, false, REDRAW_INTERVAL);
+var pipeline = new Pipeline(canvasState);
+CanvasListeners.initMouseListeners(canvasState);
+CanvasListeners.initContextMenuListener(canvasState);
+CanvasListeners.initKeyListeners(canvasState);
+CanvasListeners.initResizeListeners(canvasState);
+
+$.get("/api/pipelines/" + PIPELINE_ID + "/")
+    .done(function(pipeline_raw) {
+            pipeline.load(pipeline_raw);
+            pipeline.draw();
+            grabStatus();
+        }
+    );
+
 var status_message = {
+    $msg: $('#run_status'),
     set: function(msg: string, use_link: boolean = false, use_anim: boolean = false) {
-        $msg.empty();
+        status_message.$msg.empty();
         if (use_link) {
             $('<a>')
-                .attr('href', '/view_results/' + run_id + '?back_to_view=true')
+                .attr('href', '/view_results/' + RUN_ID + '?back_to_view=true')
                 .text(msg)
-                .appendTo($msg)
+                .appendTo(status_message.$msg)
             ;
         } else {
-            $msg.text(msg);
+            status_message.$msg.text(msg);
         }
         if (use_anim) {
-            $msg.prepend('<img src="/static/sandbox/preload.gif"> &nbsp;');
+            status_message.$msg.prepend('<img src="/static/sandbox/preload.gif"> &nbsp;');
         }
     }
 };
 
-function grabStatus() {
-    if (timer === undefined) {
-        timer = setInterval(grabStatus, timerInterval);
+interface TimerFunction extends Function { timer?: number }
+var grabStatus: TimerFunction = function() {
+    if (grabStatus.timer === undefined) {
+        grabStatus.timer = setInterval(grabStatus, TIMER_INTERVAL);
     }
 
     // Poll the server
-    $.getJSON("/api/runs/" + run_id + "/run_status/", {}, function(run) {
+    $.getJSON("/api/runs/" + RUN_ID + "/run_status/", {}, function(run) {
         var status: string = run.status;
         status_message.set('Complete', true);
 
@@ -46,27 +67,40 @@ function grabStatus() {
             status_message.set('Waiting for run to start', false, true);
         } else if (status.indexOf('Too') >= 0) {
             status_message.set(status);
-            clearInterval(timer);
+            clearInterval(grabStatus.timer);
         } else {
             if (status.indexOf('!') >= 0) {
                 status_message.set('Failed', true);
-                clearInterval(timer);
+                clearInterval(grabStatus.timer);
             } else if (status.match(/[\+\.:]/)) {
                 status_message.set('In progress', true, true);
             } else {
-                clearInterval(timer);
+                clearInterval(grabStatus.timer);
             }
-            pipeline.update(run, md5, run_id);
+            pipeline.update(run, MD5, RUN_ID);
         }
     });
-}
+};
 
-$.get("/api/pipelines/" + pipeline_id + "/")
-    .done(function(pipeline_raw) {
-        pipeline.load(pipeline_raw);
-        pipeline.draw();
-        grabStatus();
+var contextMenu = new CanvasContextMenu('.context_menu', canvasState);
+
+contextMenu.registerAction('display', function(sel) {
+    if (CanvasState.isNode(sel) && !CanvasState.isMethodNode(sel)) {
+        window.location.href = '/dataset_view/' + sel.dataset_id + '?run_id=' + sel.run_id + "&view_run";
     }
-);
-
-$(document).off('cancel', '.ctrl_menu');
+});
+contextMenu.registerAction('download', function(sel) {
+    if (CanvasState.isNode(sel) && !CanvasState.isMethodNode(sel)) {
+        window.location.href = '/dataset_download/' + sel.dataset_id + "&view_run";
+    }
+});
+contextMenu.registerAction('viewlog', function(sel) {
+    if (CanvasState.isMethodNode(sel)) {
+        window.location.href = '/stdout_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
+    }
+});
+contextMenu.registerAction('viewerrorlog', function(sel) {
+    if (CanvasState.isMethodNode(sel)) {
+        window.location.href = '/stderr_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
+    }
+});

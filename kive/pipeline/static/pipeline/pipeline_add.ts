@@ -1,9 +1,46 @@
 "use strict";
-
+import { CanvasState, CanvasContextMenu, CanvasListeners, Pipeline, PipelineReviser, REDRAW_INTERVAL } from "./pipeline_all";
 import { ViewDialog, OutputDialog, MethodDialog, InputDialog, Dialog } from "./pipeline_dialogs";
-import { canvasState, dialogs, parent_revision_id, contextMenuActions } from "./pipeline_dashboard";
-import { Pipeline } from "./pipeline_load";
-import { CanvasState } from "./drydock";
+import 'jquery';
+import '/static/portal/noxss.js';
+
+declare var noXSS: any;
+noXSS();
+
+// initialize animated canvas
+let canvas = document.getElementById('pipeline_canvas') as HTMLCanvasElement;
+canvas.width  = window.innerWidth;
+canvas.height = window.innerHeight - $(canvas).offset().top - 5;
+
+export var canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
+export var contextMenu = new CanvasContextMenu('.context_menu', canvasState);
+
+// de-activate double-click selection of text on page
+CanvasListeners.initMouseListeners(canvasState);
+CanvasListeners.initContextMenuListener(canvasState);
+CanvasListeners.initKeyListeners(canvasState);
+CanvasListeners.initResizeListeners(canvasState);
+
+let parent_revision_id;
+let initialData = $("#initial_data");
+if (initialData.length) {
+    let text = initialData.text();
+    if (text.length) {
+        let loader = new PipelineReviser(text);
+        loader.load(canvasState);
+        loader.setUpdateCtrl($('#id_update'));
+        loader.setRevertCtrl($('#id_revert'));
+        parent_revision_id = loader.pipelineRaw.id;
+    }
+}
+
+// Pack help text into an unobtrusive icon
+$('.helptext', 'form').each(function() {
+    $(this).wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
+});
+
+
+
 
 var submitPipeline = (function() {
     var $submit_error = $('#id_submit_error');
@@ -173,32 +210,55 @@ var submitPipeline = (function() {
         });
     }
 })();
+$('#id_pipeline_form').submit(submitPipeline);
 
+
+
+/**
+ * dialogs
+ *
+ */
 var $ctrl_nav = $("#id_ctrl_nav");
+var $add_menu = $('#id_add_ctrl')
 var pipeline_family_dialog = new Dialog( $('#id_family_ctrl'), $ctrl_nav.find("li[data-rel='#id_family_ctrl']") );
-var pipeline_dialog =        new Dialog( $('#id_meta_ctrl'),   $ctrl_nav.find("li[data-rel='#id_meta_ctrl']")   );
-var add_menu        =        new Dialog( $('#id_add_ctrl'),    $ctrl_nav.find("li[data-rel='#id_add_ctrl']")    );
+                             new Dialog( $('#id_meta_ctrl'),   $ctrl_nav.find("li[data-rel='#id_meta_ctrl']")   );
+var add_menu        =        new Dialog( $add_menu,            $ctrl_nav.find("li[data-rel='#id_add_ctrl']")    );
+var input_dialog    =   new InputDialog( $('#id_input_ctrl'),  $add_menu.find("li[data-rel='#id_input_ctrl']")  );
+var method_dialog   =  new MethodDialog( $('#id_method_ctrl'), $add_menu.find("li[data-rel='#id_method_ctrl']") );
+var output_dialog   =  new OutputDialog( $('#id_output_ctrl'), $add_menu.find("li[data-rel='#id_output_ctrl']") );
+var view_dialog     =    new ViewDialog( $('#id_view_ctrl'),   $ctrl_nav.find("li[data-rel='#id_view_ctrl']")   );
+// var dialogs = [
+//     pipeline_family_dialog, input_dialog, method_dialog, output_dialog, view_dialog, add_menu
+// ];
 
-add_menu.jqueryRef.click('li', function() {
+$add_menu.click('li', function() {
     add_menu.hide();
 });
-
-var input_dialog    =   new InputDialog( $('#id_input_ctrl'),  $("li[data-rel='#id_input_ctrl']")  );
-var method_dialog   =  new MethodDialog( $('#id_method_ctrl'), $("li[data-rel='#id_method_ctrl']") );
-var output_dialog   =  new OutputDialog( $('#id_output_ctrl'), $("li[data-rel='#id_output_ctrl']") );
-var view_dialog     =    new ViewDialog( $('#id_view_ctrl'),   $ctrl_nav.find("li[data-rel='#id_view_ctrl']")   );
-dialogs.push(pipeline_family_dialog, pipeline_dialog, input_dialog, method_dialog, output_dialog, view_dialog, add_menu);
 
 // Handle jQuery-UI Dialog spawned for output cable
 $('form', '#id_output_ctrl') .submit( function(e) { e.preventDefault(); output_dialog.submit(canvasState); } );
 $('form', '#id_input_ctrl')  .submit( function(e) { e.preventDefault();  input_dialog.submit(canvasState); } );
 $('form', '#id_method_ctrl') .submit( function(e) { e.preventDefault(); method_dialog.submit(canvasState); } );
 
+$('.form-inline-opts').on('click', 'input',
+    () => view_dialog.changeExecOrderDisplayOption(canvasState)
+);
+$('#autolayout_btn').click(
+    () => canvasState.autoLayout()
+);
+$('.align-btn').click(function() {
+    canvasState.alignSelection($(this).data('axis'));
+});
 
-contextMenuActions['delete'] = function(sel) {
-    canvasState.deleteObject();
-};
-contextMenuActions['edit'] = function(sel) {
+/******/
+
+
+
+/**
+ * context menu
+ */
+contextMenu.registerAction('delete', function(sel) { canvasState.deleteObject(); });
+contextMenu.registerAction('edit', function(sel) {
     if (CanvasState.isMethodNode(sel) || CanvasState.isOutputNode(sel)) {
         // For methods, open the edit dialog (rename, method selection, colour picker...)
         // For outputs, open the renaming dialog
@@ -215,14 +275,14 @@ contextMenuActions['edit'] = function(sel) {
             dialog.load(sel);
         }
     }
-};
+});
 
-function checkForUnsavedChanges() {
+
+$(window).on('beforeunload', function checkForUnsavedChanges() {
     if (canvasState.can_edit && canvasState.has_unsaved_changes) {
         return 'You have unsaved changes.';
     }
-}
-
+});
 let $submit_btn = $('#id_submit_button');
 var pipelineCheckReadiness = function() {
     let is = 'pipeline-not-ready';
@@ -232,13 +292,10 @@ var pipelineCheckReadiness = function() {
     }
     $submit_btn.addClass(is).removeClass(isnt);
 };
-
 pipelineCheckReadiness();
-$(window).on('beforeunload', checkForUnsavedChanges);
-$(document).keydown(pipelineCheckReadiness);
-canvasState.canvas.addEventListener('mouseup', pipelineCheckReadiness, true);
-$('#id_pipeline_form').submit(submitPipeline);
-$('.form-inline-opts').on('click', 'input', () => view_dialog.changeExecOrderDisplayOption(canvasState) );
+document.addEventListener('keydown', pipelineCheckReadiness, false);
+canvas.addEventListener('mouseup', pipelineCheckReadiness, false);
+
 
 /* Silly happy face widget. */
 $('#id_revision_desc')

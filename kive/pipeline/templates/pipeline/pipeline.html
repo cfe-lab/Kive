@@ -6,20 +6,14 @@
 {% block title %}Pipelines{% endblock %}
 
 {% block javascript %}
+    <!-- Accumulator still uses jQuery as a global. -->
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/portal/noxss.js"></script>
+
     <script src="/static/portal/core.min.js"></script>
     <script src="/static/portal/system.js"></script>
     <script src="/static/portal/system.config.js"></script>
     <script>
         System.import('/static/pipeline');
-    </script>
-
-    <script type="text/javascript">
-$(function() {
-    // Security stuff to prevent cross-site scripting.
-    noXSS();
-});
     </script>
 {% endblock %}
 

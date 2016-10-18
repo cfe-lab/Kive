@@ -283,7 +283,7 @@ export interface CNode extends CanvasObject {
     deleteFrom(cs: CanvasState): void;
     unlightMagnets(): void;
     setMagnetPosition(): void;
-    getMouseTarget(x: number, y: number, skip_check: boolean): BaseNode|Magnet;
+    getMouseTarget(x: number, y: number, skip_check?: boolean): BaseNode|CNode|Magnet;
     x: number;
     y: number;
     dx: number;
@@ -360,7 +360,7 @@ class BaseNode {
             magnet.acceptingConnector = false;
         }
     }
-    getMouseTarget(mx: number, my: number, skip_check: boolean): BaseNode|Magnet {
+    getMouseTarget(mx: number, my: number, skip_check?: boolean): BaseNode|CNode|Magnet {
         if (skip_check || this.contains(mx,my)) {
             // are we clicking on a magnet?
             for (let magnet of this.out_magnets.concat(this.in_magnets)) {
@@ -422,6 +422,9 @@ class BaseNode {
         this.setMagnetPosition();
     }
     setMagnetPosition() {
+        // placeholder - child classes must set
+    }
+    draw() {
         // placeholder - child classes must set
     }
 
@@ -914,6 +917,7 @@ export class MethodNode extends BaseNode implements CNode {
         if (this.update_signal) {
             this.update_signal.x = vertices[6].x - this.update_signal.r;
             this.update_signal.y = vertices[2].y + this.update_signal.r;
+            this.update_signal.draw(ctx);
         }
 
         // Highlight the method based on status.

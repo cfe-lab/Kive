@@ -6,7 +6,6 @@
 {% block title %}Runs{% endblock %}
 
 {% block javascript %}
-    <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/system.js"></script>
     <script src="/static/portal/system.config.js"></script>
@@ -82,7 +81,7 @@
     </div>
 
     <div>
-        <canvas id="pipeline_canvas" data-editable="false">HTML5 Canvas not supported by this browser.</canvas>
+        <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
         <div id="method_context_menu" class="context_menu">
             <ul>
                 <li data-action="display" class="dataset_node">View Dataset</li>

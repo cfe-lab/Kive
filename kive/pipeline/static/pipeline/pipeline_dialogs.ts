@@ -74,6 +74,13 @@ export class Dialog {
      */
     constructor(public jqueryRef, public activator) {
         activator.click( () => this.show() );
+        jqueryRef.on('click mousedown keydown', e => e.stopPropagation() )
+        jqueryRef.on('keydown', e => {
+            if (e.which === 27) { // esc
+                this.cancel();
+            }
+        });
+        $(document).click( () => this.cancel() );
     }
     
     /**
