@@ -1,10 +1,15 @@
 $(document).ready(function(){ // wait for page to finish loading before executing jQuery code
     "use strict";
+    
+    var cr_id;
+    
+    var $coderesource = $("#id_coderesource");
+    var $dependencyForms = $("#dependencyForms");
 
     noXSS();
 
     // trigger ajax on CR drop-down to populate revision select
-    $("#id_coderesource").on('change', function() {
+    $coderesource.on('change', function() {
         cr_id = this.value;
         if (cr_id !== "") {
             $.getJSON(
@@ -29,7 +34,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     /* populate CR revision dropdown on selection of CodeResource
      * By *delegating* this event to #dependencyForms rather than each select.coderesource
      * directly, new dynamically-generated selects retain this behaviour. */
-    $("#dependencyForms").on('change', 'select.coderesource', function() {
+    $dependencyForms.on('change', 'select.coderesource', function() {
         var suffix = this.id.split('_')[2];
         cr_id = this.value;
         if (cr_id !== "") {
@@ -56,7 +61,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     }).change(); // trigger on load
 
     var dep_coderesource_options = document.getElementById("id_coderesource_0").options,
-        numberOfDepForms = $('#dependencyForms > tr').length;
+        numberOfDepForms = $dependencyForms.children('tr').length;
 
     // modify name attributes for extra input forms received from server
     for (var i = 0; i < numberOfDepForms; i++) {
@@ -106,7 +111,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
 
     // add or subtract input forms
-    var numberOfInputForms = $('#extraInputForms > tr').length;
+    var numberOfInputForms = $('#extraInputForms').children('tr').length;
     var io_cdt_options = document.getElementById("id_compounddatatype_in_0").options;
 
     // modify name attributes for extra input forms received from server
@@ -151,7 +156,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
 
     // add or subtract output forms
-    var numberOfOutputForms = $('#extraOutputForms > tr').length;
+    var numberOfOutputForms = $('#extraOutputForms').children('tr').length;
     // we can reuse options
 
     // modify name attributes for extra input forms received from server
@@ -208,7 +213,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     // hide Method Family form if a pre-existing family is selected
     $('#id_family').on('change', function() {
-        this_family = $(this).val();
+        var this_family = $(this).val();
         if (this_family === "") {
             $('#id_name').prop('disabled', false);
             $('#id_description').prop('disabled', false);
@@ -220,7 +225,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     }).change(); // trigger on load
 
     // set default MethodFamily name to name of CodeResource
-    $("#id_coderesource").on("change", function () {
+    $coderesource.on("change", function () {
         $("#id_revision_name").val($(this).children("option:selected").text());
     });
 });
