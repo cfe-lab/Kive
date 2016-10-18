@@ -706,7 +706,7 @@ export class CanvasState {
         }
     }
     
-    doUp (): void {
+    doUp (e?: Event): void {
         this.valid = false;
         this.$dialog = this.$dialog || $('#dialog_form');
         $(this.canvas).css("cursor", "auto");
@@ -1182,6 +1182,13 @@ export class CanvasState {
         return labels;
     }
     
+    initMouseListeners(): void {
+        this.canvas.addEventListener('selectstart', e => { e.preventDefault(); return false; }, false);
+        this.canvas.addEventListener('mousedown',   e => this.doDown(e), true);
+        this.canvas.addEventListener('mousemove',   e => this.doMove(e), true);
+        this.canvas.addEventListener('mouseup',     e => this.doUp(e),   true);
+    }
+    
     getPos (e): Point {
         // returns an object with x, y coordinates defined
         var element = this.canvas, offsetX = 0, offsetY = 0, mx, my;
@@ -1198,6 +1205,11 @@ export class CanvasState {
     
         mx = e.pageX - offsetX;
         my = e.pageY - offsetY;
+    
+        if (this.scale !== 1) {
+            mx /= this.scale;
+            my /= this.scale;
+        }
     
         return { x: mx, y: my };
     };

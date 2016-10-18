@@ -11,7 +11,6 @@ export var canvasState;
 export var dialogs: Dialog[] = [];
 export var parent_revision_id;
 
-var canvas;
 noXSS();
 
 /**
@@ -21,7 +20,7 @@ noXSS();
 
 // initialize animated canvas
 let REDRAW_INTERVAL = 50; // ms
-canvas = document.getElementById('pipeline_canvas');
+let canvas = document.getElementById('pipeline_canvas');
 canvas.width  = window.innerWidth;
 canvas.height = window.innerHeight - $(canvas).offset().top - 5;
 canvasState = new CanvasState(canvas, REDRAW_INTERVAL);
@@ -176,10 +175,7 @@ if (initialData.length) {
 }
 
 // de-activate double-click selection of text on page
-canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
-canvas.addEventListener('mousedown',   function(e) { canvasState.doDown(e); }, true);
-canvas.addEventListener('mousemove',   function(e) { canvasState.doMove(e); }, true);
-canvas.addEventListener('mouseup',     function( ) { canvasState.doUp(); }, true);
+canvasState.initMouseListeners();
 canvas.addEventListener('contextmenu', function(e) { canvasState.contextMenu(e); }, true);
 
 $(document).keydown(documentKeyHandler)
