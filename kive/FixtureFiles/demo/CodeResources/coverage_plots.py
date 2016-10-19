@@ -6,17 +6,17 @@ import errno
 import itertools
 from collections import Counter
 from csv import DictReader, DictWriter
+from operator import itemgetter
+import tarfile
+
+from micall.core import project_config, aln2counts
 
 # NOTE: this must be performed BEFORE pyplot is imported
 # http://stackoverflow.com/a/3054314/4794
 import matplotlib
 matplotlib.use('Agg')
-from matplotlib import pyplot as plt, patches # @IgnorePep8
-from matplotlib.ticker import FuncFormatter
-from operator import itemgetter
-import tarfile
-
-from micall.core import project_config, aln2counts
+from matplotlib import pyplot as plt, patches  # @IgnorePep8
+from matplotlib.ticker import FuncFormatter  # @IgnorePep8
 
 
 def coverage_plot(amino_csv,

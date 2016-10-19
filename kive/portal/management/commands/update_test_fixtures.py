@@ -820,8 +820,8 @@ x,y
         g2pdeps = ["micall.g2p.pssm_lib.py", "micall.g2p.g2p_fpr.txt", "micall.g2p.g2p.matrix"]
         # now the pipeline step dependencies
         prelim_deplst = loggingdeps + configdeps + externaldeps
-        remap__deplst = loggingdeps + configdeps + externaldeps + \
-                        translationdeps + sam2alndeps + ["micall.core.prelim_map.py"]
+        remap__deplst = (loggingdeps + configdeps + externaldeps +
+                         translationdeps + sam2alndeps + ["micall.core.prelim_map.py"])
         sam2al_deplst = []
         aln2co_deplst = loggingdeps + configdeps + translationdeps
 
