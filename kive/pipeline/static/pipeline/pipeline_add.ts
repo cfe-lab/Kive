@@ -253,6 +253,18 @@ contextMenu.registerAction('edit', function(sel) {
         dialog.load(sel);
     }
 });
+contextMenu.registerAction('add_input', function(_, pos) {
+    input_dialog.show();
+    input_dialog.align(pos.clientX, pos.clientY);
+});
+contextMenu.registerAction('add_method', function(_, pos) {
+    method_dialog.show();
+    method_dialog.align(pos.clientX, pos.clientY);
+});
+contextMenu.registerAction('add_output', function(_, pos) {
+    output_dialog.show();
+    output_dialog.align(pos.clientX, pos.clientY);
+});
 
 
 $(window).on('beforeunload', function checkForUnsavedChanges() {

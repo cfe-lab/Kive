@@ -1,7 +1,8 @@
 (function() {
     "use strict";
     
-    describe("Pipeline Families table for sandbox", function() {
+    /* Move to async module tests */
+    xdescribe("Pipeline Families table for sandbox", function() {
         beforeEach(function() {
             this.$table = $('<table>');
             this.$navigation_links = $("<div/>");

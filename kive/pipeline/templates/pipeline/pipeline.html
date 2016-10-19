@@ -42,12 +42,7 @@
     <!-- CANVAS -->
     <div>
         <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
-        <div id="method_context_menu" class="context_menu">
-            <ul>
-                <li data-action="edit" class="edit">Edit</li>
-                <li data-action="delete" class="delete">Delete</li>
-            </ul>
-        </div>
+        {% include 'pipeline/pipeline_context_menu.tpl.html'  with dlg_id="method_context_menu"  %}
     </div>
 
     <!-- Method selector -->
@@ -56,8 +51,6 @@
             <li data-rel="#id_family_ctrl">Family</li>
             <li data-rel="#id_meta_ctrl">Pipeline</li>
             <li data-rel="#id_add_ctrl"><span class="icon">+</span><span class="longname"> Add Node</span></li>
-            <!--<li data-rel="#id_input_ctrl" class="new_ctrl">Add Input</li>-->
-            <!--<li data-rel="#id_method_ctrl" class="new_ctrl">Add Method</li>-->
             <li data-rel="#id_view_ctrl">View</li>
         </ul>
 

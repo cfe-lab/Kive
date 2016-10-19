@@ -7,7 +7,7 @@ import "jquery";
 interface ContextMenuInterface {
     [action: string]: ContextMenuAction;
 }
-type ContextMenuAction = (sel: (Connector|CNode)|(Connector|CNode)[]) => void
+type ContextMenuAction = (sel: (Connector|CNode)|(Connector|CNode)[], e: JQueryMouseEventObject) => void
 
 export class CanvasContextMenu {
     $menu: JQuery;
@@ -34,10 +34,11 @@ export class CanvasContextMenu {
                 var sel = cs.selection;
                 var action = $(this).data('action');
             
-                if (sel && sel.length) {
+                if (sel) {
                     if (menu.actions.hasOwnProperty(action)) {
                         menu.actions[action](
-                            action == 'delete' ? sel : sel[0]
+                            action == 'delete' ? sel : sel[0],
+                            e
                         );
                     }
                 }
@@ -78,11 +79,13 @@ export class CanvasContextMenu {
         if (this.cs.can_edit) {
             if (CanvasState.isNode(sel[0])) {
                 this.show(e);
+                $('.cm-add', this.$menu).hide();
                 if (sel.length > 1 || CanvasState.isInputNode(sel[0])) {
                     $('.edit', this.$menu).hide();
                 }
             } else {
-                // @todo: Display menu to add nodes
+                this.show(e);
+                $('.edit, .delete', this.$menu).hide();
             }
         } else if (sel.length == 1) {
             // Otherwise, we're read only, so only popup the context menu for outputs with datasets

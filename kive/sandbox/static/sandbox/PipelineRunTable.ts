@@ -28,18 +28,13 @@ function drawThumbnail(select) {
     var $select = $(select),
         $canvas = $select.closest('tr').find('canvas'),
         canvas = $canvas[0];
-    $.ajax({
-        type: "GET",
-        url: "/api/pipelines/" + $select.val(),
-        datatype: "json",
-        success: function(result) {
-            var cs = new CanvasState(canvas, false);
-            var pipeline = new Pipeline(cs);
-            cs.setScale(0.12);
-            cs.enable_labels = false;
-            pipeline.load(result);
-            pipeline.draw();
-        }
+    $.getJSON("/api/pipelines/" + $select.val()).done(function(result) {
+        var cs = new CanvasState(canvas, false);
+        var pipeline = new Pipeline(cs);
+        cs.setScale(0.12);
+        cs.enable_labels = false;
+        pipeline.load(result);
+        pipeline.draw();
     });
 }
 function buildThumbnail($td, row) {

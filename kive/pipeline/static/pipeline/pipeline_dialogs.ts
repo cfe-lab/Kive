@@ -299,6 +299,20 @@ export class InputDialog extends NodePreviewDialog {
     }
     
     /**
+     * Align the dialog to a given coord. Anchor point is center of the dialog.
+     * @param x
+     *      The x-coordinate.
+     * @param y
+     *      The y-coordinate.
+     */
+    align(x: number, y: number): void {
+        this.jqueryRef.css({
+            left: x - this.jqueryRef.innerWidth()  / 2,
+            top:  y - parseInt(this.jqueryRef.css('padding-top'), 10)
+        });
+    }
+    
+    /**
      * Creates a node object based on the dialog state.
      * Coords default to 0, 0 and label is an empty string.
      * @returns {RawNode|CdtNode}
