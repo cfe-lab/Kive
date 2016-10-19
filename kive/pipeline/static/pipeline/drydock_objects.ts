@@ -295,7 +295,7 @@ export interface CNode extends CanvasObject {
     in_magnets: Magnet[];
     out_magnets: Magnet[];
     affects_exec_order: boolean;
-    has_unsaved_changes: number;
+    has_unsaved_changes: boolean;
     
     /* @todo: investigate where these came from */
     dataset_id?: any;
@@ -343,7 +343,8 @@ class BaseNode {
     dy: number;
     w: number;
     h: number;
-    has_unsaved_changes: number;
+    has_unsaved_changes: boolean;
+    status?: string; // for view_run
 
     constructor() { }
 
@@ -598,6 +599,10 @@ export class RawNode extends CylinderNode implements CNode {
     found_fill = "blue";
     inset = 10; // distance of magnet from center
     dataset_id: number;
+    
+    /* for view_run */
+    md5: string;
+    run_id: string;
 
     constructor(public x, public y, public label = "", public input_index?) {
         super(x, y, label);
@@ -629,8 +634,12 @@ export class CdtNode extends BaseNode implements CNode {
     offset = 15;
     in_magnets = [];
     out_magnets = [];
+    
+    /* for view_run */
+    md5: string;
     found_md5: boolean;
     dataset_id: number;
+    run_id: string;
 
     /*
     BaseNode represents a Compound Datatype (CSV structured data).

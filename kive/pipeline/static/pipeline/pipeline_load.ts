@@ -72,7 +72,7 @@ export class Pipeline {
         this.build_steps();
         this.build_outputs();
 
-        this.canvasState.has_unsaved_changes = 0;
+        this.canvasState.has_unsaved_changes = false;
         for (let shape of this.canvasState.shapes) {
             shape.has_unsaved_changes = false;
         }

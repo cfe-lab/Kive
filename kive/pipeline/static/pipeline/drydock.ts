@@ -50,7 +50,7 @@ export class CanvasState {
     exec_order_may_have_changed: boolean;
     input_order_may_have_changed: boolean;
     force_show_exec_order: boolean;
-    has_unsaved_changes = 0;
+    has_unsaved_changes = false;
 
     collisions = 0;
 
@@ -760,7 +760,7 @@ export class CanvasState {
                     connector.dest.connected.push(connector);
                 }
 
-                this.has_unsaved_changes = 1;
+                this.has_unsaved_changes = true;
             } else {
                 // connector not yet linked to anything
             
@@ -829,9 +829,9 @@ export class CanvasState {
         } else if (CanvasState.isOutputNode(shape)) {
             this.outputs.push(shape);
         }
-        shape.has_unsaved_changes = 1;
+        shape.has_unsaved_changes = true;
         this.valid = false;
-        this.has_unsaved_changes = 1;
+        this.has_unsaved_changes = true;
         return shape;
     };
     
@@ -1193,7 +1193,7 @@ export class CanvasState {
             do {
                 offsetX += element.offsetLeft;
                 offsetY += element.offsetTop;
-            } while (element = element.offsetParent);
+            } while (element = <HTMLElement> element.offsetParent);
         }
     
         offsetX += this.stylePaddingLeft + this.styleBorderLeft + this.htmlLeft;
@@ -1226,7 +1226,7 @@ export class CanvasState {
         this.testExecutionOrder();
         this.selection = [];
         this.valid = false; // re-draw canvas to make Connector disappear
-        this.has_unsaved_changes = 1;
+        this.has_unsaved_changes = true;
     }
     
     findMethodNode (method_pk: number): MethodNode {

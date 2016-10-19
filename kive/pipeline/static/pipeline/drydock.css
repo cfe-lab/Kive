@@ -84,6 +84,9 @@ html body {
     box-sizing: border-box;
     width: 250px;
 }
+#id_select_method:empty {
+    display: none;
+}
 #id_method_delete_outputs_field {
     margin: .5em 0;
     font-size: .8em;
