@@ -1365,51 +1365,18 @@ export class Connector implements CanvasObject {
     }
     
     drawLabel (ctx: CanvasRenderingContext2D) {
-        var jsb = this.calculateCurve(),
-            label = this.source.label,
-            canvas = new CanvasWrapper(undefined, ctx);
-        if (this.source.label !== this.dest.label) {
-            label += "->" + this.dest.label;
-        }
-        
-        this.label_width = ctx.measureText(label).width + 10;
-        this.dx = this.x - this.fromX;
-        this.dy = this.y - this.fromY;
-        
-        // only draw if it's long enough to contain the text
-        if ( this.dx * this.dx + this.dy * this.dy > this.label_width * this.label_width / 0.49) {
-            // determine the angle of the bezier at the midpoint
-            var midpoint = Bezier.nearestPointOnCurve(
-                { x: this.fromX + this.dx/2, y: this.fromY + this.dy/2 },
-                jsb
-            );
-            var midpointAngle = Bezier.gradientAtPoint(jsb, midpoint.location);
-            
+        let builtLabel;
+        if (builtLabel = this.buildLabel(ctx)) {
             // save the canvas state to start applying transformations
             ctx.save();
-            
             // set the bezier midpoint as the origin
-            ctx.translate(midpoint.point.x, midpoint.point.y);
-            ctx.rotate(midpointAngle);
-            
-            ctx.font = '10pt Lato, sans-serif';
-            ctx.textBaseline = 'middle';
-            ctx.globalAlpha = 1;
-            ctx.textAlign = 'center';
-            ctx.fillStyle = '#aaa';
-            
-            // make a backing box so the label is on the fill colour
-            canvas.fillRect({
-                x: - this.label_width / 2,
-                y: -7,
-                r: 6,
-                width: this.label_width,
-                height: 14
+            ctx.translate(builtLabel.centre.x, builtLabel.centre.y);
+            ctx.rotate(builtLabel.rotate);
+            (new CanvasWrapper(undefined, ctx)).drawText({
+                x: 0, y: 0, dir: 0,
+                text: builtLabel.label,
+                style: "connector"
             });
-            
-            ctx.fillStyle = "white";
-            ctx.fillText(label, 0, 0);
-            
             ctx.restore();
         }
     }
