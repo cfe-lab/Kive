@@ -5,6 +5,67 @@ import { MethodNode, CdtNode, RawNode, OutputNode, Connector } from "./drydock_o
 import { CanvasState } from "./drydock";
 import 'jquery';
 
+interface ApiPipelineData extends PipelineMetadata {
+    steps?: ApiStepData[],
+    inputs?: ApiInputData[],
+    outcables?: ApiOutputData[]
+}
+interface PipelineMetadata {
+    family?: string,
+    family_desc?: string,
+    revision_name?: string,
+    revision_desc?: string,
+    revision_parent?: number,
+    published?: boolean,
+    users_allowed?: string[],
+    groups_allowed?: string[],
+    canvas_width?: number,
+    canvas_height?: number
+}
+interface ApiCdtData {
+    compounddatatype: number,
+    min_row: null,
+    max_row: null
+}
+interface ApiInputData {
+    structure: ApiCdtData,
+    dataset_name: string,
+    dataset_idx: number,
+    x: number,
+    y: number
+}
+interface ApiOutputData {
+    output_name: string,
+    output_idx: number,
+    output_cdt: number,
+    source: number,
+    source_step: number,
+    source_dataset_name: string,
+    x: number,
+    y: number,
+    custom_wires: any[] // in the future we might have this
+}
+interface ApiStepData {
+    transformation: number,  // to retrieve Method
+    transformation_type: string,
+    step_num: number,  // 1-index (pipeline inputs are index 0)
+    x: number,
+    y: number,
+    name: string,
+    fill_colour: string,
+    cables_in: ApiCableData[],
+    new_code_resource_revision_id: number,
+    new_outputs_to_delete_names: string[],
+    new_dependency_ids?: number[]
+}
+interface ApiCableData {
+    source_dataset_name: string,
+    dest_dataset_name: string,
+    source_step: number,
+    keep_output: boolean,
+    custom_wires: any[] // no wires for a raw cable
+}
+
 /**
  * Convert between API calls and CanvasState object.
  */
@@ -13,48 +74,8 @@ export class Pipeline {
     pipeline: any = null;
     private API_URL = "/api/pipelinefamilies/";
     
-    private metadata: any;
-
     // Pipeline constructor
     constructor(private canvasState: CanvasState) {
-    }
-    
-    setMetadata(action: string, family: string, family_desc: string,
-                revision_name: string, revision_desc: string,
-                parent_revision_id: number, published: boolean,
-                users_allowed: string[], groups_allowed: string[]) {
-    
-        // @todo: check to make sure all arguments exist
-        // @todo: action can also be 'add' when pipeline family exists with 0 revisions
-        if (action == "new" && family === '') {
-            throw 'Pipeline family must be named';
-        }
-        
-        this.metadata = {
-            users_allowed,
-            groups_allowed,
-    
-            // There is no PipelineFamily yet; we're going to create one.
-            family,
-            family_desc,
-    
-            // arguments to add first pipeline revision
-            revision_name,
-            revision_desc,
-            revision_parent: action === 'revise' ? parent_revision_id : null,
-            published,
-    
-            // Canvas information to store in the Pipeline object.
-            canvas_width: this.canvasState.width,
-            canvas_height: this.canvasState.height
-        };
-    }
-    getMetadata() {
-        var obj = {};
-        for (let key in this.metadata) {
-            obj[key] = this.metadata[key];
-        }
-        return obj;
     }
 
     load(pipeline) {
@@ -77,18 +98,24 @@ export class Pipeline {
             shape.has_unsaved_changes = false;
         }
     }
-
-    serialize (form_data?) {
-        /**
-         * This method serializes the pipeline into an object that can be
-         * fed to the backend REST API.
-         *
-         * See: /api/pipelines/
-         *
-         * @param form_data: starting data that all of the pipeline details
-         * will be added to. Object format matches the JSON structure of the
-         * API.
-         */
+    
+    /**
+     * This method serializes the pipeline into an object that can be
+     * fed to the backend REST API.
+     *
+     * Will throw errors if there are any. Contain this method in a
+     * try/catch block.
+     *
+     * See: /api/pipelines/
+     *
+     * @param form_data: starting data that all of the pipeline details
+     * will be added to. Object format matches the JSON structure of the
+     * API.
+     *
+     * form_data will be merged with existing this.metadata if setMetadata()
+     * is used first.
+     */
+    serialize (metadata?: PipelineMetadata) {
 
         var pipeline_outputs = this.canvasState.getOutputNodes(),
             pipeline_inputs = this.canvasState.getInputNodes(),
@@ -97,14 +124,11 @@ export class Pipeline {
             // This is a trivial modification until we hit a non trivial
             // @todo: This variable is not used. Why?
             is_trivial = true;
-        // modification
 
         // Check graph integrity
-        try {
-            this.canvasState.checkIntegrity();
-        } catch(e) {
-            console.error(e);
-        }
+        // Warning: This will throw errors if pipeline is not complete.
+        // serialize() should be wrapped in a try/catch block to account for this.
+        this.canvasState.assertIntegrity();
 
         // Sort inputs and outputs by their isometric position, left-to-right, top-to-bottom
         // (sort of like reading order if you tilt your screen 30° clockwise).
@@ -117,7 +141,7 @@ export class Pipeline {
         }
 
         // Now we're ready to start
-        form_data = this.metadata ? this.getMetadata() : (form_data || {});
+        let form_data: ApiPipelineData = metadata || {};
         form_data.steps = [];
         form_data.inputs = [];
         form_data.outcables = [];

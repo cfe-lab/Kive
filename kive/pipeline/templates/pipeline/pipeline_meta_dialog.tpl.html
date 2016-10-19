@@ -16,7 +16,11 @@
     <input type="hidden" id="id_family_desc" value="{{ family.desc }}"/>
 
     <input id="id_revision_name" maxlength="128" name="revision_name" type="text" placeholder="Revision name">
-    <textarea id="id_revision_desc" name="revision_desc" placeholder="Description"></textarea>
+    <div id="description_wrap">
+        <textarea id="id_revision_desc" name="revision_desc" placeholder="Description"></textarea>
+        <div id="happy_indicator_label">Keep typing!</div>
+        <div id="happy_indicator"></div>
+    </div>
 
     <div class="form-inline-opts"><input type="checkbox" id="published" name="published"> <label for="published" class="checkbox-label">Publish this revision immediately on submission</label></div>
 

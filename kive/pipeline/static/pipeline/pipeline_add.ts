@@ -3,6 +3,7 @@ import { CanvasState, CanvasContextMenu, CanvasListeners, Pipeline, PipelineRevi
 import { ViewDialog, OutputDialog, MethodDialog, InputDialog, Dialog } from "./pipeline_dialogs";
 import 'jquery';
 import '/static/portal/noxss.js';
+import {PipelineSubmit} from "./pipeline_submit";
 
 declare var noXSS: any;
 noXSS();
@@ -21,164 +22,48 @@ CanvasListeners.initContextMenuListener(canvasState, contextMenu);
 CanvasListeners.initKeyListeners(canvasState);
 CanvasListeners.initResizeListeners(canvasState);
 
+
+interface BtnFunction extends Function { $btn?: JQuery }
+var pipelineCheckCompleteness: BtnFunction = function() {
+    let $submit_btn = pipelineCheckCompleteness.$btn || $('#id_submit_button');
+    pipelineCheckCompleteness.$btn = $submit_btn;
+    let is = 'pipeline-not-ready';
+    let isnt = 'pipeline-ready';
+    // exec_order is a 2D array if pipeline is executable, otherwise false
+    if (canvasState.isComplete()) {
+        [is, isnt] = [isnt, is]; // swap variables
+    }
+    $submit_btn.addClass(is).removeClass(isnt);
+};
+function initPipelineCheck() {
+    canvas.addEventListener('CanvasStateChange', () => pipelineCheckCompleteness(), false);
+    pipelineCheckCompleteness();
+}
+
+
 let parent_revision_id;
 let initialData = $("#initial_data");
 if (initialData.length) {
     let text = initialData.text();
     if (text.length) {
         let loader = new PipelineReviser(text);
-        loader.load(canvasState);
+        loader.load(
+            canvasState,
+            initPipelineCheck
+        );
         loader.setUpdateCtrl($('#id_update'));
         loader.setRevertCtrl($('#id_revert'));
         parent_revision_id = loader.pipelineRaw.id;
     }
+} else {
+    initPipelineCheck();
 }
+
 
 // Pack help text into an unobtrusive icon
 $('.helptext', 'form').each(function() {
     $(this).wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
 });
-
-
-
-var submitPipeline = (function() {
-    var $submit_error = $('#id_submit_error');
-    return function(e) {
-        /*
-         Trigger AJAX transaction on submitting form.
-         */
-        
-        e.preventDefault(); // override form submit action
-        clearErrors();
-    
-        let action = $('#id_pipeline_action').val();
-        let is_new = action == "new";
-        
-        let form_data;
-        let pipeline;
-        
-        try {
-            pipeline = new Pipeline(canvasState);
-            pipeline.setMetadata(
-                action,
-                $('#id_family_name').val(),
-                $('#id_family_desc').val(),
-                $('#id_revision_name').val(),
-                $('#id_revision_desc').val(),
-                parent_revision_id,
-                $('#published').prop('checked'),
-                $("#id_permissions_0").find("option:selected").get().map(el => el.textContent),
-                $("#id_permissions_1").find("option:selected").get().map(el => el.textContent)
-            );
-        } catch(e) {
-            pipeline_family_dialog.show();
-            $('#id_family_name').addClass('submit-error-missing').focus();
-            submitError(e);
-            return;
-        }
-        
-        try {
-            // TODO: data cleaning should either be within pipeline.serialize
-            // or within this context but probably not both.
-            form_data = pipeline.serialize();
-        } catch(error) {
-            submitError(error);
-            return;
-        }
-        
-        if (!is_new) {
-            submitPipelineAjax($('#id_family_pk').val(), form_data);
-        } else { // Pushing a new family
-            submitPipelineFamilyAjax({
-                users_allowed: form_data.users_allowed,
-                groups_allowed: form_data.groups_allowed,
-                name: form_data.family,
-                description: form_data.family_desc
-            }).done(function(result) {
-                submitPipelineAjax(result.id, form_data);
-            });
-        }
-        
-    };// end exposed function - everything that follows is closed over
-    
-    function clearErrors() {
-        $submit_error.empty();
-        $('#id_family_name, #id_family_desc, #id_revision_name, #id_revision_desc').removeClass('submit-error-missing');
-    }
-    function buildErrors(context, json, errors) {
-        for (var field in json) {
-            var value = json[field],
-                new_context = context;
-            if (new_context.length) {
-                new_context += ".";
-            }
-            new_context += field;
-            
-            for (let i = 0; i < value.length; i++) {
-                var item = value[i];
-                if (typeof(item) === "string") {
-                    errors.push(new_context + ": " + item);
-                } else {
-                    buildErrors(new_context, item, errors);
-                }
-            }
-        }
-    }
-    function submitError(errors) {
-        if (errors instanceof Array) {
-            $submit_error.empty();
-            for (var i = 0; i < errors.length; i++) {
-                $submit_error.append($('<p>').text(errors[i]));
-            }
-        } else {
-            $submit_error.text(errors);
-        }
-        $submit_error.show();
-    }
-    function submitPipelineAjax(family_pk, form_data) {
-        return $.ajax({
-            type: "POST",
-            url: '/api/pipelines/',
-            data: JSON.stringify(form_data),
-            contentType: "application/json" // data will not be parsed correctly without this
-        }).done(function() {
-            $(window).off('beforeunload');
-            window.location.href = '/pipelines/' + family_pk;
-        }).fail(function(xhr, status, error) {
-            var json = xhr.responseJSON,
-                errors = [];
-            
-            if (json) {
-                if (json.non_field_errors) {
-                    submitError(json.non_field_errors);
-                } else {
-                    buildErrors("", json, errors);
-                    submitError(errors);
-                }
-            } else {
-                submitError(xhr.status + " - " + error);
-            }
-        });
-    }
-    function submitPipelineFamilyAjax(family_form_data) {
-        return $.ajax({
-            type: "POST",
-            url: '/api/pipelinefamilies/',
-            data: JSON.stringify(family_form_data),
-            contentType: "application/json" // data will not be parsed correctly without this
-        }).fail(function(xhr, status, error) {
-            var json = xhr.responseJSON,
-                serverErrors = json && json.non_field_errors || [];
-            
-            if (serverErrors.length === 0) {
-                serverErrors = xhr.status + " - " + error;
-            }
-            submitError(serverErrors);
-        });
-    }
-})();
-$('#id_pipeline_form').submit(submitPipeline);
-
 
 
 /**
@@ -198,22 +83,24 @@ var input_dialog    =   new InputDialog( $('#id_input_ctrl'),  $add_menu.find("l
 var method_dialog   =  new MethodDialog( $('#id_method_ctrl'), $add_menu.find("li[data-rel='#id_method_ctrl']") );
 var output_dialog   =  new OutputDialog( $('#id_output_ctrl'), $add_menu.find("li[data-rel='#id_output_ctrl']") );
 
-$add_menu.click('li', function() {
-    add_menu.hide();
-});
+$add_menu.click('li', function() { add_menu.hide(); });
 
 // Handle jQuery-UI Dialog spawned for output cable
 $('form', '#id_output_ctrl') .submit( function(e) { e.preventDefault(); output_dialog.submit(canvasState); } );
 $('form', '#id_input_ctrl')  .submit( function(e) { e.preventDefault();  input_dialog.submit(canvasState); } );
 $('form', '#id_method_ctrl') .submit( function(e) { e.preventDefault(); method_dialog.submit(canvasState); } );
 
-canvas.addEventListener("new_output", function(e: CustomEvent) {
-    // spawn dialog for output label
-    let node = e.detail.out_node;
-    output_dialog.makeImmune(); // hack to get around the document.click event closing this right away
-    output_dialog.show();
-    output_dialog.align(node.x + node.dx, node.y + node.dy);
-    output_dialog.load(node);
+canvas.addEventListener("CanvasStateNewOutput", function(e: CustomEvent) {
+    let d = e.detail;
+    if (d.open_dialog && Array.isArray(d.added) && CanvasState.isOutputNode(d.added[0])) {
+        // spawn dialog for output label
+        let node = d.added[0];
+        // hack to get around the document.click event closing this right away
+        output_dialog.makeImmune();
+        output_dialog.show();
+        output_dialog.align(node.x + node.dx, node.y + node.dy);
+        output_dialog.load(node);
+    }
 }, false);
 
 $view_menu.find('.show-order-grp').on('click', '.show-order', function() {
@@ -227,6 +114,25 @@ $view_menu.find('#autolayout_btn').click(
 );
 
 /******/
+
+
+
+
+$('#id_pipeline_form').submit(PipelineSubmit.buildSubmit(
+    canvasState,
+    $('#id_pipeline_action'),
+    $('#id_family_name'),   $('#id_family_desc'),
+    $('#id_family_pk'),
+    $('#id_revision_name'), $('#id_revision_desc'),
+    parent_revision_id,
+    $('#published'),
+    $("#id_permissions_0"), $("#id_permissions_1"),
+    $('#id_submit_error'),
+    function() {
+        pipeline_family_dialog.show();
+        $('#id_family_name').addClass('submit-error-missing').focus();
+    }
+));
 
 
 
@@ -272,56 +178,39 @@ $(window).on('beforeunload', function checkForUnsavedChanges() {
         return 'You have unsaved changes.';
     }
 });
-let $submit_btn = $('#id_submit_button');
-var pipelineCheckReadiness = function() {
-    let is = 'pipeline-not-ready';
-    let isnt = 'pipeline-ready';
-    if (canvasState.isComplete()) {// exec_order is a 2D array if pipeline is executable, otherwise false
-        [is, isnt] = [isnt, is]; // swap variables
-    }
-    $submit_btn.addClass(is).removeClass(isnt);
-};
-pipelineCheckReadiness();
-document.addEventListener('keydown', pipelineCheckReadiness, false);
-canvas.addEventListener('mouseup', pipelineCheckReadiness, false);
 
 
 /* Silly happy face widget. */
-$('#id_revision_desc')
-    .on({
-        keydown: function() {
-            var chars_per_smile = 12,
-                happy_mapped = -Math.min(15, Math.floor(this.value.length / chars_per_smile)) * 32;
-            
-            $('.happy_indicator').css(
-                'background-position-x',
-                happy_mapped + 'px'
-            );
-        },
-        'focus keyup': function() {
-            var desc_length = this.value.length,
-                $this = $(this),
-                indicator = $this.siblings('.happy_indicator'),
-                label = $this.siblings('.happy_indicator_label')
-                ;
-            
-            if (desc_length === 0 || $this.hasClass('input-label')) {
-                indicator.add(label).hide();
-            } else {
-                indicator.show();
-                label[ desc_length > 20 ? 'hide':'show' ]();
-            }
-        },
-        blur: function() {
-            $(this).siblings('.happy_indicator, .happy_indicator_label').hide();
+let smileWidgetEvents = (function() {
+    let indicator = $('#happy_indicator');
+    let label = $('#happy_indicator_label');
+    let indicatorAndLabel = indicator.add(label);
+    const CHARS_PER_SMILE = 12;
+    const NUM_EMOJIS = 10;
+    const EMOJI_WIDTH = 16;
+    
+    let keydown = function() {
+        let happy_mapped = -Math.min(
+                NUM_EMOJIS - 1,
+                Math.floor(this.value.length / CHARS_PER_SMILE)
+            ) * EMOJI_WIDTH;
+        indicator.css('background-position-x', happy_mapped + 'px');
+    };
+    let focus = function() {
+        let chars_typed = this.value.length;
+        if (chars_typed === 0 || $(this).hasClass('input-label')) {
+            indicatorAndLabel.hide();
+        } else {
+            indicator.show();
+            label[ chars_typed > 20 ? 'hide':'show' ]();
         }
-    })
-    .trigger('keydown')
-    .trigger('blur')
-    .wrap('<div id="description_wrap">')
-    .after('<div class="happy_indicator">')
-    .after(
-        $('<div class="happy_indicator_label">')
-            .text('Keep typing!')
-    )
-;
+    };
+    let blur = function() {
+        indicatorAndLabel.hide();
+    };
+    
+    return { keydown, keyup: focus, focus, blur }
+})();
+
+$('#id_revision_desc').on(smileWidgetEvents)
+    .keydown().blur();

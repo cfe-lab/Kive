@@ -23,7 +23,7 @@ export class PipelineReviser {
         }
     }
 
-    load(cs?: CanvasState) {
+    load(cs?: CanvasState, onComplete?: Function) {
         if (cs) {
             this.cs = cs;
         }
@@ -39,6 +39,9 @@ export class PipelineReviser {
                 complete: () => {
                     this.pipelineRevision.load(this.pipelineRaw);
                     this.pipelineRevision.draw();
+                    if (onComplete) {
+                        onComplete();
+                    }
                     $canvas.fadeIn();
                 }
             });

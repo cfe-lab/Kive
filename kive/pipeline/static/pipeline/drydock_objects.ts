@@ -789,8 +789,8 @@ export class MethodNode extends BaseNode implements CNode {
     spacing = 20; // separation between pins
     stack = 20;
     scoop = 45;
-    in_magnets = [];
-    out_magnets = [];
+    in_magnets: Magnet[] = [];
+    out_magnets: Magnet[] = [];
     affects_exec_order = true;
     n_inputs: number;
     n_outputs: number;
@@ -1165,7 +1165,7 @@ export class Magnet implements CanvasObject {
         }
     }
 
-    tryAcceptConnector (conn: Connector) {
+    tryAcceptConnector (conn: Connector): boolean {
         if (!this.connected.length &&
                 this.contains(conn.x, conn.y)) {
             // jump to magnet
@@ -1178,7 +1178,9 @@ export class Magnet implements CanvasObject {
             if (CanvasState.isOutputNode(this.parent)) {
                 this.cdt = conn.source.cdt;
             }
+            return true;
         }
+        return false;
     }
 
     isNode() {

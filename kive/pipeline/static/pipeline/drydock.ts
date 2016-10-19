@@ -205,48 +205,56 @@ export class CanvasState {
                 // are we carrying a connector?
                 if (CanvasState.isConnector(sel)) {
                     if (this.can_edit) {
+    
                         // reset to allow mouse to disengage Connector from a magnet
                         sel.x = mouse.x;
                         sel.y = mouse.y;
-
+    
                         // get this connector's shape
                         let source_shape = sel.source.parent;
-
+    
+                        let old_dest = sel.dest; // keep track for purposes of change detection
+    
                         if (sel.dest !== undefined && sel.dest !== null) {
                             sel.dest.connected = [];
                             sel.dest = null;
                         }
-
+    
                         // check if connector has been dragged to an in-magnet
                         for (let shape of this.shapes) {
                             // disallow self-referential connections
                             if (source_shape !== undefined && shape === source_shape) {
                                 continue;
                             }
-
+        
                             for (let in_magnet of shape.in_magnets) {
                                 // light up magnet
                                 if (in_magnet.connected.length === 0 &&
-                                        (sel.source.cdt === in_magnet.cdt ||
-                                        // OutputNodes don't care about datatype.
-                                        CanvasState.isOutputNode(shape))
-                                    ) {
+                                    (sel.source.cdt === in_magnet.cdt ||
+                                    // OutputNodes don't care about datatype.
+                                    CanvasState.isOutputNode(shape))
+                                ) {
                                     in_magnet.acceptingConnector = true;
                                 }
                             }
-
+        
                             let in_magnet = shape.getMouseTarget(mouse.x, mouse.y);
-
+        
                             // does this in-magnet accept this CompoundDatatype?
                             // cdt is null if own_shape is a RawNode
                             if (CanvasState.isMagnet(in_magnet) &&
-                                    (sel.source.cdt === in_magnet.cdt ||
+                                (
+                                    sel.source.cdt === in_magnet.cdt ||
                                     // OutputNodes don't care about datatype.
                                     CanvasState.isOutputNode(shape)
-                                    )
-                                ) {
-                                in_magnet.tryAcceptConnector(sel);
+                                )
+                            ) {
+                                in_magnet.tryAcceptConnector(sel)
                             }
+                        }
+    
+                        if (sel.dest !== old_dest) {
+                            this.dispatchChangeEvent({connected: [sel]});
                         }
                     }
                 } else {
@@ -485,9 +493,6 @@ export class CanvasState {
                 layer = CanvasState.insertIntoLayer(connected_node, this.exec_order[i+1], layer);// `layer` will be added to here
             }
             node_order.push(layer);
-
-            // console.log('exec layer ' + i);
-            // console.table(node_order.map( e1 => e1.map( e2 => e2.label ) ));
         }
 
         $(this.canvas).fadeOut({ complete: () => {
@@ -776,14 +781,7 @@ export class CanvasState {
                         let new_output_label = this.uniqueNodeName(connector.source.label, OutputNode);
                         let out_node = connector.spawnOutputNode(new_output_label);
                         this.detectCollisions(out_node);
-                        this.addShape(out_node);
-                        
-                        // console.log('dispatching event...');
-                        this.canvas.dispatchEvent(
-                            new CustomEvent('new_output', {
-                                detail: { out_node }
-                            })
-                        );
+                        this.addShape(out_node, true);
                     }
                 } else {
                     // Connector not linked to anything - delete
@@ -818,7 +816,7 @@ export class CanvasState {
         return name;
     }
     
-    addShape(shape: CNode): CNode {
+    addShape(shape: CNode, open_dialog: boolean = false): CNode {
         this.shapes.push(shape);
         if (CanvasState.isMethodNode(shape)) {
             this.methods.push(shape);
@@ -832,6 +830,10 @@ export class CanvasState {
         shape.has_unsaved_changes = true;
         this.valid = false;
         this.has_unsaved_changes = true;
+        if (open_dialog) {
+            this.dispatchNewOutputEvent({ added: [ shape ], open_dialog });
+        }
+        this.dispatchChangeEvent({ added: [ shape ] });
         return shape;
     };
     
@@ -1042,6 +1044,20 @@ export class CanvasState {
         this.connectors = [];
         this.exec_order = [];
         this.selection = [];
+        
+        this.dispatchChangeEvent({ reset: true });
+    }
+    
+    private dispatchNewOutputEvent(data: any) {
+        this.canvas.dispatchEvent(
+            new CustomEvent('CanvasStateNewOutput', { detail: data })
+        );
+    }
+    
+    private dispatchChangeEvent(data: any) {
+        this.canvas.dispatchEvent(
+            new CustomEvent('CanvasStateChange', { detail: data })
+        );
     }
     
     /**
@@ -1227,6 +1243,8 @@ export class CanvasState {
         this.selection = [];
         this.valid = false; // re-draw canvas to make Connector disappear
         this.has_unsaved_changes = true;
+        
+        this.dispatchChangeEvent({ removed: sel });
     }
     
     findMethodNode (method_pk: number): MethodNode {
@@ -1333,51 +1351,79 @@ export class CanvasState {
     
     /**
      * Converts checkIntegrity into a simple yes-or-no with errors ignored.
+     * Useful to passively and continuously validate pipeline.
      * @returns {boolean}
      */
     isComplete(): boolean {
         try {
-            this.checkIntegrity();
+            this.assertIntegrity();
         } catch(e) {
+            // Enable to watch pipeline integrity in real-time:
+            // console.log(e);
             return false;
         }
         return true;
     }
     
-    checkIntegrity() {
-        for (let shape of this.shapes) {
-            if (CanvasState.isNode(shape)) {
-                if (CanvasState.isMethodNode(shape)) {
-                    let num_connections = 0;
-                    for (let magnet of shape.out_magnets) {
-                        num_connections += magnet.connected.length;
-                    }
-                    if (num_connections === 0) {
-                        throw 'MethodNode with unused outputs';
-                    }
-                } else if (CanvasState.isInputNode(shape)) {
-                    // all CDtNodes or RawNodes (inputs) should feed into a MethodNode and have only one magnet
-                    if (shape.out_magnets.length !== 1) {
-                        throw 'Invalid amount of magnets for input node!';
-                    }
+    assertIntegrity() {
+        let expected_num_shapes = this.inputs.length + this.outputs.length + this.methods.length;
+        
+        if (expected_num_shapes > this.shapes.length) {
+            throw 'CanvasState has more nodes than it knows about!'
+        } else if (expected_num_shapes < this.shapes.length) {
+            throw 'CanvasState has fewer nodes than it knows about!'
+        }
+        
+        for (let shape of this.inputs) {
+            // <any> type so that TS compiler doesn't detect a tautology here.
+            if (!CanvasState.isInputNode(<any> shape)) {
+                throw 'Invalid input detected: ' + shape.label;
+            }
+            
+            // all CDtNodes or RawNodes (inputs) should feed into a MethodNode and have only one magnet
+            if (shape.out_magnets.length !== 1) {
+                throw 'Invalid amount of magnets for input node ' + shape.label;
+            }
     
-                    // is this magnet connected?
-                    if (shape.out_magnets[0].connected.length === 0) {
-                        throw 'Unconnected input node';
-                    }
-                } else if (CanvasState.isOutputNode(shape)) {
-                    // all outputs should come from a MethodNode and have only one magnet
-                    if (shape.in_magnets.length !== 1) {
-                        throw 'Invalid amount of magnets for output node!';
-                    }
-    
-                    // is this magnet connected?
-                    if (shape.in_magnets[0].connected.length === 0) {
-                        throw 'Unconnected output node';
-                    }
-                }
-            } else {
-                throw 'Unknown node type encountered!';
+            // is this magnet connected?
+            if (shape.out_magnets[0].connected.length === 0) {
+                throw 'Disconnected input node ' + shape.label;
+            }
+        }
+        
+        for (let shape of this.outputs) {
+            // <any> type so that TS compiler doesn't detect a tautology here.
+            if (!CanvasState.isOutputNode(<any> shape)) {
+                throw 'Invalid output detected: ' + shape.label;
+            }
+            
+            // all outputs should come from a MethodNode and have only one magnet
+            if (shape.in_magnets.length !== 1) {
+                throw 'Invalid amount of magnets for output node ' + shape.label;
+            }
+        
+            // is this magnet connected?
+            if (shape.in_magnets[0].connected.length === 0) {
+                throw 'Disconnected output node ' + shape.label;
+            }
+        }
+        
+        for (let shape of this.methods) {
+            // <any> type so that TS compiler doesn't detect a tautology here.
+            if (!CanvasState.isMethodNode(<any> shape)) {
+                throw 'Invalid output detected: ' + shape.label;
+            }
+            let empty_out_magnets_list = shape.out_magnets
+                .filter(el => el.connected.length === 0)
+                .map(el => el.label)
+                .join(', ');
+            if (empty_out_magnets_list.length) {
+                throw 'MethodNode ' + shape.label + ' has unused outputs ' + empty_out_magnets_list;
+            }
+            let empty_in_magnets_list = shape.in_magnets
+                .filter(el => el.connected.length === 0);
+            if (empty_in_magnets_list.length) {
+                throw 'MethodNode ' + shape.label + ' has unused inputs';
             }
         }
     }
