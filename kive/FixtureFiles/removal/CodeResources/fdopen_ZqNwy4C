@@ -1,0 +1,2 @@
+#!/bin/bash
+./noop.bash "$1" "$2"

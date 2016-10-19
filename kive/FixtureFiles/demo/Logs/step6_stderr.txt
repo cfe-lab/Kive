@@ -1,2 +1,10 @@
 /usr/lib/python2.7/dist-packages/matplotlib/font_manager.py:273: UserWarning: Matplotlib is building the font cache using fc-list. This may take a moment.
   warnings.warn('Matplotlib is building the font cache using fc-list. This may take a moment.')
+Traceback (most recent call last):
+  File "/home/walter/kivemediaroot/Sandboxes/userkive_run2__HbFhK/step6/coverage_plots.py", line 240, in <module>
+    main()
+  File "/home/walter/kivemediaroot/Sandboxes/userkive_run2__HbFhK/step6/coverage_plots.py", line 230, in main
+    coverage_maps_path=coverage_maps_path)
+  File "/home/walter/kivemediaroot/Sandboxes/userkive_run2__HbFhK/step6/coverage_plots.py", line 76, in coverage_plot
+    deletion_count = int(row['del'])
+KeyError: 'del'
