@@ -1124,7 +1124,9 @@ export class CanvasState {
         let connectorLabels = [];
         let canvasWrapper = new CanvasWrapper(null, ctx);
         for (let connector of this.connectors) {
-            if (sel.indexOf(connector.source.parent) > -1 || sel.indexOf(connector.dest.parent) > -1) {
+            if (    connector.source && sel.indexOf(connector.source.parent) > -1 ||
+                    connector.dest   && sel.indexOf(  connector.dest.parent) > -1
+                ) {
                 let label;
                 if (label = connector.buildLabel(ctx)) {
                     connectorLabels.push(label);
