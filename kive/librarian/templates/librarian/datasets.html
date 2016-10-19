@@ -33,10 +33,10 @@
         if (pairs === null) {
             table.filterSet.add('uploaded');
         } else {
-            storedPage = parseInt(sessionStorage.getItem('datasetPage') || 1, 10);
+            storedPage = parseInt(sessionStorage.getItem('datasetPage'), 10);
             table.filterSet.setFromPairs(pairs);
+            table.page = storedPage || 1;
         }
-        table.page = storedPage;
         asf.reloadTable();
     });
     </script>
