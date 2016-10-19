@@ -1,6 +1,11 @@
 "use strict";
 
+// this line will work better with IDE
+// import { CanvasState, CanvasContextMenu, CanvasListeners, Pipeline, REDRAW_INTERVAL } from "../../../pipeline/static/pipeline/pipeline_all";
+
+// this line works better when the server is running
 import { CanvasState, CanvasContextMenu, CanvasListeners, Pipeline, REDRAW_INTERVAL } from "/static/pipeline/pipeline_all";
+
 import 'jquery';
 import '/static/portal/noxss.js';
 
@@ -13,14 +18,13 @@ const MD5 = $('#run_md5').val();
 const TIMER_INTERVAL = 1000;
 
 // initialize animated canvas
-let canvas = document.getElementById('pipeline_canvas') as HTMLCanvasElement;
+let canvas = <HTMLCanvasElement> document.getElementById('pipeline_canvas');
 canvas.width  = window.innerWidth;
 canvas.height = window.innerHeight - $(canvas).offset().top - 5;
 
 var canvasState = new CanvasState(canvas, false, REDRAW_INTERVAL);
 var pipeline = new Pipeline(canvasState);
 CanvasListeners.initMouseListeners(canvasState);
-CanvasListeners.initContextMenuListener(canvasState);
 CanvasListeners.initKeyListeners(canvasState);
 CanvasListeners.initResizeListeners(canvasState);
 
@@ -83,7 +87,7 @@ var grabStatus: TimerFunction = function() {
 };
 
 var contextMenu = new CanvasContextMenu('.context_menu', canvasState);
-
+CanvasListeners.initContextMenuListener(canvasState, contextMenu);
 contextMenu.registerAction('display', function(sel) {
     if (CanvasState.isNode(sel) && !CanvasState.isMethodNode(sel)) {
         window.location.href = '/dataset_view/' + sel.dataset_id + '?run_id=' + sel.run_id + "&view_run";

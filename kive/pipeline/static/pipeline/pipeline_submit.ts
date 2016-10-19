@@ -13,8 +13,6 @@ export class PipelineSubmit {
                 parent_revision_id, $published: JQuery, $user_permissions: JQuery,
                 $group_permissions: JQuery, $error: JQuery, familyNameError: () => any) {
         
-        var args = (arguments);
-    
         /*
          * Trigger AJAX transaction on submitting form.
          */
@@ -25,7 +23,6 @@ export class PipelineSubmit {
             let action = $action.val();
             let form_data;
             let family = $family_name.val();
-            console.log(args, family);
     
             if (action == "new" && family === '') {
                 familyNameError();
@@ -75,7 +72,7 @@ export class PipelineSubmit {
         };// end exposed function - everything that follows is closed over
     }
     
-    private static getPermissionsArray($permissionsElement) {
+    private static getPermissionsArray($permissionsElement: JQuery) {
         return $permissionsElement.find("option:selected").get().map(el => el.textContent);
     }
     private static clearErrors($error) {
