@@ -19,13 +19,13 @@ export class PipelineSubmit {
          * Trigger AJAX transaction on submitting form.
          */
         return function(e) {
-            console.log(args);
             e.preventDefault(); // override form submit action
             PipelineSubmit.clearErrors($error);
         
             let action = $action.val();
             let form_data;
             let family = $family_name.val();
+            console.log(args, family);
     
             if (action == "new" && family === '') {
                 familyNameError();

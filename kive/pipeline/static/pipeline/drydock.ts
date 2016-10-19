@@ -1368,10 +1368,23 @@ export class CanvasState {
     assertIntegrity() {
         let expected_num_shapes = this.inputs.length + this.outputs.length + this.methods.length;
         
+        if (this.shapes.length === 0) {
+            throw "Pipeline is empty";
+        }
+        if (this.inputs.length === 0) {
+            throw "Pipeline has no inputs";
+        }
+        if (this.methods.length === 0) {
+            throw "Pipeline has no methods";
+        }
+        if (this.outputs.length === 0) {
+            throw "Pipeline has no outputs";
+        }
+        
         if (expected_num_shapes > this.shapes.length) {
-            throw 'CanvasState has more nodes than it knows about!'
+            throw 'Pipeline has more nodes than it knows about!'
         } else if (expected_num_shapes < this.shapes.length) {
-            throw 'CanvasState has fewer nodes than it knows about!'
+            throw 'Pipeline has fewer nodes than it knows about!'
         }
         
         for (let shape of this.inputs) {
@@ -1418,12 +1431,12 @@ export class CanvasState {
                 .map(el => el.label)
                 .join(', ');
             if (empty_out_magnets_list.length) {
-                throw 'MethodNode ' + shape.label + ' has unused outputs ' + empty_out_magnets_list;
+                throw 'Step ' + shape.label + ' has unused outputs ' + empty_out_magnets_list;
             }
             let empty_in_magnets_list = shape.in_magnets
                 .filter(el => el.connected.length === 0);
             if (empty_in_magnets_list.length) {
-                throw 'MethodNode ' + shape.label + ' has unused inputs';
+                throw 'Step ' + shape.label + ' has unused inputs';
             }
         }
     }

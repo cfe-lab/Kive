@@ -1,28 +1,39 @@
 "use strict";
-import { CanvasState, CanvasContextMenu, CanvasListeners, Pipeline, PipelineReviser, REDRAW_INTERVAL } from "./pipeline_all";
+import { CanvasState, CanvasContextMenu, CanvasListeners, PipelineReviser, PipelineSubmit, REDRAW_INTERVAL } from "./pipeline_all";
 import { ViewDialog, OutputDialog, MethodDialog, InputDialog, Dialog } from "./pipeline_dialogs";
 import 'jquery';
 import '/static/portal/noxss.js';
-import {PipelineSubmit} from "./pipeline_submit";
 
 declare var noXSS: any;
 noXSS();
 
-// initialize animated canvas
+/**
+ * DIRECTORY:
+ *
+ * Part 1/8: Initialize CanvasState with event listeners.
+ * Part 2/8: Prepare Pipeline completeness check.
+ * Part 3/8: Load initial pipeline data if present.
+ * Part 4/8: Initialize Dialogs (Family, revision, add, add input, add method, add output, and view)
+ * Part 5/8: Initialize the submission of this page
+ * Part 6/8: Initialize CanvasContextMenu and register actions
+ * Part 7/8: Prompt the user when navigating away unsaved changes
+ * Part 8/8: Silly happy face widget
+ */
+
+/**
+ * Part 1/8: Initialize CanvasState with event listeners.
+ */
 let canvas = document.getElementById('pipeline_canvas') as HTMLCanvasElement;
 canvas.width  = window.innerWidth;
 canvas.height = window.innerHeight - $(canvas).offset().top - 5;
-
-export var canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
-export var contextMenu = new CanvasContextMenu('.context_menu', canvasState);
-
-// de-activate double-click selection of text on page
+let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
 CanvasListeners.initMouseListeners(canvasState);
-CanvasListeners.initContextMenuListener(canvasState, contextMenu);
 CanvasListeners.initKeyListeners(canvasState);
 CanvasListeners.initResizeListeners(canvasState);
 
-
+/**
+ * Part 2/8: Prepare Pipeline completeness check.
+ */
 interface BtnFunction extends Function { $btn?: JQuery }
 var pipelineCheckCompleteness: BtnFunction = function() {
     let $submit_btn = pipelineCheckCompleteness.$btn || $('#id_submit_button');
@@ -40,11 +51,13 @@ function initPipelineCheck() {
     pipelineCheckCompleteness();
 }
 
-
+/**
+ * Part 3/8: Load initial pipeline data if present.
+ */
 let parent_revision_id;
 let initialData = $("#initial_data");
-if (initialData.length) {
-    let text = initialData.text();
+let text;
+if (initialData.length && (text = initialData.text())) {
     if (text.length) {
         let loader = new PipelineReviser(text);
         loader.load(
@@ -59,29 +72,20 @@ if (initialData.length) {
     initPipelineCheck();
 }
 
-
-// Pack help text into an unobtrusive icon
-$('.helptext', 'form').each(function() {
-    $(this).wrapInner('<span class="fulltext"></span>').prepend('<a rel="ctrl">?</a>');
-});
-
-
 /**
- * dialogs
- *
+ * Part 4/8: Initialize Dialogs (Family, revision, add, add input, add method, add output, and view)
  */
 var $ctrl_nav = $("#id_ctrl_nav");
 var $add_menu = $('#id_add_ctrl');
 var $view_menu = $('#id_view_ctrl');
 
-var pipeline_family_dialog = new Dialog( $('#id_family_ctrl'), $ctrl_nav.find("li[data-rel='#id_family_ctrl']") );
-                             new Dialog( $('#id_meta_ctrl'),   $ctrl_nav.find("li[data-rel='#id_meta_ctrl']")   );
-                         new ViewDialog( $view_menu,           $ctrl_nav.find("li[data-rel='#id_view_ctrl']")   );
-
-var add_menu        =        new Dialog( $add_menu,            $ctrl_nav.find("li[data-rel='#id_add_ctrl']")    );
-var input_dialog    =   new InputDialog( $('#id_input_ctrl'),  $add_menu.find("li[data-rel='#id_input_ctrl']")  );
-var method_dialog   =  new MethodDialog( $('#id_method_ctrl'), $add_menu.find("li[data-rel='#id_method_ctrl']") );
-var output_dialog   =  new OutputDialog( $('#id_output_ctrl'), $add_menu.find("li[data-rel='#id_output_ctrl']") );
+var family_dialog =       new Dialog( $('#id_family_ctrl'), $ctrl_nav.find("li[data-rel='#id_family_ctrl']") );
+/* anonymous */           new Dialog( $('#id_meta_ctrl'),   $ctrl_nav.find("li[data-rel='#id_meta_ctrl']")   );
+/* anonymous */       new ViewDialog( $view_menu,           $ctrl_nav.find("li[data-rel='#id_view_ctrl']")   );
+var add_menu      =       new Dialog( $add_menu,            $ctrl_nav.find("li[data-rel='#id_add_ctrl']")    );
+var input_dialog  =  new InputDialog( $('#id_input_ctrl'),  $add_menu.find("li[data-rel='#id_input_ctrl']")  );
+var method_dialog = new MethodDialog( $('#id_method_ctrl'), $add_menu.find("li[data-rel='#id_method_ctrl']") );
+var output_dialog = new OutputDialog( $('#id_output_ctrl'), $add_menu.find("li[data-rel='#id_output_ctrl']") );
 
 $add_menu.click('li', function() { add_menu.hide(); });
 
@@ -113,11 +117,9 @@ $view_menu.find('#autolayout_btn').click(
     () => canvasState.autoLayout()
 );
 
-/******/
-
-
-
-
+/**
+ * Part 5/8: Initialize the submission of this page
+ */
 $('#id_pipeline_form').submit(PipelineSubmit.buildSubmit(
     canvasState,
     $('#id_pipeline_action'),
@@ -129,16 +131,16 @@ $('#id_pipeline_form').submit(PipelineSubmit.buildSubmit(
     $("#id_permissions_0"), $("#id_permissions_1"),
     $('#id_submit_error'),
     function() {
-        pipeline_family_dialog.show();
+        family_dialog.show();
         $('#id_family_name').addClass('submit-error-missing').focus();
     }
 ));
 
-
-
 /**
- * context menu
+ * Part 6/8: Initialize context menu and register actions
  */
+var contextMenu = new CanvasContextMenu('.context_menu', canvasState);
+CanvasListeners.initContextMenuListener(canvasState, contextMenu);
 contextMenu.registerAction('delete', function(sel) { canvasState.deleteObject(); });
 contextMenu.registerAction('edit', function(sel) {
     var coords = canvasState.getAbsoluteCoordsOfNode(sel);
@@ -172,15 +174,20 @@ contextMenu.registerAction('add_output', function(_, pos) {
     output_dialog.align(pos.clientX, pos.clientY);
 });
 
+/**
+ * Part 7/8: Prompt the user when navigating away unsaved changes
+ */
+if (canvasState.can_edit) {
+    $(window).on('beforeunload', function checkForUnsavedChanges() {
+        if (canvasState.has_unsaved_changes) {
+            return 'You have unsaved changes.';
+        }
+    });
+}
 
-$(window).on('beforeunload', function checkForUnsavedChanges() {
-    if (canvasState.can_edit && canvasState.has_unsaved_changes) {
-        return 'You have unsaved changes.';
-    }
-});
-
-
-/* Silly happy face widget. */
+/**
+ * Part 8/8: Silly happy face widget
+ */
 let smileWidgetEvents = (function() {
     let indicator = $('#happy_indicator');
     let label = $('#happy_indicator_label');
@@ -211,6 +218,5 @@ let smileWidgetEvents = (function() {
     
     return { keydown, keyup: focus, focus, blur }
 })();
-
 $('#id_revision_desc').on(smileWidgetEvents)
     .keydown().blur();

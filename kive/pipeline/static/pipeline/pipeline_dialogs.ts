@@ -135,10 +135,9 @@ export class Dialog {
     }
     
     /**
-     * Resets and hides all in one.
+     * Hides by default - child classes may choose to have this reset the dialog as well.
      */
     cancel() {
-        this.reset();
         this.hide();
     }
     
@@ -236,6 +235,14 @@ class NodePreviewDialog extends Dialog {
         super.reset();
         // this has the side-effect of clearing the canvas.
         this.clearPreview();
+    }
+    
+    /**
+     * Hide and reset all in one.
+     */
+    cancel() {
+        this.hide();
+        this.reset();
     }
     
     /**

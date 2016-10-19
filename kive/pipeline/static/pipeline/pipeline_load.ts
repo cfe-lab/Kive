@@ -135,11 +135,6 @@ export class Pipeline {
         pipeline_inputs.sort(Geometry.isometricSort);
         pipeline_outputs.sort(Geometry.isometricSort);
 
-        // at least one Connector must terminate as pipeline output
-        if (pipeline_outputs.length === 0) {
-            throw 'Pipeline has no output.';
-        }
-
         // Now we're ready to start
         let form_data: ApiPipelineData = metadata || {};
         form_data.steps = [];
