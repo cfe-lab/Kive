@@ -4,7 +4,10 @@
  *   pipelines from datatype and method nodes.
  */
 "use strict";
-import { CanvasObject, CNode, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet, Connector } from "./drydock_objects";
+import {
+    CanvasObject, CNode, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet, Connector,
+    CanvasWrapper
+} from "./drydock_objects";
 import { Geometry, Point, Rectangle } from "./geometry";
 import 'jquery';
 
@@ -191,6 +194,76 @@ export class CanvasState {
         }
     }
     
+    private moveConnector(connector: Connector, mouse: Point) {
+        // reset to allow mouse to disengage Connector from a magnet
+        connector.x = mouse.x;
+        connector.y = mouse.y;
+    
+        // get this connector's shape
+        let source_shape = connector.source.parent;
+    
+        let old_dest = connector.dest; // keep track for purposes of change detection
+    
+        if (connector.dest !== undefined && connector.dest !== null) {
+            connector.dest.connected = [];
+            connector.dest = null;
+        }
+    
+        // check if connector has been dragged to an in-magnet
+        for (let shape of this.shapes) {
+            // disallow self-referential connections
+            if (source_shape !== undefined && shape === source_shape) {
+                continue;
+            }
+        
+            for (let in_magnet of shape.in_magnets) {
+                // light up magnet
+                if (in_magnet.connected.length === 0 &&
+                    (connector.source.cdt === in_magnet.cdt ||
+                    // OutputNodes don't care about datatype.
+                    CanvasState.isOutputNode(shape))
+                ) {
+                    in_magnet.acceptingConnector = true;
+                }
+            }
+        
+            let in_magnet = shape.getMouseTarget(mouse.x, mouse.y);
+        
+            // does this in-magnet accept this CompoundDatatype?
+            // cdt is null if own_shape is a RawNode
+            if (CanvasState.isMagnet(in_magnet) &&
+                (
+                    connector.source.cdt === in_magnet.cdt ||
+                    // OutputNodes don't care about datatype.
+                    CanvasState.isOutputNode(shape)
+                )
+            ) {
+                in_magnet.tryAcceptConnector(connector)
+            }
+        }
+    
+        if (connector.dest !== old_dest) {
+            this.dispatchChangeEvent({connected: [connector]});
+        }
+    }
+    
+    private moveShape(shape: CNode, mouse: Point) {
+        // update coordinates of this shape/connector
+        // any changes made by the collision detection algorithm on this shape are now made "official"
+        let dx = mouse.x - this.dragstart.x;
+        let dy = mouse.y - this.dragstart.y;
+        shape.x += dx + shape.dx;
+        shape.y += dy + shape.dy;
+        shape.dy = shape.dx = 0;
+    
+        // if execution order is ambiguous, the tiebreaker is the y-position.
+        // dragging a method node needs to calculate this in real-time.
+        this.exec_order_may_have_changed = this.exec_order_may_have_changed ||
+            this.exec_order_is_ambiguous && shape.affects_exec_order;
+        this.input_order_may_have_changed = this.input_order_may_have_changed ||
+            CanvasState.isInputNode(shape);
+    }
+    
     doMove (e: MouseEvent): void {
         /*
          event handler for mouse motion over canvas
@@ -205,96 +278,33 @@ export class CanvasState {
                 // are we carrying a connector?
                 if (CanvasState.isConnector(sel)) {
                     if (this.can_edit) {
-    
-                        // reset to allow mouse to disengage Connector from a magnet
-                        sel.x = mouse.x;
-                        sel.y = mouse.y;
-    
-                        // get this connector's shape
-                        let source_shape = sel.source.parent;
-    
-                        let old_dest = sel.dest; // keep track for purposes of change detection
-    
-                        if (sel.dest !== undefined && sel.dest !== null) {
-                            sel.dest.connected = [];
-                            sel.dest = null;
-                        }
-    
-                        // check if connector has been dragged to an in-magnet
-                        for (let shape of this.shapes) {
-                            // disallow self-referential connections
-                            if (source_shape !== undefined && shape === source_shape) {
-                                continue;
-                            }
-        
-                            for (let in_magnet of shape.in_magnets) {
-                                // light up magnet
-                                if (in_magnet.connected.length === 0 &&
-                                    (sel.source.cdt === in_magnet.cdt ||
-                                    // OutputNodes don't care about datatype.
-                                    CanvasState.isOutputNode(shape))
-                                ) {
-                                    in_magnet.acceptingConnector = true;
-                                }
-                            }
-        
-                            let in_magnet = shape.getMouseTarget(mouse.x, mouse.y);
-        
-                            // does this in-magnet accept this CompoundDatatype?
-                            // cdt is null if own_shape is a RawNode
-                            if (CanvasState.isMagnet(in_magnet) &&
-                                (
-                                    sel.source.cdt === in_magnet.cdt ||
-                                    // OutputNodes don't care about datatype.
-                                    CanvasState.isOutputNode(shape)
-                                )
-                            ) {
-                                in_magnet.tryAcceptConnector(sel)
-                            }
-                        }
-    
-                        if (sel.dest !== old_dest) {
-                            this.dispatchChangeEvent({connected: [sel]});
-                        }
+                        this.moveConnector(sel, mouse);
                     }
-                } else {
-                    // carrying a shape
-
-                    // update coordinates of this shape/connector
-                    // any changes made by the collision detection algorithm on this shape are now made "official"
-                    let dx = mouse.x - this.dragstart.x;
-                    let dy = mouse.y - this.dragstart.y;
-                    sel.x += dx + sel.dx;
-                    sel.y += dy + sel.dy;
-                    sel.dy = sel.dx = 0;
-
-                    // if execution order is ambiguous, the tiebreaker is the y-position.
-                    // dragging a method node needs to calculate this in real-time.
-                    this.exec_order_may_have_changed = this.exec_order_may_have_changed ||
-                            this.exec_order_is_ambiguous && sel.affects_exec_order;
-                    this.input_order_may_have_changed = this.input_order_may_have_changed ||
-                            CanvasState.isInputNode(sel);
+                }
+                // carrying a shape
+                else {
+                    this.moveShape(sel, mouse);
                 }
             }
             
             this.dragstart = mouse;
         }
         
-        let was_highlighted = CanvasState.isMagnet(this.mouse_highlight);
-        this.mouse_highlight = null;
-        for (let shape of this.shapes) {
-            let magnet = shape.getMouseTarget(mouse.x, mouse.y);
-            if (CanvasState.isMagnet(magnet) && magnet.connected.length === 0) {
-                if (magnet !== this.mouse_highlight) {
-                    this.mouse_highlight = magnet;
-                    this.valid = false;
-                }
-                break;
-            }
-        }
-        if (was_highlighted && !this.mouse_highlight) {
-            this.valid = false;
-        }
+        // let was_highlighted = this.mouse_highlight !== null;
+        // this.mouse_highlight = null;
+        // for (let shape of this.shapes) {
+        //     let magnet = shape.getMouseTarget(mouse.x, mouse.y);
+        //     if (CanvasState.isMagnet(magnet) && magnet.connected.length === 0) {
+        //         if (magnet !== this.mouse_highlight) {
+        //             this.mouse_highlight = magnet;
+        //             this.valid = false;
+        //         }
+        //         break;
+        //     }
+        // }
+        // if (was_highlighted && !this.mouse_highlight) {
+        //     this.valid = false;
+        // }
     }
     
     scaleToCanvas (maintain_aspect_ratio?: boolean): void {
@@ -1093,12 +1103,12 @@ export class CanvasState {
                 sel_.highlight(ctx);
             }
         }
-        
+    
         // draw all shapes and magnets
         for (let shape of this.shapes) {
             shape.draw(ctx);
         }
-
+        
         // draw all connectors
         ctx.globalAlpha = 0.75;
         for (let connector of this.connectors) {
@@ -1107,13 +1117,37 @@ export class CanvasState {
         ctx.globalAlpha = 1.0;
     
         // draw labels on connectors of selected nodes
-        ctx.fillStyle = '#aaa';
-        for (let connector of sel.filter(CanvasState.isNode)
-            .reduce((a, b: CNode)  => a.concat( b.in_magnets.concat(b.out_magnets) ), [])
-            .reduce((a, b: Magnet) => a.concat( b.connected                        ), [])
-            ) {
-            connector.drawLabel(ctx);
+    
+        // Attempting to make this more efficient by batching all labels into one.
+        // Drawing text is the most resource-intensive operation here.
+        // This code uses makeLabel() instead of drawLabel(), which this replaces.
+        let connectorLabels = [];
+        let canvasWrapper = new CanvasWrapper(null, ctx);
+        for (let connector of this.connectors) {
+            if (sel.indexOf(connector.source.parent) > -1 || sel.indexOf(connector.dest.parent) > -1) {
+                let label;
+                if (label = connector.buildLabel(ctx)) {
+                    connectorLabels.push(label);
+                }
+            }
         }
+        ctx.save();
+        ctx.font = '10pt Lato, sans-serif';
+        ctx.textBaseline = 'middle';
+        ctx.globalAlpha = 1;
+        ctx.textAlign = 'center';
+        for (let i = 0; i < connectorLabels.length; i++) {
+            let label = connectorLabels[i];
+            let prevLabel = connectorLabels[i - 1] || { centre: { x: 0, y: 0 }, rotate: 0 };
+            ctx.rotate(-prevLabel.rotate);
+            ctx.translate(label.centre.x - prevLabel.centre.x, label.centre.y - prevLabel.centre.y);
+            ctx.rotate(label.rotate);
+            ctx.fillStyle = '#aaa';
+            canvasWrapper.fillRect(label.rect);
+            ctx.fillStyle = "white";
+            ctx.fillText(label.label, 0, 0);
+        }
+        ctx.restore();
     
         // draw label if connector itself is selected (and connected)
         ctx.strokeStyle = this.selectionColor;
@@ -1149,10 +1183,10 @@ export class CanvasState {
             }
         }
         
-        if (this.mouse_highlight) {
-            // Highlight (label) the object (usually a magnet);
-            this.mouse_highlight.highlight(ctx);
-        }
+        // if (this.mouse_highlight) {
+        //     // Highlight (label) the object (usually a magnet);
+        //     this.mouse_highlight.highlight(ctx);
+        // }
         
         ctx.restore();
         this.valid = true;
