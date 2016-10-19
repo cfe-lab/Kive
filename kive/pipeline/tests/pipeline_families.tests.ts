@@ -1,11 +1,13 @@
 import "jasmine";
 import 'jasmine-html';
 import 'jquery';
-declare var pipeline_families: any;
+import '/static/portal/permissions.js'
+import '/static/pipeline/PipelineFamiliesTable.js';
+declare var permissions: any;
 
 "use strict";
 
-xdescribe('Pipeline families', function() {
+describe('Pipeline families', function() {
     beforeEach(function() {
         this.$table = $('<table/>');
         this.$navigation_links = $("<div/>");
@@ -14,13 +16,14 @@ xdescribe('Pipeline families', function() {
             name: 'Example',
             num_revisions: 1,
             published_version_display_name: null,
-            users_allowed: [],
-            groups_allowed: []
+            user: 'John Doe',
+            users_allowed: [ 'User 1', 'User 2' ],
+            groups_allowed: [ 'Everyone' ]
         }];
     });
     
     it('should build a table', function() {
-        var table = new pipeline_families.PipelineFamiliesTable(
+        var table = new permissions.PipelineFamiliesTable(
             this.$table, this.is_user_admin, this.$navigation_links
         );
         table.image_path = "portal/static/portal/img";
@@ -30,20 +33,13 @@ xdescribe('Pipeline families', function() {
         expect($rows.length).toBe(2);
         var $cells = $rows.eq(1).find('td');
         expect($cells.eq(0).text()).toBe('Example'); // Name
-        expect($cells.eq(3).text()).toBe('None'); // Published version
+        expect($cells.eq(2).text()).toBe('1'); // User
+        expect($cells.eq(3).text()).toBe('John Doe'); // User
+        expect($cells.eq(4).text()).toBe('User 1User 2'); // Users allowed (actually a <ul>)
+        expect($cells.eq(5).text()).toBe('Everyone'); // Groups allowed
     });
     
-    it('should display published version', function() {
-        this.initial_data[0].published_version_display_name = "1: First";
-        
-        var table = new pipeline_families.PipelineFamiliesTable(
-            this.$table, this.is_user_admin, this.$navigation_links
-        );
-        table.image_path = "portal/static/portal/img";
-        table.buildTable(this.initial_data);
-        
-        var $rows = this.$table.find('tr');
-        var $cells = $rows.eq(1).find('td');
-        expect($cells.eq(3).text()).toBe('1: First'); // Published version
-    });
+    /*
+    
+     */
 });

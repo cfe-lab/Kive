@@ -117,7 +117,7 @@ export class Pipeline {
         }
 
         // Now we're ready to start
-        form_data = this.metadata ? this.getMetadata() : {};
+        form_data = this.metadata ? this.getMetadata() : (form_data || {});
         form_data.steps = [];
         form_data.inputs = [];
         form_data.outcables = [];

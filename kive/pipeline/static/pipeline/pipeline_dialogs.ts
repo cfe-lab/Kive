@@ -541,7 +541,9 @@ export class MethodDialog extends NodePreviewDialog {
                 this.methodOutputs = result.outputs;
                 this.cached_api_result = result;
                 this.setOutputsFieldsetList(result.outputs);
-                this.setOutputsToDeleteFromEditingNode();
+                if (this.editing_node) {
+                    this.setOutputsToDeleteFromEditingNode();
+                }
                 this.drawPreviewCanvas(result, this.colour_picker.val());
             });
         }

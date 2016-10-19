@@ -16,7 +16,7 @@ describe("Pipeline functions", function() {
         jasmine.addMatchers(imagediff.jasmine);
         this.rawCanvas = imagediff.createCanvas(width, height);
         this.canvas = new CanvasWrapper(this.rawCanvas);
-        this.canvasState = new CanvasState(this.rawCanvas);
+        this.canvasState = new CanvasState(this.rawCanvas, true);
         
         this.api_pipeline = {
             "id": 25,

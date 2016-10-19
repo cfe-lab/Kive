@@ -4,47 +4,6 @@ import "jasmine";
 import 'jasmine-html';
 import 'jquery';
 import 'imagediff';
-declare var imagediff: any;
-
-/**
- *  Ugh, none of these work.
- */
-// declare namespace jasmine {
-//     interface Matchers {
-//         toImageDiffEqual<T>(a: T, b: T): boolean;
-//     }
-// }
-// namespace jasmine {
-//     interface Matchers {
-//         toImageDiffEqual<T>(a: T, b: T): boolean;
-//     }
-// }
-// interface Matchers {
-//     toImageDiffEqual<T>(a: T, b: T): boolean;
-// }
-// declare interface Matchers {
-//     toImageDiffEqual<T>(a: T, b: T): boolean;
-// }
-// module jasmine {
-//     interface Matchers {
-//         toImageDiffEqual<T>(a: T, b: T): boolean;
-//     }
-// }
-// declare module jasmine {
-//     interface Matchers {
-//         toImageDiffEqual<T>(a: T, b: T): boolean;
-//     }
-// }
-// namespace jasmine {
-//     declare interface Matchers {
-//         toImageDiffEqual<T>(a: T, b: T): boolean;
-//     }
-// }
-// module jasmine {
-//     declare interface Matchers {
-//         toImageDiffEqual<T>(a: T, b: T): boolean;
-//     }
-// }
 
 "use strict";
 
@@ -384,14 +343,14 @@ describe("Canvas classes", function() {
             this.expectedCanvas.ctx.strokeRect(80, 27.5, 40, 25);
             this.expectedCanvas.strokeEllipse({x: 100, y: 52.5, rx: 20, ry: 10});
             this.node.draw(this.expectedCanvas.ctx);
-            
-            this.node.draw(this.ctx);
+    
             this.ctx.strokeStyle = "#7bf";
             this.ctx.lineWidth = 4;
             this.node.highlight(this.ctx);
+            this.node.draw(this.ctx);
         });
         
-        it('should highlight cable', function() {
+        xit('should highlight cable', function() {
             var sourceParent = {},
                 r = 5,
                 attract = 3,
@@ -415,12 +374,12 @@ describe("Canvas classes", function() {
             this.expectedCanvas.ctx.font = '9pt Lato, sans-serif';
             this.expectedCanvas.ctx.textBaseline = 'middle';
             connector.highlight(this.expectedCanvas.ctx);
-            
-            this.node.draw(this.ctx);
-            connector.draw(this.ctx);
+    
             this.ctx.strokeStyle = "#7bf";
             this.ctx.lineWidth = 4;
             this.node.highlight(this.ctx);
+            this.node.draw(this.ctx);
+            connector.draw(this.ctx);
         });
         
         it('should have label', function() {
@@ -467,11 +426,11 @@ describe("Canvas classes", function() {
             this.expectedCanvas.ctx.strokeRect(80, 27.5, 40, 25);
             this.expectedCanvas.strokeEllipse({x: 100, y: 52.5, rx: 20, ry: 10});
             this.node.draw(this.expectedCanvas.ctx);
-            
-            this.node.draw(this.ctx);
+    
             this.ctx.strokeStyle = "#7bf";
             this.ctx.lineWidth = 4;
             this.node.highlight(this.ctx);
+            this.node.draw(this.ctx);
         });
         
         itContains([100, 40, true, 'centre',
@@ -586,11 +545,11 @@ describe("Canvas classes", function() {
             this.expectedCanvas.ctx.closePath();
             this.expectedCanvas.ctx.stroke();
             this.node.draw(this.expectedCanvas.ctx);
-            
-            this.node.draw(this.ctx);
+    
             this.ctx.strokeStyle = "orange";
             this.ctx.lineWidth = 4;
             this.node.highlight(this.ctx);
+            this.node.draw(this.ctx);
         });
         
         itContains([100, 40, true, 'centre',
@@ -741,11 +700,11 @@ describe("Canvas classes", function() {
             
             this.ctx.strokeStyle = "#7bf";
             this.ctx.lineWidth = 4;
-            this.node.draw(this.ctx);
             this.node.highlight(this.ctx);
+            this.node.draw(this.ctx);
         });
         
-        it('should highlight with input cable', function() {
+        it('should highlight and show input cable label', function() {
             this.expectedCanvas.ctx.strokeStyle = "#7bf";
             this.expectedCanvas.ctx.lineWidth = 4;
             buildMethodBodyPath(this.expectedCanvas.ctx);
@@ -767,28 +726,22 @@ describe("Canvas classes", function() {
             expectedCable.dest = in_magnet;
             in_magnet.connected.push(expectedCable);
             expectedCable.draw(this.expectedCanvas.ctx);
+            this.expectedCanvas.ctx.fillStyle = "#aaa";
             expectedCable.drawLabel(this.expectedCanvas.ctx);
-            
-            // // out magnet
-            // var out_magnet = new Magnet(null);
-            // out_magnet.x = 188.97114317029974;
-            // out_magnet.y = 57.5;
-            // out_magnet.r = 5;
-            // out_magnet.label = "out";
-            // out_magnet.isOutput = true;
-            // out_magnet.highlight(this.expectedCanvas.ctx);
             
             var actualCable = new Connector(source);
             actualCable.dest = this.node.in_magnets[0];
             this.node.in_magnets[0].connected.push(actualCable);
-            this.node.draw(this.ctx);
-            actualCable.draw(this.ctx);
             this.ctx.strokeStyle = "#7bf";
             this.ctx.lineWidth = 4;
             this.node.highlight(this.ctx);
+            this.node.draw(this.ctx);
+            actualCable.draw(this.ctx);
+            this.ctx.fillStyle = "#aaa";
+            actualCable.drawLabel(this.ctx);
         });
         
-        it('should highlight with output cable', function() {
+        it('should highlight and show output cable label', function() {
             this.expectedCanvas.ctx.strokeStyle = "#7bf";
             this.expectedCanvas.ctx.lineWidth = 4;
             buildMethodBodyPath(this.expectedCanvas.ctx);
@@ -819,62 +772,20 @@ describe("Canvas classes", function() {
             expectedCable.dest = dest;
             out_magnet.connected.push(expectedCable);
             expectedCable.draw(this.expectedCanvas.ctx);
+            this.expectedCanvas.ctx.fillStyle = "#aaa";
             expectedCable.drawLabel(this.expectedCanvas.ctx);
             
             var actualCable = new Connector(
                     this.node.out_magnets[0]);
             actualCable.dest = dest;
             this.node.out_magnets[0].connected.push(actualCable);
-            this.node.draw(this.ctx);
-            actualCable.draw(this.ctx);
             this.ctx.strokeStyle = "#7bf";
             this.ctx.lineWidth = 4;
             this.node.highlight(this.ctx);
-        });
-        
-        it('should highlight with output cable to output node', function() {
-            this.expectedCanvas.ctx.strokeStyle = "#7bf";
-            this.expectedCanvas.ctx.lineWidth = 4;
-            buildMethodBodyPath(this.expectedCanvas.ctx);
-            this.expectedCanvas.ctx.stroke();
-            this.node.draw(this.expectedCanvas.ctx);
-            // dest magnet
-            var expectedOutput = new OutputNode(250, 75, "out");
-            
-            // // in magnet
-            // var in_magnet = new Magnet(null);
-            // in_magnet.x = 150;
-            // in_magnet.y = 15;
-            // in_magnet.r = 5;
-            // in_magnet.label = "in";
-            // in_magnet.highlight(this.expectedCanvas.ctx);
-            
-            // out magnet
-            var out_magnet = new Magnet(this.node),
-            expectedCable = new Connector(out_magnet);
-            out_magnet.x = 188.97114317029974;
-            out_magnet.y = 57.5;
-            out_magnet.r = 5;
-            out_magnet.label = "out";
-            out_magnet.isOutput = true;
-            expectedCable.dest = expectedOutput.in_magnets[0];
-            out_magnet.connected.push(expectedCable);
-            expectedOutput.draw(this.expectedCanvas.ctx);
-            expectedOutput.highlight(this.expectedCanvas.ctx);
-            expectedCable.draw(this.expectedCanvas.ctx);
-            expectedCable.drawLabel(this.expectedCanvas.ctx);
-            
-            var actualCable = new Connector(
-                this.node.out_magnets[0]),
-                actualOutput = new OutputNode(250, 75, "out");
-            actualCable.dest = actualOutput.in_magnets[0];
-            this.node.out_magnets[0].connected.push(actualCable);
             this.node.draw(this.ctx);
-            actualOutput.draw(this.ctx);
             actualCable.draw(this.ctx);
-            this.ctx.strokeStyle = "#7bf";
-            this.ctx.lineWidth = 4;
-            this.node.highlight(this.ctx);
+            this.ctx.fillStyle = "#aaa";
+            actualCable.drawLabel(this.ctx);
         });
         
         itContains([150, 35, true, 'centre',
@@ -1031,8 +942,8 @@ describe("Canvas classes", function() {
             this.expectedCanvas.ctx.stroke();
             // draw label
             this.expectedCanvas.ctx.fillStyle = "#aaa";
-            this.expectedCanvas.ctx.translate(101.5519, 19.2424);
-            this.expectedCanvas.ctx.rotate(-0.2262);
+            this.expectedCanvas.ctx.translate(101.55188749877561, 19.24240868503108);
+            this.expectedCanvas.ctx.rotate(-0.22622805083017744);
             this.expectedCanvas.drawText(
                     {x: 0, y: 0, text: "example", dir: 0, style: "connector"});
             
@@ -1040,6 +951,8 @@ describe("Canvas classes", function() {
             this.connector.draw(this.ctx);
             this.ctx.strokeStyle = 'blue';
             this.connector.highlight(this.ctx);
+            this.ctx.fillStyle = "#aaa";
+            this.connector.drawLabel(this.ctx);
         });
         
         it('should highlight without room for label', function() {
@@ -1085,14 +998,15 @@ describe("Canvas classes", function() {
             this.expectedCanvas.ctx.stroke();
             // draw label
             this.expectedCanvas.ctx.fillStyle = "#aaa";
-            this.expectedCanvas.ctx.translate(101.5519, 19.2424);
-            this.expectedCanvas.ctx.rotate(-0.2262);
+            this.expectedCanvas.ctx.translate(101.55188749877561, 19.24240868503108);
+            this.expectedCanvas.ctx.rotate(-0.22622805083017744);
             this.expectedCanvas.drawText(
                     {x: 0, y: 0, text: "example", dir: 0, style: "connector"});
             
             this.connector.dest = this.dest;
             this.connector.draw(this.ctx);
             this.ctx.strokeStyle = 'blue';
+            this.ctx.fillStyle = "#aaa";
             this.connector.drawLabel(this.ctx);
         });
         
@@ -1214,7 +1128,7 @@ describe("Canvas classes", function() {
     
     describe("CanvasState", function() {
         beforeEach(function() {
-            this.state = new CanvasState(this.rawCanvas);
+            this.state = new CanvasState(this.rawCanvas, true);
             
             this.expectedInput = new RawNode(30, 50, "in");
             this.actualInput = new RawNode(30, 50, "in");
@@ -1254,10 +1168,10 @@ describe("Canvas classes", function() {
         
         it('should move', function() {
             this.expectedInput.x += 10;
-            this.expectedInput.draw(this.expectedCanvas.ctx);
             this.expectedCanvas.ctx.strokeStyle = "#7bf";
             this.expectedCanvas.ctx.lineWidth = 4;
             this.expectedInput.highlight(this.expectedCanvas.ctx);
+            this.expectedInput.draw(this.expectedCanvas.ctx);
             this.expectedCanvas.drawText(
                     {x: 40, y: 19.5, text: "i1: in", style: "node", dir: 0});
             
@@ -1321,10 +1235,10 @@ describe("Canvas classes", function() {
             });
             
             it('should highlight clicked input', function() {
-                drawStartingPipeline(this);
                 this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
                 this.expectedCanvas.ctx.lineWidth = 4;
                 this.expectedInput.highlight(this.expectedCanvas.ctx);
+                drawStartingPipeline(this);
                 
                 this.state.doDown({
                     pageX: this.expectedInput.x,
@@ -1334,10 +1248,10 @@ describe("Canvas classes", function() {
             });
             
             it('should highlight clicked method', function() {
-                drawStartingPipeline(this);
                 this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
                 this.expectedCanvas.ctx.lineWidth = 4;
                 this.expectedMethod.highlight(this.expectedCanvas.ctx);
+                drawStartingPipeline(this);
                 
                 this.state.doDown({
                     pageX: this.expectedMethod.x,
@@ -1384,10 +1298,10 @@ describe("Canvas classes", function() {
             });
             
             it('should not remove highlight when shift clicking background', function() {
-                drawStartingPipeline(this);
                 this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
                 this.expectedCanvas.ctx.lineWidth = 4;
                 this.expectedMethod.highlight(this.expectedCanvas.ctx);
+                drawStartingPipeline(this);
                  
                 // click method
                 this.state.doDown({
@@ -1406,15 +1320,15 @@ describe("Canvas classes", function() {
             
             it('should drag input', function() {
                 this.expectedInput.y += 50;
+                this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                this.expectedCanvas.ctx.lineWidth = 4;
+                this.expectedInput.highlight(this.expectedCanvas.ctx);
                 this.expectedInput.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
                         {x: 30, y: 69.5, text: "i1: in", style: "node", dir: 0});
                 this.expectedMethod.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
                         {x: 111.25, y: 14.5, text: "example", style: "node", dir: 0});
-                this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
-                this.expectedCanvas.ctx.lineWidth = 4;
-                this.expectedInput.highlight(this.expectedCanvas.ctx);
                 
                 this.state.draw(this.ctx);
                 this.state.doDown(
@@ -1426,15 +1340,15 @@ describe("Canvas classes", function() {
             
             it('should drag off edge', function() {
                 this.expectedInput.y += 110;
+                this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                this.expectedCanvas.ctx.lineWidth = 4;
+                this.expectedInput.highlight(this.expectedCanvas.ctx);
                 this.expectedInput.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
                         {x: 30, y: 129.5, text: "i1: in", style: "node", dir: 0});
                 this.expectedMethod.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
                         {x: 111.25, y: 14.5, text: "example", style: "node", dir: 0});
-                this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
-                this.expectedCanvas.ctx.lineWidth = 4;
-                this.expectedInput.highlight(this.expectedCanvas.ctx);
                 
                 this.state.draw(this.ctx);
                 this.state.doDown(
@@ -1447,16 +1361,16 @@ describe("Canvas classes", function() {
             it('should drag two objects with shift click', function() {
                 this.expectedInput.y += 50;
                 this.expectedMethod.y += 50;
+                this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                this.expectedCanvas.ctx.lineWidth = 4;
+                this.expectedInput.highlight(this.expectedCanvas.ctx);
+                this.expectedMethod.highlight(this.expectedCanvas.ctx);
                 this.expectedInput.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
                         {x: 30, y: 69.5, text: "i1: in", style: "node", dir: 0});
                 this.expectedMethod.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
                         {x: 111.25, y: 64.5, text: "example", style: "node", dir: 0});
-                this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
-                this.expectedCanvas.ctx.lineWidth = 4;
-                this.expectedInput.highlight(this.expectedCanvas.ctx);
-                this.expectedMethod.highlight(this.expectedCanvas.ctx);
                 
                 this.state.draw(this.ctx);
                 // click input
@@ -1480,16 +1394,16 @@ describe("Canvas classes", function() {
             it('should drag two objects with click', function() {
                 this.expectedInput.y += 50;
                 this.expectedMethod.y += 50;
+                this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                this.expectedCanvas.ctx.lineWidth = 4;
+                this.expectedInput.highlight(this.expectedCanvas.ctx);
+                this.expectedMethod.highlight(this.expectedCanvas.ctx);
                 this.expectedInput.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
                         {x: 30, y: 69.5, text: "i1: in", style: "node", dir: 0});
                 this.expectedMethod.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
                         {x: 111.25, y: 64.5, text: "example", style: "node", dir: 0});
-                this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
-                this.expectedCanvas.ctx.lineWidth = 4;
-                this.expectedInput.highlight(this.expectedCanvas.ctx);
-                this.expectedMethod.highlight(this.expectedCanvas.ctx);
                 
                 this.state.draw(this.ctx);
                 // click input
@@ -1522,16 +1436,16 @@ describe("Canvas classes", function() {
             it('should drag two objects with shift click on magnet', function() {
                 this.expectedInput.y += 50;
                 this.expectedMethod.y += 50;
+                this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                this.expectedCanvas.ctx.lineWidth = 4;
+                this.expectedInput.highlight(this.expectedCanvas.ctx);
+                this.expectedMethod.highlight(this.expectedCanvas.ctx);
                 this.expectedInput.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
                         {x: 30, y: 69.5, text: "i1: in", style: "node", dir: 0});
                 this.expectedMethod.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText(
                         {x: 111.25, y: 64.5, text: "example", style: "node", dir: 0});
-                this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
-                this.expectedCanvas.ctx.lineWidth = 4;
-                this.expectedInput.highlight(this.expectedCanvas.ctx);
-                this.expectedMethod.highlight(this.expectedCanvas.ctx);
                 
                 this.state.draw(this.ctx);
                 // click input
@@ -1592,6 +1506,8 @@ describe("Canvas classes", function() {
                 this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
                 this.expectedCanvas.ctx.lineWidth = 4;
                 this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                this.expectedCanvas.ctx.fillStyle = this.state.selectionColor;
+                this.expectedConnector.drawLabel(this.expectedCanvas.ctx);
                 var magnet = this.expectedMethod.out_magnets[0];
                 
                 this.state.draw(this.ctx);
@@ -1602,11 +1518,11 @@ describe("Canvas classes", function() {
             });
             
             it('should create and delete output', function() {
-                drawStartingPipeline(this);
                 this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
                 this.expectedCanvas.ctx.lineWidth = 4;
                 this.expectedMethod.highlight(this.expectedCanvas.ctx);
                 var magnet = this.expectedMethod.out_magnets[0];
+                drawStartingPipeline(this);
                 
                 this.state.draw(this.ctx);
                 // drag to create output
@@ -1636,6 +1552,9 @@ describe("Canvas classes", function() {
                 drawStartingPipeline(this);
                 this.expectedOutput.x = 233.56696744775581;
                 this.expectedOutput.y = 109.94283749469356;
+                this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
+                this.expectedCanvas.ctx.lineWidth = 4;
+                this.expectedOutput.highlight(this.expectedCanvas.ctx);
                 this.expectedOutput.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText({
                     x: 233.56696744775581,
@@ -1649,10 +1568,8 @@ describe("Canvas classes", function() {
                 this.expectedCanvas.ctx.globalAlpha = 0.75;
                 this.expectedConnector.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.ctx.globalAlpha = 1.0;
-                this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
-                this.expectedCanvas.ctx.lineWidth = 4;
-                this.expectedOutput.highlight(this.expectedCanvas.ctx);
-                this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                this.expectedCanvas.ctx.fillStyle = '#aaa';
+                this.expectedConnector.drawLabel(this.expectedCanvas.ctx);
                 var magnet = this.expectedMethod.out_magnets[0];
                 
                 this.state.draw(this.ctx);
@@ -1761,6 +1678,8 @@ describe("Canvas classes", function() {
                 this.expectedCanvas.ctx.strokeStyle = this.state.selectionColor;
                 this.expectedCanvas.ctx.lineWidth = 4;
                 this.expectedConnector.highlight(this.expectedCanvas.ctx);
+                this.expectedCanvas.ctx.fillStyle = this.state.selectionColor;
+                this.expectedConnector.drawLabel(this.expectedCanvas.ctx);
                 var magnet = this.expectedMethod.out_magnets[0];
                 
                 this.state.draw(this.ctx);
