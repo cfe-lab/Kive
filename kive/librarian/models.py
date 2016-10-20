@@ -477,6 +477,8 @@ class Dataset(metadata.models.AccessControl):
 
         The stored value is used when regenerating data
         that once existed, as a coherence check.
+
+        Return True if the check passed, otherwise False.
         """
         # Recompute the MD5, see if it equals what is already stored
         new_md5 = self.compute_md5()
@@ -504,11 +506,15 @@ class Dataset(metadata.models.AccessControl):
         if bool(self.dataset_file):
             return True
 
+        # we have an external file: check existence and MD5 sum...
         abs_path = self.external_absolute_path()
         if abs_path is not None:
             if os.path.exists(abs_path) and os.access(abs_path, os.R_OK):
-                return True
-
+                # the external file exists, has it been changed?
+                return self.check_md5()
+            else:
+                # external file might have been removed...
+                return False
         return False
 
     def has_structure(self):
@@ -1321,13 +1327,12 @@ class Dataset(metadata.models.AccessControl):
             did_something = False
             for dataset in d_set.all():
                 did_something = True
-                filename = dataset.external_absolute_path()
-                if filename is None:
-                    raise RuntimeError("Unexpected None for external dataset!")
-                if not os.path.exists(filename):
-                    cls.logger.warn("MISSING EXTERNAL FILE '%s'" % filename)
-                else:
-                    cls.logger.warn("CHECK EXISTING EXT. FILE '%s'" % filename)
+                path_name = dataset.external_absolute_path()
+                if path_name is None:
+                    raise RuntimeError("Unexpected None for external dataset path!")
+                kive_name = dataset.name
+                if not os.path.exists(path_name):
+                    cls.logger.warn("missing external file '%s' at '%s'" % (kive_name, path_name))
                 # --update the last_time_checked regardless of
                 # whether we issued a warning or not
                 dataset.last_time_checked = timezone.now()

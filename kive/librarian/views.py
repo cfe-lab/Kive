@@ -158,8 +158,9 @@ def dataset_view(request, dataset_id):
     if not dataset.has_data():
         t = loader.get_template("librarian/missing_dataset_view.html")
         if dataset.external_path:
-            c["missing_data_message"] = "This dataset's external file is missing.  " \
-                                        "Consult your system administrator if this was unexpected."
+            c["missing_data_message"] = "This dataset's external file is missing or has "\
+                                        "been modified (MD5 mismatch).  " \
+                                        "Please consult your system administrator if this is unexpected."
         elif dataset.is_redacted():
             c["missing_data_message"] = "Data has been redacted."
         else:

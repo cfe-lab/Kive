@@ -362,13 +362,15 @@ class Manager(object):
         The newidletask must be a function that accepts a single argument of
         type comparable to time.time() and returns nothing.
         The argument provides the time limit after which a task must return from its
-        task. For example, the structure of an idle task would typically be:
+        task.
+
+        For example, the structure of an idle task would typically be of the form:
+
         def my_idle_task(time_to_stop):
            something_todo = True
            while (time.time() < time_to_stop and something_todo:
               do a small amount of work
               something_todo = checkwork()
-        
         """
         try:
             argspecs = inspect.getargspec(newidletask)
@@ -390,7 +392,7 @@ class Manager(object):
         num_tasks = len(self.idle_job_queue)
         num_done = 0
         while (time.time() < time_limit) and num_done < num_tasks:
-            mgr_logger.info("Running an idle task..")
+            mgr_logger.debug("Running an idle task..")
             jobtodo = self.idle_job_queue[0]
             jobtodo(time_limit)
             self.idle_job_queue.rotate(1)
@@ -783,6 +785,7 @@ class Manager(object):
         mgr_logger.debug("Pending runs: {}".format(pending_runs))
 
         for run_to_process in pending_runs:
+            # do we have the thread capacity for this run?
             threads_needed = run_to_process.pipeline.threads_needed()
             if threads_needed > self.max_host_cpus:
                 mgr_logger.info(
@@ -798,14 +801,19 @@ class Manager(object):
                 run_to_process.clean()
                 continue
 
-            self.start_run(run_to_process)
-            mgr_logger.info("Started run id %d, pipeline %s, user %s",
-                            run_to_process.pk,
-                            run_to_process.pipeline,
-                            run_to_process.user)
+            # are all inputs valid ? if so, lets start the run.
+            if run_to_process.all_inputs_have_data():
+                self.start_run(run_to_process)
+                mgr_logger.info("Started run id %d, pipeline %s, user %s",
+                                run_to_process.pk,
+                                run_to_process.pipeline,
+                                run_to_process.user)
 
-            mgr_logger.debug("Task queue: {}".format(self.task_queue))
-            mgr_logger.debug("Active sandboxes: {}".format(self.active_sandboxes))
+                mgr_logger.debug("Task queue: {}".format(self.task_queue))
+                mgr_logger.debug("Active sandboxes: {}".format(self.active_sandboxes))
+            else:
+                mgr_logger.info("Cannot run Pipeline %s for user %s: data inputs failed the 'have_data' test",
+                                run_to_process.pipeline, run_to_process.user)
 
             if time.time() > time_to_stop:
                 # We stop, to avoid possible starvation if new tasks are continually added.

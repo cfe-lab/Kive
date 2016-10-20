@@ -356,6 +356,16 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     def get_state_name(self):
         return self._runstate.name
 
+    def all_inputs_have_data(self):
+        """Return True if all datasets pass the has_data() test.
+        Do this just before we start a run, as an external file
+        might be missing or have been corrupted.
+        """
+        for _input in self.inputs.all():
+            if not _input.dataset.has_data():
+                return False
+        return True
+
     @transaction.atomic
     def start(self, save=True, **kwargs):
         """
