@@ -289,7 +289,10 @@ export class CanvasState {
             
             this.dragstart = mouse;
         }
-        
+    
+        /**
+         * Have no idea what this code was supposed to do.
+         */
         // let was_highlighted = this.mouse_highlight !== null;
         // this.mouse_highlight = null;
         // for (let shape of this.shapes) {
@@ -831,7 +834,7 @@ export class CanvasState {
         let emptyMagnets = method.in_magnets.filter(el => el.connected.length === 0);
         for (let magnet of emptyMagnets) {
             let ctor;
-            let args: (string|number)[] = [ method.x - 80, method.y - 80 ];
+            let args: (string|number)[] = [ magnet.x - 80, magnet.y - 80 ];
             if (magnet.cdt !== null && magnet.cdt !== undefined) {
                 ctor = CdtNode;
                 args.unshift(magnet.cdt);
@@ -839,16 +842,38 @@ export class CanvasState {
                 ctor = RawNode;
             }
             args.push(this.uniqueNodeName(magnet.label, ctor));
-            let shape = new ctor(...args);
-            this.addShape(shape);
-            var connector = new Connector(shape.out_magnets[0]);
-            connector.dest = magnet;
-            connector.source = shape.out_magnets[0];
-            shape.out_magnets[0].connected = [ connector ];
-            magnet.connected = [ connector ];
+            let input = new ctor(...args);
+            this.addShape(input);
+            this.connectMagnets(input.out_magnets[0], magnet);
+        }
+    }
+    
+    completeMethodOutputs(method): void {
+        let emptyMagnets = method.out_magnets.filter(el => el.connected.length === 0);
+        for (let magnet of emptyMagnets) {
+            let output = new OutputNode(
+                magnet.x + 80,
+                magnet.y + 80,
+                this.uniqueNodeName(magnet.label, OutputNode)
+            );
+            this.addShape(output);
+            let connector = this.connectMagnets(magnet, output.in_magnets[0]);
+            connector.dest.cdt = connector.source.cdt;
+        }
+    }
+    
+    connectMagnets(out_magnet: Magnet, in_magnet: Magnet): Connector {
+        if (!out_magnet.isInput && in_magnet.isInput) {
+            var connector = new Connector(out_magnet);
+            connector.dest = in_magnet;
+            connector.source = out_magnet;
+            out_magnet.connected = [connector];
+            in_magnet.connected = [connector];
             this.connectors.push(connector);
             this.valid = false;
+            return connector;
         }
+        return null;
     }
     
     addShape(shape: CNode, open_dialog: boolean = false): CNode {

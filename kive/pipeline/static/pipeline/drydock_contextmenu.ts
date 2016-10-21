@@ -82,14 +82,17 @@ export class CanvasContextMenu {
                 let sel0 = sel[0];
                 $('.cm-add', this.$menu).hide();
                 if (sel.length > 1 || CanvasState.isInputNode(sel0)) {
-                    $('.edit, .complete-inputs', this.$menu).hide();
+                    $('.edit, .complete-inputs, .complete-outputs', this.$menu).hide();
                 }
                 if (sel.length > 1 || CanvasState.isOutputNode(sel0)) {
-                    $('.complete-inputs', this.$menu).hide();
+                    $('.complete-inputs, .complete-outputs', this.$menu).hide();
                 }
                 if (sel.length === 1 && CanvasState.isMethodNode(sel0)) {
                     if (sel0.in_magnets.filter(el => el.connected.length === 0).length === 0) {
                         $('.complete-inputs', this.$menu).hide();
+                    }
+                    if (sel0.out_magnets.filter(el => el.connected.length === 0).length === 0) {
+                        $('.complete-outputs', this.$menu).hide();
                     }
                 }
             } else {

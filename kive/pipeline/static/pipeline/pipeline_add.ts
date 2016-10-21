@@ -182,8 +182,12 @@ contextMenu.registerAction('add_output', function(_, pos) {
 });
 contextMenu.registerAction('complete_inputs', function(sel) {
     if (CanvasState.isMethodNode(sel)) {
-        console.log('triggered');
         canvasState.completeMethodInputs(sel);
+    }
+});
+contextMenu.registerAction('complete_outputs', function(sel) {
+    if (CanvasState.isMethodNode(sel)) {
+        canvasState.completeMethodOutputs(sel);
     }
 });
 
