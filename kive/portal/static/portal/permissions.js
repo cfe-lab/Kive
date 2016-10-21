@@ -144,7 +144,9 @@ var permissions = (function() {
     };
     
     function defaultBuilder($td, row, field_name) {
-        $td.text(row[field_name]);
+        if (row[field_name] !== null) {
+            $td.text(row[field_name]);
+        }
     }
     
     my.PermissionsTable.prototype.buildTable = function(rows) {

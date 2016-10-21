@@ -11,7 +11,6 @@ from django.db.utils import ConnectionHandler, NotSupportedError
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
-from django_mock_queries.query import MockSet
 
 if not apps.ready:
     # Do the Django set up when running as a stand-alone unit test.
@@ -36,6 +35,11 @@ if not apps.ready:
         return result
     mock_execute = mock_ops.compiler.return_value.side_effect = compiler
     mock_ops.integer_field_range.return_value = (-sys.maxint - 1, sys.maxint)
+
+# Import after the Django configuration has been mocked out.
+# Can move back to the top if this pull request is accepted:
+# https://github.com/stphivos/django-mock-queries/pull/14
+from django_mock_queries.query import MockSet  # @IgnorePep8
 
 
 def setup_mock_relations(*models):

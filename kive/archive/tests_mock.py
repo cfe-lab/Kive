@@ -1,16 +1,20 @@
 from unittest.case import TestCase
 
-from mock import Mock
-
-from django_mock_queries.query import MockSet
+from mock import Mock, patch
 
 from django.utils import timezone
 
-from archive.models import Run, RunState, RunStep, RunOutputCable,\
-    RunComponentState, ExecLog
-from librarian.models import ExecRecord
-from constants import runstates, runcomponentstates
 from kive.mock_setup import mocked_relations
+from django_mock_queries.query import MockSet
+
+from archive.models import Run, RunState, RunStep, RunOutputCable,\
+    RunComponentState, ExecLog, RunInput, MethodOutput
+from archive.serializers import RunOutputsSerializer
+from constants import runstates, runcomponentstates
+from librarian.models import ExecRecord, Dataset, ExecRecordOut
+from pipeline.models import Pipeline, PipelineOutputCable, PipelineStep
+from transformation.models import TransformationInput, TransformationOutput
+from django.core.files.base import ContentFile
 
 
 @mocked_relations(Run, RunState)
@@ -765,3 +769,269 @@ class RunComponentStateMockTests(TestCase):
         rs.run.is_quarantined.assert_called_once_with()
         rs.run.attempt_decontamination.assert_called_once_with(save=True, recurse_upward=True)
         rs.run.refresh_from_db.assert_called_once_with()
+
+
+@mocked_relations(Run, Pipeline, ExecRecord)
+class RunOutputsSerializerMockTests(TestCase):
+    def test_no_steps(self):
+        run = Run(id=1234, pipeline=Pipeline())
+        expected_data = {'output_summary': [], 'input_summary': [], 'id': 1234}
+
+        data = RunOutputsSerializer(run).data
+
+        self.assertEqual(expected_data, data)
+
+    def test_inputs(self):
+        run = Run(id=1234, pipeline=Pipeline())
+        run.inputs = MockSet(RunInput(index=1, dataset=Dataset()),
+                             RunInput(index=2, dataset=Dataset()))
+        run.pipeline.inputs = MockSet(TransformationInput(dataset_idx=1,
+                                                          dataset_name='foo'),
+                                      TransformationInput(dataset_idx=2))
+        expected_data = {'output_summary': [],
+                         'input_summary': [{'is_ok': True,
+                                            'errors': [],
+                                            'name': 'foo',
+                                            'url': None,
+                                            'is_invalid': False,
+                                            'display': '1: foo',
+                                            'redaction_plan': None,
+                                            'step_name': 'Run inputs',
+                                            'date': 'removed',
+                                            'filename': None,
+                                            'type': 'dataset',
+                                            'id': None,
+                                            'size': 'removed'},
+                                           {'is_ok': True,
+                                            'errors': [],
+                                            'name': '',
+                                            'url': None,
+                                            'is_invalid': False,
+                                            'display': '2: ',
+                                            'redaction_plan': None,
+                                            'step_name': '',
+                                            'date': 'removed',
+                                            'filename': None,
+                                            'type': 'dataset',
+                                            'id': None,
+                                            'size': 'removed'}],
+                         'id': 1234}
+
+        data = RunOutputsSerializer(run).data
+
+        self.assertEqual(expected_data['input_summary'], data['input_summary'])
+        self.assertEqual(expected_data, data)
+
+    def test_run_outputs(self):
+        pipeline = Pipeline()
+        pipeline.outputs = MockSet(TransformationOutput(dataset_idx=1,
+                                                        dataset_name='foo'),
+                                   TransformationOutput(dataset_idx=2,
+                                                        dataset_name='bar'))
+        for o in pipeline.outputs:
+            o.transformationoutput = o
+        run = Run(id=1234, pipeline=pipeline)
+        execrecord1 = ExecRecord()
+        execrecord1.execrecordouts = MockSet(ExecRecordOut(dataset=Dataset()))
+        execrecord2 = ExecRecord()
+        execrecord2.execrecordouts = MockSet(ExecRecordOut(dataset=Dataset()))
+        run.runoutputcables = MockSet(
+            RunOutputCable(execrecord=execrecord1,
+                           pipelineoutputcable=PipelineOutputCable(pipeline=pipeline,
+                                                                   output_name='foo')),
+            RunOutputCable(execrecord=execrecord2,
+                           pipelineoutputcable=PipelineOutputCable(pipeline=pipeline,
+                                                                   output_name='bar')))
+        expected_data = {'output_summary': [{'date': 'removed',
+                                             'display': '1: foo',
+                                             'errors': [],
+                                             'filename': None,
+                                             'id': None,
+                                             'is_invalid': False,
+                                             'is_ok': True,
+                                             'name': 'foo',
+                                             'redaction_plan': None,
+                                             'size': 'removed',
+                                             'step_name': 'Run outputs',
+                                             'type': 'dataset',
+                                             'url': None},
+                                            {'date': 'removed',
+                                             'display': '2: bar',
+                                             'errors': [],
+                                             'filename': None,
+                                             'id': None,
+                                             'is_invalid': False,
+                                             'is_ok': True,
+                                             'name': 'bar',
+                                             'redaction_plan': None,
+                                             'size': 'removed',
+                                             'step_name': '',
+                                             'type': 'dataset',
+                                             'url': None}],
+                         'input_summary': [],
+                         'id': 1234}
+
+        data = RunOutputsSerializer(run).data
+
+        self.assertEqual(expected_data['output_summary'], data['output_summary'])
+        self.assertEqual(expected_data, data)
+
+    @patch('archive.serializers.reverse', return_value='/some/url')
+    def test_step_outputs(self, mock_reverse):
+        pipeline = Pipeline()
+        run = Run(id=1234, pipeline=pipeline)
+        step = RunStep(pipelinestep=PipelineStep(step_num=1,
+                                                 name='foo.py'))
+        step.log = ExecLog(end_time='12 May 2015')
+        step.log.methodoutput = MethodOutput(id=99,
+                                             return_code=0,
+                                             output_log=ContentFile('Done.',
+                                                                    name='x'),
+                                             error_log=ContentFile('',
+                                                                   name='y'))
+        run.runsteps = MockSet(step)
+        expected_data = {'output_summary': [{'date': '12 May 2015',
+                                             'display': 'Standard out',
+                                             'errors': [],
+                                             'filename': None,
+                                             'id': 99,
+                                             'is_invalid': False,
+                                             'is_ok': True,
+                                             'name': 'step_1_stdout',
+                                             'redaction_plan': '/some/url',
+                                             'size': u'5\xa0bytes',
+                                             'step_name': '1: foo.py',
+                                             'type': 'stdout',
+                                             'url': '/some/url'},
+                                            {'date': '12 May 2015',
+                                             'display': 'Standard error',
+                                             'errors': [],
+                                             'filename': None,
+                                             'id': 99,
+                                             'is_invalid': False,
+                                             'is_ok': True,
+                                             'name': 'step_1_stderr',
+                                             'redaction_plan': '/some/url',
+                                             'size': u'0\xa0bytes',
+                                             'step_name': '',
+                                             'type': 'stderr',
+                                             'url': '/some/url'}],
+                         'input_summary': [],
+                         'id': 1234}
+
+        data = RunOutputsSerializer(run).data
+
+        self.maxDiff = None
+        self.assertEqual(expected_data['output_summary'], data['output_summary'])
+        self.assertEqual(expected_data, data)
+
+    @patch('archive.serializers.reverse', return_value='/some/url')
+    def test_step_outputs_error(self, mock_reverse):
+        pipeline = Pipeline()
+        run = Run(id=1234, pipeline=pipeline)
+        step = RunStep(pipelinestep=PipelineStep(step_num=1,
+                                                 name='foo.py'))
+        step.log = ExecLog(end_time='12 May 2015')
+        step.log.methodoutput = MethodOutput(id=99,
+                                             return_code=1,
+                                             output_log=ContentFile('Done.',
+                                                                    name='x'),
+                                             error_log=ContentFile('Bad stuff.',
+                                                                   name='y'))
+        run.runsteps = MockSet(step)
+        expected_data = {'output_summary': [{'date': '12 May 2015',
+                                             'display': 'Standard out',
+                                             'errors': [],
+                                             'filename': None,
+                                             'id': 99,
+                                             'is_invalid': False,
+                                             'is_ok': True,
+                                             'name': 'step_1_stdout',
+                                             'redaction_plan': '/some/url',
+                                             'size': u'5\xa0bytes',
+                                             'step_name': '1: foo.py',
+                                             'type': 'stdout',
+                                             'url': '/some/url'},
+                                            {'date': '12 May 2015',
+                                             'display': 'Standard error',
+                                             'errors': ['return code 1'],
+                                             'filename': None,
+                                             'id': 99,
+                                             'is_invalid': True,
+                                             'is_ok': False,
+                                             'name': 'step_1_stderr',
+                                             'redaction_plan': '/some/url',
+                                             'size': u'10\xa0bytes',
+                                             'step_name': '',
+                                             'type': 'stderr',
+                                             'url': '/some/url'}],
+                         'input_summary': [],
+                         'id': 1234}
+
+        data = RunOutputsSerializer(run).data
+
+        self.maxDiff = None
+        self.assertEqual(expected_data['output_summary'], data['output_summary'])
+        self.assertEqual(expected_data, data)
+
+    @patch('archive.serializers.reverse', return_value='/some/url')
+    def test_step_outputs_missing(self, mock_reverse):
+        pipeline = Pipeline()
+        run = Run(id=1234, pipeline=pipeline)
+        step = RunStep(pipelinestep=PipelineStep(step_num=1,
+                                                 name='foo.py'))
+        step.log = ExecLog(end_time='12 May 2015')
+        step.log.methodoutput = MethodOutput(id=99)
+        run.runsteps = MockSet(step)
+        expected_data = {'output_summary': [{'date': '12 May 2015',
+                                             'display': 'Standard out',
+                                             'errors': ['Did not run.'],
+                                             'filename': None,
+                                             'id': None,
+                                             'is_invalid': False,
+                                             'is_ok': False,
+                                             'name': 'step_1_stdout',
+                                             'redaction_plan': None,
+                                             'size': 'missing',
+                                             'step_name': '1: foo.py',
+                                             'type': 'stdout',
+                                             'url': None}],
+                         'input_summary': [],
+                         'id': 1234}
+
+        data = RunOutputsSerializer(run).data
+
+        self.maxDiff = None
+        self.assertEqual(expected_data['output_summary'], data['output_summary'])
+        self.assertEqual(expected_data, data)
+
+    @patch('archive.serializers.reverse', return_value='/some/url')
+    def test_step_outputs_running(self, mock_reverse):
+        pipeline = Pipeline()
+        run = Run(id=1234, pipeline=pipeline)
+        step = RunStep(pipelinestep=PipelineStep(step_num=1,
+                                                 name='foo.py'))
+        step.log = ExecLog()
+        step.log.methodoutput = MethodOutput(id=99)
+        run.runsteps = MockSet(step)
+        expected_data = {'output_summary': [{'date': None,
+                                             'display': 'Running',
+                                             'errors': [],
+                                             'filename': None,
+                                             'id': None,
+                                             'is_invalid': False,
+                                             'is_ok': False,
+                                             'name': 'step_1_stdout',
+                                             'redaction_plan': None,
+                                             'size': None,
+                                             'step_name': '1: foo.py',
+                                             'type': 'stdout',
+                                             'url': None}],
+                         'input_summary': [],
+                         'id': 1234}
+
+        data = RunOutputsSerializer(run).data
+
+        self.maxDiff = None
+        self.assertEqual(expected_data['output_summary'], data['output_summary'])
+        self.assertEqual(expected_data, data)

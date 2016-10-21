@@ -1,5 +1,4 @@
 import os
-import copy
 
 from django.template.defaultfilters import filesizeformat
 from django.utils import timezone
@@ -12,7 +11,7 @@ from transformation.models import TransformationInput
 from metadata.models import who_cannot_access, everyone_group
 from datachecking.models import BadData, MD5Conflict, ContentCheckLog
 
-from constants import groups, runstates
+from constants import runstates
 
 from kive.serializers import AccessControlSerializer
 
@@ -181,20 +180,27 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 outputs.append(output)
             else:
                 try:
-                    output.id = methodoutput.id
-                    output.size = methodoutput.output_log.size
-                    output.date = execlog.end_time
-                    output.is_ok = methodoutput.return_code == 0
-                    if not output.is_ok:
-                        output.errors.append('return code {}'.format(
-                            methodoutput.return_code))
-                    output.url = reverse('methodoutput-detail',
-                                         kwargs={'pk': methodoutput.id},
-                                         request=request)
-                    output.redaction_plan = reverse(
-                        'methodoutput-output-redaction-plan',
-                        kwargs={'pk': methodoutput.id},
-                        request=request)
+                    if not methodoutput.output_log:
+                        output.is_ok = False
+                        if execlog.end_time is None:
+                            output.display = 'Running'
+                            output.date = None
+                            output.size = None
+                        else:
+                            output.date = execlog.end_time
+                            output.size = 'missing'
+                            output.errors.append('Did not run.')
+                    else:
+                        output.id = methodoutput.id
+                        output.size = methodoutput.output_log.size
+                        output.url = reverse('methodoutput-detail',
+                                             kwargs={'pk': methodoutput.id},
+                                             request=request)
+                        output.redaction_plan = reverse(
+                            'methodoutput-output-redaction-plan',
+                            kwargs={'pk': methodoutput.id},
+                            request=request)
+                        output.date = execlog.end_time
                     outputs.append(output)
                 except ValueError:
                     pass
@@ -210,6 +216,10 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     output.id = methodoutput.id
                     output.size = methodoutput.error_log.size
                     output.date = execlog.end_time
+                    output.is_ok = methodoutput.return_code == 0
+                    if not output.is_ok:
+                        output.errors.append('return code {}'.format(
+                            methodoutput.return_code))
                     output.url = reverse('methodoutput-detail',
                                          kwargs={'pk': methodoutput.id},
                                          request=request)
@@ -264,10 +274,14 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 output.size += 0
                 # It's a number, so format it nicely, along with date.
                 output.size = filesizeformat(output.size)
-                output.date = timezone.localtime(output.date).strftime(
-                    '%d %b %Y %H:%M:%S')
             except TypeError:
                 pass  # Size was not a number, so leave it alone.
+            try:
+                if output.date:
+                    output.date = timezone.localtime(output.date).strftime(
+                        '%d %b %Y %H:%M:%S')
+            except Exception:
+                pass
 
         return [output.__dict__ for output in outputs]
 
@@ -633,8 +647,8 @@ class RunBatchSerializer(AccessControlSerializer, serializers.ModelSerializer):
         runs = []
         for run_data in run_dictionaries:
             if (len(run_data.get("users_allowed", [])) == 0 and
-                    len(run_data.get("groups_allowed", [])) == 0
-                    and copy_permissions_to_runs):
+                    len(run_data.get("groups_allowed", [])) == 0 and
+                    copy_permissions_to_runs):
                 run_data["users_allowed"] = users_allowed
                 run_data["groups_allowed"] = groups_allowed
 
