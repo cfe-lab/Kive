@@ -5,7 +5,11 @@
         "noImplicitAny": false,
         "removeComments": true,
         "preserveConstEnums": true,
-        "sourceMap": true
+        "sourceMap": true,
+        "baseUrl": "kive",
+        "paths": {
+            "static/pipeline/*": [ "pipeline/static/pipeline/*" ]
+        }
     },
     "exclude": [
         "node_modules",

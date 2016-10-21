@@ -1,17 +1,9 @@
 "use strict";
 
-// this line will work better with IDE
-// import {
-//     CanvasState, CanvasContextMenu, CanvasListeners,
-//     Pipeline, REDRAW_INTERVAL
-// } from "../../../pipeline/static/pipeline/pipeline_all";
-
-// this line works better when the server is running
 import {
     CanvasState, CanvasContextMenu, CanvasListeners,
     Pipeline, REDRAW_INTERVAL
-} from "/static/pipeline/pipeline_all";
-
+} from "static/pipeline/pipeline_all";
 import 'jquery';
 import '/static/portal/noxss.js';
 

@@ -1,6 +1,6 @@
 "use strict";
 
-import { CanvasState, Pipeline } from "/static/pipeline/pipeline_all";
+import { CanvasState, Pipeline } from "static/pipeline/pipeline_all";
 import 'jquery';
 declare var permissions: any;
 
@@ -29,7 +29,7 @@ function drawThumbnail(select) {
         $canvas = $select.closest('tr').find('canvas'),
         canvas = $canvas[0];
     $.getJSON("/api/pipelines/" + $select.val()).done(function(result) {
-        var cs = new CanvasState(canvas, false);
+        var cs = new CanvasState(<HTMLCanvasElement> canvas, false);
         var pipeline = new Pipeline(cs);
         cs.setScale(0.12);
         cs.enable_labels = false;
