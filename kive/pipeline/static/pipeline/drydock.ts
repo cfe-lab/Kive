@@ -814,6 +814,7 @@ export class CanvasState {
         var suffix = 0,
             name = desired_name;
         for (let i = 0, shape; (shape = this.shapes[i]); i++) {
+            // @todo: BUG: CdtNodes and RawNodes may share a name under this scheme
             if (object_class && !(shape instanceof object_class)) {
                 continue;
             }
@@ -824,6 +825,30 @@ export class CanvasState {
             }
         }
         return name;
+    }
+    
+    completeMethodInputs(method): void {
+        let emptyMagnets = method.in_magnets.filter(el => el.connected.length === 0);
+        for (let magnet of emptyMagnets) {
+            let ctor;
+            let args: (string|number)[] = [ method.x - 80, method.y - 80 ];
+            if (magnet.cdt !== null && magnet.cdt !== undefined) {
+                ctor = CdtNode;
+                args.unshift(magnet.cdt);
+            } else {
+                ctor = RawNode;
+            }
+            args.push(this.uniqueNodeName(magnet.label, ctor));
+            let shape = new ctor(...args);
+            this.addShape(shape);
+            var connector = new Connector(shape.out_magnets[0]);
+            connector.dest = magnet;
+            connector.source = shape.out_magnets[0];
+            shape.out_magnets[0].connected = [ connector ];
+            magnet.connected = [ connector ];
+            this.connectors.push(connector);
+            this.valid = false;
+        }
     }
     
     addShape(shape: CNode, open_dialog: boolean = false): CNode {
@@ -1103,8 +1128,9 @@ export class CanvasState {
                 sel_.highlight(ctx);
             }
         }
-    
+        
         // draw all shapes and magnets
+        // @todo: render these in hidden canvases and import them instead of redrawing from scratch
         for (let shape of this.shapes) {
             shape.draw(ctx);
         }
@@ -1121,6 +1147,7 @@ export class CanvasState {
         // Attempting to make this more efficient by batching all labels into one.
         // Drawing text is the most resource-intensive operation here.
         // This code uses makeLabel() instead of drawLabel(), which this replaces.
+        // @todo: draw these using a separate SVG layer? CSS3 transforms are hardware-accelerated, and canvas is slow for text
         let connectorLabels = [];
         let canvasWrapper = new CanvasWrapper(null, ctx);
         for (let connector of this.connectors) {

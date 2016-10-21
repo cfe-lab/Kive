@@ -3,6 +3,7 @@ import { CanvasState, CanvasContextMenu, CanvasListeners, PipelineReviser, Pipel
 import { ViewDialog, OutputDialog, MethodDialog, InputDialog, Dialog } from "./pipeline_dialogs";
 import 'jquery';
 import '/static/portal/noxss.js';
+import {CdtNode} from "./drydock_objects";
 
 declare var noXSS: any;
 noXSS();
@@ -18,6 +19,17 @@ noXSS();
  * Part 6/8: Initialize CanvasContextMenu and register actions
  * Part 7/8: Prompt the user when navigating away unsaved changes
  * Part 8/8: Silly happy face widget
+ */
+
+/**
+ * @todo
+ * New features:
+ * - History tracking: Ctrl+Z & Ctrl+Shift+Z - medium
+ * - Upload Methods from the Dialog - hard
+ * - Add Methods using GUI - hard
+ * - Create InputNodes automatically for MethodNode - easy
+ * - Create CDTs from the Dialog - hard
+ * - Drag area to select nodes - medium
  */
 
 /**
@@ -58,16 +70,11 @@ let parent_revision_id;
 let initialData = $("#initial_data");
 let text;
 if (initialData.length && (text = initialData.text())) {
-    if (text.length) {
-        let loader = new PipelineReviser(text);
-        loader.load(
-            canvasState,
-            initPipelineCheck
-        );
-        loader.setUpdateCtrl($('#id_update'));
-        loader.setRevertCtrl($('#id_revert'));
-        parent_revision_id = loader.pipelineRaw.id;
-    }
+    let loader = new PipelineReviser(text);
+    loader.load(canvasState, initPipelineCheck);
+    loader.setUpdateCtrl($('#id_update'));
+    loader.setRevertCtrl($('#id_revert'));
+    parent_revision_id = loader.pipelineRaw.id;
 } else {
     initPipelineCheck();
 }
@@ -172,6 +179,12 @@ contextMenu.registerAction('add_method', function(_, pos) {
 contextMenu.registerAction('add_output', function(_, pos) {
     output_dialog.show();
     output_dialog.align(pos.clientX, pos.clientY);
+});
+contextMenu.registerAction('complete_inputs', function(sel) {
+    if (CanvasState.isMethodNode(sel)) {
+        console.log('triggered');
+        canvasState.completeMethodInputs(sel);
+    }
 });
 
 /**

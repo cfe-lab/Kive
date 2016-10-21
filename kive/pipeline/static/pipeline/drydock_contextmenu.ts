@@ -79,13 +79,22 @@ export class CanvasContextMenu {
         if (this.cs.can_edit) {
             if (CanvasState.isNode(sel[0])) {
                 this.show(e);
+                let sel0 = sel[0];
                 $('.cm-add', this.$menu).hide();
-                if (sel.length > 1 || CanvasState.isInputNode(sel[0])) {
-                    $('.edit', this.$menu).hide();
+                if (sel.length > 1 || CanvasState.isInputNode(sel0)) {
+                    $('.edit, .complete-inputs', this.$menu).hide();
+                }
+                if (sel.length > 1 || CanvasState.isOutputNode(sel0)) {
+                    $('.complete-inputs', this.$menu).hide();
+                }
+                if (sel.length === 1 && CanvasState.isMethodNode(sel0)) {
+                    if (sel0.in_magnets.filter(el => el.connected.length === 0).length === 0) {
+                        $('.complete-inputs', this.$menu).hide();
+                    }
                 }
             } else {
                 this.show(e);
-                $('.edit, .delete', this.$menu).hide();
+                $('.edit, .delete, .complete-inputs', this.$menu).hide();
             }
         } else if (sel.length == 1) {
             // Otherwise, we're read only, so only popup the context menu for outputs with datasets
