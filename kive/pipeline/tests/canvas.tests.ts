@@ -1571,7 +1571,7 @@ describe("Canvas classes", function() {
                 this.expectedConnector.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.ctx.globalAlpha = 1.0;
                 this.expectedCanvas.ctx.fillStyle = '#aaa';
-                this.expectedConnector.drawLabel(this.expectedCanvas.ctx);
+                this.expectedConnector.drawLabel(this.expectedCanvas.ctx); // 1
                 var magnet = this.expectedMethod.out_magnets[0];
 
                 this.state.draw(this.ctx);
@@ -1579,7 +1579,7 @@ describe("Canvas classes", function() {
                 this.state.doDown({pageX: magnet.x, pageY: magnet.y});
                 this.state.doMove({pageX: 250, pageY: 20});
                 this.state.doUp({pageX: 250, pageY: 20}); // in output zone
-                this.state.draw(this.ctx);
+                this.state.draw(this.ctx); // 2
                 // clear selection
                 this.state.doDown({pageX: 0, pageY: 0});
                 this.state.doUp({pageX: 0, pageY: 0});
@@ -1588,7 +1588,7 @@ describe("Canvas classes", function() {
                     startY = this.actualMethod.out_magnets[0].connected[0].y + 10;
                 this.state.doDown({ pageX: startX, pageY: startY });
                 this.state.doMove({ pageX: startX + 10, pageY: startY + 80 });
-                this.state.draw(this.ctx);
+                this.state.draw(this.ctx); // 3
             });
 
             it('should drag output cable', function() {

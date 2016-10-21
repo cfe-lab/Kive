@@ -1333,7 +1333,7 @@ export class Connector implements CanvasObject {
 
         if (label !== this.measured_text) {
             this.measured_text = label;
-            this.label_width = ctx.measureText(this.measured_text).width + 10;
+            this.label_width = ctx.measureText(this.measured_text).width + 12;
         }
 
         this.dx = this.x - this.fromX;

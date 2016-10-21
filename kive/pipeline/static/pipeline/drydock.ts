@@ -199,7 +199,6 @@ export class CanvasState {
 
         // get this connector's shape
         let source_shape = connector.source.parent;
-
         let old_dest = connector.dest; // keep track for purposes of change detection
 
         if (connector.dest !== undefined && connector.dest !== null) {
@@ -217,9 +216,11 @@ export class CanvasState {
             for (let in_magnet of shape.in_magnets) {
                 // light up magnet
                 if (in_magnet.connected.length === 0 &&
-                    (connector.source.cdt === in_magnet.cdt ||
-                    // OutputNodes don't care about datatype.
-                    CanvasState.isOutputNode(shape))
+                    (
+                        connector.source.cdt === in_magnet.cdt ||
+                        // OutputNodes don't care about datatype.
+                        CanvasState.isOutputNode(shape)
+                    )
                 ) {
                     in_magnet.acceptingConnector = true;
                 }
@@ -241,7 +242,7 @@ export class CanvasState {
         }
 
         if (connector.dest !== old_dest) {
-            this.dispatchChangeEvent({connected: [connector]});
+            this.dispatchChangeEvent({ connected: [connector] });
         }
     }
 
@@ -267,10 +268,8 @@ export class CanvasState {
          event handler for mouse motion over canvas
          */
         var mouse = this.getPos(e);
-
         if (this.dragging) {
             this.valid = false; // redraw
-
             // are we carrying a shape or Connector?
             for (let sel of this.selection) {
                 // are we carrying a connector?
@@ -284,10 +283,8 @@ export class CanvasState {
                     this.moveShape(sel, mouse);
                 }
             }
-
             this.dragstart = mouse;
         }
-
         /**
          * Have no idea what this code was supposed to do.
          */
