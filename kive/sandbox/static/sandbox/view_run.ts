@@ -1,10 +1,16 @@
 "use strict";
 
 // this line will work better with IDE
-// import { CanvasState, CanvasContextMenu, CanvasListeners, Pipeline, REDRAW_INTERVAL } from "../../../pipeline/static/pipeline/pipeline_all";
+// import {
+//     CanvasState, CanvasContextMenu, CanvasListeners,
+//     Pipeline, REDRAW_INTERVAL
+// } from "../../../pipeline/static/pipeline/pipeline_all";
 
 // this line works better when the server is running
-import { CanvasState, CanvasContextMenu, CanvasListeners, Pipeline, REDRAW_INTERVAL } from "/static/pipeline/pipeline_all";
+import {
+    CanvasState, CanvasContextMenu, CanvasListeners,
+    Pipeline, REDRAW_INTERVAL
+} from "/static/pipeline/pipeline_all";
 
 import 'jquery';
 import '/static/portal/noxss.js';
@@ -12,9 +18,9 @@ import '/static/portal/noxss.js';
 declare var noXSS: any;
 noXSS();
 
-const RUN_ID = parseInt($('#run_id').val(), 10);
-const PIPELINE_ID = parseInt($('#run_pipeline_id').val(), 10);
-const MD5 = $('#run_md5').val();
+const RUN_ID         = parseInt($('#run_id').val(), 10);
+const PIPELINE_ID    = parseInt($('#run_pipeline_id').val(), 10);
+const MD5            = $('#run_md5').val();
 const TIMER_INTERVAL = 1000;
 
 // initialize animated canvas
@@ -55,7 +61,7 @@ var status_message = {
     }
 };
 
-interface TimerFunction extends Function { timer?: number }
+interface TimerFunction extends Function { timer?: number; }
 var grabStatus: TimerFunction = function() {
     if (grabStatus.timer === undefined) {
         grabStatus.timer = setInterval(grabStatus, TIMER_INTERVAL);

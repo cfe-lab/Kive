@@ -51,7 +51,7 @@ function buildMembers($td, row) {
 
     if (row.members.length === 0) {
         $option = $("<option>")
-            .attr("disabled", true)
+            .attr("disabled", 1)
             .text("No published versions");
         $select.append($option).appendTo($form);
     } else {

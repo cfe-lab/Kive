@@ -1,22 +1,22 @@
 export interface Point {
-    x: number,
-    y: number
+    x: number;
+    y: number;
 }
 export interface Circle extends Point {
-    r: number
+    r: number;
 }
 export interface Ellipse extends Point {
-    rx: number,
-    ry: number
+    rx: number;
+    ry: number;
 }
 export interface Rectangle extends Point {
-    height: number,
-    width: number
-    r?: number,
-    stroke?: boolean
+    height: number;
+    width: number;
+    r?: number;
+    stroke?: boolean;
 }
 export interface TextParams extends Point {
-    dir: number,
-    style: string,
-    text: string
+    dir: number;
+    style: string;
+    text: string;
 }

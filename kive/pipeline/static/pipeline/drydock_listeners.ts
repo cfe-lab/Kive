@@ -13,7 +13,7 @@ export class CanvasListeners {
             let backspace = e.which === 8;
             let del = e.which === 46;
             let esc = e.which === 27;
-        
+
             // backspace or delete key also removes selected object
             if (backspace || del) {
                 // prevent backspace from triggering browser to navigate back one page
@@ -30,20 +30,20 @@ export class CanvasListeners {
     static initResizeListeners(cs: CanvasState): void {
         let resize_timeout = 0;
         let canvas = cs.canvas;
-        
+
         function endDocumentResize() {
             cs.valid = false;
             cs.outputZone.alignWithCanvas(canvas.width, canvas.height);
             cs.detectAllCollisions();
         }
-            
+
         window.addEventListener("resize", function() {
             cs.width  = canvas.width  = window.innerWidth;
             cs.height = canvas.height = window.innerHeight - $(canvas).offset().top - 5;
-    
+
             let scale_x = canvas.width  / cs.old_width;
             let scale_y = canvas.height / cs.old_height;
-    
+
             if (scale_x === 1 && scale_y === 1) {
                 return;
             }
@@ -59,11 +59,11 @@ export class CanvasListeners {
                     shape.dy *= scale_y;
                 }
             }
-    
+
             cs.old_width = canvas.width;
             cs.old_height = canvas.height;
             cs.valid = false;
-    
+
             // Collision detection is computationally expensive, so
             // deferred until 0.5s have passed without further resizing.
             clearTimeout(resize_timeout);

@@ -12,12 +12,12 @@ describe("Pipeline functions", function() {
     beforeEach(function() {
         var width = 600,
             height = 300;
-        
+
         jasmine.addMatchers(imagediff.jasmine);
         this.rawCanvas = imagediff.createCanvas(width, height);
         this.canvas = new CanvasWrapper(this.rawCanvas);
         this.canvasState = new CanvasState(this.rawCanvas, true);
-        
+
         this.api_pipeline = {
             "id": 25,
             "url": "http://127.0.0.1:8000/api/pipelines/25/",
@@ -289,37 +289,36 @@ describe("Pipeline functions", function() {
             "removal_plan": "http://127.0.0.1:8000/api/pipelines/25/removal_plan/"
         };
     });
-    
+
     afterEach(function() {
         expect('Suppress SPEC HAS NO EXPECTATIONS').toBeDefined();
     });
-    
+
     function loadApiPipeline(canvasState, pipeline) {
         var ppln = new Pipeline(canvasState);
         ppln.load(pipeline);
         return ppln;
     }
-    
+
     describe('Load', function(){
         it('should load pipeline from API', function() {
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
         });
-        
+
         it('should draw pipeline from API', function() {
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             pipeline.draw();
         });
-        
-        
+
         it('should autolayout from API', function() {
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             pipeline.draw();
             this.canvasState.autoLayout();
         });
-        
+
         it('should find pipeline nodes from API', function() {
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
-            
+
             var input1  = this.canvasState.findNodeByLabel('input1'),
                 input2  = this.canvasState.findNodeByLabel('input2'),
                 prelim  = this.canvasState.findNodeByLabel('prelim_map.py'),
@@ -330,7 +329,7 @@ describe("Pipeline functions", function() {
                 umfasq1 = this.canvasState.findNodeByLabel('unmapped2_fastq'),
                 umfasq2 = this.canvasState.findNodeByLabel('unmapped1_fastq'),
                 jmguire = this.canvasState.findNodeByLabel('Jerry Maguire');
-            
+
             expect(input1).toBeDefined();
             expect(input2).toBeDefined();
             expect(prelim).toBeDefined();
@@ -343,43 +342,43 @@ describe("Pipeline functions", function() {
             expect(jmguire).toBeUndefined();
         });
     });
-    
+
     describe('Connections', function(){
-        
+
         it('should connect inputs to methods API', function(){
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
-            
+
             var input1 = this.canvasState.findNodeByLabel('input1'),
                 input2 = this.canvasState.findNodeByLabel('input2'),
                 prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
                 remap  = this.canvasState.findNodeByLabel('remap.py');
-            
+
             expect(input1.isConnectedTo(input2)).toBe(false);
             expect(input1.isConnectedTo(prelim)).toBe(true);
             expect(input2.isConnectedTo(prelim)).toBe(true);
             expect(input1.isConnectedTo(remap)).toBe(true);
             expect(input2.isConnectedTo(remap)).toBe(true);
         });
-        
+
         it('should connect methods API', function(){
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
-            
+
             var prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
                 remap  = this.canvasState.findNodeByLabel('remap.py');
-            
+
             expect(prelim.isConnectedTo(remap)).toBe(true);
         });
-        
+
         it('should connect methods to outputs API', function(){
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
-            
+
             var remap   = this.canvasState.findNodeByLabel('remap.py'),
                 remapc  = this.canvasState.findNodeByLabel('remap_counts'),
                 remapcs = this.canvasState.findNodeByLabel('remap_conseq'),
                 remapp  = this.canvasState.findNodeByLabel('remap'),
                 umfasq1 = this.canvasState.findNodeByLabel('unmapped2_fastq'),
                 umfasq2 = this.canvasState.findNodeByLabel('unmapped1_fastq');
-            
+
             expect(remapc.isConnectedTo(remap)).toBe(true);
             expect(remapcs.isConnectedTo(remap)).toBe(true);
             expect(remapp.isConnectedTo(remap)).toBe(true);
@@ -387,79 +386,79 @@ describe("Pipeline functions", function() {
             expect(umfasq2.isConnectedTo(remap)).toBe(true);
             expect(remapc.isConnectedTo(umfasq2)).toBe(false);
         });
-        
+
         it('should ignore order of cables_in when wiring', function(){
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
                 expectedImage;
             pipeline.draw();
             expectedImage = imagediff.toImageData(this.rawCanvas);
-            
+
             // Now reverse the order of the cables_in
             this.api_pipeline.steps[1].cables_in.reverse();
             pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             pipeline.draw();
-            
+
             expect(this.rawCanvas).toImageDiffEqual(
                 expectedImage);
         });
     });
-    
+
     describe('Structure', function(){
-        
+
         it('should have correct properties for inputs API', function(){
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             pipeline.draw();
-            
+
             var input1 = this.canvasState.findNodeByLabel('prelim_map.py'),
                 input2 = this.canvasState.findNodeByLabel('input2');
-            
+
             var i1keys = Object.keys(input1),
                 i2keys = Object.keys(input2);
-            
+
             $.each(['x', 'y', 'dx', 'dy', 'fill', 'label'], function(_, key){
                 expect(i1keys).toContain(key);
                 expect(i2keys).toContain(key);
             });
         });
-        
+
         it('shoud have correct properties for inputs API', function(){
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             pipeline.draw();
-            
+
             var prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
                 remap  = this.canvasState.findNodeByLabel('remap.py');
-            
+
             var i1keys = Object.keys(prelim),
                 i2keys = Object.keys(remap);
-            
+
             $.each(['x', 'y', 'dx', 'dy', 'fill', 'label', 'family'], function(_, key){
                 expect(i1keys).toContain(key);
                 expect(i2keys).toContain(key);
             });
-            
+
             expect(prelim.family).toBe(3);
             expect(remap.family).toBe(4);
             expect(prelim.out_magnets[0].connected.length).toBe(1);
             expect(remap.out_magnets[0].connected.length).toBe(1);
         });
-        
+
         it('should have correct properties for output API', function(){
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             pipeline.draw();
-            
+
             var remapc  = this.canvasState.findNodeByLabel('remap_counts'),
                 remapcs = this.canvasState.findNodeByLabel('remap_conseq');
-            
+
             var i1keys = Object.keys(remapc),
                 i2keys = Object.keys(remapcs);
-            
+
             $.each(['x', 'y', 'dx', 'dy', 'fill', 'label'], function(_, key){
                 expect(i1keys).toContain(key);
                 expect(i2keys).toContain(key);
             });
         });
     });
-    
+
     describe('Update steps', function(){
         it('should apply method update', function() {
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
@@ -486,12 +485,12 @@ describe("Pipeline functions", function() {
                         }]
                     }
                 }];
-            
+
             pipeline.applyStepRevisions(step_updates);
             var new_method = this.canvasState.findNodeByLabel('prelim_map.py');
             expect(new_method.pk).toBe(new_method_id);
         });
-        
+
         it('should notify the user of updates', function(){
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
                 new_method_id = 77,
@@ -517,14 +516,14 @@ describe("Pipeline functions", function() {
                         }]
                     }
                 }];
-            
+
             pipeline.applyStepRevisions(step_updates);
             var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
             var no_updates_found_method = this.canvasState.findNodeByLabel('remap.py');
             expect(updated_method.update_signal.status).toBe('updated');
             expect(no_updates_found_method.update_signal.status).toBe('no update available');
         });
-        
+
         it('should notify the user if an updated method has changed inputs', function(){
             // changed input
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
@@ -551,12 +550,12 @@ describe("Pipeline functions", function() {
                         }]
                     }
                 }];
-            
+
             pipeline.applyStepRevisions(step_updates);
             var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
             expect(updated_method.update_signal.status).toBe('updated with issues');
         });
-        
+
         it('should notify the user if an updated method has changed outputs', function(){
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
                 new_method_id = 78,
@@ -582,12 +581,12 @@ describe("Pipeline functions", function() {
                         }]
                     }
                 }];
-            
+
             pipeline.applyStepRevisions(step_updates);
             var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
             expect(updated_method.update_signal.status).toBe('updated with issues');
         });
-        
+
         it('should notify the user if an updated method has new inputs', function(){
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
                 new_method_id = 78,
@@ -605,7 +604,7 @@ describe("Pipeline functions", function() {
                                 dataset_name: "fastq2",
                                 dataset_idx: 2,
                                 structure: null
-                            },{
+                            }, {
                                 dataset_name: "new_input",
                                 dataset_idx: 3,
                                 structure: null
@@ -617,12 +616,12 @@ describe("Pipeline functions", function() {
                         }]
                     }
                 }];
-            
+
             pipeline.applyStepRevisions(step_updates);
             var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
             expect(updated_method.update_signal.status).toBe('updated with issues');
         });
-        
+
         it('should notify the user if an updated method has new outputs', function(){
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
                 new_method_id = 78,
@@ -645,19 +644,19 @@ describe("Pipeline functions", function() {
                             dataset_name: "prelim",
                             dataset_idx: 1,
                             structure: { compounddatatype: 7 }
-                        },{
+                        }, {
                             dataset_name: "new_output",
                             dataset_idx: 2,
                             structure: { compounddatatype: 19 }
                         }]
                     }
                 }];
-            
+
             pipeline.applyStepRevisions(step_updates);
             var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
             expect(updated_method.update_signal.status).toBe('updated with issues');
         });
-        
+
         it('should apply code resource update', function() {
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
                 step_updates = [{
@@ -668,14 +667,14 @@ describe("Pipeline functions", function() {
                     }
                 }];
             pipeline.applyStepRevisions(step_updates);
-            
+
             var new_method = this.canvasState.findNodeByLabel('prelim_map.py');
-            
+
             expect(new_method.new_code_resource_revision).toBe(
                 step_updates[0].code_resource_revision,
                 "new_code_resource_revision");
         });
-        
+
         it('should apply dependency update', function() {
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
                 step_updates = [{
@@ -686,113 +685,112 @@ describe("Pipeline functions", function() {
                     }]
                 }];
             pipeline.applyStepRevisions(step_updates);
-            
+
             var new_method = this.canvasState.findNodeByLabel('prelim_map.py');
-            
+
             expect(new_method.new_dependencies).toBe(
                 step_updates[0].dependencies,
                 "new_dependencies");
         });
     });
-    
+
     function loadAndSerialize(canvasState, api_pipeline, additional_args?) {
         var pipeline = loadApiPipeline(canvasState, api_pipeline);
         pipeline.draw();
         return pipeline.serialize(additional_args);
     }
-    
+
     describe('Serialize', function(){
         it('should serialize', function(){
             var test = loadAndSerialize(this.canvasState, this.api_pipeline);
         });
-        
+
         it('should check structure', function() {
             var serialized = loadAndSerialize(
                 this.canvasState,
                 this.api_pipeline,
-                {'pass_thru': "pass this argument thru"}
+                { family: "pass this argument thru" }
             );
-            
-            expect(serialized.pass_thru).toBe("pass this argument thru");
+
+            expect(serialized.family).toBe("pass this argument thru");
             expect(serialized.steps).toBeDefined();
             expect(serialized.inputs).toBeDefined();
             expect(serialized.outcables).toBeDefined();
         });
-        
+
         it('should match original pipeline inputs', function(){
             var self = this,
                 serialized = loadAndSerialize(
                     this.canvasState,
                     this.api_pipeline
                 );
-            
+
             // TODO: These (inputs) should really be sorted by dataset_idx
             $.each(serialized.inputs, function(index, ser_input){
                 var api_input = self.api_pipeline.inputs[index];
-                
+
                 expect(ser_input.dataset_name).toBe(api_input.dataset_name);
                 expect(ser_input.dataset_idx).toBe(api_input.dataset_idx);
                 expect(ser_input.x).toBeCloseTo(api_input.x, 8);
                 expect(ser_input.y).toBeCloseTo(api_input.y, 8);
-                
-                if(ser_input.structure === null) {
+
+                if (ser_input.structure === null) {
                     expect(ser_input.structure).toBe(api_input.structure);
                 } else {
                     expect(ser_input.structure.compounddatatype).toBe(api_input.structure.compounddatatype);
                 }
             });
         });
-        
+
         it('should match original pipeline steps', function() {
             var self = this,
                 serialized = loadAndSerialize(
                     this.canvasState,
                     this.api_pipeline
                 );
-            
+
             // TODO: These (inputs) should really be sorted by dataset_idx
             $.each(serialized.steps, function(index, ser_step){
                 var api_step = self.api_pipeline.steps[index];
-                
+
                 expect(ser_step.name).toBe(api_step.name);
                 expect(ser_step.step_num).toBe(api_step.step_num);
                 expect(ser_step.transformation).toBe(api_step.transformation);
-                
+
             });
         });
-        
+
         it('should match original pipeline steps (cables_in)', function() {
             var self = this,
                 serialized = loadAndSerialize(
                     this.canvasState,
                     this.api_pipeline
                 );
-            
+
             // TODO: These (inputs) should really be sorted by dataset_idx
             $.each(serialized.steps, function(index, ser_step){
                 var api_step = self.api_pipeline.steps[index];
-                
+
                 $.each(ser_step.cables_in, function(cable_index, ser_cable){
                     var api_cable = api_step.cables_in[cable_index];
-                    
+
                     expect(ser_cable.dest_dataset_name).toBe(api_cable.dest_dataset_name);
                     expect(ser_cable.source_dataset_name).toBe(api_cable.source_dataset_name);
                 });
             });
         });
-        
+
         it('should match original pipeline output', function() {
             var self = this,
                 serialized = loadAndSerialize(
                     this.canvasState,
                     this.api_pipeline
                 );
-            
+
             // TODO: These (inputs) should really be sorted by dataset_idx
             $.each(serialized.outcables, function(index, ser_output){
                 var api_output = self.api_pipeline.outcables[index];
-                
-                
+
                 expect(ser_output.output_cdt).toBe(api_output.output_cdt);
                 expect(ser_output.output_idx).toBe(api_output.output_idx);
                 expect(ser_output.output_name).toBe(api_output.output_name);
@@ -800,7 +798,7 @@ describe("Pipeline functions", function() {
                 expect(ser_output.source_step).toBe(api_output.source_step);
             });
         });
-        
+
         it('should submit code resource update', function() {
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
                 method = this.canvasState.findNodeByLabel("prelim_map.py"),
@@ -812,12 +810,12 @@ describe("Pipeline functions", function() {
             pipeline.draw();
             var data = pipeline.serialize(),
                 step = data.steps[0];
-            
+
             expect(step.new_code_resource_revision_id).toBe(
                 new_code_resource_revision_id,
                 "step.new_code_resource_revision_id");
         });
-        
+
         it('should submit dependency update', function() {
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
                 method = this.canvasState.findNodeByLabel("prelim_map.py"),
@@ -829,7 +827,7 @@ describe("Pipeline functions", function() {
             pipeline.draw();
             var data = pipeline.serialize(),
                 step = data.steps[0];
-            
+
             expect(step.new_dependency_ids).toEqual(
                 [new_code_resource_revision_id],
                 "step.new_dependency_ids");

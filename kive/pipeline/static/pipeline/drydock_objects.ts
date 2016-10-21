@@ -11,14 +11,14 @@ import { CanvasState } from "./drydock";
 import 'jquery';
 
 export class CanvasWrapper {
-    
+
     /**
      * A helper class to easily draw primitive shapes on the canvas.
      */
     constructor(canvas: HTMLCanvasElement, private ctx?: CanvasRenderingContext2D) {
         this.ctx = ctx || canvas.getContext('2d');
     }
-    
+
     /**
      * Draw a circle.
      * 
@@ -32,7 +32,7 @@ export class CanvasWrapper {
         this.ctx.closePath();
         this.ctx.fill();
     }
-    
+
     /**
      * Draw an ellipse.
      * 
@@ -48,7 +48,7 @@ export class CanvasWrapper {
         this.drawCircle({x: 1, y: 1, r: 1});
         this.ctx.restore(); // restore to original state
     }
-    
+
     /**
      * Stroke an ellipse.
      * 
@@ -67,7 +67,7 @@ export class CanvasWrapper {
         this.ctx.restore(); // restore to original state
         this.ctx.stroke();
     }
-    
+
     /**
      * Draw text with a standard font, colour, and background rectangle.
      * 
@@ -162,11 +162,11 @@ export class CanvasWrapper {
             rectArgs.y -= 7.5;
         }
         this.ctx.textAlign = dir === 1 ? 'left' : dir === 0 ? 'center' : 'right';
-        
+
         // make a backing box so the label is on the fill colour
         rectArgs.width = 2 * margin + this.ctx.measureText(args.text).width;
         if (dir === 0) {
-            rectArgs.x -= rectArgs.width/2;
+            rectArgs.x -= rectArgs.width / 2;
         }
         else {
             rectArgs.x -= dir * margin;
@@ -176,10 +176,10 @@ export class CanvasWrapper {
         if (rectArgs.stroke) {
             this.strokeRect(rectArgs);
         }
-        if (args.style == 'in-magnet' || args.style == 'out-magnet') {
+        if (args.style === 'in-magnet' || args.style === 'out-magnet') {
             // draw triangle pointer
             this.ctx.beginPath();
-            if (args.style == 'in-magnet') {
+            if (args.style === 'in-magnet') {
                 this.ctx.moveTo(rectArgs.x - 1,     args.y - 3);
                 this.ctx.lineTo(rectArgs.x + 3, args.y);
                 this.ctx.lineTo(rectArgs.x - 1,     args.y + 3);
@@ -190,7 +190,7 @@ export class CanvasWrapper {
             }
             this.ctx.closePath();
             this.ctx.fill();
-        } else if (args.style == 'callout') {
+        } else if (args.style === 'callout') {
             // draw triangle pointer
             this.ctx.beginPath();
             this.ctx.moveTo(rectArgs.x + 1, args.y - 5);
@@ -199,13 +199,13 @@ export class CanvasWrapper {
             this.ctx.closePath();
             this.ctx.fill();
         }
-        
+
         this.ctx.globalAlpha = 1;
         this.ctx.fillStyle = textFill;
         this.ctx.fillText(args.text, args.x, args.y);
         this.ctx.restore();
     };
-    
+
     /**
      * Draw a rectangle or rounded rectangle.
      * 
@@ -235,45 +235,35 @@ export class CanvasWrapper {
     buildRect(rectangle: Rectangle) {
         this.ctx.beginPath();
         // middle of top edge
-        this.ctx.moveTo(rectangle.x + rectangle.width/2, rectangle.y);
+        this.ctx.moveTo(rectangle.x + rectangle.width / 2, rectangle.y);
         // to middle of right edge
         this.ctx.arcTo(
                 rectangle.x + rectangle.width, rectangle.y,
-                rectangle.x + rectangle.width, rectangle.y + rectangle.height/2,
+                rectangle.x + rectangle.width, rectangle.y + rectangle.height / 2,
                 rectangle.r);
         // to middle of bottom edge
         this.ctx.arcTo(
                 rectangle.x + rectangle.width, rectangle.y + rectangle.height,
-                rectangle.x + rectangle.width/2, rectangle.y + rectangle.height,
+                rectangle.x + rectangle.width / 2, rectangle.y + rectangle.height,
                 rectangle.r);
         // to middle of left edge
         this.ctx.arcTo(
                 rectangle.x, rectangle.y + rectangle.height,
-                rectangle.x, rectangle.y + rectangle.height/2,
+                rectangle.x, rectangle.y + rectangle.height / 2,
                 rectangle.r);
         // to middle of top edge
         this.ctx.arcTo(
                 rectangle.x, rectangle.y,
-                rectangle.x + rectangle.width/2, rectangle.y,
+                rectangle.x + rectangle.width / 2, rectangle.y,
                 rectangle.r);
         this.ctx.closePath();
     };
 }
 
-
 export interface CanvasObject {
     draw(ctx: CanvasRenderingContext2D): void;
     doDown(cs: CanvasState, e: Event): void;
     contains(x: number, y: number, pad?: number): boolean;
-    isNode(): boolean;
-    isMethodNode(): boolean;
-    isInputNode(): boolean;
-    isCdtNode(): boolean;
-    isRawNode(): boolean;
-    isOutputNode(): boolean;
-    isMagnet(): boolean;
-    isConnector(): boolean;
-    isOutputZone(): boolean;
 }
 
 export interface CNode extends CanvasObject {
@@ -296,7 +286,7 @@ export interface CNode extends CanvasObject {
     out_magnets: Magnet[];
     affects_exec_order: boolean;
     has_unsaved_changes: boolean;
-    
+
     /* @todo: investigate where these came from */
     dataset_id?: any;
     run_id?: any;
@@ -348,7 +338,7 @@ class BaseNode {
 
     constructor() { }
 
-    contains(x:number, y:number) {
+    contains(x: number, y: number) {
         // to be replaced by child classes
         return false;
     }
@@ -362,7 +352,7 @@ class BaseNode {
         }
     }
     getMouseTarget(mx: number, my: number, skip_check?: boolean): BaseNode|CNode|Magnet {
-        if (skip_check || this.contains(mx,my)) {
+        if (skip_check || this.contains(mx, my)) {
             // are we clicking on a magnet?
             for (let magnet of this.out_magnets.concat(this.in_magnets)) {
                 if (magnet.contains(mx, my)) {
@@ -382,14 +372,14 @@ class BaseNode {
             pos = canvasState.getPos(e);
 
         // this shape is now on top.
-        canvasState.shapes.push(canvasState.shapes.splice(i,1)[0]);
+        canvasState.shapes.push(canvasState.shapes.splice(i, 1)[0]);
 
         // moving the shape
         canvasState.dragoffx = pos.x - this.x;
         canvasState.dragoffy = pos.y - this.y;
 
         if (e.shiftKey && sel_stack_ix > -1) {
-            sel.splice(sel_stack_ix,1);
+            sel.splice(sel_stack_ix, 1);
         } else if (e.shiftKey) {
             sel.push(this);
         } else {
@@ -432,30 +422,6 @@ class BaseNode {
     isNode() {
         return true;
     }
-    isOutputZone() {
-        return false;
-    }
-    isMagnet() {
-        return false;
-    }
-    isConnector() {
-        return false;
-    }
-    isInputNode() {
-        return false;
-    }
-    isRawNode() {
-        return false;
-    }
-    isCdtNode() {
-        return false;
-    }
-    isOutputNode() {
-        return false;
-    }
-    isMethodNode() {
-        return false;
-    }
 }
 
 /**
@@ -465,7 +431,7 @@ class CylinderNode extends BaseNode {
     /*
     BaseNode rendered as a cylinder.
      */
-    dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
+    dx = 0; // display offset to avoid collisions, relative to its "true" coordinates
     dy = 0;
     r = 20; // x-radius (ellipse)
     r2 = this.r / 2; // y-radius (ellipse)
@@ -475,7 +441,7 @@ class CylinderNode extends BaseNode {
     fill = "grey";
     found_fill: string;
     found_md5: boolean;
-    magnetOffset: Point = { x: -12, y: -this.h/2 };
+    magnetOffset: Point = { x: -12, y: -this.h / 2 };
     in_magnets = [];
     out_magnets = [];
     highlightStroke: string;
@@ -487,26 +453,26 @@ class CylinderNode extends BaseNode {
     private getTopEllipse(): Ellipse {
         return {
             x: this.x + this.dx,
-            y: this.y + this.dy - this.h/2,
+            y: this.y + this.dy - this.h / 2,
             rx: this.r,
             ry: this.r2
-        }
+        };
     }
     private getBottomEllipse(): Ellipse {
         return {
             x: this.x + this.dx,
-            y: this.y + this.dy + this.h/2,
+            y: this.y + this.dy + this.h / 2,
             rx: this.r,
             ry: this.r2
-        }
+        };
     }
     private getStack(): Rectangle {
         return {
             x: this.x + this.dx - this.r,
-            y: this.y + this.dy - this.h/2,
+            y: this.y + this.dy - this.h / 2,
             width: this.r * 2,
             height: this.h
-        }
+        };
     }
     draw(ctx: CanvasRenderingContext2D) {
         var canvas = new CanvasWrapper(undefined, ctx),
@@ -568,7 +534,7 @@ class CylinderNode extends BaseNode {
 
         var x1 = cx + this.r,
             x2 = cx - this.r,
-            y1 = cy + this.h/2,
+            y1 = cy + this.h / 2,
             y2 = y1 - this.h;
 
         // Include centre to collide with small objects completely inside border.
@@ -578,15 +544,15 @@ class CylinderNode extends BaseNode {
             { x: x2, y: y1 },
             { x: x1, y: y2 },
             { x: x2, y: y2 },
-            { x: cx, y: cy + this.h/2 + this.r2 },
-            { x: cx, y: cy - this.h/2 - this.r2 }
+            { x: cx, y: cy + this.h / 2 + this.r2 },
+            { x: cx, y: cy - this.h / 2 - this.r2 }
         ];
     }
     getLabel() {
         return new NodeLabel(
                 this.label,
                 this.x + this.dx,
-                this.y + this.dy - this.h/2 - this.offset,
+                this.y + this.dy - this.h / 2 - this.offset,
                 this.has_unsaved_changes ? '*' : '');
     }
 }
@@ -599,14 +565,14 @@ export class RawNode extends CylinderNode implements CNode {
     found_fill = "blue";
     inset = 10; // distance of magnet from center
     dataset_id: number;
-    
+
     /* for view_run */
     md5: string;
     run_id: string;
 
     constructor(public x, public y, public label = "", public input_index?) {
         super(x, y, label);
-        this.magnetOffset = {x: 10, y: this.r2/2};
+        this.magnetOffset = {x: 10, y: this.r2 / 2};
         // Input node always has one magnet
         this.out_magnets = [
             new Magnet(this, 5, 2, "white", null, this.label, null, true)
@@ -624,7 +590,7 @@ export class RawNode extends CylinderNode implements CNode {
 }
 
 export class CdtNode extends BaseNode implements CNode {
-    dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
+    dx = 0; // display offset to avoid collisions, relative to its "true" coordinates
     dy = 0;
     w = 45;
     h = 28;
@@ -634,7 +600,7 @@ export class CdtNode extends BaseNode implements CNode {
     offset = 15;
     in_magnets = [];
     out_magnets = [];
-    
+
     /* for view_run */
     md5: string;
     found_md5: boolean;
@@ -659,23 +625,23 @@ export class CdtNode extends BaseNode implements CNode {
         ctx.fillStyle = this.found_md5 ? this.found_fill : this.fill;
 
         // draw base
-        var prism_base = cy + this.h/2;
+        var prism_base = cy + this.h / 2;
         ctx.beginPath();
-        ctx.moveTo(cx - this.w/2, prism_base);
-        ctx.lineTo(cx, prism_base + this.w/4);
-        ctx.lineTo(cx + this.w/2, prism_base);
-        ctx.lineTo(cx + this.w/2, prism_base - this.h);
-        ctx.lineTo(cx - this.w/2, prism_base - this.h);
+        ctx.moveTo(cx - this.w / 2, prism_base);
+        ctx.lineTo(cx, prism_base + this.w / 4);
+        ctx.lineTo(cx + this.w / 2, prism_base);
+        ctx.lineTo(cx + this.w / 2, prism_base - this.h);
+        ctx.lineTo(cx - this.w / 2, prism_base - this.h);
         ctx.closePath();
         ctx.fill();
 
         // draw top
-        var prism_cap = cy - this.h/2;
+        var prism_cap = cy - this.h / 2;
         ctx.beginPath();
-        ctx.moveTo(cx - this.w/2, prism_cap);
-        ctx.lineTo(cx, prism_cap + this.w/4);
-        ctx.lineTo(cx + this.w/2, prism_cap);
-        ctx.lineTo(cx, prism_cap - this.w/4);
+        ctx.moveTo(cx - this.w / 2, prism_cap);
+        ctx.lineTo(cx, prism_cap + this.w / 4);
+        ctx.lineTo(cx + this.w / 2, prism_cap);
+        ctx.lineTo(cx, prism_cap - this.w / 4);
         ctx.closePath();
         ctx.fill();
 
@@ -692,23 +658,23 @@ export class CdtNode extends BaseNode implements CNode {
     setMagnetPosition() {
         var out_magnet = this.out_magnets[0];
         out_magnet.x = this.x + this.dx + this.inset;
-        out_magnet.y = this.y + this.dy + this.w/8;
+        out_magnet.y = this.y + this.dy + this.w / 8;
     }
     getVertices(): Point[] {
         var cx = this.x + this.dx,
             cy = this.y + this.dy;
 
-        var w2 = this.w/2,
-            butt = cy + this.h/2,
-            cap  = cy - this.h/2;
+        var w2 = this.w / 2,
+            butt = cy + this.h / 2,
+            cap  = cy - this.h / 2;
 
         return [
             { x: cx,      y: cy },
             { x: cx - w2, y: butt },
-            { x: cx,      y: butt + w2/2 },
+            { x: cx,      y: butt + w2 / 2 },
             { x: cx + w2, y: butt },
             { x: cx + w2, y: cap },
-            { x: cx,      y: cap - w2/2 },
+            { x: cx,      y: cap - w2 / 2 },
             { x: cx - w2, y: cap }
         ];
     }
@@ -718,17 +684,17 @@ export class CdtNode extends BaseNode implements CNode {
 
         ctx.lineJoin = 'bevel';
 
-        var w2 = this.w/2,
-            h2 = this.h/2,
+        var w2 = this.w / 2,
+            h2 = this.h / 2,
             butt = cy + h2,
             cap = cy - h2;
 
         ctx.beginPath();
         ctx.moveTo(cx - w2, butt);
-        ctx.lineTo(cx,      butt + w2/2);
+        ctx.lineTo(cx,      butt + w2 / 2);
         ctx.lineTo(cx + w2, butt);
         ctx.lineTo(cx + w2, cap);
-        ctx.lineTo(cx,      cap - w2/2);
+        ctx.lineTo(cx,      cap - w2 / 2);
         ctx.lineTo(cx - w2, cap);
         ctx.closePath();
         ctx.stroke();
@@ -742,15 +708,15 @@ export class CdtNode extends BaseNode implements CNode {
 
         // mouse coords are within the 4 diagonal lines.
         // can be checked with 1 expression because the 4 lines are mirror images of each other
-        return this.h/2 + this.w/4 - dy > dx / 2 &&
+        return this.h / 2 + this.w / 4 - dy > dx / 2 &&
         // then check the horizontal boundaries on the sides of the hexagon
-            dx < this.w/2;
+            dx < this.w / 2;
     }
     getLabel() {
         return new NodeLabel(
                 this.label,
                 this.x + this.dx,
-                this.y + this.dy - this.h/2 - this.offset,
+                this.y + this.dy - this.h / 2 - this.offset,
                 this.has_unsaved_changes ? '*' : '');
     }
 
@@ -782,7 +748,7 @@ export class CdtNode extends BaseNode implements CNode {
  */
 export class MethodNode extends BaseNode implements CNode {
 
-    dx = 0;// display offset to avoid collisions, relative to its "true" coordinates
+    dx = 0; // display offset to avoid collisions, relative to its "true" coordinates
     dy = 0;
     inset = 10; // distance from left or right edge to center of hole
     offset = 10; // space between bottom of node and label
@@ -810,14 +776,14 @@ export class MethodNode extends BaseNode implements CNode {
 
     constructor (
             public pk,
-            public family,// can be passed from database
+            public family, // can be passed from database
             public x,
             public y,
             public fill,
             public label,
             public inputs,
             public outputs,
-            public status?,// Members for instances of methods in runs
+            public status?, // Members for instances of methods in runs
             public outputs_to_delete = []
         ) {
         super();
@@ -829,7 +795,7 @@ export class MethodNode extends BaseNode implements CNode {
         this.n_outputs = Object.keys(outputs).length;
         this.h = Math.max(this.n_inputs, this.n_outputs) * this.spacing;
 
-        var sortByIdxFn = (a,b) => a.dataset_idx - b.dataset_idx;
+        var sortByIdxFn = (a, b) => a.dataset_idx - b.dataset_idx;
         for (let input of this.inputs.sort( sortByIdxFn )) {
             this.addInput(input);
         }
@@ -879,7 +845,7 @@ export class MethodNode extends BaseNode implements CNode {
 
     draw(ctx: CanvasRenderingContext2D) {
         ctx.fillStyle = this.fill;
-        var vertices = this.getVertices();
+        var vxs = this.getVertices();
 
         // body
         this.buildBodyPath(ctx);
@@ -887,21 +853,21 @@ export class MethodNode extends BaseNode implements CNode {
 
         // input plane (shading)
         ctx.beginPath();
-        ctx.moveTo( vertices[0].x, vertices[0].y );
-        ctx.lineTo( vertices[1].x, vertices[1].y );
-        ctx.lineTo( vertices[2].x, vertices[2].y );
-        ctx.lineTo( vertices[3].x, vertices[3].y );
+        ctx.moveTo( vxs[0].x, vxs[0].y );
+        ctx.lineTo( vxs[1].x, vxs[1].y );
+        ctx.lineTo( vxs[2].x, vxs[2].y );
+        ctx.lineTo( vxs[3].x, vxs[3].y );
         ctx.fillStyle = '#fff';
         ctx.globalAlpha = 0.35;
         ctx.fill();
 
         // top bend (shading)
         ctx.beginPath();
-        ctx.moveTo( vertices[6].x, vertices[6].y );
-        ctx.lineTo( vertices[7].x, vertices[7].y );
-        ctx.bezierCurveTo( vertices[9].x,  vertices[9].y,  vertices[9].x,  vertices[9].y,  vertices[0].x, vertices[0].y );
-        ctx.lineTo( vertices[1].x, vertices[1].y );
-        ctx.bezierCurveTo( vertices[10].x, vertices[10].y, vertices[10].x, vertices[10].y, vertices[6].x, vertices[6].y );
+        ctx.moveTo( vxs[6].x, vxs[6].y );
+        ctx.lineTo( vxs[7].x, vxs[7].y );
+        ctx.bezierCurveTo( vxs[9].x,  vxs[9].y,  vxs[9].x,  vxs[9].y,  vxs[0].x, vxs[0].y );
+        ctx.lineTo( vxs[1].x, vxs[1].y );
+        ctx.bezierCurveTo( vxs[10].x, vxs[10].y, vxs[10].x, vxs[10].y, vxs[6].x, vxs[6].y );
         ctx.globalAlpha = 0.12;
         ctx.fill();
 
@@ -916,8 +882,8 @@ export class MethodNode extends BaseNode implements CNode {
 
         // update signal
         if (this.update_signal) {
-            this.update_signal.x = vertices[6].x - this.update_signal.r;
-            this.update_signal.y = vertices[2].y + this.update_signal.r;
+            this.update_signal.x = vxs[6].x - this.update_signal.r;
+            this.update_signal.y = vxs[2].y + this.update_signal.r;
             this.update_signal.draw(ctx);
         }
 
@@ -939,7 +905,7 @@ export class MethodNode extends BaseNode implements CNode {
         let magnet, pos;
         let cx = this.x + this.dx,
             cy = this.y + this.dy,
-            cos30 = Math.sqrt(3)/2,
+            cos30 = Math.sqrt(3) / 2,
             magnet_margin = 6,
             c2c = this.in_magnets[0].r * 2 + magnet_margin,
             y_inputs = cy - this.stack,
@@ -947,15 +913,15 @@ export class MethodNode extends BaseNode implements CNode {
             y_outputs = cy + this.scoop * 0.5;
         for (let i = 0, len = this.in_magnets.length; i < len; i++) {
             magnet = this.in_magnets[i];
-            pos = (i - len/2 + 0.5) * c2c;
+            pos = (i - len / 2 + 0.5) * c2c;
             magnet.x = cx + pos * cos30;
-            magnet.y = y_inputs - pos/2;
+            magnet.y = y_inputs - pos / 2;
         }
         for (let i = 0, len = this.out_magnets.length; i < len; i++) {
             magnet = this.out_magnets[i];
-            pos = (i - len/2 + 0.5) * c2c;
+            pos = (i - len / 2 + 0.5) * c2c;
             magnet.x = x_outputs + pos * cos30;
-            magnet.y = y_outputs - pos/2;
+            magnet.y = y_outputs - pos / 2;
         }
 
     }
@@ -969,7 +935,7 @@ export class MethodNode extends BaseNode implements CNode {
     contains (mx, my) {
         var vertices = this.getVertices();
         return Geometry.inPolygon(mx, my,
-            [ 1,2,3,8,4,5,6,10 ].map(i => vertices[i])
+            [ 1, 2, 3, 8, 4, 5, 6, 10 ].map(i => vertices[i])
         );
     }
 
@@ -980,7 +946,7 @@ export class MethodNode extends BaseNode implements CNode {
                 cx !== this.prevX ||
                 cy !== this.prevY) {
             // experimental draw
-            var cos30 = Math.sqrt(3)/2,
+            var cos30 = Math.sqrt(3) / 2,
              // sin30 = 0.5 (this is trivial)
                 magnet_radius = this.in_magnets[0].r,
                 magnet_margin = 6,
@@ -1033,8 +999,8 @@ export class MethodNode extends BaseNode implements CNode {
     getLabel() {
         return new NodeLabel(
                 this.label,
-                this.x + this.dx + this.scoop/4,
-                this.y + this.dy - this.stack - this.input_plane_len/2 - this.offset,
+                this.x + this.dx + this.scoop / 4,
+                this.y + this.dy - this.stack - this.input_plane_len / 2 - this.offset,
                 this.has_unsaved_changes ? '*' : '');
     };
 
@@ -1134,7 +1100,7 @@ export class Magnet implements CanvasObject {
             y: this.y,
             text: this.label,
             dir: 0,
-            style: this.isOutput? "out-magnet":"in-magnet"
+            style: this.isOutput ? "out-magnet" : "in-magnet"
         });
     }
     contains (mx, my) {
@@ -1183,32 +1149,8 @@ export class Magnet implements CanvasObject {
         return false;
     }
 
-    isNode() {
-        return false;
-    }
-    isInputNode() {
-        return false;
-    }
-    isRawNode() {
-        return false;
-    }
-    isCdtNode() {
-        return false;
-    }
-    isOutputNode() {
-        return false;
-    }
-    isMethodNode() {
-        return false;
-    }
     isMagnet() {
         return true;
-    }
-    isOutputZone() {
-        return false;
-    }
-    isConnector() {
-        return false;
     }
 }
 
@@ -1283,11 +1225,11 @@ export class Connector implements CanvasObject {
                 cable_stat = "RUNNING";
 
                 // Upper cable is done!
-                if (src.status == 'CLEAR' && typeof this.dest.parent.status == 'string' ) {
+                if (src.status === 'CLEAR' && typeof this.dest.parent.status === 'string' ) {
                     // Whatever, everything else is fine!
                     cable_stat = "CLEAR";
                 }
-                else if(src.status == 'FAILURE') {// Source is borked
+                else if (src.status === 'FAILURE') {// Source is borked
                     // so is any cable that pokes out of it...
                     cable_stat = "FAILURE";
                 }
@@ -1363,7 +1305,7 @@ export class Connector implements CanvasObject {
             { x: this.x, y: this.y }
         ];
     }
-    
+
     drawLabel (ctx: CanvasRenderingContext2D) {
         let builtLabel;
         if (builtLabel = this.buildLabel(ctx)) {
@@ -1380,31 +1322,31 @@ export class Connector implements CanvasObject {
             ctx.restore();
         }
     }
-    
+
     buildLabel (ctx: CanvasRenderingContext2D) {
         var jsb = this.calculateCurve();
         var label = this.source.label;
-        
+
         if (this.source.label !== this.dest.label) {
             label += "->" + this.dest.label;
         }
-    
+
         if (label !== this.measured_text) {
             this.measured_text = label;
             this.label_width = ctx.measureText(this.measured_text).width + 10;
         }
-        
+
         this.dx = this.x - this.fromX;
         this.dy = this.y - this.fromY;
-        
+
         // only draw if it's long enough to contain the text
         if ( this.dx * this.dx + this.dy * this.dy > this.label_width * this.label_width * 2) {
             // determine the angle of the bezier at the midpoint
             var midpoint = Bezier.nearestPointOnCurve({
-                x: this.fromX + this.dx/2,
+                x: this.fromX + this.dx / 2,
                 y: this.fromY + this.dy / 2
             }, jsb);
-            
+
             return {
                 // set the bezier midpoint as the origin
                 centre: midpoint.point,
@@ -1553,30 +1495,6 @@ export class Connector implements CanvasObject {
         }
     }
 
-    isNode() {
-        return false;
-    }
-    isInputNode() {
-        return false;
-    }
-    isRawNode() {
-        return false;
-    }
-    isCdtNode() {
-        return false;
-    }
-    isOutputNode() {
-        return false;
-    }
-    isMethodNode() {
-        return false;
-    }
-    isMagnet() {
-        return false;
-    }
-    isOutputZone() {
-        return false;
-    }
     isConnector() {
         return true;
     }
@@ -1609,7 +1527,6 @@ export class Connector implements CanvasObject {
     };
 }
 
-
 class NodeLabel {
     constructor(public label = '', public x = 0, public y = 0, public suffix = '') { }
 }
@@ -1619,13 +1536,15 @@ class NodeUpdateSignal {
     r: number = 10;
     status: string;
     status_opts = (function() {
-        var imgs:any = {},
+        var imgs: any = {},
             pngprefix = "data:image/png;base64,",
             icon64 = {
+                /* tslint:disable:max-line-length */
                 check: /*inline update-check:*/"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAAAtUExURUxpcf///////////////////////////////////////////////////////3EAnbYAAAAOdFJOUwAQcO9QQCCfj8+/MN+vrAj6JgAAAGFJREFUCNdjYEAFTgIQmuVdAYSRDGOse5wAppnePYEI7Ht3gYFBvJCBYd4boCa9Vwwc754Chf3eKcS9awAyeN+ZnnsJUsho9+7da7CWuHfvFMAMjnevIIYwzjOD2iwCNh4AiZcdZAU+g5sAAAAASUVORK5CYII=",
                 question: /*inline update-question:*/"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAAAzUExURUxpcf////////////////////////////////////////////////////////////////Hv/K4AAAAQdFJOUwCfgFBgvyDvMECvzxCPcN9FpKciAAAAaElEQVQY01WO6xbAEAyDy1C1W97/addlzPH9IZFGRZxy7sAeD+kkBdH6acNAC43mtyTH5blAw5+Mk0CmoVCe2zAsMmD/CKn5ba1T8+c0A9FlKFO/hSYLtaw6qW6LoWOHwQ20tSK3vsMDBq4EkJmvtUUAAAAASUVORK5CYII=",
                 x: /*inline update-x:*/"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAAAbUExURUxpcf///////////////////////////////+WJFuQAAAAIdFJOUwCfEM+AcI+vhS7NcwAAAFlJREFUCNdjYIABJlcFIBmiwMDSYcTAwNghwMDa0azAINHhwAAkDBg7GhlAwo0SQBkGkFBHO1gfYwdIPYQBlgFJNUIEmiGKJTqMwNrhBsKtYEoDWRqoAHcFAAWbFYtiUTTsAAAAAElFTkSuQmCC",
                 refresh: /*inline update-refresh:*/"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAAAzUExURUxpcf////////////////////////////////////////////////////////////////Hv/K4AAAAQdFJOUwCfQL/fj1AQ73BgIDDPgK825B7lAAAAg0lEQVQY001PWxLEIAxCjY+obXP/0y6mjl0+nBARECBmEDMJAxvZNjJKIQ92IDaBm8PFi3JxaEBtZmE97BzsAZTCuhbxpkSB5OeLWoZHnDhEpTh+fLpdjfgrRNdilnJxC+b0t2frizOlVY8x6XEq/7MEsPZVXw1nrrpX7RQamkSSeuEf5C8HP4rTRNYAAAAASUVORK5CYII="
+                /* tslint:enable:max-line-length */
             };
 
         for (var i in icon64) if (icon64.hasOwnProperty(i)) {
@@ -1659,8 +1578,8 @@ class NodeUpdateSignal {
 
     constructor(public node: BaseNode, status) {
         this.setStatus(status);
-        this.x = node.x + node.w/2;
-        this.y = node.y - node.h/2;
+        this.x = node.x + node.w / 2;
+        this.y = node.y - node.h / 2;
     };
     draw (ctx: CanvasRenderingContext2D) {
         var canvas = new CanvasWrapper(undefined, ctx);
@@ -1758,33 +1677,8 @@ export class OutputZone implements CanvasObject {
     deleteFrom() {
         // can't delete this object
     }
-
-    isNode() {
-        return false;
-    }
-    isInputNode() {
-        return false;
-    }
-    isRawNode() {
-        return false;
-    }
-    isCdtNode() {
-        return false;
-    }
-    isOutputNode() {
-        return false;
-    }
-    isMethodNode() {
-        return false;
-    }
-    isMagnet() {
-        return false;
-    }
     isOutputZone() {
         return true;
-    }
-    isConnector() {
-        return false;
     }
 }
 
@@ -1838,9 +1732,6 @@ export class OutputNode extends CylinderNode implements CNode {
         this.label = label;
         this.in_magnets[0].label = label;
     }
-    // debug(ctx: CanvasRenderingContext2D) {
-    //     this.in_magnets[0].connected[0].debug(ctx);
-    // }
     isOutputNode() {
         return true;
     }

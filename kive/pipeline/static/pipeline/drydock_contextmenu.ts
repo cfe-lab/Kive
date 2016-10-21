@@ -17,7 +17,7 @@ export class CanvasContextMenu {
     private actions: ContextMenuInterface = {};
     private criteria: { [id: string]: Function } = {};
     private visible = false;
-    
+
     constructor(selector: string, private cs: CanvasState) {
         var menu = this;
         this.$menu = $(selector);
@@ -35,26 +35,24 @@ export class CanvasContextMenu {
                 // when a context menu option is clicked
                 e.stopPropagation();
                 menu.$menu.hide();
-            
+
                 var sel = cs.selection;
                 var action = $(this).data('action');
-            
+
                 if (sel) {
                     if (menu.actions.hasOwnProperty(action)) {
                         menu.actions[action](
-                            action == 'delete' ? sel : sel[0],
+                            action === 'delete' ? sel : sel[0],
                             e
                         );
                     }
                 }
             }
         }, 'li');
-        
-        console.log(this.$menu, this.$ul);
-        
+
         $(document).click( () => { this.visible && this.cancel(); } );
     }
-    
+
     /**
      * Creates a context menu option
      * @param name Human-readable name - internal ID will be generated based on this
@@ -74,30 +72,30 @@ export class CanvasContextMenu {
             this.criteria[id_name] = criteriaFn;
         }
     }
-    
+
     cancel() {
         this.$menu.hide();
         this.visible = false;
     }
-    
+
     hide() {
         this.cancel();
     }
-    
+
     show(e) {
         this.$menu.show().css({ top: e.pageY, left: e.pageX });
         $('li', this.$menu).show();
         this.visible = true;
     }
-    
+
     open(e) {
         e.preventDefault();
-        
+
         let sel = this.cs.selection.length > 1 ? this.cs.selection : this.cs.selection[0];
         let sel_multi = this.cs.selection.length > 1;
-        
+
         this.visible && this.cancel();
-        
+
         this.show(e);
         this.$ul.find('li').hide();
         for (let action_id in this.actions) {
@@ -108,9 +106,7 @@ export class CanvasContextMenu {
         if (this.$ul.find('li:visible').length === 0) {
             this.hide();
         }
-        
+
         this.cs.doUp();
     }
-    
-    
 }

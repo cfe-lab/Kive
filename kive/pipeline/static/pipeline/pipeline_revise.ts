@@ -18,7 +18,7 @@ export class PipelineReviser {
         }
         try {
             this.pipelineRaw = JSON.parse(data);
-        } catch(e) {
+        } catch (e) {
             console.error("Pipeline could not be loaded: JSON parse error");
         }
     }

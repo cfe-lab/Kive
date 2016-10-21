@@ -8,13 +8,13 @@ import 'jasmine-jquery';
 import 'imagediff';
 
 describe("MethodDialog class", function() {
-    
+
     var dlg;
     jasmine.getFixtures().fixturesPath = '/templates/pipeline';
     jasmine.getFixtures().preload('./pipeline_method_dialog.tpl.html');
     jasmine.getStyleFixtures().fixturesPath = '/static/pipeline';
     jasmine.getStyleFixtures().preload('./drydock.css');
-    
+
     /* Mock API server call responses by overloading jQuery's getJSON method */
     // @todo: Use Jasmine's AJAX library: http://jasmine.github.io/2.0/ajax.html
     $.getJSON = function(url: string, ...restArgs: any[]) {
@@ -180,7 +180,7 @@ describe("MethodDialog class", function() {
                 }
             ];
         }
-        
+
         if (result) {
             return $.Deferred()
                 .resolve(result)
@@ -191,11 +191,11 @@ describe("MethodDialog class", function() {
             return $.Deferred().reject("404 error");
         }
     };
-    
+
     beforeAll(function() {
         jasmine.addMatchers(imagediff.jasmine);
     });
-    
+
     beforeEach(function(){
         appendLoadFixtures('./pipeline_method_dialog.tpl.html');
         appendLoadStyleFixtures('./drydock.css');
@@ -204,46 +204,46 @@ describe("MethodDialog class", function() {
             $('.ctrl_menu').attr('id', '#id_method_ctrl'),
             $('#activator')
         );
-        
+
         let method_family_menu = $('#id_select_method_family');
-        
+
         method_family_menu.find('option')
             .filter(function() { return $(this).val() !== ""; })
             .remove();
-        
+
         $('<option>').val('6').appendTo(method_family_menu);
     });
-    
+
     it('should initialize properly', function() {
         expect(dlg.jqueryRef).toBeInDOM();
         expect(dlg.activator).toBeInDOM();
         try {
             dlg.validateInitialization();
-        } catch(e) {
+        } catch (e) {
             fail(e);
         }
     });
-    
+
     it('should appear after the activator is clicked', function() {
         expect(dlg.jqueryRef).toBeHidden();
         dlg.activator.click();
         expect(dlg.jqueryRef).toBeVisible();
     });
-    
+
     it('should reset itself', function() {
         var firstInput = $('#id_method_name');
         firstInput.val('foo');
         dlg.reset();
         expect(firstInput.val()).toBe('');
     });
-    
+
     it('should update when the family menu changes', function(done) {
-        let canvas = <HTMLCanvasElement>$('canvas')[0];
-        
+        let canvas = <HTMLCanvasElement> $('canvas')[0];
+
         dlg.activator.click();
         $('#id_select_method_family').val('6').change();
         expect($('#id_select_method').find('option').length).toBeGreaterThan(0);
-    
+
         var sam2aln = new Image();
         sam2aln.src = "/pipeline/test_assets/sam2aln_node.png";
         sam2aln.onload = function() {
@@ -251,16 +251,16 @@ describe("MethodDialog class", function() {
             done();
         };
     });
-    
+
     /*
         TODO:
-        
+
         Methods:
         cancel() => reset() and hide() in one
         align(x, y) => dialog should move (Align the dialog to a given coord. Anchor point is top center.)
         load(MethodNode) =>
         submit(CanvasState) => node should go to a new CanvasState and be in exact same position from user's perspective
-        
+
         Events:
         $select_method.change => canvas should draw
         $select_method_family.change => $select_method should change

@@ -1,9 +1,11 @@
 "use strict";
-import { CanvasState, CanvasContextMenu, CanvasListeners, PipelineReviser, PipelineSubmit, REDRAW_INTERVAL } from "./pipeline_all";
+import {
+    CanvasState, CanvasContextMenu, CanvasListeners,
+    PipelineReviser, PipelineSubmit, REDRAW_INTERVAL
+} from "./pipeline_all";
 import { ViewDialog, OutputDialog, MethodDialog, InputDialog, Dialog } from "./pipeline_dialogs";
 import 'jquery';
 import '/static/portal/noxss.js';
-import {CdtNode} from "./drydock_objects";
 
 declare var noXSS: any;
 noXSS();
@@ -46,7 +48,7 @@ CanvasListeners.initResizeListeners(canvasState);
 /**
  * Part 2/8: Prepare Pipeline completeness check.
  */
-interface BtnFunction extends Function { $btn?: JQuery }
+interface BtnFunction extends Function { $btn?: JQuery; }
 var pipelineCheckCompleteness: BtnFunction = function() {
     let $submit_btn = pipelineCheckCompleteness.$btn || $('#id_submit_button');
     pipelineCheckCompleteness.$btn = $submit_btn;
@@ -163,8 +165,8 @@ contextMenu.registerAction('Edit', function(multi, sel) {
             CanvasState.isOutputNode(sel)
         );
 }, function(sel) {
-    var coords = canvasState.getAbsoluteCoordsOfNode(sel);
-    
+    let coords = canvasState.getAbsoluteCoordsOfNode(sel);
+
     // For methods, open the edit dialog (rename, method selection, colour picker...)
     if (CanvasState.isMethodNode(sel)) {
         let dialog = method_dialog;
@@ -233,7 +235,7 @@ let smileWidgetEvents = (function() {
     const CHARS_PER_SMILE = 12;
     const NUM_EMOJIS = 10;
     const EMOJI_WIDTH = 16;
-    
+
     let keydown = function() {
         let happy_mapped = -Math.min(
                 NUM_EMOJIS - 1,
@@ -247,14 +249,14 @@ let smileWidgetEvents = (function() {
             indicatorAndLabel.hide();
         } else {
             indicator.show();
-            label[ chars_typed > 20 ? 'hide':'show' ]();
+            label[ chars_typed > 20 ? 'hide' : 'show' ]();
         }
     };
     let blur = function() {
         indicatorAndLabel.hide();
     };
-    
-    return { keydown, keyup: focus, focus, blur }
+
+    return { keydown, keyup: focus, focus, blur };
 })();
 $('#id_revision_desc').on(smileWidgetEvents)
     .keydown().blur();

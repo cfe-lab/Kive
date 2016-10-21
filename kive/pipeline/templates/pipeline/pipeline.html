@@ -40,10 +40,10 @@
     <div id="initial_data" style="display:none">{{ parent_revision_json|escape }}</div>
 
     <!-- CANVAS -->
-    <div>
-        <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
-        <div id="context_menu"></div>
-    </div>
+    <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
+
+    <!-- Context menu -->
+    <div id="context_menu"></div>
 
     <!-- Method selector -->
     <div id="pipeline_ctrl">
@@ -54,7 +54,7 @@
             <li data-rel="#id_view_ctrl">View</li>
         </ul>
 
-        <form id="id_pipeline_form" action="" method="post" enctype="multipart/form-data">{% csrf_token %}
+        <form id="id_pipeline_form">{% csrf_token %}
             <div id="form_ctrl">
                 <input type="submit" id="id_submit_button" value="Submit">
                 <div class="indicator-light"> </div>
@@ -71,7 +71,7 @@
         {% endif %}
         {% include 'pipeline/pipeline_family_dialog.tpl.html' with dlg_id="id_family_ctrl" %}
         {% include 'pipeline/pipeline_meta_dialog.tpl.html'   with dlg_id="id_meta_ctrl" %}
-        {% include 'pipeline/pipeline_view_dialog.tpl.html'   with dlg_id="id_view_ctrl"   %}
+        {% include 'pipeline/pipeline_view_dialog.tpl.html'   with dlg_id="id_view_ctrl" %}
 
         <div id="id_add_ctrl" class="ctrl_menu">
             <ul>

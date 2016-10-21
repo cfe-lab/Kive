@@ -6,64 +6,64 @@ import { CanvasState } from "./drydock";
 import 'jquery';
 
 interface ApiPipelineData extends PipelineMetadata {
-    steps?: ApiStepData[],
-    inputs?: ApiInputData[],
-    outcables?: ApiOutputData[]
+    steps?: ApiStepData[];
+    inputs?: ApiInputData[];
+    outcables?: ApiOutputData[];
 }
 interface PipelineMetadata {
-    family?: string,
-    family_desc?: string,
-    revision_name?: string,
-    revision_desc?: string,
-    revision_parent?: number,
-    published?: boolean,
-    users_allowed?: string[],
-    groups_allowed?: string[],
-    canvas_width?: number,
-    canvas_height?: number
+    family?: string;
+    family_desc?: string;
+    revision_name?: string;
+    revision_desc?: string;
+    revision_parent?: number;
+    published?: boolean;
+    users_allowed?: string[];
+    groups_allowed?: string[];
+    canvas_width?: number;
+    canvas_height?: number;
 }
 interface ApiCdtData {
-    compounddatatype: number,
-    min_row: null,
-    max_row: null
+    compounddatatype: number;
+    min_row: null;
+    max_row: null;
 }
 interface ApiInputData {
-    structure: ApiCdtData,
-    dataset_name: string,
-    dataset_idx: number,
-    x: number,
-    y: number
+    structure: ApiCdtData;
+    dataset_name: string;
+    dataset_idx: number;
+    x: number;
+    y: number;
 }
 interface ApiOutputData {
-    output_name: string,
-    output_idx: number,
-    output_cdt: number,
-    source: number,
-    source_step: number,
-    source_dataset_name: string,
-    x: number,
-    y: number,
-    custom_wires: any[] // in the future we might have this
+    output_name: string;
+    output_idx: number;
+    output_cdt: number;
+    source: number;
+    source_step: number;
+    source_dataset_name: string;
+    x: number;
+    y: number;
+    custom_wires: any[]; // in the future we might have this
 }
 interface ApiStepData {
-    transformation: number,  // to retrieve Method
-    transformation_type: string,
-    step_num: number,  // 1-index (pipeline inputs are index 0)
-    x: number,
-    y: number,
-    name: string,
-    fill_colour: string,
-    cables_in: ApiCableData[],
-    new_code_resource_revision_id: number,
-    new_outputs_to_delete_names: string[],
-    new_dependency_ids?: number[]
+    transformation: number;  // to retrieve Method
+    transformation_type: string;
+    step_num: number;  // 1-index (pipeline inputs are index 0)
+    x: number;
+    y: number;
+    name: string;
+    fill_colour: string;
+    cables_in: ApiCableData[];
+    new_code_resource_revision_id: number;
+    new_outputs_to_delete_names: string[];
+    new_dependency_ids?: number[];
 }
 interface ApiCableData {
-    source_dataset_name: string,
-    dest_dataset_name: string,
-    source_step: number,
-    keep_output: boolean,
-    custom_wires: any[] // no wires for a raw cable
+    source_dataset_name: string;
+    dest_dataset_name: string;
+    source_step: number;
+    keep_output: boolean;
+    custom_wires: any[]; // no wires for a raw cable
 }
 
 /**
@@ -73,7 +73,7 @@ export class Pipeline {
 
     pipeline: any = null;
     private API_URL = "/api/pipelinefamilies/";
-    
+
     // Pipeline constructor
     constructor(private canvasState: CanvasState) {
     }
@@ -98,7 +98,7 @@ export class Pipeline {
             shape.has_unsaved_changes = false;
         }
     }
-    
+
     /**
      * This method serializes the pipeline into an object that can be
      * fed to the backend REST API.
@@ -145,7 +145,7 @@ export class Pipeline {
         for (let idx = 0; idx < pipeline_inputs.length; idx++) {
             let input = pipeline_inputs[idx];
             let structure = null;
-    
+
             // Setup the compound datatype
             if (CanvasState.isCdtNode(input)) {
                 structure = {
@@ -154,7 +154,7 @@ export class Pipeline {
                     max_row: null
                 };
             }
-    
+
             // Slap this input into the form data
             form_data.inputs[idx] = {
                 structure: structure,
@@ -565,8 +565,8 @@ export class Pipeline {
                 new_method = new MethodNode(
                     update.method.id,
                     update.method.family_id,
-                    0,// x
-                    0,// y
+                    0, // x
+                    0, // y
                     old_method.fill,
                     old_method.label,
                     update.method.inputs,

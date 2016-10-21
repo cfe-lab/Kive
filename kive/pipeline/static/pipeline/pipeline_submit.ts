@@ -2,29 +2,29 @@ import { Pipeline } from "./pipeline_load";
 import { CanvasState } from "./drydock";
 
 export class PipelineSubmit {
-    
+
     /**
      * @todo: this class should contain serialize and set/getMetadata
      * functions instead of the Pipeline class.
      */
-    
+
     public static buildSubmit(canvasState: CanvasState, $action: JQuery, $family_name: JQuery,
                 $family_desc: JQuery, $family_pk: JQuery, $revision_name: JQuery, $revision_desc: JQuery,
                 parent_revision_id, $published: JQuery, $user_permissions: JQuery,
                 $group_permissions: JQuery, $error: JQuery, familyNameError: () => any) {
-        
+
         /*
          * Trigger AJAX transaction on submitting form.
          */
         return function(e) {
             e.preventDefault(); // override form submit action
             PipelineSubmit.clearErrors($error);
-        
+
             let action = $action.val();
             let form_data;
             let family = $family_name.val();
-    
-            if (action == "new" && family === '') {
+
+            if (action === "new" && family === '') {
                 familyNameError();
                 PipelineSubmit.submitError('Pipeline family must be named', $error);
                 return;
@@ -36,26 +36,26 @@ export class PipelineSubmit {
                 form_data = pipeline.serialize({
                     users_allowed:  PipelineSubmit.getPermissionsArray($user_permissions),
                     groups_allowed: PipelineSubmit.getPermissionsArray($group_permissions),
-        
+
                     // There is no PipelineFamily yet; we're going to create one.
                     family,
                     family_desc: $family_desc.val(),
-        
+
                     // arguments to add first pipeline revision
                     revision_name: $revision_name.val(),
                     revision_desc: $revision_desc.val(),
                     revision_parent: action === 'revise' ? parent_revision_id : null,
                     published: $published.prop('checked'),
-        
+
                     // Canvas information to store in the Pipeline object.
                     canvas_width:  canvasState.width,
                     canvas_height: canvasState.height
                 });
-            } catch(e) {
+            } catch (e) {
                 PipelineSubmit.submitError(e, $error);
                 return;
             }
-        
+
             if (action !== "new") {
                 PipelineSubmit.submitPipelineAjax($family_pk.val(), form_data, $error);
             } else { // Pushing a new family
@@ -68,10 +68,10 @@ export class PipelineSubmit {
                     PipelineSubmit.submitPipelineAjax(result.id, form_data, $error);
                 });
             }
-        
-        };// end exposed function - everything that follows is closed over
+
+        }; // end exposed function - everything that follows is closed over
     }
-    
+
     private static getPermissionsArray($permissionsElement: JQuery) {
         return $permissionsElement.find("option:selected").get().map(el => el.textContent);
     }
@@ -87,7 +87,7 @@ export class PipelineSubmit {
                 new_context += ".";
             }
             new_context += field;
-            
+
             for (let i = 0; i < value.length; i++) {
                 var item = value[i];
                 if (typeof(item) === "string") {
@@ -108,7 +108,7 @@ export class PipelineSubmit {
             $error.text(errors);
         }
         $error.show();
-        
+
         setTimeout(() => $error.hide(), 8000);
     }
     private static submitPipelineAjax(family_pk, form_data, $error) {
@@ -123,7 +123,7 @@ export class PipelineSubmit {
         }).fail(function(xhr, status, error) {
             var json = xhr.responseJSON,
                 errors = [];
-            
+
             if (json) {
                 if (json.non_field_errors) {
                     PipelineSubmit.submitError(json.non_field_errors, $error);
@@ -145,7 +145,7 @@ export class PipelineSubmit {
         }).fail(function(xhr, status, error) {
             var json = xhr.responseJSON,
                 serverErrors = json && json.non_field_errors || [];
-            
+
             if (serverErrors.length === 0) {
                 serverErrors = xhr.status + " - " + error;
             }

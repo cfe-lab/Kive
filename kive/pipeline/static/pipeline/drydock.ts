@@ -25,7 +25,7 @@ export class CanvasState {
      * @param interval: the number of milliseconds between calls to draw(),
      *  or undefined if no automatic scheduling is needed.
      */
-     
+
     // fixes issues with mouse coordinates
     stylePaddingLeft = 0;
     stylePaddingTop = 0;
@@ -60,7 +60,7 @@ export class CanvasState {
     // options
     selectionColor = '#7bf';
     selectionWidth = 2;
-    
+
     width: number;
     height: number;
     old_width: number;
@@ -68,7 +68,7 @@ export class CanvasState {
     pos_x: number;
     pos_y: number;
     ctx: CanvasRenderingContext2D;
-    htmlTop:number;
+    htmlTop: number;
     htmlLeft: number;
     outputZone: OutputZone;
 
@@ -76,7 +76,7 @@ export class CanvasState {
     $dialog: any;
 
     static method_node_queue: MethodNode[] = [];
-    
+
     constructor(public canvas: HTMLCanvasElement, public can_edit: boolean, interval?: number) {
         /*
         keeps track of canvas state (mouse drag, etc.)
@@ -101,14 +101,14 @@ export class CanvasState {
             this.styleBorderLeft  = getStyle(css, 'border-left-width');
             this.styleBorderTop   = getStyle(css, 'border-top-width');
         }
-    
+
         // adjust for fixed-position bars at top or left of page
-        var html:any = document.body.parentNode;
+        var html: any = document.body.parentNode;
         this.htmlTop = html.offsetTop;
         this.htmlLeft = html.offsetLeft;
-    
+
         this.outputZone = new OutputZone(this.width, this.height);
-        
+
         // events
         var interval_fn = () => {
             if (this.exec_order_may_have_changed) {
@@ -133,11 +133,11 @@ export class CanvasState {
         this.scale = factor;
         this.valid = false;
     }
-    
+
     getMouseTarget (mx: number, my: number): CanvasObject {
         var shapes = this.shapes,
             connectors = this.connectors;
-    
+
         // did we click on a shape?
         // check shapes in reverse order
         for (let i = shapes.length - 1; i >= 0; i--) {
@@ -146,7 +146,7 @@ export class CanvasState {
                 return shapes[i].getMouseTarget(mx, my, true);
             }
         }
-        
+
         // did we click on a Connector?
         // check this -after- checking shapes, as the algorithm is slower.
         for (let i = connectors.length - 1; i >= 0; i--) {
@@ -154,10 +154,10 @@ export class CanvasState {
                 return connectors[i];
             }
         }
-        
+
         return null;
     }
-    
+
     /**
      * If a node or connector was clicked, select it.
      * If nothing was clicked, de-select everything.
@@ -173,7 +173,7 @@ export class CanvasState {
         var pos = this.getPos(e),
             mySel = this.getMouseTarget(pos.x, pos.y),
             selection = this.selection;
-    
+
         if (mySel === null) {
             if (!e.shiftKey) {
                 // nothing clicked
@@ -193,29 +193,29 @@ export class CanvasState {
             this.valid = false; // activate canvas
         }
     }
-    
+
     private moveConnector(connector: Connector, mouse: Point) {
         // reset to allow mouse to disengage Connector from a magnet
         connector.x = mouse.x;
         connector.y = mouse.y;
-    
+
         // get this connector's shape
         let source_shape = connector.source.parent;
-    
+
         let old_dest = connector.dest; // keep track for purposes of change detection
-    
+
         if (connector.dest !== undefined && connector.dest !== null) {
             connector.dest.connected = [];
             connector.dest = null;
         }
-    
+
         // check if connector has been dragged to an in-magnet
         for (let shape of this.shapes) {
             // disallow self-referential connections
             if (source_shape !== undefined && shape === source_shape) {
                 continue;
             }
-        
+
             for (let in_magnet of shape.in_magnets) {
                 // light up magnet
                 if (in_magnet.connected.length === 0 &&
@@ -226,9 +226,9 @@ export class CanvasState {
                     in_magnet.acceptingConnector = true;
                 }
             }
-        
+
             let in_magnet = shape.getMouseTarget(mouse.x, mouse.y);
-        
+
             // does this in-magnet accept this CompoundDatatype?
             // cdt is null if own_shape is a RawNode
             if (CanvasState.isMagnet(in_magnet) &&
@@ -238,15 +238,15 @@ export class CanvasState {
                     CanvasState.isOutputNode(shape)
                 )
             ) {
-                in_magnet.tryAcceptConnector(connector)
+                in_magnet.tryAcceptConnector(connector);
             }
         }
-    
+
         if (connector.dest !== old_dest) {
             this.dispatchChangeEvent({connected: [connector]});
         }
     }
-    
+
     private moveShape(shape: CNode, mouse: Point) {
         // update coordinates of this shape/connector
         // any changes made by the collision detection algorithm on this shape are now made "official"
@@ -255,7 +255,7 @@ export class CanvasState {
         shape.x += dx + shape.dx;
         shape.y += dy + shape.dy;
         shape.dy = shape.dx = 0;
-    
+
         // if execution order is ambiguous, the tiebreaker is the y-position.
         // dragging a method node needs to calculate this in real-time.
         this.exec_order_may_have_changed = this.exec_order_may_have_changed ||
@@ -263,13 +263,13 @@ export class CanvasState {
         this.input_order_may_have_changed = this.input_order_may_have_changed ||
             CanvasState.isInputNode(shape);
     }
-    
+
     doMove (e: MouseEvent): void {
         /*
          event handler for mouse motion over canvas
          */
         var mouse = this.getPos(e);
-        
+
         if (this.dragging) {
             this.valid = false; // redraw
 
@@ -286,10 +286,10 @@ export class CanvasState {
                     this.moveShape(sel, mouse);
                 }
             }
-            
+
             this.dragstart = mouse;
         }
-    
+
         /**
          * Have no idea what this code was supposed to do.
          */
@@ -309,7 +309,7 @@ export class CanvasState {
         //     this.valid = false;
         // }
     }
-    
+
     scaleToCanvas (maintain_aspect_ratio?: boolean): void {
         // general strategy: get the x and y coords of every shape, then get the max and mins of these sets.
         var x_ar = [],
@@ -323,7 +323,7 @@ export class CanvasState {
             x_ar.push(shape.x);
             y_ar.push(shape.y);
         }
-        
+
         var xmin = Math.min(... x_ar),
             ymin = Math.min(... y_ar),
             pipeline_width = Math.max(... x_ar) - xmin,
@@ -332,11 +332,11 @@ export class CanvasState {
                 x: (this.width  - margin.x * 2) / pipeline_width,
                 y: (this.height - margin.y * 2) / pipeline_height
             };
-            
+
         if (maintain_aspect_ratio) {
             scale.y = scale.x = Math.min(scale.x, scale.y);
         }
-        
+
         /*
         for both x and y dimensions, 4 numbers are now available:
          - the current position
@@ -348,19 +348,19 @@ export class CanvasState {
             shape.x = (shape.x - xmin) * scale.x + margin.x;
             shape.y = (shape.y - ymin) * scale.y + margin.y;
         }
-        
+
         this.valid = false;
     }
-    
+
     centreCanvas(): void {
         var x_ar = [],
             y_ar = [];
-        
+
         for (let shape of this.shapes) {
             x_ar.push(shape.x);
             y_ar.push(shape.y);
         }
-        
+
         var xmove = ( this.width  - Math.max(... x_ar) - Math.min(... x_ar) ) / 2;
         var ymove = ( this.height - Math.max(... y_ar) - Math.min(... y_ar) ) / 2;
 
@@ -368,14 +368,14 @@ export class CanvasState {
             shape.x += xmove;
             shape.y += ymove;
         }
-        
+
         this.valid = false;
     };
 
     /*
      * Helper functions for CanvasState.autoLayout.
      */
-    private static insertIntoLayer(node: CNode, exec_order: MethodNode[], list:CNode[]): CNode[] {
+    private static insertIntoLayer(node: CNode, exec_order: MethodNode[], list: CNode[]): CNode[] {
         // Insert a node into a list in a "smart" way.
         // * Checks for duplicate entries
         // * If `node` is a method which is not the next method in exec_order, insertion is deferred
@@ -383,8 +383,8 @@ export class CanvasState {
         var queue = CanvasState.method_node_queue; // queue is a static variable that persists across function calls
         if (list.indexOf(node) === -1) {
             if (CanvasState.isMethodNode(node) &&
-                exec_order.indexOf(<MethodNode>node) > -1) {
-                let method_list = list.filter(node => node.isMethodNode());
+                exec_order.indexOf(<MethodNode> node) > -1) {
+                let method_list = list.filter(node => CanvasState.isMethodNode(node));
                 if (exec_order.length <= method_list.length) {
                     console.error("Unexpected number of methods in method_nodes.");
                 }
@@ -402,10 +402,10 @@ export class CanvasState {
                     }
                 } else {
                     // Not the method node next in exec_order. Reserve it until we find the right node.
-                    queue.push(<MethodNode>node);
+                    queue.push(<MethodNode> node);
                 }
             }
-            else if (node.isOutputNode()) {
+            else if (CanvasState.isOutputNode(node)) {
                 // Output nodes are not relevant to execution order.
                 list.push(node);
             }
@@ -422,8 +422,8 @@ export class CanvasState {
         return ar.reduce((a, b) => a + b.length, 0);
     }
     private static matrixIndexOf<T>(matrix: T[][], value: T): number[] {
-        for (let i=0; i < matrix.length; i++) {
-            for (let j=0; j < matrix[i].length; j++) {
+        for (let i = 0; i < matrix.length; i++) {
+            for (let j = 0; j < matrix[i].length; j++) {
                 if (matrix[i][j] === value) {
                     return [ i, j ];
                 }
@@ -471,18 +471,18 @@ export class CanvasState {
         }
 
         interface NodeOrderArray<T> extends Array<T> {
-            center_x?: number
+            center_x?: number;
         }
-        
+
         let x_spacing = 60,
             y_spacing = 130,
-            // z_drop = 20,// not implemented yet. intent is for nodes to cascade down into each other like a series of waterfalls!
+            // z_drop = 20, // not implemented yet.
             l1_inmagnets_in_order = this.exec_order[0].reduce(
                 (prev, curr) => prev.concat(curr.in_magnets), []
             ),
             // First two layers are relatively easy.
             // Layer 1 is exec_order[0]. (Potentially with more input nodes which will be found later)
-            node_order:NodeOrderArray<any> = [ [], this.exec_order[0] ],
+            node_order: NodeOrderArray<any> = [ [], this.exec_order[0] ],
             original_input_order = this.inputs.map(x => x);
 
         // Layer 0 is any input node leading to exec_order[0].
@@ -503,7 +503,8 @@ export class CanvasState {
                 CanvasState.addConnectedInputNodesIn(node, node_order[node_order.length - 2], node_order);
             }
             for (let connected_node of connected_nodes_in_order) {
-                layer = CanvasState.insertIntoLayer(connected_node, this.exec_order[i+1], layer);// `layer` will be added to here
+                // `layer` will be added to here
+                layer = CanvasState.insertIntoLayer(connected_node, this.exec_order[i + 1], layer);
             }
             node_order.push(layer);
         }
@@ -513,10 +514,10 @@ export class CanvasState {
                 let layer_length = node_order[j].length;
                 let layer = node_order[j];
                 layer.center_x = layer.center_x || 0;
-            
+
                 for (let i = 0; i < layer_length; i++) {
                     layer[i].setCoordsFromIso(
-                        x_spacing * (i - layer_length/2) + layer.center_x,
+                        x_spacing * (i - layer_length / 2) + layer.center_x,
                         y_spacing * j
                     );
                 }
@@ -525,11 +526,12 @@ export class CanvasState {
                     (prev, curr) => prev.concat(curr.out_magnets), []
                 );
 
-                // the isometric X centre of the layer after this one will be aligned with the centre of the magnets leading to its nodes.
+                // the isometric X centre of the layer after this one will be aligned
+                // with the centre of the magnets leading to its nodes.
                 if (j !== node_order.length - 1) {
                     let avg = Geometry.averagePoint(layer_out_magnets);
-                    node_order[j+1].center_x = Geometry.isometricXCoord(avg.x, avg.y);
-                    if ( isNaN(node_order[j+1].center_x) ) {
+                    node_order[j + 1].center_x = Geometry.isometricXCoord(avg.x, avg.y);
+                    if ( isNaN(node_order[j + 1].center_x) ) {
                         console.error("Autolayout failed!");
                         // console.error({
                         //     "ordered nodes": node_order,
@@ -549,7 +551,7 @@ export class CanvasState {
                 original_input_order[i].y = new_dims.y;
             }
 
-            this.scaleToCanvas(true);// "true" to maintain aspect ratio
+            this.scaleToCanvas(true); // "true" to maintain aspect ratio
             this.centreCanvas();
             for (let shape of this.shapes) {
                 this.detectCollisions(shape);
@@ -558,8 +560,7 @@ export class CanvasState {
             $(this.canvas).fadeIn();
         }});
     };
-    
-    
+
     private static getCoord = {
         x:     o => o.y,
         y:     o => o.x,
@@ -603,7 +604,7 @@ export class CanvasState {
                 ).reduce(
                     (a, b) => a + b
                 ) / sel.length;
-            
+
             for (let sel_ of sel) {
                 if (CanvasState.isNode(sel_)) {
                     CanvasState.setCoord[axis](sel_, center);
@@ -614,8 +615,13 @@ export class CanvasState {
             this.valid = false;
         }
     }
-    
-    private static pushShapesApart(shape1: CNode|OutputZone, shape2: CNode|OutputZone, bias: number, bounds: Rectangle): void {
+
+    private static pushShapesApart(
+            shape1: CNode|OutputZone,
+            shape2: CNode|OutputZone,
+            bias: number,
+            bounds: Rectangle
+    ): void {
         let step = 5;
         // Drawing a line between the two objects' centres, move the centre 
         // of mySel to extend this line while keeping the same angle.
@@ -625,8 +631,9 @@ export class CanvasState {
         let sh_y = shape2.y + shape2.dy;
         let dx = my_x - sh_x;
         let dy = my_y - sh_y;
-        let dh = (dx < 0 ? -1 : 1) * (Math.sqrt(dx*dx + dy*dy) + step);// add however many additional pixels you want to move
-        let angle = dx ? Math.atan(dy / dx) : Math.PI/2;
+        // add however many additional pixels you want to move
+        let dh = (dx < 0 ? -1 : 1) * (Math.sqrt(dx * dx + dy * dy) + step);
+        let angle = dx ? Math.atan(dy / dx) : Math.PI / 2;
         let Dx = Math.cos(angle) * dh - dx;
         let Dy = Math.sin(angle) * dh - dy;
 
@@ -681,7 +688,7 @@ export class CanvasState {
         shape1.dy = my_y - shape1.y;
         shape2.dy = sh_y - shape2.y;
     }
-    
+
     detectCollisions (myShape: CNode|OutputZone, bias?: number) {
         var followups = [],
             vertices = myShape.getVertices(),
@@ -693,14 +700,14 @@ export class CanvasState {
                 height: this.canvas.height / this.scale
             },
             implemented_bias;
-            
+
         // Bias defines how much to move myShape vs how much to move the shape it collided with.
         // 1 would be 100% myShape movement, 0 would be 100% other shape movement, and everything
         // else in-between is possible.
         if (bias === undefined || bias === null) bias = 0.75;
         // output zone is not allowed to move
         if (myShape === this.outputZone) implemented_bias = 0;
-        
+
         for (let i = 0, shape; (shape = shapes_plus[i]); i++) {
             // Objects are passed by reference in JS, so this comparison is really comparing references.
             // Identical objects at different memory addresses will not pass this condition.
@@ -711,11 +718,11 @@ export class CanvasState {
                 // returns 1 if shape is output zone. otherwise go with pre-set bias.
                 implemented_bias = shape === this.outputZone || bias;
             }
-            
+
             for (let j = 0, vertex; (vertex = vertices[j]); j++) {
                 while (shape.contains(vertex.x, vertex.y)) {
-                    // If a collision is detected and we start moving myShape, we have to re-check all previous shapes as well.
-                    // We do this by resetting the counter.
+                    // If a collision is detected and we start moving myShape, we have to re-check all
+                    // previous shapes as well. We do this by resetting the counter.
                     // We also have to check for collisions on the other shape.
                     if (i > -1) {
                         i = -1;
@@ -723,20 +730,20 @@ export class CanvasState {
                             followups.push(shape);
                         }
                     }
-                    
+
                     CanvasState.pushShapesApart(myShape, shape, implemented_bias, canvas_bounds);
-            
+
                     vertices = myShape.getVertices();
                     vertex = vertices[j];
                 }
             }
         }
-        
+
         for (let followup of followups) {
             this.detectCollisions(followup, bias);
         }
     }
-    
+
     detectAllCollisions(fromBasePosition: boolean = false, bias: number = 0.5): void {
         for (let shape of this.shapes) {
             if (fromBasePosition) {
@@ -745,11 +752,11 @@ export class CanvasState {
             this.detectCollisions(shape, bias);
         }
     }
-    
+
     doUp (e?: MouseEvent): void {
         this.valid = false;
         $(this.canvas).css("cursor", "auto");
-        
+
         // Collision detection!
         // Note: algorithm now includes collisions with OutputZone.
         if (this.dragging) {
@@ -759,9 +766,9 @@ export class CanvasState {
                 }
             }
         }
-        
+
         this.dragging = false;
-        
+
         let sel = this.selection[0];
         if (CanvasState.isConnector(sel)) {
             let connector = sel;
@@ -772,7 +779,7 @@ export class CanvasState {
                 if (connector.source.connected.indexOf(connector) < 0) {
                     connector.source.connected.push(connector);
                 }
-    
+
                 // update destination magnet
                 if (connector.dest.connected.indexOf(connector) < 0) {
                     connector.dest.connected.push(connector);
@@ -781,7 +788,7 @@ export class CanvasState {
                 this.has_unsaved_changes = true;
             } else {
                 // connector not yet linked to anything
-            
+
                 if (this.outputZone.contains(connector.x, connector.y)) {
                     // Connector drawn into output zone
                     if (!(connector.source.parent.isMethodNode())) {
@@ -801,18 +808,18 @@ export class CanvasState {
                     connector.deleteFrom(this);
                     this.selection = [];
                 }
-            } 
+            }
         }
-            
+
         // see if this has changed the execution order or input order
         this.testExecutionOrder();
-    
+
         // turn off all in-magnets
         for (let shape of this.shapes) {
             shape.unlightMagnets();
         }
     }
-    
+
     private uniqueNodeName (desired_name: string, object_class): string {
         var suffix = 0,
             name = desired_name;
@@ -821,15 +828,15 @@ export class CanvasState {
             if (object_class && !(shape instanceof object_class)) {
                 continue;
             }
-            if (shape.label == name) {
+            if (shape.label === name) {
                 i = -1;
                 suffix++;
-                name = desired_name +'_'+ suffix;
+                name = desired_name + '_' + suffix;
             }
         }
         return name;
     }
-    
+
     completeMethodInputs(method): void {
         let emptyMagnets = method.in_magnets.filter(el => el.connected.length === 0);
         for (let magnet of emptyMagnets) {
@@ -848,7 +855,7 @@ export class CanvasState {
             this.connectMagnets(input.out_magnets[0], magnet);
         }
     }
-    
+
     completeMethodOutputs(method): void {
         let emptyMagnets = method.out_magnets.filter(el => el.connected.length === 0);
         for (let magnet of emptyMagnets) {
@@ -863,7 +870,7 @@ export class CanvasState {
             connector.dest.cdt = connector.source.cdt;
         }
     }
-    
+
     connectMagnets(out_magnet: Magnet, in_magnet: Magnet): Connector {
         if (!out_magnet.isInput && in_magnet.isInput) {
             var connector = new Connector(out_magnet);
@@ -877,7 +884,7 @@ export class CanvasState {
         }
         return null;
     }
-    
+
     addShape(shape: CNode, open_dialog: boolean = false): CNode {
         this.shapes.push(shape);
         if (CanvasState.isMethodNode(shape)) {
@@ -898,14 +905,14 @@ export class CanvasState {
         this.dispatchChangeEvent({ added: [ shape ] });
         return shape;
     };
-    
+
     private static migrateConnectors(from_node: MethodNode, to_node: MethodNode): void {
         var migrateInputs  = migrateFnUsing('inputs',  'in_magnets',  'dest',   'push'),
             migrateOutputs = migrateFnUsing('outputs', 'out_magnets', 'source', 'unshift');
 
         from_node.inputs.forEach(migrateInputs);
         from_node.outputs.forEach(migrateOutputs);
-        
+
         // inner helper function does the bulk of the work 
         // 4 arguments tell it which properties to use
         // modifies from_node and to_node in parent's scope
@@ -916,7 +923,7 @@ export class CanvasState {
                     new_xput = to_node[xputs_prop][old_didx_s1],
                     xputs_are_matching_cdts = new_xput &&
                         new_xput.structure !== null && old_xput.structure !== null &&
-                        new_xput.structure.compounddatatype == old_xput.structure.compounddatatype,
+                        new_xput.structure.compounddatatype === old_xput.structure.compounddatatype,
                     xputs_are_raw = new_xput &&
                         new_xput.structure === null && old_xput.structure === null;
 
@@ -937,7 +944,7 @@ export class CanvasState {
             };
         }
     }
-    
+
     replaceMethod (old_method: MethodNode, new_method: MethodNode): boolean {
         var was_fully_connected = old_method.isFullyConnected();
         new_method.x = old_method.x;
@@ -948,11 +955,11 @@ export class CanvasState {
         // this will detect a mismatch if any new xputs have been added
         return was_fully_connected !== new_method.isFullyConnected();
     }
-    
+
     findNodeByLabel (label: string): CNode {
         var found;
         for (let shape of this.shapes) {
-            if (shape.label == label) {
+            if (shape.label === label) {
                 if (found !== undefined) {
                     throw new Error("Duplicate label: '" + label + "'.");
                 }
@@ -974,8 +981,8 @@ export class CanvasState {
 
         var phases = [];
 
-        // esoteric syntax: label before a loop allows "continue" and "break" to specify which loop they are continuing or breaking.
-        // check number of methods in the phases array
+        // esoteric syntax: label before a loop allows "continue" and "break" to specify which
+        // loop they are continuing or breaking. check number of methods in the phases array
         fill_phases_array: for (
             var L = 0;
             methods.length > CanvasState.matrixTotalLength(phases) &&
@@ -1036,11 +1043,11 @@ export class CanvasState {
 
         return phases;
     }
-    
+
     // Returns nothing, but sets CanvasState.exec_order and CanvasState.exec_order_is_ambiguous
     testExecutionOrder (): void {
         this.exec_order = CanvasState.phaseOrderMethods(this.methods);
-        
+
         if (this.exec_order) {
             this.checkAmbiguousExecutionOrder();
             this.exec_order_may_have_changed = this.exec_order_may_have_changed || this.exec_order_is_ambiguous;
@@ -1065,7 +1072,7 @@ export class CanvasState {
             ... this.exec_order.map(a => a.length)
         ));
     }
-    
+
     disambiguateExecutionOrder() {
         this.methods = [];
         for (let exec_step of this.exec_order ) {
@@ -1076,7 +1083,7 @@ export class CanvasState {
             this.methods = this.methods.concat(exec_step);
         }
     }
-    
+
     getSteps() {
         if ( ! this.exec_order) {
             this.testExecutionOrder();
@@ -1084,17 +1091,17 @@ export class CanvasState {
         if ( ! this.exec_order) {
             return this.getMethodNodes(); // unordered list
         } else {
-            return this.exec_order.reduce((a,b) => a.concat(b), []); // ordered list
+            return this.exec_order.reduce((a, b) => a.concat(b), []); // ordered list
         }
     }
-    
+
     clear(): void {
         // wipe canvas content clean before redrawing
         this.ctx.clearRect(0, 0, this.width / this.scale, this.height / this.scale);
         this.ctx.textAlign = 'center';
         this.ctx.font = '12pt Lato, sans-serif';
     }
-    
+
     reset(): void {
         // remove all objects from canvas
         this.clear();
@@ -1106,22 +1113,22 @@ export class CanvasState {
         this.connectors = [];
         this.exec_order = [];
         this.selection = [];
-        
+
         this.dispatchChangeEvent({ reset: true });
     }
-    
+
     private dispatchNewOutputEvent(data: any) {
         this.canvas.dispatchEvent(
             new CustomEvent('CanvasStateNewOutput', { detail: data })
         );
     }
-    
+
     private dispatchChangeEvent(data: any) {
         this.canvas.dispatchEvent(
             new CustomEvent('CanvasStateChange', { detail: data })
         );
     }
-    
+
     /**
      * Render pipeline objects to Canvas.
      */
@@ -1131,19 +1138,19 @@ export class CanvasState {
         ctx.save();
         this.clear();
         ctx.scale(this.scale, this.scale);
-        
+
         let sel0 = sel[0];
         var draggingFromMethodOut = (
                 this.dragging &&
-                sel.length == 1 &&
+                sel.length === 1 &&
                 CanvasState.isConnector(sel0) &&
                 sel0.source.parent.isMethodNode() );
-        
+
         // draw output end-zone -when- dragging a connector from a MethodNode
         if (draggingFromMethodOut && this.can_edit) {
             this.outputZone.draw(this.ctx);
         }
-    
+
         // draw selection ring
         if (sel.length > 0) {
             ctx.strokeStyle = this.selectionColor;
@@ -1155,26 +1162,27 @@ export class CanvasState {
                 sel_.highlight(ctx);
             }
         }
-        
+
         // draw all shapes and magnets
         // @todo: render these in hidden canvases and import them instead of redrawing from scratch
         for (let shape of this.shapes) {
             shape.draw(ctx);
         }
-        
+
         // draw all connectors
         ctx.globalAlpha = 0.75;
         for (let connector of this.connectors) {
             connector.draw(ctx);
         }
         ctx.globalAlpha = 1.0;
-    
+
         // draw labels on connectors of selected nodes
-    
+
         // Attempting to make this more efficient by batching all labels into one.
         // Drawing text is the most resource-intensive operation here.
         // This code uses makeLabel() instead of drawLabel(), which this replaces.
-        // @todo: draw these using a separate SVG layer? CSS3 transforms are hardware-accelerated, and canvas is slow for text
+        // @todo: draw these using a separate SVG layer?
+        // CSS3 transforms are hardware-accelerated, and canvas is slow for text
         let connectorLabels = [];
         let canvasWrapper = new CanvasWrapper(null, ctx);
         for (let connector of this.connectors) {
@@ -1204,7 +1212,7 @@ export class CanvasState {
             ctx.fillText(label.label, 0, 0);
         }
         ctx.restore();
-    
+
         // draw label if connector itself is selected (and connected)
         ctx.strokeStyle = this.selectionColor;
         ctx.lineWidth = this.selectionWidth * 2;
@@ -1230,7 +1238,7 @@ export class CanvasState {
             ctx.globalAlpha = 0.7;
             for (let label of labels) {
                 let textWidth = ctx.measureText(label.label).width;
-                ctx.fillRect(label.x - textWidth/2 - 2, label.y - 11, textWidth + 4, 14);
+                ctx.fillRect(label.x - textWidth / 2 - 2, label.y - 11, textWidth + 4, 14);
             }
             ctx.fillStyle = '#000';
             ctx.globalAlpha = 1.0;
@@ -1238,36 +1246,28 @@ export class CanvasState {
                 ctx.fillText(label.label, label.x, label.y);
             }
         }
-        
+
         // if (this.mouse_highlight) {
         //     // Highlight (label) the object (usually a magnet);
         //     this.mouse_highlight.highlight(ctx);
         // }
-        
+
         ctx.restore();
         this.valid = true;
     }
 
     private labelFns = {
-        inputs: function(l, _i) {
-            return "i" + (_i + 1) + (l.suffix || '') + ": " + l.label;
-        },
+        inputs:                (l, i) => "i" + (i + 1) + (l.suffix || '') + ": " + l.label,
         methods: null,
-        methods_with_order: function(l, _i) {
-            return "s" + (_i + 1) + (l.suffix || '') + ': ' + l.label;
-        },
-        methods_without_order: function(l, _i) {
-            return (l.suffix ? l.suffix + ' ' : '') + l.label;
-        },
-        outputs: function(l) {
-            return (l.suffix ? l.suffix + ' ' : '') + l.label;
-        }
+        methods_with_order:    (l, i) => "s" + (i + 1) + (l.suffix || '') + ': ' + l.label,
+        methods_without_order:  l => (l.suffix ? l.suffix + ' ' : '') + l.label,
+        outputs:                l => (l.suffix ? l.suffix + ' ' : '') + l.label
     };
     generateLabels () {
         // check if method node order is not needed
         let showXO = this.force_show_exec_order;
         let showXOUndef = showXO === undefined;
-        
+
         if (showXO === true ||
                 showXOUndef && this.exec_order_is_ambiguous) {
             this.labelFns.methods = this.labelFns.methods_with_order;
@@ -1288,43 +1288,43 @@ export class CanvasState {
 
         return labels;
     }
-    
+
     getPos (e): Point {
         // returns an object with x, y coordinates defined
         var element = <HTMLElement> this.canvas,
             offsetX = 0,
             offsetY = 0;
-    
+
         if (typeof element.offsetParent !== 'undefined') {
             do {
                 offsetX += element.offsetLeft;
                 offsetY += element.offsetTop;
             } while (element = <HTMLElement> element.offsetParent);
         }
-    
+
         offsetX += this.stylePaddingLeft + this.styleBorderLeft + this.htmlLeft;
         offsetY += this.stylePaddingTop + this.styleBorderTop + this.htmlTop;
-    
+
         let mx = (e.pageX - offsetX) / this.scale;
         let my = (e.pageY - offsetY) / this.scale;
-    
+
         return { x: mx, y: my };
     };
-    
+
     deleteObject (objectToDelete?) {
         // delete selected object
         // @param objectToDelete optionally specifies which object should be deleted.
         // Otherwise just go with the current selection.
         var sel;
-        
+
         if (typeof objectToDelete !== 'undefined') {
             sel = [ objectToDelete ];
         } else {
             sel = this.selection;
         }
-        
+
         for (let sel_ of sel) {
-            if (typeof sel_ == 'object' && typeof sel_.deleteFrom == 'function') {
+            if (typeof sel_ === 'object' && typeof sel_.deleteFrom === 'function') {
                 sel_.deleteFrom(this);
             }
         }
@@ -1333,22 +1333,22 @@ export class CanvasState {
         this.selection = [];
         this.valid = false; // re-draw canvas to make Connector disappear
         this.has_unsaved_changes = true;
-        
+
         this.dispatchChangeEvent({ removed: sel });
     }
-    
+
     findMethodNode (method_pk: number): MethodNode {
         for (let method of this.methods) {
-            if (method.pk == method_pk) {
+            if (method.pk === method_pk) {
                 return method;
             }
         }
         return null;
     }
-    
+
     findOutputNode (pk: number): OutputNode {
         for (let output of this.outputs) {
-            if (output.pk == pk) {
+            if (output.pk === pk) {
                 return output;
             }
         }
@@ -1357,7 +1357,7 @@ export class CanvasState {
 
     findInputNode (input_index) {
         for (let input of this.inputs) {
-            if (input.input_index == input_index) {
+            if (input.input_index === input_index) {
                 return input;
             }
         }
@@ -1385,17 +1385,18 @@ export class CanvasState {
             let inputs_width = node.n_inputs * 4 + 7;
             let outputs_width = node.n_outputs * 4 + 24;
             return {
-                x: node.x + node.dx + 0.8660254 * Math.min(Math.max(outputs_width - inputs_width, 0), 45) + canvas.offsetLeft - 9,
+                x: node.x + node.dx + canvas.offsetLeft - 9 +
+                        0.8660254 * Math.min(Math.max(outputs_width - inputs_width, 0), 45),
                 y: node.y + node.dy - inputs_width + canvas.offsetTop - 29
             };
         } else if (CanvasState.isInputNode(node) || CanvasState.isOutputNode(node)) {
             return {
                 x: node.x + node.dx + canvas.offsetLeft,
-                y: node.y + node.dy + canvas.offsetTop - node.h/2 - node.offset
+                y: node.y + node.dy + canvas.offsetTop - node.h / 2 - node.offset
             };
         }
     }
-    
+
     static isUniqueName(list: CNode[], name: string) {
       for (let shape of list) {
         if (shape.label === name) {
@@ -1438,7 +1439,7 @@ export class CanvasState {
     static isOutputZone(obj: any): obj is OutputZone {
         return obj && obj.isOutputZone && obj.isOutputZone();
     }
-    
+
     /**
      * Converts checkIntegrity into a simple yes-or-no with errors ignored.
      * Useful to passively and continuously validate pipeline.
@@ -1447,17 +1448,17 @@ export class CanvasState {
     isComplete(): boolean {
         try {
             this.assertIntegrity();
-        } catch(e) {
+        } catch (e) {
             // Enable to watch pipeline integrity in real-time:
             // console.log(e);
             return false;
         }
         return true;
     }
-    
+
     assertIntegrity() {
         let expected_num_shapes = this.inputs.length + this.outputs.length + this.methods.length;
-        
+
         if (this.shapes.length === 0) {
             throw "Pipeline is empty";
         }
@@ -1470,47 +1471,47 @@ export class CanvasState {
         if (this.outputs.length === 0) {
             throw "Pipeline has no outputs";
         }
-        
+
         if (expected_num_shapes > this.shapes.length) {
-            throw 'Pipeline has more nodes than it knows about!'
+            throw 'Pipeline has more nodes than it knows about!';
         } else if (expected_num_shapes < this.shapes.length) {
-            throw 'Pipeline has fewer nodes than it knows about!'
+            throw 'Pipeline has fewer nodes than it knows about!';
         }
-        
+
         for (let shape of this.inputs) {
             // <any> type so that TS compiler doesn't detect a tautology here.
             if (!CanvasState.isInputNode(<any> shape)) {
                 throw 'Invalid input detected: ' + shape.label;
             }
-            
+
             // all CDtNodes or RawNodes (inputs) should feed into a MethodNode and have only one magnet
             if (shape.out_magnets.length !== 1) {
                 throw 'Invalid amount of magnets for input node ' + shape.label;
             }
-    
+
             // is this magnet connected?
             if (shape.out_magnets[0].connected.length === 0) {
                 throw 'Disconnected input node ' + shape.label;
             }
         }
-        
+
         for (let shape of this.outputs) {
             // <any> type so that TS compiler doesn't detect a tautology here.
             if (!CanvasState.isOutputNode(<any> shape)) {
                 throw 'Invalid output detected: ' + shape.label;
             }
-            
+
             // all outputs should come from a MethodNode and have only one magnet
             if (shape.in_magnets.length !== 1) {
                 throw 'Invalid amount of magnets for output node ' + shape.label;
             }
-        
+
             // is this magnet connected?
             if (shape.in_magnets[0].connected.length === 0) {
                 throw 'Disconnected output node ' + shape.label;
             }
         }
-        
+
         for (let shape of this.methods) {
             // <any> type so that TS compiler doesn't detect a tautology here.
             if (!CanvasState.isMethodNode(<any> shape)) {

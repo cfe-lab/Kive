@@ -1,3 +1,4 @@
+"use strict";
 import "jasmine";
 import 'jasmine-html';
 import 'jquery';
@@ -5,7 +6,6 @@ import '/static/portal/permissions.js'
 import '/static/pipeline/PipelineFamiliesTable.js';
 declare var permissions: any;
 
-"use strict";
 
 describe('Pipeline families', function() {
     beforeEach(function() {
@@ -21,14 +21,14 @@ describe('Pipeline families', function() {
             groups_allowed: [ 'Everyone' ]
         }];
     });
-    
+
     it('should build a table', function() {
         var table = new permissions.PipelineFamiliesTable(
             this.$table, this.is_user_admin, this.$navigation_links
         );
         table.image_path = "portal/static/portal/img";
         table.buildTable(this.initial_data);
-        
+
         var $rows = this.$table.find('tr');
         expect($rows.length).toBe(2);
         var $cells = $rows.eq(1).find('td');
@@ -38,8 +38,4 @@ describe('Pipeline families', function() {
         expect($cells.eq(4).text()).toBe('User 1User 2'); // Users allowed (actually a <ul>)
         expect($cells.eq(5).text()).toBe('Everyone'); // Groups allowed
     });
-    
-    /*
-    
-     */
 });
