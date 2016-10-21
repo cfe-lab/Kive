@@ -49,7 +49,9 @@ export class CanvasContextMenu {
                 }
             }
         }, 'li');
-    
+        
+        console.log(this.$menu, this.$ul);
+        
         $(document).click( () => { this.visible && this.cancel(); } );
     }
     
@@ -97,13 +99,13 @@ export class CanvasContextMenu {
         this.visible && this.cancel();
         
         this.show(e);
-        this.$menu.find('li').hide();
+        this.$ul.find('li').hide();
         for (let action_id in this.actions) {
             if (this.criteria[action_id](sel_multi, sel)) {
-                this.$menu.find('.' + action_id).show();
+                this.$ul.find('.' + action_id).show();
             }
         }
-        if (this.$menu.find('li:visible').length === 0) {
+        if (this.$ul.find('li:visible').length === 0) {
             this.hide();
         }
         

@@ -182,19 +182,19 @@ html body {
 #pipeline_ctrl #id_add_ctrl {
     padding: 0;
 }
-.context_menu {
+#context_menu {
     position: absolute;
     display: none;
     border: 1px solid #ddd;
     font-size: 1em;
 }
-.context_menu ul,
+#context_menu ul,
 #id_add_ctrl  ul {
     display: block;
     margin: 0; padding: 0;
     background-color: #fff;
 }
-.context_menu li,
+#context_menu li,
 #id_add_ctrl  li  {
     display: block;
     margin: 0; padding: 0.7em;
@@ -202,7 +202,7 @@ html body {
     padding-right: 1.5em;
     cursor: pointer;
 }
-.context_menu li:hover,
+#context_menu li:hover,
 #id_add_ctrl  li:hover {
     background-color: #eee;
 }

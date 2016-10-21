@@ -146,7 +146,7 @@ $('#id_pipeline_form').submit(PipelineSubmit.buildSubmit(
 /**
  * Part 6/8: Initialize context menu and register actions
  */
-var contextMenu = new CanvasContextMenu('.context_menu', canvasState);
+var contextMenu = new CanvasContextMenu('#context_menu', canvasState);
 var nothingSelected = (multi, sel) => sel === undefined || sel === null || Array.isArray(sel) && sel.length === 0;
 CanvasListeners.initContextMenuListener(canvasState, contextMenu);
 contextMenu.registerAction('Delete', function(multi, sel) {

@@ -86,7 +86,7 @@ var grabStatus: TimerFunction = function() {
     });
 };
 
-var contextMenu = new CanvasContextMenu('.context_menu', canvasState);
+var contextMenu = new CanvasContextMenu('#context_menu', canvasState);
 var hasDataset = (multi, sel) => !multi && CanvasState.isDataNode(sel)   && sel.dataset_id;
 var hasLogs    = (multi, sel) => !multi && CanvasState.isMethodNode(sel) && sel.log_id;
 CanvasListeners.initContextMenuListener(canvasState, contextMenu);
