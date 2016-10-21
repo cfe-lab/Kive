@@ -17,9 +17,7 @@ export class CanvasState {
     /**
      * HTML5 Canvas interface for assembling pipelines.
      * 
-     * Builds pipelines from the input, method, and output nodes defined in
-     * Nodes.js. Based on the canvas interactivity example by Simon
-     * Sarris, HTML5 Unleashed (2014) Pearson Education Inc.
+     * Builds pipelines from the input, method, and output nodes defined in drydock_objects.ts.
      * 
      * @param canvas: the canvas element to draw on
      * @param interval: the number of milliseconds between calls to draw(),
@@ -72,7 +70,7 @@ export class CanvasState {
     htmlLeft: number;
     outputZone: OutputZone;
 
-    mouse_highlight: Magnet;
+    // mouse_highlight: Magnet;
     $dialog: any;
 
     static method_node_queue: MethodNode[] = [];
@@ -448,8 +446,8 @@ export class CanvasState {
         // Do not insert any duplicates into `list`.
         for (let in_magnet of node.in_magnets) {
             let connected_input = in_magnet.connected[0].source.parent;
-            if (connected_input.isInputNode() &&
-                CanvasState.matrixIndexOf(node_order, connected_input) === null
+            if (CanvasState.isInputNode(connected_input) &&
+                CanvasState.matrixIndexOf(node_order, <CNode> connected_input) === null
             ) {
                 list.push(connected_input);
             }
@@ -791,7 +789,7 @@ export class CanvasState {
 
                 if (this.outputZone.contains(connector.x, connector.y)) {
                     // Connector drawn into output zone
-                    if (!(connector.source.parent.isMethodNode())) {
+                    if (!CanvasState.isMethodNode(connector.source.parent)) {
                         // disallow Connectors from data node directly to end-zone
                         let index = this.connectors.indexOf(connector);
                         this.connectors.splice(index, 1);
@@ -1144,7 +1142,7 @@ export class CanvasState {
                 this.dragging &&
                 sel.length === 1 &&
                 CanvasState.isConnector(sel0) &&
-                sel0.source.parent.isMethodNode() );
+                CanvasState.isMethodNode(sel0.source.parent) );
 
         // draw output end-zone -when- dragging a connector from a MethodNode
         if (draggingFromMethodOut && this.can_edit) {
