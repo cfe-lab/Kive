@@ -7,7 +7,7 @@ type ImageType = HTMLImageElement | HTMLCanvasElement | CanvasRenderingContext2D
 
 declare namespace jasmine {
     interface Matchers {
-        toImageDiffEqual(compareImg: ImageType, tolerance: number): boolean;
+        toImageDiffEqual(compareImg: ImageType, tolerance?: number): boolean;
         toBeImageData(): boolean;
     }
 }
