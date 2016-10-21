@@ -87,23 +87,25 @@ var grabStatus: TimerFunction = function() {
 };
 
 var contextMenu = new CanvasContextMenu('.context_menu', canvasState);
+var hasDataset = (multi, sel) => !multi && CanvasState.isDataNode(sel)   && sel.dataset_id;
+var hasLogs    = (multi, sel) => !multi && CanvasState.isMethodNode(sel) && sel.log_id;
 CanvasListeners.initContextMenuListener(canvasState, contextMenu);
-contextMenu.registerAction('display', function(sel) {
+contextMenu.registerAction('View Dataset', hasDataset, function(sel) {
     if (CanvasState.isNode(sel) && !CanvasState.isMethodNode(sel)) {
         window.location.href = '/dataset_view/' + sel.dataset_id + '?run_id=' + sel.run_id + "&view_run";
     }
 });
-contextMenu.registerAction('download', function(sel) {
+contextMenu.registerAction('Download Dataset', hasDataset, function(sel) {
     if (CanvasState.isNode(sel) && !CanvasState.isMethodNode(sel)) {
-        window.location.href = '/dataset_download/' + sel.dataset_id + "&view_run";
+        window.location.href = '/dataset_download/' + sel.dataset_id + "?view_run";
     }
 });
-contextMenu.registerAction('viewlog', function(sel) {
+contextMenu.registerAction('View Log', hasLogs, function(sel) {
     if (CanvasState.isMethodNode(sel)) {
         window.location.href = '/stdout_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
     }
 });
-contextMenu.registerAction('viewerrorlog', function(sel) {
+contextMenu.registerAction('View Error Log', hasLogs, function(sel) {
     if (CanvasState.isMethodNode(sel)) {
         window.location.href = '/stderr_view/' + sel.log_id + '?run_id=' + sel.run_id + "&view_run";
     }

@@ -7,16 +7,21 @@ import "jquery";
 interface ContextMenuInterface {
     [action: string]: ContextMenuAction;
 }
-type ContextMenuAction = (sel: (Connector|CNode)|(Connector|CNode)[], e: JQueryMouseEventObject) => void
+type Selectable = (Connector|CNode);
+type ContextMenuAction = (sel: Selectable|Selectable[], e: JQueryMouseEventObject) => void;
+type CriteriaFn = (multi: boolean, sel: Selectable|Selectable[]) => boolean;
 
 export class CanvasContextMenu {
     $menu: JQuery;
+    private $ul: JQuery;
     private actions: ContextMenuInterface = {};
+    private criteria: { [id: string]: Function } = {};
     private visible = false;
     
     constructor(selector: string, private cs: CanvasState) {
         var menu = this;
         this.$menu = $(selector);
+        this.$ul = $('<ul>').appendTo(this.$menu);
         this.$menu.on({
             // necessary to stop document click handler from kicking in
             mousedown: (e: JQueryMouseEventObject) => e.stopPropagation(),
@@ -48,9 +53,23 @@ export class CanvasContextMenu {
         $(document).click( () => { this.visible && this.cancel(); } );
     }
     
-    registerAction(name: string, newAction: ContextMenuAction) {
+    /**
+     * Creates a context menu option
+     * @param name Human-readable name - internal ID will be generated based on this
+     * @param criteriaFn Function for checking if this action should be available
+     *      Params are (1) boolean for whether or not multi-node selections are allowed,
+     *      and (2) the CanvasState's current selection.
+     * @param newAction
+     *      The action to run. Params are (1) the CanvasState's current selection and
+     *      (2) the event object.
+     */
+    registerAction(name: string, criteriaFn: CriteriaFn, newAction: ContextMenuAction) {
         if (!this.actions.hasOwnProperty(name)) {
-            this.actions[name] = newAction;
+            let id_name = name.toLowerCase().replace(/ /g, '_');
+            let $li = $('<li>').addClass(id_name).data('action', id_name).text(name);
+            this.$ul.append($li);
+            this.actions[id_name] = newAction;
+            this.criteria[id_name] = criteriaFn;
         }
     }
     
@@ -70,48 +89,24 @@ export class CanvasContextMenu {
     }
     
     open(e) {
-        var sel = this.cs.selection;
         e.preventDefault();
+        
+        let sel = this.cs.selection.length > 1 ? this.cs.selection : this.cs.selection[0];
+        let sel_multi = this.cs.selection.length > 1;
         
         this.visible && this.cancel();
         
-        // Edit mode can popup the context menu to delete and edit nodes
-        if (this.cs.can_edit) {
-            if (CanvasState.isNode(sel[0])) {
-                this.show(e);
-                let sel0 = sel[0];
-                $('.cm-add', this.$menu).hide();
-                if (sel.length > 1 || CanvasState.isInputNode(sel0)) {
-                    $('.edit, .complete-inputs, .complete-outputs', this.$menu).hide();
-                }
-                if (sel.length > 1 || CanvasState.isOutputNode(sel0)) {
-                    $('.complete-inputs, .complete-outputs', this.$menu).hide();
-                }
-                if (sel.length === 1 && CanvasState.isMethodNode(sel0)) {
-                    if (sel0.in_magnets.filter(el => el.connected.length === 0).length === 0) {
-                        $('.complete-inputs', this.$menu).hide();
-                    }
-                    if (sel0.out_magnets.filter(el => el.connected.length === 0).length === 0) {
-                        $('.complete-outputs', this.$menu).hide();
-                    }
-                }
-            } else {
-                this.show(e);
-                $('.edit, .delete, .complete-inputs', this.$menu).hide();
-            }
-        } else if (sel.length == 1) {
-            // Otherwise, we're read only, so only popup the context menu for outputs with datasets
-            let sel0 = sel[0];
-            if (CanvasState.isDataNode(sel0) && sel0.dataset_id) {
-                // Context menu for pipeline outputs
-                this.show(e);
-                $('.step_node', this.$menu).hide();
-            } else if (CanvasState.isMethodNode(sel0) && sel0.log_id) {
-                // Context menu for pipeline steps
-                this.show(e);
-                $('.dataset_node', this.$menu).hide();
+        this.show(e);
+        this.$menu.find('li').hide();
+        for (let action_id in this.actions) {
+            if (this.criteria[action_id](sel_multi, sel)) {
+                this.$menu.find('.' + action_id).show();
             }
         }
+        if (this.$menu.find('li:visible').length === 0) {
+            this.hide();
+        }
+        
         this.cs.doUp();
     }
     

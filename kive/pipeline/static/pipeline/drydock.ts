@@ -844,6 +844,7 @@ export class CanvasState {
             args.push(this.uniqueNodeName(magnet.label, ctor));
             let input = new ctor(...args);
             this.addShape(input);
+            this.detectCollisions(input);
             this.connectMagnets(input.out_magnets[0], magnet);
         }
     }
@@ -857,6 +858,7 @@ export class CanvasState {
                 this.uniqueNodeName(magnet.label, OutputNode)
             );
             this.addShape(output);
+            this.detectCollisions(output);
             let connector = this.connectMagnets(magnet, output.in_magnets[0]);
             connector.dest.cdt = connector.source.cdt;
         }

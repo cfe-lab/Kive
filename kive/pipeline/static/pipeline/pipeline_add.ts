@@ -147,9 +147,22 @@ $('#id_pipeline_form').submit(PipelineSubmit.buildSubmit(
  * Part 6/8: Initialize context menu and register actions
  */
 var contextMenu = new CanvasContextMenu('.context_menu', canvasState);
+var nothingSelected = (multi, sel) => sel === undefined || sel === null || Array.isArray(sel) && sel.length === 0;
 CanvasListeners.initContextMenuListener(canvasState, contextMenu);
-contextMenu.registerAction('delete', function(sel) { canvasState.deleteObject(); });
-contextMenu.registerAction('edit', function(sel) {
+contextMenu.registerAction('Delete', function(multi, sel) {
+    return CanvasState.isNode(sel) ||
+        Array.isArray(sel) &&
+        sel.filter(CanvasState.isNode).length === sel.length;
+}, function() {
+    canvasState.deleteObject();
+});
+contextMenu.registerAction('Edit', function(multi, sel) {
+    return !multi &&
+        (
+            CanvasState.isMethodNode(sel) ||
+            CanvasState.isOutputNode(sel)
+        );
+}, function(sel) {
     var coords = canvasState.getAbsoluteCoordsOfNode(sel);
     
     // For methods, open the edit dialog (rename, method selection, colour picker...)
@@ -168,24 +181,32 @@ contextMenu.registerAction('edit', function(sel) {
         dialog.load(sel);
     }
 });
-contextMenu.registerAction('add_input', function(_, pos) {
+contextMenu.registerAction('Add Input', nothingSelected, function(_, pos) {
     input_dialog.show();
     input_dialog.align(pos.clientX, pos.clientY);
 });
-contextMenu.registerAction('add_method', function(_, pos) {
+contextMenu.registerAction('Add Method', nothingSelected, function(_, pos) {
     method_dialog.show();
     method_dialog.align(pos.clientX, pos.clientY);
 });
-contextMenu.registerAction('add_output', function(_, pos) {
+contextMenu.registerAction('Add Output', nothingSelected, function(_, pos) {
     output_dialog.show();
     output_dialog.align(pos.clientX, pos.clientY);
 });
-contextMenu.registerAction('complete_inputs', function(sel) {
+contextMenu.registerAction('Complete Inputs', function(multi, sel) {
+    return !multi &&
+        CanvasState.isMethodNode(sel) &&
+        sel.in_magnets.filter(el => el.connected.length === 0).length > 0;
+}, function(sel) {
     if (CanvasState.isMethodNode(sel)) {
         canvasState.completeMethodInputs(sel);
     }
 });
-contextMenu.registerAction('complete_outputs', function(sel) {
+contextMenu.registerAction('Complete Outputs', function(multi, sel) {
+    return !multi &&
+        CanvasState.isMethodNode(sel) &&
+        sel.out_magnets.filter(el => el.connected.length === 0).length > 0;
+}, function(sel) {
     if (CanvasState.isMethodNode(sel)) {
         canvasState.completeMethodOutputs(sel);
     }
