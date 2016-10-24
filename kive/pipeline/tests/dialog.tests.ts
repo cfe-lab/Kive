@@ -17,7 +17,7 @@ describe("MethodDialog class", function() {
 
     /* Mock API server call responses by overloading jQuery's getJSON method */
     // @todo: Use Jasmine's AJAX library: http://jasmine.github.io/2.0/ajax.html
-    $.getJSON = function(url: string, ...restArgs: any[]) {
+    $.getJSON = <any> function(url: string, ...restArgs: any[]) {
         var result = null;
         if (url.match(/\/api\/methods\/\d+/)) {
             result = {

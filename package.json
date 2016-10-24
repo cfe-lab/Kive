@@ -20,7 +20,7 @@
     "systemjs": "^0.19.39"
   },
   "scripts": {
-    "install": "grunt pngicons; typings install && tsc; sass --update kive/"
+    "install": "grunt pngicons; typings install && tsc"
   },
   "description": "Kive ====",
   "repository": {
