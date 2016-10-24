@@ -29,7 +29,6 @@ noXSS();
  * - History tracking: Ctrl+Z & Ctrl+Shift+Z - medium
  * - Upload Methods from the Dialog - hard
  * - Add Methods using GUI - hard
- * - Create InputNodes automatically for MethodNode - easy
  * - Create CDTs from the Dialog - hard
  * - Drag area to select nodes - medium
  */
