@@ -3,24 +3,25 @@
 {% block title %}Analysis{% endblock %}
 
 {% block javascript %}
-    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <!--<script src="/static/portal/jquery-2.0.3.min.js"></script>-->
 	<script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-    <script src="/static/sandbox/PipelineRunTable.js"></script>
     <script src="/static/portal/ajaxsearchfilter.js"></script>
-    <script src="/static/pipeline/jsBezier-0.6.js"></script>
-    <script src="/static/pipeline/drydock_objects.js"></script>
-    <script src="/static/pipeline/drydock.js"></script>
-    <script src="/static/pipeline/pipeline_load.js"></script>
+    <script src="/static/portal/system.js"></script>
+    <script src="/static/portal/system.config.js"></script>
+    <!--<script src="/static/pipeline/jsBezier-0.6.js"></script>-->
+    <!--<script src="/static/pipeline/drydock_objects.js"></script>-->
+    <!--<script src="/static/pipeline/drydock.js"></script>-->
+    <!--<script src="/static/pipeline/pipeline_load.js"></script>-->
     <script type="text/javascript">
 
-    $(function() {
+    System.import('/static/sandbox/PipelineRunTable').then(function() {
         noXSS();
         var IS_USER_ADMIN = false; // Never show admin tools on this page
         var table = new permissions.PipelineRunTable(
-            $('#pipeline_families'),
-            IS_USER_ADMIN,
-            $(".navigation_links")
+                $('#pipeline_families'),
+                IS_USER_ADMIN,
+                $(".navigation_links")
         );
         var asf = new AjaxSearchFilter(table);
         asf.reloadTable();

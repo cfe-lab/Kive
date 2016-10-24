@@ -1,12 +1,13 @@
 (function() {
     "use strict";
     
+    /* Move to async module tests */
     xdescribe("Pipeline Families table for sandbox", function() {
         beforeEach(function() {
             this.$table = $('<table>');
             this.$navigation_links = $("<div/>");
             this.is_user_admin = false;
-            this.table = new choose_pipeline.PipelineFamiliesTable(
+            this.table = new permissions.PipelineRunTable(
                     this.$table,
                     this.is_user_admin,
                     this.$navigation_links

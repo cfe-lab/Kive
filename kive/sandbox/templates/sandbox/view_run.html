@@ -6,16 +6,12 @@
 {% block title %}Runs{% endblock %}
 
 {% block javascript %}
-    <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
-    <script src="/static/pipeline/jsBezier-0.6.js"></script>
-
-    <script src="/static/pipeline/drydock_objects.js"></script>
-    <script src="/static/pipeline/drydock.js"></script>
-
-    <script src="/static/pipeline/pipeline_add.js"></script>
-    <script src="/static/pipeline/pipeline_load.js"></script>
-    <script src="/static/sandbox/view_run.js"></script>
+    <script src="/static/portal/system.js"></script>
+    <script src="/static/portal/system.config.js"></script>
+    <script>
+        System.import('/static/sandbox');
+    </script>
 {% endblock %}
 
 {% block stylesheets %}
@@ -44,6 +40,10 @@
         .pipeline_rdonly_ctrl h4 {
             margin-top: 0;
             font-size: 1.3em;
+            word-break: break-all;
+        }
+        .pipeline_rdonly_ctrl h5 {
+            margin-bottom: 0.5em;
         }
     </style>
 {% endblock %}
@@ -55,7 +55,7 @@
         <a href="/runs" rel="prev"> Back to runs </a>
     {% endif %}
 
-    <div class="pipeline_rdonly_ctrl ctrl_menu">
+    <div class="pipeline_rdonly_ctrl">
         <h4>
             {% if run.description != "" %}
             <span title="{{ run.description }}">
@@ -84,32 +84,14 @@
         </ul>
     </div>
 
-    <div>
-        <canvas id="pipeline_canvas" data-editable="false">HTML5 Canvas not supported by this browser.</canvas>
-        <div id="method_context_menu" class="context_menu">
-            <ul>
-                <li data-action="display" class="dataset_node">View Dataset</li>
-                <li data-action="download" class="dataset_node">Download Dataset</li>
-                <li data-action="viewlog" class="step_node">View Log</li>
-                <li data-action="viewerrorlog" class="step_node">View Error Log</li>
-            </ul>
-        </div>
+    <!-- CANVAS -->
+    <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
 
-    </div>
+    <!-- Context menu -->
+    <div id="context_menu"></div>
 
     <input type="hidden" id="run_id" value="{{run.id}}">
     <input type="hidden" id="run_pipeline_id" value="{{run.pipeline.id}}">
     <input type="hidden" id="run_md5" value="{{ md5 }}">
 
-    <!-- These are here because drydock expects them, todo, remove these and refactor the code so as not to need them -->
-    <select id="id_pipeline_select" style="display:none"></select>
-    <input type="submit" id="id_method_button" value="Add Method" style="display:none">
-    <div id="dialog_form">
-        <form id="id_output_name_form">
-            <label for="output_name">Output name</label>
-            <input type="text" name="output_name" id="output_name" class="text">
-            <input type="submit" id="output_submit" value="OK">
-            <div id="output_name_error"><img src="/static/pipeline/warning_icon.png"> That name has already been used.</div>
-        </form>
-    </div>
 {% endblock %}

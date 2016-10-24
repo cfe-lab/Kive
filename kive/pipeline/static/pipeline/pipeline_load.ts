@@ -1,18 +1,84 @@
+"use strict";
+
+import { Geometry } from "./geometry";
+import { MethodNode, CdtNode, RawNode, OutputNode, Connector } from "./drydock_objects";
+import { CanvasState } from "./drydock";
+import 'jquery';
+
+interface ApiPipelineData extends PipelineMetadata {
+    steps?: ApiStepData[];
+    inputs?: ApiInputData[];
+    outcables?: ApiOutputData[];
+}
+interface PipelineMetadata {
+    family?: string;
+    family_desc?: string;
+    revision_name?: string;
+    revision_desc?: string;
+    revision_parent?: number;
+    published?: boolean;
+    users_allowed?: string[];
+    groups_allowed?: string[];
+    canvas_width?: number;
+    canvas_height?: number;
+}
+interface ApiCdtData {
+    compounddatatype: number;
+    min_row: null;
+    max_row: null;
+}
+interface ApiInputData {
+    structure: ApiCdtData;
+    dataset_name: string;
+    dataset_idx: number;
+    x: number;
+    y: number;
+}
+interface ApiOutputData {
+    output_name: string;
+    output_idx: number;
+    output_cdt: number;
+    source: number;
+    source_step: number;
+    source_dataset_name: string;
+    x: number;
+    y: number;
+    custom_wires: any[]; // in the future we might have this
+}
+interface ApiStepData {
+    transformation: number;  // to retrieve Method
+    transformation_type: string;
+    step_num: number;  // 1-index (pipeline inputs are index 0)
+    x: number;
+    y: number;
+    name: string;
+    fill_colour: string;
+    cables_in: ApiCableData[];
+    new_code_resource_revision_id: number;
+    new_outputs_to_delete_names: string[];
+    new_dependency_ids?: number[];
+}
+interface ApiCableData {
+    source_dataset_name: string;
+    dest_dataset_name: string;
+    source_step: number;
+    keep_output: boolean;
+    custom_wires: any[]; // no wires for a raw cable
+}
+
 /**
  * Convert between API calls and CanvasState object.
  */
-var pipeline = (function(exports){
-    "use strict";
+export class Pipeline {
 
-    var my = {};
+    pipeline: any = null;
+    private API_URL = "/api/pipelinefamilies/";
 
     // Pipeline constructor
-    my.Pipeline = function(canvasState){
-        this.pipeline = null;
-        this.canvasState = canvasState;
-    };
+    constructor(private canvasState: CanvasState) {
+    }
 
-    my.Pipeline.prototype.load = function(pipeline) {
+    load(pipeline) {
         /**
          * This method loads a pipeline and sets up the canvas to
          * draw the pipeline.
@@ -26,92 +92,62 @@ var pipeline = (function(exports){
         this.build_inputs();
         this.build_steps();
         this.build_outputs();
-        
+
         this.canvasState.has_unsaved_changes = false;
-        for (var i=0; i < this.canvasState.shapes.length; i++) {
-            var shape = this.canvasState.shapes[i];
+        for (let shape of this.canvasState.shapes) {
             shape.has_unsaved_changes = false;
         }
-    };
+    }
 
-    my.Pipeline.prototype.serialize = function(form_data) {
-        /**
-         * This method serializes the pipeline into an object that can be
-         * fed to the backend REST API.
-         *
-         * See: /api/pipelines/
-         *
-         * @param form_data: starting data that all of the pipeline details
-         * will be added to. Object format matches the JSON structure of the
-         * API.
-         */
+    /**
+     * This method serializes the pipeline into an object that can be
+     * fed to the backend REST API.
+     *
+     * Will throw errors if there are any. Contain this method in a
+     * try/catch block.
+     *
+     * See: /api/pipelines/
+     *
+     * @param form_data: starting data that all of the pipeline details
+     * will be added to. Object format matches the JSON structure of the
+     * API.
+     *
+     * form_data will be merged with existing this.metadata if setMetadata()
+     * is used first.
+     */
+    serialize (metadata?: PipelineMetadata) {
 
-        var self = this,
-            pipeline_outputs = [],
-            pipeline_inputs = [],
-            canvas_x_ratio = 1.0/self.canvasState.canvas.width,
-            canvas_y_ratio = 1.0/self.canvasState.canvas.height,
-            is_trivial = true; // This is a trivial modification until we hit a non trivial
-            // modification
-
-        // TODO: Move check graph integrity out of Pipeline and into CanvasState
+        var pipeline_outputs = this.canvasState.getOutputNodes(),
+            pipeline_inputs = this.canvasState.getInputNodes(),
+            canvas_x_ratio = 1.0 / this.canvasState.width,
+            canvas_y_ratio = 1.0 / this.canvasState.height,
+            // This is a trivial modification until we hit a non trivial
+            // @todo: This variable is not used. Why?
+            is_trivial = true;
 
         // Check graph integrity
-        $.each(self.canvasState.shapes, function(_, shape){
-            if (shape instanceof drydock_objects.MethodNode) {
-                var num_connections = 0;
-
-                $.each(shape.out_magnets, function(_, magnet){
-                    num_connections += magnet.connected.length;
-                });
-
-                if (num_connections === 0) {
-                    throw 'MethodNode with unused outputs';
-                }
-            }
-            else if (shape instanceof drydock_objects.OutputNode) {
-                pipeline_outputs.push(shape);
-
-            }
-            else if (shape instanceof drydock_objects.CdtNode || shape instanceof drydock_objects.RawNode) {
-                var magnet = null;
-                pipeline_inputs.push(shape);
-
-                // all CDtNodes or RawNodes (inputs) should feed into a MethodNode and have only one magnet
-                if (shape.out_magnets.length != 1)
-                    throw 'Invalid amount of magnets for output node!';
-
-                // is this magnet connected?
-                if (shape.out_magnets[0].connected.length === 0)
-                    throw 'Unconnected input node';
-            }
-            else {
-                throw 'Unknown node type encountered!';
-            }
-        });
+        // Warning: This will throw errors if pipeline is not complete.
+        // serialize() should be wrapped in a try/catch block to account for this.
+        this.canvasState.assertIntegrity();
 
         // Sort inputs and outputs by their isometric position, left-to-right, top-to-bottom
         // (sort of like reading order if you tilt your screen 30° clockwise).
         pipeline_inputs.sort(Geometry.isometricSort);
         pipeline_outputs.sort(Geometry.isometricSort);
 
-        // at least one Connector must terminate as pipeline output
-        if (pipeline_outputs.length === 0) {
-            throw 'Pipeline has no output.';
-        }
-
         // Now we're ready to start
-        form_data = form_data || {};
+        let form_data: ApiPipelineData = metadata || {};
         form_data.steps = [];
         form_data.inputs = [];
         form_data.outcables = [];
 
         // Construct the input updates
-        $.each(pipeline_inputs, function(idx, input){
-            var structure = null;
+        for (let idx = 0; idx < pipeline_inputs.length; idx++) {
+            let input = pipeline_inputs[idx];
+            let structure = null;
 
             // Setup the compound datatype
-            if (input instanceof drydock_objects.CdtNode) {
+            if (CanvasState.isCdtNode(input)) {
                 structure = {
                     compounddatatype: input.pk,
                     min_row: null,
@@ -127,10 +163,10 @@ var pipeline = (function(exports){
                 x: input.x * canvas_x_ratio,
                 y: input.y * canvas_y_ratio,
             };
-        });
+        }
 
         // MethodNodes are now sorted live, prior to pipeline submission —JN
-        var sorted_elements = self.canvasState.getSteps();
+        var sorted_elements = this.canvasState.getSteps();
 
         // Add arguments for input cabling
         $.each(sorted_elements, function(idx, step) {
@@ -148,9 +184,9 @@ var pipeline = (function(exports){
                 fill_colour: step.fill,
                 cables_in: [],
                 new_code_resource_revision_id: (
-                        step.new_code_resource_revision ?
-                                step.new_code_resource_revision.id :
-                                    null),
+                    step.new_code_resource_revision ?
+                        step.new_code_resource_revision.id :
+                        null),
                 new_outputs_to_delete_names: step.outputs_to_delete
             };
 
@@ -174,7 +210,7 @@ var pipeline = (function(exports){
                 form_data.steps[idx].cables_in[cable_idx] = {
                     source_dataset_name: connector.source.label,
                     dest_dataset_name: connector.dest.label,
-                    source_step: source instanceof drydock_objects.MethodNode ? sorted_elements.indexOf(source)+1 : 0,
+                    source_step: CanvasState.isMethodNode(source) ? sorted_elements.indexOf(source) + 1 : 0,
                     keep_output: false, // in the future this can be more flexible
                     custom_wires: [] // no wires for a raw cable
                 };
@@ -184,8 +220,7 @@ var pipeline = (function(exports){
         // Construct outputs
         $.each(pipeline_outputs, function(idx, output) {
             var connector = output.in_magnets[0].connected[0],
-                source_step = connector.source.parent,
-                structure = null;
+                source_step = connector.source.parent;
 
             form_data.outcables[idx] = {
                 output_name: output.label,
@@ -213,9 +248,9 @@ var pipeline = (function(exports){
         // April 28, 2048 - Cat
 
         return form_data;
-    };
+    }
 
-    my.Pipeline.prototype.update = function(runstat, look_for_md5, run_id)  {
+    update (runstat, look_for_md5, run_id)  {
         /**
          * Updates the progress of this pipeline with the status
          *
@@ -231,9 +266,7 @@ var pipeline = (function(exports){
 
         // Mark all the inputs as complete
         $.each(self.canvasState.shapes, function(_, shape){
-            if ( shape instanceof drydock_objects.RawNode ||
-                 shape instanceof drydock_objects.CdtNode) {
-
+            if ( CanvasState.isInputNode(shape) ) {
                 shape.status = 'CLEAR';
             }
         });
@@ -251,7 +284,7 @@ var pipeline = (function(exports){
         $.each(runstat.output_progress, function(output_pk, output) {
             var shape = self.canvasState.findOutputNode(parseInt(output_pk));
 
-            if (shape instanceof drydock_objects.OutputNode) {
+            if (CanvasState.isOutputNode(shape)) {
                 shape.status = output.status;
                 shape.dataset_id = output.dataset_id;
                 shape.md5 = output.md5;
@@ -265,8 +298,7 @@ var pipeline = (function(exports){
         $.each(runstat.inputs, function(input_pk, output) {
             var shape = self.canvasState.findInputNode(parseInt(input_pk));
 
-            if (shape instanceof drydock_objects.RawNode ||
-                shape instanceof drydock_objects.CdtNode) {
+            if ( CanvasState.isInputNode(shape) ) {
                 shape.dataset_id = output.dataset_id;
                 shape.md5 = output.md5;
 
@@ -278,38 +310,37 @@ var pipeline = (function(exports){
         // Invalidate and force redraw
         self.canvasState.valid = false;
         self.canvasState.draw();
-    };
+    }
 
-    my.Pipeline.prototype.draw = function() {
+    draw() {
         /**
          * Forces a redraw of this pipeline on its associated canvas
          */
 
         this.canvasState.testExecutionOrder();
-        for (var i = 0; i < this.canvasState.shapes.length; i++) {
-            this.canvasState.detectCollisions(this.canvasState.shapes[i], 0.5);
-        }
+        this.canvasState.detectAllCollisions();
         this.canvasState.draw();
-    };
-
+    }
 
     // Private members
-    my.Pipeline.prototype.build_inputs = function() {
+    private build_inputs() {
         /**
          * Sets up the canvas state with the inputs for a pipeline
          */
         var self = this,
-            canvas_x_ratio = this.canvasState.canvas.width / this.canvasState.scale,
-            canvas_y_ratio = this.canvasState.canvas.height / this.canvasState.scale;
+            canvas_x_ratio = this.canvasState.width / this.canvasState.scale,
+            canvas_y_ratio = this.canvasState.height / this.canvasState.scale;
 
-        if (self.pipeline === null) { throw "build_inputs() called with no pipeline?"; }
+        if (self.pipeline === null) {
+            throw "build_inputs() called with no pipeline?";
+        }
 
         // Over each input for the pipeline
         $.each(self.pipeline.inputs, function(_, node) {
 
-            // Node has no structure => no CDT, so it's raw
+            // BaseNode has no structure => no CDT, so it's raw
             if (node.structure === null) {
-                self.canvasState.addShape(new drydock_objects.RawNode(
+                self.canvasState.addShape(new RawNode(
                     node.x * canvas_x_ratio,
                     node.y * canvas_y_ratio,
                     node.dataset_name,
@@ -317,7 +348,7 @@ var pipeline = (function(exports){
                 ));
             }
             else {
-                self.canvasState.addShape(new drydock_objects.CdtNode(
+                self.canvasState.addShape(new CdtNode(
                     node.structure.compounddatatype,
                     node.x * canvas_x_ratio,
                     node.y * canvas_y_ratio,
@@ -330,15 +361,15 @@ var pipeline = (function(exports){
             // but I'd like an explaination
             self.canvasState.dragging = true;
         });
-    };
+    }
 
-    my.Pipeline.prototype.build_steps = function() {
+    private build_steps() {
         /**
          * Private method that sets up canvas state to draw methods
          */
         var self = this,
-            canvas_x_ratio = self.canvasState.canvas.width / self.canvasState.scale,
-            canvas_y_ratio = self.canvasState.canvas.height / self.canvasState.scale;
+            canvas_x_ratio = self.canvasState.width / self.canvasState.scale,
+            canvas_y_ratio = self.canvasState.height / self.canvasState.scale;
 
         if (self.pipeline === null) { throw "build_steps() called with no pipeline?"; }
         var method_node_offset = self.pipeline.inputs.length;
@@ -346,7 +377,7 @@ var pipeline = (function(exports){
         // Over each pipeline step
         $.each(self.pipeline.steps, function() {
             var node = this,
-                method_node = new drydock_objects.MethodNode(
+                method_node = new MethodNode(
                     node.transformation,
                     node.transformation_family,
                     node.x * canvas_x_ratio,
@@ -357,7 +388,7 @@ var pipeline = (function(exports){
                     node.outputs,
                     undefined, // status
                     node.outputs_to_delete
-            );
+                );
 
             // Add `n draw
             self.canvasState.addShape(method_node);
@@ -376,7 +407,7 @@ var pipeline = (function(exports){
                         return false; // break
                     }
                 });
-                
+
                 // Not found?
                 if (magnet === null) {
                     console.error("Failed to redraw Pipeline: missing in_magnet");
@@ -388,8 +419,8 @@ var pipeline = (function(exports){
 
                     // Find the source for this
                     $.each(self.canvasState.shapes, function() {
-                        if (!(this instanceof drydock_objects.MethodNode) &&
-                              this.label === cable.source_dataset_name) {
+                        if (!CanvasState.isMethodNode(this) &&
+                            this.label === cable.source_dataset_name) {
                             source = this;
                             return false; // break
                         }
@@ -400,9 +431,9 @@ var pipeline = (function(exports){
                         console.error("Failed to redraw Pipeline: missing data node");
                         return false; // Bail
                     }
-                    
+
                     // data nodes only have one out-magnet, so use 0-index
-                    connector = new drydock_objects.Connector(source.out_magnets[0]);
+                    connector = new Connector(source.out_magnets[0]);
 
                     // connect other end of cable to the MethodNode
                     connector.x = magnet.x;
@@ -423,7 +454,7 @@ var pipeline = (function(exports){
                     $.each(source.out_magnets, function(){
 
                         if (this.label === cable.source_dataset_name) {
-                            connector = new drydock_objects.Connector(this);
+                            connector = new Connector(this);
                             connector.x = magnet.x;
                             connector.y = magnet.y;
                             connector.dest = magnet;
@@ -437,46 +468,43 @@ var pipeline = (function(exports){
                 }
             });
         });
-    };
+    }
 
-    my.Pipeline.prototype.build_outputs = function () {
+    private build_outputs() {
         /**
          * Private method that sets up canvas state to draw outputs
          */
         var self = this,
-            canvas_x_ratio = self.canvasState.canvas.width / self.canvasState.scale,
-            canvas_y_ratio = self.canvasState.canvas.height / self.canvasState.scale;
+            canvas_x_ratio = self.canvasState.width / self.canvasState.scale,
+            canvas_y_ratio = self.canvasState.height / self.canvasState.scale;
 
         if (self.pipeline === null) { throw "build_outputs() called with no pipeline?"; }
 
         var method_node_offset = self.pipeline.inputs.length;
 
-        $.each(self.pipeline.outcables, function(_, this_outcable) {
-
+        for (let outcable of self.pipeline.outcables) {
             // identify source Method
-            var source = self.canvasState.shapes[method_node_offset + this_outcable.source_step - 1];
+            var source = self.canvasState.shapes[method_node_offset + outcable.source_step - 1];
 
             // Over each out magnet for that source
-            $.each(source.out_magnets, function(j, magnet) {
-                if (magnet.label === this_outcable.source_dataset_name) {
-
-                    var output_in_list = $.grep(self.pipeline.outputs,
-                        function(output, _) {
-                            return output.dataset_idx === this_outcable.output_idx;
-                        }
+            for (let magnet of source.out_magnets) {
+                if (magnet.label === outcable.source_dataset_name) {
+                    var output_idx = outcable.output_idx;
+                    let output_in_list = self.pipeline.outputs.filter(
+                        output => output.dataset_idx === output_idx
                     );
                     if (output_in_list.length !== 1) {
-                        throw "There should be exactly 1 output with dataset_idx=" + this_outcable.output_idx;
+                        throw "There should be exactly 1 output with dataset_idx=" + output_idx;
                     }
-                    var output = output_in_list[0];
+                    let output = output_in_list[0];
 
-                    var connector = new drydock_objects.Connector(magnet),
-                        output_node = new drydock_objects.OutputNode(
+                    let connector = new Connector(magnet),
+                        output_node = new OutputNode(
                             output.x * canvas_x_ratio,
                             output.y * canvas_y_ratio,
-                            this_outcable.output_name,
-                            this_outcable.pk
-                         );
+                            outcable.output_name,
+                            outcable.pk
+                        );
 
                     self.canvasState.addShape(output_node);
 
@@ -488,50 +516,68 @@ var pipeline = (function(exports){
                     connector.source = magnet;
                     connector.dest.cdt = connector.source.cdt;
 
-                    source.out_magnets[j].connected.push(connector);  // bind cable to source Method
+                    magnet.connected.push(connector);  // bind cable to source Method
                     self.canvasState.connectors.push(connector);
-                    return false; // break
+                    break;
                 }
-            });
-        });
-    };
+            }
+        }
+    }
 
-    my.Pipeline.prototype.applyStepUpdates = function(updates) {
+    findNewStepRevisions() {
+        var pipeline = this,
+            pipeline_id = pipeline.pipeline.id,
+            steps = pipeline.canvasState.getSteps();
+
+        for (let step of steps) {
+            step.updateSignal("update in progress");
+        }
+        pipeline.canvasState.valid = false;
+
+        $.getJSON("/api/pipelines/" + pipeline_id + "/step_updates/").done(
+            updates => pipeline.applyStepRevisions(updates)
+        ).fail(() => {
+            for (let step of steps) {
+                step.updateSignal("unavailable");
+            }
+            pipeline.canvasState.valid = false;
+        });
+    }
+
+    applyStepRevisions(updates) {
         var pipeline = this,
             steps = pipeline.canvasState.getSteps(),
-            updated_step_nums = updates.map(function(update) { return update.step_num - 1; });
-        
-        for (var i = 0; i < steps.length; i++) {
+            updated_step_nums = updates.map(update => update.step_num - 1);
+
+        for (let i = 0; i < steps.length; i++) {
             if (updated_step_nums.indexOf(i) < 0) {
                 steps[i].updateSignal('no update available');
             }
         }
-        $.each(updates, function() {
-            var update = this,
-                old_method = steps[update.step_num - 1],
-                new_method,
-                any_mismatch;
+        for (let update of updates) {
+            let old_method = steps[update.step_num - 1];
+            let new_method;
+            let any_mismatch;
             if ( ! update.method) {
                 new_method = old_method;
                 any_mismatch = false;
-            }
-            else {
-                new_method = new drydock_objects.MethodNode(
-                        update.method.id,
-                        update.method.family_id,
-                        0,// x
-                        0,// y
-                        old_method.fill,
-                        old_method.label,
-                        update.method.inputs,
-                        update.method.outputs);
+            } else {
+                new_method = new MethodNode(
+                    update.method.id,
+                    update.method.family_id,
+                    0, // x
+                    0, // y
+                    old_method.fill,
+                    old_method.label,
+                    update.method.inputs,
+                    update.method.outputs);
                 any_mismatch = pipeline.canvasState.replaceMethod(
-                        old_method,
-                        new_method);
+                    old_method,
+                    new_method);
                 new_method.updateSignal(
-                        any_mismatch ?
-                                'updated with issues'
-                                : 'updated');
+                    any_mismatch ?
+                        'updated with issues'
+                        : 'updated');
             }
             if (update.code_resource_revision) {
                 new_method.new_code_resource_revision = update.code_resource_revision;
@@ -541,19 +587,19 @@ var pipeline = (function(exports){
                 new_method.new_dependencies = update.dependencies;
                 new_method.updateSignal(any_mismatch ? 'updated with issues' : 'updated');
             }
-        });
-        
-        pipeline.canvasState.valid = false;
-    };
+        }
 
-    my.Pipeline.prototype.isPublished = function() {
+        pipeline.canvasState.valid = false;
+    }
+
+    isPublished() {
         /**
          * Returns whether or not the pipeline has been published
          */
         return this.pipeline.is_published_version;
-    };
+    }
 
-    my.Pipeline.prototype.publish = function(family_pk, callback) {
+    publish(family_pk, callback) {
         /**
          * Sets this pipeline as published
          *
@@ -561,21 +607,19 @@ var pipeline = (function(exports){
          * TODO: ^^ This should be in the serializer maybe?
          * @param callback: Function called on success
          */
-        var self = this;
-
         $.ajax({
             type: "PATCH",
-            url: "/api/pipelinefamilies/"  + family_pk,
-            data: { published_version: self.pipeline.id },
-            datatype: "json",
-            success: function(result){
-                self.pipeline.is_published_version = true;
+            url: this.API_URL + family_pk,
+            data: { published_version: this.pipeline.id },
+            dataType: "json",
+            success: result => {
+                this.pipeline.is_published_version = true;
                 callback(result);
             }
         });
-    };
+    }
 
-    my.Pipeline.prototype.unpublish =  function(family_pk, callback) {
+    unpublish(family_pk, callback) {
         /**
          * Sets this pipeline as unpublished
          *
@@ -583,21 +627,16 @@ var pipeline = (function(exports){
          * TODO: ^^ This should be in the serializer maybe?
          * @param callback: Function called on success
          */
-        var self = this;
-
         $.ajax({
             type: "PATCH",
-            url: "/api/pipelinefamilies/"  + family_pk,
+            url: this.API_URL + family_pk,
             data: { published_version: null },
-            datatype: "json",
-            success: function(result){
-                self.pipeline.is_published_version = false;
+            dataType: "json",
+            success: result => {
+                this.pipeline.is_published_version = false;
                 callback(result);
             }
         });
-    };
+    }
+}
 
-    return my;
-})();
-
-window.Pipeline = pipeline.Pipeline;

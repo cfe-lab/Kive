@@ -28,23 +28,25 @@ html body {
     display: inline;
 }
 #pipeline_ctrl #id_method_button,
-#pipeline_ctrl #id_cdt_button {
+#pipeline_ctrl #id_cdt_button,
+#pipeline_ctrl #id_output_button {
     margin: .5em;
 }
 #pipeline_ctrl h3 { display: none; }
-ul#id_ctrl_nav { padding: 0; margin: 0 0 0 3.5em; }
-ul#id_ctrl_nav li {
+
+#id_ctrl_nav { padding: 0; margin: 0 0 0 3.5em; }
+#id_ctrl_nav li {
     display: inline;
     padding: .2em 1em;
     cursor: pointer;
     font-weight: bold;
 }
-ul#id_ctrl_nav li.clicked,
-ul#id_ctrl_nav li.clicked:hover {
+#id_ctrl_nav li.clicked,
+#id_ctrl_nav li.clicked:hover {
     background-color: #aaa;
     color: #fff;
 }
-ul#id_ctrl_nav li:hover {
+#id_ctrl_nav li:hover {
     background-color: #aaa;
     color: #fff;
 }
@@ -52,23 +54,19 @@ ul#id_ctrl_nav li:hover {
 #description_wrap {
   margin-bottom: .2em;
 }
-#pipeline_ctrl .ctrl_menu {
+.ctrl_menu {
     top: 4.3em;
     position: fixed;
     padding: .5em;
     border: 1px solid #aaa;
     display: none;
     background: #fff;
-    width: auto;
+    width: 250px;
     min-width: 10em;
 }
 .ctrl_menu#id_meta_ctrl,
 .ctrl_menu#id_view_ctrl {
     width: auto;
-}
-.ctrl_menu#id_method_ctrl,
-.ctrl_menu#id_input_ctrl {
-    width: 250px;
 }
 .ctrl_menu h5 {
     margin-bottom: 2px;
@@ -81,9 +79,13 @@ ul#id_ctrl_nav li:hover {
 
 #id_datatype_name, #id_select_method_family, 
 #id_select_method, #id_method_name, 
-#id_revision_name, #id_select_cdt {
+#id_revision_name, #id_select_cdt,
+#id_output_name {
     box-sizing: border-box;
     width: 250px;
+}
+#id_select_method:empty {
+    display: none;
 }
 #id_method_delete_outputs_field {
     margin: .5em 0;
@@ -96,30 +98,6 @@ ul#id_ctrl_nav li:hover {
 #id_method_delete_outputs_field fieldset {
     display: none;
 }
-#pipeline_ctrl #form_ctrl {
-    float: right;
-    margin-top: -1.25em;
-    margin-right: 9em;
-}
-#pipeline_ctrl #form_ctrl input[type="submit"] { font-weight: bold; }
-#pipeline_ctrl #form_ctrl input {
-    border-radius: 0;
-    padding: 0 .5em;
-    float: left;
-    margin-right: -1px;
-    margin-left: 0;
-}
-#pipeline_ctrl #form_ctrl input:first-of-type {
-    border-top-left-radius: 1em;
-    border-bottom-left-radius: 1em;
-    padding-left: 1em;
-}
-#pipeline_ctrl #form_ctrl input:last-of-type  {
-    border-top-right-radius: 1em;
-    border-bottom-right-radius: 1em;
-    padding-right: 1em;
-}
-#pipeline_ctrl #form_ctrl input:first-of-type:last-of-type  { border-radius: 1em; padding: 0 1em 0 1em; }
 
 #pipeline_ctrl .form-inline-opts {
     font-size: 0.85em;
@@ -131,19 +109,30 @@ ul#id_ctrl_nav li:hover {
     display: inline;
 }
 
-#id_submit_button {
-    padding-right: 1.75em !important;
+#pipeline_ctrl #form_ctrl {
+    float: right;
+    margin-top: -1.25em;
+    margin-right: 9em;
 }
-#id_submit_button + .tooltip {
-    display: none;
-    position: absolute;
-    background-color: #fdd;
-    border: 1px solid #c44;
-    padding: .5em;
-}
-#id_submit_button:hover + .tooltip {
-    display: block;
-}
+    #id_submit_button {
+        font-weight: bold;
+        border-radius: 1em;
+        padding: 0 1em;
+        float: left;
+        margin-right: -1px;
+        margin-left: 0;
+        padding-right: 1.75em !important;
+    }
+    #id_submit_button + .tooltip {
+        display: none;
+        position: absolute;
+        background-color: #fdd;
+        border: 1px solid #c44;
+        padding: .5em;
+    }
+    #id_submit_button:hover + .tooltip {
+        display: block;
+    }
 
 #form_ctrl .indicator-light {
     border-radius: .35em;
@@ -172,38 +161,12 @@ ul#id_ctrl_nav li:hover {
     background-color: #ffc;
 }
 
-#dialog_form {
-    display: none;
-    position: absolute;
-}
-#dialog_form label {
-    font-size: .8em;
-    text-align: center;
-    text-shadow: -.5px 1px 0px #fff;
-}
-#dialog_form input[type="submit"] {
-    box-sizing: border-box;
-    width: 100%;
-    margin-top: -1px;
-    border-radius: 0 0 1em 1em;
-}
-#dialog_form #output_name {
-    border-radius: 1em 1em 0 0;
-    text-align: center;
-}
-#dialog_form form > * {
+#colour_picker_menu {
+    width: 147px;
     display: block;
-}
-#dialog_form #output_name_error {
-    display: none;
-    font-weight: bold;
-    padding: 0.25em;
-    background-color: #fff;
-    background-color: rgba(255,255,255,0.7);
-    text-align: center;
     position: absolute;
+    display: none;
 }
-
 .colour_picker_colour {
     width: 20px; height: 20px;
     display: block;
@@ -215,31 +178,31 @@ ul#id_ctrl_nav li:hover {
 #colour_picker_pick {
     float: none;
 }
-#colour_picker_menu {
-    width: 147px;
-    display: block;
-    position: absolute;
-    display: none;
-}
 
-.context_menu {
+#pipeline_ctrl #id_add_ctrl {
+    padding: 0;
+}
+#context_menu {
     position: absolute;
     display: none;
     border: 1px solid #ddd;
     font-size: 1em;
 }
-.context_menu ul {
+#context_menu ul,
+#id_add_ctrl  ul {
     display: block;
     margin: 0; padding: 0;
     background-color: #fff;
 }
-.context_menu li {
+#context_menu li,
+#id_add_ctrl  li  {
     display: block;
     margin: 0; padding: 0.7em;
     background-color: #fff;
     padding-right: 1.5em;
     cursor: pointer;
 }
-.context_menu li:hover {
+#context_menu li:hover,
+#id_add_ctrl  li:hover {
     background-color: #eee;
 }

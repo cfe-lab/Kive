@@ -18,6 +18,7 @@ Before installing Kive, you need to install some other software.
   models used to store all the records in the database)
 * pygraphviz (optional, for the UML diagram)
 * requests (optional, for using the Kive API wrapper to make API calls)
+* NodeJS (for compiling TypeScript and SASS)
 
 
 Installing Python
@@ -551,6 +552,18 @@ To properly dispose of this database, run the following commands:
 This is similar to the incantation used to completely remove the `kive` database,
 but simpler because we are only trying to get rid of the database and do not need to
 recreate or reinitialize anything.
+
+
+Compiling Front-End Scripts
+---------------------------
+First, download and install [NodeJS](https://nodejs.org/en/download/) on your local
+machine. Then use the following command to download all dependencies and initialize
+scripts:
+
+    npm install
+
+This command should generate all needed Javascript/CSS code.
+
 
 Initialize the system
 ---------------------

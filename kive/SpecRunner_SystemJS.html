@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Kive Spec Runner - Jasmine v2.3.4</title>
+  <!-- Open this in a browser to run all the Javascript unit tests. -->
+
+  <link rel="shortcut icon" type="image/png" href="tests/js/jasmine-2.3.4/jasmine_favicon.png">
+  <link rel="stylesheet" href="tests/js/jasmine-2.3.4/jasmine.css">
+
+  <!-- include source files here... -->
+  <!--<script src="portal/js/imagediff.js"></script>-->
+  <script src="static/portal/core.min.js"></script>
+  <script src="static/portal/system.js"></script>
+  <script src="tests/js/system-tests.config.js"></script>
+  <script src="static/portal/noxss.js"></script>
+
+  <!-- include test files here... -->
+  <script>
+    System.config({
+      // packages tells the System loader how to load when no filename and/or no extension
+      packages: {
+        pipeline: {
+          format: 'register',
+          main: './tests.js',
+          defaultExtension: 'js'
+        }
+      }
+    });
+    System.import('pipeline').then(function() {
+      System.import('jasmine-boot').then(function() {
+        window.onload();
+      });
+    });
+  </script>
+
+</head>
+
+<body>
+
+</body>
+</html>
