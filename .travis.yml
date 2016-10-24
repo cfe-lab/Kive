@@ -1,5 +1,7 @@
 language: python
 python:
     - "2.7"
+before_install:
+    - sudo apt-get install -y -q openmpi-bin libopenmpi-dev
 install: "pip install -r requirements-dev.txt"
 script: "cd kive && python -m unittest discover -p tests_mock.py"
