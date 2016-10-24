@@ -65,7 +65,7 @@ export class CanvasContextMenu {
      */
     registerAction(name: string, criteriaFn: CriteriaFn, newAction: ContextMenuAction) {
         if (!this.actions.hasOwnProperty(name)) {
-            let id_name = name.toLowerCase().replace(/ /g, '_');
+            let id_name = name.toLowerCase().replace(/[^A-Za-z0-9]/g, '_');
             let $li = $('<li>').addClass(id_name).data('action', id_name).text(name);
             this.$ul.append($li);
             this.actions[id_name] = newAction;
