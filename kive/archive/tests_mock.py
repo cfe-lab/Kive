@@ -5,6 +5,7 @@ from mock import Mock, patch
 from django.utils import timezone
 
 from kive.mock_setup import mocked_relations
+from django.contrib.auth.models import User
 from django_mock_queries.query import MockSet
 
 from archive.models import Run, RunState, RunStep, RunOutputCable,\
@@ -12,7 +13,8 @@ from archive.models import Run, RunState, RunStep, RunOutputCable,\
 from archive.serializers import RunOutputsSerializer
 from constants import runstates, runcomponentstates
 from librarian.models import ExecRecord, Dataset, ExecRecordOut
-from pipeline.models import Pipeline, PipelineOutputCable, PipelineStep
+from pipeline.models import Pipeline, PipelineOutputCable, PipelineStep,\
+    PipelineFamily
 from transformation.models import TransformationInput, TransformationOutput
 from django.core.files.base import ContentFile
 
@@ -1035,3 +1037,152 @@ class RunOutputsSerializerMockTests(TestCase):
         self.maxDiff = None
         self.assertEqual(expected_data['output_summary'], data['output_summary'])
         self.assertEqual(expected_data, data)
+
+
+@mocked_relations(Run, Pipeline)
+class QueuedRunMockTests(TestCase):
+    def create_run_with_runstep(self, runstep_state_id):
+        pipeline = Pipeline(family=PipelineFamily())
+        pipelineoutputcable = PipelineOutputCable(pipelinecable_ptr_id=99,
+                                                  pipeline=pipeline)
+        pipeline.outcables = MockSet(pipelineoutputcable)
+        user = User()
+        run = Run(pipeline=pipeline, user=user)
+        run.start(save=False)
+        run.runsteps = MockSet(
+            RunStep(_runcomponentstate_id=runstep_state_id))
+        run.runoutputcables = MockSet(RunOutputCable(
+            pipelineoutputcable=pipelineoutputcable))
+        return run
+
+    def test_owner(self):
+        expected_username = 'dave'
+        run = Run(user=User(username=expected_username))
+
+        progress = run.get_run_progress()
+
+        self.assertSequenceEqual(expected_username, progress['user'])
+
+    def test_unstarted_pipeline(self):
+        pipeline = Pipeline(family=PipelineFamily())
+        user = User()
+        run = Run(pipeline=pipeline, user=user)
+
+        progress = run.get_run_progress()
+        self.assertSequenceEqual("?", progress["status"])
+
+    def test_run_progress_empty_pipeline(self):
+        pipeline = Pipeline(family=PipelineFamily())
+        user = User()
+        run = Run(pipeline=pipeline, user=user)
+        run.start(save=False)
+
+        progress = run.get_run_progress()
+
+        self.assertSequenceEqual('-', progress['status'])
+
+    def test_run_progress_starting(self):
+        run = self.create_run_with_runstep(runcomponentstates.PENDING_PK)
+
+        progress = run.get_run_progress()
+
+        self.assertSequenceEqual('.-.', progress['status'])
+
+    def test_run_progress_ready(self):
+        run = self.create_run_with_runstep(runcomponentstates.RUNNING_PK)
+
+        progress = run.get_run_progress()
+
+        self.assertSequenceEqual(':-.', progress['status'])
+
+    def test_run_progress_started_steps(self):
+        run = self.create_run_with_runstep(runcomponentstates.RUNNING_PK)
+        run.runsteps.first().log = ExecLog()
+
+        progress = run.get_run_progress()
+
+        self.assertSequenceEqual('+-.', progress['status'])
+
+    def test_run_progress_completed_steps(self):
+        run = self.create_run_with_runstep(runcomponentstates.SUCCESSFUL_PK)
+
+        progress = run.get_run_progress()
+
+        self.assertSequenceEqual('*-.', progress['status'])
+
+    def test_run_progress_failed_steps(self):
+        run = self.create_run_with_runstep(runcomponentstates.FAILED_PK)
+
+        progress = run.get_run_progress()
+
+        self.assertSequenceEqual('!-.', progress['status'])
+
+    def test_run_progress_output_ready(self):
+        run = self.create_run_with_runstep(runcomponentstates.SUCCESSFUL_PK)
+        run.runoutputcables.first()._runcomponentstate_id = runcomponentstates.RUNNING_PK
+
+        progress = run.get_run_progress()
+
+        self.assertSequenceEqual('*-:', progress['status'])
+
+    def test_run_progress_output_running(self):
+        run = self.create_run_with_runstep(runcomponentstates.SUCCESSFUL_PK)
+        run.runoutputcables.first()._runcomponentstate_id = runcomponentstates.RUNNING_PK
+        run.runoutputcables.first().log = ExecLog()
+
+        progress = run.get_run_progress()
+
+        self.assertSequenceEqual('*-+', progress['status'])
+
+    def test_run_progress_complete(self):
+        run = self.create_run_with_runstep(runcomponentstates.SUCCESSFUL_PK)
+        run.runoutputcables.first()._runcomponentstate_id = runcomponentstates.SUCCESSFUL_PK
+
+        progress = run.get_run_progress()
+
+        self.assertSequenceEqual('*-*', progress['status'])
+
+    def test_run_progress_display_name_input(self):
+        run = self.create_run_with_runstep(runcomponentstates.PENDING_PK)
+        run.pipeline.family.name = 'Fasta2CSV'
+        run.inputs = MockSet(RunInput(dataset=Dataset(
+            name='TestFASTA',
+            dataset_file=ContentFile('contents', name='file1234.txt'))))
+
+        progress = run.get_run_progress()
+
+        self.assertSequenceEqual('Fasta2CSV on TestFASTA', progress['name'])
+
+    def test_run_progress_display_name_date(self):
+        run = self.create_run_with_runstep(runcomponentstates.PENDING_PK)
+        run.pipeline.family.name = 'Fasta2CSV'
+        run.time_queued = '2010-02-14'
+
+        progress = run.get_run_progress()
+
+        self.assertSequenceEqual('Fasta2CSV at 2010-02-14', progress['name'])
+
+    def test_run_progress_display_name_but_no_runsteps(self):
+        pipeline = Pipeline(family=PipelineFamily())
+        user = User()
+        run = Run(pipeline=pipeline, user=user)
+        run.start(save=False)
+        run.pipeline.family.name = 'Fasta2CSV'
+        run.inputs = MockSet(RunInput(dataset=Dataset(
+            name='TestFASTA',
+            dataset_file=ContentFile('contents', name='file1234.txt'))))
+
+        progress = run.get_run_progress()
+
+        self.assertSequenceEqual('Fasta2CSV on TestFASTA', progress['name'])
+
+    def test_run_progress_display_name_run_name_set(self):
+        expected_run_name = 'My custom run name'
+        run = self.create_run_with_runstep(runcomponentstates.PENDING_PK)
+        run.pipeline.family.name = 'Fasta2CSV'
+        run.time_queued = '2010-02-14'
+        run.name = expected_run_name
+
+        progress = run.get_run_progress()
+
+        self.assertSequenceEqual(expected_run_name, progress['name'])
