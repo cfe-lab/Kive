@@ -99,7 +99,7 @@
             <div id="insert_many_menu">
                 <ul>
                     <li data-action="fill-column">Fill column</li>
-                    <li data-action="auto-fill-column">Fill column and auto-fill new runs</li>
+                    <li data-action="auto-fill-column">Fill column &amp; enable auto-fill</li>
                 </ul>
             </div></div>
             <button id="insert_one_dataset">↓</button>
@@ -162,9 +162,9 @@
             </tr>
         </thead>
 
-        <tbody>
+        <tbody class="single-run">
             <tr>
-                <td><input type="text" name="run_name[0]" class="run-name"></td>
+                <td><a class="remove-row ctrl"><span class="inner">&times;</span></a><input type="text" name="run_name[0]" class="run-name"></td>
             {% for input in inputs %}
                 <td class="pipeline-input"><button name="input" data-input-name="{{ input.dataset_name }}" data-dataset-idx="{{ input.dataset_idx }}" data-cdt="{{ input.compounddatatype.id }}" class="select_dataset">+</button></td>
             {% endfor %}
