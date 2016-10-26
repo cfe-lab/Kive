@@ -585,9 +585,9 @@ export class CanvasState {
     /**
      * Align selected nodes along the named axis.
      * 
-     * @param axis: a string from ["x", "y", "iso_x", "iso_y", "iso_z"]
+     * @param axis: a string from ["x", "y", "iso_x", "iso_y"]
      */
-    alignSelection (axis: string): void {
+    alignSelection (axis: "x"|"y"|"iso_x"|"iso_y"): void {
         /* @todo
          * if nodes are too close together then they will collide and then get pushed back out.
          * when this "push back out" happens, it should happen -only- on the axis of alignment.

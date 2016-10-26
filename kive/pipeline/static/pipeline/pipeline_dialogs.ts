@@ -23,7 +23,7 @@ $.fn.extend({
                 $drag = $(this).addClass('active-handle').parent().addClass('draggable');
             }
             
-            if (typeof opt.start == 'function') {
+            if (typeof opt.start === 'function') {
                 opt.start(this);
             }
             
@@ -50,7 +50,7 @@ $.fn.extend({
             } else {
                 $(this).removeClass('active-handle').parent().removeClass('draggable');
             }
-            if (typeof opt.stop == 'function') {
+            if (typeof opt.stop === 'function') {
                 opt.stop(this);
             }
         });
@@ -185,7 +185,7 @@ class NodePreviewDialog extends Dialog {
         if (jqueryRef.draggable) {
             jqueryRef.draggable();
         }
-        this.preview_canvas = <HTMLCanvasElement>$('canvas', jqueryRef)[0];
+        this.preview_canvas = <HTMLCanvasElement> $('canvas', jqueryRef)[0];
         this.preview_canvas.width = jqueryRef.width();
         this.preview_canvas.height = 60;
     }
@@ -584,9 +584,9 @@ export class MethodDialog extends NodePreviewDialog {
      */
     align(x: number, y: number): void {
         this.jqueryRef.css({
-            left: x - this.preview_canvas.width/2,
+            left: x - this.preview_canvas.width / 2,
             top: y
-        })
+        });
     }
     
     /**
@@ -636,7 +636,7 @@ export class MethodDialog extends NodePreviewDialog {
             // wait for AJAX to populate drop-down before selecting option
             this.$select_method.val(node.pk);
             this.$input_name.val(node.label).select();
-        })
+        });
     }
     
     setOutputsToDeleteFromEditingNode() {
@@ -740,12 +740,12 @@ export class MethodDialog extends NodePreviewDialog {
                     type: 'checkbox',
                     name: 'dont_delete_outputs',
                     'class': 'method_delete_outputs',
-                    id: 'dont_delete_outputs_'+ output.dataset_idx,
+                    id: 'dont_delete_outputs_' + output.dataset_idx,
                     value: output.dataset_name,
                     checked: 'checked'
                 }),
                 $('<label>')
-                    .attr('for', 'dont_delete_outputs_'+ output.dataset_idx)
+                    .attr('for', 'dont_delete_outputs_' + output.dataset_idx)
                     .text(output.dataset_name),
                 $('<br>')
             );
@@ -777,7 +777,7 @@ export class MethodDialog extends NodePreviewDialog {
         let method = MethodDialog.setOutputsToDelete(
             new MethodNode(
                 api_method_result.pk,
-                null,// family
+                null, // family
                 // Ensures node is centred perfectly on the preview canvas
                 // For this calculation to be accurate, method node draw params cannot change.
                 this.preview_canvas.width / 2 -
@@ -787,7 +787,7 @@ export class MethodDialog extends NodePreviewDialog {
                 ) * 0.4330127, // x
                 n_inputs / 2 + 20, // y
                 colour,
-                null,// label
+                null, // label
                 api_method_result.inputs,
                 api_method_result.outputs
             ),
@@ -837,7 +837,7 @@ export class MethodDialog extends NodePreviewDialog {
                 this.methodInputs,
                 this.methodOutputs
             );
-            if (this.add_or_revise == 'add') {
+            if (this.add_or_revise === 'add') {
                 // create new MethodNode
                 canvasState.addShape(method);
             } else {
@@ -934,7 +934,7 @@ export class OutputDialog extends NodePreviewDialog {
         this.cancel_ = this.cancel;
         this.cancel = function() {
             this.cancel = this.cancel_;
-        }
+        };
     }
     
     /**
@@ -982,7 +982,7 @@ export class OutputDialog extends NodePreviewDialog {
     submit(canvasState: CanvasState) {
         var label = this.$output_name.val();
         if (this.paired_node) {
-            if (this.paired_node.label == label) {
+            if (this.paired_node.label === label) {
                 /* No change */
                 this.hide();
                 this.reset();
@@ -1051,8 +1051,9 @@ export class ViewDialog extends Dialog {
     /**
      * Change whether canvasState shows order numbers on MethodNodes.
      * @param canvasState
+     * @param value One of 3 configuration options for canvasState.force_show_exec_order.
      */
-    static changeExecOrderDisplayOption (canvasState: CanvasState, value: string) {
+    static changeExecOrderDisplayOption (canvasState: CanvasState, value: "always"|"never"|"ambiguous") {
         if (ViewDialog.execOrderDisplayOptions.hasOwnProperty(value)) {
             canvasState.force_show_exec_order = ViewDialog.execOrderDisplayOptions[value];
             canvasState.valid = false;
@@ -1062,10 +1063,10 @@ export class ViewDialog extends Dialog {
     /**
      * Align nodes along an axis.
      * @param canvasState
-     * @param value
+     * @param axis A string from "x"|"y"|"iso_x"|"iso_y"
      */
-    static alignCanvasSelection (canvasState: CanvasState, value: string) {
-        canvasState.alignSelection(value);
+    static alignCanvasSelection (canvasState: CanvasState, axis: "x"|"y"|"iso_x"|"iso_y") {
+        canvasState.alignSelection(axis);
     }
     
 }

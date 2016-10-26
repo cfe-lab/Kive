@@ -2,7 +2,7 @@
 import "jasmine";
 import 'jasmine-html';
 import 'jquery';
-import '/static/portal/permissions.js'
+import '/static/portal/permissions.js';
 import '/static/pipeline/PipelineFamiliesTable.js';
 declare var permissions: any;
 

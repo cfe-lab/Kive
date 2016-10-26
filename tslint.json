@@ -1,13 +1,12 @@
 {
   "rules": {
-    "class-name": true,
     "comment-format": [true, "check-space"],
     "indent": [true, "spaces"],
     "max-line-length": [true, 120],
     "no-duplicate-variable": true,
     "no-eval": true,
     "no-internal-module": true,
-    "no-trailing-whitespace": true,
+    "no-trailing-whitespace": false,
     "no-var-keyword": false,
     "object-literal-shorthand": false,
     "one-line": [true, "check-open-brace", "check-whitespace"],

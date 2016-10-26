@@ -25,7 +25,7 @@ declare interface imagediff {
 
     toImageData(object: any): ImageData;
 
-    equal(a: ImageType, b: ImageType, tolerance?: number): boolean
+    equal(a: ImageType, b: ImageType, tolerance?: number): boolean;
     diff(a: ImageType, b: ImageType, options?: { align?: string }): ImageData;
 
     jasmine: CustomMatcherFactories;
