@@ -26,7 +26,7 @@ source.
 
     cd ~/git
     git clone https://github.com/cfe-lab/django-mock-queries.git
-    sudo python django-mock-queries/setup.py
+    sudo python django-mock-queries/setup.py install
 
 If you already had the main version installed, uninstall it with pip, and then
 check to see if you need to manually delete the files.
@@ -35,7 +35,7 @@ check to see if you need to manually delete the files.
     locate django_mock_queries/query.py
     ls /usr/local/lib/python2.7/dist-packages/django_mock_queries
     sudo rm /usr/local/lib/python2.7.dist-packages/django_mock_queries/*
-    sudo python django-mock-queries/setup.py
+    sudo python django-mock-queries/setup.py install
 
 If you want to see what's currently being worked on, check out the [waffle board][waffle].
 
