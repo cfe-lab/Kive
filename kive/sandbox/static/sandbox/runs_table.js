@@ -56,26 +56,26 @@
         this.registerColumn(" ", function($td, run) {
 
             // A "rerun" link, accessible to anyone who can see this Run.
-            var $rerun_link = $("<a>");
-            $rerun_link.attr("href", runsTable.create_url)
+            $("<a>").attr("href", runsTable.create_url)
                 .text("Rerun")
                 .click({
                     run: run,
                     run_table: runsTable
-                }, clickRerun);
-            $td.append($rerun_link);
+                }, clickRerun)
+                .addClass('button')
+                .appendTo($td);
             
-            var stopped_by = run.stopped_by;
-            if (stopped_by !== null) {
-                // no html - extra safe
-                stopped_by = stopped_by.replace(/(<([^>]+)>)/ig,"");
-                $td.append(" (Stopped by user " + stopped_by + ")");
+            if (run.stopped_by !== null) {
+                $td.append(" (Stopped by user ", $('<span>').text(run.stopped_by), ")");
             } else if (run.run_progress.end === null &&
                     (runsTable.user === run.user || ! runsTable.is_locked)) {
-                var $stop_link = $("<a>");
-                $stop_link.attr("href", run.url)
-                    .attr("run_id", run.id)
+                var $stop_link = $("<a>")
+                    .attr({
+                        "href": run.url,
+                        "run_id": run.id
+                    })
                     .text("Stop")
+                    .addClass('button')
                     .click(runsTable, clickStop);
                 $td.append(" (", $stop_link, ")");
             }
@@ -98,17 +98,15 @@
                     success: function() {
                         run_table.reloadTable();
                     }
-                }).fail(
-                    function (request) {
-                        var response = request.responseJSON,
-                            detail = (
-                                response ?
-                                response.detail :
-                                "Failed to redact"
-                            );
-                        window.alert(detail);
-                    }
-                );
+                }).fail(function (request) {
+                    var response = request.responseJSON,
+                        detail = (
+                            response ?
+                            response.detail :
+                            "Failed to redact"
+                        );
+                    window.alert(detail);
+                });
             }
         }
 

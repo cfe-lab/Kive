@@ -5,7 +5,7 @@
         this.list_url = "../../api/methods/";
         this.registerLinkColumn("Name", "", "display_name", "view_url");
         this.registerColumn("", function($td, method) {
-            $("<a>").attr("href", method.absolute_url).text("Revise").appendTo($td);
+            $("<a>").attr("href", method.absolute_url).addClass('button').text("Revise").appendTo($td);
         });
         this.registerColumn("Description", "revision_desc");
         this.registerStandardColumn("user");

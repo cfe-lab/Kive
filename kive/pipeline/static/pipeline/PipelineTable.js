@@ -15,7 +15,7 @@
             $td.append($a);
         });
         this.registerColumn("", function pipeline_revise_link($td, pipeline) {
-            $("<a>").attr("href", pipeline.absolute_url).text("Revise").appendTo($td);
+            $("<a>").attr("href", pipeline.absolute_url).addClass('button').text("Revise").appendTo($td);
         });
         this.registerColumn("Description", function($td, pipeline) {
             if (pipeline.revision_desc && pipeline.revision_desc !== '') {

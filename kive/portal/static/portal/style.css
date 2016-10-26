@@ -134,6 +134,10 @@ h3 {
 p {
     max-width: 55em;
 }
+pre {
+    word-break: break-all;
+    white-space: normal;
+}
 a[rel="prev"] {
     display: block;
     margin-left: -4em;
