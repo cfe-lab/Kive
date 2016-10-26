@@ -1,1 +1,3 @@
 project,region,seed,q.cut,min.coverage,which.key.pos,off.score,on.score
+HIV,V3LOOP,HIV1B-env-seed,15,0,18,-1,1
+V3LOOP,V3LOOP,HIV1B-env-seed,15,0,18,-1,1

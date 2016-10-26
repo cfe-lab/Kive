@@ -1,5 +1,6 @@
 from datetime import datetime
 import json
+from operator import itemgetter
 import os
 import shutil
 import sys
@@ -820,8 +821,8 @@ x,y
         g2pdeps = ["micall.g2p.pssm_lib.py", "micall.g2p.g2p_fpr.txt", "micall.g2p.g2p.matrix"]
         # now the pipeline step dependencies
         prelim_deplst = loggingdeps + configdeps + externaldeps
-        remap__deplst = loggingdeps + configdeps + externaldeps + \
-                        translationdeps + sam2alndeps + ["micall.core.prelim_map.py"]
+        remap__deplst = (loggingdeps + configdeps + externaldeps +
+                         translationdeps + sam2alndeps + ["micall.core.prelim_map.py"])
         sam2al_deplst = []
         aln2co_deplst = loggingdeps + configdeps + translationdeps
 
@@ -948,16 +949,36 @@ x,y
                 raise RuntimeError("MiCallDemo: failed to create pipeline. Missing inputs:" +
                                    ", ".join(missing_inp_set))
 
+            method_names = map(itemgetter(0), methlst)
+            dangling_outputs = []
+            for output_name in dangling_outp_set:
+                method_name, step_output_index = outpnamedct[output_name]
+                method_num = method_names.index(method_name)
+                dangling_outputs.append((method_num, step_output_index, output_name))
+            dangling_outputs.sort()
             # all dangling outputs are assumed to be pipeline outputs
-            for opnum, opname in enumerate(dangling_outp_set, 1):
-                methname, stepoutpnum = outpnamedct[opname]
-                self.create_PL_output(pipeline1, stepdct[methname], stepoutpnum, opname, opnum)
+            for opnum, dangling_output in enumerate(dangling_outputs, 1):
+                method_num, step_output_index, output_name = dangling_output
+                method_name, _ = outpnamedct[output_name]
+                self.create_PL_output(pipeline1,
+                                      stepdct[method_name],
+                                      step_output_index,
+                                      output_name,
+                                      opnum)
 
             pipeline1.create_outputs()
 
+            outputs = list(pipeline1.outputs.order_by('dataset_idx'))
             self.set_position([input1, input2] +
                               [stepdct[k[0]] for k in methlst] +
-                              [pipeline1.outputs.first()])
+                              outputs[:1])
+            n = len(outputs)
+            y = outputs[0].y
+            for i, output in enumerate(outputs, 1):
+                output.x = 0.25 + 0.75*float(i)/(n+1)
+                output.y = y
+                output.save()
+
             pipeline1.complete_clean()
         return pipeline1
 
@@ -1278,7 +1299,7 @@ class Command(BaseCommand):
         RestoreReusableDatasetBuilder().run()
         ExecuteTestsBuilder().run()
         FindDatasetsBuilder().run()
-        DemoBuilder().run()
         RestoreReusableDatasetBuilder().run()
+        DemoBuilder().run()
 
         self.stdout.write('Done.')

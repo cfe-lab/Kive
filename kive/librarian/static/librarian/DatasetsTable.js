@@ -7,21 +7,20 @@
         this.session_page_key = "datasetPage";
         this.registerLinkColumn("Name", "/dataset_view/");
         this.registerColumn("Description", function($td, dataset) {
-            $.each(dataset.description.split('\n'), function(_, txt){
-                $td.append(txt, '<br>');
-            });
+            $td.css("white-space", "pre-line") // preserve newlines
+                .text(dataset.description);
         });
         this.registerColumn("Created", function($td, row) {
             $td.text(permissions.formatDate(row.date_created));
         });
         this.registerColumn("File Size", function($td, dataset) {
-            var content = "<em>missing</em>";
             if (dataset.has_data) {
-                content = dataset.filesize_display;
+                $td.text(dataset.filesize_display);
             } else if (dataset.is_redacted) {
-                content = "<em>redacted</em>";
+                $('<em>').text('redacted').appendTo($td);
+            } else {
+                $('<em>').text('missing').appendTo($td);
             }
-            $td.append(content);
         });
         this.registerColumn("", function($td, dataset) {
             if (dataset.has_data) {

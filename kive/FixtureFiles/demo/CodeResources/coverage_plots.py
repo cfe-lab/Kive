@@ -9,8 +9,6 @@ import itertools
 from operator import itemgetter
 import tarfile
 
-from matplotlib.ticker import FuncFormatter
-
 from micall.core import project_config, aln2counts
 
 # NOTE: this must be performed BEFORE pyplot is imported
@@ -18,6 +16,7 @@ from micall.core import project_config, aln2counts
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt, patches  # @IgnorePep8
+from matplotlib.ticker import FuncFormatter  # @IgnorePep8
 
 
 def coverage_plot(amino_csv,

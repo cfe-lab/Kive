@@ -372,7 +372,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         Start this run, changing its state from Pending to Running.
         """
         assert self._runstate_id == runstates.PENDING_PK
-        self._runstate = RunState.objects.get(pk=runstates.RUNNING_PK)
+        self._runstate_id = runstates.RUNNING_PK
         stopwatch.models.Stopwatch.start(self, save=save, **kwargs)
 
     @transaction.atomic

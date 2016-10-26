@@ -66,9 +66,9 @@ The following browsers are supported
 Browser            | Basic Support | Bulk Upload Feature
 -------------------|---------------|--------------------
 Google Chrome      | version 4     | version 5
-Firefox            | version 3.6   | version 3.6
+Firefox            | version 4     | version 4
 Safari             | version 3.1   | version 7
-Internet Explorer  | version 9     | version 10
+Internet Explorer  | version 10    | version 10
 
 RESTful API
 -----------

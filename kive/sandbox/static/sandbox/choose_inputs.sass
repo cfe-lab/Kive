@@ -139,11 +139,11 @@ html #inner_wrap
     clear: both
   @at-root #insert_one_dataset
     @include graphic-button(down32)
-    width: calc(100% - 2em)
+    width: calc(100% - 0.8em)
   @at-root #insert_many_dataset
     @include graphic-button(menu_white32)
     float: right
-    width: calc(2em)
+    width: calc(0.8em)
     border-left-color: white
   @at-root #insert_many_dataset.active
     @include graphic-button(menu_green32)
@@ -159,8 +159,10 @@ html #inner_wrap
     top: 100%
     background: white
     color: black
+    width: 14rem
     ul
-      font-size: 1rem
+      font-size: 0.9rem
+      font-weight: 400
       text-indent: 0
       list-style: none
       padding: 0
@@ -172,7 +174,7 @@ html #inner_wrap
         top: 0
     li
       display: block
-      padding: 1em 1.25em
+      padding: 1em
       &:hover
         background-color: $selected-blue
         color: white
@@ -196,8 +198,8 @@ html #inner_wrap
     top: 0
     padding: 1em
     font-weight: bold
-    height: 80px
-    line-height: 40px
+    height: 60px
+    line-height: 28px
     box-sizing: border-box
     border-left: 1px solid white
 
@@ -262,33 +264,78 @@ html #inner_wrap
   thead th
     text-align: center
     border-bottom: 1px solid black
-  tbody td
-    &.selected
-      background-color: $selected-blue
-      color: #fff
-    &.input-dataset
+  tbody 
+    td
+      padding: 0 1px 1px 0
+      vertical-align: middle
+      position: relative
+      width: 12em
       box-sizing: border-box
-      padding:
-        left: 1em
-        right: 1em
-      div.text
-        word-break: break-all
-        overflow: hidden
-        text-overflow: ellipsis
-        max-width: 10em
-        max-height: 5em
-    &:last-child
-      padding-right: 0
-    &:first-child
-      width: auto
-    .run-name
-      padding: 1.85em .25em 1.85em 1em
-    padding: 0 1px 1px 0
-    vertical-align: middle
-    position: relative
-    width: 12em
-    height: 5em
-    min-width: 7.5em
+      height: 60px
+      min-width: 7.5em
+      &.selected
+        background-color: $selected-blue
+        color: #fff
+      &.input-dataset
+        box-sizing: border-box
+        padding:
+          left: 1em
+          right: 1em
+        div.text
+          word-break: break-all
+          overflow: hidden
+          text-overflow: ellipsis
+          max-width: 10em
+          max-height: 5em
+      &:last-child
+        padding-right: 0
+      &:first-child
+        width: auto
+      .run-name
+        box-sizing: border-box
+        height: 60px
+        border-width: 0 0 1px
+        margin-top: 1px
+        margin-bottom: -1px
+    tr:first-child td .run-name
+      border-top: 0
+    tr:last-child td .run-name
+      border-bottom: 1px
+    td .remove-row.ctrl
+      /* per-row remove control */
+      .inner
+        display: inline-block
+        box-sizing: border-box
+        width: 1em
+        height: 1em
+        padding: 0 .25em
+        line-height: 0.85em
+      /* mouseover target larger than visible button */
+      box-sizing: border-box
+      width: 1.5em
+      height: 60px
+      margin-left: -1.5em
+      visibility: hidden
+      display: inline-block
+      line-height: .4em !important
+      text-align: center
+      color: #ccc
+      font: 1.4em bold
+      vertical-align: top
+    tr:hover td .remove-row.ctrl
+      visibility: visible
+      &:hover .inner
+        color: #fff
+        background-color: $selected-blue
+    &.single-run .remove-row.ctrl
+      display: none
+    button
+      +green-button
+      margin-bottom: 0
+      padding: 0
+      width: 100%
+      font-size: 2.5em
+      line-height: 1.5em
   tfoot td
     text-align: right
     padding: 1.5em 0
@@ -298,12 +345,6 @@ html #inner_wrap
       +no-select
       padding: .25em 1em
       font-weight: normal
-  tbody button
-    +green-button
-    padding: .25em 1em
-    width: 100%
-    font-size: 2.5em
-    line-height: 1.5em
   .inactive button
     &.receiving
       background-color: #aaa

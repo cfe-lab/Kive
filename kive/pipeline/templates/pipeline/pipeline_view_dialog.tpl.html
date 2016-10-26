@@ -1,0 +1,25 @@
+<div id="{{ dlg_id }}" class="ctrl_menu">
+    <h3>View Options</h3>
+
+    <label>Show order of steps:</label>
+    <div class="form-inline-opts show-order-grp">
+        <input type="radio" name="show_order" class="show-order" value="always"> Always&emsp;
+        <input type="radio" name="show_order" class="show-order" value="never"> Never&emsp;
+        <input type="radio" name="show_order" class="show-order" value="ambiguous" checked="checked"> Only when ambiguous&emsp;
+    </div>
+
+    <label>Align selected nodes:</label>
+    <div class="form-inline-opts align-btn-grp">
+        <img src="/static/pipeline/dim_x_icon.png" class="image-button align-btn" data-axis="x">
+        <img src="/static/pipeline/iso_x_icon.png" class="image-button align-btn" data-axis="iso_x">
+        <img src="/static/pipeline/iso_y_icon.png" class="image-button align-btn" data-axis="iso_y">
+        <img src="/static/pipeline/iso_z_icon.png" class="image-button align-btn" data-axis="y">
+    </div>
+
+    {% if parent_revision %}
+    <button id="id_revert">Revert</button>
+    <button id="id_update">Check for Updates</button>
+    {% endif %}
+
+    <button id="autolayout_btn">Automatically arrange nodes</button>
+</div>
