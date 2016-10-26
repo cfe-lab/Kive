@@ -123,36 +123,47 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     }
 
     // append row to table
-    $("#addInputForm").click(
-        function () {
-            numberOfInputForms += 1;
-            i = numberOfInputForms - 1; // 0-indexing
-            var $inputRow = $('<tr>'),
-                $select;
-            $inputRow.append("<td>"+numberOfInputForms+"</td>");
+    $("#addInputForm").click(function () {
+        numberOfInputForms += 1;
+        i = numberOfInputForms - 1; // 0-indexing
+        var $inputRow = $('<tr>'),
+            $select;
+        
+        $('<td>').text(numberOfInputForms).appendTo($inputRow);
 
-            $inputRow.append("<td><input id=\"id_dataset_name_in_" + i + "\" maxlength=\"128\" name=\"dataset_name_in_" + i + "\" type=\"text\" /></td>");
-            $select = $("<select id=\"id_compounddatatype_in_" + i + "\" name=\"compounddatatype_in_" + i + "\">");
-            for (var j = 0; j < io_cdt_options.length; j++) {
-                $select.append($('<option>')
-                        .attr('value', io_cdt_options[j].value)
-                        .text(io_cdt_options[j].text));
-            }
-            $inputRow.append($('<td>').append($select));
-            $inputRow.append("<td><input id=\"id_min_row_in_" + i + "\" class=\"shortIntField\" name=\"min_row_in_" + i + "\" type=\"number\" /></td>");
-            $inputRow.append("<td><input id=\"id_max_row_in_" + i + "\" class=\"shortIntField\" name=\"max_row_in_" + i + "\" type=\"number\" /></td>");
+        $inputRow.append("<td><input id=\"id_dataset_name_in_" + i + "\" maxlength=\"128\" name=\"dataset_name_in_" + i + "\" type=\"text\" /></td>");
+        $select = $("<select id=\"id_compounddatatype_in_" + i + "\" name=\"compounddatatype_in_" + i + "\">");
+        for (var j = 0; j < io_cdt_options.length; j++) {
+            $select.append($('<option>')
+                    .attr('value', io_cdt_options[j].value)
+                    .text(io_cdt_options[j].text));
+        }
+        $inputRow.append($('<td>').append($select));
+    
+        var min_row = $('<input>').attr({
+            'id': "id_min_row_in_" + i,
+            'name': "min_row_in_" + i,
+            'class': "shortIntField",
+            'type': "number"
+        });
+        var max_row = $('<input>').attr({
+            'id': "id_max_row_in_" + i,
+            'name': "max_row_in_" + i,
+            'class': "shortIntField",
+            'type': "number"
+        });
+    
+        $('<td>').append(min_row).appendTo($inputRow);
+        $('<td>').append(max_row).appendTo($inputRow);
 
-            $('#extraInputForms').find('tr:last').after($inputRow);
+        $('#extraInputForms').find('tr:last').after($inputRow);
+    });
+    $("#removeInputForm").click(function() {
+        if (numberOfInputForms > 1) {
+            numberOfInputForms -= 1;
+            $('#extraInputForms').find('tr:last').remove();
         }
-    );
-    $("#removeInputForm").click(
-        function() {
-            if (numberOfInputForms > 1) {
-                numberOfInputForms -= 1;
-                $('#extraInputForms').find('tr:last').remove();
-            }
-        }
-    );
+    });
 
 
     // add or subtract output forms
@@ -168,28 +179,50 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     }
 
     // append row to table
-    $("#addOutputForm").click(
-        function () {
-            numberOfOutputForms += 1;
-            i = numberOfOutputForms - 1; // 0-indexing
-            var $outputRow = $('<tr>'),
-                $select;
-            $outputRow.append("<td>"+numberOfOutputForms+"</td>");
+    $("#addOutputForm").click(function () {
+        numberOfOutputForms += 1;
+        i = numberOfOutputForms - 1; // 0-indexing
+        var $outputRow = $('<tr>');
+        
+        $('<td>').text(numberOfOutputForms).appendTo($outputRow);
 
-            $outputRow.append("<td><input id=\"id_dataset_name_out_" + i + "\" maxlength=\"128\" name=\"dataset_name_out_" + i + "\" type=\"text\" /></td>");
-            $select = $("<select id=\"id_compounddatatype_out_" + i + "\" name=\"compounddatatype_out_" + i + "\">");
-            for (var j = 0; j < io_cdt_options.length; j++) {
-                $select.append($('<option>')
-                        .attr('value', io_cdt_options[j].value)
-                        .text(io_cdt_options[j].text));
-            }
-            $outputRow.append($('<td>').append($select));
-            $outputRow.append("<td><input id=\"id_min_row_out_" + i + "\" class=\"shortIntField\" name=\"min_row_out_" + i + "\" type=\"number\" /></td>");
-            $outputRow.append("<td><input id=\"id_max_row_out_" + i + "\" class=\"shortIntField\" name=\"max_row_out_" + i + "\" type=\"number\" /></td>");
-
-            $('#extraOutputForms').find('tr:last').after($outputRow);
+        var dataset_name = $('<input>').attr({
+            'id': "id_dataset_name_out_" + i,
+            'name': "dataset_name_out_" + i,
+            'maxlength': '128',
+            'type': "text"
+        });
+        $('<td>').append(dataset_name).appendTo($outputRow);
+        
+        var $select = $("<select>").attr({
+            'id': "id_compounddatatype_out_" + i,
+            'name': "compounddatatype_out_" + i
+        });
+        for (var j = 0; j < io_cdt_options.length; j++) {
+            $select.append($('<option>')
+                    .attr('value', io_cdt_options[j].value)
+                    .text(io_cdt_options[j].text));
         }
-    );
+        $('<td>').append($select).appendTo($outputRow);
+        
+        var min_row = $('<input>').attr({
+            'id': "id_min_row_out_" + i,
+            'name': "min_row_out_" + i,
+            'class': "shortIntField",
+            'type': "number"
+        });
+        var max_row = $('<input>').attr({
+            'id': "id_max_row_out_" + i,
+            'name': "max_row_out_" + i,
+            'class': "shortIntField",
+            'type': "number"
+        });
+
+        $('<td>').append(min_row).appendTo($outputRow);
+        $('<td>').append(max_row).appendTo($outputRow);
+
+        $('#extraOutputForms').find('tr:last').after($outputRow);
+    });
     $("#removeOutputForm").click(
         function() {
             if (numberOfOutputForms > 1) {

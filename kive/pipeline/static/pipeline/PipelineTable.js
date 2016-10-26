@@ -19,7 +19,7 @@
         });
         this.registerColumn("Description", function($td, pipeline) {
             if (pipeline.revision_desc && pipeline.revision_desc !== '') {
-                $td.append(pipeline.revision_desc);
+                $td.css('white-space', 'pre-line').text(pipeline.revision_desc);
             } else {
                 $td.append('<span class="placeholder">(none)</span>');
             }
