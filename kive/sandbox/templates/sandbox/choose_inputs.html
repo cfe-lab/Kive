@@ -164,7 +164,7 @@
 
         <tbody class="single-run">
             <tr>
-                <td><a class="remove-row ctrl"><span class="inner">&times;</span></a><input type="text" name="run_name[0]" class="run-name"></td>
+                <td><a class="remove-row ctrl"><span class="inner">&times;</span></a><input type="text" name="run_name[0]" class="run-name" placeholder="{{ pipeline }}"></td>
             {% for input in inputs %}
                 <td class="pipeline-input"><button name="input" data-input-name="{{ input.dataset_name }}" data-dataset-idx="{{ input.dataset_idx }}" data-cdt="{{ input.compounddatatype.id }}" class="select_dataset">+</button></td>
             {% endfor %}
