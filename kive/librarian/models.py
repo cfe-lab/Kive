@@ -1829,7 +1829,7 @@ class ExecRecordIn(models.Model):
                     error_str = 'Dataset "{}" has too few rows for TransformationInput "{}"'
                 raise ValidationError(error_str.format(input_SD, transf_xput_used))
 
-            if (transf_xput_used.get_max_row() != None and
+            if (transf_xput_used.get_max_row() is not None and
                     input_SD.num_rows() > transf_xput_used.get_max_row()):
                 error_str = ""
                 if type(self.generic_input) == transformation.models.TransformationOutput:

@@ -2,15 +2,20 @@ from datetime import datetime
 import os
 from unittest.case import TestCase
 
+from django.core.exceptions import ValidationError
 from mock import PropertyMock, Mock
 
 from kive.mock_setup import mock_relations, mocked_relations  # Import before any Django models
+from django_mock_queries.query import MockSet
 from constants import datatypes, runcomponentstates
 from datachecking.models import BadData, CellError, ContentCheckLog
 from kive.tests import dummy_file
-from librarian.models import Dataset, ExecRecord, ExecRecordOut
-from metadata.models import Datatype, CompoundDatatypeMember
-from archive.models import RunStep, ExecLog
+from librarian.models import Dataset, ExecRecord, ExecRecordOut, ExecRecordIn, DatasetStructure
+from metadata.models import Datatype, CompoundDatatypeMember, CompoundDatatype
+from archive.models import RunStep, ExecLog, Run, RunOutputCable, RunSIC
+from method.models import Method
+from pipeline.models import PipelineOutputCable, PipelineStepInputCable, PipelineStep
+from transformation.models import TransformationOutput, XputStructure
 
 
 class DatasetMockTests(TestCase):
@@ -224,6 +229,7 @@ Dave,40
                 row_num=expected_bad_row)
 
 
+# noinspection PyUnresolvedReferences
 @mocked_relations(ExecRecord)
 class ExecRecordQuarantineDecontaminateMockTests(TestCase):
     """
@@ -381,3 +387,177 @@ class ExecRecordQuarantineDecontaminateMockTests(TestCase):
         er.attempt_decontamination(ds1)
         rs3.log.is_successful.assert_called_once_with()
         er.decontaminate_runcomponents.assert_not_called()
+
+
+class ExecRecordMockTests(TestCase):
+    def test_execrecord_input_matches_output_cable_source(self):
+        trx_out1 = TransformationOutput()
+        trx_out1.transformationoutput = trx_out1
+        execrecord = ExecRecord(generator=ExecLog(record=RunOutputCable(
+            run=Run(),
+            pipelineoutputcable=PipelineOutputCable(source=trx_out1))))
+
+        trx_out2 = TransformationOutput()
+        trx_out2.transformationoutput = trx_out2
+        execrecordin = ExecRecordIn(execrecord=execrecord, dataset=Dataset(id=99), generic_input=trx_out2)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            'ExecRecordIn "S99" does not denote the TO that feeds the parent ExecRecord POC',
+            execrecordin.clean)
+
+    def test_execrecord_input_matches_input_cable_source(self):
+        trx_out1 = TransformationOutput()
+        trx_out1.transformationoutput = trx_out1
+        execrecord = ExecRecord(generator=ExecLog(record=RunSIC(
+            dest_runstep=RunStep(run=Run()),
+            PSIC=PipelineStepInputCable(source=trx_out1))))
+
+        trx_out2 = TransformationOutput()
+        trx_out2.transformationoutput = trx_out2
+        execrecordin = ExecRecordIn(execrecord=execrecord, dataset=Dataset(id=99), generic_input=trx_out2)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            'ExecRecordIn "S99" does not denote the TO/TI that feeds the parent ExecRecord PSIC',
+            execrecordin.clean)
+
+    def test_ER_doesnt_link_cable_so_ERI_mustnt_link_TO(self):
+        method = Method()
+        method.method = method
+        execrecord = ExecRecord(generator=ExecLog(record=RunStep(run=Run(),
+                                                                 pipelinestep=PipelineStep(transformation=method))))
+
+        trx_out = TransformationOutput(dataset_name='ages')
+        trx_out.transformationoutput = trx_out
+        execrecordin = ExecRecordIn(execrecord=execrecord, dataset=Dataset(id=99), generic_input=trx_out)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            'ExecRecordIn "S99=>ages" must refer to a TI of the Method of the parent ExecRecord',
+            execrecordin.clean)
+
+    def test_general_transf_returns_correct_method(self):
+        """
+        Test if ExecRecord.general_transf() returns the method of the PipelineStep
+        it was defined with.
+        """
+        method = Method()
+        method.method = method
+        execrecord = ExecRecord(generator=ExecLog(record=RunStep(run=Run(),
+                                                                 pipelinestep=PipelineStep(transformation=method))))
+
+        self.assertEqual(execrecord.general_transf(), method)
+
+    def test_execrecordin_raw_raw(self):
+        trx_out = TransformationOutput()
+        trx_out.transformationoutput = trx_out
+        execrecord = ExecRecord(generator=ExecLog(record=RunOutputCable(
+            run=Run(),
+            pipelineoutputcable=PipelineOutputCable(source=trx_out))))
+
+        execrecordin = ExecRecordIn(execrecord=execrecord, dataset=Dataset(), generic_input=trx_out)
+
+        execrecordin.clean()
+
+    @mocked_relations(Dataset)
+    def test_execrecordin_raw_cdt(self):
+        trx_out = TransformationOutput(dataset_idx=3, dataset_name='ages')
+        trx_out.transformationoutput = trx_out
+        trx_out.structure = XputStructure()
+        execrecord = ExecRecord(generator=ExecLog(record=RunOutputCable(
+            run=Run(),
+            pipelineoutputcable=PipelineOutputCable(source=trx_out))))
+
+        execrecordin = ExecRecordIn(execrecord=execrecord, dataset=Dataset(id=99), generic_input=trx_out)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            'Dataset "S99" \(raw\) cannot feed source "3: ages" \(non-raw\)',
+            execrecordin.clean)
+
+    def test_execrecordin_cdt_raw(self):
+        trx_out = TransformationOutput(dataset_idx=3, dataset_name='ages')
+        trx_out.transformationoutput = trx_out
+        execrecord = ExecRecord(generator=ExecLog(record=RunOutputCable(
+            run=Run(),
+            pipelineoutputcable=PipelineOutputCable(source=trx_out))))
+
+        dataset = Dataset(id=99)
+        dataset.structure = DatasetStructure()
+        execrecordin = ExecRecordIn(execrecord=execrecord, dataset=dataset, generic_input=trx_out)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            'Dataset "S99" \(non-raw\) cannot feed source "3: ages" \(raw\)',
+            execrecordin.clean)
+
+    def test_execrecordin_cdt_cdt(self):
+        trx_out = TransformationOutput(dataset_idx=3, dataset_name='ages')
+        trx_out.transformationoutput = trx_out
+        cdt = CompoundDatatype()
+        trx_out.structure = XputStructure(compounddatatype=cdt)
+        execrecord = ExecRecord(generator=ExecLog(record=RunOutputCable(
+            run=Run(),
+            pipelineoutputcable=PipelineOutputCable(source=trx_out))))
+
+        dataset = Dataset(id=99)
+        dataset.structure = DatasetStructure(compounddatatype=cdt)
+        execrecordin = ExecRecordIn(execrecord=execrecord, dataset=dataset, generic_input=trx_out)
+
+        execrecordin.clean()
+
+    @mocked_relations(CompoundDatatype)
+    def test_execrecordin_cdts_differ(self):
+        trx_out = TransformationOutput(dataset_idx=3, dataset_name='ages')
+        trx_out.transformationoutput = trx_out
+        cdt1 = CompoundDatatype()
+        cdt1.members = MockSet(CompoundDatatypeMember(datatype=Datatype()), CompoundDatatypeMember(datatype=Datatype()))
+        trx_out.structure = XputStructure(compounddatatype=cdt1)
+        execrecord = ExecRecord(generator=ExecLog(record=RunOutputCable(
+            run=Run(),
+            pipelineoutputcable=PipelineOutputCable(source=trx_out))))
+
+        dataset = Dataset(id=99)
+        cdt2 = CompoundDatatype()
+        cdt2.members = MockSet(CompoundDatatypeMember(datatype=Datatype()))
+        dataset.structure = DatasetStructure(compounddatatype=cdt2)
+        execrecordin = ExecRecordIn(execrecord=execrecord, dataset=dataset, generic_input=trx_out)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            'CDT of Dataset "S99" is not a restriction of the required CDT',
+            execrecordin.clean)
+
+    def test_execrecordin_max_row(self):
+        trx_out = TransformationOutput(dataset_idx=3, dataset_name='ages')
+        trx_out.transformationoutput = trx_out
+        cdt = CompoundDatatype()
+        trx_out.structure = XputStructure(compounddatatype=cdt, max_row=10)
+        execrecord = ExecRecord(generator=ExecLog(record=RunOutputCable(
+            run=Run(),
+            pipelineoutputcable=PipelineOutputCable(source=trx_out))))
+
+        dataset = Dataset(id=99)
+        dataset.structure = DatasetStructure(compounddatatype=cdt, num_rows=10)
+        execrecordin = ExecRecordIn(execrecord=execrecord, dataset=dataset, generic_input=trx_out)
+
+        execrecordin.clean()
+
+    def test_execrecordin_too_many_rows(self):
+        trx_out = TransformationOutput(dataset_idx=3, dataset_name='ages')
+        trx_out.transformationoutput = trx_out
+        cdt = CompoundDatatype()
+        trx_out.structure = XputStructure(compounddatatype=cdt, max_row=10)
+        execrecord = ExecRecord(generator=ExecLog(record=RunOutputCable(
+            run=Run(),
+            pipelineoutputcable=PipelineOutputCable(source=trx_out))))
+
+        dataset = Dataset(id=99)
+        dataset.structure = DatasetStructure(compounddatatype=cdt, num_rows=11)
+        execrecordin = ExecRecordIn(execrecord=execrecord, dataset=dataset, generic_input=trx_out)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            'Dataset "S99" has too many rows to have come from TransformationOutput "3: ages"',
+            execrecordin.clean)
