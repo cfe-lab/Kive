@@ -14,8 +14,9 @@ from librarian.models import Dataset, ExecRecord, ExecRecordOut, ExecRecordIn, D
 from metadata.models import Datatype, CompoundDatatypeMember, CompoundDatatype
 from archive.models import RunStep, ExecLog, Run, RunOutputCable, RunSIC
 from method.models import Method
-from pipeline.models import PipelineOutputCable, PipelineStepInputCable, PipelineStep
-from transformation.models import TransformationOutput, XputStructure
+from pipeline.models import PipelineOutputCable, PipelineStepInputCable, PipelineStep, Pipeline, PipelineCable, \
+    CustomCableWire
+from transformation.models import TransformationOutput, XputStructure, TransformationXput, TransformationInput
 
 
 class DatasetMockTests(TestCase):
@@ -561,3 +562,319 @@ class ExecRecordMockTests(TestCase):
             ValidationError,
             'Dataset "S99" has too many rows to have come from TransformationOutput "3: ages"',
             execrecordin.clean)
+
+    def create_pipeline_execrecordout(self):
+        pipeline = Pipeline()
+        pipeline.pipeline = pipeline
+        method = Method()
+        method.method = method
+        del TransformationXput.transformationoutput  # remove mock
+        method_out = TransformationOutput(pk=42, transformation=method)
+        method_out.transformationoutput = method_out
+        execrecord = ExecRecord(generator=ExecLog(record=RunOutputCable(
+            run=Run(),
+            pipelineoutputcable=PipelineOutputCable(source=method_out, pipeline=pipeline, output_name='ages'))))
+        pipeline_out = TransformationOutput(pk=43, transformation=pipeline, dataset_name='ages', dataset_idx=3)
+        pipeline_out.transformationoutput = pipeline_out
+        dataset = Dataset(id=99)
+        Dataset.objects = MockSet(dataset)
+        TransformationXput.objects = MockSet(method_out, pipeline_out)
+        execrecordout = ExecRecordOut(execrecord=execrecord, dataset=dataset, generic_output=pipeline_out)
+        return execrecordout
+
+    @mocked_relations(Dataset, TransformationXput)
+    def test_pipeline_execrecordout_different_pipelines(self):
+        """ If the parent ER is linked with a POC, the ERO TO must belong to that pipeline """
+
+        execrecordout = self.create_pipeline_execrecordout()
+        pipeline2 = Pipeline()
+        pipeline2.pipeline = pipeline2
+        execrecordout.generic_output.transformation = pipeline2
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            'ExecRecordOut "S99" does not belong to the same pipeline as its parent ExecRecord POC',
+            execrecordout.clean)
+
+    @mocked_relations(Dataset, TransformationXput)
+    def test_pipeline_execrecordout_same_pipeline(self):
+        """ If the parent ER is linked with a POC, the ERO TO must belong to that pipeline """
+
+        execrecordout = self.create_pipeline_execrecordout()
+
+        execrecordout.clean()
+
+    @mocked_relations(Dataset, TransformationXput)
+    def test_ER_links_with_POC_and_POC_output_name_must_match_pipeline_TO_name(self):
+        # The TO must have the same name as the POC which supposedly created it
+        execrecordout = self.create_pipeline_execrecordout()
+        execrecordout.execrecord.generator.record.pipelineoutputcable.output_name = 'foo'
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            'ExecRecordOut "S99" does not represent the same output as its parent ExecRecord POC',
+            execrecordout.clean)
+
+    @mocked_relations(Dataset, TransformationXput)
+    def test_pipeline_execrecordout_raw_cdt(self):
+        del TransformationXput.structure
+
+        execrecordout = self.create_pipeline_execrecordout()
+        execrecordout.generic_output.structure = XputStructure()
+        self.assertRaisesRegexp(
+            ValidationError,
+            r'Dataset "S99" \(raw\) cannot have come from output "3: ages" \(non-raw\)',
+            execrecordout.clean)
+
+    @mocked_relations(Dataset, TransformationXput)
+    def test_pipeline_execrecordout_cdt_raw(self):
+        del Dataset.structure
+
+        execrecordout = self.create_pipeline_execrecordout()
+        execrecordout.dataset.structure = DatasetStructure()
+        self.assertRaisesRegexp(
+            ValidationError,
+            r'Dataset "S99" \(non-raw\) cannot have come from output "3: ages" \(raw\)',
+            execrecordout.clean)
+
+    @mocked_relations(Dataset, TransformationXput, CompoundDatatype)
+    def test_pipeline_execrecordout_cdt_cdt(self):
+        del Dataset.structure
+        del TransformationXput.structure
+        cdt = CompoundDatatype()
+
+        execrecordout = self.create_pipeline_execrecordout()
+        execrecordout.generic_output.structure = XputStructure(compounddatatype=cdt)
+        execrecordout.dataset.structure = DatasetStructure(compounddatatype=cdt)
+        execrecordout.clean()
+
+    @mocked_relations(Dataset, TransformationXput, CompoundDatatype)
+    def test_pipeline_execrecordout_cdt1_cdt2(self):
+        del Dataset.structure
+        del TransformationXput.structure
+        execrecordout = self.create_pipeline_execrecordout()
+        cdt1 = CompoundDatatype()
+        cdt1.members = MockSet(CompoundDatatypeMember(datatype=Datatype()))
+        execrecordout.generic_output.structure = XputStructure(compounddatatype=cdt1)
+        cdt2 = CompoundDatatype()
+        cdt2.members = MockSet(CompoundDatatypeMember(datatype=Datatype()),
+                               CompoundDatatypeMember(datatype=Datatype()))
+        execrecordout.dataset.structure = DatasetStructure(compounddatatype=cdt2)
+        self.assertRaisesRegexp(
+            ValidationError,
+            'CDT of Dataset "S99" is not identical to the CDT of the '
+            'TransformationOutput "3: ages" of the generating Pipeline',
+            execrecordout.clean)
+
+    @mocked_relations(Dataset, TransformationXput, CompoundDatatype)
+    def test_pipeline_execrecordout_cdt_cdt(self):
+        del Dataset.structure
+        del TransformationXput.structure
+        cdt = CompoundDatatype()
+
+        execrecordout = self.create_pipeline_execrecordout()
+        execrecordout.generic_output.structure = XputStructure(compounddatatype=cdt, max_row=10)
+        execrecordout.dataset.structure = DatasetStructure(compounddatatype=cdt, num_rows=11)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            'Dataset "S99" was produced by TransformationOutput "3: ages" but has too many rows',
+            execrecordout.clean)
+
+    def create_method_execrecordout(self):
+        del TransformationXput.transformationinput
+        method = Method()
+        method.method = method
+        execrecord = ExecRecord(generator=ExecLog(record=RunStep(run=Run(),
+                                                                 pipelinestep=PipelineStep(transformation=method))))
+
+        trx_in = TransformationInput(pk=43, dataset_idx=3, dataset_name='ages')
+        trx_in.transformationinput = trx_in
+        dataset = Dataset(id=99)
+        Dataset.objects = MockSet(dataset)
+        TransformationXput.objects = MockSet(trx_in)
+        execrecordout = ExecRecordOut(execrecord=execrecord, dataset=dataset, generic_output=trx_in)
+        return execrecordout
+
+    @mocked_relations(Dataset, TransformationXput)
+    def test_method_execrecordout_raw_raw(self):
+        execrecordout = self.create_method_execrecordout()
+
+        execrecordout.clean()
+
+    @mocked_relations(Dataset, TransformationXput, CompoundDatatype)
+    def test_method_execrecordout_cdt1_cdt2(self):
+        del Dataset.structure
+        del TransformationXput.structure
+
+        execrecordout = self.create_method_execrecordout()
+        cdt1 = CompoundDatatype()
+        cdt1.members = MockSet(CompoundDatatypeMember(datatype=Datatype()))
+        execrecordout.generic_output.structure = XputStructure(compounddatatype=cdt1)
+        cdt2 = CompoundDatatype()
+        cdt2.members = MockSet(CompoundDatatypeMember(datatype=Datatype()),
+                               CompoundDatatypeMember(datatype=Datatype()))
+        execrecordout.dataset.structure = DatasetStructure(compounddatatype=cdt2)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            'CDT of Dataset "S99" is not the CDT of the TransformationOutput "3: ages" of the generating Method',
+            execrecordout.clean)
+
+    @mocked_relations(ExecRecord, Dataset, TransformationXput)
+    def test_cable_execrecordout_raw_raw(self):
+        execrecordout = self.create_cable_execrecordout()
+
+        execrecordout.clean()
+
+    @mocked_relations(ExecRecord, Dataset, TransformationXput, CompoundDatatype)
+    def test_cable_execrecordout_cdt1_cdt2(self):
+        del Dataset.structure
+        del TransformationXput.structure
+
+        execrecordout = self.create_cable_execrecordout()
+        cdt1 = CompoundDatatype()
+        cdt1.members = MockSet(CompoundDatatypeMember(datatype=Datatype()))
+        execrecordout.generic_output.structure = XputStructure(compounddatatype=cdt1)
+        cdt2 = CompoundDatatype()
+        cdt2.members = MockSet(CompoundDatatypeMember(datatype=Datatype()),
+                               CompoundDatatypeMember(datatype=Datatype()))
+        execrecordout.dataset.structure = DatasetStructure(compounddatatype=cdt2)
+
+        self.assertRaisesRegexp(
+            ValidationError,
+            'CDT of Dataset "S99" is not a restriction of the CDT of the fed TransformationInput "3: ages"',
+            execrecordout.clean)
+
+    @mocked_relations(ExecRecord, TransformationXput, Dataset)
+    def test_trivial_execrecord_matches(self):
+        """ERs representing trivial PSICs must have the same Dataset on both sides."""
+
+        execrecord = self.create_cable_execrecordout().execrecord
+
+        execrecord.clean()
+
+    @mocked_relations(ExecRecord, TransformationXput, Dataset)
+    def test_trivial_execrecord_no_match(self):
+        """ERs representing trivial PSICs must have the same Dataset on both sides."""
+
+        execrecord = self.create_cable_execrecordout().execrecord
+        execrecord.execrecordins.first().dataset = Dataset(id=100)
+
+        print('')
+        print('start test_trivial_execrecord_no_match')
+        self.assertTrue(execrecord.execrecordouts.first().generic_output.is_raw())
+        self.assertTrue(execrecord.execrecordins.first().generic_input.is_raw())
+        self.assertRaisesRegexp(
+            ValidationError,
+            r'ExecRecord "S100 ={2: history:ages\(raw\)}=> S99" represents a trivial cable'
+            r' but its input and output do not match',
+            execrecord.clean)
+        print('finish test_trivial_execrecord_no_match')
+
+    def create_cable_execrecordout(self):
+        del TransformationXput.transformationoutput
+        del TransformationXput.transformationinput
+        prev_out = TransformationOutput(pk=42, dataset_idx=1, dataset_name='eras')
+        prev_out.transformationoutput = prev_out
+        next_in = TransformationInput(pk=43, dataset_idx=3, dataset_name='ages')
+        next_in.transformationinput = next_in
+        execrecord = ExecRecord(generator=ExecLog(record=RunSIC(
+            dest_runstep=RunStep(run=Run()),
+            PSIC=PipelineStepInputCable(source=prev_out, dest=next_in, pipelinestep=PipelineStep(name='history',
+                                                                                                 step_num=2)))))
+        dataset = Dataset(id=99)
+        Dataset.objects = MockSet(dataset)
+        execrecordin = ExecRecordIn(execrecord=execrecord, dataset=dataset, generic_input=prev_out)
+        TransformationXput.objects = MockSet(next_in)
+        execrecordout = ExecRecordOut(execrecord=execrecord, dataset=dataset, generic_output=next_in)
+        execrecord.execrecordins = MockSet(execrecordin)
+        execrecord.execrecordouts = MockSet(execrecordout)
+        return execrecordout
+
+    def create_custom_cable_execrecordout(self):
+        del Dataset.structure
+        del TransformationXput.structure
+        execrecordout = self.create_cable_execrecordout()
+        execrecord = execrecordout.execrecord
+        execrecordin = execrecord.execrecordins.first()
+        string_type = Datatype(name='string')
+        cdt1 = CompoundDatatype()
+        field1_in = CompoundDatatypeMember(datatype=string_type, column_idx=1, column_name='age')
+        field2_in = CompoundDatatypeMember(datatype=string_type, column_idx=2, column_name='start')
+        cdt1.members = MockSet(field1_in,
+                               field2_in)
+        execrecordin.generic_input.structure = XputStructure(compounddatatype=cdt1)
+        execrecordin.dataset.structure = DatasetStructure(compounddatatype=cdt1)
+        cdt2 = CompoundDatatype()
+        field1_out = CompoundDatatypeMember(datatype=string_type, column_idx=1, column_name='era')
+        field2_out = CompoundDatatypeMember(datatype=string_type, column_idx=2, column_name='start')
+        cdt2.members = MockSet(field1_out,
+                               field2_out)
+        execrecordout.generic_output.structure = XputStructure(compounddatatype=cdt2)
+        execrecordout.dataset = Dataset(id=100)
+        execrecordout.dataset.structure = DatasetStructure(compounddatatype=cdt2)
+        Dataset.objects = MockSet(execrecordin.dataset, execrecordout.dataset)
+        cable = execrecord.generator.record.PSIC
+        cable.custom_wires = MockSet(CustomCableWire(source_pin=field1_in, dest_pin=field1_out),
+                                     CustomCableWire(source_pin=field2_in, dest_pin=field2_out))
+        return execrecordout
+
+    @mocked_relations(ExecRecord, TransformationXput, Dataset, CompoundDatatype, PipelineCable)
+    def test_custom_cable(self):
+        """Test that the Datatypes of Datasets passing through PSICs are properly preserved."""
+        execrecordout = self.create_custom_cable_execrecordout()
+        execrecord = execrecordout.execrecord
+        execrecord.clean()
+
+    @mocked_relations(ExecRecord, TransformationXput, Dataset, CompoundDatatype, PipelineCable)
+    def test_custom_cable_mismatch(self):
+        """Test that the Datatypes of Datasets passing through PSICs are properly preserved."""
+        execrecordout = self.create_custom_cable_execrecordout()
+        execrecord = execrecordout.execrecord
+        int_type = Datatype(name='int')
+        execrecordout.dataset.structure.compounddatatype.members.last().datatype = int_type
+        self.assertRaisesRegexp(
+            ValidationError,
+            'ExecRecord "S99 ={2: history:ages}=> S100" represents a cable, but the Datatype of its destination '
+            'column, "int", does not match the Datatype of its source column, "string"',
+            execrecord.clean)
+
+    def create_execrecord_with_runstep_states(self, *state_ids):
+        execrecord = ExecRecord()
+        execrecord.used_by_components = MockSet()
+        for state_id in state_ids:
+            run_step = RunStep(_runcomponentstate_id=state_id)
+            run_step.runstep = run_step
+            execrecord.used_by_components.add(run_step)
+        return execrecord
+
+    @mocked_relations(ExecRecord)
+    def test_execrecord_new_never_failed(self):
+        """An ExecRecord with no RunSteps has never failed."""
+        execrecord = self.create_execrecord_with_runstep_states()
+
+        self.assertFalse(execrecord.has_ever_failed())
+
+    @mocked_relations(ExecRecord)
+    def test_execrecord_one_good_step(self):
+        """An ExecRecord with one good RunStep has never failed."""
+        execrecord = self.create_execrecord_with_runstep_states(runcomponentstates.SUCCESSFUL_PK)
+
+        self.assertFalse(execrecord.has_ever_failed())
+
+    @mocked_relations(ExecRecord)
+    def test_execrecord_two_good_steps(self):
+        """An ExecRecord with two good RunSteps has never failed."""
+        execrecord = self.create_execrecord_with_runstep_states(runcomponentstates.SUCCESSFUL_PK,
+                                                                runcomponentstates.SUCCESSFUL_PK)
+
+        self.assertFalse(execrecord.has_ever_failed())
+
+    @mocked_relations(ExecRecord)
+    def test_execrecord_mixed_steps(self):
+        """An ExecRecord with two good RunSteps has never failed."""
+        execrecord = self.create_execrecord_with_runstep_states(runcomponentstates.SUCCESSFUL_PK,
+                                                                runcomponentstates.FAILED_PK)
+
+        self.assertTrue(execrecord.has_ever_failed())

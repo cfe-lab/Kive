@@ -305,19 +305,11 @@ class TransformationXput(models.Model):
 
     @property
     def is_input(self):
-        try:
-            self.transformationinput
-        except TransformationXput.DoesNotExist:
-            return False
-        return True
+        return hasattr(self, 'transformationinput')
 
     @property
     def is_output(self):
-        try:
-            self.transformationoutput
-        except TransformationXput.DoesNotExist:
-            return False
-        return True
+        return hasattr(self, 'transformationoutput')
 
     @property
     def definite(self):

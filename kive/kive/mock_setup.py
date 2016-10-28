@@ -40,6 +40,29 @@ if not apps.ready:
 # Can move back to the top if this pull request is accepted:
 # https://github.com/stphivos/django-mock-queries/pull/14
 from django_mock_queries.query import MockSet  # @IgnorePep8
+import django_mock_queries.utils
+import django_mock_queries.constants
+
+
+def patched_get_attribute(obj, attr, default=None):
+    result = obj
+    comparison = None
+    parts = attr.split('__')
+
+    for p in parts:
+        if p in django_mock_queries.constants.COMPARISONS:
+            comparison = p
+        elif result is None:
+            break
+        else:
+            result = getattr(result, p, None)
+
+    value = result if result is not None else default
+    return value, comparison
+
+# Remove this monkey patch after pull request is merged and released:
+# https://github.com/stphivos/django-mock-queries/pull/16
+django_mock_queries.utils.get_attribute = patched_get_attribute
 
 
 def setup_mock_relations(*models):
