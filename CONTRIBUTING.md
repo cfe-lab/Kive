@@ -258,11 +258,13 @@ To update Javascript generated from TypeScript (.ts) files, you must have the
 TypeScript compiler installed, which should happen when you run `npm install`.
 Don't edit any js file which has a ts equivalent as these changes will be
 overwritten. When editing ts files, it is useful to have the compiler run in
-watch mode as a background task using `tsc -w`. Be sure to adhere to Kive's
-TypeScript style by running `grunt tslint` on your contributions.
+watch mode as a background task using `npm run ts-watch`. Be sure to adhere to
+Kive's TypeScript style by running `grunt tslint` on your contributions.
 
 A similar pattern is true for CSS and Sass files. You can run the Sass compiler
-in watch mode using `sass --watch`.
+in watch mode using `npm run sass-watch`.
+
+Run both the TypeScript and Sass watchers simultaneously with `npm run watch-all`.
 
 ### Updating embedded icon files ###
 
