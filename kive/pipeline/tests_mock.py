@@ -11,16 +11,16 @@ from constants import datatypes
 from metadata.models import CompoundDatatype, CompoundDatatypeMember, Datatype
 from method.models import Method
 from pipeline.models import Pipeline, PipelineFamily, PipelineStep,\
-    PipelineStepInputCable, PipelineOutputCable
+    PipelineStepInputCable, PipelineOutputCable, PipelineCable
 from transformation.models import TransformationInput, XputStructure,\
-    TransformationOutput
+    TransformationOutput, Transformation
 
 
 class PipelineMockTests(TestCase):
     """Tests for basic Pipeline functionality."""
     def test_pipeline_no_inputs_no_steps(self):
         """A Pipeline with no inputs and no steps is clean but not complete."""
-        with mock_relations(Pipeline):
+        with mock_relations(Pipeline, Transformation):
             p = Pipeline(family=PipelineFamily())
 
             p.clean()
@@ -34,7 +34,7 @@ class PipelineMockTests(TestCase):
     """Tests for basic Pipeline functionality."""
     def test_pipeline_one_valid_input_no_steps(self):
         """A Pipeline with one valid input, but no steps, is clean but not complete."""
-        with mock_relations(Pipeline):
+        with mock_relations(Pipeline, Transformation):
             p = Pipeline(family=PipelineFamily())
             self.add_inputs(p, TransformationInput(dataset_idx=1))
 
@@ -48,7 +48,7 @@ class PipelineMockTests(TestCase):
 
     def test_pipeline_one_invalid_input_clean(self):
         """A Pipeline with one input not numbered "1" is not clean."""
-        with mock_relations(Pipeline):
+        with mock_relations(Pipeline, Transformation):
             p = Pipeline(family=PipelineFamily())
             self.add_inputs(p, TransformationInput(dataset_idx=4))
 
@@ -58,7 +58,7 @@ class PipelineMockTests(TestCase):
 
     def test_pipeline_many_valid_inputs_clean(self):
         """A Pipeline with multiple, properly indexed inputs is clean."""
-        with mock_relations(Pipeline):
+        with mock_relations(Pipeline, Transformation):
             p = Pipeline(family=PipelineFamily())
             self.add_inputs(p,
                             TransformationInput(dataset_idx=2),
@@ -69,7 +69,7 @@ class PipelineMockTests(TestCase):
 
     def test_pipeline_many_invalid_inputs_clean(self):
         """A Pipeline with multiple, badly indexed inputs is not clean."""
-        with mock_relations(Pipeline):
+        with mock_relations(Pipeline, Transformation):
             p = Pipeline(family=PipelineFamily())
             self.add_inputs(p,
                             TransformationInput(dataset_idx=2),
@@ -110,11 +110,13 @@ class PipelineMockTests(TestCase):
 
     def test_pipeline_many_valid_steps_clean(self):
         """Test step index check, well-indexed multi-step case."""
-        with mock_relations(Pipeline, PipelineStep, Method):
+        with mock_relations(Pipeline, PipelineStep, Method, Transformation):
             p = Pipeline(family=PipelineFamily())
+            p.inputs = MockSet()
             self.add_inputs(p,
                             TransformationInput(dataset_idx=1))
             m = Method()
+            m.inputs = MockSet()
             self.add_inputs(m,
                             TransformationInput(dataset_idx=1))
             p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=2))
@@ -125,11 +127,13 @@ class PipelineMockTests(TestCase):
 
     def test_pipeline_many_invalid_steps_clean(self):
         """Test step index check, badly-indexed multi-step case."""
-        with mock_relations(Pipeline, PipelineStep, Method):
+        with mock_relations(Pipeline, PipelineStep, Method, Transformation):
             p = Pipeline(family=PipelineFamily())
+            p.inputs = MockSet()
             self.add_inputs(p,
                             TransformationInput(dataset_idx=1))
             m = Method()
+            m.inputs = MockSet()
             self.add_inputs(m,
                             TransformationInput(dataset_idx=1))
             p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=1))
@@ -185,10 +189,15 @@ class PipelineMockTests(TestCase):
                             Method,
                             CompoundDatatype,
                             Datatype,
-                            PipelineStepInputCable):
+                            PipelineStepInputCable,
+                            PipelineCable,
+                            Transformation):
+            del PipelineCable.pipelinestepinputcable
             p = Pipeline(family=PipelineFamily())
+            p.inputs = MockSet()
             self.add_inputs(p, self.create_input(datatypes.INT_PK, dataset_idx=1))
             m = Method()
+            m.inputs = MockSet()
             self.add_inputs(m, self.create_input(datatypes.STR_PK, dataset_idx=1))
 
             step1 = PipelineStep(pipeline=p, transformation=m, step_num=1)
@@ -733,13 +742,19 @@ class PipelineMockTests(TestCase):
         with mock_relations(Pipeline,
                             PipelineStep,
                             Method,
+                            Transformation,
                             CompoundDatatype,
                             Datatype,
+                            PipelineCable,
                             PipelineStepInputCable,
                             PipelineOutputCable):
+            del Transformation.method
+            del PipelineCable.pipelinestepinputcable
             p = Pipeline(family=PipelineFamily())
+            p.inputs = MockSet()
             self.add_inputs(p, self.create_input(datatypes.STR_PK, dataset_idx=1))
             m = Method()
+            m.inputs = MockSet()
             m.method = m
             self.add_inputs(m, self.create_input(datatypes.STR_PK, dataset_idx=1))
             self.add_outputs(m, self.create_output(datatypes.STR_PK, dataset_idx=1))

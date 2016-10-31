@@ -615,7 +615,7 @@ class ExecRecordMockTests(TestCase):
             'ExecRecordOut "S99" does not represent the same output as its parent ExecRecord POC',
             execrecordout.clean)
 
-    @mocked_relations(Dataset, TransformationXput)
+    @mocked_relations(Dataset, TransformationInput, TransformationOutput, TransformationXput)
     def test_pipeline_execrecordout_raw_cdt(self):
         del TransformationXput.structure
 
@@ -648,7 +648,7 @@ class ExecRecordMockTests(TestCase):
         execrecordout.dataset.structure = DatasetStructure(compounddatatype=cdt)
         execrecordout.clean()
 
-    @mocked_relations(Dataset, TransformationXput, CompoundDatatype)
+    @mocked_relations(Dataset, TransformationInput, TransformationOutput, TransformationXput, CompoundDatatype)
     def test_pipeline_execrecordout_cdt1_cdt2(self):
         del Dataset.structure
         del TransformationXput.structure
@@ -666,7 +666,7 @@ class ExecRecordMockTests(TestCase):
             'TransformationOutput "3: ages" of the generating Pipeline',
             execrecordout.clean)
 
-    @mocked_relations(Dataset, TransformationXput, CompoundDatatype)
+    @mocked_relations(Dataset, TransformationInput, TransformationOutput, TransformationXput, CompoundDatatype)
     def test_pipeline_execrecordout_cdt_cdt(self):
         del Dataset.structure
         del TransformationXput.structure
@@ -702,7 +702,7 @@ class ExecRecordMockTests(TestCase):
 
         execrecordout.clean()
 
-    @mocked_relations(Dataset, TransformationXput, CompoundDatatype)
+    @mocked_relations(Dataset, TransformationInput, TransformationOutput, TransformationXput, CompoundDatatype)
     def test_method_execrecordout_cdt1_cdt2(self):
         del Dataset.structure
         del TransformationXput.structure
@@ -746,7 +746,7 @@ class ExecRecordMockTests(TestCase):
             'CDT of Dataset "S99" is not a restriction of the CDT of the fed TransformationInput "3: ages"',
             execrecordout.clean)
 
-    @mocked_relations(ExecRecord, TransformationXput, Dataset)
+    @mocked_relations(ExecRecord, TransformationInput, TransformationOutput, TransformationXput, Dataset)
     def test_trivial_execrecord_matches(self):
         """ERs representing trivial PSICs must have the same Dataset on both sides."""
 
@@ -754,15 +754,13 @@ class ExecRecordMockTests(TestCase):
 
         execrecord.clean()
 
-    @mocked_relations(ExecRecord, TransformationXput, Dataset)
+    @mocked_relations(ExecRecord, TransformationInput, TransformationOutput, TransformationXput, Dataset)
     def test_trivial_execrecord_no_match(self):
         """ERs representing trivial PSICs must have the same Dataset on both sides."""
 
         execrecord = self.create_cable_execrecordout().execrecord
         execrecord.execrecordins.first().dataset = Dataset(id=100)
 
-        print('')
-        print('start test_trivial_execrecord_no_match')
         self.assertTrue(execrecord.execrecordouts.first().generic_output.is_raw())
         self.assertTrue(execrecord.execrecordins.first().generic_input.is_raw())
         self.assertRaisesRegexp(
@@ -770,7 +768,6 @@ class ExecRecordMockTests(TestCase):
             r'ExecRecord "S100 ={2: history:ages\(raw\)}=> S99" represents a trivial cable'
             r' but its input and output do not match',
             execrecord.clean)
-        print('finish test_trivial_execrecord_no_match')
 
     def create_cable_execrecordout(self):
         del TransformationXput.transformationoutput

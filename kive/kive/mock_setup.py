@@ -68,6 +68,8 @@ django_mock_queries.utils.get_attribute = patched_get_attribute
 def setup_mock_relations(*models):
     for model in models:
         model_name = model._meta.object_name
+        if 'old_relations' in model.__dict__:
+            raise RuntimeError('Already mocked relations on {} model.'.format(model_name))
         model.old_relations = {}
         model.old_objects = model.objects
         model.old_save = model.save
@@ -75,19 +77,21 @@ def setup_mock_relations(*models):
         for related_object in chain(model._meta.related_objects,
                                     model._meta.many_to_many):
             name = related_object.name
-            old_relation = getattr(model, name, None)
-            if old_relation is not None:
-                # type_name = type(old_relation).__name__
-                # expected_types = {'ReverseManyToOneDescriptor',
-                #                   'ManyToManyDescriptor',
-                #                   'ReverseOneToOneDescriptor'}
-                # assert type_name in expected_types, model_name + '.' + name + ': ' + type_name
-                model.old_relations[name] = old_relation
-                if related_object.one_to_one:
-                    new_relation = PropertyMock(side_effect=ObjectDoesNotExist)
-                else:
-                    new_relation = MockSet(cls=old_relation.field.model)
-                setattr(model, name, new_relation)
+            if name in model.__dict__:
+                # Only mock direct relations, not inherited ones.
+                old_relation = getattr(model, name, None)
+                if old_relation is not None:
+                    # type_name = type(old_relation).__name__
+                    # expected_types = {'ReverseManyToOneDescriptor',
+                    #                   'ManyToManyDescriptor',
+                    #                   'ReverseOneToOneDescriptor'}
+                    # assert type_name in expected_types, model_name + '.' + name + ': ' + type_name
+                    model.old_relations[name] = old_relation
+                    if related_object.one_to_one:
+                        new_relation = PropertyMock(side_effect=ObjectDoesNotExist)
+                    else:
+                        new_relation = MockSet(cls=old_relation.field.model)
+                    setattr(model, name, new_relation)
         model.objects = MockSet(mock_name=model_name + '.objects', cls=model)
         model.save = Mock(name=model_name + '.save')
 

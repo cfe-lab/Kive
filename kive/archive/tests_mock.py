@@ -15,7 +15,7 @@ from constants import runstates, runcomponentstates
 from librarian.models import ExecRecord, Dataset, ExecRecordOut
 from pipeline.models import Pipeline, PipelineOutputCable, PipelineStep,\
     PipelineFamily
-from transformation.models import TransformationInput, TransformationOutput
+from transformation.models import TransformationInput, TransformationOutput, Transformation
 from django.core.files.base import ContentFile
 
 
@@ -773,7 +773,7 @@ class RunComponentStateMockTests(TestCase):
         rs.run.refresh_from_db.assert_called_once_with()
 
 
-@mocked_relations(Run, Pipeline, ExecRecord)
+@mocked_relations(Run, Pipeline, Transformation, ExecRecord)
 class RunOutputsSerializerMockTests(TestCase):
     def test_no_steps(self):
         run = Run(id=1234, pipeline=Pipeline())
