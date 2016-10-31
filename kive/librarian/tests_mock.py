@@ -16,7 +16,8 @@ from archive.models import RunStep, ExecLog, Run, RunOutputCable, RunSIC
 from method.models import Method
 from pipeline.models import PipelineOutputCable, PipelineStepInputCable, PipelineStep, Pipeline, PipelineCable, \
     CustomCableWire
-from transformation.models import TransformationOutput, XputStructure, TransformationXput, TransformationInput
+from transformation.models import TransformationOutput, XputStructure, TransformationXput, TransformationInput, \
+    Transformation
 
 
 class DatasetMockTests(TestCase):
@@ -682,27 +683,29 @@ class ExecRecordMockTests(TestCase):
             execrecordout.clean)
 
     def create_method_execrecordout(self):
-        del TransformationXput.transformationinput
+        del TransformationXput.transformationoutput
+        del Transformation.method
         method = Method()
         method.method = method
         execrecord = ExecRecord(generator=ExecLog(record=RunStep(run=Run(),
                                                                  pipelinestep=PipelineStep(transformation=method))))
 
-        trx_in = TransformationInput(pk=43, dataset_idx=3, dataset_name='ages')
-        trx_in.transformationinput = trx_in
+        trx_out = TransformationOutput(pk=43, dataset_idx=3, dataset_name='ages')
+        trx_out.transformationoutput = trx_out
+        method.outputs = MockSet(trx_out)
         dataset = Dataset(id=99)
         Dataset.objects = MockSet(dataset)
-        TransformationXput.objects = MockSet(trx_in)
-        execrecordout = ExecRecordOut(execrecord=execrecord, dataset=dataset, generic_output=trx_in)
+        TransformationXput.objects = MockSet(trx_out)
+        execrecordout = ExecRecordOut(execrecord=execrecord, dataset=dataset, generic_output=trx_out)
         return execrecordout
 
-    @mocked_relations(Dataset, TransformationXput)
+    @mocked_relations(Dataset, TransformationXput, Transformation)
     def test_method_execrecordout_raw_raw(self):
         execrecordout = self.create_method_execrecordout()
 
         execrecordout.clean()
 
-    @mocked_relations(Dataset, TransformationInput, TransformationOutput, TransformationXput, CompoundDatatype)
+    @mocked_relations(Dataset, Transformation, TransformationInput, TransformationOutput, TransformationXput, CompoundDatatype)
     def test_method_execrecordout_cdt1_cdt2(self):
         del Dataset.structure
         del TransformationXput.structure
