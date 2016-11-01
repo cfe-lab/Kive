@@ -1356,7 +1356,7 @@ class Sandbox:
     # representation of a RunCableExecuteInfo.  It does not update the Sandbox maps either,
     # as that falls to the Manager (who has the Sandbox).
     @staticmethod
-    def finish_cable(cable_execute_dict, worker_rank):
+    def finish_cable(cable_execute_dict, slurm_id):
         """
         Finishes an un-reused cable that has already been prepared for execution.
 
@@ -1409,7 +1409,7 @@ class Sandbox:
                         if (not can_reuse["successful"] or
                                 (can_reuse["fully reusable"] and cable_execute_dict["by_step_pk"] is None)):
                             logger.debug("[%d] ExecRecord %s is reusable (successful = %s)",
-                                         worker_rank, curr_ER, can_reuse["successful"])
+                                         slurm_id, curr_ER, can_reuse["successful"])
                             curr_record.reused = True
                             curr_record.execrecord = curr_ER
 
@@ -1427,7 +1427,7 @@ class Sandbox:
             except (OperationalError, InternalError):
                 wait_time = random.random()
                 logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
-                             worker_rank, wait_time)
+                             slurm_id, wait_time)
                 time.sleep(wait_time)
 
         # We're now committed to actually running this cable.
@@ -1443,7 +1443,7 @@ class Sandbox:
         # Write the input dataset to the sandbox if necessary.
         # FIXME at some point in the future this will have to be updated to mean "write to the local sandbox".
         if not input_dataset_in_sdbx:
-            logger.debug("[%d] Dataset is in the DB - writing it to the file system", worker_rank)
+            logger.debug("[%d] Dataset is in the DB - writing it to the file system", slurm_id)
             file_path = None
             if bool(input_dataset.dataset_file):
                 file_path = input_dataset.dataset_file.path
@@ -1457,7 +1457,7 @@ class Sandbox:
             except IOError:
                 copy_end = timezone.now()
                 logger.error("[%d] could not copy file %s to file %s.",
-                             worker_rank, file_path, input_dataset_path)
+                             slurm_id, file_path, input_dataset_path)
 
                 with transaction.atomic():
                     # Create a failed IntegrityCheckLog.
@@ -1490,14 +1490,14 @@ class Sandbox:
                         wait_time = random.uniform(3, 7)
                         logger.warning("[%d] file %s appears to not be finished copying to %s; "
                                        "waiting %f seconds before retrying.",
-                                       worker_rank, file_path, input_dataset_path, wait_time)
+                                       slurm_id, file_path, input_dataset_path, wait_time)
                         time.sleep(wait_time)
                         total_wait_time += wait_time
                     else:
                         copy_end = timezone.now()
                         logger.warning("[%d] file %s failed to copy to %s; "
                                        "checked three times over %f seconds.",
-                                       worker_rank, file_path, input_dataset_path, total_wait_time)
+                                       slurm_id, file_path, input_dataset_path, total_wait_time)
 
                         with transaction.atomic():
                             # Create a failed IntegrityCheckLog.
@@ -1517,7 +1517,7 @@ class Sandbox:
                 # Perform an integrity check since we've just copied this file to the sandbox for the
                 # first time.
                 logger.debug("[%d] Checking file just copied to sandbox for integrity.",
-                             worker_rank)
+                             slurm_id)
                 check = input_dataset.check_integrity(input_dataset_path, user, execlog=None, runcomponent=curr_record)
 
                 fail_now = check.is_fail()
@@ -1533,7 +1533,7 @@ class Sandbox:
                 output_CDT = cable.find_compounddatatype() or cable.create_compounddatatype()
 
         else:
-            logger.debug("[%d] Recovering - will update old ER", worker_rank)
+            logger.debug("[%d] Recovering - will update old ER", slurm_id)
             output_dataset = curr_ER.execrecordouts.first().dataset
             output_CDT = output_dataset.get_cdt()
 
@@ -1581,7 +1581,7 @@ class Sandbox:
                         dataset_name = curr_record.output_name()
                         dataset_desc = curr_record.output_description()
                         if not make_dataset:
-                            logger.debug("[%d] Cable doesn't keep output: not creating a dataset", worker_rank)
+                            logger.debug("[%d] Cable doesn't keep output: not creating a dataset", slurm_id)
 
                         if curr_ER is not None:
                             output_dataset = curr_ER.execrecordouts.first().dataset
@@ -1603,7 +1603,7 @@ class Sandbox:
                     if not recover:
                         if curr_ER is None:
                             logger.debug("[%d] No ExecRecord already in use - creating fresh cable ExecRecord",
-                                         worker_rank)
+                                         slurm_id)
                             # Make ExecRecord, linking it to the ExecLog.
                             curr_ER = librarian.models.ExecRecord.create(
                                 curr_log,
@@ -1616,12 +1616,12 @@ class Sandbox:
 
                     else:
                         logger.debug("[%d] This was a recovery - not linking RSIC/RunOutputCable to ExecRecord",
-                                     worker_rank)
+                                     slurm_id)
                 succeeded_yet = True
             except (OperationalError, InternalError):
                 wait_time = random.random()
                 logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
-                             worker_rank, wait_time)
+                             slurm_id, wait_time)
                 time.sleep(wait_time)
 
         ####
@@ -1631,7 +1631,7 @@ class Sandbox:
             # Case 1: the cable is trivial.  Don't check the integrity, it was already checked
             # when it was first written to the sandbox.
             if cable.is_trivial():
-                logger.debug("[%d] Cable is trivial; skipping integrity check", worker_rank)
+                logger.debug("[%d] Cable is trivial; skipping integrity check", slurm_id)
 
             else:
                 # Case 2a: ExecRecord already existed and its output had been properly vetted.
@@ -1641,13 +1641,13 @@ class Sandbox:
                                          output_dataset.any_failed_checks())) or
                         cable.is_trivial() or recover):
                     logger.debug("[%d] Performing integrity check of trivial or previously generated output",
-                                 worker_rank)
+                                 slurm_id)
                     # Perform integrity check.  Note: if this fails, it will notify all RunComponents using it.
                     check = output_dataset.check_integrity(output_path, user, curr_log)
 
                 # Case 3: the Dataset, one way or another, is not properly vetted.
                 else:
-                    logger.debug("[%d] Output has no complete content check; performing content check", worker_rank)
+                    logger.debug("[%d] Output has no complete content check; performing content check", slurm_id)
                     summary_path = "{}_summary".format(output_path)
                     # Perform content check.  Note: if this fails, it will notify all RunComponents using it.
                     check = output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
@@ -1656,7 +1656,7 @@ class Sandbox:
                 if check.is_fail():
                     curr_record.finish_failure(save=True)
 
-        logger.debug("[%d] DONE EXECUTING %s '%s'", worker_rank, type(cable).__name__, cable)
+        logger.debug("[%d] DONE EXECUTING %s '%s'", slurm_id, type(cable).__name__, cable)
 
         # End. Return curr_record.  Update state if necessary (i.e. if it hasn't already failed).
         if curr_record.is_running():
@@ -1666,7 +1666,7 @@ class Sandbox:
 
     # The actual running of code happens here.
     @staticmethod
-    def finish_step(step_execute_dict, worker_rank, stop_execution_callback=None):
+    def finish_step(step_execute_dict, slurm_id):
         """
         Carry out the task specified by step_execute_dict.
 
@@ -1674,7 +1674,6 @@ class Sandbox:
         it should not have been run previously.  This should not be a RunStep representing a Pipeline.
         """
         # Break out the execution info.
-        curr_RS = archive.models.RunStep.objects.get(pk=step_execute_dict["runstep_pk"])  # already start()ed
         step_run_dir = step_execute_dict["step_run_dir"]
         curr_ER = None
         preexisting_ER = step_execute_dict["execrecord_pk"] is not None
@@ -1689,318 +1688,337 @@ class Sandbox:
                 pk=step_execute_dict["recovering_record_pk"]
             ).definite
 
-        assert not curr_RS.pipelinestep.is_subpipeline()
+        try:
+            curr_RS = archive.models.RunStep.objects.get(pk=step_execute_dict["runstep_pk"])  # already start()ed
+            assert not curr_RS.pipelinestep.is_subpipeline()
 
-        recover = recovering_record is not None
-        invoking_record = recovering_record or curr_RS
+            recover = recovering_record is not None
+            invoking_record = recovering_record or curr_RS
 
-        if recover:
-            curr_RS.begin_recovery(save=True)
-
-        ####
-        # Gather inputs: finish all input cables -- we want them written to the sandbox now, which is never
-        # done by reuse_or_prepare_cable.
-        inputs_after_cable = []
-        input_paths = []
-        completed_cable_pks = []
-        for curr_execute_dict in cable_info_dicts:
-            # Update the cable execution information with the recovering record if applicable.
             if recover:
-                curr_execute_dict["recovering_record_pk"] = recovering_record.pk
+                curr_RS.begin_recovery(save=True)
 
-            curr_RSIC = Sandbox.finish_cable(curr_execute_dict, worker_rank)
-            completed_cable_pks.append(curr_RSIC.pk)
+            ####
+            # Gather inputs: finish all input cables -- we want them written to the sandbox now, which is never
+            # done by reuse_or_prepare_cable.
+            inputs_after_cable = []
+            input_paths = []
+            completed_cable_pks = []
+            for curr_execute_dict in cable_info_dicts:
+                # Update the cable execution information with the recovering record if applicable.
+                if recover:
+                    curr_execute_dict["recovering_record_pk"] = recovering_record.pk
 
-            # Cable failed, return incomplete RunStep.
-            curr_RSIC.refresh_from_db()
-            if not curr_RSIC.is_successful():
-                logger.error("[%d] PipelineStepInputCable %s %s.",
-                             worker_rank, curr_RSIC, curr_RSIC.get_state_name())
+                curr_RSIC = Sandbox.finish_cable(curr_execute_dict, slurm_id)
+                completed_cable_pks.append(curr_RSIC.pk)
 
-                # Cancel the other RunSICs for this step.
-                for rsic in curr_RS.RSICs.exclude(pk__in=completed_cable_pks):
-                    rsic.cancel_pending(save=True)
+                # Cable failed, return incomplete RunStep.
+                curr_RSIC.refresh_from_db()
+                if not curr_RSIC.is_successful():
+                    logger.error("[%d] PipelineStepInputCable %s %s.",
+                                 slurm_id, curr_RSIC, curr_RSIC.get_state_name())
 
-                # Update state variables.
-                curr_RS.refresh_from_db()
-                curr_RS.cancel_running(save=True)  # Transition: Running->Cancelled
-                curr_RS.complete_clean()
-                return curr_RS
+                    # Cancel the other RunSICs for this step.
+                    for rsic in curr_RS.RSICs.exclude(pk__in=completed_cable_pks):
+                        rsic.cancel_pending(save=True)
 
-            # Cable succeeded.
-            inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
-            input_paths.append(curr_execute_dict["output_path"])
+                    # Update state variables.
+                    curr_RS.refresh_from_db()
+                    curr_RS.cancel_running(save=True)  # Transition: Running->Cancelled
+                    curr_RS.complete_clean()
+                    return curr_RS
 
-        # Check again to see if the ExecRecord was completed while this task
-        # waited on the queue.  If this isn't a recovery, we can just stop.
-        if recover:
-            assert preexisting_ER
-            curr_ER = librarian.models.ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
-        else:
-            succeeded_yet = False
-            while not succeeded_yet:
-                try:
-                    with transaction.atomic():
-                        if preexisting_ER:
-                            curr_ER = librarian.models.ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
+                # Cable succeeded.
+                inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
+                input_paths.append(curr_execute_dict["output_path"])
 
-                            if curr_ER.generator.record.is_quarantined():
-                                logger.debug(
-                                    "[%d] ExecRecord %s is quarantined; "
-                                    "will try again and decontaminate if successful",
-                                    worker_rank,
-                                    curr_ER
-                                )
+            # Check again to see if the ExecRecord was completed while this task
+            # waited on the queue.  If this isn't a recovery, we can just stop.
+            if recover:
+                assert preexisting_ER
+                curr_ER = librarian.models.ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
+            else:
+                succeeded_yet = False
+                while not succeeded_yet:
+                    try:
+                        with transaction.atomic():
+                            if preexisting_ER:
+                                curr_ER = librarian.models.ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
 
-                            else:
-                                can_reuse = curr_RS.check_ER_usable(curr_ER)
-                                if can_reuse["successful"] and not can_reuse["fully reusable"]:
-                                    logger.debug("[%d] ExecRecord not fully reusable -- filling it in %s",
-                                                 worker_rank, curr_ER)
+                                if curr_ER.generator.record.is_quarantined():
+                                    logger.debug(
+                                        "[%d] ExecRecord %s is quarantined; "
+                                        "will try again and decontaminate if successful",
+                                        slurm_id,
+                                        curr_ER
+                                    )
 
                                 else:
-                                    # We can fully reuse this (either successfully or unsuccessfully).
-                                    logger.debug("[%d] ExecRecord %s is reusable (successful = %s)",
-                                                 worker_rank, curr_ER, can_reuse["successful"])
-                                    curr_RS.reused = True
-                                    curr_RS.execrecord = curr_ER
+                                    can_reuse = curr_RS.check_ER_usable(curr_ER)
+                                    if can_reuse["successful"] and not can_reuse["fully reusable"]:
+                                        logger.debug("[%d] ExecRecord not fully reusable -- filling it in %s",
+                                                     slurm_id, curr_ER)
 
-                                    if can_reuse["successful"]:
-                                        curr_RS.finish_successfully(save=True)  # calls stop()
                                     else:
-                                        curr_RS.cancel_running(save=True)  # also calls stop()
+                                        # We can fully reuse this (either successfully or unsuccessfully).
+                                        logger.debug("[%d] ExecRecord %s is reusable (successful = %s)",
+                                                     slurm_id, curr_ER, can_reuse["successful"])
+                                        curr_RS.reused = True
+                                        curr_RS.execrecord = curr_ER
 
-                                    curr_RS.complete_clean()
-                                    return curr_RS
-                        else:
-                            logger.debug("[%d] No compatible ExecRecord found yet", worker_rank)
+                                        if can_reuse["successful"]:
+                                            curr_RS.finish_successfully(save=True)  # calls stop()
+                                        else:
+                                            curr_RS.cancel_running(save=True)  # also calls stop()
 
-                        curr_RS.reused = False
-                        curr_RS.save()
+                                        curr_RS.complete_clean()
+                                        return curr_RS
+                            else:
+                                logger.debug("[%d] No compatible ExecRecord found yet", slurm_id)
+
+                            curr_RS.reused = False
+                            curr_RS.save()
+                        succeeded_yet = True
+                    except (OperationalError, InternalError):
+                        wait_time = random.random()
+                        logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
+                                     slurm_id, wait_time)
+                        time.sleep(wait_time)
+
+            pipelinestep = curr_RS.pipelinestep
+
+            # Run code, creating ExecLog and MethodOutput.
+            curr_log = archive.models.ExecLog.create(curr_RS, invoking_record)
+            stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
+            stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
+
+            # Check the integrity of the code before we run.
+            if not pipelinestep.transformation.definite.check_md5():  # this checks the driver and dependencies
+                logger.error("[%d] Method code has gone corrupt for %s or its " +
+                             "dependencies; stopping step",
+                             slurm_id,
+                             pipelinestep.transformation.definite.driver)
+                # Stop everything!
+                curr_log.start()
+                curr_log.methodoutput.are_checksums_OK = False
+                curr_log.methodoutput.save()
+                curr_log.stop(save=True, clean=False)
+
+                # Update state variables:
+                curr_RS.finish_failure(save=True)
+                curr_RS.complete_clean()
+
+                logger.debug("[%d] Quarantining any other RunComponents using the same ExecRecord", slurm_id)
+                if preexisting_ER:
+                    curr_ER.quarantine_runcomponents()  # this is transaction'd
+
+                return curr_RS
+
+            # From here on the code is assumed to not be corrupted.
+            try:
+                with open(stdout_path, "w+") as out_write, open(stderr_path, "w+") as err_write:
+                    pipelinestep.transformation.definite.run_code(
+                        step_run_dir,
+                        input_paths,
+                        output_paths,
+                        out_write,
+                        err_write,
+                        curr_log,
+                        curr_log.methodoutput
+                    )
+            except StopExecution as e:
+                # Immediately end, marking the RunStep as cancelled, and re-raise e.
+                logger.debug("[%d] Method execution stopped.", slurm_id)
+                curr_RS.cancel_running(save=True)
+                raise e
+
+            logger.debug("[%d] Method execution complete, ExecLog saved (started = %s, ended = %s)",
+                         slurm_id, curr_log.start_time, curr_log.end_time)
+
+            succeeded_yet = False
+            while not succeeded_yet:
+                integrity_checks = {}  # {output_idx: check}
+                try:
+                    with transaction.atomic():
+                        # Create outputs.
+                        # bad_output_found indicates we have detected problems with the output.
+                        bad_output_found = False
+                        bad_execution = not curr_log.is_successful()
+                        output_datasets = []
+                        logger.debug("[%d] ExecLog.is_successful() == %s", slurm_id, not bad_execution)
+
+                        if not recover:
+                            if preexisting_ER:
+                                logger.debug("[%d] Filling in pre-existing ExecRecord with PipelineStep outputs",
+                                             slurm_id)
+                            else:
+                                logger.debug("[%d] Creating new Datasets for PipelineStep outputs", slurm_id)
+
+                            for i, curr_output in enumerate(pipelinestep.outputs):
+                                output_path = output_paths[i]
+                                output_CDT = curr_output.get_cdt()
+
+                                # Check that the file exists, as we did for cables.
+                                start_time = timezone.now()
+                                if not file_access_utils.file_exists(output_path):
+                                    end_time = timezone.now()
+                                    if preexisting_ER:
+                                        output_dataset = curr_ER.get_execrecordout(curr_output).dataset
+                                    else:
+                                        output_dataset = librarian.models.Dataset.create_empty(
+                                            cdt=output_CDT, file_source=curr_RS)
+                                    output_dataset.mark_missing(start_time, end_time, curr_log, user)
+
+                                    bad_output_found = True
+
+                                else:
+                                    # If necessary, create new Dataset for output, and create the Dataset
+                                    # if it's to be retained.
+                                    dataset_name = curr_RS.output_name(curr_output)
+                                    dataset_desc = curr_RS.output_description(curr_output)
+                                    make_dataset = curr_RS.keeps_output(curr_output)
+
+                                    if preexisting_ER:
+                                        if make_dataset:
+                                            # Wrap in a transaction to prevent
+                                            # concurrent authoring of Datasets to
+                                            # an existing Dataset.
+                                            output_ERO = curr_ER.get_execrecordout(curr_output)
+                                            with transaction.atomic():
+                                                output_dataset = Dataset.objects.select_for_update().filter(
+                                                    pk=output_ERO.dataset.pk).first()
+                                                if not output_dataset.has_data():
+                                                    check = output_dataset.check_integrity(
+                                                        output_path,
+                                                        checking_user=user,
+                                                        execlog=curr_log,
+                                                        notify_all=True)
+                                                    integrity_checks[i] = check
+                                                    if not check.is_fail():
+                                                        output_dataset.register_file(output_path)
+
+                                    else:
+                                        output_dataset = librarian.models.Dataset.create_dataset(
+                                            output_path,
+                                            cdt=output_CDT,
+                                            keep_file=make_dataset,
+                                            name=dataset_name,
+                                            description=dataset_desc,
+                                            file_source=curr_RS,
+                                            check=False
+                                        )
+                                        logger.debug("[%d] First time seeing file: saved md5 %s",
+                                                     slurm_id, output_dataset.MD5_checksum)
+                                output_datasets.append(output_dataset)
+
+                            # Create ExecRecord if there isn't already one.
+                            if not preexisting_ER:
+                                # Make new ExecRecord, linking it to the ExecLog
+                                logger.debug("[%d] Creating fresh ExecRecord", slurm_id)
+                                curr_ER = librarian.models.ExecRecord.create(curr_log, pipelinestep,
+                                                                             inputs_after_cable, output_datasets)
+
+                            # Link ExecRecord to RunStep (it may already have been linked; that's fine).
+                            curr_RS.link_execrecord(curr_ER, False)
+
                     succeeded_yet = True
                 except (OperationalError, InternalError):
                     wait_time = random.random()
-                    logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.",
-                                 worker_rank, wait_time)
+                    logger.debug(
+                        "[%d] Database conflict.  Waiting for %f seconds before retrying.",
+                        slurm_id,
+                        wait_time)
                     time.sleep(wait_time)
 
-        pipelinestep = curr_RS.pipelinestep
+            # Check outputs.
+            for i, curr_output in enumerate(pipelinestep.outputs):
+                output_path = output_paths[i]
+                output_dataset = curr_ER.get_execrecordout(curr_output).dataset
+                check = None
 
-        # Run code, creating ExecLog and MethodOutput.
-        curr_log = archive.models.ExecLog.create(curr_RS, invoking_record)
-        stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
-        stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
+                if bad_execution:
+                    logger.debug("[%d] Execution was unsuccessful; no check on %s was done", slurm_id, output_path)
+                elif bad_output_found:
+                    logger.debug("[%d] Bad output found; no check on %s was done", slurm_id, output_path)
 
-        # Check the integrity of the code before we run.
-        if not pipelinestep.transformation.definite.check_md5():  # this checks the driver and dependencies
-            logger.error("[%d] Method code has gone corrupt for %s or its " +
-                         "dependencies; stopping step",
-                         worker_rank,
-                         pipelinestep.transformation.definite.driver)
-            # Stop everything!
-            curr_log.start()
-            curr_log.methodoutput.are_checksums_OK = False
-            curr_log.methodoutput.save()
-            curr_log.stop(save=True, clean=False)
+                # Recovering or filling in old ER? Yes.
+                elif preexisting_ER:
 
-            # Update state variables:
-            curr_RS.finish_failure(save=True)
-            curr_RS.complete_clean()
+                    file_is_present = True
+                    if recover:
+                        # Check that the file exists as in the non-recovery case.
+                        start_time = timezone.now()
+                        if not file_access_utils.file_exists(output_path):
+                            end_time = timezone.now()
+                            check = output_dataset.mark_missing(start_time, end_time, curr_log, user)
+                            logger.debug("[%d] During recovery, output (%s) is missing", slurm_id, output_path)
+                            file_is_present = False
 
-            logger.debug("[%d] Quarantining any other RunComponents using the same ExecRecord", worker_rank)
-            if preexisting_ER:
+                    if file_is_present:
+                        # Perform integrity check.
+                        logger.debug("[%d] Dataset has been computed before, checking integrity of %s",
+                                     slurm_id, output_dataset)
+                        check = integrity_checks.get(i)
+                        if check is None:
+                            check = output_dataset.check_integrity(output_path, user, curr_log)
+
+                        # We may also need to perform a content check if there isn't a complete
+                        # one already.
+                        if not check.is_fail() and not output_dataset.content_checks.filter(
+                                end_time__isnull=False).exists():
+                            logger.debug("[%d] Output has no complete content check; performing content check",
+                                         slurm_id)
+                            summary_path = "{}_summary".format(output_path)
+                            check = output_dataset.check_file_contents(
+                                output_path, summary_path, curr_output.get_min_row(),
+                                curr_output.get_max_row(), curr_log, user)
+
+                # Recovering or filling in old ER? No.
+                else:
+                    # Perform content check.
+                    logger.debug("[%d] %s is new data - performing content check", slurm_id, output_dataset)
+                    summary_path = "{}_summary".format(output_path)
+                    check = output_dataset.check_file_contents(
+                        output_path,
+                        summary_path,
+                        curr_output.get_min_row(),
+                        curr_output.get_max_row(),
+                        curr_log,
+                        user
+                    )
+
+                # Check OK? No.
+                if check and check.is_fail():
+                    logger.warn("[%d] %s failed for %s", slurm_id, check.__class__.__name__, output_path)
+                    bad_output_found = True
+
+                # Check OK? Yes.
+                elif check:
+                    logger.debug("[%d] %s passed for %s", slurm_id, check.__class__.__name__, output_path)
+
+            curr_ER.complete_clean()
+
+            # End.  Return curr_RS.  Update the state.
+            if not bad_output_found and not bad_execution:
+                curr_RS.finish_successfully(save=True)
+            else:
+                curr_RS.finish_failure(save=True)
+                logger.debug("[%d] Quarantining any other RunComponents using the same ExecRecord", slurm_id)
                 curr_ER.quarantine_runcomponents()  # this is transaction'd
 
+            curr_RS.complete_clean()
             return curr_RS
 
-        # From here on the code is assumed to not be corrupted.
-        try:
-            with open(stdout_path, "w+") as out_write, open(stderr_path, "w+") as err_write:
-                pipelinestep.transformation.definite.run_code(
-                    step_run_dir, input_paths,
-                    output_paths, [out_write], [err_write],
-                    curr_log, curr_log.methodoutput,
-                    stop_execution_callback=stop_execution_callback
-                )
-        except StopExecution as e:
-            # Immediately end, marking the RunStep as cancelled, and re-raise e.
-            logger.debug("[%d] Method execution stopped.", worker_rank)
+        except KeyboardInterrupt:
+            # Execution was stopped somewhere outside of run_code (that would
+            # have been caught above).
             curr_RS.cancel_running(save=True)
-            raise e
-
-        logger.debug("[%d] Method execution complete, ExecLog saved (started = %s, ended = %s)",
-                     worker_rank, curr_log.start_time, curr_log.end_time)
-
-        succeeded_yet = False
-        while not succeeded_yet:
-            integrity_checks = {}  # {output_idx: check}
-            try:
-                with transaction.atomic():
-                    # Create outputs.
-                    # bad_output_found indicates we have detected problems with the output.
-                    bad_output_found = False
-                    bad_execution = not curr_log.is_successful()
-                    output_datasets = []
-                    logger.debug("[%d] ExecLog.is_successful() == %s", worker_rank, not bad_execution)
-
-                    if not recover:
-                        if preexisting_ER:
-                            logger.debug("[%d] Filling in pre-existing ExecRecord with PipelineStep outputs",
-                                         worker_rank)
-                        else:
-                            logger.debug("[%d] Creating new Datasets for PipelineStep outputs", worker_rank)
-
-                        for i, curr_output in enumerate(pipelinestep.outputs):
-                            output_path = output_paths[i]
-                            output_CDT = curr_output.get_cdt()
-
-                            # Check that the file exists, as we did for cables.
-                            start_time = timezone.now()
-                            if not file_access_utils.file_exists(output_path):
-                                end_time = timezone.now()
-                                if preexisting_ER:
-                                    output_dataset = curr_ER.get_execrecordout(curr_output).dataset
-                                else:
-                                    output_dataset = librarian.models.Dataset.create_empty(
-                                        cdt=output_CDT, file_source=curr_RS)
-                                output_dataset.mark_missing(start_time, end_time, curr_log, user)
-
-                                bad_output_found = True
-
-                            else:
-                                # If necessary, create new Dataset for output, and create the Dataset
-                                # if it's to be retained.
-                                dataset_name = curr_RS.output_name(curr_output)
-                                dataset_desc = curr_RS.output_description(curr_output)
-                                make_dataset = curr_RS.keeps_output(curr_output)
-
-                                if preexisting_ER:
-                                    if make_dataset:
-                                        # Wrap in a transaction to prevent
-                                        # concurrent authoring of Datasets to
-                                        # an existing Dataset.
-                                        output_ERO = curr_ER.get_execrecordout(curr_output)
-                                        with transaction.atomic():
-                                            output_dataset = Dataset.objects.select_for_update().filter(
-                                                pk=output_ERO.dataset.pk).first()
-                                            if not output_dataset.has_data():
-                                                check = output_dataset.check_integrity(
-                                                    output_path,
-                                                    checking_user=user,
-                                                    execlog=curr_log,
-                                                    notify_all=True)
-                                                integrity_checks[i] = check
-                                                if not check.is_fail():
-                                                    output_dataset.register_file(output_path)
-
-                                else:
-                                    output_dataset = librarian.models.Dataset.create_dataset(
-                                        output_path,
-                                        cdt=output_CDT,
-                                        keep_file=make_dataset,
-                                        name=dataset_name,
-                                        description=dataset_desc,
-                                        file_source=curr_RS,
-                                        check=False
-                                    )
-                                    logger.debug("[%d] First time seeing file: saved md5 %s",
-                                                 worker_rank, output_dataset.MD5_checksum)
-                            output_datasets.append(output_dataset)
-
-                        # Create ExecRecord if there isn't already one.
-                        if not preexisting_ER:
-                            # Make new ExecRecord, linking it to the ExecLog
-                            logger.debug("[%d] Creating fresh ExecRecord", worker_rank)
-                            curr_ER = librarian.models.ExecRecord.create(curr_log, pipelinestep,
-                                                                         inputs_after_cable, output_datasets)
-
-                        # Link ExecRecord to RunStep (it may already have been linked; that's fine).
-                        curr_RS.link_execrecord(curr_ER, False)
-
-                succeeded_yet = True
-            except (OperationalError, InternalError):
-                wait_time = random.random()
-                logger.debug("[%d] Database conflict.  Waiting for %f seconds before retrying.", worker_rank, wait_time)
-                time.sleep(wait_time)
-
-        # Check outputs.
-        for i, curr_output in enumerate(pipelinestep.outputs):
-            output_path = output_paths[i]
-            output_dataset = curr_ER.get_execrecordout(curr_output).dataset
-            check = None
-
-            if bad_execution:
-                logger.debug("[%d] Execution was unsuccessful; no check on %s was done", worker_rank, output_path)
-            elif bad_output_found:
-                logger.debug("[%d] Bad output found; no check on %s was done", worker_rank, output_path)
-
-            # Recovering or filling in old ER? Yes.
-            elif preexisting_ER:
-
-                file_is_present = True
-                if recover:
-                    # Check that the file exists as in the non-recovery case.
-                    start_time = timezone.now()
-                    if not file_access_utils.file_exists(output_path):
-                        end_time = timezone.now()
-                        check = output_dataset.mark_missing(start_time, end_time, curr_log, user)
-                        logger.debug("[%d] During recovery, output (%s) is missing", worker_rank, output_path)
-                        file_is_present = False
-
-                if file_is_present:
-                    # Perform integrity check.
-                    logger.debug("[%d] Dataset has been computed before, checking integrity of %s",
-                                 worker_rank, output_dataset)
-                    check = integrity_checks.get(i)
-                    if check is None:
-                        check = output_dataset.check_integrity(output_path, user, curr_log)
-
-                    # We may also need to perform a content check if there isn't a complete
-                    # one already.
-                    if not check.is_fail() and not output_dataset.content_checks.filter(
-                            end_time__isnull=False).exists():
-                        logger.debug("[%d] Output has no complete content check; performing content check",
-                                     worker_rank)
-                        summary_path = "{}_summary".format(output_path)
-                        check = output_dataset.check_file_contents(
-                            output_path, summary_path, curr_output.get_min_row(),
-                            curr_output.get_max_row(), curr_log, user)
-
-            # Recovering or filling in old ER? No.
-            else:
-                # Perform content check.
-                logger.debug("[%d] %s is new data - performing content check", worker_rank, output_dataset)
-                summary_path = "{}_summary".format(output_path)
-                check = output_dataset.check_file_contents(
-                    output_path,
-                    summary_path,
-                    curr_output.get_min_row(),
-                    curr_output.get_max_row(),
-                    curr_log,
-                    user
+            raise StopExecution(
+                "Execution of step {} (method {}) was stopped during preamble/postamble.".format(
+                    curr_RS,
+                    curr_RS.pipelinestep.transformation.definite
                 )
-
-            # Check OK? No.
-            if check and check.is_fail():
-                logger.warn("[%d] %s failed for %s", worker_rank, check.__class__.__name__, output_path)
-                bad_output_found = True
-
-            # Check OK? Yes.
-            elif check:
-                logger.debug("[%d] %s passed for %s", worker_rank, check.__class__.__name__, output_path)
-
-        curr_ER.complete_clean()
-
-        # End.  Return curr_RS.  Update the state.
-        if not bad_output_found and not bad_execution:
-            curr_RS.finish_successfully(save=True)
-        else:
-            curr_RS.finish_failure(save=True)
-            logger.debug("[%d] Quarantining any other RunComponents using the same ExecRecord", worker_rank)
-            curr_ER.quarantine_runcomponents()  # this is transaction'd
-
-        curr_RS.complete_clean()
-        return curr_RS
+            )
 
 
 class RunPlan(object):

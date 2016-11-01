@@ -1243,8 +1243,8 @@ class Datatype(AccessControl):
             verif_method.run_code(summary_path,
                                   [input_path],
                                   [output_path],
-                                  [out, sys.stdout],
-                                  [err, sys.stderr],
+                                  out,
+                                  err,
                                   verif_log,
                                   verif_log)
 

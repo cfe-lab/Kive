@@ -605,11 +605,10 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                  run_path,
                  input_paths,
                  output_paths,
-                 output_streams,
-                 error_streams,
+                 stdout_stream,
+                 stderr_stream,
                  log=None,
-                 details_to_fill=None,
-                 stop_execution_callback=None):
+                 details_to_fill=None):
         """
         Run this Method with the specified inputs and outputs.
 
@@ -633,90 +632,65 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         run_path        see invoke_code
         input_paths     see invoke_code
         output_paths    see invoke_code
-        output_streams  list of streams (eg. open file handles) to output stdout to
-        error_streams   list of streams (eg. open file handles) to output stderr to
+        stdout_stream   stream (eg. open file handle) to output stdout to (must be read-write)
+        stderr_stream   stream (eg. open file handle) to output stderr to (must be read-write)
         log             object with start_time and end_time fields to fill in (either
                         VerificationLog, or ExecLog)
         details_to_fill object with return_code, output_log, and error_log to fill in
                         (either VerificationLog, or MethodOutput)
 
         ASSUMPTIONS
-        1) if details_to_fill is provided, the first entry in output_streams and error_streams
+        1) if details_to_fill is provided, the first entry in stdout_stream and stderr_stream
         are handles to regular files, open for reading and writing.
         """
         if log:
             log.start(save=True)
 
-        return_code = None
         try:
-            method_popen = self.invoke_code(run_path, input_paths, output_paths)
-        except OSError:
-            for stream in error_streams:
-                traceback.print_exc(file=stream)
-            return_code = -1
+            return_code = None
+            try:
+                method_popen = self.invoke_code(
+                    run_path,
+                    input_paths,
+                    output_paths,
+                    stdout_stream,
+                    stderr_stream
+                )
+            except OSError:
+                traceback.print_exc(file=stderr_stream)
+                return_code = -1
 
-        is_terminated = False
-        # Successful execution.
-        if return_code is None:
-            err_thread = threading.Thread(
-                target=self._poll_stream,
-                args=(method_popen.stderr, 'stderr', error_streams))
-            err_thread.start()
-            out_thread = threading.Thread(
-                target=self._poll_stream,
-                args=(method_popen.stdout, 'stdout', output_streams))
-            out_thread.start()
-
-            if stop_execution_callback is None:
+            # Successful execution.
+            if return_code is None:
                 return_code = method_popen.wait()
-            else:
-                # While periodically checking for a STOP message, we
-                # monitor the progress of method_popen.
-                while method_popen.returncode is None:
-                    if stop_execution_callback() is not None:
-                        # We have received a STOP message.  Terminate method_popen.
-                        method_popen.terminate()
-                        return_code = -2
-                        is_terminated = True
-                        break
 
-                    time.sleep(settings.SLEEP_SECONDS)
-                    method_popen.poll()
-                if not is_terminated:
-                    return_code = method_popen.returncode
+            with transaction.atomic():
+                if log:
+                    log.stop(save=True, clean=True)
 
-            # Having stopped one way or another, make sure we capture the rest of the output.
-            err_thread.join()
-            out_thread.join()
+                # TODO: I'm not sure how this is going to handle huge output,
+                # it would be better to update the logs as we go.
+                if details_to_fill:
+                    self.logger.debug('return code is %s for %r.',
+                                      return_code,
+                                      details_to_fill)
+                    details_to_fill.return_code = return_code
+                    stdout_stream.seek(0)
+                    stderr_stream.seek(0)
 
-        for stream in output_streams + error_streams:
-            stream.flush()
+                    details_to_fill.error_log.save(stderr_stream.name, File(stderr_stream))
+                    details_to_fill.output_log.save(stdout_stream.name, File(stdout_stream))
+                    details_to_fill.clean()
+                    details_to_fill.save()
 
-        with transaction.atomic():
-            if log:
-                log.stop(save=True, clean=True)
-
-            # TODO: I'm not sure how this is going to handle huge output,
-            # it would be better to update the logs as we go.
-            if details_to_fill:
-                self.logger.debug('return code is %s for %r.',
-                                  return_code,
-                                  details_to_fill)
-                details_to_fill.return_code = return_code
-                outlog = output_streams[0]
-                errlog = error_streams[0]
-                outlog.seek(0)
-                errlog.seek(0)
-
-                details_to_fill.error_log.save(errlog.name, File(errlog))
-                details_to_fill.output_log.save(outlog.name, File(outlog))
-                details_to_fill.clean()
-                details_to_fill.save()
-
-        if is_terminated:
+        except KeyboardInterrupt:
+            # This has been stopped either by Kive or otherwise.  In any case, we want to make sure
+            # our popen is terminated correctly.
+            if method_popen is not None and method_popen.returncode is None:
+                method_popen.terminate()
             raise StopExecution("Execution of method {} was stopped.".format(self))
 
-    def invoke_code(self, run_path, input_paths, output_paths,
+    def invoke_code(self, run_path, input_paths, output_paths, stdout_stream, stderr_stream,
                     ssh_sandbox_worker_account=settings.KIVE_SANDBOX_WORKER_ACCOUNT):
         """
         SYNOPSIS
@@ -728,6 +702,8 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         run_path        Directory where code will be run
         input_paths     List of input files expected by the code
         output_paths    List of where code will write results
+        stdout_stream   Stream to write stdout to
+        stderr_stream   Stream to write stderr to
         ssh_sandbox_worker_account
                         Name of the user account that the code will be invoked by
                         (see kive.settings for more details).  If blank, code will
@@ -797,7 +773,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             command = [code_to_run] + input_paths + output_paths
 
         self.logger.debug("subprocess.Popen({})".format(command))
-        code_popen = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        code_popen = subprocess.Popen(command, shell=False, stdout=stdout_stream, stderr=stderr_stream,
                                       cwd=run_path)
 
         return code_popen

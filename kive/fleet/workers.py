@@ -10,38 +10,19 @@ import itertools
 import os
 import glob
 import shutil
+import json
 
-from django.db import connection
 from django.conf import settings
 from django.utils import timezone
 
 from archive.models import Dataset, Run, ExceedsSystemCapabilities,\
-    RunStep, RunSIC, RunComponent
+    RunStep, RunSIC, RunCable
 from sandbox.execute import Sandbox, sandbox_glob
 from fleet.exceptions import StopExecution
 
 mgr_logger = logging.getLogger("fleet.Manager")
 foreman_logger = logging.getLogger("fleet.Foreman")
 worker_logger = logging.getLogger("fleet.Worker")
-
-
-def adjust_log_files(target_logger, rank):
-    """ Configure a different log file for each worker process.
-
-    Because multiple processes are not allowed to log to the same file, we have
-    to adjust the configuration.
-    https://docs.python.org/2/howto/logging-cookbook.html#logging-to-a-single-file-from-multiple-processes
-    """
-    for handler in target_logger.handlers:
-        filename = getattr(handler, 'baseFilename', None)
-        if filename is not None:
-            handler.close()
-            fileRoot, fileExt = os.path.splitext(filename)
-            rank_suffix = '.{:03}'.format(rank)
-            if not fileRoot.endswith(rank_suffix):
-                handler.baseFilename = fileRoot + rank_suffix + fileExt
-    if target_logger.parent is not None:
-        adjust_log_files(target_logger.parent, rank)
 
 
 class Manager(object):
@@ -634,7 +615,7 @@ class Foreman(object):
         else:
             # Attempt to stop any tasks that belong to this Run.
             for task, slurm_id in self.tasks_in_progress:
-                # FIXME need a function that sends an appropriate signal to the Slurm job.
+                # FIXME need a function that sends SIGTERM to the Slurm job using scancel.
                 pass
 
             # Cancel all tasks on the task queue pertaining to this run, and finalize the
@@ -654,6 +635,7 @@ class Foreman(object):
     def change_priority(self, priority):
         pass
 
+
 # This should now be a thing that's done in Slurm by srun.
 # FIXME Need to watch for scancel rather than a shutdown message.
 # scancel will send SIGTERM?
@@ -661,56 +643,23 @@ class Worker(object):
     """
     Performs the actual computational tasks required of Pipelines.
     """
-    # READY = "ready"
-    # VASSAL = "vassal"
-    # LORD = "lord"
+    FINISHED = 1
+    STOPPED = 2
+    ERROR = 3
 
-    ROLLCALL = 1
-    ASSIGNMENT = 2
-    FINISHED = 3
-    SHUTDOWN = 4
-    STOP = 5
-
-    FAILURE = -1
-
-    # Step
-    # def dict_repr(self):
-        # return {
-        #     "runstep_pk": self.runstep.pk,
-        #     "user_pk": self.user.pk,
-        #     "cable_info_dicts": [x.dict_repr() for x in self.cable_info_list],
-        #     "execrecord_pk": None if self.execrecord is None else self.execrecord.pk,
-        #     "step_run_dir": self.step_run_dir,
-        #     "log_dir": self.log_dir,
-        #     "recovering_record_pk": self.recovering_record.pk if self.recovering_record is not None else None,
-        #     "output_paths": self.output_paths,
-        #     "threads_required": self.threads_required
-        # }
-
-    # Cable
-    # def dict_repr(self):
-    #     return {
-    #         "cable_record_pk": self.cable_record.pk,
-    #         "user_pk": self.user.pk,
-    #         "execrecord_pk": self.execrecord.pk if self.execrecord is not None else None,
-    #         "input_dataset_pk": self.input_dataset.pk,
-    #         "input_dataset_path": self.input_dataset_path,
-    #         "output_path": self.output_path,
-    #         "recovering_record_pk": self.recovering_record.pk if self.recovering_record is not None else None,
-    #         "by_step_pk": None if self.by_step is None else self.by_step.pk,
-    #         "threads_required": self.threads_required,
-    #         "ready_to_go": self.ready_to_go
-    #     }
-
-
-    def __init__(self, task_info_dict):
-        adjust_log_files(worker_logger, self.rank)
+    def __init__(self, task_info_dict, slurm_id):
+        self.slurm_id = slurm_id
+        # adjust_log_files(worker_logger, self.rank)
 
         # Unpack task_info_dict.
         self.task_info_dict = task_info_dict
 
-        self.task_type = "RunStep" if "runstep_pk" in task_info_dict else "RunCable"
-        self.task = RunStep.objects.get(pk=task_info_dict["runstep_pk"]) if self.task_type == "RunStep"
+        if "runstep_pk" in task_info_dict:
+            self.task_type = "RunStep"
+            self.task = RunStep.objects.get(pk=task_info_dict["runstep_pk"])
+        else:
+            self.task_type = "RunCable"
+            self.task_type = RunCable.objects.get(pk=task_info_dict["cable_record_pk"])
 
         worker_logger.debug(
             "Worker created to handle {} with pk={}".format(
@@ -722,50 +671,81 @@ class Worker(object):
 
         self.task_info_dict = task_info_dict
 
-    # FIXME continue from here
+    def write_summary(self, status, message, log_dir=None, summary_prefix="summary_"):
+        result_dict = {
+            "status": status,
+            "message": message
+        }
+
+        summary_path = "{}_slurmID{}_task{}.log".format(
+            summary_prefix,
+            self.slurm_id,
+            self.task.pk
+        )
+        with open(os.path.join(log_dir, summary_path), "wb") as f:
+            json.dump(result_dict, f)
+
     def perform_task(self):
         """
         Perform the assigned task.
         """
         try:
-            try:
-                if type(task) == RunStep:
-                    sandbox_result = Sandbox.finish_step(task_info_dict, self.rank, self.interface.stop_run_callback)
-                else:
-                    sandbox_result = Sandbox.finish_cable(task_info_dict, self.rank)
-                worker_logger.debug(
-                    "%s %s completed.  Returning results to Manager.",
-                    task.__class__.__name__,
-                    task)
-                result = sandbox_result.pk
-            except StopExecution as e:
-                worker_logger.debug(
-                    "[%d] %s %s stopped (%s).",
-                    self.rank,
-                    task.__class__.__name__,
-                    task,
-                    e,
-                    exc_info=True
+            if isinstance(self.task, RunStep):
+                Sandbox.finish_step(
+                    self.task_info_dict,
+                    self.slurm_id,
                 )
-                result = Worker.STOP
+            else:
+                Sandbox.finish_cable(self.task_info_dict, self.slurm_id)
+            worker_logger.debug(
+                "%s %s completed.  Returning results to Manager.",
+                self.task.__class__.__name__,
+                self.task
+            )
+
+        except StopExecution as e:
+            # Execution was stopped during actual execution of code.
+            message = "[{}] {} {} stopped ({}).".format(
+                self.slurm_id,
+                self.task_type,
+                self.task,
+                e
+            )
+
+            worker_logger.debug(
+                message,
+                exc_info=True
+            )
+            status = Worker.STOPPED
+
+        except KeyboardInterrupt:
+            # Execution was stopped somewhere outside of run_code (that would
+            # have been caught above and raised a StopExecution.
+            self.task.cancel(save=True)
+            task_string = str(self.task)
+            if isinstance(self.task, RunStep):
+                task_string = "{} (method {})".format(
+                    task_string,
+                    self.task.pipelinestep.transformation.definite
+                )
+            message = "Execution of {} {} (method {}) was stopped during preamble/postamble.".format(
+                self.task_type,
+                task_string
+            )
+            worker_logger.debug(message)
+            status = Worker.STOPPED
+
         except:
-            result = Worker.FAILURE  # bogus return value
-            self.interface.record_exception(self.rank, task)
+            status = Worker.ERROR  # bogus return value
+            message = "[{}] Task {} failed.".format(
+                self.slurm_id,
+                self.task
+            )
+            worker_logger.error(message, exc_info=True)
 
-        message = (self.rank, result)
-        self.interface.send_finished_task(message)
-        worker_logger.debug("Sent {} to Manager".format(message))
-
-        return tag
-
-    def main_procedure(self):
-        """
-        Loop on receive_and_perform_task.
-        """
-        tag = None
-        while tag != self.SHUTDOWN:
-            tag = self.receive_and_perform_task()
-        connection.close()
+        if isinstance(self.task, RunStep):
+            self.write_summary(status, message, log_dir=self.task_info_dict["log_dir"])
+        worker_logger.debug("Task {} completed.".format(self.task))
 
 
 class WorkerFailedException(Exception):
