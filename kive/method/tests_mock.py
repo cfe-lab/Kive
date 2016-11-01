@@ -62,7 +62,6 @@ class MethodMockTests(TestCase):
         check_input_indices() return with no exception.
         """
 
-        del TransformationXput.transformationinput
         driver = CodeResourceRevision(coderesource=CodeResource())
 
         foo = Method(driver=driver, family=MethodFamily())
@@ -79,7 +78,6 @@ class MethodMockTests(TestCase):
         correctly indexed and in order.
         """
 
-        del TransformationXput.transformationinput
         driver = CodeResourceRevision(coderesource=CodeResource())
 
         foo = Method(driver=driver, family=MethodFamily())
@@ -97,7 +95,6 @@ class MethodMockTests(TestCase):
         correctly indexed and in scrambled order.
         """
 
-        del TransformationXput.transformationinput
         driver = CodeResourceRevision(coderesource=CodeResource())
 
         foo = Method(driver=driver, family=MethodFamily())
@@ -114,7 +111,6 @@ class MethodMockTests(TestCase):
         Test input index check, one badly-indexed input case.
         """
 
-        del TransformationXput.transformationinput
         driver = CodeResourceRevision(coderesource=CodeResource())
 
         foo = Method(driver=driver, family=MethodFamily())
@@ -135,7 +131,6 @@ class MethodMockTests(TestCase):
     def test_many_nonconsective_inputs_scrambled_checkInputIndices_bad(self):
         """Test input index check, badly-indexed multi-input case."""
 
-        del TransformationXput.transformationinput
         driver = CodeResourceRevision(coderesource=CodeResource())
 
         foo = Method(driver=driver, family=MethodFamily())
@@ -165,7 +160,6 @@ class MethodMockTests(TestCase):
     def test_one_valid_output_checkOutputIndices_good(self):
         """Test output index check, one well-indexed output case."""
 
-        del TransformationXput.transformationoutput
         driver = CodeResourceRevision(coderesource=CodeResource())
 
         foo = Method(driver=driver, family=MethodFamily())
@@ -178,7 +172,6 @@ class MethodMockTests(TestCase):
     def test_many_valid_outputs_scrambled_checkOutputIndices_good(self):
         """Test output index check, well-indexed multi-output (scrambled order) case."""
 
-        del TransformationXput.transformationoutput
         driver = CodeResourceRevision(coderesource=CodeResource())
 
         foo = Method(driver=driver, family=MethodFamily())
@@ -192,7 +185,6 @@ class MethodMockTests(TestCase):
     def test_one_invalid_output_checkOutputIndices_bad(self):
         """Test output index check, one badly-indexed output case."""
 
-        del TransformationXput.transformationoutput
         driver = CodeResourceRevision(coderesource=CodeResource())
 
         foo = Method(driver=driver, family=MethodFamily())
@@ -212,7 +204,6 @@ class MethodMockTests(TestCase):
     def test_many_invalid_outputs_scrambled_checkOutputIndices_bad(self):
         """Test output index check, badly-indexed multi-output case."""
 
-        del TransformationXput.transformationoutput
         driver = CodeResourceRevision(coderesource=CodeResource())
 
         foo = Method(driver=driver, family=MethodFamily())
@@ -231,8 +222,6 @@ class MethodMockTests(TestCase):
             foo.clean)
 
     def create_parent(self):
-        del TransformationXput.transformationinput
-        del TransformationXput.transformationoutput
         parent = Method()
         parent.inputs = MockSet(name='parent.inputs', cls=TransformationInput)
         parent.outputs = MockSet(name='parent.outputs', cls=TransformationOutput)
@@ -335,13 +324,9 @@ class MethodMockTests(TestCase):
         self.assertTrue(m.is_identical(m))
 
     def test_identical(self):
-        del TransformationXput.transformationinput
-        del TransformationXput.transformationoutput
         driver = CodeResourceRevision()
         user = User()
         m1 = Method(revision_name='A', driver=driver, user=user)
-        m1.inputs = MockSet(cls=TransformationInput)
-        m1.outputs = MockSet(cls=TransformationOutput)
         for i in range(2):
             inp = m1.inputs.create(dataset_name='a_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -352,8 +337,6 @@ class MethodMockTests(TestCase):
             out.transformationoutput = out
 
         m2 = Method(revision_name='B', driver=driver, user=user)
-        m2.inputs = MockSet(cls=TransformationInput)
-        m2.outputs = MockSet(cls=TransformationOutput)
         for i in range(2):
             inp = m2.inputs.create(dataset_name='b_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -366,14 +349,10 @@ class MethodMockTests(TestCase):
         self.assertTrue(m1.is_identical(m2))
 
     def test_identical_when_drivers_unmatched(self):
-        del TransformationXput.transformationinput
-        del TransformationXput.transformationoutput
         driver1 = CodeResourceRevision()
         driver2 = CodeResourceRevision()
         user = User()
         m1 = Method(revision_name='A', driver=driver1, user=user)
-        m1.inputs = MockSet(cls=TransformationInput)
-        m1.outputs = MockSet(cls=TransformationOutput)
         for i in range(2):
             inp = m1.inputs.create(dataset_name='a_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -384,8 +363,6 @@ class MethodMockTests(TestCase):
             out.transformationoutput = out
 
         m2 = Method(revision_name='B', driver=driver2, user=user)
-        m2.inputs = MockSet(cls=TransformationInput)
-        m2.outputs = MockSet(cls=TransformationOutput)
         for i in range(2):
             inp = m2.inputs.create(dataset_name='b_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -398,13 +375,9 @@ class MethodMockTests(TestCase):
         self.assertFalse(m1.is_identical(m2))
 
     def test_identical_when_inputs_unmatched(self):
-        del TransformationXput.transformationinput
-        del TransformationXput.transformationoutput
         driver = CodeResourceRevision()
         user = User()
         m1 = Method(revision_name='A', driver=driver, user=user)
-        m1.inputs = MockSet(cls=TransformationInput)
-        m1.outputs = MockSet(cls=TransformationOutput)
         for i in range(1):
             inp = m1.inputs.create(dataset_name='a_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -415,8 +388,6 @@ class MethodMockTests(TestCase):
             out.transformationoutput = out
 
         m2 = Method(revision_name='B', driver=driver, user=user)
-        m2.inputs = MockSet(cls=TransformationInput)
-        m2.outputs = MockSet(cls=TransformationOutput)
         for i in range(2):
             inp = m2.inputs.create(dataset_name='b_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -429,13 +400,9 @@ class MethodMockTests(TestCase):
         self.assertFalse(m1.is_identical(m2))
 
     def test_identical_when_outputs_unmatched(self):
-        del TransformationXput.transformationinput
-        del TransformationXput.transformationoutput
         driver = CodeResourceRevision()
         user = User()
         m1 = Method(revision_name='A', driver=driver, user=user)
-        m1.inputs = MockSet(cls=TransformationInput)
-        m1.outputs = MockSet(cls=TransformationOutput)
         for i in range(2):
             inp = m1.inputs.create(dataset_name='a_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -446,8 +413,6 @@ class MethodMockTests(TestCase):
             out.transformationoutput = out
 
         m2 = Method(revision_name='B', driver=driver, user=user)
-        m2.inputs = MockSet(cls=TransformationInput)
-        m2.outputs = MockSet(cls=TransformationOutput)
         for i in range(2):
             inp = m2.inputs.create(dataset_name='b_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -610,7 +575,6 @@ class MethodUpdateMockTests(TestCase):
 
     @mocked_relations(Pipeline, Transformation)
     def test_find_update_not_found_from_transformation(self):
-        del Transformation.method
         transformation = Transformation(id=self.new_method.id)
         transformation.method = self.new_method
         update = transformation.find_update()

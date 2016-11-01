@@ -181,7 +181,6 @@ Dave,40
 
         dataset = Dataset()
         dataset.get_open_file_handle = lambda: data_file
-        Dataset.content_checks.first.return_value = None
 
         rows = list(dataset.rows(data_check=True))
 
@@ -562,7 +561,6 @@ class ExecRecordMockTests(TestCase):
         pipeline.pipeline = pipeline
         method = Method()
         method.method = method
-        del TransformationXput.transformationoutput  # remove mock
         method_out = TransformationOutput(pk=42, transformation=method)
         method_out.transformationoutput = method_out
         execrecord = ExecRecord(generator=ExecLog(record=RunOutputCable(
@@ -611,8 +609,6 @@ class ExecRecordMockTests(TestCase):
 
     @mocked_relations(Dataset, TransformationInput, TransformationOutput, TransformationXput)
     def test_pipeline_execrecordout_raw_cdt(self):
-        del TransformationXput.structure
-
         execrecordout = self.create_pipeline_execrecordout()
         execrecordout.generic_output.structure = XputStructure()
         self.assertRaisesRegexp(
@@ -622,8 +618,6 @@ class ExecRecordMockTests(TestCase):
 
     @mocked_relations(Dataset, TransformationXput)
     def test_pipeline_execrecordout_cdt_raw(self):
-        del Dataset.structure
-
         execrecordout = self.create_pipeline_execrecordout()
         execrecordout.dataset.structure = DatasetStructure()
         self.assertRaisesRegexp(
@@ -633,8 +627,6 @@ class ExecRecordMockTests(TestCase):
 
     @mocked_relations(Dataset, TransformationXput, CompoundDatatype)
     def test_pipeline_execrecordout_cdt_cdt(self):
-        del Dataset.structure
-        del TransformationXput.structure
         cdt = CompoundDatatype()
 
         execrecordout = self.create_pipeline_execrecordout()
@@ -644,8 +636,6 @@ class ExecRecordMockTests(TestCase):
 
     @mocked_relations(Dataset, TransformationInput, TransformationOutput, TransformationXput, CompoundDatatype)
     def test_pipeline_execrecordout_cdt1_cdt2(self):
-        del Dataset.structure
-        del TransformationXput.structure
         execrecordout = self.create_pipeline_execrecordout()
         cdt1 = CompoundDatatype()
         cdt1.members = MockSet(CompoundDatatypeMember(datatype=Datatype()))
@@ -662,8 +652,6 @@ class ExecRecordMockTests(TestCase):
 
     @mocked_relations(Dataset, TransformationInput, TransformationOutput, TransformationXput, CompoundDatatype)
     def test_pipeline_execrecordout_cdt_cdt(self):
-        del Dataset.structure
-        del TransformationXput.structure
         cdt = CompoundDatatype()
 
         execrecordout = self.create_pipeline_execrecordout()
@@ -676,8 +664,6 @@ class ExecRecordMockTests(TestCase):
             execrecordout.clean)
 
     def create_method_execrecordout(self):
-        del TransformationXput.transformationoutput
-        del Transformation.method
         method = Method()
         method.method = method
         execrecord = ExecRecord(generator=ExecLog(record=RunStep(run=Run(),
@@ -705,9 +691,6 @@ class ExecRecordMockTests(TestCase):
                       TransformationXput,
                       CompoundDatatype)
     def test_method_execrecordout_cdt1_cdt2(self):
-        del Dataset.structure
-        del TransformationXput.structure
-
         execrecordout = self.create_method_execrecordout()
         cdt1 = CompoundDatatype()
         cdt1.members = MockSet(CompoundDatatypeMember(datatype=Datatype()))
@@ -730,8 +713,6 @@ class ExecRecordMockTests(TestCase):
 
     @mocked_relations(ExecRecord, Dataset, TransformationXput, CompoundDatatype)
     def test_cable_execrecordout_cdt1_cdt2(self):
-        del Dataset.structure
-        del TransformationXput.structure
 
         execrecordout = self.create_cable_execrecordout()
         cdt1 = CompoundDatatype()
@@ -771,8 +752,6 @@ class ExecRecordMockTests(TestCase):
             execrecord.clean)
 
     def create_cable_execrecordout(self):
-        del TransformationXput.transformationoutput
-        del TransformationXput.transformationinput
         prev_out = TransformationOutput(pk=42, dataset_idx=1, dataset_name='eras')
         prev_out.transformationoutput = prev_out
         next_in = TransformationInput(pk=43, dataset_idx=3, dataset_name='ages')
@@ -791,8 +770,6 @@ class ExecRecordMockTests(TestCase):
         return execrecordout
 
     def create_custom_cable_execrecordout(self):
-        del Dataset.structure
-        del TransformationXput.structure
         execrecordout = self.create_cable_execrecordout()
         execrecord = execrecordout.execrecord
         execrecordin = execrecord.execrecordins.first()
@@ -840,7 +817,6 @@ class ExecRecordMockTests(TestCase):
 
     def create_execrecord_with_runstep_states(self, *state_ids):
         execrecord = ExecRecord()
-        execrecord.used_by_components = MockSet()
         for state_id in state_ids:
             run_step = RunStep(_runcomponentstate_id=state_id)
             run_step.runstep = run_step
