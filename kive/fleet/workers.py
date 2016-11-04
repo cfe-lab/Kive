@@ -29,6 +29,8 @@ from constants import runcomponentstates
 mgr_logger = logging.getLogger("fleet.Manager")
 worker_logger = logging.getLogger("fleet.Worker")
 
+# from fleet.slurminterface import SlurmManagerInterface
+
 
 def adjust_log_files(target_logger, rank):
     """ Configure a different log file for each worker process.
@@ -49,7 +51,58 @@ def adjust_log_files(target_logger, rank):
         adjust_log_files(target_logger.parent, rank)
 
 
-class MPIFleetInterface(object):
+class BaseFleetInterface(object):
+    """ Virtual base class for all Interface classes."""
+    def get_rank(self):
+        raise NotImplementedError()
+
+    def get_size(self):
+        raise NotImplementedError()
+
+    @staticmethod
+    def get_hostname():
+        raise NotImplementedError()
+
+
+class BaseManagerInterface(BaseFleetInterface):
+    """ Base class for all Interfaces that the Manager will interact with """
+    def __init__(self, *args, **kwrds):
+        pass
+
+    def send_task_to_worker(self, task_info, worker_rank):
+        raise NotImplementedError()
+
+    def worker_is_available(self):
+        """ Return a boolean value: a worker is available to do work. """
+        raise NotImplementedError()
+
+    def a_task_is_finished(self):
+        """ Return a boolean value: a worker has finished a run """
+        raise NotImplementedError()
+
+    def receive_finished(self):
+        raise NotImplementedError()
+
+    def take_rollcall(self):
+        """ Return a dictionary, in which the key is a hostname,
+        and the entries are lists of integers (the 'rank' or unique worker number).
+        """
+        raise NotImplementedError()
+
+    def stop_run(self, foreman):
+        """
+        Instructs the foreman to stop the task.  Blocks while waiting for a response.
+        """
+        raise NotImplementedError()
+
+    def record_exception(self):
+        mgr_logger.error("Manager failed.", exc_info=True)
+
+    def shut_down_fleet(self):
+        raise NotImplementedError()
+
+
+class MPIFleetInterface(BaseFleetInterface):
     """
     Base class for both MPIManagerInterface and MPIWorkerInterface.
     """
@@ -67,19 +120,15 @@ class MPIFleetInterface(object):
         return MPI.Get_processor_name()
 
 
-class SingleThreadedFleetInterface(object):
+class SingleThreadedFleetInterface(BaseFleetInterface):
     """ Base class for both single-threaded manager and worker. """
-    def get_rank(self):
-        raise NotImplementedError()
-
-    def get_size(self):
-        raise NotImplementedError()
 
     @staticmethod
     def get_hostname():
         return socket.gethostname()
 
 
+# class MPIManagerInterface(BaseManagerInterface):
 class MPIManagerInterface(MPIFleetInterface):
     """
     Object that is used by a Manager to communicate with Workers.
@@ -103,8 +152,16 @@ class MPIManagerInterface(MPIFleetInterface):
     def send_task_to_worker(self, task_info, worker_rank):
         self.comm.send(task_info.dict_repr(), dest=worker_rank, tag=Worker.ASSIGNMENT)
 
-    def probe_for_finished_worker(self):
+    def _probe_for_finished_worker(self):
         return self.comm.Iprobe(source=MPI.ANY_SOURCE, tag=Worker.FINISHED)
+
+    def worker_is_available(self):
+        """ Return a boolean value: a worker is available to do work. """
+        return self._probe_for_finished_worker()
+
+    def a_task_is_finished(self):
+        """ Return a boolean value: a worker has finished a run """
+        return self._probe_for_finished_worker()
 
     def receive_finished(self):
         # This returns the rank of the
@@ -164,7 +221,15 @@ class SingleThreadedManagerInterface(SingleThreadedFleetInterface):
             block=True
         )
 
-    def probe_for_finished_worker(self):
+    def worker_is_available(self):
+        """ Return a boolean value: a worker is available to do work. """
+        return self._probe_for_finished_worker()
+
+    def a_task_is_finished(self):
+        """ Return a boolean value: a worker has finished a run """
+        return self._probe_for_finished_worker()
+
+    def _probe_for_finished_worker(self):
         for rank in range(self.worker_count):
             worker_interface = self.worker_interfaces[rank]
             if not worker_interface.job_queue.empty():
@@ -463,7 +528,7 @@ class Manager(object):
             # Having reached this point, we know that no host was capable of taking on the task.
             # We block and wait for a worker to become ready, so we can try again.
             mgr_logger.debug("Looking for a host that has become ready....")
-            if not self.interface.probe_for_finished_worker():
+            if not self.interface.worker_is_available():
                 raise NoWorkersAvailable("No hosts ready to handle task {}".format(task))
             # Having reached here, we know something finished.
             lord_rank, result_pk = self.interface.receive_finished()
@@ -486,7 +551,13 @@ class Manager(object):
                 return
 
     def worker_finished(self, lord_rank, result_pk):
-        """Handle bookkeeping when a worker finishes."""
+        """Handle bookkeeping when a worker finishes.
+
+        result_pk: upon successful completion of a job, this is a positive number.
+
+        If the worker failed, this will be
+        Worker.FAILURE  (a negative number...)
+        """
         if result_pk == Worker.FAILURE:
             raise WorkerFailedException("Worker {} reports a failed task (PK {})".format(
                 lord_rank,
@@ -499,12 +570,18 @@ class Manager(object):
         task_finished = archive.models.RunComponent.objects.get(pk=result_pk).definite
 
         # Mark this task as having finished.
-        just_finished = self.tasks_in_progress.pop(lord_rank)
+        try:
+            just_finished = self.tasks_in_progress.pop(lord_rank)
+        except KeyError:
+            mgr_logger.error("inconsistent lord_rank = %d " %lord_rank)
+            raise RuntimeError("Manager: Unexpected worker number")
+        
         # SCO: replaced this assert with some logging information
         # for debugging, and an exception
         # assert task_finished == just_finished["task"]
         if task_finished != just_finished["task"]:
             mgr_logger.error("Manager Error: '%s'  vs '%s'", task_finished, just_finished["task"])
+            mgr_logger.error("lord_rank: %d, result_pk: %d" % (lord_rank, result_pk))
             raise RuntimeError("Manager: Unexpected Task Error!")
         curr_sdbx = self.active_sandboxes[task_finished.top_level_run]
         task_execute_info = curr_sdbx.get_task_info(task_finished)
@@ -554,6 +631,9 @@ class Manager(object):
         clean_up_now = False
         curr_sdbx.run.refresh_from_db()
         stop_subruns_if_possible = False
+
+        sco_finish = task_finished.is_successful()
+        mgr_logger.debug("Manager looking for task_finished: %d" % sco_finish)
 
         if task_finished.is_successful():
             if curr_sdbx.run.is_failing() or curr_sdbx.run.is_cancelling():
@@ -761,14 +841,18 @@ class Manager(object):
         Return True iff no error occurred in doing this.
         """
         while time.time() < time_to_poll:
-            if self.interface.probe_for_finished_worker():
+            if self.interface.a_task_is_finished():
                 lord_rank, result_pk = self.interface.receive_finished()
+                mgr_logger.debug("received_polling rank: %d, res_pk: %s" % (lord_rank, result_pk))
                 try:
                     self.worker_finished(lord_rank, result_pk)
                     break
                 except WorkerFailedException as e:
                     mgr_logger.error(e.error_msg)
                     return False
+            # else:
+            #    mgr_logger.debug("no task is finished...")
+            # mgr_logger.debug("just before sleep")
             try:
                 time.sleep(settings.SLEEP_SECONDS)
             except KeyboardInterrupt:
@@ -1013,8 +1097,11 @@ class Manager(object):
 
         # The run is already in the queue, so we can just start the fleet and let it exit
         # when it finishes.
+        # single_threaded = True
         if not single_threaded:
             interface = MPIManagerInterface(worker_count=1, manage_script=sys.argv[0])
+            # interface = SlurmManagerInterface(worker_count=1, manage_script=sys.argv[0])
+            pass
         else:
             interface = SingleThreadedManagerInterface(worker_count=1)
         manager = cls(interface=interface, quit_idle=True, history=1)
@@ -1160,6 +1247,9 @@ class Worker(object):
             worker_logger.info("Worker {} received a stop message too late; ignoring.".format(self.rank))
             return tag
 
+        if tag != self.ASSIGNMENT:
+            worker_logger.error("Worker Received unknown tag %d" % tag)
+            raise RuntimeError("Worker received unknown tag")
         try:
             task = None
             if "cable_record_pk" in task_info_dict:

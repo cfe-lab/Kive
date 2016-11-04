@@ -1817,6 +1817,7 @@ class Sandbox:
         try:
             with open(stdout_path, "w+") as out_write, open(stderr_path, "w+") as err_write:
                 pipelinestep.transformation.definite.run_code(
+                    step_execute_dict,
                     step_run_dir, input_paths,
                     output_paths, [out_write], [err_write],
                     curr_log, curr_log.methodoutput,

@@ -601,7 +601,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 with dep.requirement.content_file:
                     shutil.copyfileobj(dep.requirement.content_file, f)
 
-    def run_code(self,
+    def run_code(self, step_execute_dict,
                  run_path,
                  input_paths,
                  output_paths,
@@ -647,36 +647,59 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         if log:
             log.start(save=True)
 
-        SSH_ERROR = 255
-        MAX_TRY = 5
-        itry = 0
-        dunnit = False
-        method_popen = None
-        # NOTE: we only retry invoking code iff the error code is an ssh error.
-        while itry < MAX_TRY and not dunnit:
-            itry += 1
-            dunnit = True
-            try:
-                method_popen = self.invoke_code(run_path, input_paths, output_paths)
-            except OSError as oserror:
-                method_popen = None
-                self.logger.warning('attempt %d: OSError return code is %d' % (itry, oserror.errno))
-                for stream in error_streams:
-                    traceback.print_exc(file=stream)
-                if oserror.errno == SSH_ERROR:
-                    dunnit = False
-                    # the ssh probably timed out: wait for a random amount of time and retry.
-                    time.sleep(random.random() * itry * 10.0)
-        # if the invocation failed for any reason, bail
-        if method_popen is None:
-            # an OS error
-            return_code = -1
+        # how shall we run the code ? The answer is in the step_execute_dict
+        if 'DO_SLURM' in step_execute_dict and step_execute_dict['DO_SLURM']:
+            # invoke and wait via slurm
+            self.install(run_path)
+            cmd_str = self.driver.coderesource.filename
+            arglst = input_paths + output_paths
+            if len(output_streams) > 1:
+                raise RuntimeError("SLURM can only handle 1 stdout file")
+            if len(error_streams) > 1:
+                raise RuntimeError("SLURM can only handle 1 stderr file")
+
+            precedent_job_lst = None
+            # invoke and wait until this job has stopped running....
+            slurm_manager = step_execute_dict['SLURM_MANAGER']
+            worker_rank = step_execute_dict['SLURM_WORKER']
+            return_code = slurm_manager.helper_invoke(worker_rank,
+                                                      run_path, cmd_str, arglst,
+                                                      output_streams[0].name,
+                                                      error_streams[0].name,
+                                                      step_execute_dict, precedent_job_lst)
         else:
-            # Successful invocation, now wait for the step to finish or be terminated.
-            return_code = self._wait_by_threading(method_popen,
-                                                  output_streams,
-                                                  error_streams,
-                                                  stop_execution_callback)
+            # run via SSH or directly via bash
+            SSH_ERROR = 255
+            MAX_TRY = 5
+            itry = 0
+            dunnit = False
+            method_popen = None
+            # NOTE: we only retry invoking code iff the error code is an ssh error.
+            while itry < MAX_TRY and not dunnit:
+                itry += 1
+                dunnit = True
+                try:
+                    method_popen = self.invoke_code(run_path, input_paths, output_paths)
+                except OSError as oserror:
+                    method_popen = None
+                    self.logger.warning('attempt %d: OSError return code is %d' % (itry, oserror.errno))
+                    for stream in error_streams:
+                        traceback.print_exc(file=stream)
+                        if oserror.errno == SSH_ERROR:
+                            dunnit = False
+                            # the ssh probably timed out: wait for a random amount of time and retry.
+                            time.sleep(random.random() * itry * 10.0)
+            # if the invocation failed for any reason, bail
+            if method_popen is None:
+                # an OS error
+                return_code = -1
+            else:
+                # Successful invocation, now wait for the step to finish or be terminated.
+                return_code = self._wait_by_threading(method_popen,
+                                                      output_streams,
+                                                      error_streams,
+                                                      stop_execution_callback)
+        # ---the method's driver has been called and has completed: now keep a record
         with transaction.atomic():
             if log:
                 log.stop(save=True, clean=True)

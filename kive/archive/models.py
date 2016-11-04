@@ -1054,7 +1054,9 @@ class RunComponent(stopwatch.models.Stopwatch):
         """
         True if RunComponent is successful; False otherwise.
         """
-        return self._runcomponentstate_id == runcomponentstates.SUCCESSFUL_PK
+        retval = self._runcomponentstate_id == runcomponentstates.SUCCESSFUL_PK
+        self.logger.debug("is_successful returning %d (state= %s)" % (retval, self._runcomponentstate_id))
+        return retval
 
     def is_cancelled(self):
         """
