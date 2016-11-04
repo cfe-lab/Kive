@@ -140,12 +140,33 @@ class Command(BaseCommand):
         return logging.DEBUG, 'MD5 matched for dataset id {}.'.format(dataset.id)
 
     def purge_trash(self, sandbox_path, limit):
-        filenames = os.listdir(sandbox_path)
-        if len(filenames)+1 > limit:
-            filepaths = (os.path.join(sandbox_path, filename) for filename in filenames)
-            filestats = sorted((os.stat(path).st_mtime, path) for path in filepaths)
-            for _mtime, filename in filestats[:len(filestats)+1-limit]:
-                os.remove(os.path.join(sandbox_path, filename))
+        """ Infinite generator function that will purge oldest files.
+
+        :return: a generator that yields None for successful purge, or an error
+            message.
+        """
+        previous_stats = []
+        while True:
+            filenames = None
+            try:
+                filenames = os.listdir(sandbox_path)
+                if len(filenames) > limit:
+                    filepaths = (os.path.join(sandbox_path, filename)
+                                 for filename in filenames)
+                    filestats = sorted((os.stat(path).st_mtime, path)
+                                       for path in filepaths)
+                    for _mtime, filename in filestats[:len(filestats)+1-limit]:
+                        os.remove(os.path.join(sandbox_path, filename))
+                    previous_stats = filestats
+                yield
+            except StandardError:
+                message = '\n'.join(['Purge failed with previous stats:',
+                                     previous_stats,
+                                     'current file names:',
+                                     filenames,
+                                     'error:',
+                                     format_exc()])
+                yield message
 
     # noinspection PyArgumentList
     def launch_workers(self, worker_count, options):
@@ -169,14 +190,18 @@ class Command(BaseCommand):
         host = MPI.Get_processor_name()
         rank = comm.Get_rank()
         sandbox_path = self.create_sandbox(rank)
+        cleaner = self.purge_trash(sandbox_path, limit)
         result = (logging.INFO, 'Worker {} started on {}.'.format(rank, host))
         while True:
             comm.send(result, dest=manager_rank)
             dataset_id = self.polling_receive(comm, source=manager_rank)
             try:
                 dataset = Dataset.objects.get(id=dataset_id)
-                self.purge_trash(sandbox_path, limit)
                 self.check_dataset(dataset, sandbox_path, host)
-                result = (logging.DEBUG, 'Checked dataset id {}.'.format(dataset_id))
+                purge_message = cleaner.next()
+                if purge_message is None:
+                    result = (logging.DEBUG, 'Checked dataset id {}.'.format(dataset_id))
+                else:
+                    result = (logging.ERROR, purge_message)
             except StandardError:
                 result = (logging.ERROR, format_exc())
