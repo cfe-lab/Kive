@@ -673,13 +673,13 @@ class Worker(object):
 
     def write_summary(self, status, message, log_dir=None, summary_prefix="summary_"):
         result_dict = {
+            "Slurm ID": self.slurm_id,
             "status": status,
             "message": message
         }
 
-        summary_path = "{}_slurmID{}_task{}.log".format(
+        summary_path = "{}_task{}.log".format(
             summary_prefix,
-            self.slurm_id,
             self.task.pk
         )
         with open(os.path.join(log_dir, summary_path), "wb") as f:
@@ -720,7 +720,7 @@ class Worker(object):
 
         except KeyboardInterrupt:
             # Execution was stopped somewhere outside of run_code (that would
-            # have been caught above and raised a StopExecution.
+            # have been caught above and raised a StopExecution).
             self.task.cancel(save=True)
             task_string = str(self.task)
             if isinstance(self.task, RunStep):
