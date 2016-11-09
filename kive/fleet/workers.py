@@ -11,6 +11,9 @@ import os
 import glob
 import shutil
 import json
+import Queue
+import socket
+import inspect
 
 from django.conf import settings
 from django.utils import timezone
@@ -23,6 +26,8 @@ from fleet.exceptions import StopExecution
 mgr_logger = logging.getLogger("fleet.Manager")
 foreman_logger = logging.getLogger("fleet.Foreman")
 worker_logger = logging.getLogger("fleet.Worker")
+
+# from fleet.slurminterface import SlurmManagerInterface
 
 
 class Manager(object):
@@ -67,6 +72,47 @@ class Manager(object):
             # Watch for a finished task, hand it off to the Foreman to handle.
             pass
 
+    def _add_idletask(self, newidletask):
+        """Add a task for the manager to perform during her idle time.
+        The newidletask must be a function that accepts a single argument of
+        type comparable to time.time() and returns nothing.
+        The argument provides the time limit after which a task must return from its
+        task.
+
+        For example, the structure of an idle task would typically be of the form:
+
+        def my_idle_task(time_to_stop):
+           something_todo = True
+           while (time.time() < time_to_stop and something_todo:
+              do a small amount of work
+              something_todo = checkwork()
+        """
+        try:
+            argspecs = inspect.getargspec(newidletask)
+        except TypeError:
+            raise RuntimeError("add_idletask: Expecting a function as a task")
+        func_isok = (len(argspecs.args) == 1 and argspecs.varargs is None
+                     and argspecs.keywords is None
+                     and argspecs.defaults is None)
+        if func_isok:
+            self.idle_job_queue.append(newidletask)
+        else:
+            print "argspecs", argspecs
+            raise RuntimeError("add_idletask: idle task function must have exactly one argument")
+
+    def _do_idle_tasks(self, time_limit):
+        """Perform registered idle tasks once each, or until time runs out.
+        Idle tasks are called in a round-robin fashion.
+        """
+        num_tasks = len(self.idle_job_queue)
+        num_done = 0
+        while (time.time() < time_limit) and num_done < num_tasks:
+            mgr_logger.debug("Running an idle task..")
+            jobtodo = self.idle_job_queue[0]
+            jobtodo(time_limit)
+            self.idle_job_queue.rotate(1)
+            num_done += 1
+
     def find_new_runs(self, time_to_stop):
         # Look for new jobs to run.  We will also
         # build in a delay here so we don't clog up the database.
@@ -77,6 +123,7 @@ class Manager(object):
         mgr_logger.debug("Pending runs: {}".format(pending_runs))
 
         for run_to_process in pending_runs:
+            # do we have the thread capacity for this run?
             threads_needed = run_to_process.pipeline.threads_needed()
             if threads_needed > self.max_host_cpus:
                 mgr_logger.info(
@@ -191,16 +238,26 @@ class Manager(object):
         """
         Poll the database for new jobs, and handle running of sandboxes.
         """
+        ext_check_interval = datetime.timedelta(days=settings.EXTERNAL_FILE_CHECK_DAYS,
+                                                hours=settings.EXTERNAL_FILE_CHECK_HOURS,
+                                                minutes=settings.EXTERNAL_FILE_CHECK_MINUTES)
+        if ext_check_interval > datetime.timedelta():
+            self._add_idletask(lambda t: Dataset.idle_externalcheck(t))
+
         time_to_purge = None
         while True:
             self.find_stopped_runs()
 
             time_to_poll = time.time() + settings.FLEET_POLLING_INTERVAL
+            # Start some tasks that are in the queue
             if not self.assign_tasks(time_to_poll):
                 return
+            # Some jobs in the queue have been started:
+            # if we have time, do some idle tasks until time_to_poll and
+            # then check and see if anything has finished.
+            if time.time() < time_to_poll:
+                self._do_idle_tasks(time_to_poll)
 
-            # Everything in the queue has been started, so we check and see if
-            # anything has finished.
             if not self.wait_for_polling(time_to_poll):
                 return
 

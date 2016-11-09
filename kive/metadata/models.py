@@ -86,6 +86,14 @@ def remove_helper(removal_plan):
         except (SandboxActiveException, OSError) as e:
             LOGGER.warning(e)
 
+    for execrecord in removal_plan["ExecRecords"]:
+        execlog = execrecord.generator
+        methodoutput = getattr(execlog, 'methodoutput', None)
+        if methodoutput is not None:
+            for f in (methodoutput.output_log, methodoutput.error_log):
+                if f is not None:
+                    f.delete()
+
     for class_name in deletion_order:
         if class_name in removal_plan:
             for obj_to_delete in removal_plan[class_name]:

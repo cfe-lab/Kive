@@ -170,6 +170,13 @@ class Dataset(metadata.models.AccessControl):
 
     _redacted = models.BooleanField(default=False)
 
+    # The last time a check was performed on this external file, to see whether
+    # the external file referenced was still there.
+    # See self.idle_externalcheck() for details.
+    last_time_checked = models.DateTimeField(default=timezone.now,
+                                             help_text="Date-time of last (external) dataset existence check.",
+                                             null=True)
+
     class Meta:
         ordering = ["-date_created", "name"]
 
@@ -470,6 +477,8 @@ class Dataset(metadata.models.AccessControl):
 
         The stored value is used when regenerating data
         that once existed, as a coherence check.
+
+        Return True if the check passed, otherwise False.
         """
         # Recompute the MD5, see if it equals what is already stored
         new_md5 = self.compute_md5()
@@ -497,11 +506,15 @@ class Dataset(metadata.models.AccessControl):
         if bool(self.dataset_file):
             return True
 
+        # we have an external file: check existence and MD5 sum...
         abs_path = self.external_absolute_path()
         if abs_path is not None:
             if os.path.exists(abs_path) and os.access(abs_path, os.R_OK):
-                return True
-
+                # the external file exists, has it been changed?
+                return self.check_md5()
+            else:
+                # external file might have been removed...
+                return False
         return False
 
     def has_structure(self):
@@ -653,6 +666,7 @@ class Dataset(metadata.models.AccessControl):
             empty_SD.MD5_checksum = ""
             empty_SD.dataset_file = None
             empty_SD.file_source = file_source
+            empty_SD.last_time_checked = None
             # Save so we can add structure and permissions.
             empty_SD.save()
 
@@ -726,6 +740,7 @@ class Dataset(metadata.models.AccessControl):
             new_dataset.description = description or ""
             new_dataset.externalfiledirectory = externalfiledirectory
             new_dataset.external_path = external_path
+            new_dataset.last_time_checked = timezone.now()
 
             if new_dataset.is_raw():
                 new_dataset.set_MD5(file_path, file_handle)
@@ -1286,6 +1301,43 @@ class Dataset(metadata.models.AccessControl):
             if log_method == cls.logger.error:
                 raise RuntimeError(message)
 
+    @classmethod
+    def idle_externalcheck(cls, time_to_stop):
+        """ Perform a consistency check of external files as an idle task.
+
+        We search for datasets that fullfil the following criteria:
+        a) external files with last_time_checked < now - CHECK_INTERVAL
+        b) sorted in ascending order by last_time_checked
+        c) in batches of N at a time.
+        """
+        cut_off_time = timezone.now() - timedelta(days=settings.EXTERNAL_FILE_CHECK_DAYS,
+                                                  hours=settings.EXTERNAL_FILE_CHECK_HOURS,
+                                                  minutes=settings.EXTERNAL_FILE_CHECK_MINUTES)
+
+        # aset: only external files
+        a_set = Dataset.objects.filter(externalfiledirectory__isnull=False)
+        # bset: only those external files that haven't been checked for some time
+        b_set = a_set.filter(last_time_checked__lt=cut_off_time)
+        # prioritise least recently checked files
+        c_set = b_set.order_by('last_time_checked')
+        # limit number of results returned to 10. This must be the last filter to apply
+        d_set = c_set[:10]
+        did_something = True
+        while time.time() < time_to_stop and did_something:
+            did_something = False
+            for dataset in d_set.all():
+                did_something = True
+                path_name = dataset.external_absolute_path()
+                if path_name is None:
+                    raise RuntimeError("Unexpected None for external dataset path!")
+                kive_name = dataset.name
+                if not os.path.exists(path_name):
+                    cls.logger.warn("missing external file '%s' at '%s'" % (kive_name, path_name))
+                # --update the last_time_checked regardless of
+                # whether we issued a warning or not
+                dataset.last_time_checked = timezone.now()
+                dataset.save()
+
     def increase_permissions_from_json(self, permissions_json):
         """
         Grant permission to all users and groups specified in the parameter.
@@ -1829,7 +1881,7 @@ class ExecRecordIn(models.Model):
                     error_str = 'Dataset "{}" has too few rows for TransformationInput "{}"'
                 raise ValidationError(error_str.format(input_SD, transf_xput_used))
 
-            if (transf_xput_used.get_max_row() != None and
+            if (transf_xput_used.get_max_row() is not None and
                     input_SD.num_rows() > transf_xput_used.get_max_row()):
                 error_str = ""
                 if type(self.generic_input) == transformation.models.TransformationOutput:
@@ -2013,7 +2065,7 @@ class ExecRecordOut(models.Model):
             # If the input SD has a number of rows, then check that it is coherent.  (If it is -1,
             # then we can't check this.)
             if input_SD.num_rows() != -1:
-                if (self.generic_output.get_min_row() != None and
+                if (self.generic_output.get_min_row() is not None and
                         input_SD.num_rows() < self.generic_output.get_min_row()):
                     if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineStepInputCable):
                         raise ValidationError(
@@ -2024,7 +2076,7 @@ class ExecRecordOut(models.Model):
                             "Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too few rows".
                             format(input_SD, self.generic_output))
 
-                if (self.generic_output.get_max_row() != None and
+                if (self.generic_output.get_max_row() is not None and
                         input_SD.num_rows() > self.generic_output.get_max_row()):
                     if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineStepInputCable):
                         raise ValidationError(

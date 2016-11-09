@@ -1,9 +1,15 @@
 $(document).ready(function(){ // wait for page to finish loading before executing jQuery code
+    "use strict";
+    
+    var cr_id;
+    
+    var $coderesource = $("#id_coderesource");
+    var $dependencyForms = $("#dependencyForms");
 
     noXSS();
 
     // trigger ajax on CR drop-down to populate revision select
-    $("#id_coderesource").on('change', function() {
+    $coderesource.on('change', function() {
         cr_id = this.value;
         if (cr_id !== "") {
             $.getJSON(
@@ -28,7 +34,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     /* populate CR revision dropdown on selection of CodeResource
      * By *delegating* this event to #dependencyForms rather than each select.coderesource
      * directly, new dynamically-generated selects retain this behaviour. */
-    $("#dependencyForms").on('change', 'select.coderesource', function() {
+    $dependencyForms.on('change', 'select.coderesource', function() {
         var suffix = this.id.split('_')[2];
         cr_id = this.value;
         if (cr_id !== "") {
@@ -55,7 +61,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     }).change(); // trigger on load
 
     var dep_coderesource_options = document.getElementById("id_coderesource_0").options,
-        numberOfDepForms = $('#dependencyForms > tr').length;
+        numberOfDepForms = $dependencyForms.children('tr').length;
 
     // modify name attributes for extra input forms received from server
     for (var i = 0; i < numberOfDepForms; i++) {
@@ -69,30 +75,30 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     $("#addDependencyForm").click(function() {
         numberOfDepForms += 1;
         i = numberOfDepForms - 1; // zero-based index
-        var htmlStr = '<tr>\n';
-        htmlStr += '<td><select class="coderesource" id="id_coderesource_' + i + '" name="coderesource_' + i + '">\n';
+        var $dependencyRow = $('<tr>'),
+            $select = $('<select class="coderesource" id="id_coderesource_' + i + '" name="coderesource_' + i + '">');
 
         for (var j = 0; j < dep_coderesource_options.length; j++) {
-            htmlStr += '<option value="' + dep_coderesource_options[j].value + '">' +
-                dep_coderesource_options[j].text + '</option>\n';
+            $select.append($('<option>')
+                    .attr('value', dep_coderesource_options[j].value)
+                    .text(dep_coderesource_options[j].text));
         }
 
-        htmlStr += (
-                '</select></td>\n' +
+        $dependencyRow.append($('<td>').append($select));
+        $dependencyRow.append(
                 '<td><select class="revisions" id="id_revisions_' + i + '" ' +
                 'name="revisions_' + i + '">\n' +
                 '<option value="" selected="selected">--- select a ' +
                 'CodeResource first ---</option></select></td>\n');
 
         // generate char fields
-        htmlStr += (
+        $dependencyRow.append(
                 '<td><input id="id_path_' + i + '" maxlength="255" ' +
                 'name="path_' + i + '" type="text"></td>\n' +
                 '<td><input id="id_filename_' + i + '" maxlength="255" ' +
-                'name="filename_' + i + '" type="text"></td>\n' +
-                '</tr>\n');
+                'name="filename_' + i + '" type="text"></td>\n');
 
-        $('#dependencyForms').find('tr:last').after(htmlStr);
+        $('#dependencyForms').find('tr:last').after($dependencyRow);
 
     });
 
@@ -105,7 +111,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
 
     // add or subtract input forms
-    var numberOfInputForms = $('#extraInputForms > tr').length;
+    var numberOfInputForms = $('#extraInputForms').children('tr').length;
     var io_cdt_options = document.getElementById("id_compounddatatype_in_0").options;
 
     // modify name attributes for extra input forms received from server
@@ -117,38 +123,51 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     }
 
     // append row to table
-    $("#addInputForm").click(
-        function () {
-            numberOfInputForms += 1;
-            i = numberOfInputForms - 1; // 0-indexing
-            htmlStr = "<tr>";
-            htmlStr += "<td>"+numberOfInputForms+"</td>";
+    $("#addInputForm").click(function () {
+        numberOfInputForms += 1;
+        i = numberOfInputForms - 1; // 0-indexing
+        var $inputRow = $('<tr>'),
+            $select;
+        
+        $('<td>').text(numberOfInputForms).appendTo($inputRow);
 
-            htmlStr += "<td><input id=\"id_dataset_name_in_" + i + "\" maxlength=\"128\" name=\"dataset_name_in_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "<td><select id=\"id_compounddatatype_in_" + i + "\" name=\"compounddatatype_in_" + i + "\">";
-            for (var j = 0; j < io_cdt_options.length; j++) {
-                htmlStr += "<option value=\"" + io_cdt_options[j].value + "\">" + io_cdt_options[j].text + "</option>";
-            }
-            htmlStr += "</select></td>";
-            htmlStr += "<td><input id=\"id_min_row_in_" + i + "\" class=\"shortIntField\" name=\"min_row_in_" + i + "\" type=\"number\" /></td>";
-            htmlStr += "<td><input id=\"id_max_row_in_" + i + "\" class=\"shortIntField\" name=\"max_row_in_" + i + "\" type=\"number\" /></td>";
-            htmlStr += "</tr>";
+        $inputRow.append("<td><input id=\"id_dataset_name_in_" + i + "\" maxlength=\"128\" name=\"dataset_name_in_" + i + "\" type=\"text\" /></td>");
+        $select = $("<select id=\"id_compounddatatype_in_" + i + "\" name=\"compounddatatype_in_" + i + "\">");
+        for (var j = 0; j < io_cdt_options.length; j++) {
+            $select.append($('<option>')
+                    .attr('value', io_cdt_options[j].value)
+                    .text(io_cdt_options[j].text));
+        }
+        $inputRow.append($('<td>').append($select));
+    
+        var min_row = $('<input>').attr({
+            'id': "id_min_row_in_" + i,
+            'name': "min_row_in_" + i,
+            'class': "shortIntField",
+            'type': "number"
+        });
+        var max_row = $('<input>').attr({
+            'id': "id_max_row_in_" + i,
+            'name': "max_row_in_" + i,
+            'class': "shortIntField",
+            'type': "number"
+        });
+    
+        $('<td>').append(min_row).appendTo($inputRow);
+        $('<td>').append(max_row).appendTo($inputRow);
 
-            $('#extraInputForms').find('tr:last').after(htmlStr);
+        $('#extraInputForms').find('tr:last').after($inputRow);
+    });
+    $("#removeInputForm").click(function() {
+        if (numberOfInputForms > 1) {
+            numberOfInputForms -= 1;
+            $('#extraInputForms').find('tr:last').remove();
         }
-    );
-    $("#removeInputForm").click(
-        function() {
-            if (numberOfInputForms > 1) {
-                numberOfInputForms -= 1;
-                $('#extraInputForms').find('tr:last').remove();
-            }
-        }
-    );
+    });
 
 
     // add or subtract output forms
-    var numberOfOutputForms = $('#extraOutputForms > tr').length;
+    var numberOfOutputForms = $('#extraOutputForms').children('tr').length;
     // we can reuse options
 
     // modify name attributes for extra input forms received from server
@@ -160,26 +179,50 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     }
 
     // append row to table
-    $("#addOutputForm").click(
-        function () {
-            numberOfOutputForms += 1;
-            i = numberOfOutputForms - 1; // 0-indexing
-            htmlStr = "<tr>";
-            htmlStr += "<td>"+numberOfOutputForms+"</td>";
+    $("#addOutputForm").click(function () {
+        numberOfOutputForms += 1;
+        i = numberOfOutputForms - 1; // 0-indexing
+        var $outputRow = $('<tr>');
+        
+        $('<td>').text(numberOfOutputForms).appendTo($outputRow);
 
-            htmlStr += "<td><input id=\"id_dataset_name_out_" + i + "\" maxlength=\"128\" name=\"dataset_name_out_" + i + "\" type=\"text\" /></td>";
-            htmlStr += "<td><select id=\"id_compounddatatype_out_" + i + "\" name=\"compounddatatype_out_" + i + "\">";
-            for (var j = 0; j < io_cdt_options.length; j++) {
-                htmlStr += "<option value=\"" + io_cdt_options[j].value + "\">" + io_cdt_options[j].text + "</option>";
-            }
-            htmlStr += "</select></td>";
-            htmlStr += "<td><input id=\"id_min_row_out_" + i + "\" class=\"shortIntField\" name=\"min_row_out_" + i + "\" type=\"number\" /></td>";
-            htmlStr += "<td><input id=\"id_max_row_out_" + i + "\" class=\"shortIntField\" name=\"max_row_out_" + i + "\" type=\"number\" /></td>";
-            htmlStr += "</tr>";
-
-            $('#extraOutputForms').find('tr:last').after(htmlStr);
+        var dataset_name = $('<input>').attr({
+            'id': "id_dataset_name_out_" + i,
+            'name': "dataset_name_out_" + i,
+            'maxlength': '128',
+            'type': "text"
+        });
+        $('<td>').append(dataset_name).appendTo($outputRow);
+        
+        var $select = $("<select>").attr({
+            'id': "id_compounddatatype_out_" + i,
+            'name': "compounddatatype_out_" + i
+        });
+        for (var j = 0; j < io_cdt_options.length; j++) {
+            $select.append($('<option>')
+                    .attr('value', io_cdt_options[j].value)
+                    .text(io_cdt_options[j].text));
         }
-    );
+        $('<td>').append($select).appendTo($outputRow);
+        
+        var min_row = $('<input>').attr({
+            'id': "id_min_row_out_" + i,
+            'name': "min_row_out_" + i,
+            'class': "shortIntField",
+            'type': "number"
+        });
+        var max_row = $('<input>').attr({
+            'id': "id_max_row_out_" + i,
+            'name': "max_row_out_" + i,
+            'class': "shortIntField",
+            'type': "number"
+        });
+
+        $('<td>').append(min_row).appendTo($outputRow);
+        $('<td>').append(max_row).appendTo($outputRow);
+
+        $('#extraOutputForms').find('tr:last').after($outputRow);
+    });
     $("#removeOutputForm").click(
         function() {
             if (numberOfOutputForms > 1) {
@@ -203,7 +246,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
 
     // hide Method Family form if a pre-existing family is selected
     $('#id_family').on('change', function() {
-        this_family = $(this).val();
+        var this_family = $(this).val();
         if (this_family === "") {
             $('#id_name').prop('disabled', false);
             $('#id_description').prop('disabled', false);
@@ -215,7 +258,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
     }).change(); // trigger on load
 
     // set default MethodFamily name to name of CodeResource
-    $("#id_coderesource").on("change", function () {
+    $coderesource.on("change", function () {
         $("#id_revision_name").val($(this).children("option:selected").text());
     });
 });

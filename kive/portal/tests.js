@@ -24,6 +24,13 @@
             
             expect(this.$table.find('tr').length).toBe(3);
         });
+
+        it("should use &nbsp; for null", function() {
+            this.examples[0].name = null;
+            this.table.buildTable(this.examples);
+
+            expect(this.$table.find('tr').eq(1).find('td').text()).toBe('\xa0');
+        });
     });
     
     describe("FilterSet", function() {

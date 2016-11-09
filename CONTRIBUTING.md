@@ -26,7 +26,7 @@ source.
 
     cd ~/git
     git clone https://github.com/cfe-lab/django-mock-queries.git
-    sudo python django-mock-queries/setup.py
+    sudo python django-mock-queries/setup.py install
 
 If you already had the main version installed, uninstall it with pip, and then
 check to see if you need to manually delete the files.
@@ -35,7 +35,7 @@ check to see if you need to manually delete the files.
     locate django_mock_queries/query.py
     ls /usr/local/lib/python2.7/dist-packages/django_mock_queries
     sudo rm /usr/local/lib/python2.7.dist-packages/django_mock_queries/*
-    sudo python django-mock-queries/setup.py
+    sudo python django-mock-queries/setup.py install
 
 If you want to see what's currently being worked on, check out the [waffle board][waffle].
 
@@ -189,6 +189,10 @@ and replace them with your backed-up versions.
 To run all the unit tests, run `./manage.py test`. Note that running the
 full test suite can take around half an hour.
 
+The front-end tests are run separately. run `node tests-server.node.js` in the
+root directory, which should open your browser. In this directory view, run both
+SpecRunner.html and SpecRunner_SystemJS.html.
+
 ### Faster unit tests ###
 
 If you want to run your unit tests faster, you can run them against an
@@ -248,14 +252,27 @@ are in `portal/fixtures`. If this code or
 any functions it calls are modified, the fixtures will need to be
 re-created by running `update_test_fixtures` again.
 
+### Updating TypeScript and Sass files ###
+
+To update Javascript generated from TypeScript (.ts) files, you must have the
+TypeScript compiler installed, which should happen when you run `npm install`.
+Don't edit any js file which has a ts equivalent as these changes will be
+overwritten. When editing ts files, it is useful to have the compiler run in
+watch mode as a background task using `tsc -w`. Be sure to adhere to Kive's
+TypeScript style by running `grunt tslint` on your contributions.
+
+A similar pattern is true for CSS and Sass files. You can run the Sass compiler
+in watch mode using `sass --watch`.
+
 ### Updating embedded icon files ###
 
-Some icon files are stored as base64-encoded strings which describe PNG images inside Javascript files.
- 
-To edit these in a convenient way, you'll need `node`, which you can get from your favourite package manager or from the [Node.js website][nodejs]. Once you have `node`, run `npm install` in the project root to install the necessary dependencies. This will install the node task runner Grunt and several Grunt modules.
+Some icon files are stored as base64-encoded strings which describe PNG images
+inside Javascript files.
 
-Now you're ready to edit the icons. Find the original icon in `raw_assets` in the project root. Make your modifications and then run `grunt pngicons` to compile them into the Javascript files.
+Find the original icon in `raw_assets` in the project root. Make your modifications
+and then run `grunt pngicons` to compile them into the Javascript files.
 
-\* *Recommended*: If `pngquant` is available on your system, Grunt will use it to compress the icons.
+\* *Recommended*: If `pngquant` is available on your system, Grunt will use
+it to compress the icons.
 
 [nodejs]: https://nodejs.org/download/

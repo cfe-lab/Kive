@@ -181,6 +181,8 @@ $(function() {
             ;
             /*
             */
+
+            dataset_input_table.removeClass('single-run');
             
             if (this.hasOwnProperty('auto_fill')) {
                 for (i = 0; (cell_index = this.auto_fill[i]); i++) {
@@ -193,15 +195,8 @@ $(function() {
             setRunNamesPrefix();
         };
         dataset_input_table.removeLastRunRow = function() {
-            var $tr = this.find('tr');
-            if ($tr.length > 1) {
-                if ($tr.eq(-1).find('.receiving').length) {
-                    above_box.hide();
-                }
-                $tr.eq(-1).remove();
-            } else {
-                showPageError("You must have at least 1 run.", '.row-ctrl-error');
-            }
+            var $last_tr = this.find('tr').eq(-1);
+            removeRunRow.call($last_tr[0]);
         };
         dataset_input_table.fillColumn = function(selection, column_ix) {
             // @todo: add pattern fill when multiple datasets are selected
@@ -630,6 +625,21 @@ $(function() {
             auto_fill.splice(auto_fill_index, 1);
         }
     };
+    var removeRunRow = function() {
+        var length = dataset_input_table.find('tr').length;
+        if (length > 1) { 
+            if (length == 2) {
+                dataset_input_table.addClass('single-run');
+            }
+            var $row = $(this).closest('tr');
+            if ($row.find('.receiving').length) {
+                above_box.hide();
+            }
+            $row.remove();
+        } else {
+            showPageError("You must have at least 1 run.", '.row-ctrl-error');
+        }
+    };
     var creatorFilterHandler = function() {
         var value = $(this).val();
         dataset_search_table.filterSet.remove('user');
@@ -802,8 +812,7 @@ $(function() {
 
         px_offset[pos - 1] = 0;
 
-        // currently just scrolls through until it finds that offset.
-        // a better algorithm would do midpoint, then quartiles, etc
+        // scrolls through until it finds that offset.
         for (pos; px_offset[pos - 1] < offset && pos - 1 < text.length + 1; pos++) {
             px_offset[pos] = this.textWidth(text.substr(0, pos));
         }
@@ -965,38 +974,39 @@ $(function() {
     /**
      * Event bindings
      */
-    $(document)            .scroll ( dataset_search_dialog.scrollButton )
-                           .click  ( unfocusAll );
-    $(window)              .resize ( dataset_search_dialog.scrollButton )
-                           .resize ( $permissions.widget.autoPosition )
-                           .resize ( function()  { dataset_input_table.checkHeaderWidth(); })
-                           .resize ( function()  { dataset_search_table.checkOverflow(); })
-                           .resize ( function()  { above_box.adjustSpacing(); })
-                           .scroll ( function(e) { dataset_input_table.scrollHeader(e); });
-    set_dataset.btn        .click  ( addSelectedDatasetsToInput );
-    set_dataset.options_btn.click  ( set_dataset.options_menu.show )
-                        .mouseleave( set_dataset.options_menu.hide );
-    $permissions.ctrl      .click  ( $permissions.widget.toggle )
-                           .click  ( stopProp );
-    $permissions.widget    .click  ( stopProp );
-    above_box              .click  ( stopProp )
-      .find('.close.ctrl') .click  ( dataset_search_dialog.hide );
-    $('#date_added')       .change ( dateAddedFilterHandler );
-    $('#id_name')          .keyup  ( setRunNamesPrefix );
-    $('#run_pipeline')     .submit ( mainSubmitHandler );
+    $(document)             .scroll     ( dataset_search_dialog.scrollButton )
+                            .click      ( unfocusAll );
+    $(window)               .resize     ( dataset_search_dialog.scrollButton )
+                            .resize     ( $permissions.widget.autoPosition )
+                            .resize     ( function()  { dataset_input_table.checkHeaderWidth(); })
+                            .resize     ( function()  { dataset_search_table.checkOverflow(); })
+                            .resize     ( function()  { above_box.adjustSpacing(); })
+                            .scroll     ( function(e) { dataset_input_table.scrollHeader(e); });
+    set_dataset.btn         .click      ( addSelectedDatasetsToInput );
+    set_dataset.options_btn .click      ( set_dataset.options_menu.show )
+                            .mouseleave ( set_dataset.options_menu.hide );
+    $permissions.ctrl       .click      ( $permissions.widget.toggle )
+                            .click      ( stopProp );
+    $permissions.widget     .click      ( stopProp );
+    above_box               .click      ( stopProp )
+      .find('.close.ctrl')  .click      ( dataset_search_dialog.hide );
+    $('#date_added')        .change     ( dateAddedFilterHandler );
+    $('#id_name')           .keyup      ( setRunNamesPrefix );
+    $('#run_pipeline')      .submit     ( mainSubmitHandler );
 
     /**
      * Delegated events
      */
-    below_box                 .on( 'click', 'input, textarea', stopProp                     );
-    dataset_input_table       .on( 'click', '.input-dataset',  toggleInputDatasetSelection  )
-                              .on( 'click', '.remove.ctrl',    removeDatasetFromInput       )
-                              .on( 'click', '.select_dataset', dataset_search_dialog.show   );
-    $('.search_results')      .on( 'click', 'tbody tr',        selectSearchResult           )
-                            .on('dblclick', 'tbody tr',        addSelectedDatasetsToInput   );
-    set_dataset.options_menu  .on( 'click', 'li',              set_dataset.options_menu.choose );
-    $('.add_run')             .on( 'click',                function() { dataset_input_table.addNewRunRow(); } );
-    $('#run_controls')        .on( 'click', '.remove_run', function() { dataset_input_table.removeLastRunRow(); } );
+    below_box                .on( 'click',    'input, textarea',  stopProp                     );
+    dataset_input_table      .on( 'click',    '.input-dataset',   toggleInputDatasetSelection  )
+                             .on( 'click',    '.remove.ctrl',     removeDatasetFromInput       )
+                             .on( 'click',    '.remove-row.ctrl', removeRunRow                 )
+                             .on( 'click',    '.select_dataset',  dataset_search_dialog.show   );
+    $('.search_results')     .on( 'click',    'tbody tr',         selectSearchResult           )
+                             .on( 'dblclick', 'tbody tr',         addSelectedDatasetsToInput   );
+    set_dataset.options_menu .on( 'click',    'li',               set_dataset.options_menu.choose );
+    $('.add_run')            .on( 'click',                        function() { dataset_input_table.addNewRunRow(); } );
+    $('#run_controls')       .on( 'click',    '.remove_run',      function() { dataset_input_table.removeLastRunRow(); } );
 
     $(window).scroll();
 });

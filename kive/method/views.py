@@ -268,7 +268,7 @@ def resource_revision_add(request, id):
                 'parent_revision': parent_revision,
                 'coderesource': coderesource
             })
-            return HttpResponse(t.render(c))
+            return HttpResponse(t.render(c, request))
 
         try:
             _make_crv(request.FILES.get('content_file', None), creating_user, revision_form,
@@ -281,7 +281,7 @@ def resource_revision_add(request, id):
                     'parent_revision': parent_revision,
                     'coderesource': coderesource
                 })
-            return HttpResponse(t.render(c))  # CodeResourceRevision object required for next steps
+            return HttpResponse(t.render(c, request))  # CodeResourceRevision object required for next steps
 
         # Success; return to the resources page.
         return HttpResponseRedirect('/resources')
@@ -467,7 +467,8 @@ def _make_dep_forms(query_dict, user):
 
 def create_method_forms(request_post, user, family=None):
     """
-    Helper function for method_add() that creates Forms from the provided information and validates them.
+    Helper function for method_add() that creates Forms from the
+    provided information and validates them.
     """
     query_dict = request_post.dict()
     if 'name' in query_dict:
@@ -491,13 +492,28 @@ def create_method_forms(request_post, user, family=None):
     else:
         method_form = MethodReviseForm(request_post)
     method_form.is_valid()
+    # Determine whether the confirm_shebang button has been clicked.
+    # NOTE: confirm_shebang is a checkbox html element; according to HTML spec, it will only
+    # be present iff its true. ==> we cannot rely on it being present, and set the value
+    # to false if it is absent.
+    has_override = (request_post.get("confirm_shebang", 'off') == 'on')
+    # NOTE: for shebang_val, we must differentiate between yes, no and undefined
+    shebang_val = _get_shebang_code(method_form)
+    has_shebang = (shebang_val == SHEBANG_YES)
+    show_shebang_field = query_dict["SHOW_SHEBANG_FIELD"] = (shebang_val == SHEBANG_NO)
+    query_dict["SHEBANG_OK"] = (has_shebang or has_override)
+
+    etxt = """The code resource should be executable, which means that the file usually starts
+with a shebang: '#!'. The currently selected code resource does not.
+If you know what you are doing, you can override this requirement here."""
+    if show_shebang_field and not has_override:
+        method_form.add_error("confirm_shebang", etxt)
 
     # Populate in/output forms with submitted values.
     input_forms = []
     output_forms = []
-    for xput_type in ["in", "out"]:
+    for xput_type, formlst in [("in", input_forms), ("out", output_forms)]:
         num_forms = sum(k.startswith('dataset_name_{}_'.format(xput_type)) for k in query_dict)
-
         for i in range(num_forms):
             auto_id = "id_%s_{}_{}".format(xput_type, i)
             t_form = TransformationXputForm(
@@ -512,15 +528,49 @@ def create_method_forms(request_post, user, family=None):
                 user=user,
                 auto_id=auto_id)
             xs_form.is_valid()
-
-            if xput_type == "in":
-                input_forms.append((t_form, xs_form))
-            else:
-                output_forms.append((t_form, xs_form))
+            formlst.append((t_form, xs_form))
 
     dep_forms = _make_dep_forms(request_post.dict(), user)
+    # the methods must have at least one input and output each.
+    if len(input_forms) == 0:
+        tx_form = TransformationXputForm(auto_id='id_%s_in_0')
+        xs_form = XputStructureForm(user=user, auto_id='id_%s_in_0')
+        input_forms.append((tx_form, xs_form))
+    if len(output_forms) == 0:
+        tx_form = TransformationXputForm(auto_id='id_%s_out_0')
+        xs_form = XputStructureForm(user=user, auto_id='id_%s_out_0')
+        output_forms.append((tx_form, xs_form))
 
-    return family_form, method_form, dep_forms, input_forms, output_forms
+    return family_form, method_form, dep_forms, input_forms, output_forms, query_dict
+
+SHEBANG_YES = 1
+SHEBANG_NO = 2
+SHEBANG_UNDEF = 3
+
+
+def _get_shebang_code(method_form):
+    # Retrieve the CodeResource revision and return whether it has a #! on its first line or not.
+    # This routine can return three different values:
+    # SHEBANG_UNDEF: resource driver is defined
+    # SHEBANG_YES, SHEBANG_NO: code resource is defined, and 'code resource has a shebang'
+    # This logic is required because a form can be submitted with an empty code_resource
+    # field. In that case, the whole form will fail, but we need to know, independently of
+    # that form failing, whether we should display the 'no shebang override' button to the user.
+    try:
+        coderesource_revision = CodeResourceRevision.objects.get(pk=method_form.cleaned_data['driver_revisions'])
+    except (KeyError, ValueError, CodeResourceRevision.DoesNotExist):
+        return SHEBANG_UNDEF
+    # We do have a code resource defined;
+    # now check to see whether the driver code begins with a shebang
+    try:
+        coderesource_revision.content_file.open()
+        first_line = coderesource_revision.content_file.file.readline()
+        coderesource_revision.content_file.close()
+    except Exception as exc:
+        method_form.add_error("driver_revisions", exc)
+        return SHEBANG_UNDEF
+    tdct = {True: SHEBANG_YES, False: SHEBANG_NO}
+    return tdct[first_line.startswith("#!")]
 
 
 def create_method_from_forms(family_form, method_form, dep_forms, input_forms, output_forms, creating_user,
@@ -528,7 +578,11 @@ def create_method_from_forms(family_form, method_form, dep_forms, input_forms, o
     """
     Given Forms representing the MethodFamily, Method, inputs, and outputs, create a Method.
 
-    Return the same forms, updated with errors if there are any.
+    Warning: this routine has side effects (it can mod its arguments):
+    If an error occurs:
+        return None and update the forms with errors.
+    else:
+        return the new method and the forms are returned without modification.
     """
     # This assures that not both family_form and family are None.
     assert family is not None or family_form is not None
@@ -539,7 +593,7 @@ def create_method_from_forms(family_form, method_form, dep_forms, input_forms, o
     # Retrieve the CodeResource revision as driver.
     try:
         coderesource_revision = CodeResourceRevision.objects.get(pk=method_form.cleaned_data['driver_revisions'])
-    except (ValueError, CodeResourceRevision.DoesNotExist) as e:
+    except (KeyError, ValueError, CodeResourceRevision.DoesNotExist) as e:
         method_form.add_error("driver_revisions", e)
         return None
 
@@ -657,13 +711,15 @@ def create_method_from_forms(family_form, method_form, dep_forms, input_forms, o
     return new_method
 
 
-def _method_forms_check_valid(family_form, method_form, dep_forms, input_form_tuples, output_form_tuples):
+def _method_forms_check_valid(family_form, method_form, dep_forms,
+                              input_form_tuples, output_form_tuples):
     """
     Helper that validates all forms returned from create_method_forms.
     """
     in_xput_forms, in_struct_forms = zip(*input_form_tuples)
     out_xput_forms, out_struct_forms = zip(*output_form_tuples)
-    all_forms = ([family_form] + [method_form] + dep_forms + list(in_xput_forms) + list(in_struct_forms) +
+    all_forms = ([family_form] + [method_form] + dep_forms +
+                 list(in_xput_forms) + list(in_struct_forms) +
                  list(out_xput_forms) + list(out_struct_forms))
     return all(x.is_valid() for x in all_forms)
 
@@ -785,67 +841,86 @@ def _method_creation_helper(request, method_family=None):
     """
     creating_user = request.user
 
-    header = 'Start a new MethodFamily with an initial Method'
     if method_family:
         header = "Add a new Method to MethodFamily '%s'" % method_family.name
-
-    t = loader.get_template('method/method.html')
-    c = {}
-    if request.method == 'POST':
-        family_form, method_form, dep_forms, input_form_tuples, output_form_tuples = create_method_forms(
-            request.POST, creating_user, family=method_family)
-        if not _method_forms_check_valid(family_form, method_form, dep_forms, input_form_tuples, output_form_tuples):
-            # Bail out now if there are any problems.
-            c.update(
-                {
-                    'family_form': family_form,
-                    'method_form': method_form,
-                    'dep_forms': dep_forms,
-                    'input_forms': input_form_tuples,
-                    'output_forms': output_form_tuples,
-                    'family': method_family,
-                    'header': header
-                })
-            return HttpResponse(t.render(c))
-
-        # Next, attempt to build the Method and its associated MethodFamily (if necessary),
-        # inputs, and outputs.
-        just_created = create_method_from_forms(
-            family_form, method_form, dep_forms, input_form_tuples, output_form_tuples, creating_user,
-            family=method_family
-        )
-
-        if _method_forms_check_valid(family_form, method_form, dep_forms, input_form_tuples, output_form_tuples):
-            # Success!
-            return HttpResponseRedirect('/methods/{}'.format(just_created.family.pk))
-
     else:
-        # Prepare a blank set of forms for rendering.
+        header = 'Start a new MethodFamily with an initial Method'
+    t = loader.get_template('method/method.html')
+    if request.method == 'POST':
+        family_form, method_form, dep_forms,\
+            input_form_tuples, output_form_tuples,\
+            query_dict = create_method_forms(request.POST, creating_user, family=method_family)
+        forms_are_valid = _method_forms_check_valid(family_form,
+                                                    method_form, dep_forms,
+                                                    input_form_tuples, output_form_tuples)
+        display_shebang_button = query_dict["SHOW_SHEBANG_FIELD"]
+        shebang_ok = query_dict["SHEBANG_OK"]
+        if not (forms_are_valid and shebang_ok):
+            # Bail out now if a) the forms are invalid, or we need to allow
+            # the user to override a missing shebang in the driver code_resource
+            if not dep_forms:
+                dep_forms = [MethodDependencyForm(user=creating_user, auto_id='id_%s_0')]
+            c = {'show_shebang_button': display_shebang_button,
+                 'family_form': family_form,
+                 'method_form': method_form,
+                 'dep_forms': dep_forms,
+                 'input_forms': input_form_tuples,
+                 'output_forms': output_form_tuples,
+                 'family': method_family,
+                 'header': header
+                 }
+            return HttpResponse(t.render(c, request))
+        else:
+            # We are happy with the input, now attempt to build the Method and
+            # its associated MethodFamily (if necessary), inputs, and outputs.
+            just_created = create_method_from_forms(family_form, method_form,
+                                                    dep_forms, input_form_tuples,
+                                                    output_form_tuples, creating_user,
+                                                    family=method_family)
+            if just_created is None:
+                # creation failed: the forms have been modded by create_method_from_forms
+                # so just show the user these.
+                if not dep_forms:
+                    dep_forms = [MethodDependencyForm(user=creating_user, auto_id='id_%s_0')]
+                c = {'show_shebang_button': display_shebang_button,
+                     'family_form': family_form,
+                     'method_form': method_form,
+                     'dep_forms': dep_forms,
+                     'input_forms': input_form_tuples,
+                     'output_forms': output_form_tuples,
+                     'family': method_family,
+                     'header': header + ": ERROR"
+                     }
+                return HttpResponse(t.render(c, request))
+            else:
+                # Success!
+                return HttpResponseRedirect('/methods/{}'.format(just_created.family.pk), request)
+    else:
+        # not a POST: Just prepare a blank set of forms for rendering.
         family_form = MethodFamilyForm()
         method_form = MethodForm(user=creating_user)
 
         dep_forms = [MethodDependencyForm(user=creating_user, auto_id='id_%s_0')]
-
         input_form_tuples = [
-            (TransformationXputForm(auto_id='id_%s_in_0'), XputStructureForm(user=creating_user,
-                                                                             auto_id='id_%s_in_0'))
+            (TransformationXputForm(auto_id='id_%s_in_0'),
+             XputStructureForm(user=creating_user, auto_id='id_%s_in_0'))
         ]
         output_form_tuples = [
-            (TransformationXputForm(auto_id='id_%s_out_0'), XputStructureForm(user=creating_user,
-                                                                              auto_id='id_%s_out_0'))
+            (TransformationXputForm(auto_id='id_%s_out_0'),
+             XputStructureForm(user=creating_user, auto_id='id_%s_out_0'))
         ]
-
-    c.update(
-        {
-            'family_form': family_form,
-            'method_form': method_form,
-            'dep_forms': dep_forms,
-            'input_forms': input_form_tuples,
-            'output_forms': output_form_tuples,
-            'family': method_family,
-            'header': header
-        })
-    return HttpResponse(t.render(c, request))
+        c = {'show_shebang_button': False,
+             'family_form': family_form,
+             'method_form': method_form,
+             'dep_forms': dep_forms,
+             'input_forms': input_form_tuples,
+             'output_forms': output_form_tuples,
+             'family': method_family,
+             'header': header
+             }
+        return HttpResponse(t.render(c, request))
+    # ---should not fall off the end of this routine
+    raise RuntimeError("error in METHOD")
 
 
 @login_required
@@ -882,8 +957,9 @@ def method_revise(request, id):
 
     if request.method == 'POST':
         # Because there is no CodeResource specified, the second value is of type MethodReviseForm.
-        family_form, method_revise_form, dep_forms, input_form_tuples, output_form_tuples = create_method_forms(
-            request.POST, creating_user, family=family)
+        family_form, method_revise_form,\
+            dep_forms, input_form_tuples,\
+            output_form_tuples, _ = create_method_forms(request.POST, creating_user, family=family)
         if not _method_forms_check_valid(family_form, method_revise_form, dep_forms,
                                          input_form_tuples, output_form_tuples):
             # Bail out now if there are any problems.
@@ -898,7 +974,7 @@ def method_revise(request, id):
                     'family_form': family_form,
                     'parent': parent_method
                 })
-            return HttpResponse(t.render(c))
+            return HttpResponse(t.render(c, request))
 
         # Next, attempt to build the Method and add it to family.
         create_method_from_forms(

@@ -34,6 +34,7 @@ import threading
 import logging
 import shutil
 import time
+import random
 
 
 @python_2_unicode_compatible
@@ -327,9 +328,9 @@ class CodeResourceRevision(metadata.models.AccessControl):
                     dependant.method.build_removal_plan(removal_plan)
                 )
 
-        for method in self.methods.all():
-            if method not in removal_plan["Methods"]:
-                update_removal_plan(removal_plan, method.build_removal_plan(removal_plan))
+        for meth in self.methods.all():
+            if meth not in removal_plan["Methods"]:
+                update_removal_plan(removal_plan, meth.build_removal_plan(removal_plan))
 
         return removal_plan
 
@@ -490,7 +491,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             return None
 
         # If inputs/outputs already exist, do nothing.
-        if (self.inputs.count() + self.outputs.count() != 0):
+        if self.inputs.count() + self.outputs.count() != 0:
             return None
         # Copy all inputs/outputs (Including raws) from parent revision to this revision
         else:
@@ -515,29 +516,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                         compounddatatype=parent_output.get_cdt(),
                         min_row=parent_output.get_min_row(),
                         max_row=parent_output.get_max_row())
-
-    def _poll_stream(self, source_stream, source_name, dest_streams):
-        """ Redirect all input from source_stream to all the dest_streams
-
-        This is a helper function for run_code, like the Unix tee command.
-        @param source_stream: an input stream to redirect
-        @param dest_streams: a sequence of streams to redirect output to
-        """
-        for line in source_stream:
-            # drops \n
-            self.logger.debug('%s: %s', source_name, line.rstrip().decode('utf-8'))
-
-            for stream in dest_streams:
-                stream.write(line)
-
-    def _capture_stream(self, source_stream, dest_streams):
-        """
-        Read the source stream and multiplex its output to all destination streams.
-        """
-        source_contents = source_stream.read()
-        # As in _poll_stream, this drops the trailing \n.
-        for dest_stream in dest_streams:
-            dest_stream.write(source_contents)
 
     def check_md5(self):
         """
@@ -601,7 +579,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 with dep.requirement.content_file:
                     shutil.copyfileobj(dep.requirement.content_file, f)
 
-    def run_code(self,
+    def run_code(self, step_execute_dict,
                  run_path,
                  input_paths,
                  output_paths,
@@ -646,137 +624,128 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         if log:
             log.start(save=True)
 
-        try:
-            return_code = None
-            try:
-                method_popen = self.invoke_code(
-                    run_path,
-                    input_paths,
-                    output_paths,
-                    stdout_stream,
-                    stderr_stream
-                )
-            except OSError:
-                traceback.print_exc(file=stderr_stream)
-                return_code = -1
-
-            # Successful execution.
-            if return_code is None:
-                return_code = method_popen.wait()
-
-            with transaction.atomic():
-                if log:
-                    log.stop(save=True, clean=True)
-
-                # TODO: I'm not sure how this is going to handle huge output,
-                # it would be better to update the logs as we go.
-                if details_to_fill:
-                    self.logger.debug('return code is %s for %r.',
-                                      return_code,
-                                      details_to_fill)
-                    details_to_fill.return_code = return_code
-                    stdout_stream.seek(0)
-                    stderr_stream.seek(0)
-
-                    details_to_fill.error_log.save(stderr_stream.name, File(stderr_stream))
-                    details_to_fill.output_log.save(stdout_stream.name, File(stdout_stream))
-                    details_to_fill.clean()
-                    details_to_fill.save()
-
-        except KeyboardInterrupt:
-            # This has been stopped either by Kive or otherwise.  In any case, we want to make sure
-            # our popen is terminated correctly.
-            if method_popen is not None and method_popen.returncode is None:
-                method_popen.terminate()
-            raise StopExecution("Execution of method {} was stopped.".format(self))
-
-    def invoke_code(self, run_path, input_paths, output_paths, stdout_stream, stderr_stream,
-                    ssh_sandbox_worker_account=settings.KIVE_SANDBOX_WORKER_ACCOUNT):
-        """
-        SYNOPSIS
-        Runs a method using the run path and input/outputs.
-        Leaves responsibility of DB annotation up to execute().
-        Leaves routing of output/error streams to run_code.
-
-        INPUTS
-        run_path        Directory where code will be run
-        input_paths     List of input files expected by the code
-        output_paths    List of where code will write results
-        stdout_stream   Stream to write stdout to
-        stderr_stream   Stream to write stderr to
-        ssh_sandbox_worker_account
-                        Name of the user account that the code will be invoked by
-                        (see kive.settings for more details).  If blank, code will
-                        be invoked directly by the current user
-
-        OUTPUTS
-        A running subprocess.Popen object which is asynchronous
-
-        ASSUMPTIONS
-        1) The CRR of this Method can interface with Shipyard.
-        Ie, it has positional inputs and outputs at command line:
-        script_name.py [input 1] ... [input n] [output 1] ... [output k]
-
-        2) The caller is responsible for cleaning up the stdout/err
-        file handles after the Popen has finished processing.
-
-        3) We don't handle exceptions of Popen here, the caller must do that.
-        """
-        if len(input_paths) != self.inputs.count() or len(output_paths) != self.outputs.count():
-            raise ValueError('Method "{}" expects {} inputs and {} outputs, but {} inputs and {} outputs were supplied'
-                             .format(self, self.inputs.count(), self.outputs.count(), len(input_paths),
-                                     len(output_paths)))
-
-        self.logger.debug("Checking run_path exists: {}".format(run_path))
-        file_access_utils.set_up_directory(run_path, tolerate=True)
-
-        for input_path in input_paths:
-            self.logger.debug("Confirming input file exists + readable: {}".format(input_path))
-            f = open(input_path, "rb")
-            f.close()
-
-        for output_path in output_paths:
-            self.logger.debug("Confirming output path doesn't exist: {}".format(output_path))
-            can_create, reason = file_access_utils.can_create_new_file(output_path)
-
-            if not can_create:
-                raise ValueError(reason)
-
-        self.logger.debug("Installing CodeResourceRevision driver to file system: {}".format(self.driver))
+        # invoke and wait via slurm
         self.install(run_path)
+        cmd_str = self.driver.coderesource.filename
+        arglst = input_paths + output_paths
 
-        # At this point, run_path has all of the necessary stuff
-        # written into place.  It remains to execute the code.
-        # The code to be executed sits in
-        # [run_path]/[driver.coderesource.name],
-        # and is executable.
-        code_to_run = os.path.join(
-            run_path,
-            self.driver.coderesource.filename
-        )
+        precedent_job_lst = None
+        # invoke and wait until this job has stopped running....
+        slurm_manager = step_execute_dict['SLURM_MANAGER']
+        worker_rank = step_execute_dict['SLURM_WORKER']
+        return_code = slurm_manager.helper_invoke(worker_rank,
+                                                  run_path, cmd_str, arglst,
+                                                  stdout_stream.name,
+                                                  stderr_stream.name,
+                                                  step_execute_dict, precedent_job_lst)
 
-        if ssh_sandbox_worker_account:
-            # We have to first cd into the appropriate directory before executing the command.
-            ins_and_outs = '"{}"'.format(input_paths[0]) if len(input_paths) > 0 else ""
-            for input_path in input_paths[1:] + output_paths:
-                ins_and_outs += ' "{}"'.format(input_path)
-            full_command = '"{}" {}'.format(code_to_run, ins_and_outs)
-            ssh_command = 'cd "{}" && {}'.format(run_path, full_command)
+        # The method's driver has been called and has completed: now keep the record.
+        with transaction.atomic():
+            if log:
+                log.stop(save=True, clean=True)
 
-            kive_sandbox_worker_preamble = [
-                "ssh",
-                "{}@localhost".format(ssh_sandbox_worker_account)
-            ]
-            command = kive_sandbox_worker_preamble + [ssh_command]
+            # TODO: I'm not sure how this is going to handle huge output,
+            # it would be better to update the logs as we go.
+            if details_to_fill:
+                self.logger.debug('return code is %s for %r.',
+                                  return_code,
+                                  details_to_fill)
+                details_to_fill.return_code = return_code
+                stdout_stream.seek(0)
+                stderr_stream.seek(0)
 
-        else:
-            command = [code_to_run] + input_paths + output_paths
+                details_to_fill.error_log.save(stderr_stream.name, File(stderr_stream))
+                details_to_fill.output_log.save(stdout_stream.name, File(stdout_stream))
+                details_to_fill.clean()
+                details_to_fill.save()
 
-        self.logger.debug("subprocess.Popen({})".format(command))
-        code_popen = subprocess.Popen(command, shell=False, stdout=stdout_stream, stderr=stderr_stream,
-                                      cwd=run_path)
-
-        return code_popen
+    # def invoke_code(self, run_path, input_paths, output_paths, stdout_stream, stderr_stream,
+    #                 ssh_sandbox_worker_account=settings.KIVE_SANDBOX_WORKER_ACCOUNT):
+    #     """
+    #     SYNOPSIS
+    #     Runs a method using the run path and input/outputs.
+    #     Leaves responsibility of DB annotation up to execute().
+    #     Leaves routing of output/error streams to run_code.
+    #
+    #     INPUTS
+    #     run_path        Directory where code will be run
+    #     input_paths     List of input files expected by the code
+    #     output_paths    List of where code will write results
+    #     stdout_stream   Stream to write stdout to
+    #     stderr_stream   Stream to write stderr to
+    #     ssh_sandbox_worker_account
+    #                     Name of the user account that the code will be invoked by
+    #                     (see kive.settings for more details).  If blank, code will
+    #                     be invoked directly by the current user
+    #
+    #     OUTPUTS
+    #     A running subprocess.Popen object which is asynchronous
+    #
+    #     ASSUMPTIONS
+    #     1) The CRR of this Method can interface with Shipyard.
+    #     Ie, it has positional inputs and outputs at command line:
+    #     script_name.py [input 1] ... [input n] [output 1] ... [output k]
+    #
+    #     2) The caller is responsible for cleaning up the stdout/err
+    #     file handles after the Popen has finished processing.
+    #
+    #     3) We don't handle exceptions of Popen here, the caller must do that.
+    #     """
+    #     if len(input_paths) != self.inputs.count() or len(output_paths) != self.outputs.count():
+    #         raise ValueError('Method "{}" expects {} inputs and {} outputs, but {} inputs and {} outputs were supplied'
+    #                          .format(self, self.inputs.count(), self.outputs.count(), len(input_paths),
+    #                                  len(output_paths)))
+    #
+    #     self.logger.debug("Checking run_path exists: {}".format(run_path))
+    #     file_access_utils.set_up_directory(run_path, tolerate=True)
+    #
+    #     for input_path in input_paths:
+    #         self.logger.debug("Confirming input file exists + readable: {}".format(input_path))
+    #         f = open(input_path, "rb")
+    #         f.close()
+    #
+    #     for output_path in output_paths:
+    #         self.logger.debug("Confirming output path doesn't exist: {}".format(output_path))
+    #         can_create, reason = file_access_utils.can_create_new_file(output_path)
+    #         if not can_create:
+    #             raise ValueError(reason)
+    #
+    #     self.logger.debug("Installing CodeResourceRevision driver to file system: {}".format(self.driver))
+    #     self.install(run_path)
+    #
+    #     # At this point, run_path has all of the necessary stuff
+    #     # written into place.  It remains to execute the code.
+    #     # The code to be executed sits in
+    #     # [run_path]/[driver.coderesource.name],
+    #     # and is executable.
+    #     code_to_run = os.path.join(
+    #         run_path,
+    #         self.driver.coderesource.filename
+    #     )
+    #
+    #     if ssh_sandbox_worker_account:
+    #         # We have to first cd into the appropriate directory before executing the command.
+    #         ins_and_outs = '"{}"'.format(input_paths[0]) if len(input_paths) > 0 else ""
+    #         for input_path in input_paths[1:] + output_paths:
+    #             ins_and_outs += ' "{}"'.format(input_path)
+    #         full_command = '"{}" {}'.format(code_to_run, ins_and_outs)
+    #         ssh_command = 'cd "{}" && {}'.format(run_path, full_command)
+    #
+    #         kive_sandbox_worker_preamble = [
+    #             "ssh",
+    #             "{}@localhost".format(ssh_sandbox_worker_account)
+    #         ]
+    #         command = kive_sandbox_worker_preamble + [ssh_command]
+    #     else:
+    #         command = [code_to_run] + input_paths + output_paths
+    #     self.logger.debug("subprocess.Popen({})".format(command))
+    #     return subprocess.Popen(
+    #         command,
+    #         shell=False,
+    #         stdout=stdout_stream,
+    #         stderr=stderr_stream,
+    #         cwd=run_path
+    #     )
 
     def is_identical(self, other):
         """Is this Method identical to another one?"""
@@ -906,9 +875,9 @@ class MethodFamily(transformation.models.TransformationFamily):
         removal_plan = empty_removal_plan()
         removal_plan["MethodFamilies"].add(self)
 
-        for method in self.members.all():
-            if method not in removal_plan["Methods"]:
-                update_removal_plan(removal_plan, method.build_removal_plan(removal_plan))
+        for meth in self.members.all():
+            if meth not in removal_plan["Methods"]:
+                update_removal_plan(removal_plan, meth.build_removal_plan(removal_plan))
 
         return removal_plan
 

@@ -923,7 +923,7 @@ class MethodFamilyApiTests(BaseTestCases.ApiTestCase):
         super(MethodFamilyApiTests, self).setUp()
 
         self.list_path = reverse("methodfamily-list")
-        self.detail_pk = 2
+        self.detail_pk = MethodFamily.objects.get(name='sums_and_products').pk
         self.detail_path = reverse("methodfamily-detail",
                                    kwargs={'pk': self.detail_pk})
         self.removal_path = reverse("methodfamily-removal-plan",
@@ -944,13 +944,13 @@ class MethodFamilyApiTests(BaseTestCases.ApiTestCase):
 
         # There are four CDTs loaded into the Database by default.
         self.assertEquals(len(response.data), 7)
-        self.assertEquals(response.data[6]['name'], 'sums and products')
+        self.assertEquals(response.data[6]['name'], 'sums_and_products')
 
     def test_detail(self):
         request = self.factory.get(self.detail_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.data['name'], 'sums and products')
+        self.assertEquals(response.data['name'], 'sums_and_products')
 
     def test_removal_plan(self):
         request = self.factory.get(self.removal_path)

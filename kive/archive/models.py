@@ -356,13 +356,23 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     def get_state_name(self):
         return self._runstate.name
 
+    def all_inputs_have_data(self):
+        """Return True if all datasets pass the has_data() test.
+        Do this just before we start a run, as an external file
+        might be missing or have been corrupted.
+        """
+        for _input in self.inputs.all():
+            if not _input.dataset.has_data():
+                return False
+        return True
+
     @transaction.atomic
     def start(self, save=True, **kwargs):
         """
         Start this run, changing its state from Pending to Running.
         """
         assert self._runstate_id == runstates.PENDING_PK
-        self._runstate = RunState.objects.get(pk=runstates.RUNNING_PK)
+        self._runstate_id = runstates.RUNNING_PK
         stopwatch.models.Stopwatch.start(self, save=save, **kwargs)
 
     @transaction.atomic
@@ -1044,7 +1054,9 @@ class RunComponent(stopwatch.models.Stopwatch):
         """
         True if RunComponent is successful; False otherwise.
         """
-        return self._runcomponentstate_id == runcomponentstates.SUCCESSFUL_PK
+        retval = self._runcomponentstate_id == runcomponentstates.SUCCESSFUL_PK
+        self.logger.debug("is_successful returning %d (state= %s)" % (retval, self._runcomponentstate_id))
+        return retval
 
     def is_cancelled(self):
         """

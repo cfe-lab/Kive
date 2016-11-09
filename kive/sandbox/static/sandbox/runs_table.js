@@ -64,9 +64,12 @@
                     run_table: runsTable
                 }, clickRerun);
             $td.append($rerun_link);
-
-            if (run.stopped_by !== null) {
-                $td.append(" (Stopped by user " + run.stopped_by + ")");
+            
+            var stopped_by = run.stopped_by;
+            if (stopped_by !== null) {
+                // no html - extra safe
+                stopped_by = stopped_by.replace(/(<([^>]+)>)/ig,"");
+                $td.append(" (Stopped by user " + stopped_by + ")");
             } else if (run.run_progress.end === null &&
                     (runsTable.user === run.user || ! runsTable.is_locked)) {
                 var $stop_link = $("<a>");
@@ -148,7 +151,10 @@
         var $no_results = this.$no_results,
             runs;
         if ('detail' in response) {
-            $no_results.html('<h2>Errors:</h2><p>' + response.detail + '</p>');
+            $no_results.append(
+                $('<h2>').text('Errors:'),
+                $('<p>').text(response.detail)
+            );
         } else {
             runs = response.results;
             if (runs !== undefined && runs.length > 0) {

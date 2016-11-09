@@ -366,21 +366,20 @@ input[disabled]:active {
 
 
 
-.happy_indicator {
+#happy_indicator {
     background: url('/static/portal/smiley.png');
-    width: 32px;
-    height: 32px;
-    margin-top: -40px;
+    width: 16px;
+    height: 16px;
+    margin-top: -22px;
     margin-right: 50px;
     float: right;
     z-index: 2;
     position: relative;
 }
-.happy_indicator_label {
+#happy_indicator_label {
     position: relative;
-    margin-top: -3em;
-    margin-right: 90px;
-    line-height: 1.1em;
+    margin-top: -22px;
+    margin-right: 74px;
     float: right;
     z-index: 2;
     font-size: 0.8em;
