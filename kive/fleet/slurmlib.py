@@ -3,13 +3,14 @@
 
 import os.path
 import subprocess as sp
+import time
 
 import logging
 
 logger = logging.getLogger("fleet.slurmlib")
 
 
-class SlurmJobhandle:
+class SlurmJobHandle:
     def __init__(self, job_id):
         self._job_id = job_id
 
@@ -37,7 +38,7 @@ class SlurmJobhandle:
         SUCC_COMPLETED: This jobs has successfully completed (return code of zero).
 
         NOTE: If you want the states of many jobhandles at the same time, it is more
-        efficient to  use SlurmScheduler.get_job_states() directly.
+        efficient to use SlurmScheduler.get_job_states() directly.
 
         """
         return SlurmScheduler.get_job_states([self])[0]
@@ -48,7 +49,7 @@ class SlurmJobhandle:
 
 class SlurmScheduler:
     # All possible run states we expose to the outside
-    # These states will be reported by SlurmJobhandle.getstate() and
+    # These states will be reported by SlurmJobHandle.getstate() and
     # SlurmScheduler.get_job_states()
     PREC_WAIT = 'PREC_WAIT'
     RESO_WAIT = 'RESO_WAIT'
@@ -157,6 +158,7 @@ class SlurmScheduler:
         cmd_lst = ["sbatch", "-D", workingdir, "--gid=%d" % group_id,
                    "-J", drivername, "--priority=%d" % prio_level,
                    "-s", "--uid=%d" % user_id, "--kill-on-invalid-dep=yes",
+                   "-c", num_cpus,
                    "--export=PYTHONPATH=%s" % workingdir]
         # "--get-user-env",
 
@@ -187,7 +189,7 @@ class SlurmScheduler:
         else:
             logger.error("sbatch completed with '%s'" % out_str)
             raise RuntimeError("cannot parse sbatch output")
-        return SlurmJobhandle(job_id)
+        return SlurmJobHandle(job_id)
 
     @classmethod
     def job_cancel(cls, jobhandle):
@@ -341,3 +343,10 @@ class SlurmScheduler:
         # now return the list in the correct order, filling in those states not
         # found with an unknown state
         return [found_dct.get(jh._job_id, cls.UNKNOWN) for jh in jobhandle_lst]
+
+
+ret_dct = {
+    SlurmScheduler.CANCELLED: -2,
+    SlurmScheduler.RUN_FAILED: -1,
+    SlurmScheduler.SUCC_COMPLETED: 0
+}

@@ -8,13 +8,17 @@ import shutil
 import tempfile
 import time
 import itertools
+import pwd
 
 from django.utils import timezone
 from django.db import transaction, OperationalError, InternalError
 from django.contrib.auth.models import User
+from django.conf import settings
+from django.core.files import File
+
 
 import archive.models
-from archive.models import RunStep, Run
+from archive.models import RunStep, Run, ExecLog
 from constants import dirnames, extensions, runcomponentstates
 import file_access_utils
 import librarian.models
@@ -23,6 +27,7 @@ import pipeline.models
 from method.models import Method
 from datachecking.models import IntegrityCheckLog
 from fleet.exceptions import StopExecution
+from fleet.slurmlib import SlurmScheduler
 
 
 logger = logging.getLogger("Sandbox")
@@ -87,6 +92,17 @@ class Sandbox:
         PRECONDITIONS
         inputs must have real data
         """
+        self.slurm_scheduler = SlurmScheduler()
+
+        if settings.KIVE_SANDBOX_WORKER_ACCOUNT:
+            pwd_info = pwd.getpwnam(settings.KIVE_SANDBOX_WORKER_ACCOUNT)
+            self._sandbox_uid = pwd_info.pw_uid
+            self._sandbox_gid = pwd_info.pw_gid
+        else:
+            # get our own current uid/hid
+            self._sandbox_uid = os.getuid()
+            self._sandbox_gid = os.getgid()
+
         self.run = run
         user = run.user
         my_pipeline = run.pipeline
@@ -1351,14 +1367,13 @@ class Sandbox:
             file_access_utils.configure_sandbox_permissions(workdir)
         return (in_dir, out_dir, log_dir)
 
-    # This function will be called by fleet Workers.  Since they do not have access
-    # to the Sandboxes, we need to pass in all the information they need via a dictionary
-    # representation of a RunCableExecuteInfo.  It does not update the Sandbox maps either,
-    # as that falls to the Manager (who has the Sandbox).
     @staticmethod
     def finish_cable(cable_execute_dict):
         """
         Finishes an un-reused cable that has already been prepared for execution.
+
+        This code is intended to be run as a Slurm task, so it's a static method that
+        takes a dictionary rather than a RunCableExecuteInfo object.
 
         If we are reaching this point, we know that the data required for input_dataset is either
         in place in the sandbox or available in the database.
@@ -1664,6 +1679,8 @@ class Sandbox:
         """
         Prepare to carry out the task specified by step_execute_dict.
 
+        This is intended to be run as a Slurm job, so is a static method.
+
         Precondition: the task must be ready to go, i.e. its inputs must all be in place.  Also
         it should not have been run previously.  This should not be a RunStep representing a Pipeline.
         """
@@ -1671,6 +1688,7 @@ class Sandbox:
         curr_ER = None
         preexisting_ER = step_execute_dict["execrecord_pk"] is not None
         cable_info_dicts = step_execute_dict["cable_info_dicts"]
+        step_run_dir = step_execute_dict["step_run_dir"]
 
         recovering_record = None
         if step_execute_dict["recovering_record_pk"] is not None:
@@ -1678,10 +1696,11 @@ class Sandbox:
                 pk=step_execute_dict["recovering_record_pk"]
             ).definite
 
-        try:
-            curr_RS = archive.models.RunStep.objects.get(pk=step_execute_dict["runstep_pk"])  # already start()ed
-            assert not curr_RS.pipelinestep.is_subpipeline()
+        curr_RS = archive.models.RunStep.objects.get(pk=step_execute_dict["runstep_pk"])  # already start()ed
+        assert not curr_RS.pipelinestep.is_subpipeline()
+        method = curr_RS.pipelinestep.transformation.definite
 
+        try:
             recover = recovering_record is not None
             invoking_record = recovering_record or curr_RS
 
@@ -1795,6 +1814,9 @@ class Sandbox:
                 if preexisting_ER:
                     curr_ER.quarantine_runcomponents()  # this is transaction'd
 
+            # Install the code.
+            method.install(step_run_dir)
+
         except KeyboardInterrupt:
             # Execution was stopped somewhere outside of run_code (that would
             # have been caught above).
@@ -1802,53 +1824,83 @@ class Sandbox:
             raise StopExecution(
                 "Execution of step {} (method {}) was stopped during setup.".format(
                     curr_RS,
-                    curr_RS.pipelinestep.transformation.definite
+                    method
                 )
             )
 
         return curr_RS
 
-    # def submit_step_execution(self, step_execute_dict):
-    #     """
-    #     Submit the step execution to Slurm.
-    #     """
-    #     # From here on the code is assumed to not be corrupted.
-    #     # FIXME get start and end time of the logs from Slurm
-    #
-    #     step_run_dir = step_execute_dict["step_run_dir"]
-    #     curr_ER = None
-    #     preexisting_ER = step_execute_dict["execrecord_pk"] is not None
-    #     cable_info_dicts = step_execute_dict["cable_info_dicts"]
-    #     output_paths = step_execute_dict["output_paths"]
-    #     user = User.objects.get(pk=step_execute_dict["user_pk"])
-    #     log_dir = step_execute_dict["log_dir"]
-    #     stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(pipelinestep.step_num))
-    #     stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(pipelinestep.step_num))
-    #
-    #     try:
-    #         with open(stdout_path, "w+") as out_write, open(stderr_path, "w+") as err_write:
-    #             pipelinestep.transformation.definite.run_code(
-    #                 step_run_dir,
-    #                 input_paths,
-    #                 output_paths,
-    #                 out_write,
-    #                 err_write,
-    #                 curr_log,
-    #                 curr_log.methodoutput
-    #             )
-    #     except StopExecution as e:
-    #         # Immediately end, marking the RunStep as cancelled, and re-raise e.
-    #         logger.debug("[%d] Method execution stopped.", slurm_id)
-    #         curr_RS.cancel_running(save=True)
-    #         raise e
-    #
-    #     logger.debug("[%d] Method execution complete, ExecLog saved (started = %s, ended = %s)",
-    #                  slurm_id, curr_log.start_time, curr_log.end_time)
+    @staticmethod
+    def start_step_execlog(log_pk):
+        """
+        Start the specified ExecLog.
+        """
+        log = ExecLog.objects.get(pk=log_pk)
+        log.start(save=True)
+
+    def submit_step_execution(self, step_execute_info, dependencies):
+        """
+        Submit the step execution to Slurm.
+
+        step_execute_info is an object of class RunStepExecuteInfo.
+        dependencies is a list of Slurm job IDs that must be completed (successfully)
+        before the step execution can proceed.
+        """
+        # From here on the code is assumed to not be corrupted, and all the required files
+        # are in their right places.
+        curr_RS = step_execute_info.runstep
+
+        cable_info_dicts = step_execute_info["cable_info_dicts"]
+        output_paths = step_execute_info["output_paths"]
+        log_dir = step_execute_info["log_dir"]
+        stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(curr_RS.pipelinestep.step_num))
+        stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(curr_RS.pipelinestep.step_num))
+
+        input_paths = [x["output_path"] for x in cable_info_dicts]
+        # Driver name
+        driver = curr_RS.pipelinestep.transformation.definite.driver
+
+        logger.debug("Submitting driver '%s', task_pk %d", driver.coderesource.filename, curr_RS.pk)
+        job_handle = curr_RS.pipelinestep.transformation.definite.submit_code(
+            self.slurm_scheduler,
+            step_execute_info.step_run_dir,
+            input_paths,
+            output_paths,
+            stdout_path,
+            stderr_path,
+            self._sandbox_uid,
+            self._sandbox_gid,
+            step_execute_info.priority,
+            dependencies
+        )
+        logger.debug("Submitted task with pk=%d; Slurm job ID=%d", curr_RS.pk, job_handle._job_id)
+        return job_handle
+
+    # return_code, stdout_path, and stderr_path will all be collected within the
+    # sbatch script and passed as command-line parameters to whatever script
+    # runs this code.
+    @staticmethod
+    def stop_step_execlog(log_pk, return_code, stdout_path, stderr_path):
+        """
+        Finalize the specified ExecLog with the given details.
+        """
+        log = ExecLog.objects.get(pk=log_pk)
+        log.stop(save=True)
+
+        log.methodoutput.return_code = return_code
+        with open(stdout_path, "rb") as out_f, open(stderr_path, "rb") as err_f:
+            log.methodoutput.error_log.save(stderr_path, File(err_f))
+            log.methodoutput.output_log.save(stdout_path, File(out_f))
+
+        log.clean()
+        log.save()
 
     @staticmethod
     def step_execution_bookkeeping(step_execute_dict):
         """
         Perform bookkeeping after step execution.
+
+        This is intended to run as a Slurm task, so it's coded as a static method.
         """
         # Break out step_execute_dict.
         curr_RS = archive.models.RunStep.objects.get(pk=step_execute_dict["runstep_pk"])

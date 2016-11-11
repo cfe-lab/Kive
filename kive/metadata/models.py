@@ -14,17 +14,18 @@ from django.contrib.auth.models import User, Group
 from django.db.models import Q
 from django.conf import settings
 from django.core.urlresolvers import reverse
+from django.core.files import File
 
 import re
 import csv
 import os
-import sys
 import math
 import tempfile
 import shutil
 from datetime import datetime
 import json
 import itertools
+import time
 
 from file_access_utils import set_up_directory, configure_sandbox_permissions
 from constants import datatypes, CDTs, maxlengths, groups, users
@@ -32,6 +33,7 @@ from constants import datatypes, CDTs, maxlengths, groups, users
 import logging
 from portal.views import admin_check
 from archive.exceptions import SandboxActiveException, RunNotFinished
+from fleet.slurmlib import SlurmScheduler, ret_dct
 
 LOGGER = logging.getLogger(__name__)  # Module level logger.
 
@@ -1219,7 +1221,8 @@ class Datatype(AccessControl):
 
         return constraints_failed
 
-    def check_custom_constraint(self, summary_path, input_path, verif_log=None):
+    def check_custom_constraint(self, summary_path, input_path, verification_log=None,
+                                check_interval=None):
         """
         SYNOPSIS
         Check the one-column CSV file file stored at input_path against this
@@ -1229,7 +1232,8 @@ class Datatype(AccessControl):
         summary_path        the work directory where we will run the
                             verification method
         input_path          one-column CSV to be checked
-        verif_log           VerificationLog to fill out
+        verification_log    VerificationLog to fill out
+        check_interval      Number of seconds between status queries to Slurm
 
         OUTPUTS
         failing_cells       a dictionary of cells which failed a custom
@@ -1239,22 +1243,59 @@ class Datatype(AccessControl):
         1) this Datatype has a CustomConstraint.
         2) summary_path has been set up using setup_verification_path.
         """
+        check_interval = check_interval or settings.DEFAULT_SLURM_CHECK_INTERVAL
+
         assert self.has_custom_constraint()
         # We need to invoke the verification method using run_code.
-        verif_method = self.custom_constraint.verification_method
+        verifier = self.custom_constraint.verification_method
+
+        if verification_log:
+            verification_log.start(save=True)
+
+        # Invoke and wait via Slurm.
+        verifier.install(summary_path)
 
         output_path = os.path.join(summary_path, "output_data", "failed_row.csv")
         stdout_path = os.path.join(summary_path, "logs", "stdout.txt")
         stderr_path = os.path.join(summary_path, "logs", "stderr.txt")
 
-        with open(stdout_path, "w+") as out, open(stderr_path, "w+") as err:
-            verif_method.run_code(summary_path,
-                                  [input_path],
-                                  [output_path],
-                                  out,
-                                  err,
-                                  verif_log,
-                                  verif_log)
+        scheduler = SlurmScheduler()
+        job = verifier.submit_code(
+            scheduler,
+            summary_path,
+            [input_path],
+            [output_path],
+            stdout_path,
+            stderr_path,
+            None,
+            verification_log,
+            verification_log
+        )
+
+        is_done = False
+        while not is_done:
+            time.sleep(check_interval)
+            curr_state = self.get_state()
+            is_done = curr_state in SlurmScheduler.STOPPED_SET
+            self.logger.debug("Waiting for Slurm job (id = %d, state = %s)", self._job_id, curr_state)
+        return_code = ret_dct[curr_state]
+
+        # The method's driver has been called and has completed: now keep the record.
+        with transaction.atomic():
+            if verification_log:
+                verification_log.stop(save=True, clean=True)
+
+                self.logger.debug('return code is %s for %r.',
+                                  return_code,
+                                  verification_log)
+                verification_log.return_code = return_code
+
+                with open(stdout_path, "rb") as out_f, open(stderr_path, "rb") as err_f:
+                    verification_log.error_log.save(stderr_path, File(err_f))
+                    verification_log.output_log.save(stdout_path, File(out_f))
+
+            verification_log.clean()
+            verification_log.save()
 
         return self._check_verification_output(summary_path, output_path)
 

@@ -6,16 +6,16 @@ do with CodeResources.
 """
 
 from __future__ import unicode_literals
+import pwd
 
 from django.db import models, transaction
 from django.db.models import Max
 from django.db.models.signals import post_delete
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator
-from django.core.files import File
 from django.utils.encoding import python_2_unicode_compatible
-from django.conf import settings
 from django.core.urlresolvers import reverse
+from django.conf import settings
 
 import metadata.models
 import transformation.models
@@ -23,18 +23,12 @@ import file_access_utils
 from constants import maxlengths
 import method.signals
 from metadata.models import empty_removal_plan, remove_helper, update_removal_plan
-from fleet.exceptions import StopExecution
 
 import os
 import stat
-import subprocess
 import hashlib
-import traceback
-import threading
 import logging
 import shutil
-import time
-import random
 
 
 @python_2_unicode_compatible
@@ -348,7 +342,6 @@ class Method(transformation.models.Transformation):
     Related to :model:`copperfish.CodeResource`
     Related to :model:`copperfish.MethodFamily`
     """
-
     DETERMINISTIC = 1
     REUSABLE = 2
     NON_REUSABLE = 3
@@ -579,173 +572,61 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                 with dep.requirement.content_file:
                     shutil.copyfileobj(dep.requirement.content_file, f)
 
-    def run_code(self, step_execute_dict,
-                 run_path,
-                 input_paths,
-                 output_paths,
-                 stdout_stream,
-                 stderr_stream,
-                 log=None,
-                 details_to_fill=None):
+    def submit_code(self,
+                    scheduler,
+                    run_path,
+                    input_paths,
+                    output_paths,
+                    stdout_path,
+                    stderr_path,
+                    dependencies=None,
+                    uid=None,
+                    gid=None,
+                    priority=None):
         """
-        Run this Method with the specified inputs and outputs.
+        Submit this Method to Slurm for execution.
 
-        SYNOPSIS
-        Run the method with the specified inputs and outputs, writing each
-        line of its stdout/stderr to all of the specified streams.
+        The method runs with the specified inputs and outputs, writing its
+        stdout/stderr to the specified streams.
 
-        Return the Method's return code, or -1 if the Method suffers an
-        OS-level error (ie. is not executable), or -2 if execution is
-        stopped.
-
-        If details_to_fill is not None, fill it in with the return code, and
-        set its output and error logs to the provided handles (meaning
-        these should be files, not standard streams, and they must be open
-        for reading AND writing).
-
-        If log is not None, set its start_time and end_time immediately
-        before and after calling invoke_code.
+        Return a SlurmJobHandle.
 
         INPUTS
-        run_path        see invoke_code
-        input_paths     see invoke_code
-        output_paths    see invoke_code
-        stdout_stream   stream (eg. open file handle) to output stdout to (must be read-write)
-        stderr_stream   stream (eg. open file handle) to output stderr to (must be read-write)
-        log             object with start_time and end_time fields to fill in (either
-                        VerificationLog, or ExecLog)
-        details_to_fill object with return_code, output_log, and error_log to fill in
-                        (either VerificationLog, or MethodOutput)
-
-        ASSUMPTIONS
-        1) if details_to_fill is provided, the first entry in stdout_stream and stderr_stream
-        are handles to regular files, open for reading and writing.
+        scheduler       An object of class SlurmScheduler
+        run_path        Directory where code will be run
+        input_paths     List of input files expected by the code
+        output_paths    List of where code will write results
+        stdout_path     File path to write stdout to
+        stderr_path     Path to write stderr to
         """
-        if log:
-            log.start(save=True)
+        if settings.KIVE_SANDBOX_WORKER_ACCOUNT:
+            pwd_info = pwd.getpwnam(settings.KIVE_SANDBOX_WORKER_ACCOUNT)
+            default_uid = pwd_info.pw_uid
+            default_gid = pwd_info.pw_gid
+        else:
+            # Get our own current uid/gid.
+            default_uid = os.getuid()
+            default_gid = os.getgid()
 
-        # invoke and wait via slurm
-        self.install(run_path)
-        cmd_str = self.driver.coderesource.filename
-        arglst = input_paths + output_paths
+        # Override the default UID and GID if possible.
+        uid = uid or default_uid
+        gid = gid or default_gid
 
-        precedent_job_lst = None
-        # invoke and wait until this job has stopped running....
-        slurm_manager = step_execute_dict['SLURM_MANAGER']
-        worker_rank = step_execute_dict['SLURM_WORKER']
-        return_code = slurm_manager.helper_invoke(worker_rank,
-                                                  run_path, cmd_str, arglst,
-                                                  stdout_stream.name,
-                                                  stderr_stream.name,
-                                                  step_execute_dict, precedent_job_lst)
+        priority = priority or settings.DEFAULT_SLURM_PRIORITY
 
-        # The method's driver has been called and has completed: now keep the record.
-        with transaction.atomic():
-            if log:
-                log.stop(save=True, clean=True)
-
-            # TODO: I'm not sure how this is going to handle huge output,
-            # it would be better to update the logs as we go.
-            if details_to_fill:
-                self.logger.debug('return code is %s for %r.',
-                                  return_code,
-                                  details_to_fill)
-                details_to_fill.return_code = return_code
-                stdout_stream.seek(0)
-                stderr_stream.seek(0)
-
-                details_to_fill.error_log.save(stderr_stream.name, File(stderr_stream))
-                details_to_fill.output_log.save(stdout_stream.name, File(stdout_stream))
-                details_to_fill.clean()
-                details_to_fill.save()
-
-    # def invoke_code(self, run_path, input_paths, output_paths, stdout_stream, stderr_stream,
-    #                 ssh_sandbox_worker_account=settings.KIVE_SANDBOX_WORKER_ACCOUNT):
-    #     """
-    #     SYNOPSIS
-    #     Runs a method using the run path and input/outputs.
-    #     Leaves responsibility of DB annotation up to execute().
-    #     Leaves routing of output/error streams to run_code.
-    #
-    #     INPUTS
-    #     run_path        Directory where code will be run
-    #     input_paths     List of input files expected by the code
-    #     output_paths    List of where code will write results
-    #     stdout_stream   Stream to write stdout to
-    #     stderr_stream   Stream to write stderr to
-    #     ssh_sandbox_worker_account
-    #                     Name of the user account that the code will be invoked by
-    #                     (see kive.settings for more details).  If blank, code will
-    #                     be invoked directly by the current user
-    #
-    #     OUTPUTS
-    #     A running subprocess.Popen object which is asynchronous
-    #
-    #     ASSUMPTIONS
-    #     1) The CRR of this Method can interface with Shipyard.
-    #     Ie, it has positional inputs and outputs at command line:
-    #     script_name.py [input 1] ... [input n] [output 1] ... [output k]
-    #
-    #     2) The caller is responsible for cleaning up the stdout/err
-    #     file handles after the Popen has finished processing.
-    #
-    #     3) We don't handle exceptions of Popen here, the caller must do that.
-    #     """
-    #     if len(input_paths) != self.inputs.count() or len(output_paths) != self.outputs.count():
-    #         raise ValueError('Method "{}" expects {} inputs and {} outputs, but {} inputs and {} outputs were supplied'
-    #                          .format(self, self.inputs.count(), self.outputs.count(), len(input_paths),
-    #                                  len(output_paths)))
-    #
-    #     self.logger.debug("Checking run_path exists: {}".format(run_path))
-    #     file_access_utils.set_up_directory(run_path, tolerate=True)
-    #
-    #     for input_path in input_paths:
-    #         self.logger.debug("Confirming input file exists + readable: {}".format(input_path))
-    #         f = open(input_path, "rb")
-    #         f.close()
-    #
-    #     for output_path in output_paths:
-    #         self.logger.debug("Confirming output path doesn't exist: {}".format(output_path))
-    #         can_create, reason = file_access_utils.can_create_new_file(output_path)
-    #         if not can_create:
-    #             raise ValueError(reason)
-    #
-    #     self.logger.debug("Installing CodeResourceRevision driver to file system: {}".format(self.driver))
-    #     self.install(run_path)
-    #
-    #     # At this point, run_path has all of the necessary stuff
-    #     # written into place.  It remains to execute the code.
-    #     # The code to be executed sits in
-    #     # [run_path]/[driver.coderesource.name],
-    #     # and is executable.
-    #     code_to_run = os.path.join(
-    #         run_path,
-    #         self.driver.coderesource.filename
-    #     )
-    #
-    #     if ssh_sandbox_worker_account:
-    #         # We have to first cd into the appropriate directory before executing the command.
-    #         ins_and_outs = '"{}"'.format(input_paths[0]) if len(input_paths) > 0 else ""
-    #         for input_path in input_paths[1:] + output_paths:
-    #             ins_and_outs += ' "{}"'.format(input_path)
-    #         full_command = '"{}" {}'.format(code_to_run, ins_and_outs)
-    #         ssh_command = 'cd "{}" && {}'.format(run_path, full_command)
-    #
-    #         kive_sandbox_worker_preamble = [
-    #             "ssh",
-    #             "{}@localhost".format(ssh_sandbox_worker_account)
-    #         ]
-    #         command = kive_sandbox_worker_preamble + [ssh_command]
-    #     else:
-    #         command = [code_to_run] + input_paths + output_paths
-    #     self.logger.debug("subprocess.Popen({})".format(command))
-    #     return subprocess.Popen(
-    #         command,
-    #         shell=False,
-    #         stdout=stdout_stream,
-    #         stderr=stderr_stream,
-    #         cwd=run_path
-    #     )
+        job_handle = scheduler.submit_job(
+            run_path,
+            self.driver.coderesource.filename,
+            input_paths + output_paths,
+            uid,
+            gid,
+            priority,
+            self.threads,
+            stdout_path,
+            stderr_path,
+            dependencies
+        )
+        return job_handle
 
     def is_identical(self, other):
         """Is this Method identical to another one?"""

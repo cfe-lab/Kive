@@ -1,24 +1,15 @@
-
 import os
 import socket
 import pwd
 import time
-
 import Queue
 import multiprocessing as mp
-
 import logging
 
 from django.conf import settings
+
 from fleet.workers import BaseManagerInterface, Worker, MPIFleetInterface
-
-
-from slurmlib import SlurmScheduler
-
-
-ret_dct = {SlurmScheduler.CANCELLED: -2,
-           SlurmScheduler.RUN_FAILED: -1,
-           SlurmScheduler.SUCC_COMPLETED: 0}
+from slurmlib import SlurmScheduler, ret_dct
 
 
 # currently, this has only be tested with one worker process
