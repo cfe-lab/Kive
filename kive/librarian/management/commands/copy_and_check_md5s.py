@@ -161,9 +161,9 @@ class Command(BaseCommand):
                 yield
             except StandardError:
                 message = '\n'.join(['Purge failed with previous stats:',
-                                     previous_stats,
+                                     repr(previous_stats),
                                      'current file names:',
-                                     filenames,
+                                     repr(sorted(filenames)),
                                      'error:',
                                      format_exc()])
                 yield message
