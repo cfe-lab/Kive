@@ -67,7 +67,7 @@ export class CanvasListeners {
             // Collision detection is computationally expensive, so
             // deferred until 0.5s have passed without further resizing.
             clearTimeout(resize_timeout);
-            resize_timeout = setTimeout(endDocumentResize, 500);
+            resize_timeout = <any> setTimeout(endDocumentResize, 500);
         });
     }
     static initContextMenuListener(cs: CanvasState, contextMenu: CanvasContextMenu): void {
