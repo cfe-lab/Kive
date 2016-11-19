@@ -96,12 +96,12 @@ class Sandbox:
 
         if settings.KIVE_SANDBOX_WORKER_ACCOUNT:
             pwd_info = pwd.getpwnam(settings.KIVE_SANDBOX_WORKER_ACCOUNT)
-            self._sandbox_uid = pwd_info.pw_uid
-            self._sandbox_gid = pwd_info.pw_gid
+            self.uid = pwd_info.pw_uid
+            self.gid = pwd_info.pw_gid
         else:
             # get our own current uid/hid
-            self._sandbox_uid = os.getuid()
-            self._sandbox_gid = os.getgid()
+            self.uid = os.getuid()
+            self.gid = os.getgid()
 
         self.run = run
         user = run.user
@@ -1838,7 +1838,7 @@ class Sandbox:
         log = ExecLog.objects.get(pk=log_pk)
         log.start(save=True)
 
-    def submit_step_execution(self, step_execute_info, dependencies):
+    def submit_step_execution(self, step_execute_info, after_okay=None):
         """
         Submit the step execution to Slurm.
 
@@ -1868,10 +1868,10 @@ class Sandbox:
             output_paths,
             stdout_path,
             stderr_path,
-            self._sandbox_uid,
-            self._sandbox_gid,
+            self.uid,
+            self.gid,
             step_execute_info.priority,
-            dependencies
+            after_okay=None
         )
         logger.debug("Submitted task with pk=%d; Slurm job ID=%d", curr_RS.pk, job_handle._job_id)
         return job_handle

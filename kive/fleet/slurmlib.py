@@ -4,6 +4,7 @@
 import os.path
 import subprocess as sp
 import time
+from datetime import datetime
 
 import logging
 
@@ -12,7 +13,7 @@ logger = logging.getLogger("fleet.slurmlib")
 
 class SlurmJobHandle:
     def __init__(self, job_id):
-        self._job_id = job_id
+        self.job_id = job_id
 
     def get_state(self):
         """ Get the current state of this job.
@@ -44,7 +45,7 @@ class SlurmJobHandle:
         return SlurmScheduler.get_job_states([self])[0]
 
     def __str__(self):
-        return "slurm job_id %d" % self._job_id
+        return "slurm job_id %d" % self.job_id
 
 
 class SlurmScheduler:
@@ -97,6 +98,34 @@ class SlurmScheduler:
     _slurm_jobcomp_file = "/var/log/slurm-llnl/job_completions"
     _last_file_pos = 0
 
+    # A lookup that maps Slurm completion states to integers.
+    ret_dct = {
+        CANCELLED: -2,
+        RUN_FAILED: -1,
+        SUCC_COMPLETED: 0
+    }
+
+    # States as reported by sacct.
+    # RUNNING, RESIZING, SUSPENDED, COMPLETED, CANCELLED, FAILED, TIMEOUT, PREEMPTED, BOOT_FAIL, DEADLINE or NODE_FAIL
+    BOOT_FAIL = "BOOT_FAIL"
+    CANCELLED = "CANCELLED"
+    COMPLETED = "COMPLETED"
+    # CONFIGURING = "CONFIGURING"
+    COMPLETING = "COMPLETING"
+    DEADLINE = "DEADLINE"
+    FAILED = "FAILED"
+    NODE_FAIL = "NODE_FAIL"
+    # PENDING = "PENDING"
+    PREEMPTED = "PREEMPTED"
+    RUNNING = "RUNNING"
+    RESIZING = "RESIZING"
+    SUSPENDED = "SUSPENDED"
+    TIMEOUT = "TIMEOUT"
+
+    RUNNING_STATES = set([RUNNING, COMPLETING, PREEMPTED, RESIZING, SUSPENDED])
+    CANCELLED_STATES = set([CANCELLED, BOOT_FAIL, DEADLINE, NODE_FAIL, TIMEOUT])
+    FAILED_STATES = set([FAILED])
+
     @classmethod
     def _slurmtosched_state(cls, slurm_job_state, job_reason=None):
         """Translate the SLURM job state into a Scheduler job state """
@@ -128,7 +157,8 @@ class SlurmScheduler:
                    user_id, group_id,
                    prio_level, num_cpus,
                    stdoutfile, stderrfile,
-                   dep_handle_lst=None):
+                   after_okay=None,
+                   after_any=None):
         """ Submit a job to the slurm queue.
         The executable submitted will be of the form:
 
@@ -146,10 +176,13 @@ class SlurmScheduler:
         stdoutfile, stderrfile (strings or None): file names into which the job's
         std out and err streams will be written.
 
-        dep_handle_lst: (list of jobhandles): the jobhandles on which this job depends.
+        after_okay: (list of jobhandles): the jobhandles on whose success this job depends.
         All of these previously submitted jobs must complete successfully before slurm
         will start this one.
         If a job on which this one is cancelled, this job will also be cancelled by slurm.
+
+        after_any: (list of jobhandles): job handles which must complete, successfully
+        or not, before this job runs.
 
         This method returns a slurmjobhandle on success, or raises a
         subprocess.CalledProcessError exception.
@@ -166,8 +199,10 @@ class SlurmScheduler:
             cmd_lst.append("--output=%s" % stdoutfile)
         if stderrfile:
             cmd_lst.append("--error=%s" % stderrfile)
-        if dep_handle_lst is not None and len(dep_handle_lst) > 0:
-            cmd_lst.append("--dependency=afterok:" + ":".join(["%d" % jh._job_id for jh in dep_handle_lst]))
+        if after_okay is not None and len(after_okay) > 0:
+            cmd_lst.append("--dependency=afterok:" + ":".join(["%d" % jh.job_id for jh in after_okay]))
+        if after_any is not None and len(after_any) > 0:
+            cmd_lst.append("--dependency=afterany:" + ":".join(["%d" % jh.job_id for jh in after_any]))
 
         cmd_lst.append(os.path.join(workingdir, drivername))
         cmd_lst.extend(driver_arglst)
@@ -175,19 +210,19 @@ class SlurmScheduler:
         logger.debug(" ".join(cmd_lst))
         try:
             out_str = sp.check_output(cmd_lst)
-        except sp.CalledProcessError as E:
-            logger.error("sbatch returned an error code '%d'" % E.returncode)
-            logger.error("sbatch wrote this: '%s' " % E.output)
+        except sp.CalledProcessError as e:
+            logger.error("sbatch returned an error code '%d'", e.returncode)
+            logger.error("sbatch wrote this: '%s' ", e.output)
             raise
         if out_str.startswith("Submitted"):
             cl = out_str.split()
             try:
                 job_id = int(cl[3])
             except:
-                logger.error("sbatch completed with '%s'" % out_str)
+                logger.error("sbatch completed with '%s'", out_str)
                 raise RuntimeError("cannot parse sbatch output")
         else:
-            logger.error("sbatch completed with '%s'" % out_str)
+            logger.error("sbatch completed with '%s'", out_str)
             raise RuntimeError("cannot parse sbatch output")
         return SlurmJobHandle(job_id)
 
@@ -196,12 +231,12 @@ class SlurmScheduler:
         """Cancel a given job given its jobhandle.
         Raise an exception if an error occurs, otherwise return nothing.
         """
-        cmd_lst = ["scancel", "%d" % jobhandle._job_id]
+        cmd_lst = ["scancel", "{}".format(jobhandle.job_id)]
         try:
             _ = sp.check_output(cmd_lst)
-        except sp.CalledProcessError as E:
-            logger.error("scancel returned an error code '%s'" % E.returncode)
-            logger.error("scancel wrote this: '%s' " % E.output)
+        except sp.CalledProcessError as e:
+            logger.error("scancel returned an error code '%s'", e.returncode)
+            logger.error("scancel wrote this: '%s' ", e.output)
             raise
 
     @classmethod
@@ -235,8 +270,8 @@ class SlurmScheduler:
           the squeue column table headers:
           JOBID, PARTITION, NAME, USER, ST, TIME, NODES and 'NODELIST(REASON)'
           The values are the values from the respective row.
-          NOTE: all of these values are ruturned 'as is', i.e. as strings, except for
-          the 'JOBID' value, which is converted to an intteger.
+          NOTE: all of these values are returned 'as is', i.e. as strings, except for
+          the 'JOBID' value, which is converted to an integer.
 
         See the squeue man pages for more information about these entries.
         """
@@ -274,6 +309,74 @@ class SlurmScheduler:
         return retdct
 
     @classmethod
+    def get_accounting_info(cls, job_id_iter=None):
+        """
+        Get detailed information, i.e. sacct, on the speicfied job(s).
+
+        job_id_iter is an iterable that must contain job IDs (integers) of previously
+        submitted jobs.
+        If this list is None, or empty, information about all jobs on the
+        queue is returned.
+
+        Returns a dictionary which maps job IDs to a dictionary containing
+        the following fields:
+          - job_name (string)
+          - start_time (datetime object)
+          - end_time (datetime object)
+          - return_code (int)
+          - signal (int: the signal number that caused termination of this step, or 0 if
+            it ended normally)
+        """
+        # The --parsable2 option creates parsable output: fields are separated by a pipe, with
+        # no trailing pipe (the difference between --parsable2 and --parsable).
+        cmd_lst = ["sacct", "--parsable2", "--format", "JobID,JobName,Start,End,State,ExitCode"]
+        if job_id_iter is not None and len(job_id_iter) > 0:
+            cmd_lst.append("-j")
+            cmd_lst.append(",".join(["{}".format(job_id) for job_id in job_id_iter]))
+        logger.debug('Running command "{}"'.format(" ".join(cmd_lst)))
+        try:
+            sacct_output = sp.check_output(cmd_lst)
+        except sp.CalledProcessError as e:
+            logger.error("sacct returned an error code '%s'", e.returncode)
+            logger.error("sacct output: '%s' ", e.output)
+            raise
+
+        lines = sacct_output.split('\n')
+        logger.debug("read %d lines", len(lines))
+        name_tuple = tuple([s.strip() for s in lines[0].split("|")])
+        accounting_info = {}
+
+        for line in lines[1:]:  # skip the header line
+            values = tuple([s.strip() for s in line.split("|")])
+            raw_job_dict = dict(zip(name_tuple, values))
+
+            # Pre-process the fields.
+            job_id = int(raw_job_dict["JobID"])
+
+            # Create proper DateTime objects with the following format string.
+            date_format = "%Y-%m-%dT%H:%M:%S"
+            start_time = None
+            if raw_job_dict["Start"] != "Unknown":
+                start_time = datetime.strptime(raw_job_dict["Start"], date_format)
+            end_time = None
+            if raw_job_dict["End"] != "Unknown":
+                end_time = datetime.strptime(raw_job_dict["End"], date_format)
+
+            # Split sacct's ExitCode field, which looks like "[return code]:[signal]".
+            return_code, signal = (int(x) for x in raw_job_dict["ExitCode"].split(":"))
+
+            accounting_info[job_id] = {
+                "job_name": raw_job_dict["JobName"],
+                "start_time": start_time,
+                "end_time": end_time,
+                "return_code": return_code,
+                "state": raw_job_dict["State"],
+                "signal": signal
+            }
+
+        return accounting_info
+
+    @classmethod
     def get_job_states(cls, jobhandle_lst):
         """ Return a list of job states. Each element i in this list corresponds
         to the state of jobhandle i.
@@ -287,7 +390,7 @@ class SlurmScheduler:
         """
         # we keep track of those job_ids that we are still looking for in a tofind_set
         # we keep the found states in a found_dct
-        tofind_set = set([j._job_id for j in jobhandle_lst])
+        tofind_set = set([j.job_id for j in jobhandle_lst])
         # try a)
         common_set = tofind_set & set(cls._myjobdct.keys())
         found_dct = dict([itm for itm in cls._myjobdct.items() if itm[0] in common_set])
@@ -342,11 +445,4 @@ class SlurmScheduler:
             # --
         # now return the list in the correct order, filling in those states not
         # found with an unknown state
-        return [found_dct.get(jh._job_id, cls.UNKNOWN) for jh in jobhandle_lst]
-
-
-ret_dct = {
-    SlurmScheduler.CANCELLED: -2,
-    SlurmScheduler.RUN_FAILED: -1,
-    SlurmScheduler.SUCC_COMPLETED: 0
-}
+        return [found_dct.get(jh.job_id, cls.UNKNOWN) for jh in jobhandle_lst]

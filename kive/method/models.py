@@ -23,6 +23,7 @@ import file_access_utils
 from constants import maxlengths
 import method.signals
 from metadata.models import empty_removal_plan, remove_helper, update_removal_plan
+from fleet.slurmlib import SlurmScheduler
 
 import os
 import stat
@@ -573,7 +574,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                     shutil.copyfileobj(dep.requirement.content_file, f)
 
     def submit_code(self,
-                    scheduler,
                     run_path,
                     input_paths,
                     output_paths,
@@ -592,7 +592,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         Return a SlurmJobHandle.
 
         INPUTS
-        scheduler       An object of class SlurmScheduler
         run_path        Directory where code will be run
         input_paths     List of input files expected by the code
         output_paths    List of where code will write results
@@ -614,7 +613,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
         priority = priority or settings.DEFAULT_SLURM_PRIORITY
 
-        job_handle = scheduler.submit_job(
+        job_handle = SlurmScheduler.submit_job(
             run_path,
             self.driver.coderesource.filename,
             input_paths + output_paths,

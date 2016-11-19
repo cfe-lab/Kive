@@ -298,3 +298,7 @@ DATASET_DISPLAY_MAX = 100
 DEFAULT_SLURM_PRIORITY = 1000
 # Number of seconds between checking Slurm for job information.
 DEFAULT_SLURM_CHECK_INTERVAL = 5
+
+KIVE_HOME = "/usr/local/share/Kive/kive"
+STEP_HELPER_COMMAND = "manage.py step_helper"
+CABLE_HELPER_COMMAND = "manage.py cable_helper"

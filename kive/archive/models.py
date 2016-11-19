@@ -217,6 +217,10 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         on_delete=models.SET_NULL
     )
 
+    priority = models.IntegerField(
+        help_text="Priority of this Run"
+    )
+
     # Implicitly, this also has start_time and end_time through inheritance.
 
     def is_stopped(self):

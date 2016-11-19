@@ -11,23 +11,20 @@ import os
 import glob
 import shutil
 import json
-import Queue
-import socket
 import inspect
+import tempfile
 
 from django.conf import settings
 from django.utils import timezone
 
 from archive.models import Dataset, Run, ExceedsSystemCapabilities,\
-    RunStep, RunSIC, RunCable
+    RunStep, RunSIC
 from sandbox.execute import Sandbox, sandbox_glob
-from fleet.exceptions import StopExecution
+from fleet.slurmlib import SlurmScheduler
 
 mgr_logger = logging.getLogger("fleet.Manager")
 foreman_logger = logging.getLogger("fleet.Foreman")
 worker_logger = logging.getLogger("fleet.Worker")
-
-# from fleet.slurminterface import SlurmManagerInterface
 
 
 class Manager(object):
@@ -61,16 +58,17 @@ class Manager(object):
         self.runs_in_progress[run_to_start] = foreman
         foreman.start_run()
 
-    # FIXME change this into a "watch Slurm queue for finished tasks" function
-    def monitor_queue(self, time_to_stop):
+    # FIXME do we need to build in a stopping time parameter anymore?
+    # How best to do this so that all Foremen get equal chance?
+    def monitor_queue(self):
         """
         Monitor the queue for completed tasks.
 
         When a task is finished, it's handed off to the appropriate Foreman for handling.
         """
-        while time.time() < time_to_stop:
-            # Watch for a finished task, hand it off to the Foreman to handle.
-            pass
+        # Tell the foremen to see if any of their jobs are done.
+        for foreman in self.runs_in_progress:
+            foreman.monitor_queue()
 
     def _add_idletask(self, newidletask):
         """Add a task for the manager to perform during her idle time.
@@ -108,8 +106,8 @@ class Manager(object):
         num_done = 0
         while (time.time() < time_limit) and num_done < num_tasks:
             mgr_logger.debug("Running an idle task..")
-            jobtodo = self.idle_job_queue[0]
-            jobtodo(time_limit)
+            job_to_do = self.idle_job_queue[0]
+            job_to_do(time_limit)
             self.idle_job_queue.rotate(1)
             num_done += 1
 
@@ -279,7 +277,7 @@ class Manager(object):
             mgr_logger.error("Manager failed.", exc_info=True)
 
         for foreman in self.runs_in_progress.itervalues():
-            foreman.shut_down()
+            foreman.cancel_all_slurm_jobs()
 
     @classmethod
     def execute_pipeline(cls,
@@ -337,11 +335,130 @@ class Foreman(object):
     """
     def __init__(self, run):
         # tasks_in_progress tracks the Slurm IDs of currently running tasks:
-        # task -|--> Slurm ID
+        # If the task is a RunStep:
+        # task -|--> {
+        #     "setup": [setup handle],
+        #     "driver": [driver handle],
+        #     "bookkeeping": [bookkeeping handle],
+        #     "info_path": [path of file specifying the details needed for execution]
+        # }
+        # If the task is a RunCable:
+        # task -|--> {
+        #     "cable": [cable handle],
+        #     "info_path": [path of file specifying details of execution]
+        # }
         self.tasks_in_progress = {}
         self.sandbox = Sandbox(run=run)
         # A flag to indicate that this Foreman is in the process of terminating its Run and Sandbox.
         self.shutting_down = False
+        self.scheduler = SlurmScheduler()
+
+    def monitor_queue(self):
+        """
+        Look to see if any of this Run's tasks are done.
+        """
+        # For each task, get all relevant Slurm IDs.
+        # FIXME also look to see if the Run's priority might have changed
+
+        our_slurm_jobs = []
+        for task_dict in self.tasks_in_progress.itervalues():
+            if "cable" in task_dict:
+                our_slurm_jobs.append(task_dict["cable"])
+            else:
+                our_slurm_jobs.append(task_dict["setup"])
+                our_slurm_jobs.append(task_dict["driver"])
+                our_slurm_jobs.append(task_dict["bookkeepping"])
+        task_accounting_info = self.scheduler.get_accounting_info(our_slurm_jobs)
+
+        # These flags reflect the status from the actual execution, not
+        # the states of the RunComponents in the database.  (We may have to
+        # use them to update said database states.)
+        failed = False
+        cancelled = False
+        terminated_during = ""
+        for task, task_dict in self.tasks_in_progress.iteritems():
+            # Check on the status of the jobs.
+            if isinstance(task, RunStep):
+                setup_acct_info = task_accounting_info[task_dict["setup"].job_id]
+                driver_acct_info = task_accounting_info[task_dict["driver"].job_id]
+                bookkeeping_acct_info = task_accounting_info[task_dict["bookkeeping"].job_id]
+
+                setup_state = setup_acct_info["state"]
+                if setup_state in SlurmScheduler.RUNNING_STATES:
+                    # This is still going, so we move on.
+                    continue
+                elif setup_state in SlurmScheduler.CANCELLED_STATES:
+                    cancelled = True
+                    terminated_during = "setup"
+                elif setup_state in SlurmScheduler.FAILED_STATES:
+                    # Something went wrong, so we get ready to bail.
+                    failed = True
+                    terminated_during = "setup"
+
+                else:
+                    # Having reached here, we know that setup is all clear, so check on the driver.
+                    # Note that we don't check on whether it's in FAILED_STATES, because
+                    # that will be handled in the bookkeeping stage.
+                    driver_state = driver_acct_info["state"]
+                    if driver_state in SlurmScheduler.RUNNING_STATES:
+                        continue
+                    elif driver_state in SlurmScheduler.CANCELLED_STATES:
+                        # This was externally cancelled, so we get ready to bail.
+                        cancelled = True
+
+                    else:
+                        # Having reached here, we know that the driver ran to completion,
+                        # successfully or no.  Check on the bookkeeping script.
+                        bookkeeping_state = bookkeeping_acct_info["state"]
+                        if bookkeeping_state in SlurmScheduler.RUNNING_STATES:
+                            continue
+                        elif bookkeeping_state in SlurmScheduler.CANCELLED_STATES:
+                            cancelled = True
+                            terminated_during = "bookkeeping"
+                        elif bookkeeping_state in SlurmScheduler.FAILED_STATES:
+                            # Something went wrong, so we bail.
+                            failed = True
+                            terminated_during = "bookkeeping"
+            else:
+                cable_acct_info = task_accounting_info[task_dict["cable"].job_id]
+
+                cable_state = cable_acct_info["state"]
+                if cable_state in SlurmScheduler.RUNNING_STATES:
+                    # This is still going, so we move on.
+                    continue
+                elif cable_state in SlurmScheduler.CANCELLED_STATES:
+                    cancelled = True
+                elif cable_state in SlurmScheduler.FAILED_STATES:
+                    # Something went wrong, so we get ready to bail.
+                    failed = True
+
+            # Having reached here, we know we're done with this task.
+            os.remove(task_dict["info_path"])
+            if failed or cancelled:
+                foreman_logger.error(
+                    'Run "%s" (pk=%d, Pipeline: %s, User: %s) %s during %s '
+                    'while handling task %s (pk=%d)',
+                    self.sandbox.run,
+                    self.sandbox.run.pk,
+                    self.sandbox.pipeline,
+                    self.sandbox.user,
+                    "failed" if failed else "cancelled",
+                    terminated_during,
+                    task,
+                    task.pk
+                )
+
+                if failed:
+                    assert task.has_started()
+                    # Mark it as failed.
+                    task.finish_failure()
+                else:
+                    task.cancel()
+
+            # At this point, the task has either run to completion or been
+            # terminated either through failure or cancellation.
+            # The worker_finished routine will handle it from here.
+            self.worker_finished(task)
 
     def start_run(self):
         """
@@ -378,9 +495,7 @@ class Foreman(object):
             self.sandbox.run.stop(save=True)
 
         else:
-            for task in self.sandbox.hand_tasks_to_fleet():
-                # FIXME submit jobs directly to Slurm
-                self.task_queue.append((self.sandbox, task))
+            self.submit_ready_tasks()
 
         return self.sandbox
 
@@ -408,23 +523,134 @@ class Foreman(object):
             except_outcables=outcables_processing
         )
 
-    # FIXME this will submit the task to Slurm
-    def assign_task(self, task):
+    def submit_ready_tasks(self):
         """
-        Assign a task to a worker.
+        Go through the task queue, submitting all ready tasks to Slurm.
         """
-        pass
+        for task in self.sandbox.hand_tasks_to_fleet():
+            if isinstance(task, RunStep):
+                slurm_info = self.submit_runstep(task)
+            else:
+                slurm_info = self.submit_runcable(task)
 
-    def worker_finished(self, finished_task, result):
+            self.tasks_in_progress[task] = slurm_info
+
+    def submit_runcable(self, runcable):
+        """
+        Submit a RunCable to Slurm for processing.
+
+        This will use the cable helper management command defined in settings.
+
+        Return a dictionary containing the SlurmJobHandle for the cable helper,
+        as well as the path of the execution info dictionary file used by the step.
+        """
+        # First, serialize the task execution information.
+        cable_info = self.sandbox.cable_execute_info[(runcable.parent_run, runcable.component)]
+        # We need to get some information about the cable: the step that it feeds (RunSIC)
+        # or that it's fed by (RunOutputCable), and the input/output that it feeds/is fed by.
+        # We need this so that we can write the stderr and stdout to the appropriate locations.
+        cable_record = cable_info.cable_record
+        if isinstance(cable_record, RunSIC):
+            parent_step = cable_record.runstep
+            cable_idx = cable_record.component.dest.dataset_idx
+            cable_type_str = "input"
+        else:
+            # This is the step that feeds the cable.
+            parent_step = cable_record.run.runsteps.get(pipelinestep__step_num=cable_record.source_step)
+            cable_idx = cable_record.component.source.dataset_idx
+            cable_type_str = "output"
+        parent_step_info = self.sandbox.cable_execute_info[(parent_step.parent_run, parent_step.pipelinestep)]
+
+        # Submit the job.
+        cable_execute_dict_fd, cable_execute_dict_path = tempfile.mkstemp()
+        with os.fdopen(cable_execute_dict_fd, "wb") as f:
+            f.write(json.dumps(cable_info.dict_repr()))
+
+        stdout_path = os.path.join(parent_step_info.log_dir,
+                                   "{}{}_stdout.txt".format(cable_type_str, cable_idx))
+        stderr_path = os.path.join(parent_step_info.log_dir,
+                                   "{}{}_stderr.txt".format(cable_type_str, cable_idx))
+
+        cable_slurm_handle = SlurmScheduler.submit_job(
+            settings.KIVE_HOME,
+            settings.CABLE_HELPER_COMMAND,
+            [cable_execute_dict_path],
+            self.sandbox.uid,
+            self.sandbox.gid,
+            self.sandbox.run.priority,
+            cable_info.threads_required,
+            stdout_path,
+            stderr_path,
+        )
+
+        return {
+            "cable": cable_slurm_handle,
+            "info_path": cable_execute_dict_path
+        }
+
+    def submit_runstep(self, runstep):
+        """
+        Submit a RunStep to Slurm for processing.
+
+        The RunStep will proceed in three parts:
+         - setup
+         - driver
+         - bookkeeping
+        all of which will be submitted to Slurm, with dependencies so that
+        each relies on the last.
+
+        Return a dictionary containing SlurmJobHandles for each, as well as
+        the path of the execution info dictionary file used by the step.
+        """
+        # First, serialize the task execution information.
+        step_info = self.sandbox.step_execute_info[(runstep.run, runstep.pipelinestep)]
+
+        # Submit a job for the setup.
+        step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp()
+        with os.fdopen(step_execute_dict_fd, "wb") as f:
+            f.write(json.dumps(step_info.dict_repr()))
+
+        arg_list = [step_execute_dict_path]
+
+        setup_slurm_handle = SlurmScheduler.submit_job(
+            settings.KIVE_HOME,
+            settings.STEP_HELPER_COMMAND,
+            arg_list,
+            self.sandbox.uid,
+            self.sandbox.gid,
+            self.sandbox.run.priority,
+            step_info.threads_required,
+            os.path.join(step_info.log_dir, "setup_out.txt"),
+            os.path.join(step_info.log_dir, "setup_err.txt")
+        )
+
+        # Next, submit a job for the driver itself.
+        driver_slurm_handle = self.sandbox.submit_step_execution(step_info, after_okay=[setup_slurm_handle])
+
+        # Last, submit a job for the bookkeeping.
+        arg_list = ["--bookkeeping"] + arg_list
+        bookkeeping_slurm_handle = SlurmScheduler.submit_job(
+            settings.KIVE_HOME,
+            settings.STEP_HELPER_COMMAND,
+            arg_list,
+            self.sandbox.uid,
+            self.sandbox.gid,
+            self.sandbox.run.priority,
+            step_info.threads_required,
+            os.path.join(step_info.log_dir, "bookkeeping_out.txt"),
+            os.path.join(step_info.log_dir, "bookkeeping_err.txt"),
+            after_any=[driver_slurm_handle]
+        )
+
+        return {
+            "setup": setup_slurm_handle,
+            "driver": driver_slurm_handle,
+            "bookkeeping": bookkeeping_slurm_handle,
+            "info_path": step_execute_dict_path
+        }
+
+    def worker_finished(self, finished_task):
         """Handle bookkeeping when a worker finishes."""
-        if result == Worker.FAILURE:
-            raise WorkerFailedException(
-                "Task (pk={}, Slurm ID={}) failed".format(
-                    finished_task.pk,
-                    self.tasks_in_progress[finished_task]
-                )
-            )
-
         foreman_logger.info(
             "Run %s (pk=%d) reports task with PK %d is finished",
             self.sandbox.run,
@@ -478,7 +704,7 @@ class Foreman(object):
         if finished_task.is_successful():
             if self.sandbox.run.is_failing() or self.sandbox.run.is_cancelling():
                 assert self.shutting_down
-                mgr_logger.debug(
+                foreman_logger.debug(
                     'Task %s (pk=%d) was successful but run "%s" (pk=%d) (Pipeline: %s, User: %s) %s.',
                     finished_task,
                     finished_task.pk,
@@ -499,7 +725,7 @@ class Foreman(object):
             else:  # run is still processing successfully
                 # Was this task a recovery or novel progress?
                 if task_execute_info.is_recovery():
-                    mgr_logger.debug(
+                    foreman_logger.debug(
                         'Recovering task %s (pk=%d) was successful; '
                         'queueing waiting tasks from run "%s" (pk=%d, Pipeline: %s, User: %s).',
                         finished_task,
@@ -517,7 +743,7 @@ class Foreman(object):
                     self.sandbox.enqueue_runnable_tasks(data_newly_available)
 
                 else:
-                    mgr_logger.debug(
+                    foreman_logger.debug(
                         'Task %s (pk=%d) was successful; '
                         'advancing run "%s" (pk=%d, Pipeline: %s, User: %s).',
                         finished_task,
@@ -536,7 +762,7 @@ class Foreman(object):
                     if self.sandbox.run.is_successful():
                         clean_up_now = not tasks_currently_running
                         if clean_up_now and self.sandbox.run.is_successful():
-                            mgr_logger.info(
+                            foreman_logger.info(
                                 'Run "%s" (pk=%d, Pipeline: %s, User: %s) finished successfully',
                                 self.sandbox.run,
                                 self.sandbox.run.pk,
@@ -545,7 +771,7 @@ class Foreman(object):
                             )
                     elif self.sandbox.run.is_failing() or self.sandbox.run.is_cancelling():
                         # Something just failed in advance_pipeline.
-                        mgr_logger.debug(
+                        foreman_logger.debug(
                             'Run "%s" (pk=%d, Pipeline: %s, User: %s) failed to advance '
                             'after finishing task %s (pk=%d)',
                             self.sandbox.run,
@@ -570,7 +796,7 @@ class Foreman(object):
             stop_subruns_if_possible = True
             if self.sandbox.run.is_failing() or self.sandbox.run.is_cancelling():
                 assert self.shutting_down
-                mgr_logger.debug(
+                foreman_logger.debug(
                     'Task %s (pk=%d) %s; run "%s" (pk=%d, Pipeline: %s, User: %s) was already %s',
                     finished_task,
                     finished_task.pk,
@@ -584,7 +810,7 @@ class Foreman(object):
 
             else:
                 assert self.sandbox.run.is_running(), "{} != Running".format(self.sandbox.run.get_state_name())
-                mgr_logger.info(
+                foreman_logger.info(
                     'Task %s (pk=%d) of run "%s" (pk=%d, Pipeline: %s, User: %s) failed; '
                     'marking run as failing',
                     finished_task,
@@ -633,9 +859,7 @@ class Foreman(object):
 
         if not clean_up_now:
             # The Run is still going and there may be more stuff to do.
-            for ready_task in self.sandbox.hand_tasks_to_fleet():
-                # FIXME make this a Slurm submission
-                self.task_queue.append(ready_task)
+            self.submit_ready_tasks()
 
         else:
             self.sandbox.run.refresh_from_db()
@@ -658,158 +882,42 @@ class Foreman(object):
         Stop this Foreman's run.
         """
         mgr_logger.debug("Stopping run (pk=%d) on behalf of user %s",
-                         self.run.pk,
-                         self.run.stopped_by)
+                         self.sandbox.run.pk,
+                         self.sandbox.run.stopped_by)
 
-        if not self.run.has_started():
-            self.run.start(save=True)
+        if not self.sandbox.run.has_started():
+            self.sandbox.run.start(save=True)
 
-        if self.run.is_complete():
+        if self.sandbox.run.is_complete():
             # This run already completed, so we ignore this call.
             mgr_logger.warn("Run (pk=%d) is already complete; ignoring stop request.", self.run.pk)
             return
 
         else:
-            # Attempt to stop any tasks that belong to this Run.
-            for task, slurm_id in self.tasks_in_progress:
-                # FIXME need a function that sends SIGTERM to the Slurm job using scancel.
-                pass
-
-            # Cancel all tasks on the task queue pertaining to this run, and finalize the
+            self.cancel_all_slurm_jobs()
+            self.tasks_in_progress.clear()
+            # Mark all RunComponents as cancelled, and finalize the
             # details.
             self.mop_up()
 
-        self.run.cancel(save=True)
-        self.run.stop(save=True)
+        self.sandbox.run.cancel(save=True)
+        self.sandbox.run.stop(save=True)
 
         foreman_logger.debug("Run (pk={}) stopped by user {}".format(self.run.pk, self.run.stopped_by))
 
-    def shut_down(self):
-        for running_task in self.task_queue:
-            # FIXME signal Slurm and stop the task from running.
-            pass
+    def cancel_all_slurm_jobs(self):
+        """
+        Cancel all Slurm jobs relating to this Foreman.
+        """
+        for task, task_dict in self.tasks_in_progress.iteritems():
+            if isinstance(task, RunStep):
+                for job in ("setup", "driver", "bookkeeping"):
+                    SlurmScheduler.job_cancel(task_dict[job])
+            else:
+                SlurmScheduler.job_cancel(task_dict["cable"])
+
+            os.remove(task_dict["info_path"])
 
     def change_priority(self, priority):
         pass
 
-
-# This should now be a thing that's done in Slurm by srun.
-# FIXME Need to watch for scancel rather than a shutdown message.
-# scancel will send SIGTERM?
-class Worker(object):
-    """
-    Performs the actual computational tasks required of Pipelines.
-    """
-    FINISHED = 1
-    STOPPED = 2
-    ERROR = 3
-
-    def __init__(self, task_info_dict, slurm_id):
-        self.slurm_id = slurm_id
-        # adjust_log_files(worker_logger, self.rank)
-
-        # Unpack task_info_dict.
-        self.task_info_dict = task_info_dict
-
-        if "runstep_pk" in task_info_dict:
-            self.task_type = "RunStep"
-            self.task = RunStep.objects.get(pk=task_info_dict["runstep_pk"])
-        else:
-            self.task_type = "RunCable"
-            self.task_type = RunCable.objects.get(pk=task_info_dict["cable_record_pk"])
-
-        worker_logger.debug(
-            "Worker created to handle {} with pk={}".format(
-                "RunStep" if "runstep_pk" in task_info_dict else "RunCable",
-                (task_info_dict["runstep_pk"] if "runstep_pk" in task_info_dict
-                 else task_info_dict["cable_record_pk"])
-            )
-        )
-
-        self.task_info_dict = task_info_dict
-
-    def write_summary(self, status, message, log_dir=None, summary_prefix="summary_"):
-        result_dict = {
-            "Slurm ID": self.slurm_id,
-            "status": status,
-            "message": message
-        }
-
-        summary_path = "{}_task{}.log".format(
-            summary_prefix,
-            self.task.pk
-        )
-        with open(os.path.join(log_dir, summary_path), "wb") as f:
-            json.dump(result_dict, f)
-
-    def perform_task(self):
-        """
-        Perform the assigned task.
-        """
-        try:
-            if isinstance(self.task, RunStep):
-                Sandbox.finish_step(
-                    self.task_info_dict,
-                    self.slurm_id,
-                )
-            else:
-                Sandbox.finish_cable(self.task_info_dict, self.slurm_id)
-            worker_logger.debug(
-                "%s %s completed.  Returning results to Manager.",
-                self.task.__class__.__name__,
-                self.task
-            )
-
-        except StopExecution as e:
-            # Execution was stopped during actual execution of code.
-            message = "[{}] {} {} stopped ({}).".format(
-                self.slurm_id,
-                self.task_type,
-                self.task,
-                e
-            )
-
-            worker_logger.debug(
-                message,
-                exc_info=True
-            )
-            status = Worker.STOPPED
-
-        except KeyboardInterrupt:
-            # Execution was stopped somewhere outside of run_code (that would
-            # have been caught above and raised a StopExecution).
-            self.task.cancel(save=True)
-            task_string = str(self.task)
-            if isinstance(self.task, RunStep):
-                task_string = "{} (method {})".format(
-                    task_string,
-                    self.task.pipelinestep.transformation.definite
-                )
-            message = "Execution of {} {} (method {}) was stopped during preamble/postamble.".format(
-                self.task_type,
-                task_string
-            )
-            worker_logger.debug(message)
-            status = Worker.STOPPED
-
-        except:
-            status = Worker.ERROR  # bogus return value
-            message = "[{}] Task {} failed.".format(
-                self.slurm_id,
-                self.task
-            )
-            worker_logger.error(message, exc_info=True)
-
-        if isinstance(self.task, RunStep):
-            self.write_summary(status, message, log_dir=self.task_info_dict["log_dir"])
-        worker_logger.debug("Task {} completed.".format(self.task))
-
-
-class WorkerFailedException(Exception):
-    def __init__(self, error_msg):
-        self.error_msg = error_msg
-
-
-class NoWorkersAvailable(Exception):
-    def __init__(self, error_msg):
-        self.error_msg = error_msg

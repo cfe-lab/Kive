@@ -1259,9 +1259,7 @@ class Datatype(AccessControl):
         stdout_path = os.path.join(summary_path, "logs", "stdout.txt")
         stderr_path = os.path.join(summary_path, "logs", "stderr.txt")
 
-        scheduler = SlurmScheduler()
         job = verifier.submit_code(
-            scheduler,
             summary_path,
             [input_path],
             [output_path],
@@ -1277,7 +1275,7 @@ class Datatype(AccessControl):
             time.sleep(check_interval)
             curr_state = self.get_state()
             is_done = curr_state in SlurmScheduler.STOPPED_SET
-            self.logger.debug("Waiting for Slurm job (id = %d, state = %s)", self._job_id, curr_state)
+            self.logger.debug("Waiting for %s (state = %s)", job, curr_state)
         return_code = ret_dct[curr_state]
 
         # The method's driver has been called and has completed: now keep the record.

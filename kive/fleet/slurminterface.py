@@ -9,7 +9,7 @@ import logging
 from django.conf import settings
 
 from fleet.workers import BaseManagerInterface, Worker, MPIFleetInterface
-from slurmlib import SlurmScheduler, ret_dct
+from slurmlib import SlurmScheduler
 
 
 # currently, this has only be tested with one worker process
@@ -199,7 +199,7 @@ class SlurmManagerInterface(BaseManagerInterface):
             is_done = cur_state in SlurmScheduler.STOPPED_SET
             worker_logger.debug("helper: WORKER WAITING FOR jobid %d (state =%s)" %
                                 (newhandle._job_id, cur_state))
-        retval = ret_dct[cur_state]
+        retval = SlurmScheduler.ret_dct[cur_state]
         worker_logger.debug("helper_invoke: Returning rank: %d, jobid %d, retval %d"
                             % (worker_rank, newhandle._job_id, retval))
         return retval
@@ -281,7 +281,7 @@ class SlurmManagerInterface(BaseManagerInterface):
                     j_state = job_handle.get_state()
                     is_done = (j_state in SlurmScheduler.STOPPED_SET)
                     mgr_logger.debug("WAITING FOR slurmid %d (state=%s) " % (job_handle._job_id, j_state))
-            self._set_worker_free(foreman, ret_dct[j_state])
+            self._set_worker_free(foreman, SlurmScheduler.ret_dct[j_state])
 
     def record_exception(self):
         mgr_logger.error("Manager failed.", exc_info=True)

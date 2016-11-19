@@ -252,58 +252,68 @@ Installing slurm
 Slurm installation can be complicated and daunting, for a quick overview of
 the installation, see [here](http://slurm.schedmd.com/quickstart_admin.html).
 Briefly, a slurm installation consists of computers (nodes) running among them:
- 1) on each node to be used for computation:
-   munge authentication daemon (munge)
-   slurm compute node daemon (slurmd) 
- 2) *a single* (ignoring fail-safe slaves) slurm central management daemon (slurmctld)
-   on one specific node
 
-The slurmctld can run on the same node as a slurmd. In a typical single-machine installation,
+1. on each node to be used for computation:
+   * munge authentication daemon (munge)
+   * slurm compute node daemon (slurmd) 
+2. a *single* (ignoring fail-safe slaves) slurm central management daemon (slurmctld)
+   on one specific node (i.e. the head node)
+
+The `slurmctld` can run on the same node as a `slurmd`. In a typical single-machine installation,
 all three daemons will be running at the same time.
 NOTE: both slurm and munge require that the uid/gid entries are consistent 
 across all machines.
 
 ### Ubuntu Minimal Setup
+
 The [slurm](http://slurm.schedmd.com/) workload manager can be installed from the
 Ubuntu repositories. The slurm packages in Ubuntu are somewhat in flux at the time of
-writing, with a transition from slurm-llnl to slurm-wlm underway. The nomenclature is,
-however still inconsistent in the installation.
-For ubuntu 16.04 (xenial xerus), transitionary packages are provided.
+writing, with a transition from `slurm-llnl` to `slurm-wlm` underway. The nomenclature is,
+however, still inconsistent in the installation.
+For Ubuntu 16.04 (xenial xerus), transitionary packages are provided.
 
 For a single workstation installation do:
 
-sudo apt-get install munge slurm-wlm slurmctld slurm-wlm-basic-plugins
+    sudo apt-get install munge slurm-wlm slurmctld slurm-wlm-basic-plugins
 
 Note that the munge daemon must be running before the other two will successfully start.
-Under various versions of ubuntu, munge fails to start out of the box, complaining about 
-'group-writable permissions set on "/var/log"'. Perform a
-   sudo chmod g-w /var/log
+Under various versions of Ubuntu, munge fails to start out of the box, complaining about 
+'group-writable permissions set on "/var/log"'. First, run
+
+    sudo chmod g-w /var/log
+    
 followed by:
-   sudo service munge start
+
+    sudo service munge start
+    
 to start the daemon. Do not proceed until munge is running successfully.
 
-The slurm configuration file, living in /etc/slurm-llnl/slurm.conf  needs to be created next.
+The slurm configuration file, living in `/etc/slurm-llnl/slurm.conf`, needs to be created next.
 An initial file can be created using the 
-online [slurm configuration tool](lurm.schedmd.com/configurator.html).
+online [slurm configuration tool](slurm.schedmd.com/configurator.html).
 Make sure that accounting is switched on:
-  # LOGGING AND ACCOUNTING
-  JobCompType=jobcomp/filetxt
-  JobCompLoc=/var/log/slurm-llnl/job_completions
+
+    # LOGGING AND ACCOUNTING
+    JobCompType=jobcomp/filetxt
+    JobCompLoc=/var/log/slurm-llnl/job_completions
 
 Use the simple, built-in scheduler
-  # SCHEDULING
-  FastSchedule=1
-  SchedulerType=sched/builtin
+
+    # SCHEDULING
+    FastSchedule=1
+    SchedulerType=sched/builtin
 
 Now the two daemons can be started:
-sudo service slurmd start
-sudi service slurmctld start
+
+    sudo service slurmd start
+    sudo service slurmctld start
 
 The installation can be tested by running the 'squeue' command, which should complete
 without errors and show an empty queue:
-Nibbler:/etc/slurm-llnl> squeue
-             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
-Nibbler:/etc/slurm-llnl> 
+
+    Nibbler:/etc/slurm-llnl> squeue
+                 JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+    Nibbler:/etc/slurm-llnl> 
 
 
 
