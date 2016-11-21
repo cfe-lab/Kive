@@ -537,7 +537,7 @@ def dataset_lookup(request, md5_checksum=None):
                 continue
 
             datasets_as_inputs += [{
-                "run": run.run,
+                "run": run,
                 "pipeline": run.pipeline,
                 "dataset": input.dataset
             }]
