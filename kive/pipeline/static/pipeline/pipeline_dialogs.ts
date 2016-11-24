@@ -16,11 +16,11 @@ $.fn.extend({
         });
         
         $el.css('cursor', opt.cursor).on("mousedown", function(e) {
-            var $drag;
+            var $drag = $(this);
             if (opt.handle === '') {
-                $drag = $(this).addClass('draggable');
+                $drag.addClass('draggable');
             } else {
-                $drag = $(this).addClass('active-handle').parent().addClass('draggable');
+                $drag.addClass('active-handle').parent().addClass('draggable');
             }
             
             if (typeof opt.start === 'function') {
@@ -169,7 +169,7 @@ export class Dialog {
 /**
  * Middle-base class for dialogs incorporating a Node preview canvas.
  */
-class NodePreviewDialog extends Dialog {
+abstract class NodePreviewDialog extends Dialog {
     protected preview_canvas: HTMLCanvasElement;
     protected is_modal = true;
     
@@ -211,9 +211,9 @@ class NodePreviewDialog extends Dialog {
     
     /**
      * Sync the preview canvas with dialog inputs.
-     * This base class does nothing. Child classes must implement.
+     * Child classes must implement.
      */
-    protected triggerPreviewRefresh(): void { }
+    protected abstract triggerPreviewRefresh(): void;
     
     /**
      * Show the dialog.
@@ -702,7 +702,7 @@ export class MethodDialog extends NodePreviewDialog {
      * @returns
      *      A jQuery Deferred object
      */
-    private updateMethodRevisionsMenu(mf_id) {
+    private updateMethodRevisionsMenu(mf_id): JQueryPromise<void> {
         if (mf_id !== '') {
             // this.$revision_field.show().focus();
             let request = $.getJSON("/api/methodfamilies/" + mf_id + "/methods/");
@@ -907,7 +907,6 @@ export class OutputDialog extends NodePreviewDialog {
             <input #id_output_name type="text">
             <input #id_output_button type="submit" value="OK">
             <div #id_output_error .errortext>
-
      */
     private $error;
     private $output_name;
@@ -947,6 +946,13 @@ export class OutputDialog extends NodePreviewDialog {
         let node = new OutputNode(w / 2, h / 2, '');
         ctx.clearRect(0, 0, w, h);
         node.draw(ctx);
+    }
+
+    /**
+     * Implements abstract method
+     */
+    triggerPreviewRefresh(): void {
+        // outputs all look the same: take no action
     }
     
     /**
