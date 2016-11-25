@@ -11,6 +11,18 @@ import 'imagediff';
 describe("MethodDialog class", function() {
 
     var dlg;
+    var $cp_hidden_input;
+    var $cp_pick;
+    var $cp_menu;
+    var $delete_outputs;
+    var $delete_outputs_details;
+    var $submit_button;
+    var $select_method;
+    var $select_method_family;
+    var $input_name;
+    var $error;
+    var $expand_outputs_ctrl;
+
     jasmine.getFixtures().fixturesPath = '/templates/pipeline';
     jasmine.getFixtures().preload('./pipeline_method_dialog.tpl.html');
     jasmine.getStyleFixtures().fixturesPath = '/static/pipeline';
@@ -29,13 +41,23 @@ describe("MethodDialog class", function() {
             $('#activator')
         );
 
-        let method_family_menu = $('#id_select_method_family');
+        $cp_hidden_input = $('#id_select_colour');
+        $cp_pick = $('#colour_picker_pick');
+        $cp_menu = $('#colour_picker_menu');
+        $delete_outputs = $('#id_method_delete_outputs');
+        $delete_outputs_details = $('#id_method_delete_outputs_details');
+        $submit_button = $('#id_method_button');
+        $select_method = $("#id_select_method");
+        $select_method_family = $('#id_select_method_family');
+        $input_name = $('#id_method_name');
+        $error = $('#id_method_error');
+        $expand_outputs_ctrl = $('.ctrl_menu .expand_outputs_ctrl');
 
-        method_family_menu.find('option')
+        $select_method_family.find('option')
             .filter(function() { return $(this).val() !== ""; })
             .remove();
 
-        $('<option>').val('6').appendTo(method_family_menu);
+        $('<option>').val('6').appendTo($select_method_family);
     });
 
     it('should initialize properly', function() {
@@ -55,25 +77,113 @@ describe("MethodDialog class", function() {
     });
 
     it('should reset itself', function() {
-        var firstInput = $('#id_method_name');
-        firstInput.val('foo');
+        $input_name.val('foo');
+        $error.text('error');
+        $delete_outputs_details.show();
+        $expand_outputs_ctrl.text('▾ Hide list');
+        $submit_button.val('Revise Method');
         dlg.reset();
-        expect(firstInput.val()).toBe('');
+
+        expect($input_name.val()).toBe('');
+        expect($delete_outputs_details).toBeHidden();
+        expect($submit_button.val().match(/Revise/i)).toBeFalsy();
     });
 
-    it('should update when the family menu changes', function(done) {
-        let canvas = <HTMLCanvasElement> $('canvas')[0];
-
-        jasmine.Ajax.withMock(function () {
-            dlg.activator.click();
-            $('#id_select_method_family').val('6').change();
+    function loadMockMethod(callback: () => void) {
+        jasmine.Ajax.withMock(function() {
+            $select_method_family.val('6').change();
 
             // populate method revisions menu
-            expect($('#id_select_method').find('option').length).toEqual(0);
+            expect($select_method.find('option').length).toEqual(0);
             jasmine.Ajax.requests.mostRecent().respondWith({
                 "status": 200,
                 "responseText": `[
-                    {
+                        {
+                            "revision_name": "sam2aln",
+                            "display_name": "1: sam2aln",
+                            "revision_number": 1,
+                            "revision_desc": "Conversion of SAM data into aligned format.",
+                            "revision_DateTime": "2014-08-11T21:34:09.900000Z",
+                            "revision_parent": null,
+                            "user": "kive",
+                            "users_allowed": [],
+                            "groups_allowed": [
+                            "Everyone"
+                        ],
+                            "id": 6,
+                            "url": "http://localhost:8000/api/methods/6/",
+                            "absolute_url": "/method_revise/6/",
+                            "view_url": "/method_view/6/",
+                            "removal_plan": "http://localhost:8000/api/methods/6/removal_plan/",
+                            "family_id": 5,
+                            "family": "sam2aln",
+                            "driver": 8,
+                            "reusable": 1,
+                            "threads": 1,
+                            "dependencies": [
+                            {
+                                "requirement": 3,
+                                "path": "./",
+                                "filename": ""
+                            }
+                        ],
+                            "inputs": [
+                            {
+                                "dataset_name": "remap",
+                                "dataset_idx": 1,
+                                "x": 0.0,
+                                "y": 0.0,
+                                "structure": {
+                                    "compounddatatype": 8,
+                                    "min_row": null,
+                                    "max_row": null
+                                }
+                            }
+                        ],
+                            "outputs": [
+                            {
+                                "dataset_name": "aligned",
+                                "dataset_idx": 1,
+                                "x": 0.0,
+                                "y": 0.0,
+                                "structure": {
+                                    "compounddatatype": 11,
+                                    "min_row": null,
+                                    "max_row": null
+                                }
+                            },
+                            {
+                                "dataset_name": "conseq_ins",
+                                "dataset_idx": 2,
+                                "x": 0.0,
+                                "y": 0.0,
+                                "structure": {
+                                    "compounddatatype": 12,
+                                    "min_row": null,
+                                    "max_row": null
+                                }
+                            },
+                            {
+                                "dataset_name": "failed_read",
+                                "dataset_idx": 3,
+                                "x": 0.0,
+                                "y": 0.0,
+                                "structure": {
+                                    "compounddatatype": 13,
+                                    "min_row": null,
+                                    "max_row": null
+                                }
+                            }
+                        ]
+                        }
+                    ]`
+            });
+            expect($select_method.find('option').length).toEqual(1);
+
+            // thumbnail refresh
+            jasmine.Ajax.requests.mostRecent().respondWith({
+                "status": 200,
+                "responseText": `{
                         "revision_name": "sam2aln",
                         "display_name": "1: sam2aln",
                         "revision_number": 1,
@@ -83,8 +193,8 @@ describe("MethodDialog class", function() {
                         "user": "kive",
                         "users_allowed": [],
                         "groups_allowed": [
-                        "Everyone"
-                    ],
+                            "Everyone"
+                        ],
                         "id": 6,
                         "url": "http://localhost:8000/api/methods/6/",
                         "absolute_url": "/method_revise/6/",
@@ -96,147 +206,72 @@ describe("MethodDialog class", function() {
                         "reusable": 1,
                         "threads": 1,
                         "dependencies": [
-                        {
-                            "requirement": 3,
-                            "path": "./",
-                            "filename": ""
-                        }
-                    ],
+                            {
+                                "requirement": 3,
+                                "path": "./",
+                                "filename": ""
+                            }
+                        ],
                         "inputs": [
-                        {
-                            "dataset_name": "remap",
-                            "dataset_idx": 1,
-                            "x": 0.0,
-                            "y": 0.0,
-                            "structure": {
-                                "compounddatatype": 8,
-                                "min_row": null,
-                                "max_row": null
+                            {
+                                "dataset_name": "remap",
+                                "dataset_idx": 1,
+                                "x": 0.0,
+                                "y": 0.0,
+                                "structure": {
+                                    "compounddatatype": 8,
+                                    "min_row": null,
+                                    "max_row": null
+                                }
                             }
-                        }
-                    ],
+                        ],
                         "outputs": [
-                        {
-                            "dataset_name": "aligned",
-                            "dataset_idx": 1,
-                            "x": 0.0,
-                            "y": 0.0,
-                            "structure": {
-                                "compounddatatype": 11,
-                                "min_row": null,
-                                "max_row": null
+                            {
+                                "dataset_name": "aligned",
+                                "dataset_idx": 1,
+                                "x": 0.0,
+                                "y": 0.0,
+                                "structure": {
+                                    "compounddatatype": 11,
+                                    "min_row": null,
+                                    "max_row": null
+                                }
+                            },
+                            {
+                                "dataset_name": "conseq_ins",
+                                "dataset_idx": 2,
+                                "x": 0.0,
+                                "y": 0.0,
+                                "structure": {
+                                    "compounddatatype": 12,
+                                    "min_row": null,
+                                    "max_row": null
+                                }
+                            },
+                            {
+                                "dataset_name": "failed_read",
+                                "dataset_idx": 3,
+                                "x": 0.0,
+                                "y": 0.0,
+                                "structure": {
+                                    "compounddatatype": 13,
+                                    "min_row": null,
+                                    "max_row": null
+                                }
                             }
-                        },
-                        {
-                            "dataset_name": "conseq_ins",
-                            "dataset_idx": 2,
-                            "x": 0.0,
-                            "y": 0.0,
-                            "structure": {
-                                "compounddatatype": 12,
-                                "min_row": null,
-                                "max_row": null
-                            }
-                        },
-                        {
-                            "dataset_name": "failed_read",
-                            "dataset_idx": 3,
-                            "x": 0.0,
-                            "y": 0.0,
-                            "structure": {
-                                "compounddatatype": 13,
-                                "min_row": null,
-                                "max_row": null
-                            }
-                        }
-                    ]
-                    }
-                ]`
+                        ]
+                    }`
             });
-            expect($('#id_select_method').find('option').length).toEqual(1);
 
-            // thumbnail refresh
-            jasmine.Ajax.requests.mostRecent().respondWith({
-                "status": 200,
-                "responseText": `{
-                    "revision_name": "sam2aln",
-                    "display_name": "1: sam2aln",
-                    "revision_number": 1,
-                    "revision_desc": "Conversion of SAM data into aligned format.",
-                    "revision_DateTime": "2014-08-11T21:34:09.900000Z",
-                    "revision_parent": null,
-                    "user": "kive",
-                    "users_allowed": [],
-                    "groups_allowed": [
-                        "Everyone"
-                    ],
-                    "id": 6,
-                    "url": "http://localhost:8000/api/methods/6/",
-                    "absolute_url": "/method_revise/6/",
-                    "view_url": "/method_view/6/",
-                    "removal_plan": "http://localhost:8000/api/methods/6/removal_plan/",
-                    "family_id": 5,
-                    "family": "sam2aln",
-                    "driver": 8,
-                    "reusable": 1,
-                    "threads": 1,
-                    "dependencies": [
-                        {
-                            "requirement": 3,
-                            "path": "./",
-                            "filename": ""
-                        }
-                    ],
-                    "inputs": [
-                        {
-                            "dataset_name": "remap",
-                            "dataset_idx": 1,
-                            "x": 0.0,
-                            "y": 0.0,
-                            "structure": {
-                                "compounddatatype": 8,
-                                "min_row": null,
-                                "max_row": null
-                            }
-                        }
-                    ],
-                    "outputs": [
-                        {
-                            "dataset_name": "aligned",
-                            "dataset_idx": 1,
-                            "x": 0.0,
-                            "y": 0.0,
-                            "structure": {
-                                "compounddatatype": 11,
-                                "min_row": null,
-                                "max_row": null
-                            }
-                        },
-                        {
-                            "dataset_name": "conseq_ins",
-                            "dataset_idx": 2,
-                            "x": 0.0,
-                            "y": 0.0,
-                            "structure": {
-                                "compounddatatype": 12,
-                                "min_row": null,
-                                "max_row": null
-                            }
-                        },
-                        {
-                            "dataset_name": "failed_read",
-                            "dataset_idx": 3,
-                            "x": 0.0,
-                            "y": 0.0,
-                            "structure": {
-                                "compounddatatype": 13,
-                                "min_row": null,
-                                "max_row": null
-                            }
-                        }
-                    ]
-                }`
-            });
+            callback();
+        });
+    }
+
+    it('should update when the family menu changes', function(done) {
+        let canvas = <HTMLCanvasElement> $('canvas')[0];
+        dlg.activator.click();
+
+        loadMockMethod(function () {
             var sam2aln = new Image();
             sam2aln.src = "/pipeline/test_assets/sam2aln_node.png";
             sam2aln.onload = function() {
@@ -245,6 +280,83 @@ describe("MethodDialog class", function() {
             };
         });
     });
+
+    it('should toggle visibility of the outputs list', function() {
+        dlg.activator.click();
+        $delete_outputs_details.show();
+        $expand_outputs_ctrl.click();
+        expect($delete_outputs_details).toBeHidden();
+        $expand_outputs_ctrl.click();
+        expect($delete_outputs_details).toBeVisible();
+    });
+
+    it('should sync child checkboxes of the outputs list with the parent check', function() {
+        dlg.activator.click();
+        loadMockMethod(function () {
+            $delete_outputs.prop('checked', false).change();
+            $delete_outputs_details.find('input').each(function() {
+                expect($(this).prop('checked')).toBeFalsy();
+            });
+
+            $delete_outputs.prop('checked', true).change();
+            $delete_outputs_details.find('input').each(function() {
+                expect($(this).prop('checked')).toBeTruthy();
+            });
+
+            // refreshPreviewCanvasMagnets()
+        });
+    });
+
+    it('should sync the parent checkbox of the outputs list with the child checkboxes', function() {
+        dlg.activator.click();
+
+        loadMockMethod(function () {
+            var outputs = $delete_outputs_details.find('input');
+            outputs = [
+                outputs.eq(0).prop('checked', false),
+                outputs.eq(1).prop('checked', true),
+                outputs.eq(2).prop('checked', false)
+            ];
+
+            outputs[1].change();
+            expect($delete_outputs.prop('indeterminate')).toBeTruthy();
+
+            outputs[1].prop('checked', false).change();
+            expect($delete_outputs.prop('indeterminate')).toBeFalsy();
+            expect($delete_outputs.prop('checked')).toBeFalsy();
+
+            outputs[0].prop('checked', true).change();
+            outputs[1].prop('checked', true).change();
+            expect($delete_outputs.prop('indeterminate')).toBeTruthy();
+
+            outputs[2].prop('checked', true).change();
+            expect($delete_outputs.prop('indeterminate')).toBeFalsy();
+            expect($delete_outputs.prop('checked')).toBeTruthy();
+
+            // refreshPreviewCanvasMagnets()
+        });
+    });
+
+    it('should open the colour picker', function() {
+        dlg.activator.click();
+        $cp_pick.click();
+        expect($cp_menu).toBeVisible();
+    });
+
+    it('should pick a colour and close the menu', function() {
+        dlg.activator.click();
+        $cp_pick.click();
+        var $color1 = $cp_menu.find('.colour_picker_colour').eq(0);
+        var bgcol = $color1.css('background-color');
+        $color1.click();
+        expect($cp_pick.css('background-color')).toBe(bgcol);
+        expect($cp_hidden_input.val()).toBe(bgcol);
+        expect($cp_menu).toBeHidden();
+
+        // canvas refresh
+    });
+
+
 
     /*
         TODO:
@@ -257,15 +369,7 @@ describe("MethodDialog class", function() {
 
         Events:
         $select_method.change => canvas should draw
-        $select_method_family.change => $select_method should change
-        $delete_outputs.change => $delete_outputs_details should change
-        $delete_outputs_details.change => $delete_outputs should change
-        $expand_outputs_ctrl.click => $delete_outputs_details should toggle viz
-        colour_picker.$pick.click => picker is visible
-        colour_picker.$menu.div.click =>
-                $pick changes colour,
-                $hidden_input changes val,
-                picker is hidden
+
      */
 
 });

@@ -384,7 +384,7 @@ export class InputDialog extends NodePreviewDialog {
 /**
  * Singleton UI for picking a colour.
  */
-var colourPicker = (function() {
+var colourPickerFactory = (function() {
     /**
      * Template pasted here for convenience.
      
@@ -442,7 +442,7 @@ var colourPicker = (function() {
         setCallback: (cb: Function) => { callback = cb; }
     };
     return picker;
-})();
+});
 
 export class MethodDialog extends NodePreviewDialog {
     /*
@@ -488,7 +488,7 @@ export class MethodDialog extends NodePreviewDialog {
     private $error;
     private $expand_outputs_ctrl;
     private colour_picker;
-    public add_or_revise: string = "add";
+    private add_or_revise: string = "add";
     private editing_node: MethodNode;
     private methodInputs: any[];
     private methodOutputs: any[];
@@ -506,7 +506,7 @@ export class MethodDialog extends NodePreviewDialog {
     constructor(jqueryRef, activator) {
         super(jqueryRef, activator);
         
-        this.colour_picker = colourPicker; // pre-assembled object - note no "new"
+        this.colour_picker = colourPickerFactory(); // not a class-based object - note no "new"
         this.$delete_outputs = $('#id_method_delete_outputs');
         this.$delete_outputs_details = $('#id_method_delete_outputs_details');
         this.$submit_button = $('#id_method_button');
@@ -516,30 +516,30 @@ export class MethodDialog extends NodePreviewDialog {
         this.$error = $('#id_method_error');
         this.$expand_outputs_ctrl = $('.expand_outputs_ctrl', this.jqueryRef);
 
+        this.$select_method.change(
+            () => this.triggerPreviewRefresh()
+        );
+        this.colour_picker.setCallback(
+            () => this.triggerPreviewRefresh()
+        );
         let dialog = this;
-        this.$select_method.change( function() {
-            dialog.triggerPreviewRefresh();
-        });
-        colourPicker.setCallback( function() {
-            dialog.triggerPreviewRefresh();
-        });
         this.$select_method_family.change( function() {
             dialog.updateMethodRevisionsMenu(this.value);
         });
         this.$delete_outputs.change(
             () => {
-                dialog.linkChildCheckboxes();
-                dialog.refreshPreviewCanvasMagnets();
+                this.linkChildCheckboxes();
+                this.refreshPreviewCanvasMagnets();
             }
         );
         this.$delete_outputs_details.on('change', '.method_delete_outputs',
             () => {
-                dialog.linkParentCheckbox();
-                dialog.refreshPreviewCanvasMagnets();
+                this.linkParentCheckbox();
+                this.refreshPreviewCanvasMagnets();
             }
         );
         this.$expand_outputs_ctrl.click(
-            () => dialog.showHideChildCheckboxes()
+            () => this.showHideChildCheckboxes()
         );
 
         this.updateMethodRevisionsMenu(this.$select_method_family.val());
@@ -571,7 +571,7 @@ export class MethodDialog extends NodePreviewDialog {
         return $.Deferred().fail();
     }
     
-    refreshPreviewCanvasMagnets() {
+    private refreshPreviewCanvasMagnets() {
         this.drawPreviewCanvas(this.cached_api_result, this.colour_picker.val());
     }
     
