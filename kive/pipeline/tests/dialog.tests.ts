@@ -190,6 +190,87 @@ describe("MethodDialog class", function() {
             ]
         }`
     };
+    let mockData3 = {
+        "status": 200,
+        "responseText": `{
+            "revision_name": "sam2aln",
+            "display_name": "1: sam2aln",
+            "revision_number": 1,
+            "revision_desc": "Conversion of SAM data into aligned format.",
+            "revision_DateTime": "2014-08-11T21:34:09.900000Z",
+            "revision_parent": null,
+            "user": "kive",
+            "users_allowed": [],
+            "groups_allowed": [
+                "Everyone"
+            ],
+            "id": 6,
+            "url": "http://localhost:8000/api/methods/6/",
+            "absolute_url": "/method_revise/6/",
+            "view_url": "/method_view/6/",
+            "removal_plan": "http://localhost:8000/api/methods/6/removal_plan/",
+            "family_id": 5,
+            "family": "sam2aln",
+            "driver": 8,
+            "reusable": 1,
+            "threads": 1,
+            "dependencies": [
+                {
+                    "requirement": 3,
+                    "path": "./",
+                    "filename": ""
+                }
+            ],
+            "inputs": [
+                {
+                    "dataset_name": "remap",
+                    "dataset_idx": 1,
+                    "x": 0.0,
+                    "y": 0.0,
+                    "structure": {
+                        "compounddatatype": 8,
+                        "min_row": null,
+                        "max_row": null
+                    }
+                },
+                {
+                    "dataset_name": "remap_duplicate",
+                    "dataset_idx": 1,
+                    "x": 0.0,
+                    "y": 0.0,
+                    "structure": {
+                        "compounddatatype": 8,
+                        "min_row": null,
+                        "max_row": null
+                    }
+                }
+            ],
+            "outputs": [
+                {
+                    "dataset_name": "aligned",
+                    "dataset_idx": 1,
+                    "x": 0.0,
+                    "y": 0.0,
+                    "structure": {
+                        "compounddatatype": 11,
+                        "min_row": null,
+                        "max_row": null
+                    }
+                },
+                {
+                    "dataset_name": "failed_read",
+                    "dataset_idx": 3,
+                    "x": 0.0,
+                    "y": 0.0,
+                    "structure": {
+                        "compounddatatype": 13,
+                        "min_row": null,
+                        "max_row": null
+                    }
+                }
+            ]
+        }`
+    };
 
     jasmine.getFixtures().fixturesPath = '/templates/pipeline';
     jasmine.getFixtures().preload('./pipeline_method_dialog.tpl.html');
@@ -373,9 +454,20 @@ describe("MethodDialog class", function() {
         });
     });
 
-    xit('should refresh preview when method revision changes', function() {
-        // @todo
-        fail();
+    it('should refresh preview when method revision changes', function(done) {
+        dlg.activator.click();
+        loadMockMethod(function() {
+            $select_method.append($('<option>').val(8));
+            $select_method.val(8).change();
+            jasmine.Ajax.requests.mostRecent().respondWith(mockData3);
+
+            let sam2aln_custom = new Image();
+            sam2aln_custom.src = "/pipeline/test_assets/sam2aln_custom_node4.png";
+            sam2aln_custom.onload = function() {
+                expect(canvas).toImageDiffEqual(sam2aln_custom);
+                done();
+            };
+        });
     });
 
     it('should open the colour picker', function() {
