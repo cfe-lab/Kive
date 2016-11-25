@@ -820,8 +820,8 @@ export class MethodDialog extends NodePreviewDialog {
      *      The CanvasState to add the MethodNode to.
      */
     submit(canvasState: CanvasState) {
-        let node_label = this.$input_name.val(); // pk of method
-        let method_id = this.$select_method.val();
+        let node_label = this.$input_name.val();
+        let method_id = this.$select_method.val(); // pk of method
         let family_id = this.$select_method_family.val();
         let pos = this.translateToOtherCanvas(canvasState);
         
