@@ -1,7 +1,7 @@
 "use strict";
 
-import { MethodDialog } from "../static/pipeline/pipeline_dialogs";
-import { MethodNode, CanvasWrapper } from "../static/pipeline/drydock_objects";
+import { MethodDialog, Dialog, InputDialog, OutputDialog } from "../static/pipeline/pipeline_dialogs";
+import { MethodNode, CdtNode, OutputNode } from "../static/pipeline/drydock_objects";
 import { REDRAW_INTERVAL, CanvasState } from "../static/pipeline/drydock";
 import "jasmine";
 import 'jasmine-html';
@@ -10,7 +10,66 @@ import 'jasmine-jquery';
 import 'jasmine-ajax';
 import 'imagediff';
 
-describe("MethodDialog class", function() {
+describe("Dialog fixture", function() {
+    let dlg;
+
+    jasmine.getFixtures().fixturesPath = '/templates/pipeline';
+    jasmine.getFixtures().preload('./pipeline_view_dialog.tpl.html');
+    jasmine.getStyleFixtures().fixturesPath = '/static/pipeline';
+    jasmine.getStyleFixtures().preload('./drydock.css');
+
+    beforeEach(function(){
+        appendLoadFixtures('./pipeline_view_dialog.tpl.html');
+        appendLoadStyleFixtures('./drydock.css');
+        appendSetFixtures("<a id='activator'>Activator</a>");
+        dlg = new Dialog(
+            $('.ctrl_menu').attr('id', '#id_view_ctrl'),
+            $('#activator')
+        );
+    });
+
+    it('should initialize properly', function() {
+        expect(dlg.jqueryRef).toBeInDOM();
+        expect(dlg.activator).toBeInDOM();
+        try {
+            dlg.validateInitialization();
+        } catch (e) {
+            fail(e);
+        }
+    });
+
+    it('should show', function() {
+        dlg.jqueryRef.hide();
+        dlg.show();
+        expect(dlg.jqueryRef).toBeVisible();
+    });
+
+    it('should hide', function() {
+        dlg.jqueryRef.show();
+        dlg.hide();
+        expect(dlg.jqueryRef).toBeHidden();
+    });
+
+    it('should appear after the activator is clicked', function() {
+        expect(dlg.jqueryRef).toBeHidden();
+        dlg.activator.click();
+        expect(dlg.jqueryRef).toBeVisible();
+    });
+
+    it('should capture key and mouse events', function() {
+        spyOnEvent('body', 'click');
+        spyOnEvent('body', 'mousedown');
+        spyOnEvent('body', 'keydown');
+
+        dlg.jqueryRef.click().mousedown().keydown();
+        expect('click').not.toHaveBeenTriggeredOn('body');
+        expect('mousedown').not.toHaveBeenTriggeredOn('body');
+        expect('keydown').not.toHaveBeenTriggeredOn('body');
+    });
+
+});
+
+describe("MethodDialog fixture", function() {
 
     let dlg;
     let $cp_hidden_input;
@@ -580,14 +639,14 @@ describe("MethodDialog class", function() {
             $input_name.val('custom_name');
             dlg.submit(canvasState);
             expect($select_method).toBeFocused();
-            expect($error.text()).not.toBeEmpty();
+            expect($error).not.toBeEmpty();
 
             $error.text('');
             $select_method.val(6);
             $input_name.val('');
             dlg.submit(canvasState);
             expect($input_name).toBeFocused();
-            expect($error.text()).not.toBeEmpty();
+            expect($error).not.toBeEmpty();
 
             $error.text('');
             $select_method_family.val('');
@@ -595,8 +654,26 @@ describe("MethodDialog class", function() {
             $input_name.val('custom_name');
             dlg.submit(canvasState);
             expect($select_method_family).toBeFocused();
-            expect($error.text()).not.toBeEmpty();
+            expect($error).not.toBeEmpty();
 
+            expect(canvasState.addShape).not.toHaveBeenCalled();
+        });
+    });
+
+    it('should not submit when there\'s already a node by that name', function() {
+        dlg.activator.click();
+
+        let canvas = imagediff.createCanvas(300, 150);
+        let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
+        canvasState.addShape(new CdtNode(23, 50, 50, 'custom_name'));
+
+        spyOn(canvasState, 'addShape');
+
+        loadMockMethod(function() {
+            $select_method.val(6);
+            $input_name.val('custom_name');
+            dlg.submit(canvasState);
+            expect($error).not.toBeEmpty();
             expect(canvasState.addShape).not.toHaveBeenCalled();
         });
     });
@@ -632,6 +709,257 @@ describe("MethodDialog class", function() {
             expect(methods[0].n_outputs).toEqual(3);
             expect(methods[0].n_inputs).toEqual(1);
         });
+    });
+
+});
+
+describe("InputDialog fixture", function() {
+    let dlg;
+    let $datatype_name;
+    let $select_cdt;
+    let $error;
+    let canvas;
+
+    jasmine.getFixtures().fixturesPath = '/templates/pipeline';
+    jasmine.getFixtures().preload('./pipeline_input_dialog.tpl.html');
+    jasmine.getStyleFixtures().fixturesPath = '/static/pipeline';
+    jasmine.getStyleFixtures().preload('./drydock.css');
+
+    beforeAll(function() {
+        jasmine.addMatchers(imagediff.jasmine);
+    });
+
+    beforeEach(function(){
+        appendLoadFixtures('./pipeline_input_dialog.tpl.html');
+        appendLoadStyleFixtures('./drydock.css');
+        appendSetFixtures("<a id='activator'>Activator</a>");
+        dlg = new InputDialog(
+            $('.ctrl_menu').attr('id', '#id_view_ctrl'),
+            $('#activator')
+        );
+
+        $datatype_name = $('#id_datatype_name');
+        $error = $('#id_dt_error');
+        $select_cdt = $('#id_select_cdt');
+        canvas = <HTMLCanvasElement> $('canvas')[0];
+    });
+
+    it('should initialize properly', function() {
+        expect(dlg.jqueryRef).toBeInDOM();
+        expect(dlg.activator).toBeInDOM();
+        try {
+            dlg.validateInitialization();
+        } catch (e) {
+            fail(e);
+        }
+    });
+
+    it('should move to a specified coordinate', function() {
+        dlg.activator.click();
+
+        // anchor point is top center of the inner div (inside of css padding)
+        dlg.align(100, 100);
+
+        // gets position relative to the document
+        let dlg_pos = dlg.jqueryRef.offset();
+
+        expect(dlg_pos.left).toBe(-33);
+        expect(dlg_pos.top).toBe(92);
+    });
+
+    it('should show a CDTNode preview when a CDT is selected', function(done) {
+        dlg.activator.click();
+        $select_cdt.append($('<option>').val(23));
+        $select_cdt.val(23).change();
+
+        let cdt_node = new Image();
+        cdt_node.src = "/pipeline/test_assets/cdtnode.png";
+        cdt_node.onload = function() {
+            expect(canvas).toImageDiffEqual(cdt_node);
+            done();
+        };
+    });
+
+    it('should show a RawNode preview when no CDT is selected', function(done) {
+        dlg.activator.click();
+        $select_cdt.append($('<option>').val('foo'));
+        $select_cdt.val('foo').change();
+
+        let raw_node = new Image();
+        raw_node.src = "/pipeline/test_assets/rawnode.png";
+        raw_node.onload = function() {
+            expect(canvas).toImageDiffEqual(raw_node);
+            done();
+        };
+    });
+
+    it('should not submit when required fields are empty', function() {
+        dlg.activator.click();
+        let canvas = imagediff.createCanvas(300, 150);
+        let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
+        $datatype_name.val('');
+        spyOn(canvasState, 'addShape');
+        dlg.submit(canvasState);
+        expect($error).not.toBeEmpty();
+        expect(canvasState.addShape).not.toHaveBeenCalled();
+    });
+
+    it('should not submit when there\'s already a node by that name', function() {
+        dlg.activator.click();
+        $select_cdt.append($('<option>').val(23));
+        $select_cdt.val(23);
+        let canvas = imagediff.createCanvas(300, 150);
+        let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
+        canvasState.addShape(new CdtNode(23, 50, 50, 'foo'));
+        $datatype_name.val('foo');
+
+        spyOn(canvasState, 'addShape');
+        dlg.submit(canvasState);
+        expect($error).not.toBeEmpty();
+        expect(canvasState.addShape).not.toHaveBeenCalled();
+    });
+
+    it('should apply its state to a CanvasState', function() {
+        dlg.activator.click();
+        let canvas = imagediff.createCanvas(300, 150);
+        let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
+
+        $select_cdt.append($('<option>').val(23));
+        $select_cdt.val(23);
+        $datatype_name.val('foo');
+
+        spyOn(canvasState, 'addShape').and.callThrough();
+        dlg.submit(canvasState);
+        expect(canvasState.addShape).toHaveBeenCalled();
+        let inputs = canvasState.getInputNodes();
+        expect(inputs.length).toEqual(1);
+        expect(inputs[0].label).toBe('foo');
+    });
+
+});
+
+describe("OutputDialog fixture", function() {
+    let dlg;
+    let $output_name;
+    let $error;
+    let canvas;
+
+    jasmine.getFixtures().fixturesPath = '/templates/pipeline';
+    jasmine.getFixtures().preload('./pipeline_output_dialog.tpl.html');
+    jasmine.getStyleFixtures().fixturesPath = '/static/pipeline';
+    jasmine.getStyleFixtures().preload('./drydock.css');
+
+    beforeAll(function() {
+        jasmine.addMatchers(imagediff.jasmine);
+    });
+
+    beforeEach(function(){
+        appendLoadFixtures('./pipeline_output_dialog.tpl.html');
+        appendLoadStyleFixtures('./drydock.css');
+        appendSetFixtures("<a id='activator'>Activator</a>");
+        dlg = new OutputDialog(
+            $('.ctrl_menu').attr('id', '#id_output_ctrl'),
+            $('#activator')
+        );
+
+        $output_name = $('#id_output_name');
+        $error = $('#id_output_error');
+        canvas = <HTMLCanvasElement> $('canvas')[0];
+    });
+
+    it('should initialize properly', function() {
+        expect(dlg.jqueryRef).toBeInDOM();
+        expect(dlg.activator).toBeInDOM();
+        try {
+            dlg.validateInitialization();
+        } catch (e) {
+            fail(e);
+        }
+    });
+
+    it('should move to a specified coordinate', function() {
+        dlg.activator.click();
+
+        // anchor point is top center of the inner div (inside of css padding)
+        dlg.align(100, 100);
+
+        // gets position relative to the document
+        let dlg_pos = dlg.jqueryRef.offset();
+
+        expect(dlg_pos.left).toBe(-33);
+        expect(dlg_pos.top).toBe(92);
+    });
+
+    it('should show an OutputNode preview', function(done) {
+        dlg.activator.click();
+        let outputnode = new Image();
+        outputnode.src = "/pipeline/test_assets/outputnode.png";
+        outputnode.onload = function() {
+            expect(canvas).toImageDiffEqual(outputnode);
+            done();
+        };
+    });
+
+    it('should not submit when required fields are empty', function() {
+        dlg.activator.click();
+        let canvas = imagediff.createCanvas(300, 150);
+        let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
+        $output_name.val('');
+        spyOn(canvasState, 'addShape');
+        dlg.submit(canvasState);
+        expect($error).not.toBeEmpty();
+        expect(canvasState.addShape).not.toHaveBeenCalled();
+    });
+
+    it('should not submit when there\'s already a node by that name', function() {
+        dlg.activator.click();
+        let canvas = imagediff.createCanvas(300, 150);
+        let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
+        canvasState.addShape(new OutputNode(50, 50, 'foo'));
+        $output_name.val('foo');
+
+        spyOn(canvasState, 'addShape');
+        dlg.submit(canvasState);
+        expect($error).not.toBeEmpty();
+        expect(canvasState.addShape).not.toHaveBeenCalled();
+    });
+
+    it('should load an OutputNode', function() {
+        let output_node = new OutputNode(50, 50, 'foo');
+        dlg.activator.click();
+        dlg.load(output_node);
+
+        expect($output_name).toHaveValue('foo');
+    });
+
+    it('should apply its state to a CanvasState', function() {
+        dlg.activator.click();
+        let canvas = imagediff.createCanvas(300, 150);
+        let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
+        $output_name.val('foo');
+
+        spyOn(canvasState, 'addShape').and.callThrough();
+        dlg.submit(canvasState);
+        expect(canvasState.addShape).toHaveBeenCalled();
+        let outputs = canvasState.getOutputNodes();
+        expect(outputs.length).toEqual(1);
+        expect(outputs[0].label).toBe('foo');
+    });
+
+    it('should change the name of a loaded OutputNode', function() {
+        let output_node = new OutputNode(50, 50, 'foo');
+        let canvas = imagediff.createCanvas(300, 150);
+        let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
+        canvasState.addShape(output_node);
+        dlg.activator.click();
+        dlg.load(output_node);
+
+        $output_name.val('foo2');
+        dlg.submit(canvasState);
+
+        let outputs = canvasState.getOutputNodes();
+        expect(outputs.length).toEqual(1);
+        expect(outputs[0].label).toBe('foo2');
     });
 
 });

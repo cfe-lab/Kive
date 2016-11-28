@@ -140,7 +140,10 @@ export class Dialog {
     cancel() {
         this.hide();
     }
-    
+
+    /**
+     * Ensures that all DOM fixtures have been successfully loaded.
+     */
     validateInitialization() {
         for (let propertyName in this) {
             if (propertyName[0] === "$" && this[propertyName].constructor === $) {
@@ -324,7 +327,7 @@ export class InputDialog extends NodePreviewDialog {
      * Coords default to 0, 0 and label is an empty string.
      * @returns {RawNode|CdtNode}
      */
-    generateNode(label: string = ''): RawNode|CdtNode {
+    private generateNode(label: string = ''): RawNode|CdtNode {
         let pk = parseInt(this.$select_cdt.val(), 10); // primary key
         return isNaN(pk) ? new RawNode(0, 0, label) : new CdtNode(pk, 0, 0, label);
     }
@@ -332,7 +335,7 @@ export class InputDialog extends NodePreviewDialog {
     /**
      * Draws the node on the preview canvas.
      */
-    drawPreviewCanvas (): void {
+    private drawPreviewCanvas(): void {
         let ctx = this.preview_canvas.getContext('2d');
         let w = this.preview_canvas.width;
         let h = this.preview_canvas.height;
@@ -824,8 +827,9 @@ export class MethodDialog extends NodePreviewDialog {
         let method_id = this.$select_method.val(); // pk of method
         let family_id = this.$select_method_family.val();
         let pos = this.translateToOtherCanvas(canvasState);
-        
-        if (method_id && family_id && node_label) {
+        let is_unique = CanvasState.isUniqueName(canvasState.getInputNodes(), node_label);
+
+        if (method_id && family_id && node_label && is_unique) {
             // user selected valid Method Revision
             var method = this.produceMethodNode(
                 method_id,
@@ -851,6 +855,9 @@ export class MethodDialog extends NodePreviewDialog {
         } else if (!node_label) {
             // required field
             this.$error.text("Label is required");
+            this.$input_name.focus();
+        } else if (!is_unique) {
+            this.$error.text('That name has already been used.');
             this.$input_name.focus();
         } else {
             this.$error.text("Select a method");
@@ -987,6 +994,7 @@ export class OutputDialog extends NodePreviewDialog {
      */
     submit(canvasState: CanvasState) {
         var label = this.$output_name.val();
+
         if (this.paired_node) {
             if (this.paired_node.label === label) {
                 /* No change */
@@ -1004,16 +1012,15 @@ export class OutputDialog extends NodePreviewDialog {
             }
         } else {
             let pos = this.translateToOtherCanvas(canvasState);
-    
+
             // check for empty and duplicate names
-            let node_label = this.$output_name.val();
-            if (node_label === '') {
+            if (label === '') {
                 // required field
                 this.$error.text("Label is required.");
-            } else if (!CanvasState.isUniqueName(canvasState.getOutputNodes(), node_label)) {
+            } else if (!CanvasState.isUniqueName(canvasState.getOutputNodes(), label)) {
                 this.$error.html('<img src="/static/pipeline/warning_icon.png"> That name has already been used.');
             } else {
-                let shape = new OutputNode(pos.left, pos.top, node_label);
+                let shape = new OutputNode(pos.left, pos.top, label);
                 canvasState.addShape(shape);
                 // Second arg: Upon collision, move new shape 0% and move existing objects 100%
                 canvasState.detectCollisions(shape, 0);

@@ -368,7 +368,7 @@ export class Pipeline {
          * Private method that sets up canvas state to draw methods
          */
         var self = this,
-            canvas_x_ratio = self.canvasState.width / self.canvasState.scale,
+            canvas_x_ratio = self.canvasState.width  / self.canvasState.scale,
             canvas_y_ratio = self.canvasState.height / self.canvasState.scale;
 
         if (self.pipeline === null) { throw "build_steps() called with no pipeline?"; }
