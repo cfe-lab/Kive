@@ -175,8 +175,11 @@ LOGGING = {
     'disable_existing_loggers': False,
     'filters': {
         'require_debug_false': {
-            '()': 'django.utils.log.RequireDebugFalse'
-        }
+            '()': 'django.utils.log.RequireDebugFalse'},
+        'rate_limit': {'()': 'kive.ratelimitingfilter.RateLimitingFilter',
+                       'rate': 1,
+                       'per': 300,  # seconds
+                       'burst': 5}
     },
     'formatters': {
         'debug': {
@@ -187,7 +190,7 @@ LOGGING = {
     'handlers': {
         'mail_admins': {
             'level': 'ERROR',
-            'filters': ['require_debug_false'],
+            'filters': ['require_debug_false', 'rate_limit'],
             'class': 'django.utils.log.AdminEmailHandler'
         },
         'console': {
@@ -206,7 +209,7 @@ LOGGING = {
     },
     'root': {
         # This is the default logger.
-        'handlers': ['console', 'file'],
+        'handlers': ['console', 'file', 'mail_admins'],
         'level': 'WARN'
     },
     'loggers': {
@@ -214,11 +217,6 @@ LOGGING = {
         # 'archive.tests': {
         #      'level': 'DEBUG'
         # },
-        'django.request': {
-            'handlers': ['mail_admins'],
-            'level': 'ERROR',
-            'propagate': True,
-        },
         "fleet.Manager": {
             "level": "INFO",
         },
