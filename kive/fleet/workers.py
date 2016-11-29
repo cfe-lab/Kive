@@ -16,9 +16,10 @@ import tempfile
 
 from django.conf import settings
 from django.utils import timezone
+from django.core.files import File
+from django.db import transaction
 
-from archive.models import Dataset, Run, ExceedsSystemCapabilities,\
-    RunStep, RunSIC
+from archive.models import Dataset, Run, RunStep, RunSIC
 from sandbox.execute import Sandbox, sandbox_glob
 from fleet.slurmlib import SlurmScheduler
 
@@ -34,41 +35,48 @@ class Manager(object):
     The manager is responsible for handling new Run requests and
     creating Foreman objects to execute each one.
     """
-    # FIXME retrieve max_host_cpus from Slurm
-    def __init__(self, max_host_cpus=settings.MAX_HOST_CPUS, quit_idle=False, history=0):
+    def __init__(self, quit_idle=False, history=0):
         self.quit_idle = quit_idle
-        self.max_host_cpus = max_host_cpus
 
+        # This keeps track of runs and the order in which they were most recently
+        # serviced.
+        self.runs = deque()
         # This maps run -|-> foreman
         self.runs_in_progress = {}
-        # A table of sandboxes that are in the process of shutting down/being cancelled.
-        self.runs_shutting_down = set()
 
         # A queue of recently-completed runs, to a maximum specified by history.
         self.history_queue = deque(maxlen=history)
 
-    def create_foreman(self, run_to_start):
-        """
-        Handle a request to start a pipeline running.
+        # A queue of functions to call during idle time.
+        self.idle_job_queue = deque()
 
-        This creates a Foreman object to handle the Pipeline, which
-        in turn creates a Sandbox and then coordinates the execution.
-        """
-        foreman = Foreman(run_to_start)
-        self.runs_in_progress[run_to_start] = foreman
-        foreman.start_run()
-
-    # FIXME do we need to build in a stopping time parameter anymore?
-    # How best to do this so that all Foremen get equal chance?
-    def monitor_queue(self):
+    def monitor_queue(self, time_to_stop):
         """
         Monitor the queue for completed tasks.
 
         When a task is finished, it's handed off to the appropriate Foreman for handling.
         """
-        # Tell the foremen to see if any of their jobs are done.
-        for foreman in self.runs_in_progress:
+        while True:  # this will execute at least one time to help with starvation
+            try:
+                run = self.runs.popleft()
+            except IndexError:
+                # There are no active runs.
+                return
+
+            foreman = self.runs_in_progress[run]
             foreman.monitor_queue()
+            run.refresh_from_db()
+            if run.is_complete():
+                # All done, so remove it from our map.
+                self.runs_in_progress.pop(run)
+                if self.history_queue.maxlen > 0:
+                    self.history_queue.append(run)
+            else:
+                # Add it back to the end of the queue.
+                self.runs.append(run)
+
+            if time.time() > time_to_stop:
+                break
 
     def _add_idletask(self, newidletask):
         """Add a task for the manager to perform during her idle time.
@@ -112,38 +120,24 @@ class Manager(object):
             num_done += 1
 
     def find_new_runs(self, time_to_stop):
+        """
+        Look for and begin processing new runs.
+        """
         # Look for new jobs to run.  We will also
         # build in a delay here so we don't clog up the database.
         mgr_logger.debug("Looking for new runs....")
-
         pending_runs = Run.find_unstarted().order_by("time_queued").filter(parent_runstep__isnull=True)
-
         mgr_logger.debug("Pending runs: {}".format(pending_runs))
 
         for run_to_process in pending_runs:
-            # do we have the thread capacity for this run?
-            threads_needed = run_to_process.pipeline.threads_needed()
-            if threads_needed > self.max_host_cpus:
-                mgr_logger.info(
-                    "Cannot run Pipeline %s for user %s: %d threads required, %d available",
-                    run_to_process.pipeline, run_to_process.user, threads_needed,
-                    self.max_host_cpus)
-                esc = ExceedsSystemCapabilities(
-                    run=run_to_process,
-                    threads_requested=threads_needed,
-                    max_available=self.max_host_cpus
-                )
-                esc.save()
-                run_to_process.clean()
-                continue
+            foreman = Foreman(run_to_process)
+            self.runs_in_progress[run_to_process] = foreman
+            foreman.start_run()
 
-            self.create_foreman(run_to_process)
             mgr_logger.info("Started run id %d, pipeline %s, user %s",
                             run_to_process.pk,
                             run_to_process.pipeline,
                             run_to_process.user)
-
-            mgr_logger.debug("Task queue: {}".format(self.task_queue))
             mgr_logger.debug("Active runs: {}".format(self.runs_in_progress.keys()))
 
             if time.time() > time_to_stop:
@@ -159,19 +153,6 @@ class Manager(object):
 
         for run_to_stop in just_stopped_runs:
             self.runs_in_progress[run_to_stop].stop_run()  # Foreman handles the stopping
-
-    def find_finished_runs(self):
-        """
-        Check whether any of the Foremen have finished their runs and handle the final mop-up.
-        """
-        for run in self.runs_in_progress:
-            run.refresh_from_db()
-
-            if run.is_complete():
-                # If this was already in the process of shutting down, remove the annotation.
-                self.runs_shutting_down.discard(run)
-                if self.history_queue.maxlen > 0:
-                    self.history_queue.append(run)
 
     @staticmethod
     def purge_sandboxes():
@@ -246,24 +227,20 @@ class Manager(object):
         while True:
             self.find_stopped_runs()
 
-            time_to_poll = time.time() + settings.FLEET_POLLING_INTERVAL
-            # Start some tasks that are in the queue
-            if not self.assign_tasks(time_to_poll):
-                return
-            # Some jobs in the queue have been started:
-            # if we have time, do some idle tasks until time_to_poll and
-            # then check and see if anything has finished.
-            if time.time() < time_to_poll:
-                self._do_idle_tasks(time_to_poll)
+            poll_until = time.time() + settings.FLEET_POLLING_INTERVAL
+            self.find_new_runs(poll_until)
+            self.monitor_queue(poll_until)
 
-            if not self.wait_for_polling(time_to_poll):
-                return
-
-            self.find_new_runs(time_to_poll)
-            if time_to_purge is None or time_to_poll > time_to_purge:
+            if time_to_purge is None or poll_until > time_to_purge:
                 self.purge_sandboxes()
                 Dataset.purge()
-                time_to_purge = time_to_poll + settings.FLEET_PURGING_INTERVAL
+                time_to_purge = poll_until + settings.FLEET_PURGING_INTERVAL
+
+            # Some jobs in the queue have been started:
+            # if we have time, do some idle tasks until poll_until and
+            # then check and see if anything has finished.
+            if time.time() < poll_until:
+                self._do_idle_tasks(poll_until)
 
             if self.quit_idle and not self.runs_in_progress:
                 mgr_logger.info('Fleet is idle, quitting.')
@@ -287,8 +264,7 @@ class Manager(object):
                          users_allowed=None,
                          groups_allowed=None,
                          name=None,
-                         description=None,
-                         single_threaded=True):
+                         description=None):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
@@ -352,14 +328,13 @@ class Foreman(object):
         # A flag to indicate that this Foreman is in the process of terminating its Run and Sandbox.
         self.shutting_down = False
         self.scheduler = SlurmScheduler()
+        self.priority = run.priority
 
     def monitor_queue(self):
         """
         Look to see if any of this Run's tasks are done.
         """
         # For each task, get all relevant Slurm IDs.
-        # FIXME also look to see if the Run's priority might have changed
-
         our_slurm_jobs = []
         for task_dict in self.tasks_in_progress.itervalues():
             if "cable" in task_dict:
@@ -376,6 +351,7 @@ class Foreman(object):
         failed = False
         cancelled = False
         terminated_during = ""
+        still_running = []
         for task, task_dict in self.tasks_in_progress.iteritems():
             # Check on the status of the jobs.
             if isinstance(task, RunStep):
@@ -386,6 +362,7 @@ class Foreman(object):
                 setup_state = setup_acct_info["state"]
                 if setup_state in SlurmScheduler.RUNNING_STATES:
                     # This is still going, so we move on.
+                    still_running.extend([task_dict["setup"], task_dict["driver"], task_dict["bookkeeping"]])
                     continue
                 elif setup_state in SlurmScheduler.CANCELLED_STATES:
                     cancelled = True
@@ -401,6 +378,7 @@ class Foreman(object):
                     # that will be handled in the bookkeeping stage.
                     driver_state = driver_acct_info["state"]
                     if driver_state in SlurmScheduler.RUNNING_STATES:
+                        still_running.extend([task_dict["driver"], task_dict["bookkeeping"]])
                         continue
                     elif driver_state in SlurmScheduler.CANCELLED_STATES:
                         # This was externally cancelled, so we get ready to bail.
@@ -408,9 +386,26 @@ class Foreman(object):
 
                     else:
                         # Having reached here, we know that the driver ran to completion,
-                        # successfully or no.  Check on the bookkeeping script.
+                        # successfully or no.  As such, we fill in the ExecLog.
+                        task.refresh_from_db()
+                        with transaction.atomic():
+                            task.log.start_time = task_dict["driver"].start_time
+                            task.log.end_time = task_dict["driver"].end_time
+                            task.log.methodoutput.return_code = driver_acct_info["return_code"]
+
+                            step_execute_info = self.sandbox.step_execute_info[(task.parent_run, task.pipelinestep)]
+                            with open(step_execute_info.driver_stdout_path(), "rb") as f:
+                                task.log.methodoutput.output_log.save(f.name, File(f))
+                            with open(step_execute_info.driver_stderr_path(), "rb") as f:
+                                task.log.methodoutput.error_log.save(f.name, File(f))
+
+                            task.log.methodoutput.save()
+                            task.log.save()
+
+                        # Check on the bookkeeping script.
                         bookkeeping_state = bookkeeping_acct_info["state"]
                         if bookkeeping_state in SlurmScheduler.RUNNING_STATES:
+                            still_running.append(task_dict["bookkeeping"])
                             continue
                         elif bookkeeping_state in SlurmScheduler.CANCELLED_STATES:
                             cancelled = True
@@ -425,6 +420,7 @@ class Foreman(object):
                 cable_state = cable_acct_info["state"]
                 if cable_state in SlurmScheduler.RUNNING_STATES:
                     # This is still going, so we move on.
+                    still_running.append(task_dict["cable"])
                     continue
                 elif cable_state in SlurmScheduler.CANCELLED_STATES:
                     cancelled = True
@@ -459,6 +455,21 @@ class Foreman(object):
             # terminated either through failure or cancellation.
             # The worker_finished routine will handle it from here.
             self.worker_finished(task)
+
+        # Lastly, check if the priority has changed.
+        self.sandbox.run.refresh_from_db()
+        priority_changed = self.priority != self.sandbox.run.priority
+        self.priority = self.sandbox.run.priority
+        if priority_changed:
+            foreman_logger.debug(
+                'Changing priority of Run "%s" (pk=%d, Pipeline: %s, User: %s) to %d',
+                self.sandbox.run,
+                self.sandbox.run.pk,
+                self.sandbox.pipeline,
+                self.sandbox.user,
+                self.priority
+            )
+            SlurmScheduler.set_job_priority(still_running, self.priority)
 
     def start_run(self):
         """
@@ -566,11 +577,6 @@ class Foreman(object):
         with os.fdopen(cable_execute_dict_fd, "wb") as f:
             f.write(json.dumps(cable_info.dict_repr()))
 
-        stdout_path = os.path.join(parent_step_info.log_dir,
-                                   "{}{}_stdout.txt".format(cable_type_str, cable_idx))
-        stderr_path = os.path.join(parent_step_info.log_dir,
-                                   "{}{}_stderr.txt".format(cable_type_str, cable_idx))
-
         cable_slurm_handle = SlurmScheduler.submit_job(
             settings.KIVE_HOME,
             settings.CABLE_HELPER_COMMAND,
@@ -579,8 +585,8 @@ class Foreman(object):
             self.sandbox.gid,
             self.sandbox.run.priority,
             cable_info.threads_required,
-            stdout_path,
-            stderr_path,
+            cable_info.stdout_path,
+            cable_info.stderr_path,
         )
 
         return {
@@ -620,8 +626,8 @@ class Foreman(object):
             self.sandbox.gid,
             self.sandbox.run.priority,
             step_info.threads_required,
-            os.path.join(step_info.log_dir, "setup_out.txt"),
-            os.path.join(step_info.log_dir, "setup_err.txt")
+            step_info.setup_stdout_path(),
+            step_info.setup_stderr_path()
         )
 
         # Next, submit a job for the driver itself.
@@ -637,8 +643,8 @@ class Foreman(object):
             self.sandbox.gid,
             self.sandbox.run.priority,
             step_info.threads_required,
-            os.path.join(step_info.log_dir, "bookkeeping_out.txt"),
-            os.path.join(step_info.log_dir, "bookkeeping_err.txt"),
+            step_info.bookkeeping_stdout_path(),
+            step_info.bookkeeping_stderr_path(),
             after_any=[driver_slurm_handle]
         )
 
@@ -900,7 +906,10 @@ class Foreman(object):
             # details.
             self.mop_up()
 
-        self.sandbox.run.cancel(save=True)
+        if self.sandbox.run.is_running():
+            # No tasks are running now so there is nothing that could screw up the Run state
+            # between the previous line and this line.
+            self.sandbox.run.cancel(save=True)
         self.sandbox.run.stop(save=True)
 
         foreman_logger.debug("Run (pk={}) stopped by user {}".format(self.run.pk, self.run.stopped_by))
@@ -917,7 +926,3 @@ class Foreman(object):
                 SlurmScheduler.job_cancel(task_dict["cable"])
 
             os.remove(task_dict["info_path"])
-
-    def change_priority(self, priority):
-        pass
-

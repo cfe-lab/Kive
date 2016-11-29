@@ -14,11 +14,8 @@ from django.utils import timezone
 from django.db import transaction, OperationalError, InternalError
 from django.contrib.auth.models import User
 from django.conf import settings
-from django.core.files import File
 
-
-import archive.models
-from archive.models import RunStep, Run, ExecLog
+from archive.models import RunStep, Run, ExecLog, RunSIC, RunCable, RunComponent, RunOutputCable
 from constants import dirnames, extensions, runcomponentstates
 import file_access_utils
 import librarian.models
@@ -385,9 +382,9 @@ class Sandbox:
         at most one of run_to_advance and task_completed may not be None.
         if task_completed is not None, it is finished and successful.
         """
-        assert (type(task_completed) in (archive.models.RunStep,
-                                         archive.models.RunSIC,
-                                         archive.models.RunOutputCable) or
+        assert (type(task_completed) in (RunStep,
+                                         RunSIC,
+                                         RunOutputCable) or
                 task_completed is None)
         assert not (run_to_advance is not None and task_completed is not None)
 
@@ -433,12 +430,12 @@ class Sandbox:
 
         # Update our lists of components completed.
         step_nums_completed = []
-        if type(task_completed) == archive.models.RunSIC:
+        if type(task_completed) == RunSIC:
             assert task_completed.dest_runstep.pipelinestep.is_subpipeline()
             incables_completed.append(task_completed)
-        elif type(task_completed) == archive.models.RunStep:
+        elif type(task_completed) == RunStep:
             steps_completed.append(task_completed)
-        elif type(task_completed) == archive.models.RunOutputCable:
+        elif type(task_completed) == RunOutputCable:
             outcables_completed.append(task_completed)
         elif task_completed is None and run_to_advance is None:
             # This indicates that the only things accessible are the inputs.
@@ -464,7 +461,7 @@ class Sandbox:
 
                 # At this point, we know this is a sub-Pipeline, and is possibly waiting
                 # for one of its input cables to finish.
-                if type(task_completed) == archive.models.RunSIC:
+                if type(task_completed) == RunSIC:
                     feeder_RSICs = curr_RS.RSICs.filter(pk__in=[x.pk for x in incables_completed])
                     if not feeder_RSICs.exists():
                         # This isn't one of the RunSICs for this sub-Run.
@@ -833,11 +830,11 @@ class Sandbox:
         assert input_dataset in self.dataset_fs_map
 
         # Create new RSIC/ROC.
-        curr_record = archive.models.RunCable.create(cable, parent_record)  # this start()s it
+        curr_record = RunCable.create(cable, parent_record)  # this start()s it
         self.logger.debug("Not recovering - created {}".format(curr_record.__class__.__name__))
         self.logger.debug("Cable keeps output? {}".format(curr_record.keeps_output()))
 
-        by_step = parent_record if isinstance(parent_record, archive.models.RunStep) else None
+        by_step = parent_record if isinstance(parent_record, RunStep) else None
 
         # We bail out if the input has somehow been corrupted.
         if not input_dataset.initially_OK():
@@ -919,7 +916,33 @@ class Sandbox:
                                         output_path,
                                         by_step=by_step,
                                         could_be_reused=could_be_reused)
+
+        # Set the stdout and stderr path for the execution.
+        # We need to get some information about the cable: the step that it feeds (RunSIC)
+        # or that it's fed by (RunOutputCable), and the input/output that it feeds/is fed by.
+        # We need this so that we can write the stderr and stdout to the appropriate locations.
+        if isinstance(curr_record, RunSIC):
+            parent_step = curr_record.runstep
+            cable_idx = curr_record.component.dest.dataset_idx
+            cable_type_str = "input"
+        else:
+            # This is the step that feeds the cable.
+            parent_step = curr_record.run.runsteps.get(pipelinestep__step_num=curr_record.source_step)
+            cable_idx = curr_record.component.source.dataset_idx
+            cable_type_str = "output"
+        parent_step_info = self.cable_execute_info[(parent_step.parent_run, parent_step.pipelinestep)]
+
+        exec_info.set_stdout_path(
+            os.path.join(parent_step_info.log_dir,
+                         "{}{}_stdout.txt".format(cable_type_str, cable_idx))
+        )
+        exec_info.set_stderr_path(
+            os.path.join(parent_step_info.log_dir,
+                         "{}{}_stderr.txt".format(cable_type_str, cable_idx))
+        )
+
         self.cable_execute_info[(curr_record.parent_run, cable)] = exec_info
+
         if return_now:
             curr_record.save()
             return exec_info
@@ -1310,7 +1333,7 @@ class Sandbox:
         Helper that retrieves the task information for the specified RunStep/RunCable.
         """
         assert task.top_level_run == self.run
-        if type(task) == archive.models.RunStep:
+        if type(task) == RunStep:
             return self.step_execute_info[(task.run, task.pipelinestep)]
         return self.cable_execute_info[(task.parent_run, task.component)]
 
@@ -1322,7 +1345,7 @@ class Sandbox:
         execution info available in step_execute_info or cable_execute_info.
         """
         assert task_finished.top_level_run == self.run
-        if type(task_finished) == archive.models.RunStep:
+        if type(task_finished) == RunStep:
             assert (task_finished.run, task_finished.pipelinestep) in self.step_execute_info
         else:
             assert (task_finished.parent_run, task_finished.component) in self.cable_execute_info
@@ -1330,7 +1353,7 @@ class Sandbox:
         task_execute_info = self.get_task_info(task_finished)
 
         # Update the sandbox with this information.
-        if type(task_finished) == archive.models.RunStep:
+        if type(task_finished) == RunStep:
             # Update the sandbox maps with the input cables' information as well as that
             # of the step itself.
             for rsic in task_finished.RSICs.all():
@@ -1383,12 +1406,12 @@ class Sandbox:
         may be a remote MPI host.
         """
         # Retrieve info from the database using the PKs passed.
-        curr_record = archive.models.RunComponent.objects.get(pk=cable_execute_dict["cable_record_pk"]).definite
+        curr_record = RunComponent.objects.get(pk=cable_execute_dict["cable_record_pk"]).definite
         input_dataset = librarian.models.Dataset.objects.get(pk=cable_execute_dict["input_dataset_pk"])
         output_path = cable_execute_dict["output_path"]
         recovering_record = None
         if cable_execute_dict["recovering_record_pk"] is not None:
-            recovering_record = archive.models.RunComponent.objects.get(
+            recovering_record = RunComponent.objects.get(
                 pk=cable_execute_dict["recovering_record_pk"]
             ).definite
         curr_ER = None
@@ -1551,7 +1574,7 @@ class Sandbox:
             output_dataset = curr_ER.execrecordouts.first().dataset
             output_CDT = output_dataset.get_cdt()
 
-        curr_log = archive.models.ExecLog.create(curr_record, invoking_record)
+        curr_log = ExecLog.create(curr_record, invoking_record)
 
         # Run cable (this completes the ExecLog).
         cable.run_cable(input_dataset_path, output_path, curr_record, curr_log)
@@ -1692,11 +1715,11 @@ class Sandbox:
 
         recovering_record = None
         if step_execute_dict["recovering_record_pk"] is not None:
-            recovering_record = archive.models.RunComponent.objects.get(
+            recovering_record = RunComponent.objects.get(
                 pk=step_execute_dict["recovering_record_pk"]
             ).definite
 
-        curr_RS = archive.models.RunStep.objects.get(pk=step_execute_dict["runstep_pk"])  # already start()ed
+        curr_RS = RunStep.objects.get(pk=step_execute_dict["runstep_pk"])  # already start()ed
         assert not curr_RS.pipelinestep.is_subpipeline()
         method = curr_RS.pipelinestep.transformation.definite
 
@@ -1793,7 +1816,7 @@ class Sandbox:
             pipelinestep = curr_RS.pipelinestep
 
             # Run code, creating ExecLog and MethodOutput.
-            curr_log = archive.models.ExecLog.create(curr_RS, invoking_record)
+            curr_log = ExecLog.create(curr_RS, invoking_record)
 
             # Check the integrity of the code before we run.
             if not pipelinestep.transformation.definite.check_md5():  # this checks the driver and dependencies
@@ -1830,14 +1853,6 @@ class Sandbox:
 
         return curr_RS
 
-    @staticmethod
-    def start_step_execlog(log_pk):
-        """
-        Start the specified ExecLog.
-        """
-        log = ExecLog.objects.get(pk=log_pk)
-        log.start(save=True)
-
     def submit_step_execution(self, step_execute_info, after_okay=None):
         """
         Submit the step execution to Slurm.
@@ -1852,9 +1867,6 @@ class Sandbox:
 
         cable_info_dicts = step_execute_info["cable_info_dicts"]
         output_paths = step_execute_info["output_paths"]
-        log_dir = step_execute_info["log_dir"]
-        stdout_path = os.path.join(log_dir, "step{}_stdout.txt".format(curr_RS.pipelinestep.step_num))
-        stderr_path = os.path.join(log_dir, "step{}_stderr.txt".format(curr_RS.pipelinestep.step_num))
 
         input_paths = [x["output_path"] for x in cable_info_dicts]
         # Driver name
@@ -1862,38 +1874,18 @@ class Sandbox:
 
         logger.debug("Submitting driver '%s', task_pk %d", driver.coderesource.filename, curr_RS.pk)
         job_handle = curr_RS.pipelinestep.transformation.definite.submit_code(
-            self.slurm_scheduler,
             step_execute_info.step_run_dir,
             input_paths,
             output_paths,
-            stdout_path,
-            stderr_path,
+            step_execute_info.driver_stdout_path(),
+            step_execute_info.driver_stderr_path(),
             self.uid,
             self.gid,
             step_execute_info.priority,
-            after_okay=None
+            after_okay=after_okay
         )
         logger.debug("Submitted task with pk=%d; Slurm job ID=%d", curr_RS.pk, job_handle._job_id)
         return job_handle
-
-    # return_code, stdout_path, and stderr_path will all be collected within the
-    # sbatch script and passed as command-line parameters to whatever script
-    # runs this code.
-    @staticmethod
-    def stop_step_execlog(log_pk, return_code, stdout_path, stderr_path):
-        """
-        Finalize the specified ExecLog with the given details.
-        """
-        log = ExecLog.objects.get(pk=log_pk)
-        log.stop(save=True)
-
-        log.methodoutput.return_code = return_code
-        with open(stdout_path, "rb") as out_f, open(stderr_path, "rb") as err_f:
-            log.methodoutput.error_log.save(stderr_path, File(err_f))
-            log.methodoutput.output_log.save(stdout_path, File(out_f))
-
-        log.clean()
-        log.save()
 
     @staticmethod
     def step_execution_bookkeeping(step_execute_dict):
@@ -1903,7 +1895,7 @@ class Sandbox:
         This is intended to run as a Slurm task, so it's coded as a static method.
         """
         # Break out step_execute_dict.
-        curr_RS = archive.models.RunStep.objects.get(pk=step_execute_dict["runstep_pk"])
+        curr_RS = RunStep.objects.get(pk=step_execute_dict["runstep_pk"])
         curr_log = curr_RS.log
         preexisting_ER = step_execute_dict["execrecord_pk"] is not None
         pipelinestep = curr_RS.pipelinestep
@@ -1912,7 +1904,7 @@ class Sandbox:
 
         recovering_record = None
         if step_execute_dict["recovering_record_pk"] is not None:
-            recovering_record = archive.models.RunComponent.objects.get(
+            recovering_record = RunComponent.objects.get(
                 pk=step_execute_dict["recovering_record_pk"]
             ).definite
         recover = recovering_record is not None
@@ -1920,7 +1912,7 @@ class Sandbox:
         cable_info_dicts = step_execute_dict["cable_info_dicts"]
         inputs_after_cable = []
         for curr_execute_dict in cable_info_dicts:
-            curr_RSIC = archive.models.RunSIC.objects.get(pk=curr_execute_dict["cable_record_pk"])
+            curr_RSIC = RunSIC.objects.get(pk=curr_execute_dict["cable_record_pk"])
             inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
 
         bad_execution = False
@@ -2440,6 +2432,24 @@ class RunStepExecuteInfo:
             "threads_required": self.threads_required
         }
 
+    def driver_stdout_path(self):
+        return os.path.join(self.log_dir, "step{}_stdout.txt".format(self.runstep.pipelinestep.step_num))
+
+    def driver_stderr_path(self):
+        return os.path.join(self.log_dir, "step{}_stderr.txt".format(self.runstep.pipelinestep.step_num))
+
+    def setup_stdout_path(self):
+        return os.path.join(self.log_dir, "setup_out.txt")
+
+    def setup_stderr_path(self):
+        return os.path.join(self.log_dir, "setup_err.txt")
+
+    def bookkeeping_stdout_path(self):
+        return os.path.join(self.log_dir, "bookkeeping_out.txt")
+
+    def bookkeeping_stderr_path(self):
+        return os.path.join(self.log_dir, "bookkeeping_err.txt")
+
 
 class RunCableExecuteInfo:
     def __init__(self, cable_record, user, execrecord, input_dataset, input_dataset_path, output_path,
@@ -2460,6 +2470,8 @@ class RunCableExecuteInfo:
         self.ready_to_go = False
         self.cancelled = False
         self.could_be_reused = could_be_reused
+        self.stdout_path = None
+        self.stderr_path = None
 
     def flag_for_recovery(self, recovering_record, by_step=None):
         assert self.recovering_record is None
@@ -2485,3 +2497,9 @@ class RunCableExecuteInfo:
             "threads_required": self.threads_required,
             "ready_to_go": self.ready_to_go
         }
+
+    def set_stdout_path(self, stdout_path):
+        self.stdout_path = stdout_path
+
+    def set_stderr_path(self, stderr_path):
+        self.stderr_path = stderr_path

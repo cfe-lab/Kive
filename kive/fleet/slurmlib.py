@@ -311,7 +311,7 @@ class SlurmScheduler:
     @classmethod
     def get_accounting_info(cls, job_id_iter=None):
         """
-        Get detailed information, i.e. sacct, on the speicfied job(s).
+        Get detailed information, i.e. sacct, on the specified job(s).
 
         job_id_iter is an iterable that must contain job IDs (integers) of previously
         submitted jobs.
@@ -446,3 +446,15 @@ class SlurmScheduler:
         # now return the list in the correct order, filling in those states not
         # found with an unknown state
         return [found_dct.get(jh.job_id, cls.UNKNOWN) for jh in jobhandle_lst]
+
+    @classmethod
+    def set_job_priority(cls, jobhandle_lst, priority):
+        """Set the priority of the specified jobs."""
+        cmd_list = ["scontrol", "update", "JobID={}".format(",".join(jobhandle_lst)),
+                    "Priority={}".format(priority)]
+        try:
+            _ = sp.check_output(cmd_list)
+        except sp.CalledProcessError as e:
+            logger.error("scontrol returned an error code '%s'", e.returncode)
+            logger.error("scontrol wrote this: '%s' ", e.output)
+            raise
