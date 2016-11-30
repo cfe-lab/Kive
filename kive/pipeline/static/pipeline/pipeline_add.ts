@@ -130,9 +130,9 @@ $view_menu.find('#autolayout_btn').click(
  */
 $('#id_pipeline_form').submit(PipelineSubmit.buildSubmit(
     canvasState,
-    $('#id_pipeline_action'),
+    $('#id_pipeline_action').val(),
     $('#id_family_name'),   $('#id_family_desc'),
-    $('#id_family_pk'),
+    parseInt($('#id_family_pk').val(), 10),
     $('#id_revision_name'), $('#id_revision_desc'),
     parent_revision_id,
     $('#published'),

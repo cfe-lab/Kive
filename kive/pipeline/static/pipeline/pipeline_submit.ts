@@ -8,10 +8,56 @@ export class PipelineSubmit {
      * functions instead of the Pipeline class.
      */
 
-    public static buildSubmit(canvasState: CanvasState, $action: JQuery, $family_name: JQuery,
-                $family_desc: JQuery, $family_pk: JQuery, $revision_name: JQuery, $revision_desc: JQuery,
-                parent_revision_id, $published: JQuery, $user_permissions: JQuery,
+    public static buildSubmit(canvasState: CanvasState, action: string, $family_name: JQuery,
+                $family_desc: JQuery, family_pk: number, $revision_name: JQuery, $revision_desc: JQuery,
+                parent_revision_id: number, $published: JQuery, $user_permissions: JQuery,
                 $group_permissions: JQuery, $error: JQuery, familyNameError: () => any) {
+
+        // $action, $family_pk, and parent_revision_id are static
+
+        if (!(canvasState instanceof CanvasState)) {
+            throw "Invalid object given as CanvasState.";
+        }
+        if (action === 'revise') {
+            if (typeof parent_revision_id !== 'number' || isNaN(parent_revision_id) || parent_revision_id < 0) {
+                throw 'Parent revision ID must be specified';
+            }
+        }
+        if (action === 'revise' || action === 'add') {
+            if (!family_pk && family_pk !== 0) {
+                throw 'Family primary key must be specified';
+            }
+        }
+        if ($family_name.length === 0) {
+            throw "Family name element could not be found.";
+        }
+        if ($family_desc.length === 0) {
+            throw "Family description element could not be found.";
+        }
+        if ($revision_name.length === 0) {
+            throw "Revision name element could not be found.";
+        }
+        if ($revision_desc.length === 0) {
+            throw "Revision name element could not be found.";
+        }
+        if ($published.length === 0) {
+            throw "Published checkbox element could not be found.";
+        }
+        if ($published.prop('checked') === undefined) {
+            throw "Published checkbox element does not conform to spec.";
+        }
+        if ($user_permissions.length === 0) {
+            throw "User permissions widget could not be found.";
+        }
+        if ($group_permissions.length === 0) {
+            throw "Group permissions widget could not be found.";
+        }
+        if ($error.length === 0) {
+            throw "User error message element could not be found.";
+        }
+        if (typeof familyNameError !== "function") {
+            throw "Error function callback was not supplied or not callable.";
+        }
 
         /*
          * Trigger AJAX transaction on submitting form.
@@ -20,7 +66,6 @@ export class PipelineSubmit {
             e.preventDefault(); // override form submit action
             PipelineSubmit.clearErrors($error);
 
-            let action = $action.val();
             let form_data;
             let family = $family_name.val();
 
@@ -29,9 +74,9 @@ export class PipelineSubmit {
                 PipelineSubmit.submitError('Pipeline family must be named', $error);
                 return;
             }
+
             try {
                 let pipeline = new Pipeline(canvasState);
-                // @todo: check to make sure all arguments exist
                 // @todo: action can also be 'add' when pipeline family exists with 0 revisions
                 form_data = pipeline.serialize({
                     users_allowed:  PipelineSubmit.getPermissionsArray($user_permissions),
@@ -57,7 +102,7 @@ export class PipelineSubmit {
             }
 
             if (action !== "new") {
-                PipelineSubmit.submitPipelineAjax($family_pk.val(), form_data, $error);
+                PipelineSubmit.submitPipelineAjax(family_pk, form_data, $error);
             } else { // Pushing a new family
                 PipelineSubmit.submitPipelineFamilyAjax({
                     users_allowed: form_data.users_allowed,
@@ -99,11 +144,10 @@ export class PipelineSubmit {
         }
     }
     private static submitError(errors, $error) {
-        if (errors instanceof Array) {
-            $error.empty();
-            for (var i = 0; i < errors.length; i++) {
-                $error.append($('<p>').text(errors[i]));
-            }
+        if (Array.isArray(errors)) {
+            $error.empty().append(
+                errors.map(error => $('<p>').text(error))
+            );
         } else {
             $error.text(errors);
         }
