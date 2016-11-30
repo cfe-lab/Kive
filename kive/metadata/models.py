@@ -33,7 +33,7 @@ from constants import datatypes, CDTs, maxlengths, groups, users
 import logging
 from portal.views import admin_check
 from archive.exceptions import SandboxActiveException, RunNotFinished
-from fleet.slurmlib import SlurmScheduler, ret_dct
+from fleet.slurmlib import SlurmScheduler
 
 LOGGER = logging.getLogger(__name__)  # Module level logger.
 
@@ -1276,7 +1276,7 @@ class Datatype(AccessControl):
             curr_state = self.get_state()
             is_done = curr_state in SlurmScheduler.STOPPED_SET
             self.logger.debug("Waiting for %s (state = %s)", job, curr_state)
-        return_code = ret_dct[curr_state]
+        return_code = SlurmScheduler.ret_dct[curr_state]
 
         # The method's driver has been called and has completed: now keep the record.
         with transaction.atomic():

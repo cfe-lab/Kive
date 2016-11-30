@@ -10,9 +10,12 @@ from django.core.exceptions import ImproperlyConfigured
 
 
 class KiveRouter(routers.DefaultRouter):
-    def get_api_root_view(self):
+    def get_api_root_view(self, api_urls=None):
         """
         Return a view to use as the API root.
+
+        api_urls is a dummy parameter that's included because the parent method
+        includes it.
         """
         known_actions = [route.mapping.values()
                          for route in self.routes if isinstance(route, Route)]

@@ -3,7 +3,6 @@
 
 import os.path
 import subprocess as sp
-import time
 from datetime import datetime
 
 import logging
