@@ -218,7 +218,8 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
     )
 
     priority = models.IntegerField(
-        help_text="Priority of this Run"
+        help_text="Priority of this Run",
+        default=0
     )
 
     # Implicitly, this also has start_time and end_time through inheritance.
