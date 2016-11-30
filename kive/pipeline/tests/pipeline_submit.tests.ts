@@ -94,7 +94,7 @@ describe("Pipeline Submit class", function() {
 
         afterEach(function() {
             expect(function() {
-                PipelineSubmit.buildSubmit(...args);
+                PipelineSubmit.buildSubmit.apply(null, args);
             }).toThrow();
         });
 
@@ -126,7 +126,7 @@ describe("Pipeline Submit class", function() {
 
         afterEach(function() {
             expect(function() {
-                PipelineSubmit.buildSubmit(...args);
+                PipelineSubmit.buildSubmit.apply(null, args);
             }).not.toThrow();
         });
 
@@ -187,7 +187,7 @@ describe("Pipeline Submit class", function() {
         });
 
         beforeEach(function() {
-            built_submit = PipelineSubmit.buildSubmit(...args);
+            built_submit = PipelineSubmit.buildSubmit.apply(null, args);
             jasmine.Ajax.install();
         });
 
