@@ -44,6 +44,8 @@ describe("Pipeline Submit class", function() {
             "familyNameError"
         ];
 
+    let built_submit;
+
     function jqInput(value: string): JQuery {
         return $('<input>').val(value);
     }
@@ -55,6 +57,36 @@ describe("Pipeline Submit class", function() {
             .append([ jqOpt("a"), jqOpt("b"), jqOpt("c") ])
             .val([ "b", "c" ]);
     }
+    function mockPipeline() {
+        let input = new RawNode(50, 50, 'raw_node');
+        let method = new MethodNode(
+            555, 0, 60, 60,
+            '#999', 'method_node',
+            [ { dataset_name: 'input1', structure: null } ],
+            [ { dataset_name: 'output1', structure: null } ]
+        );
+        let output = new OutputNode(50, 50, 'output_node');
+
+
+        let conn1 = new Connector(input.out_magnets[0]);
+        let conn2 = new Connector(method.out_magnets[0]);
+
+        conn1.x = method.in_magnets[0].x;
+        conn1.y = method.in_magnets[0].y;
+        conn2.x = output.in_magnets[0].x;
+        conn2.y = output.in_magnets[0].y;
+
+        input.out_magnets[0].connected.push(conn1);
+        method.in_magnets[0].tryAcceptConnector(conn1);
+        method.out_magnets[0].connected.push(conn2);
+        output.in_magnets[0].tryAcceptConnector(conn2);
+
+        canvasState.reset();
+        canvasState.addShape(input);
+        canvasState.addShape(method);
+        canvasState.addShape(output);
+        canvasState.connectors.push(conn1, conn2);
+    }
 
     beforeAll(function() {
         jasmine.addMatchers(imagediff.jasmine);
@@ -62,7 +94,7 @@ describe("Pipeline Submit class", function() {
     });
 
     beforeEach(function(){
-        $error = $('<div>');
+        $error = $('<div>').appendTo('body').hide();
 
         args = [
             canvasState,
@@ -72,7 +104,7 @@ describe("Pipeline Submit class", function() {
             0, // family_pk
             jqInput('custom_revision_name'),
             jqInput('custom_revision_desc'),
-            0, // parent_revision_id
+            -1, // parent_revision_id
             $('<input>').attr('type', 'checkbox').prop('checked', false), // published
             jqPermissionsWidget(), // users
             jqPermissionsWidget(), // groups
@@ -80,6 +112,10 @@ describe("Pipeline Submit class", function() {
             function() {} // special callback for family name errors
         ];
 
+    });
+
+    afterEach(function() {
+        $error.remove();
     });
 
     describe('should throw an error when', function() {
@@ -148,39 +184,6 @@ describe("Pipeline Submit class", function() {
     });
 
     describe("generated event handler function", function() {
-
-        let built_submit;
-
-        function mockPipeline() {
-            let input = new RawNode(50, 50, 'raw_node');
-            let method = new MethodNode(
-                555, 0, 60, 60,
-                '#999', 'method_node',
-                [ { dataset_name: 'input1', structure: null } ],
-                [ { dataset_name: 'output1', structure: null } ]
-            );
-            let output = new OutputNode(50, 50, 'output_node');
-
-
-            let conn1 = new Connector(input.out_magnets[0]);
-            let conn2 = new Connector(method.out_magnets[0]);
-
-            conn1.x = method.in_magnets[0].x;
-            conn1.y = method.in_magnets[0].y;
-            conn2.x = output.in_magnets[0].x;
-            conn2.y = output.in_magnets[0].y;
-
-            input.out_magnets[0].connected.push(conn1);
-            method.in_magnets[0].tryAcceptConnector(conn1);
-            method.out_magnets[0].connected.push(conn2);
-            output.in_magnets[0].tryAcceptConnector(conn2);
-
-            canvasState.reset();
-            canvasState.addShape(input);
-            canvasState.addShape(method);
-            canvasState.addShape(output);
-            canvasState.connectors.push(conn1, conn2);
-        }
 
         beforeAll(function() {
             mockPipeline();
@@ -252,17 +255,100 @@ describe("Pipeline Submit class", function() {
             expect(requestData.canvas_height).toEqual(150);
         });
 
+        it('should handle API errors for pipeline family', function() {
+            built_submit(new Event('submit'));
+
+            jasmine.Ajax.requests.mostRecent().respondWith({
+                status: 500,
+                statusText: 'HTTP/1.1 500 Internal Server Error',
+                contentType: 'application/json;charset=UTF-8',
+                responseText: "{ \"non_field_errors\": [ \"custom error message\" ] }"
+            });
+
+            expect($error).toContainText("custom error message");
+            expect($error).toBeVisible();
+        });
+
+        it('should handle API errors for pipeline revision', function() {
+            built_submit(new Event('submit'));
+
+            jasmine.Ajax.requests.mostRecent().respondWith({
+                status: 200,
+                statusText: 'HTTP/1.1 200 OK',
+                contentType: 'application/json;charset=UTF-8',
+                responseText: "{ \"id\": 6 }"
+            });
+
+            jasmine.Ajax.requests.mostRecent().respondWith({
+                status: 500,
+                statusText: 'HTTP/1.1 500 Internal Server Error',
+                contentType: 'application/json;charset=UTF-8',
+                responseText: "{ \"non_field_errors\": [ \"custom error message\" ] }"
+            });
+
+            expect($error).toContainText("custom error message");
+            expect($error).toBeVisible();
+        });
+
     });
 
-    xit('should submit a new pipeline revision to an empty pipeline family', function() {
+    it('should submit a new pipeline revision to an empty pipeline family', function() {
+        mockPipeline();
+        args[1] = "add";
+        built_submit = PipelineSubmit.buildSubmit.apply(null, args);
+        jasmine.Ajax.install();
+
+        built_submit(new Event('submit'));
+
+        // @types for JasmineAjaxRequest seems to be a bit spotty.
+        let request: any = jasmine.Ajax.requests.mostRecent();
+        expect(request.url).toBe("/api/pipelines/");
+        expect(request.method).toBe('POST');
+
+        let requestData = request.data();
+        expect(requestData.users_allowed).toEqual([ "b", "c" ]);
+        expect(requestData.groups_allowed).toEqual([ "b", "c" ]);
+        expect(requestData.family).toEqual('custom_family_name');
+        expect(requestData.family_desc).toEqual('custom_family_desc');
+        expect(requestData.revision_name).toEqual('custom_revision_name');
+        expect(requestData.revision_desc).toEqual('custom_revision_desc');
+        expect(requestData.revision_parent).toEqual(null);
+        expect(requestData.published).toEqual(false);
+        expect(requestData.canvas_width).toEqual(300);
+        expect(requestData.canvas_height).toEqual(150);
+
+        jasmine.Ajax.uninstall();
 
     });
 
-    xit('should submit a new pipeline revision with a parent revision', function() {
+    it('should submit a new pipeline revision with a parent revision', function() {
 
-    });
+        mockPipeline();
+        args[1] = "revise";
+        args[7] = 1;
+        built_submit = PipelineSubmit.buildSubmit.apply(null, args);
+        jasmine.Ajax.install();
 
-    xit('should handle API errors', function() {
+        built_submit(new Event('submit'));
+
+        // @types for JasmineAjaxRequest seems to be a bit spotty.
+        let request: any = jasmine.Ajax.requests.mostRecent();
+        expect(request.url).toBe("/api/pipelines/");
+        expect(request.method).toBe('POST');
+
+        let requestData = request.data();
+        expect(requestData.users_allowed).toEqual([ "b", "c" ]);
+        expect(requestData.groups_allowed).toEqual([ "b", "c" ]);
+        expect(requestData.family).toEqual('custom_family_name');
+        expect(requestData.family_desc).toEqual('custom_family_desc');
+        expect(requestData.revision_name).toEqual('custom_revision_name');
+        expect(requestData.revision_desc).toEqual('custom_revision_desc');
+        expect(requestData.revision_parent).toEqual(1);
+        expect(requestData.published).toEqual(false);
+        expect(requestData.canvas_width).toEqual(300);
+        expect(requestData.canvas_height).toEqual(150);
+
+        jasmine.Ajax.uninstall();
 
     });
 
