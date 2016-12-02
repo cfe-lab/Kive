@@ -8,13 +8,6 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "-w",
-            "--workers",
-            dest="worker_interfaces",
-            type=int,
-            default=1
-        )
-        parser.add_argument(
             "-q",
             "--quit-idle",
             dest="quit_idle",
@@ -23,9 +16,5 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        manager_interface = fleet.workers.MPIManagerInterface(
-            worker_count=options["worker_interfaces"],
-            manage_script=sys.argv[0]
-        )
-        manager = fleet.workers.Manager(manager_interface, options["quit_idle"])
+        manager = fleet.workers.Manager(options["quit_idle"])
         manager.main_procedure()

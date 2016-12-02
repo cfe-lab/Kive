@@ -246,6 +246,11 @@ class Manager(object):
                 mgr_logger.info('Fleet is idle, quitting.')
                 return
 
+            try:
+                time.sleep(settings.SLEEP_SECONDS)
+            except KeyboardInterrupt:
+                return
+
     def main_procedure(self):
         try:
             self.main_loop()
