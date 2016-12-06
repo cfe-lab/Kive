@@ -16,11 +16,11 @@ $.fn.extend({
         });
         
         $el.css('cursor', opt.cursor).on("mousedown", function(e) {
-            var $drag;
+            var $drag = $(this);
             if (opt.handle === '') {
-                $drag = $(this).addClass('draggable');
+                $drag.addClass('draggable');
             } else {
-                $drag = $(this).addClass('active-handle').parent().addClass('draggable');
+                $drag.addClass('active-handle').parent().addClass('draggable');
             }
             
             if (typeof opt.start === 'function') {
@@ -140,7 +140,10 @@ export class Dialog {
     cancel() {
         this.hide();
     }
-    
+
+    /**
+     * Ensures that all DOM fixtures have been successfully loaded.
+     */
     validateInitialization() {
         for (let propertyName in this) {
             if (propertyName[0] === "$" && this[propertyName].constructor === $) {
@@ -169,7 +172,7 @@ export class Dialog {
 /**
  * Middle-base class for dialogs incorporating a Node preview canvas.
  */
-class NodePreviewDialog extends Dialog {
+abstract class NodePreviewDialog extends Dialog {
     protected preview_canvas: HTMLCanvasElement;
     protected is_modal = true;
     
@@ -211,9 +214,9 @@ class NodePreviewDialog extends Dialog {
     
     /**
      * Sync the preview canvas with dialog inputs.
-     * This base class does nothing. Child classes must implement.
+     * Child classes must implement.
      */
-    protected triggerPreviewRefresh(): void { }
+    protected abstract triggerPreviewRefresh(): void;
     
     /**
      * Show the dialog.
@@ -324,7 +327,7 @@ export class InputDialog extends NodePreviewDialog {
      * Coords default to 0, 0 and label is an empty string.
      * @returns {RawNode|CdtNode}
      */
-    generateNode(label: string = ''): RawNode|CdtNode {
+    private generateNode(label: string = ''): RawNode|CdtNode {
         let pk = parseInt(this.$select_cdt.val(), 10); // primary key
         return isNaN(pk) ? new RawNode(0, 0, label) : new CdtNode(pk, 0, 0, label);
     }
@@ -332,7 +335,7 @@ export class InputDialog extends NodePreviewDialog {
     /**
      * Draws the node on the preview canvas.
      */
-    drawPreviewCanvas (): void {
+    private drawPreviewCanvas(): void {
         let ctx = this.preview_canvas.getContext('2d');
         let w = this.preview_canvas.width;
         let h = this.preview_canvas.height;
@@ -384,7 +387,7 @@ export class InputDialog extends NodePreviewDialog {
 /**
  * Singleton UI for picking a colour.
  */
-var colourPicker = (function() {
+var colourPickerFactory = (function() {
     /**
      * Template pasted here for convenience.
      
@@ -442,7 +445,7 @@ var colourPicker = (function() {
         setCallback: (cb: Function) => { callback = cb; }
     };
     return picker;
-})();
+});
 
 export class MethodDialog extends NodePreviewDialog {
     /*
@@ -488,7 +491,7 @@ export class MethodDialog extends NodePreviewDialog {
     private $error;
     private $expand_outputs_ctrl;
     private colour_picker;
-    public add_or_revise: string = "add";
+    private add_or_revise: string = "add";
     private editing_node: MethodNode;
     private methodInputs: any[];
     private methodOutputs: any[];
@@ -506,7 +509,7 @@ export class MethodDialog extends NodePreviewDialog {
     constructor(jqueryRef, activator) {
         super(jqueryRef, activator);
         
-        this.colour_picker = colourPicker; // pre-assembled object - note no "new"
+        this.colour_picker = colourPickerFactory(); // not a class-based object - note no "new"
         this.$delete_outputs = $('#id_method_delete_outputs');
         this.$delete_outputs_details = $('#id_method_delete_outputs_details');
         this.$submit_button = $('#id_method_button');
@@ -516,30 +519,30 @@ export class MethodDialog extends NodePreviewDialog {
         this.$error = $('#id_method_error');
         this.$expand_outputs_ctrl = $('.expand_outputs_ctrl', this.jqueryRef);
 
+        this.$select_method.change(
+            () => this.triggerPreviewRefresh()
+        );
+        this.colour_picker.setCallback(
+            () => this.triggerPreviewRefresh()
+        );
         let dialog = this;
-        this.$select_method.change( function() {
-            dialog.triggerPreviewRefresh();
-        });
-        colourPicker.setCallback( function() {
-            dialog.triggerPreviewRefresh();
-        });
         this.$select_method_family.change( function() {
             dialog.updateMethodRevisionsMenu(this.value);
         });
         this.$delete_outputs.change(
             () => {
-                dialog.linkChildCheckboxes();
-                dialog.refreshPreviewCanvasMagnets();
+                this.linkChildCheckboxes();
+                this.refreshPreviewCanvasMagnets();
             }
         );
         this.$delete_outputs_details.on('change', '.method_delete_outputs',
             () => {
-                dialog.linkParentCheckbox();
-                dialog.refreshPreviewCanvasMagnets();
+                this.linkParentCheckbox();
+                this.refreshPreviewCanvasMagnets();
             }
         );
         this.$expand_outputs_ctrl.click(
-            () => dialog.showHideChildCheckboxes()
+            () => this.showHideChildCheckboxes()
         );
 
         this.updateMethodRevisionsMenu(this.$select_method_family.val());
@@ -571,7 +574,7 @@ export class MethodDialog extends NodePreviewDialog {
         return $.Deferred().fail();
     }
     
-    refreshPreviewCanvasMagnets() {
+    private refreshPreviewCanvasMagnets() {
         this.drawPreviewCanvas(this.cached_api_result, this.colour_picker.val());
     }
     
@@ -702,7 +705,7 @@ export class MethodDialog extends NodePreviewDialog {
      * @returns
      *      A jQuery Deferred object
      */
-    private updateMethodRevisionsMenu(mf_id) {
+    private updateMethodRevisionsMenu(mf_id): JQueryPromise<void> {
         if (mf_id !== '') {
             // this.$revision_field.show().focus();
             let request = $.getJSON("/api/methodfamilies/" + mf_id + "/methods/");
@@ -820,12 +823,13 @@ export class MethodDialog extends NodePreviewDialog {
      *      The CanvasState to add the MethodNode to.
      */
     submit(canvasState: CanvasState) {
-        let node_label = this.$input_name.val(); // pk of method
-        let method_id = this.$select_method.val();
+        let node_label = this.$input_name.val();
+        let method_id = this.$select_method.val(); // pk of method
         let family_id = this.$select_method_family.val();
         let pos = this.translateToOtherCanvas(canvasState);
-        
-        if (method_id && family_id && node_label) {
+        let is_unique = CanvasState.isUniqueName(canvasState.getInputNodes(), node_label);
+
+        if (method_id && family_id && node_label && is_unique) {
             // user selected valid Method Revision
             var method = this.produceMethodNode(
                 method_id,
@@ -851,6 +855,9 @@ export class MethodDialog extends NodePreviewDialog {
         } else if (!node_label) {
             // required field
             this.$error.text("Label is required");
+            this.$input_name.focus();
+        } else if (!is_unique) {
+            this.$error.text('That name has already been used.');
             this.$input_name.focus();
         } else {
             this.$error.text("Select a method");
@@ -907,7 +914,6 @@ export class OutputDialog extends NodePreviewDialog {
             <input #id_output_name type="text">
             <input #id_output_button type="submit" value="OK">
             <div #id_output_error .errortext>
-
      */
     private $error;
     private $output_name;
@@ -948,6 +954,13 @@ export class OutputDialog extends NodePreviewDialog {
         ctx.clearRect(0, 0, w, h);
         node.draw(ctx);
     }
+
+    /**
+     * Implements abstract method
+     */
+    triggerPreviewRefresh(): void {
+        // outputs all look the same: take no action
+    }
     
     /**
      * Load an existing OutputNode so that we can rename it.
@@ -981,6 +994,7 @@ export class OutputDialog extends NodePreviewDialog {
      */
     submit(canvasState: CanvasState) {
         var label = this.$output_name.val();
+
         if (this.paired_node) {
             if (this.paired_node.label === label) {
                 /* No change */
@@ -998,16 +1012,15 @@ export class OutputDialog extends NodePreviewDialog {
             }
         } else {
             let pos = this.translateToOtherCanvas(canvasState);
-    
+
             // check for empty and duplicate names
-            let node_label = this.$output_name.val();
-            if (node_label === '') {
+            if (label === '') {
                 // required field
                 this.$error.text("Label is required.");
-            } else if (!CanvasState.isUniqueName(canvasState.getOutputNodes(), node_label)) {
+            } else if (!CanvasState.isUniqueName(canvasState.getOutputNodes(), label)) {
                 this.$error.html('<img src="/static/pipeline/warning_icon.png"> That name has already been used.');
             } else {
-                let shape = new OutputNode(pos.left, pos.top, node_label);
+                let shape = new OutputNode(pos.left, pos.top, label);
                 canvasState.addShape(shape);
                 // Second arg: Upon collision, move new shape 0% and move existing objects 100%
                 canvasState.detectCollisions(shape, 0);

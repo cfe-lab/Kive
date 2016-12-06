@@ -1109,6 +1109,9 @@ export class CanvasState {
         this.exec_order = [];
         this.selection = [];
 
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transforms
+        this.setScale(this.scale);
+
         this.dispatchChangeEvent({ reset: true });
     }
 

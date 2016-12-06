@@ -549,18 +549,18 @@ class MethodDependencyMockTests(TestCase):
         self.assertEqual(expected_filepaths, filepaths)
 
 
-@mocked_relations(Method, MethodFamily)
+@mocked_relations(Method, MethodFamily, Transformation)
 class MethodUpdateMockTests(TestCase):
     def setUp(self):
         self.family = MethodFamily()
         self.old_method = self.family.members.create(family=self.family,
                                                      revision_number=1,
-                                                     id=101)
+                                                     pk=101)
         self.old_method.method = self.old_method
 
         self.new_method = self.family.members.create(family=self.family,
                                                      revision_number=2,
-                                                     id=102)
+                                                     pk=102)
         self.new_method.method = self.new_method
 
     def test_find_update_not_found(self):
@@ -573,9 +573,9 @@ class MethodUpdateMockTests(TestCase):
 
         self.assertEqual(self.new_method, update)
 
-    @mocked_relations(Pipeline, Transformation)
+    @mocked_relations(Pipeline)
     def test_find_update_not_found_from_transformation(self):
-        transformation = Transformation(id=self.new_method.id)
+        transformation = Transformation(pk=self.new_method.pk)
         transformation.method = self.new_method
         update = transformation.find_update()
 

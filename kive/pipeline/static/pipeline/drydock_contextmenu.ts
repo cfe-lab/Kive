@@ -22,35 +22,48 @@ export class CanvasContextMenu {
         var menu = this;
         this.$menu = $(selector);
         this.$ul = $('<ul>').appendTo(this.$menu);
+        this.initEvents();
+    }
+
+    /**
+     * Initialize event listeners
+     */
+    private initEvents() {
         this.$menu.on({
             // necessary to stop document click handler from kicking in
             mousedown: (e: JQueryMouseEventObject) => e.stopPropagation(),
             keydown:   (e: JQueryKeyEventObject)   => {
                 e.stopPropagation();
-                if (e.which === 27) { // esc
-                    this.visible && menu.cancel();
+                if (e.key === "Escape") {
+                    this.visible && this.cancel();
                 }
             },
-            click: function (e: JQueryMouseEventObject) {
-                // when a context menu option is clicked
-                e.stopPropagation();
-                menu.$menu.hide();
-
-                var sel = cs.selection;
-                var action = $(this).data('action');
-
-                if (sel) {
-                    if (menu.actions.hasOwnProperty(action)) {
-                        menu.actions[action](
-                            action === 'delete' ? sel : sel[0],
-                            e
-                        );
-                    }
-                }
-            }
+            click: this.clickMenuHandlerFactory()
         }, 'li');
-
         $(document).click( () => { this.visible && this.cancel(); } );
+    }
+
+    /**
+     *
+     * @returns an event handler object ready to assign to a listener.
+     */
+    private clickMenuHandlerFactory(): (e: JQueryMouseEventObject) => void {
+        let menu = this;
+        return function(e) {
+            // when a context menu option is clicked
+            e.stopPropagation();
+            menu.$menu.hide();
+
+            var sel = menu.cs.selection;
+            var action = $(this).data('action');
+
+            if (sel && menu.actions.hasOwnProperty(action)) {
+                menu.actions[action](
+                    action === 'delete' ? sel : sel[0],
+                    e
+                );
+            }
+        };
     }
 
     /**
@@ -64,8 +77,8 @@ export class CanvasContextMenu {
      *      (2) the event object.
      */
     registerAction(name: string, criteriaFn: CriteriaFn, newAction: ContextMenuAction) {
-        if (!this.actions.hasOwnProperty(name)) {
-            let id_name = name.toLowerCase().replace(/[^A-Za-z0-9]/g, '_');
+        let id_name = name.toLowerCase().replace(/[^A-Za-z0-9]/g, '_');
+        if (!this.actions.hasOwnProperty(id_name)) {
             let $li = $('<li>').addClass(id_name).data('action', id_name).text(name);
             this.$ul.append($li);
             this.actions[id_name] = newAction;

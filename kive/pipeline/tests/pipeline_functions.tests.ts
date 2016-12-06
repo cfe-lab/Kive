@@ -302,7 +302,7 @@ describe("Pipeline functions", function() {
 
     describe('Load', function(){
         it('should load pipeline from API', function() {
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            loadApiPipeline(this.canvasState, this.api_pipeline);
         });
 
         it('should draw pipeline from API', function() {
@@ -317,7 +317,7 @@ describe("Pipeline functions", function() {
         });
 
         it('should find pipeline nodes from API', function() {
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            loadApiPipeline(this.canvasState, this.api_pipeline);
 
             var input1  = this.canvasState.findNodeByLabel('input1'),
                 input2  = this.canvasState.findNodeByLabel('input2'),
@@ -346,7 +346,7 @@ describe("Pipeline functions", function() {
     describe('Connections', function(){
 
         it('should connect inputs to methods API', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            loadApiPipeline(this.canvasState, this.api_pipeline);
 
             var input1 = this.canvasState.findNodeByLabel('input1'),
                 input2 = this.canvasState.findNodeByLabel('input2'),
@@ -361,7 +361,7 @@ describe("Pipeline functions", function() {
         });
 
         it('should connect methods API', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            loadApiPipeline(this.canvasState, this.api_pipeline);
 
             var prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
                 remap  = this.canvasState.findNodeByLabel('remap.py');
@@ -370,7 +370,7 @@ describe("Pipeline functions", function() {
         });
 
         it('should connect methods to outputs API', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            loadApiPipeline(this.canvasState, this.api_pipeline);
 
             var remap   = this.canvasState.findNodeByLabel('remap.py'),
                 remapc  = this.canvasState.findNodeByLabel('remap_counts'),
@@ -388,18 +388,18 @@ describe("Pipeline functions", function() {
         });
 
         it('should ignore order of cables_in when wiring', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
-                expectedImage;
+            let pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             pipeline.draw();
-            expectedImage = imagediff.toImageData(this.rawCanvas);
 
             // Now reverse the order of the cables_in
+            let expectedCanvas = imagediff.createCanvas(600, 300);
+            let expectedCanvasState = new CanvasState(expectedCanvas, true);
             this.api_pipeline.steps[1].cables_in.reverse();
-            pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            pipeline = loadApiPipeline(expectedCanvasState, this.api_pipeline);
             pipeline.draw();
 
             expect(this.rawCanvas).toImageDiffEqual(
-                expectedImage);
+                expectedCanvas);
         });
     });
 

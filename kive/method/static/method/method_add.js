@@ -184,7 +184,7 @@ $(document).ready(function(){ // wait for page to finish loading before executin
             return $('<option>').val(opt.value).text(opt.text);
         });
         var $select = makeSelect("compounddatatype_out_" + i)
-            .append(opts);
+            .append($opts);
         var $min_row = makeNumberInput("min_row_out_" + i);
         var $max_row = makeNumberInput("max_row_out_" + i);
         

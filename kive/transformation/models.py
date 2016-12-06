@@ -282,6 +282,7 @@ class Transformation(metadata.models.AccessControl):
 
     def find_update(self):
         update = self.definite.family.members.latest('revision_number')
+        members = list(self.definite.family.members.all())
         return update if update.pk != self.pk else None
 
 
