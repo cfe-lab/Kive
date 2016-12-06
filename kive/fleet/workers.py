@@ -14,13 +14,14 @@ import glob
 import shutil
 import Queue
 import socket
+import inspect
 
 from django.db import connection
 from django.conf import settings
 from django.utils import timezone
 
 import archive.models
-from archive.models import Dataset, Run, ExceedsSystemCapabilities
+from archive.models import Dataset, Run, ExceedsSystemCapabilities, MethodOutput
 from sandbox.execute import Sandbox, sandbox_glob
 from fleet.exceptions import StopExecution
 from constants import runcomponentstates
@@ -241,6 +242,9 @@ class Manager(object):
         # A queue of recently-completed runs, to a maximum specified by history.
         self.history_queue = deque(maxlen=history)
 
+        # A queue of functions to call during idle time.
+        self.idle_job_queue = deque()
+
     def _startup(self):
         """
         Set up/register the workers and prepare to run.
@@ -352,6 +356,43 @@ class Manager(object):
         self.sandboxes_shutting_down.discard(sandbox)
         if self.history_queue.maxlen > 0:
             self.history_queue.append(sandbox)
+
+    def _add_idletask(self, newidletask):
+        """Add a task for the manager to perform during her idle time.
+        The newidletask must be a generator that accepts a single argument of
+        type comparable to time.time() when it calls (yield) .
+        The argument provides the time limit after which a task must interrupt its task
+        and wait for the next allotted time.
+
+        For example, the structure of an idle task would typically be:
+
+        def my_idle_task(some_useful_args):
+           init_my_stuff()
+           while True:
+              time_to_stop = (yield)
+              if (time.time() < time_to_stop) and something_todo():
+                 do a small amount of work
+        """
+        if inspect.isgenerator(newidletask):
+            # we prime the generator so that it advances to the first time that
+            # it encounters a 'time_to_stop = (yield)' statement.
+            newidletask.next()
+            self.idle_job_queue.append(newidletask)
+        else:
+            raise RuntimeError("add_idletask: Expecting a generator as a task")
+
+    def _do_idle_tasks(self, time_limit):
+        """Perform the registered idle tasks once each, or until time runs out.
+        Idle tasks are called in a round-robin fashion.
+        """
+        num_tasks = len(self.idle_job_queue)
+        num_done = 0
+        while (time.time() < time_limit) and num_done < num_tasks:
+            mgr_logger.info("Running an idle task..")
+            jobtodo = self.idle_job_queue[0]
+            jobtodo.send(time_limit)
+            self.idle_job_queue.rotate(1)
+            num_done += 1
 
     def assign_task(self, sandbox, task):
         """
@@ -877,6 +918,18 @@ class Manager(object):
         """
         Poll the database for new jobs, and handle running of sandboxes.
         """
+
+        # add any idle tasks that should be performed in the mainloop here
+        # --
+        # check for consistency of external files:
+        # self._add_idletask(lambda t: Dataset.idle_externalcheck(t))
+        # --
+        # purge old files from Dataset:
+        self._add_idletask(Dataset.idle_dataset_purge())
+        # make Dataset sub-directories for next month
+        self._add_idletask(Dataset.idle_create_next_month_upload_dir())
+        # purge old log files
+        self._add_idletask(MethodOutput.idle_logfile_purge())
         time_to_purge = None
         while True:
             self.find_stopped_runs()
@@ -885,8 +938,12 @@ class Manager(object):
             if not self.assign_tasks(time_to_poll):
                 return
 
-            # Everything in the queue has been started, so we check and see if
-            # anything has finished.
+            # Some jobs in the queue have been started:
+            # if we have time, do some idle tasks until time_to_poll and
+            # then check and see if anything has finished.
+            if time.time() < time_to_poll:
+                self._do_idle_tasks(time_to_poll)
+
             if not self.wait_for_polling(time_to_poll):
                 return
 

@@ -8,12 +8,13 @@ from __future__ import unicode_literals
 
 from collections import defaultdict
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 import hashlib
 import heapq
 import itertools
 import logging
 import os
+import os.path
 import re
 import shutil
 import sys
@@ -42,6 +43,7 @@ import librarian.signals
 import file_access_utils
 from constants import maxlengths, runcomponentstates
 from datachecking.models import BadData
+import filewalker
 
 LOGGER = logging.getLogger(__name__)
 
@@ -100,6 +102,14 @@ class ExternalFileDirectory(models.Model):
         super(ExternalFileDirectory, self).save(*args, **kwargs)
 
 
+class SafeContext:
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *args):
+        pass
+
+
 @python_2_unicode_compatible
 class Dataset(metadata.models.AccessControl):
     """
@@ -156,6 +166,11 @@ class Dataset(metadata.models.AccessControl):
 
     logger = logging.getLogger('librarian.Dataset')
 
+    # This class has a FilePurger instance. See purge() below.
+    filepurger = filewalker.FilePurger(os.path.join(settings.MEDIA_ROOT, UPLOAD_DIR),
+                                       grace_period_hrs=settings.DATASET_GRACE_PERIOD_HRS,
+                                       walk_period_hrs=settings.DATASET_PURGE_SCAN_PERIOD_HRS,
+                                       logger=logger)
     # For validation of Datasets when being reused, or when being
     # regenerated.  A blank MD5_checksum means that the file was
     # missing (not created when it was supposed to be created).
@@ -1202,6 +1217,118 @@ class Dataset(metadata.models.AccessControl):
         metadata.models.remove_helper(removal_plan)
 
     @classmethod
+    def idle_create_next_month_upload_dir(cls):
+        """Create next month's dataset directory if it doesn't exist.
+        NOTE: We do not need to take into account different month lengths, because
+        we run this routine frequently.
+        """
+        CHECK_ITERS = 10000
+        numcheck = CHECK_ITERS
+        while True:
+            (yield None)
+            numcheck += 1
+            if numcheck > CHECK_ITERS:
+                numcheck = 0
+                date_str = (date.today() + timedelta(days=30)).strftime('%Y_%m')
+                next_dirname = os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR, date_str)
+                cls.logger.debug("idle_next_month_upload_dir: checking for '%s'", next_dirname)
+                try:
+                    with SafeContext():
+                        if os.path.exists(next_dirname):
+                            cls.logger.debug("idle_next_month_upload_dir: directory exists.")
+                        else:
+                            os.mkdir(next_dirname)
+                except OSError:
+                    cls.logger.warn("Could not make directory '%s'", next_dirname)
+
+    @staticmethod
+    def _active_datasets():
+        """A generator to produce the datasets of all running and pending runs."""
+        pending_runs = archive.models.Run.objects.filter(start_time=None)
+        running_runs = archive.models.Run.objects.filter(end_time=None)
+        active_runs = pending_runs | running_runs
+        for run in active_runs:
+            for component in run.get_all_atomic_runcomponents():
+                execrecord = component.execrecord
+                if execrecord is not None:
+                    for eri in execrecord.execrecordins.all():
+                        yield eri.dataset
+                    for ero in execrecord.execrecordouts.all():
+                        yield ero.dataset
+
+    @classmethod
+    def idle_dataset_purge(cls,
+                           max_storage=settings.DATASET_MAX_STORAGE,
+                           target_size=settings.DATASET_TARGET_STORAGE):
+        """Purge files if the total filesize is > max_storage. Once we start purging,
+        do this until the filesize <= target_size.
+
+        This is written as a generator that will interrupt itself when
+        time.time() > time_to_stop, and then continue when it next gets a time
+        slice by send()
+        """
+        # get batches of max 5 files at a time when we have to purge
+        BATCH_SIZE = 5
+        while True:
+            time_to_stop = (yield None)
+            cls.logger.debug('hello from idle_dataset_purge')
+            if time.time() < time_to_stop:
+                active_files = set(os.path.join(settings.MEDIA_ROOT, ds.dataset_file.name)
+                                   for ds in Dataset._active_datasets())
+                up_loaded = set(os.path.join(settings.MEDIA_ROOT, ds.dataset_file.name)
+                                for ds in Dataset.objects.filter(file_source=None).all())
+                exclude_set = active_files | up_loaded
+                cls.logger.debug('Found %d active and uploaded datasets.', len(exclude_set))
+                for ff in exclude_set:
+                    cls.logger.debug('--%s', ff)
+            # recalculate the total file size, while allowing for interruptions
+            # the resulting total file size will be in cls.filepurger._totsize once
+            # we have finished the file system scanning
+            cls.logger.debug('rescan of datasets files')
+            checker = cls.filepurger.regenerator(exclude_set)
+            try:
+                while True:
+                    time_to_stop = (yield None)
+                    checker.send(time_to_stop)
+            except StopIteration:
+                pass
+            cls.logger.debug('finished regenerating dataset file cache')
+            cls.logger.debug("\n".join(["%s: %s" % itm for itm in cls.filepurger.get_scaninfo().items()]))
+            if time.time() < time_to_stop and cls.filepurger._totsize > max_storage:
+                cls.logger.info("Purge cycle started, total size = %d > max_storage=%d",
+                                cls.filepurger._totsize, max_storage)
+                tot_size_deleted = 0
+                for ftup in cls.filepurger.next_to_purge(BATCH_SIZE, exclude_set,
+                                                         target_size,
+                                                         dodelete=True):
+                    if ftup is None:
+                        # we have run out of time: abruptly exit from for loop
+                        break
+                    else:
+                        # remove the file
+                        abspath, fsize = ftup
+                        relpath = os.path.relpath(abspath, settings.MEDIA_ROOT)
+                        tot_size_deleted += fsize
+                        dataset = Dataset.objects.filter(dataset_file=relpath).first()
+                        if dataset is None:
+                            # NOTE: must be defensive here: the file might have
+                            # moved in the mean-time (#481)
+                            try:
+                                with SafeContext():
+                                    filedate = os.path.getmtime(abspath)
+                                    file_age = datetime.now() - datetime.fromtimestamp(filedate)
+                                    if file_age > timedelta(hours=1):
+                                        cls.logger.warn('No dataset matches file %r, deleting it.',
+                                                        abspath)
+                                        os.remove(abspath)
+                            except OSError:
+                                cls.logger.warn("Failed to remove file %r", abspath)
+                        else:
+                            dataset.dataset_file.delete(save=True)
+                # -- report purging progress
+                cls.logger.info("Purge cycle completed, deleted size %d", tot_size_deleted)
+
+    @classmethod
     def purge(cls,
               max_storage=settings.DATASET_MAX_STORAGE,
               target=settings.DATASET_TARGET_STORAGE):
@@ -1222,18 +1349,7 @@ class Dataset(metadata.models.AccessControl):
             cls.logger.info('Dataset purge triggered at %s over %d files.',
                             filesizeformat(total_size),
                             len(files))
-            active_runs = archive.models.Run.objects.filter(end_time=None)
-
-            def active_datasets(active_runs):
-                for run in active_runs:
-                    for component in run.get_all_atomic_runcomponents():
-                        execrecord = component.execrecord
-                        if execrecord is not None:
-                            for eri in execrecord.execrecordins.all():
-                                yield eri.dataset
-                            for ero in execrecord.execrecordouts.all():
-                                yield ero.dataset
-            active_dataset_ids = set(d.id for d in active_datasets(active_runs))
+            active_dataset_ids = set(d.id for d in Dataset._active_datasets())
             cls.logger.debug('Found %d active datasets.',
                              len(active_dataset_ids))
             while total_size > target and files:
@@ -2013,7 +2129,7 @@ class ExecRecordOut(models.Model):
             # If the input SD has a number of rows, then check that it is coherent.  (If it is -1,
             # then we can't check this.)
             if input_SD.num_rows() != -1:
-                if (self.generic_output.get_min_row() != None and
+                if (self.generic_output.get_min_row() is not None and
                         input_SD.num_rows() < self.generic_output.get_min_row()):
                     if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineStepInputCable):
                         raise ValidationError(
@@ -2024,7 +2140,7 @@ class ExecRecordOut(models.Model):
                             "Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too few rows".
                             format(input_SD, self.generic_output))
 
-                if (self.generic_output.get_max_row() != None and
+                if (self.generic_output.get_max_row() is not None and
                         input_SD.num_rows() > self.generic_output.get_max_row()):
                     if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineStepInputCable):
                         raise ValidationError(

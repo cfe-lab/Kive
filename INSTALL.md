@@ -11,6 +11,7 @@ Before installing Kive, you need to install some other software.
 * the Django REST framework (version 3.3 or higher)
 * PostgreSQL
 * psycopg2 (Python library for interfacing with PostgreSQL)
+* scandir (python module for efficient scanning of a filesystem)
 * pytz
 * OpenMPI (optional, for running Kive on a cluster)
 * mpi4py (optional, for running Kive on a cluster)
@@ -243,6 +244,15 @@ To confirm that the module is installed, start an interactive session by calling
 an `ImportError` then something has gone wrong - for example, the version of
 Python used to install the module is different from the version running the
 interactive session.
+
+Installing scandir
+------------------
+The scandir library is an efficient scanner of the filesystem, Kive uses this when looking for
+files to clean up. scandir will become part of the standard library in python 3.2, but must 
+be installed separately before then. Install it using pip:
+
+   sudo pip install scandir
+
 
 Installing OpenMPI and mpi4py
 -----------------------------
