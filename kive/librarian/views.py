@@ -301,33 +301,33 @@ class BulkDatasetDisplay:
 @login_required
 def datasets_add_archive(request):
     """
-    Add datasets in bulk to db.  Redirect to /datasets_bulk view so user can examine upload status of each dataset.
+    Add datasets in bulk to db from an archive file (zip or tarfile).
+    Redirect to /datasets_bulk view so user can examine upload status of each dataset.
     """
-    # Redirect to page to allow user to view status of added datasets.
     c = {}
-    t = loader.get_template('librarian/datasets_bulk.html')
-    archive_add_dataset_form = None
-
     # If we got posted to, try to create DB entries
     if request.method == 'POST':
         try:
             archive_add_dataset_form = ArchiveAddDatasetForm(
                 data=request.POST,
                 files=request.FILES,
-                user=request.user
+                user=request.user,
             )
-
-            # Try to add new datasets
-            if archive_add_dataset_form.is_valid():
+            # Try to add new datasets. If this fails, we return to our current page
+            is_ok = archive_add_dataset_form.is_valid()
+            if is_ok:
                 add_results = archive_add_dataset_form.create_datasets(request.user)
+                is_ok = len(add_results) > 0
+            if is_ok:
+                t = loader.get_template('librarian/datasets_bulk.html')
             else:
-                # TODO: change this
-                c.update({'archiveAddDatasetForm': archive_add_dataset_form})
+                # give up and let user try again
+                t = loader.get_template('librarian/datasets_add_archive.html')
+                c = {'archiveAddDatasetForm': archive_add_dataset_form}
                 return HttpResponse(t.render(c, request))
 
             # New datasets added, generate a response
             archive_display_results = []
-
             # Fill in default values for the form fields
             for i in range(len(add_results)):
                 archive_display_result = {}
@@ -400,7 +400,7 @@ def datasets_add_bulk(request):
             else:
                 # The form is already annotated with the appropriate errors, so we can bail.
                 c.update({'bulkAddDatasetForm': bulk_add_dataset_form})
-                return HttpResponse(t.render(c))
+                return HttpResponse(t.render(c, request))
 
             # Generate response.
             bulk_display_results = []

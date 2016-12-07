@@ -1,5 +1,5 @@
 <!-- Django template -->
-<!-- Display contents of Methods as a HTML table -->
+<!-- Allow user to choose an archive file -->
 
 {% extends "portal/base.html" %}
 
@@ -87,7 +87,7 @@
 
 <a href="/datasets" rel="prev">Back to uploaded datasets</a>
 
-<h2>Multiple Datasets from Archive</h2>
+<h2>Add Multiple Datasets from Archive</h2>
 
 <form id="datasetArchiveForm" name="datasetArchiveForm" action="" method="post" enctype="multipart/form-data">
 
@@ -97,22 +97,27 @@
     <tr>
         <td><label>{{ archiveAddDatasetForm.dataset_file.label }}</label></td>
         <td>{{ archiveAddDatasetForm.dataset_file }}</td>
+	<td><div class="helptext">{{ archiveAddDatasetForm.dataset_file.help_text }}</div></td>
         <td class="errortext">{{ archiveAddDatasetForm.dataset_file.errors }}</td>
     </tr><tr>
         <td><label>{{ archiveAddDatasetForm.compound_datatype.label }}</label></td>
         <td>{{ archiveAddDatasetForm.compound_datatype }}</td>
+	<td><div class="helptext">{{ archiveAddDatasetForm.compound_datatype.help_text }}</div></td>
         <td class="errortext">{{ archiveAddDatasetForm.compound_datatype.errors }}</td>
     </tr><tr>
         <td><label>{{ archiveAddDatasetForm.name_prefix.label }}</label></td>
         <td>{{ archiveAddDatasetForm.name_prefix }}</td>
+	<td><div class="helptext">{{ archiveAddDatasetForm.name_prefix.help_text }}</div></td>
         <td class="errortext">{{ archiveAddDatasetForm.name_prefix.errors }}</td>
     </tr><tr>
         <td><label>{{ archiveAddDatasetForm.description.label }}</label></td>
         <td>{{ archiveAddDatasetForm.description }}</td>
+	<td><div class="helptext">{{ archiveAddDatasetForm.description.help_text }}</div></td>
         <td class="errortext">{{ archiveAddDatasetForm.description.errors }}</td>
     </tr><tr>
         <td><label>{{ archiveAddDatasetForm.permissions.label }}</label></td>
         <td>{{ archiveAddDatasetForm.permissions }}</td>
+	<td><div class="helptext">{{ archiveAddDatasetForm.permissions.help_text }}</div></td>
         <td class="errortext">{{ archiveAddDatasetForm.permissions.errors }}</td>
     </tr>
 </table>
