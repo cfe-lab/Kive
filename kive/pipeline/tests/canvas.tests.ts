@@ -293,7 +293,9 @@ describe("Canvas classes", function() {
             magnet.y = 27.5;
             magnet.draw(this.expectedCanvas.ctx);
 
-            this.node.status = 'CLEAR';
+            this.ctx.lineWidth = 5;
+            this.ctx.strokeStyle = "green";
+            this.node.highlight(this.ctx);
             this.node.draw(this.ctx);
         });
 
@@ -350,38 +352,6 @@ describe("Canvas classes", function() {
             this.ctx.lineWidth = 4;
             this.node.highlight(this.ctx);
             this.node.draw(this.ctx);
-        });
-
-        xit('should highlight cable', function() {
-            var sourceParent = {},
-                r = 5,
-                attract = 3,
-                source = new Magnet(sourceParent, r, attract),
-                connector = new Connector(source);
-            source.x = 50;
-            source.y = 10;
-            source.label = "example";
-            connector.dest = this.node.in_magnets[0];
-            this.node.in_magnets[0].connected.push(connector);
-            this.node.x = 200;
-            this.expectedCanvas.ctx.strokeStyle = "#7bf";
-            this.expectedCanvas.ctx.lineWidth = 4;
-            this.expectedCanvas.strokeEllipse({x: 200, y: 27.5, rx: 20, ry: 10});
-            this.expectedCanvas.ctx.strokeRect(180, 27.5, 40, 25);
-            this.expectedCanvas.strokeEllipse({x: 200, y: 52.5, rx: 20, ry: 10});
-            this.node.draw(this.expectedCanvas.ctx);
-            connector.draw(this.expectedCanvas.ctx);
-            this.expectedCanvas.ctx.strokeStyle = "#7bf";
-            this.expectedCanvas.ctx.lineWidth = 4;
-            this.expectedCanvas.ctx.font = '9pt Lato, sans-serif';
-            this.expectedCanvas.ctx.textBaseline = 'middle';
-            connector.highlight(this.expectedCanvas.ctx);
-
-            this.ctx.strokeStyle = "#7bf";
-            this.ctx.lineWidth = 4;
-            this.node.highlight(this.ctx);
-            this.node.draw(this.ctx);
-            connector.draw(this.ctx);
         });
 
         it('should have label', function() {
@@ -675,7 +645,9 @@ describe("Canvas classes", function() {
             this.expectedCanvas.ctx.stroke();
             this.node.draw(this.expectedCanvas.ctx);
 
-            this.node.status = "CLEAR";
+            this.ctx.lineWidth = 5;
+            this.ctx.strokeStyle = "green";
+            this.node.highlight(this.ctx);
             this.node.draw(this.ctx);
         });
 
@@ -2105,7 +2077,7 @@ describe("Canvas classes", function() {
                 [7, 8, 9, 10, 11, 12, 13, 14],
                 [15]
             ];
-            var method1 = new MethodNode(0, 0, 0, 0, '#000', '',
+            var method1 = new MethodNode(0, 0, 0, 0, '#000', 'method1',
                 [
                     { structure: null, dataset_id: 0, dataset_name: ''},
                     { structure: null, dataset_id: 1, dataset_name: ''}
@@ -2115,7 +2087,7 @@ describe("Canvas classes", function() {
                     { structure: null, dataset_id: 1, dataset_name: ''}
                 ]
             );
-            var method2 = new MethodNode(0, 0, 0, 0, '#000', '',
+            var method2 = new MethodNode(0, 0, 0, 0, '#000', 'method2',
                 [
                     { structure: null, dataset_id: 0, dataset_name: ''},
                     { structure: null, dataset_id: 1, dataset_name: ''},
@@ -2128,6 +2100,7 @@ describe("Canvas classes", function() {
             var input1 = new RawNode(0, 0);
             var input2 = new RawNode(0, 0);
             var output1 = new OutputNode(0, 0, '');
+            var output2 = new OutputNode(0, 0, '');
 
             var connector1 = new Connector(method1.out_magnets[0]);
             connector1.dest = method2.in_magnets[0];
@@ -2145,9 +2118,24 @@ describe("Canvas classes", function() {
             connector4.dest = method2.in_magnets[2];
             method2.in_magnets[2].connected = [ connector4 ];
 
+            var connector5 = new Connector(input2.out_magnets[0]);
+            connector5.dest = method1.in_magnets[0];
+            method1.in_magnets[0].connected = [ connector5 ];
+
+            var connector6 = new Connector(input2.out_magnets[0]);
+            connector6.dest = method1.in_magnets[1];
+            method1.in_magnets[1].connected = [ connector6 ];
+
+            var connector7 = new Connector(method2.out_magnets[0]);
+            connector7.dest = output2.in_magnets[0];
+            output2.in_magnets[0].connected = [ connector7 ];
+
             method1.out_magnets[0].connected = [ connector1, connector2 ];
             method1.out_magnets[1].connected = [ connector3 ];
             input1.out_magnets[0].connected = [ connector4 ];
+            input2.out_magnets[0].connected = [ connector5, connector6 ];
+            method2.out_magnets[0].connected = [ connector7 ];
+
             /***********/
 
             it("should calculate a matrix's flattened length", function() {
@@ -2180,7 +2168,44 @@ describe("Canvas classes", function() {
             });
 
             xit("should insert a node into a layer safely", function() {
-                // @todo: implement this
+
+                interface NodeOrderArray<T> extends Array<T> {
+                    center_x?: number;
+                }
+
+                let x_spacing = 60,
+                    y_spacing = 130,
+                    exec_order = backdoor.phaseOrderMethods([ method1, method2 ]);
+
+                console.log(exec_order);
+
+                let l1_inmagnets_in_order = exec_order[0].reduce(
+                        (prev, curr) => prev.concat(curr.in_magnets), []
+                    ),
+                    node_order: NodeOrderArray<any> = [ [], exec_order[0] ];
+
+                // Layer 0 is any input node leading to exec_order[0].
+                for (let magnet of l1_inmagnets_in_order) {
+                    let node = magnet.connected[0].source.parent;
+                    if (node_order[0].indexOf(node) === -1) {
+                        node_order[0].push(node);
+                    }
+                }
+
+                for (let i = 0; i < exec_order.length; i++) {
+                    let connected_nodes_in_order = [],
+                        layer = [];
+                    for (let node of exec_order[i]) {
+                        backdoor.addConnectedNodesOut(node, connected_nodes_in_order);
+                        backdoor.addConnectedInputNodesIn(node, node_order[node_order.length - 2], node_order);
+                    }
+                    for (let connected_node of connected_nodes_in_order) {
+                        // `layer` will be added to here
+                        layer = backdoor.insertIntoLayer(connected_node, this.exec_order[i + 1], layer);
+                    }
+                    console.log(layer);
+                    node_order.push(layer);
+                }
 
                 // insertIntoLayer(node: Node, exec_order: MethodNode[], list:Node[]): Node[] {
                     /**

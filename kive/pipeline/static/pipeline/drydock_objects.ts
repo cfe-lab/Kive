@@ -286,13 +286,14 @@ export interface CNode extends CanvasObject {
     out_magnets: Magnet[];
     affects_exec_order: boolean;
     has_unsaved_changes: boolean;
+    status?: string;
 
     /* @todo: investigate where these came from */
     dataset_id?: any;
     run_id?: any;
 }
 
-const statusColorMap = {
+export const statusColorMap = {
         CLEAR: 'green',
         FAILURE: 'red',
         RUNNING: 'orange',
@@ -323,7 +324,7 @@ function deleteFromTemplate(cs: CanvasState) {
  * A base class for all nodes. (RawNode, CdtNode, MethodNode, OutputNode)
  * Doesn't do much yet.
  */
-class BaseNode {
+abstract class BaseNode {
     affects_exec_order = false;
     in_magnets: Magnet[];
     out_magnets: Magnet[];
@@ -480,20 +481,6 @@ class CylinderNode extends BaseNode {
             bottom_ellipse = this.getBottomEllipse(),
             stack = this.getStack();
 
-        // Highlight the method based on status.
-        if (this.highlightStroke !== undefined) {
-            ctx.save();
-            ctx.strokeStyle = this.highlightStroke;
-            ctx.lineWidth = 5;
-            // draw bottom ellipse
-            canvas.strokeEllipse(bottom_ellipse);
-            // draw stack
-            canvas.strokeRect(stack);
-            // draw top ellipse
-            canvas.strokeEllipse(top_ellipse);
-            ctx.restore();
-        }
-
         // draw bottom ellipse
         ctx.fillStyle = this.found_md5 ? this.found_fill : this.fill;
         canvas.drawEllipse(bottom_ellipse);
@@ -619,29 +606,32 @@ export class CdtNode extends BaseNode implements CNode {
     };
 
     draw(ctx: CanvasRenderingContext2D): void {
-        var cx = this.x + this.dx,
-            cy = this.y + this.dy;
+        let cx = this.x + this.dx;
+        let cy = this.y + this.dy;
+        let w2 = this.w / 2;
+        let h2 = this.h / 2;
+        let prism_cap = cy - h2;
+        let prism_base = cy + h2;
 
+        ctx.lineJoin = 'bevel';
         ctx.fillStyle = this.found_md5 ? this.found_fill : this.fill;
 
         // draw base
-        var prism_base = cy + this.h / 2;
         ctx.beginPath();
-        ctx.moveTo(cx - this.w / 2, prism_base);
-        ctx.lineTo(cx, prism_base + this.w / 4);
-        ctx.lineTo(cx + this.w / 2, prism_base);
-        ctx.lineTo(cx + this.w / 2, prism_base - this.h);
-        ctx.lineTo(cx - this.w / 2, prism_base - this.h);
+        ctx.moveTo(cx - w2, prism_base);
+        ctx.lineTo(cx, prism_base + w2 / 2);
+        ctx.lineTo(cx + w2, prism_base);
+        ctx.lineTo(cx + w2, prism_base - this.h);
+        ctx.lineTo(cx - w2, prism_base - this.h);
         ctx.closePath();
         ctx.fill();
 
         // draw top
-        var prism_cap = cy - this.h / 2;
         ctx.beginPath();
-        ctx.moveTo(cx - this.w / 2, prism_cap);
-        ctx.lineTo(cx, prism_cap + this.w / 4);
-        ctx.lineTo(cx + this.w / 2, prism_cap);
-        ctx.lineTo(cx, prism_cap - this.w / 4);
+        ctx.moveTo(cx - w2, prism_cap);
+        ctx.lineTo(cx, prism_cap + w2 / 2);
+        ctx.lineTo(cx + w2, prism_cap);
+        ctx.lineTo(cx, prism_cap - w2 / 2);
         ctx.closePath();
         ctx.fill();
 
@@ -661,21 +651,21 @@ export class CdtNode extends BaseNode implements CNode {
         out_magnet.y = this.y + this.dy + this.w / 8;
     }
     getVertices(): Point[] {
-        var cx = this.x + this.dx,
-            cy = this.y + this.dy;
-
-        var w2 = this.w / 2,
-            butt = cy + this.h / 2,
-            cap  = cy - this.h / 2;
+        let cx = this.x + this.dx;
+        let cy = this.y + this.dy;
+        let w2 = this.w / 2;
+        let h2 = this.h / 2;
+        let prism_cap = cy - h2;
+        let prism_base = cy + h2;
 
         return [
             { x: cx,      y: cy },
-            { x: cx - w2, y: butt },
-            { x: cx,      y: butt + w2 / 2 },
-            { x: cx + w2, y: butt },
-            { x: cx + w2, y: cap },
-            { x: cx,      y: cap - w2 / 2 },
-            { x: cx - w2, y: cap }
+            { x: cx - w2, y: prism_base },
+            { x: cx,      y: prism_base + w2 / 2 },
+            { x: cx + w2, y: prism_base },
+            { x: cx + w2, y: prism_cap },
+            { x: cx,      y: prism_cap - w2 / 2 },
+            { x: cx - w2, y: prism_cap }
         ];
     }
     highlight(ctx): void {
@@ -886,19 +876,6 @@ export class MethodNode extends BaseNode implements CNode {
             this.update_signal.y = vxs[2].y + this.update_signal.r;
             this.update_signal.draw(ctx);
         }
-
-        // Highlight the method based on status.
-        // @todo Move this logic to the CanvasState.draw function.
-        if (typeof this.status === 'string') {
-            ctx.save();
-            ctx.strokeStyle = statusColorMap[this.status] || 'black';
-            ctx.lineWidth = 5;
-            ctx.globalCompositeOperation = 'destination-over';
-            // body
-            this.buildBodyPath(ctx);
-            ctx.stroke();
-            ctx.restore();
-        }
     }
 
     setMagnetPosition() {
@@ -923,7 +900,6 @@ export class MethodNode extends BaseNode implements CNode {
             magnet.x = x_outputs + pos * cos30;
             magnet.y = y_outputs - pos / 2;
         }
-
     }
 
     highlight (ctx: CanvasRenderingContext2D) {
@@ -1705,13 +1681,6 @@ export class OutputNode extends CylinderNode implements CNode {
     }
 
     draw(ctx: CanvasRenderingContext2D) {
-        // Highlight the method based on status.
-        if (this.status) {
-            this.highlightStroke = statusColorMap[this.status] || 'black';
-        } else {
-            this.highlightStroke = undefined;
-        }
-
         this.fill = this.defaultFill;
         super.draw(ctx);
     }
