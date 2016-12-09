@@ -1,8 +1,8 @@
 import {
     CanvasWrapper, MethodNode, CdtNode, RawNode,
     OutputNode, OutputZone, Magnet, Connector
-} from "../static/pipeline/drydock_objects";
-import { CanvasState } from "../static/pipeline/drydock";
+} from "../static/pipeline/canvas/drydock_objects";
+import { CanvasState } from "../static/pipeline/canvas/drydock";
 import "jasmine";
 import 'jasmine-html';
 import 'jquery';

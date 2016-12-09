@@ -4,11 +4,10 @@
  *   (see drydock.js)
  */
 "use strict";
-import { Point, Circle, Ellipse, TextParams, Rectangle } from "./ShapeTypes";
+import { Point, Ellipse, Rectangle, Geometry } from "./geometry";
+import { Circle, TextParams } from "./ShapeTypes";
 import { Bezier } from "./bezier";
-import { Geometry } from "./geometry";
 import { CanvasState } from "./drydock";
-import 'jquery';
 
 export class CanvasWrapper {
 
@@ -293,13 +292,25 @@ export interface CNode extends CanvasObject {
     run_id?: any;
 }
 
-export const statusColorMap = {
-        CLEAR: 'green',
-        FAILURE: 'red',
-        RUNNING: 'orange',
-        READY: 'orange',
-        WAITING: 'yellow'
-    };
+export interface INodeUpdateSignalMap {
+    "no update available": INodeUpdateSignalDefinition;
+    "updated": INodeUpdateSignalDefinition;
+    "updated with issues": INodeUpdateSignalDefinition;
+    "unavailable": INodeUpdateSignalDefinition;
+    "update in progress": INodeUpdateSignalDefinition;
+}
+interface INodeUpdateSignalDefinition {
+    color: string;
+    icon: HTMLImageElement;
+}
+
+export const STATUS_COLOR_MAP = {
+    CLEAR: 'green',
+    FAILURE: 'red',
+    RUNNING: 'orange',
+    READY: 'orange',
+    WAITING: 'yellow'
+};
 
 function removeFromArray(array: Array<any>, obj: any) {
     array.splice(array.indexOf(obj), 1);
@@ -734,7 +745,7 @@ export class CdtNode extends BaseNode implements CNode {
  *  {compounddatatype: pk} }]
  * @param outputs: an array of output details, same structure
  * @param status: describes progress during a run, possible values are the
- *  keys in statusColorMap
+ *  keys in STATUS_COLOR_MAP
  */
 export class MethodNode extends BaseNode implements CNode {
 
@@ -1190,7 +1201,7 @@ export class Connector implements CanvasObject {
                 dir: 1,
                 style: "connector"});
             ctx.restore();
-            $(ctx.canvas).css("cursor", "none");
+            ctx.canvas.style.cursor = "none";
         }
         else {
             // Recolour this path if the statuses of the source and dest are meaningful
@@ -1211,7 +1222,7 @@ export class Connector implements CanvasObject {
                 }
             }
 
-            ctx.strokeStyle = statusColorMap[cable_stat] || ctx.strokeStyle;
+            ctx.strokeStyle = STATUS_COLOR_MAP[cable_stat] || ctx.strokeStyle;
         }
 
         ctx.beginPath();
@@ -1511,19 +1522,24 @@ class NodeUpdateSignal {
     y: number;
     r: number = 10;
     status: string;
-    status_opts = (function() {
-        var imgs: any = {},
-            pngprefix = "data:image/png;base64,",
-            icon64 = {
-                /* tslint:disable:max-line-length */
-                check: /*inline update-check:*/"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAAAtUExURUxpcf///////////////////////////////////////////////////////3EAnbYAAAAOdFJOUwAQcO9QQCCfj8+/MN+vrAj6JgAAAGFJREFUCNdjYEAFTgIQmuVdAYSRDGOse5wAppnePYEI7Ht3gYFBvJCBYd4boCa9Vwwc754Chf3eKcS9awAyeN+ZnnsJUsho9+7da7CWuHfvFMAMjnevIIYwzjOD2iwCNh4AiZcdZAU+g5sAAAAASUVORK5CYII=",
-                question: /*inline update-question:*/"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAAAzUExURUxpcf////////////////////////////////////////////////////////////////Hv/K4AAAAQdFJOUwCfgFBgvyDvMECvzxCPcN9FpKciAAAAaElEQVQY01WO6xbAEAyDy1C1W97/addlzPH9IZFGRZxy7sAeD+kkBdH6acNAC43mtyTH5blAw5+Mk0CmoVCe2zAsMmD/CKn5ba1T8+c0A9FlKFO/hSYLtaw6qW6LoWOHwQ20tSK3vsMDBq4EkJmvtUUAAAAASUVORK5CYII=",
-                x: /*inline update-x:*/"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAAAbUExURUxpcf///////////////////////////////+WJFuQAAAAIdFJOUwCfEM+AcI+vhS7NcwAAAFlJREFUCNdjYIABJlcFIBmiwMDSYcTAwNghwMDa0azAINHhwAAkDBg7GhlAwo0SQBkGkFBHO1gfYwdIPYQBlgFJNUIEmiGKJTqMwNrhBsKtYEoDWRqoAHcFAAWbFYtiUTTsAAAAAElFTkSuQmCC",
-                refresh: /*inline update-refresh:*/"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAAAzUExURUxpcf////////////////////////////////////////////////////////////////Hv/K4AAAAQdFJOUwCfQL/fj1AQ73BgIDDPgK825B7lAAAAg0lEQVQY001PWxLEIAxCjY+obXP/0y6mjl0+nBARECBmEDMJAxvZNjJKIQ92IDaBm8PFi3JxaEBtZmE97BzsAZTCuhbxpkSB5OeLWoZHnDhEpTh+fLpdjfgrRNdilnJxC+b0t2frizOlVY8x6XEq/7MEsPZVXw1nrrpX7RQamkSSeuEf5C8HP4rTRNYAAAAASUVORK5CYII="
-                /* tslint:enable:max-line-length */
-            };
+    status_opts: INodeUpdateSignalMap = (function() {
+        let pngprefix = "data:image/png;base64,";
+        let imgs: {
+            check?: HTMLImageElement;
+            question?: HTMLImageElement;
+            x?: HTMLImageElement;
+            refresh?: HTMLImageElement;
+        } = { };
+        let icon64 = {
+            /* tslint:disable:max-line-length */
+            check: /*inline update-check:*/"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAAAtUExURUxpcf///////////////////////////////////////////////////////3EAnbYAAAAOdFJOUwAQcO9QQCCfj8+/MN+vrAj6JgAAAGFJREFUCNdjYEAFTgIQmuVdAYSRDGOse5wAppnePYEI7Ht3gYFBvJCBYd4boCa9Vwwc754Chf3eKcS9awAyeN+ZnnsJUsho9+7da7CWuHfvFMAMjnevIIYwzjOD2iwCNh4AiZcdZAU+g5sAAAAASUVORK5CYII=",
+            question: /*inline update-question:*/"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAAAzUExURUxpcf////////////////////////////////////////////////////////////////Hv/K4AAAAQdFJOUwCfgFBgvyDvMECvzxCPcN9FpKciAAAAaElEQVQY01WO6xbAEAyDy1C1W97/addlzPH9IZFGRZxy7sAeD+kkBdH6acNAC43mtyTH5blAw5+Mk0CmoVCe2zAsMmD/CKn5ba1T8+c0A9FlKFO/hSYLtaw6qW6LoWOHwQ20tSK3vsMDBq4EkJmvtUUAAAAASUVORK5CYII=",
+            x: /*inline update-x:*/"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQBAMAAADt3eJSAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAAAbUExURUxpcf///////////////////////////////+WJFuQAAAAIdFJOUwCfEM+AcI+vhS7NcwAAAFlJREFUCNdjYIABJlcFIBmiwMDSYcTAwNghwMDa0azAINHhwAAkDBg7GhlAwo0SQBkGkFBHO1gfYwdIPYQBlgFJNUIEmiGKJTqMwNrhBsKtYEoDWRqoAHcFAAWbFYtiUTTsAAAAAElFTkSuQmCC",
+            refresh: /*inline update-refresh:*/"iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAABGdBTUEAALGPC/xhBQAAAAFzUkdCAK7OHOkAAAAzUExURUxpcf////////////////////////////////////////////////////////////////Hv/K4AAAAQdFJOUwCfQL/fj1AQ73BgIDDPgK825B7lAAAAg0lEQVQY001PWxLEIAxCjY+obXP/0y6mjl0+nBARECBmEDMJAxvZNjJKIQ92IDaBm8PFi3JxaEBtZmE97BzsAZTCuhbxpkSB5OeLWoZHnDhEpTh+fLpdjfgrRNdilnJxC+b0t2frizOlVY8x6XEq/7MEsPZVXw1nrrpX7RQamkSSeuEf5C8HP4rTRNYAAAAASUVORK5CYII="
+            /* tslint:enable:max-line-length */
+        };
 
-        for (var i in icon64) if (icon64.hasOwnProperty(i)) {
+        for (let i in icon64) {
             imgs[i] = new Image();
             imgs[i].src = pngprefix + icon64[i];
         }

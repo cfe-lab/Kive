@@ -1,8 +1,8 @@
 "use strict";
 
-import { CanvasState } from "../static/pipeline/drydock";
-import { PipelineSubmit } from "../static/pipeline/pipeline_submit";
-import { RawNode, MethodNode, OutputNode, Connector } from "../static/pipeline/drydock_objects";
+import { CanvasState } from "../static/pipeline/canvas/drydock";
+import { buildPipelineSubmit } from "../static/pipeline/io/pipeline_submit";
+import { RawNode, MethodNode, OutputNode, Connector } from "../static/pipeline/canvas/drydock_objects";
 import "jasmine";
 import 'jasmine-html';
 import 'jquery';
@@ -130,7 +130,7 @@ describe("Pipeline Submit class", function() {
 
         afterEach(function() {
             expect(function() {
-                PipelineSubmit.buildSubmit.apply(null, args);
+                buildPipelineSubmit.apply(null, args);
             }).toThrow();
         });
 
@@ -162,7 +162,7 @@ describe("Pipeline Submit class", function() {
 
         afterEach(function() {
             expect(function() {
-                PipelineSubmit.buildSubmit.apply(null, args);
+                buildPipelineSubmit.apply(null, args);
             }).not.toThrow();
         });
 
@@ -190,7 +190,7 @@ describe("Pipeline Submit class", function() {
         });
 
         beforeEach(function() {
-            built_submit = PipelineSubmit.buildSubmit.apply(null, args);
+            built_submit = buildPipelineSubmit.apply(null, args);
             jasmine.Ajax.install();
         });
 
@@ -295,7 +295,7 @@ describe("Pipeline Submit class", function() {
     it('should submit a new pipeline revision to an empty pipeline family', function() {
         mockPipeline();
         args[1] = "add";
-        built_submit = PipelineSubmit.buildSubmit.apply(null, args);
+        built_submit = buildPipelineSubmit.apply(null, args);
         jasmine.Ajax.install();
 
         built_submit(new Event('submit'));
@@ -326,7 +326,7 @@ describe("Pipeline Submit class", function() {
         mockPipeline();
         args[1] = "revise";
         args[7] = 1;
-        built_submit = PipelineSubmit.buildSubmit.apply(null, args);
+        built_submit = buildPipelineSubmit.apply(null, args);
         jasmine.Ajax.install();
 
         built_submit(new Event('submit'));

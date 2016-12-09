@@ -1,6 +1,6 @@
 /* Pipeline-specific formatting. */
 html body {
-    background-image: url("/static/pipeline/isogrid.png");
+    background-image: url("/static/pipeline/img/isogrid.png");
 }
 #inner_wrap {
     margin-bottom: 0 !important;

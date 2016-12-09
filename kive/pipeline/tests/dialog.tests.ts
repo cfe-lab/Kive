@@ -1,8 +1,8 @@
 "use strict";
 
 import { MethodDialog, Dialog, InputDialog, OutputDialog } from "../static/pipeline/pipeline_dialogs";
-import { MethodNode, CdtNode, OutputNode } from "../static/pipeline/drydock_objects";
-import { REDRAW_INTERVAL, CanvasState } from "../static/pipeline/drydock";
+import { MethodNode, CdtNode, OutputNode } from "../static/pipeline/canvas/drydock_objects";
+import { REDRAW_INTERVAL, CanvasState } from "../static/pipeline/canvas/drydock";
 import "jasmine";
 import 'jasmine-html';
 import 'jquery';

@@ -1,6 +1,6 @@
 
-import { RawNode, CdtNode, MethodNode, OutputNode } from "./drydock_objects";
-import { CanvasState } from "./drydock";
+import { RawNode, CdtNode, MethodNode, OutputNode } from "./canvas/drydock_objects";
+import { CanvasState } from "./canvas/drydock";
 import 'jquery';
 
 /**
@@ -146,9 +146,9 @@ export class Dialog {
      */
     validateInitialization() {
         for (let propertyName in this) {
-            if (propertyName[0] === "$" && this[propertyName].constructor === $) {
-                if (this[propertyName].length === 0) {
-                    throw "Error in dialog: could not find " + this[propertyName].selector + " in template";
+            if (propertyName[0] === "$" && this[propertyName]['constructor'] === $) {
+                if (this[propertyName]['length'] === 0) {
+                    throw "Error in dialog: could not find " + this[propertyName]['selector'] + " in template";
                 }
             }
         }
@@ -1008,7 +1008,7 @@ export class OutputDialog extends NodePreviewDialog {
                 this.reset();
             } else {
                 /* Non-unique name entered */
-                this.$error.html('<img src="/static/pipeline/warning_icon.png"> That name has already been used.');
+                this.$error.html('<img src="/static/pipeline/img/warning_icon.png"> That name has already been used.');
             }
         } else {
             let pos = this.translateToOtherCanvas(canvasState);
@@ -1018,7 +1018,7 @@ export class OutputDialog extends NodePreviewDialog {
                 // required field
                 this.$error.text("Label is required.");
             } else if (!CanvasState.isUniqueName(canvasState.getOutputNodes(), label)) {
-                this.$error.html('<img src="/static/pipeline/warning_icon.png"> That name has already been used.');
+                this.$error.html('<img src="/static/pipeline/img/warning_icon.png"> That name has already been used.');
             } else {
                 let shape = new OutputNode(pos.left, pos.top, label);
                 canvasState.addShape(shape);

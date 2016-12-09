@@ -6,7 +6,7 @@
 "use strict";
 import {
     CanvasObject, CNode, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet, Connector,
-    CanvasWrapper, statusColorMap
+    CanvasWrapper, STATUS_COLOR_MAP
 } from "./drydock_objects";
 import { Geometry, Point, Rectangle } from "./geometry";
 import 'jquery';
@@ -366,6 +366,10 @@ export class CanvasState {
 
         this.valid = false;
     };
+
+    getAspectRatio(): [ number, number ] {
+        return [ this.width / this.scale, this.height / this.scale ];
+    }
 
     /*
      * Helper functions for CanvasState.autoLayout.
@@ -1153,7 +1157,7 @@ export class CanvasState {
         // draw colour-coded statuses
         ctx.lineWidth = 5;
         for (let shape of this.shapes.filter(shape => shape.status)) {
-            ctx.strokeStyle = statusColorMap[shape.status] || 'black';
+            ctx.strokeStyle = STATUS_COLOR_MAP[shape.status] || 'black';
             shape.highlight(ctx);
         }
 

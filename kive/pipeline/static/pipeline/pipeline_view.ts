@@ -1,32 +1,26 @@
 "use strict";
 
 import { CanvasState, CanvasListeners, Pipeline, REDRAW_INTERVAL } from "./pipeline_all";
-import 'jquery';
-import '/static/portal/noxss.js';
 
-declare var noXSS: any;
-noXSS();
+const DICT_ID = 'pipeline_dict';
+const CANVAS_ID = 'pipeline_canvas';
+const WRAPPER_ID = 'inner_wrap';
 
-let pipeline_dict_raw = $("#pipeline_dict").text();
+let id = document.getElementById.bind(document);
 let pipeline_dict;
-
 try {
-    pipeline_dict = JSON.parse(pipeline_dict_raw);
+    pipeline_dict = JSON.parse(id(DICT_ID).innerHTML);
 } catch (e) {
     console.error("Could not load pipeline dict from memory.");
 }
-
 if (pipeline_dict) {
-    // initialize animated canvas
-    let canvas  = document.getElementById('pipeline_canvas') as HTMLCanvasElement;
-    canvas.width  = $('#inner_wrap').width() * 0.7;
+    let canvas = id(CANVAS_ID) as HTMLCanvasElement;
+    canvas.width  = id(WRAPPER_ID).clientWidth * 0.7;
     canvas.height = Math.min(window.innerHeight, canvas.width * .75);
-
-    let canvasState = new CanvasState(canvas, false, REDRAW_INTERVAL);
-    canvasState.scale = 0.7;
-    CanvasListeners.initMouseListeners(canvasState);
-
-    let pipeline = new Pipeline(canvasState);
+    let cstate = new CanvasState(canvas, false, REDRAW_INTERVAL);
+    cstate.setScale(0.7);
+    CanvasListeners.initMouseListeners(cstate);
+    let pipeline = new Pipeline(cstate);
     pipeline.load(pipeline_dict);
     pipeline.draw();
 }
