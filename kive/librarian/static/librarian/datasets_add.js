@@ -1,46 +1,91 @@
-$(function() {
-
-    if ($("#id_single-externalfiledirectory").val() === "") {
-        $("#id_single-external_path").prop("disabled", true);
-        $("#id_single-save_in_db").prop("disabled", true);
-        $("#id_single-save_in_db").prop("checked", true);
+document.addEventListener("DOMContentLoaded", function(event) {
+    "use strict";
+    
+    var id = document.getElementById.bind(document);
+    
+    // Helper function that formats the file sizes
+    var filesize_units = [ 'B', 'KB', 'MB', 'GB', 'TB', 'PB' ];
+    function formatFileSize(bytes) {
+        if (typeof bytes !== 'number') {
+            return '';
+        }
+        var i = 0;
+        while (bytes > 1024 && filesize_units[i + 1]) {
+            bytes /= 1024;
+            i++;
+        }
+        if (i) {
+            bytes = bytes.toFixed(2);
+        }
+        
+        return bytes + ' ' + filesize_units[i];
     }
-
-    function setName(path) {
-        var split_path = path.split(/[\\/]/);
-        var filename_split_by_periods = split_path[split_path.length - 1].split(".");
-        var fn_no_ext = filename_split_by_periods[0];
-        if (filename_split_by_periods.length > 1) {
-            fn_no_ext = filename_split_by_periods.slice(0, -1).join(".");
-        }
-        $("#id_single-name").val(fn_no_ext);
+    
+    if (!(window.File && window.FileReader && window.FileList && window.Blob)) {
+        console.error('Unsupported browser');
     }
-
-    $("#id_single-dataset_file").on("change", function () {
-        setName($(this).val());
-    });
-
-    $("#id_single-externalfiledirectory").on("change", function () {
-        var efd_id = this.value;
-        var options = [];
-
-        if (efd_id === "") {
-            $("#id_single-external_path").val("");
-            $("#id_single-external_path").prop("disabled", true);
-            $("#id_single-dataset_file").prop("disabled", false);
-            $("#id_single-save_in_db").prop("disabled", true);
-            $("#id_single-save_in_db").prop("checked", true);
+    
+    // Hide loading gif
+    var loading = id('loading');
+    loading.style.display = 'none';
+    
+    /*
+     * Live uploading not currently implemented.
+     * If implementing, remember that jQuery has been removed from this page.
+    
+    var $uploadProgressTable = $('#uploadProgressTable');
+    id("id_dataset_files").addEventListener('change', function() {
+        // clear contents of Upload Progress Table
+        
+        $uploadProgressTable.find('tbody').remove();
+        
+        var fileList = id('id_dataset_files').files;
+        console.log('changed', fileList);
+        var rows = [];
+        for (var i = 0; i < fileList.length; i++) {
+            var f = fileList[i];
+            rows.push($('<tr>').append([
+                $('<td>').text(f.name),
+                $('<td>').text(formatFileSize(f.size)),
+                $('<td>'), $('<td>'),
+                $('<td>'), $('<td>')
+            ]));
         }
-        else {
-            $("#id_single-external_path").prop("disabled", false);
-            $("#id_single-dataset_file").val("");
-            $("#id_single-dataset_file").prop("disabled", true);
-            $("#id_single-save_in_db").prop("disabled", false);
-            $("#id_single-save_in_db").prop("checked", false);
-        }
+        $uploadProgressTable.append(rows);
     });
-
-    $("#id_single-external_path").on("keyup", function () {
-        setName($(this).val());
-    });
+    
+    */
+    
+    var archiveSubmit = id('archiveSubmit');
+    var bulkSubmit = id('bulkSubmit');
+    
+    if (archiveSubmit) {
+        archiveSubmit.addEventListener('submit', function () {
+            // disable the submit button until after the files have been uploaded and the datasets have been created.
+            archiveSubmit.setAttribute("disabled", true);
+        
+            // Indicate to user that we are going to wait a long time
+            loading.style.display = 'block';
+    
+            // Update mode? (not currently implemented)
+            // if (!$("#editButton").is(":disabled")) {
+            //     id("datasetArchiveForm").action = "/datasets_update_bulk";
+            // }
+        });
+    }
+    
+    if (bulkSubmit) {
+        bulkSubmit.addEventListener('submit', function () {
+            // disable the submit button until after the files have been uploaded and the datasets have been created.
+            bulkSubmit.setAttribute("disabled", true);
+        
+            // Indicate to user that we are going to wait a long time
+            loading.style.display = 'block';
+        
+            // Update mode? (not currently implemented)
+            // if (!$("#editButton").is(":disabled")) {
+            //     id("datasetBulkForm").action = "/datasets_update_bulk";
+            // }
+        });
+    }
 });

@@ -7,71 +7,7 @@
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
-    <script src="/static/portal/jquery-ui-1.10.4.custom.min.js"></script>
-    <script>
-        // Helper function that formats the file sizes
-        function formatFileSize(bytes) {
-            if (typeof bytes !== 'number') {
-                return '';
-            }
-            else if (bytes >= 1099511627776) {
-                return (bytes / 1099511627776).toFixed(2) + ' TB';
-            }
-            else if (bytes >= 1073741824) {
-                return (bytes / 1073741824).toFixed(2) + ' GB';
-            }
-            else if (bytes >= 1048576) {
-                return (bytes / 1048576).toFixed(2) + ' MB';
-            }
-            else if (bytes >= 1024) {
-                return (bytes / 1024).toFixed(2) + ' KB';
-            }
-            return bytes + ' B';
-        }
-
-        $(function(readEvent){
-
-            if (!(window.File && window.FileReader && window.FileList && window.Blob)) {
-              console.error('Unsupported browser');
-            }
-
-            // Hide loading gif
-            $("#loading").hide();
-
-            $("#id_dataset_files").change(function(changeEvt) {
-                // clear contents of Upload Progress Table
-                $('#uploadProgressTable tbody').remove();
-
-                var fileList = $('#id_dataset_files')[0].files;
-                for (var i= 0; i < fileList.length; i++) {
-                    var f = fileList[i];
-                    var newDatasetRow =
-                        '<tr>' +
-                        '<td>' + f.name + '</td>' +
-                        '<td>' + formatFileSize(f.size) + '</td>' +
-                        '<td></td>' +  // Dataset Name
-                        '<td></td>' +  // Dataset Description
-                        '<td></td>' +  // Dataset MD5
-                        '<td></td>' +  // Dataset status
-                        '</tr>';
-                    $('#uploadProgressTable').append(newDatasetRow);
-                }
-            });
-
-            $("#archiveSubmit").submit(function(submitEvent){
-                //disable the submit button until after the files have been uploaded and the datasets have been created.
-                $("#archiveSubmit").attr("disabled", true);
-
-                // Indicate to user that we are going to wait a long time
-                $("#loading").show();
-
-                // Update mode?
-                if (!$("#editButton").is(":disabled")) {
-                    $("#datasetArchiveForm").action = "/datasets_update_bulk";
-                }
-            });
-        });
-    </script>
+    <script src="/static/librarian/datasets_add.js"></script>
 {% endblock %}
 
 {% block stylesheets %}
@@ -86,7 +22,7 @@
 
 <a href="/datasets" rel="prev">Back to uploaded datasets</a>
 
-<h2>Add Multiple Datasets from Archive</h2>
+<h2>Add Datasets from Archive</h2>
 
 <form id="datasetArchiveForm" name="datasetArchiveForm" action="" method="post" enctype="multipart/form-data">
 
@@ -156,7 +92,7 @@
 
 <div class="errorStrip errortext">{{ bulkAddDatasetForm.non_field_errors }}</div>
 <div id="loading" class="loading_container">
-    <p><img src="loading.gif" class="loading_img"/>Please Wait...</p>
+    <p><img src="/static/sandbox/preload.gif" class="loading_img"/>Please Wait...</p>
 </div>
 </form>
 {% endblock %}
