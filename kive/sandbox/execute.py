@@ -4,7 +4,6 @@ from collections import defaultdict
 import logging
 import os
 import random
-import shutil
 import tempfile
 import time
 import itertools
@@ -25,6 +24,7 @@ from method.models import Method
 from datachecking.models import IntegrityCheckLog
 from fleet.exceptions import StopExecution
 from fleet.slurmlib import SlurmScheduler
+from file_access_utils import copy_and_confirm, FileCreationError
 
 
 logger = logging.getLogger("Sandbox")
@@ -45,7 +45,6 @@ class Sandbox:
     once in a Sandbox. To run the same Pipeline again, you must create a new
     Sandbox.
     """
-
     # dataset_fs_map: maps Dataset to a FS path: the path where a data
     # file would be if it were created (Whether or not it is there)
     # If the path is None, the Dataset is on the DB.
@@ -615,6 +614,7 @@ class Sandbox:
                                   "as started, and handling its input cables.",
                                   curr_RS, curr_RS.get_coordinates())
                 curr_RS.start(save=True)  # transition: Pending->Running
+                _in_dir, _out_dir, log_dir = self._setup_step_paths(run_dir, False)
 
                 # We start all of the RunSICs in motion.  If they all successfully reuse,
                 # we advance the sub-pipeline.
@@ -630,7 +630,8 @@ class Sandbox:
                         input_cable,
                         curr_RS,
                         step_inputs[input_cable.dest.dataset_idx-1],
-                        cable_path
+                        cable_path,
+                        log_dir
                     )
                     cable_info_list.append(cable_exec_info)
 
@@ -675,7 +676,6 @@ class Sandbox:
                         return incables_completed, steps_completed, outcables_completed
 
                 # Bundle up the information required to process this step.
-                _in_dir, _out_dir, log_dir = self._setup_step_paths(run_dir, False)
                 # Construct output_paths.
                 output_paths = [self.step_xput_path(curr_RS, x, run_dir) for x in step.outputs]
                 execute_info = RunStepExecuteInfo(curr_RS, self.user, cable_info_list, None, run_dir, log_dir,
@@ -767,10 +767,11 @@ class Sandbox:
             source_dataset = None
             fed_by_newly_completed = False
 
+            feeder_pipeline_step = pipeline_to_resume.steps.get(step_num=outcable.source_step)
             if outcable.source_step in step_nums_completed:
                 source_dataset = self.socket_map[(
                     run_to_resume,
-                    pipeline_to_resume.steps.get(step_num=outcable.source_step),
+                    feeder_pipeline_step,
                     outcable.source
                 )]
                 fed_by_newly_completed = True
@@ -798,7 +799,14 @@ class Sandbox:
             file_suffix = "raw" if outcable.is_raw() else "csv"
             out_file_name = "run{}_{}.{}".format(run_to_resume.pk, outcable.output_name, file_suffix)
             output_path = os.path.join(self.out_dir, out_file_name)
-            cable_exec_info = self.reuse_or_prepare_cable(outcable, run_to_resume, source_dataset, output_path)
+            source_step_execution_info = self.step_execute_info[(run_to_resume, feeder_pipeline_step)]
+            cable_exec_info = self.reuse_or_prepare_cable(
+                outcable,
+                run_to_resume,
+                source_dataset,
+                output_path,
+                source_step_execution_info.log_dir
+            )
 
             cr = cable_exec_info.cable_record
 
@@ -823,7 +831,8 @@ class Sandbox:
 
         return incables_completed, steps_completed, outcables_completed
 
-    def reuse_or_prepare_cable(self, cable, parent_record, input_dataset, output_path):
+    def reuse_or_prepare_cable(self, cable, parent_record, input_dataset, output_path,
+                               log_dir):
         """
         Attempt to reuse the cable; prepare it for finishing if unable.
         """
@@ -922,22 +931,18 @@ class Sandbox:
         # or that it's fed by (RunOutputCable), and the input/output that it feeds/is fed by.
         # We need this so that we can write the stderr and stdout to the appropriate locations.
         if isinstance(curr_record, RunSIC):
-            parent_step = curr_record.runstep
             cable_idx = curr_record.component.dest.dataset_idx
             cable_type_str = "input"
         else:
-            # This is the step that feeds the cable.
-            parent_step = curr_record.run.runsteps.get(pipelinestep__step_num=curr_record.source_step)
             cable_idx = curr_record.component.source.dataset_idx
             cable_type_str = "output"
-        parent_step_info = self.cable_execute_info[(parent_step.parent_run, parent_step.pipelinestep)]
 
         exec_info.set_stdout_path(
-            os.path.join(parent_step_info.log_dir,
+            os.path.join(log_dir,
                          "{}{}_stdout.txt".format(cable_type_str, cable_idx))
         )
         exec_info.set_stderr_path(
-            os.path.join(parent_step_info.log_dir,
+            os.path.join(log_dir,
                          "{}{}_stderr.txt".format(cable_type_str, cable_idx))
         )
 
@@ -1071,6 +1076,8 @@ class Sandbox:
         curr_RS = step_plan.run_step
         curr_RS.start()
 
+        _in_dir, _out_dir, log_dir = self._setup_step_paths(step_run_dir, False)
+
         assert not pipelinestep.is_subpipeline()
 
         # Note: bad inputs will be caught by the cables.
@@ -1088,7 +1095,13 @@ class Sandbox:
             # The cable that feeds this input and where it will write its eventual output.
             corresp_cable = pipelinestep.cables_in.get(dest=curr_input)
             cable_path = self.step_xput_path(curr_RS, curr_input, step_run_dir)
-            cable_exec_info = self.reuse_or_prepare_cable(corresp_cable, curr_RS, inputs[i], cable_path)
+            cable_exec_info = self.reuse_or_prepare_cable(
+                corresp_cable,
+                curr_RS,
+                inputs[i],
+                cable_path,
+                log_dir
+            )
             cable_info_list.append(cable_exec_info)
 
             # If the cable was cancelled (e.g. due to bad input), we bail.
@@ -1116,9 +1129,6 @@ class Sandbox:
                 return curr_RS
 
         # Having reached here, we know that all input cables are either fit for reuse or ready to go.
-
-        # Bundle up the information required to process this step.
-        _in_dir, _out_dir, log_dir = self._setup_step_paths(step_run_dir, False)
 
         # Construct output_paths.
         output_paths = [self.step_xput_path(curr_RS, x, step_run_dir) for x in pipelinestep.outputs]
@@ -1490,13 +1500,21 @@ class Sandbox:
 
             copy_start = timezone.now()
             fail_now = False
-            try:
-                shutil.copyfile(file_path, input_dataset_path)
-            except IOError:
-                copy_end = timezone.now()
-                logger.error("could not copy file %s to file %s.",
-                             file_path, input_dataset_path)
 
+            try:
+                copy_and_confirm(file_path, input_dataset_path)
+            except IOError:
+                logger.error("Could not copy file %s to file %s.",
+                             file_path, input_dataset_path)
+                fail_now = True
+            except FileCreationError as e:
+                logger.error(str(e))
+                fail_now = True
+            finally:
+                copy_end = timezone.now()
+
+            if fail_now:
+                # Create a failed IntegrityCheckLog.
                 with transaction.atomic():
                     # Create a failed IntegrityCheckLog.
                     iic = IntegrityCheckLog(
@@ -1509,56 +1527,20 @@ class Sandbox:
                     )
                     iic.clean()
                     iic.save()
-                    fail_now = True
 
-            if not fail_now:
-                # A bit of defensive code to ensure that the file copied properly.
-                orig_file_size = os.stat(file_path).st_size
-
-                num_tries = 0
-                total_wait_time = 0
-                while num_tries < 3:
-                    num_tries += 1
-                    new_file_size = os.stat(input_dataset_path).st_size
-                    if new_file_size == orig_file_size:
-                        # Looks like the file copied properly.
-                        break
-
-                    if num_tries < 3:
-                        wait_time = random.uniform(3, 7)
-                        logger.warning("file %s appears to not be finished copying to %s; "
-                                       "waiting %f seconds before retrying.",
-                                       file_path, input_dataset_path, wait_time)
-                        time.sleep(wait_time)
-                        total_wait_time += wait_time
-                    else:
-                        copy_end = timezone.now()
-                        logger.warning("file %s failed to copy to %s; "
-                                       "checked three times over %f seconds.",
-                                       file_path, input_dataset_path, total_wait_time)
-
-                        with transaction.atomic():
-                            # Create a failed IntegrityCheckLog.
-                            iic = IntegrityCheckLog(
-                                dataset=input_dataset,
-                                runcomponent=curr_record,
-                                read_failed=True,
-                                start_time=copy_start,
-                                end_time=copy_end,
-                                user=user
-                            )
-                            iic.clean()
-                            iic.save()
-                            fail_now = True
-
-            if not fail_now:
+            else:
                 # Perform an integrity check since we've just copied this file to the sandbox for the
                 # first time.
                 logger.debug("Checking file just copied to sandbox for integrity.")
-                check = input_dataset.check_integrity(input_dataset_path, user, execlog=None, runcomponent=curr_record)
-
+                check = input_dataset.check_integrity(
+                    input_dataset_path,
+                    user,
+                    execlog=None,
+                    runcomponent=curr_record
+                )
                 fail_now = check.is_fail()
 
+            # Check again in case it failed in the previous else block.
             if fail_now:
                 curr_record.cancel_running(save=True)
                 return curr_record
@@ -1577,7 +1559,13 @@ class Sandbox:
         curr_log = ExecLog.create(curr_record, invoking_record)
 
         # Run cable (this completes the ExecLog).
-        cable.run_cable(input_dataset_path, output_path, curr_record, curr_log)
+        cable_failed = False
+        try:
+            md5 = cable.run_cable(input_dataset_path, output_path, curr_record, curr_log)
+        except OSError:
+            cable_failed = True
+        except FileCreationError:
+            cable_failed = True
 
         # Here, we're authoring/modifying an ExecRecord, so we use a transaction.
         preexisting_ER = curr_ER is not None
@@ -1587,7 +1575,8 @@ class Sandbox:
                 with transaction.atomic():
                     missing_output = False
                     start_time = timezone.now()
-                    if not file_access_utils.file_exists(output_path):
+
+                    if cable_failed:
                         end_time = timezone.now()
                         # It's conceivable that the linking could fail in the
                         # trivial case; in which case we should associate a "missing data"
@@ -1633,7 +1622,8 @@ class Sandbox:
                                 name=dataset_name,
                                 description=dataset_desc,
                                 file_source=curr_record,
-                                check=False
+                                check=False,
+                                precomputed_md5=md5
                             )
 
                     # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
@@ -1676,7 +1666,8 @@ class Sandbox:
                         cable.is_trivial() or recover):
                     logger.debug("Performing integrity check of trivial or previously generated output")
                     # Perform integrity check.  Note: if this fails, it will notify all RunComponents using it.
-                    check = output_dataset.check_integrity(output_path, user, curr_log)
+                    check = output_dataset.check_integrity(output_path, user, curr_log,
+                                                           newly_computed_MD5=md5)
 
                 # Case 3: the Dataset, one way or another, is not properly vetted.
                 else:
@@ -1838,11 +1829,21 @@ class Sandbox:
                     curr_ER.quarantine_runcomponents()  # this is transaction'd
 
             # Install the code.
-            method.install(step_run_dir)
+            # FIXME double-check that this is reasonable tomorrow
+            # Also keep checking on all instances of method.install
+            try:
+                method.install(step_run_dir)
+            except (IOError, FileCreationError):
+                logger.error("Method code failed to install; stopping step.",
+                             exc_info=True)
+                curr_log.start()
+                curr_log.methodoutput.install_failed = True
+                curr_log.methodoutput.save()
+                curr_log.stop(save=True, clean=False)
+                curr_RS.finish_failure(save=True)
+                curr_RS.complete_clean()
 
         except KeyboardInterrupt:
-            # Execution was stopped somewhere outside of run_code (that would
-            # have been caught above).
             curr_RS.cancel_running(save=True)
             raise StopExecution(
                 "Execution of step {} (method {}) was stopped during setup.".format(
@@ -1865,26 +1866,30 @@ class Sandbox:
         # are in their right places.
         curr_RS = step_execute_info.runstep
 
-        cable_info_dicts = step_execute_info["cable_info_dicts"]
-        output_paths = step_execute_info["output_paths"]
-
-        input_paths = [x["output_path"] for x in cable_info_dicts]
+        input_paths = [x.output_path for x in step_execute_info.cable_info_list]
         # Driver name
         driver = curr_RS.pipelinestep.transformation.definite.driver
+
+        job_name = "run{}_step{}_driver[{}]".format(
+            curr_RS.top_level_run.pk,
+            curr_RS.get_coordinates(),
+            driver.coderesource.filename
+        )
 
         logger.debug("Submitting driver '%s', task_pk %d", driver.coderesource.filename, curr_RS.pk)
         job_handle = curr_RS.pipelinestep.transformation.definite.submit_code(
             step_execute_info.step_run_dir,
             input_paths,
-            output_paths,
+            step_execute_info.output_paths,
             step_execute_info.driver_stdout_path(),
             step_execute_info.driver_stderr_path(),
-            self.uid,
-            self.gid,
-            step_execute_info.priority,
-            after_okay=after_okay
+            after_okay=after_okay,
+            uid=self.uid,
+            gid=self.gid,
+            priority=curr_RS.top_level_run.priority,
+            job_name=job_name
         )
-        logger.debug("Submitted task with pk=%d; Slurm job ID=%d", curr_RS.pk, job_handle._job_id)
+        logger.debug("Submitted task with pk=%d; Slurm job ID=%d", curr_RS.pk, job_handle.job_id)
         return job_handle
 
     @staticmethod

@@ -2929,6 +2929,9 @@ class MethodOutput(models.Model):
     are_checksums_OK = models.BooleanField(help_text="Do code checksums match originals?",
                                            default=True)
 
+    install_failed = models.BooleanField(help_text="Did code fail to install?",
+                                         default=False)
+
     output_redacted = models.BooleanField(default=False)
     error_redacted = models.BooleanField(default=False)
     code_redacted = models.BooleanField(default=False)

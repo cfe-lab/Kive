@@ -4,6 +4,9 @@
 import os.path
 import subprocess as sp
 from datetime import datetime
+import re
+
+import time
 
 import logging
 
@@ -44,7 +47,7 @@ class SlurmJobHandle:
         return SlurmScheduler.get_job_states([self])[0]
 
     def __str__(self):
-        return "slurm job_id %d" % self.job_id
+        return "slurm job_id {}".format(self.job_id)
 
 
 class SlurmScheduler:
@@ -152,21 +155,28 @@ class SlurmScheduler:
             raise RuntimeError('failed translation')
 
     @classmethod
-    def submit_job(cls, workingdir, drivername, driver_arglst,
-                   user_id, group_id,
-                   prio_level, num_cpus,
-                   stdoutfile, stderrfile,
+    def submit_job(cls,
+                   workingdir,
+                   driver_name,
+                   driver_arglst,
+                   user_id,
+                   group_id,
+                   prio_level,
+                   num_cpus,
+                   stdoutfile,
+                   stderrfile,
                    after_okay=None,
-                   after_any=None):
+                   after_any=None,
+                   job_name=None):
         """ Submit a job to the slurm queue.
         The executable submitted will be of the form:
 
-        workingdir/drivername arglst[0] arglst[1] ...
+        workingdir/driver_name arglst[0] arglst[1] ...
 
         workingdir (string): directory name of the job. slurm will set this to the
         'current directory' when the job is run.
-        drivername (string): name of the command to execute as the main job script.
-        driver_arglst (list of strings): arguments to the drivername executable.
+        driver_name (string): name of the command to execute as the main job script.
+        driver_arglst (list of strings): arguments to the driver_name executable.
         user_id, group_id (integers): the unix user under whose account the jobs will
         be executed .
         prio_level (integer) : a positive number >0. Higher values have higher priority.
@@ -186,12 +196,13 @@ class SlurmScheduler:
         This method returns a slurmjobhandle on success, or raises a
         subprocess.CalledProcessError exception.
         """
+        job_name = job_name or driver_name
 
-        cmd_lst = ["sbatch", "-D", workingdir, "--gid=%d" % group_id,
-                   "-J", drivername, "--priority=%d" % prio_level,
-                   "-s", "--uid=%d" % user_id, "--kill-on-invalid-dep=yes",
-                   "-c", num_cpus,
-                   "--export=PYTHONPATH=%s" % workingdir]
+        cmd_lst = ["sbatch", "-D", workingdir, "--gid={}".format(group_id),
+                   "-J", re.escape(job_name), "--priority={}".format(prio_level),
+                   "-s", "--uid={}".format(user_id),
+                   "-c", str(num_cpus),
+                   "--export=PYTHONPATH={}".format(workingdir)]
         # "--get-user-env",
 
         if stdoutfile:
@@ -200,10 +211,11 @@ class SlurmScheduler:
             cmd_lst.append("--error=%s" % stderrfile)
         if after_okay is not None and len(after_okay) > 0:
             cmd_lst.append("--dependency=afterok:" + ":".join(["%d" % jh.job_id for jh in after_okay]))
+            cmd_lst.append("--kill-on-invalid-dep=yes")
         if after_any is not None and len(after_any) > 0:
             cmd_lst.append("--dependency=afterany:" + ":".join(["%d" % jh.job_id for jh in after_any]))
 
-        cmd_lst.append(os.path.join(workingdir, drivername))
+        cmd_lst.append(os.path.join(workingdir, driver_name))
         cmd_lst.extend(driver_arglst)
 
         logger.debug(" ".join(cmd_lst))

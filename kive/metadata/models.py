@@ -1249,8 +1249,13 @@ class Datatype(AccessControl):
         # We need to invoke the verification method using run_code.
         verifier = self.custom_constraint.verification_method
 
+        job_name = verifier.driver.coderesource.filename
         if verification_log:
             verification_log.start(save=True)
+            job_name = "dataset{}_cc[{}]".format(
+                verification_log.contentchecklog.dataset.pk,
+                verifier.driver.coderesource.filename
+            )
 
         # Invoke and wait via Slurm.
         verifier.install(summary_path)
@@ -1265,9 +1270,8 @@ class Datatype(AccessControl):
             [output_path],
             stdout_path,
             stderr_path,
-            None,
-            verification_log,
-            verification_log
+            priority=settings.DEFAULT_SLURM_PRIORITY,
+            job_name=job_name
         )
 
         is_done = False

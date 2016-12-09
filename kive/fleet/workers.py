@@ -148,6 +148,15 @@ class Manager(object):
         just_stopped_runs = Run.objects.filter(end_time__isnull=True, stopped_by__isnull=False)
 
         for run_to_stop in just_stopped_runs:
+            if run_to_stop not in self.runs_in_progress:
+                # This hasn't started yet, or is a remnant from a fleet crash/shutdown,
+                # so we can just skip this one.
+                mgr_logger.warn("Run (pk=%d) is not active.  Cancelling steps/cables that were unfinished.",
+                                run_to_stop.pk)
+                run_to_stop.cancel_components()
+                continue
+
+            # FIXME need to handle case where stuff was stopped while the fleet was down!
             self.runs_in_progress[run_to_stop].stop_run()  # Foreman handles the stopping
 
     @staticmethod
@@ -568,16 +577,6 @@ class Foreman(object):
         # or that it's fed by (RunOutputCable), and the input/output that it feeds/is fed by.
         # We need this so that we can write the stderr and stdout to the appropriate locations.
         cable_record = cable_info.cable_record
-        if isinstance(cable_record, RunSIC):
-            parent_step = cable_record.runstep
-            cable_idx = cable_record.component.dest.dataset_idx
-            cable_type_str = "input"
-        else:
-            # This is the step that feeds the cable.
-            parent_step = cable_record.run.runsteps.get(pipelinestep__step_num=cable_record.source_step)
-            cable_idx = cable_record.component.source.dataset_idx
-            cable_type_str = "output"
-        parent_step_info = self.sandbox.cable_execute_info[(parent_step.parent_run, parent_step.pipelinestep)]
 
         # Submit the job.
         cable_execute_dict_fd, cable_execute_dict_path = tempfile.mkstemp()
@@ -586,14 +585,15 @@ class Foreman(object):
 
         cable_slurm_handle = SlurmScheduler.submit_job(
             settings.KIVE_HOME,
-            settings.CABLE_HELPER_COMMAND,
-            [cable_execute_dict_path],
+            "manage.py",
+            [settings.CABLE_HELPER_COMMAND, cable_execute_dict_path],
             self.sandbox.uid,
             self.sandbox.gid,
             self.sandbox.run.priority,
             cable_info.threads_required,
             cable_info.stdout_path,
             cable_info.stderr_path,
+            job_name="run{}_cable{}".format(runcable.parent_run.pk, runcable.pk)
         )
 
         return {
@@ -627,14 +627,16 @@ class Foreman(object):
 
         setup_slurm_handle = SlurmScheduler.submit_job(
             settings.KIVE_HOME,
-            settings.STEP_HELPER_COMMAND,
-            arg_list,
+            "manage.py",
+            [settings.STEP_HELPER_COMMAND] + arg_list,
             self.sandbox.uid,
             self.sandbox.gid,
             self.sandbox.run.priority,
             step_info.threads_required,
             step_info.setup_stdout_path(),
-            step_info.setup_stderr_path()
+            step_info.setup_stderr_path(),
+            job_name="run{}_step{}_setup".format(runstep.top_level_run.pk,
+                                                 runstep.get_coordinates())
         )
 
         # Next, submit a job for the driver itself.
@@ -644,15 +646,17 @@ class Foreman(object):
         arg_list = ["--bookkeeping"] + arg_list
         bookkeeping_slurm_handle = SlurmScheduler.submit_job(
             settings.KIVE_HOME,
-            settings.STEP_HELPER_COMMAND,
-            arg_list,
+            "manage.py",
+            [settings.STEP_HELPER_COMMAND] + arg_list,
             self.sandbox.uid,
             self.sandbox.gid,
             self.sandbox.run.priority,
             step_info.threads_required,
             step_info.bookkeeping_stdout_path(),
             step_info.bookkeeping_stderr_path(),
-            after_any=[driver_slurm_handle]
+            after_any=[driver_slurm_handle],
+            job_name="run{}_step{}_bookkeeping".format(runstep.top_level_run.pk,
+                                                       runstep.get_coordinates())
         )
 
         return {
