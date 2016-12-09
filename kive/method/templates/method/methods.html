@@ -19,8 +19,6 @@
         is_owner = {{ is_owner|lower }};
 
     $(function() {
-        noXSS();
-
         var table = new permissions.MethodTable(
             $("#methods"),
             is_admin,

@@ -5,10 +5,6 @@ import {
 } from "./pipeline_all";
 import { ViewDialog, OutputDialog, MethodDialog, InputDialog, Dialog } from "./pipeline_dialogs";
 import 'jquery';
-import '/static/portal/noxss.js';
-
-declare var noXSS: any;
-noXSS();
 
 /**
  * DIRECTORY:

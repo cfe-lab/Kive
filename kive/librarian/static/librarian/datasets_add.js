@@ -1,5 +1,4 @@
 $(function() {
-    noXSS();
 
     if ($("#id_single-externalfiledirectory").val() === "") {
         $("#id_single-external_path").prop("disabled", true);

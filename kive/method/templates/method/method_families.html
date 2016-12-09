@@ -16,8 +16,6 @@
     <script type="text/javascript">
 
     $(function(){
-        noXSS();
-
         var table = new permissions.MethodFamiliesTable(
             $("#methodfamilies"),
             {{ is_user_admin|lower }},

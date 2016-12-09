@@ -14,8 +14,6 @@
     <script type="text/javascript">
 
     $(function() {
-        noXSS();
-
         var table = new permissions.DatatypesTable(
             $("#datatypes"),
             {{ is_user_admin|lower }},

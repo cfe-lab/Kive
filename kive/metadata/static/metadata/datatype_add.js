@@ -1,7 +1,5 @@
 
-$(document).ready(function(){ // wait for page to finish loading before executing jQuery code
-
-    noXSS();
+$(function() {
 
     /*
     $("#id_Python_type").on('change', function() {

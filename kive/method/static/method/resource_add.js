@@ -1,7 +1,5 @@
 // wait for page to finish loading before executing jQuery code
 $(function(){
-    noXSS();
-
     // Pack help text into an unobtrusive icon
     $('.helptext', 'form').each(function() {
         var $this = $(this);

@@ -6,6 +6,7 @@
 {% block title %}Datasets{% endblock %}
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/jquery-ui-1.10.4.custom.min.js"></script>
     <script>
         // Helper function that formats the file sizes
@@ -28,12 +29,10 @@
             return bytes + ' B';
         }
 
-        $("document").ready(function(readEvent){
+        $(function(readEvent){
 
-            if (window.File && window.FileReader && window.FileList && window.Blob) {
-              // Great success! All the File APIs are supported.
-            } else {
-              alert('Unsupported browser');
+            if (!(window.File && window.FileReader && window.FileList && window.Blob)) {
+              console.error('Unsupported browser');
             }
 
             // Hide loading gif

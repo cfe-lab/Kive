@@ -1,6 +1,5 @@
-$(document).ready(function(){ // wait for page to finish loading before executing jQuery code
+$(function(){ // wait for page to finish loading before executing jQuery code
     "use strict";
-    noXSS();
     
     var cr_id;
     var $coderesource = $("#id_coderesource");
