@@ -3050,10 +3050,11 @@ class MethodOutput(models.Model):
                             except OSError:
                                 cls.warn("Failed to remove file %r", relpath)
                         else:
+                            cls.logger.debug("Found a methodoutput id=%d, deleting '%s'" % (methodoutput.id, relpath))
                             if methodoutput.error_log == relpath:
-                                methodoutput.error_log = None
+                                methodoutput.error_log.delete(save=True)
                             elif methodoutput.output_log == relpath:
-                                methodoutput.output_log = None
+                                methodoutput.output_log.delete(save=True)
                             else:
                                 cls.logger.error("mismatch in log file purge")
                             methodoutput.save()

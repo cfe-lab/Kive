@@ -170,7 +170,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 continue
             methodoutput = execlog.methodoutput
             step_prefix = 'step_{}_'.format(runstep.pipelinestep.step_num)
-
+            # first handle the standard output file
             output = _RunDataset(step_name=runstep.pipelinestep,
                                  name=step_prefix + 'stdout',
                                  display='Standard out',
@@ -180,30 +180,47 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 outputs.append(output)
             else:
                 try:
-                    if not methodoutput.output_log:
+                    # a set the state of the run based on the exit code
+                    # NOTE: the javascript OutputsTable.js uses output.id to decide whether
+                    # to display a 'View' and 'Download' link ==> Only set
+                    # the id here iff we actually have a clickable/viewable output file.
+                    output.id = None
+                    output.is_ok = True
+                    # we attach the return_code as an error to the standard output entry
+                    # if its nonzero
+                    retcode = methodoutput.return_code
+                    if retcode is not None and retcode != 0:
+                        output.errors.append('return code {}'.format(retcode))
+                    if execlog.start_time is None:
+                        output.display = 'Did not run'
+                        output.date = None
+                        output.size = None
+                        output.errors.append('Did not run.')
                         output.is_ok = False
-                        if execlog.end_time is None:
-                            output.display = 'Running'
-                            output.date = None
-                            output.size = None
-                        else:
-                            output.date = execlog.end_time
-                            output.size = 'missing'
-                            output.errors.append('Did not run.')
+                    elif execlog.end_time is None:
+                        output.display = 'Running'
+                        output.date = None
+                        output.size = None
+                        output.is_ok = False
                     else:
-                        output.id = methodoutput.id
-                        output.size = methodoutput.output_log.size
-                        output.url = reverse('methodoutput-detail',
-                                             kwargs={'pk': methodoutput.id},
-                                             request=request)
-                        output.redaction_plan = reverse(
-                            'methodoutput-output-redaction-plan',
-                            kwargs={'pk': methodoutput.id},
-                            request=request)
-                        output.date = execlog.end_time
+                        if not methodoutput.output_log:
+                            output.date = output.size = 'removed'
+                            output.url = output.redaction_plan = None
+                        else:
+                            output.id = methodoutput.id
+                            output.date = execlog.end_time
+                            output.size = methodoutput.output_log.size
+                            output.url = reverse('methodoutput-detail',
+                                                 kwargs={'pk': methodoutput.id},
+                                                 request=request)
+                            output.redaction_plan = reverse(
+                                'methodoutput-output-redaction-plan',
+                                kwargs={'pk': methodoutput.id},
+                                request=request)
                     outputs.append(output)
-                except ValueError:
-                    pass
+                except ValueError as e:
+                    print "stdout serializer", e
+            # Now handle the stderr file
             output = _RunDataset(step_name="",
                                  name=step_prefix + 'stderr',
                                  display='Standard error',
@@ -213,23 +230,40 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 outputs.append(output)
             else:
                 try:
-                    output.id = methodoutput.id
-                    output.size = methodoutput.error_log.size
-                    output.date = execlog.end_time
-                    output.is_ok = methodoutput.return_code == 0
-                    if not output.is_ok:
-                        output.errors.append('return code {}'.format(
-                            methodoutput.return_code))
-                    output.url = reverse('methodoutput-detail',
-                                         kwargs={'pk': methodoutput.id},
-                                         request=request)
-                    output.redaction_plan = reverse(
-                        'methodoutput-error-redaction-plan',
-                        kwargs={'pk': methodoutput.id},
-                        request=request)
+                    output.id = None
+                    output.is_ok = True
+                    if retcode is not None and retcode != 0:
+                        output.errors.append('return code {}'.format(retcode))
+                        output.is_ok = False
+                    if execlog.start_time is None:
+                        output.display = 'Did not run'
+                        output.date = None
+                        output.size = None
+                        output.errors.append('Did not run.')
+                        output.is_ok = False
+                    elif execlog.end_time is None:
+                        output.display = 'Running'
+                        output.date = None
+                        output.size = None
+                        output.is_ok = False
+                    else:
+                        if not methodoutput.error_log:
+                            output.date = output.size = 'removed'
+                            output.url = output.redaction_plan = None
+                        else:
+                            output.id = methodoutput.id
+                            output.size = methodoutput.error_log.size
+                            output.date = execlog.end_time
+                            output.url = reverse('methodoutput-detail',
+                                                 kwargs={'pk': methodoutput.id},
+                                                 request=request)
+                            output.redaction_plan = reverse(
+                                'methodoutput-error-redaction-plan',
+                                kwargs={'pk': methodoutput.id},
+                                request=request)
                     outputs.append(output)
-                except ValueError:
-                    pass
+                except ValueError as e:
+                    print "stderr serializer", e
 
             if runstep.execrecord is not None:
                 for execrecordout in runstep.execrecord.execrecordouts_in_order:

@@ -99,7 +99,8 @@ urlpatterns = [
     url(r'^datasets_add_archive$', librarian.views.datasets_add_archive, name='datasets_add_archive'),
 
     url(r'^datasets_lookup/$', librarian.views.dataset_lookup, name='dataset_lookup'),
-    url(r'^datasets_lookup/(?P<md5_checksum>[0-9A-Fa-f]{32})$', librarian.views.dataset_lookup,
+    url(r'^datasets_lookup/(?P<filename>.{0,50})/(?P<filesize>\d+)/(?P<md5_checksum>[0-9A-Fa-f]{32})$',
+        librarian.views.dataset_lookup,
         name='dataset_lookup'),
     url(r'^lookup$', librarian.views.lookup, name='lookup'),
 

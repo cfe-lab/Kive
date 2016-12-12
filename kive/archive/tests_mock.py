@@ -884,7 +884,7 @@ class RunOutputsSerializerMockTests(TestCase):
         run = Run(id=1234, pipeline=pipeline)
         step = RunStep(pipelinestep=PipelineStep(step_num=1,
                                                  name='foo.py'))
-        step.log = ExecLog(end_time='12 May 2015')
+        step.log = ExecLog(start_time='11 May 2015', end_time='12 May 2015')
         step.log.methodoutput = MethodOutput(id=99,
                                              return_code=0,
                                              output_log=ContentFile('Done.',
@@ -922,7 +922,6 @@ class RunOutputsSerializerMockTests(TestCase):
                          'id': 1234}
 
         data = RunOutputsSerializer(run).data
-
         self.maxDiff = None
         self.assertEqual(expected_data['output_summary'], data['output_summary'])
         self.assertEqual(expected_data, data)
@@ -933,7 +932,7 @@ class RunOutputsSerializerMockTests(TestCase):
         run = Run(id=1234, pipeline=pipeline)
         step = RunStep(pipelinestep=PipelineStep(step_num=1,
                                                  name='foo.py'))
-        step.log = ExecLog(end_time='12 May 2015')
+        step.log = ExecLog(start_time='11 May 2015', end_time='12 May 2015')
         step.log.methodoutput = MethodOutput(id=99,
                                              return_code=1,
                                              output_log=ContentFile('Done.',
@@ -943,7 +942,7 @@ class RunOutputsSerializerMockTests(TestCase):
         run.runsteps = MockSet(step)
         expected_data = {'output_summary': [{'date': '12 May 2015',
                                              'display': 'Standard out',
-                                             'errors': [],
+                                             'errors': ['return code 1'],
                                              'filename': None,
                                              'id': 99,
                                              'is_invalid': False,
@@ -971,38 +970,51 @@ class RunOutputsSerializerMockTests(TestCase):
                          'id': 1234}
 
         data = RunOutputsSerializer(run).data
-
         self.maxDiff = None
         self.assertEqual(expected_data['output_summary'], data['output_summary'])
         self.assertEqual(expected_data, data)
 
     @patch('archive.serializers.reverse', return_value='/some/url')
     def test_step_outputs_missing(self, mock_reverse):
+        """A runstep that ran successfully (return_code = 0), but whose
+        output file is missing (removed to save disk space) """
         pipeline = Pipeline()
         run = Run(id=1234, pipeline=pipeline)
         step = RunStep(pipelinestep=PipelineStep(step_num=1,
                                                  name='foo.py'))
-        step.log = ExecLog(end_time='12 May 2015')
-        step.log.methodoutput = MethodOutput(id=99)
+        step.log = ExecLog(start_time='11 May 2015', end_time='12 May 2015')
+        step.log.methodoutput = MethodOutput(id=99, return_code=0)
         run.runsteps = MockSet(step)
-        expected_data = {'output_summary': [{'date': '12 May 2015',
+        expected_data = {'output_summary': [{'date': 'removed',
                                              'display': 'Standard out',
-                                             'errors': ['Did not run.'],
+                                             'errors': [],
                                              'filename': None,
                                              'id': None,
                                              'is_invalid': False,
-                                             'is_ok': False,
+                                             'is_ok': True,
                                              'name': 'step_1_stdout',
                                              'redaction_plan': None,
-                                             'size': 'missing',
+                                             'size': 'removed',
                                              'step_name': '1: foo.py',
                                              'type': 'stdout',
+                                             'url': None},
+                                            {'date': 'removed',
+                                             'display': 'Standard error',
+                                             'errors': [],
+                                             'filename': None,
+                                             'id': None,
+                                             'is_invalid': False,
+                                             'is_ok': True,
+                                             'name': 'step_1_stderr',
+                                             'redaction_plan': None,
+                                             'size': 'removed',
+                                             'step_name': '',
+                                             'type': 'stderr',
                                              'url': None}],
                          'input_summary': [],
                          'id': 1234}
 
         data = RunOutputsSerializer(run).data
-
         self.maxDiff = None
         self.assertEqual(expected_data['output_summary'], data['output_summary'])
         self.assertEqual(expected_data, data)
@@ -1013,7 +1025,7 @@ class RunOutputsSerializerMockTests(TestCase):
         run = Run(id=1234, pipeline=pipeline)
         step = RunStep(pipelinestep=PipelineStep(step_num=1,
                                                  name='foo.py'))
-        step.log = ExecLog()
+        step.log = ExecLog(start_time='11 May 2015')
         step.log.methodoutput = MethodOutput(id=99)
         run.runsteps = MockSet(step)
         expected_data = {'output_summary': [{'date': None,
@@ -1028,12 +1040,24 @@ class RunOutputsSerializerMockTests(TestCase):
                                              'size': None,
                                              'step_name': '1: foo.py',
                                              'type': 'stdout',
+                                             'url': None},
+                                            {'date': None,
+                                             'display': 'Running',
+                                             'errors': [],
+                                             'filename': None,
+                                             'id': None,
+                                             'is_invalid': False,
+                                             'is_ok': False,
+                                             'name': 'step_1_stderr',
+                                             'redaction_plan': None,
+                                             'size': None,
+                                             'step_name': '',
+                                             'type': 'stderr',
                                              'url': None}],
                          'input_summary': [],
                          'id': 1234}
 
         data = RunOutputsSerializer(run).data
-
         self.maxDiff = None
         self.assertEqual(expected_data['output_summary'], data['output_summary'])
         self.assertEqual(expected_data, data)
