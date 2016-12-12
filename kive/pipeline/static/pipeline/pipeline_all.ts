@@ -1,11 +1,7 @@
 "use strict";
 
-export { CanvasState, REDRAW_INTERVAL } from "./drydock";
-export { CanvasContextMenu } from "./drydock_contextmenu";
-export { CanvasListeners } from "./drydock_listeners";
-
-// @todo: merge the following two classes
-export { Pipeline } from "./pipeline_load";
-export { PipelineReviser } from "./pipeline_revise";
-
-export { PipelineSubmit } from "./pipeline_submit";
+export { CanvasState, REDRAW_INTERVAL } from "./canvas/drydock";
+export { CanvasContextMenu } from "./canvas/drydock_contextmenu";
+export { CanvasListeners } from "./canvas/drydock_listeners";
+export { Pipeline } from "./io/pipeline_load";
+export { buildPipelineSubmit } from "./io/pipeline_submit";

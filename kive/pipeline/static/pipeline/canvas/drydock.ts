@@ -6,7 +6,7 @@
 "use strict";
 import {
     CanvasObject, CNode, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet, Connector,
-    CanvasWrapper
+    CanvasWrapper, STATUS_COLOR_MAP
 } from "./drydock_objects";
 import { Geometry, Point, Rectangle } from "./geometry";
 import 'jquery';
@@ -367,6 +367,10 @@ export class CanvasState {
         this.valid = false;
     };
 
+    getAspectRatio(): [ number, number ] {
+        return [ this.width / this.scale, this.height / this.scale ];
+    }
+
     /*
      * Helper functions for CanvasState.autoLayout.
      */
@@ -456,7 +460,8 @@ export class CanvasState {
             matrixIndexOf:            CanvasState.matrixIndexOf,
             addConnectedNodesOut:     CanvasState.addConnectedNodesOut,
             addConnectedInputNodesIn: CanvasState.addConnectedInputNodesIn,
-            insertIntoLayer:          CanvasState.insertIntoLayer
+            insertIntoLayer:          CanvasState.insertIntoLayer,
+            phaseOrderMethods:        CanvasState.phaseOrderMethods
         };
     }
 
@@ -1147,6 +1152,13 @@ export class CanvasState {
         // draw output end-zone -when- dragging a connector from a MethodNode
         if (draggingFromMethodOut && this.can_edit) {
             this.outputZone.draw(this.ctx);
+        }
+
+        // draw colour-coded statuses
+        ctx.lineWidth = 5;
+        for (let shape of this.shapes.filter(shape => shape.status)) {
+            ctx.strokeStyle = STATUS_COLOR_MAP[shape.status] || 'black';
+            shape.highlight(ctx);
         }
 
         // draw selection ring

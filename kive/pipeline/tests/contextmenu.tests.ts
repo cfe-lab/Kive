@@ -1,8 +1,8 @@
 "use strict";
 
-import { CanvasState } from "../static/pipeline/drydock";
-import { CanvasContextMenu } from "../static/pipeline/drydock_contextmenu";
-import { RawNode } from "../static/pipeline/drydock_objects";
+import { CanvasState } from "../static/pipeline/canvas/drydock";
+import { CanvasContextMenu } from "../static/pipeline/canvas/drydock_contextmenu";
+import { RawNode } from "../static/pipeline/canvas/drydock_objects";
 import "jasmine";
 import 'jasmine-html';
 import 'jquery';

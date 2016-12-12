@@ -1,7 +1,4 @@
 $(function() {
-    // Security stuff to prevent cross-site scripting.
-    noXSS();
-
     // "final" vars (should never change)
     // "const" keyword is not well supported otherwise it would be of use here
     var IS_USER_ADMIN = false, // Never show admin tools on this page

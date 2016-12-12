@@ -16,7 +16,6 @@
     <script type="text/javascript">
     $(function(){
         var is_user_admin = {{ is_user_admin|lower }};
-        noXSS();
 
         var table = new permissions.DatasetsTable(
                 $('#datasets'),
