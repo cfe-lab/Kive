@@ -13,3 +13,5 @@ pysqlite==2.8.2
 pytz==2012rc0
 requests==2.9.0
 six==1.10.0
+scandir==1.4
+
