@@ -14,9 +14,6 @@
     <script type="text/javascript">
 
     $(function(){ 
-        // Security stuff to prevent cross-site scripting.
-        noXSS();
-        
         var table = new permissions.CompoundDatatypesTable(
             $('#compounddatatypes'),
             {{ is_user_admin|lower }},

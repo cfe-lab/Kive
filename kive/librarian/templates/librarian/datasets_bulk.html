@@ -3,27 +3,11 @@
 
 {% extends "portal/base.html" %}
 
-{% block title %}Bulk Added Dataset{% endblock %}
+{% block title %}Added Datasets{% endblock %}
 
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script>
-    $(document).ready(function() {
-        // TODO:  put these somewhere more central.
-        // TODO:  the loading_img css class doesn't work here.  Fix it instead of hardcoding width and height
-        STATUS_FAIL = "1"
-        STATUS_SUCCESS = "0"
-
-        $('.status_cell').each(function () {
-            if ($(this).html() == STATUS_SUCCESS) {
-                $(this).html('<img class="loading_img" src="/static/portal/img/success.png" width="20px" height="auto">');
-            }
-            else {
-                $(this).html('<img class="loading_img" src="/static/portal/img/fail.png" width="20px" height="auto">');
-            }
-        });
-    });
-    </script>
+    <script src="/static/portal/noxss.js"></script>
 {% endblock %}
 
 {% block stylesheets %}
@@ -35,7 +19,7 @@
 
 <a href="usr.html" rel="prev">Back to user's portal</a>
 
-<h2>Bulk Added Datasets</h2>
+<h2>Added Datasets</h2>
 
 <form id="bulkDatasetDisplayForm" name="bulkDatasetDisplayForm" action="/datasets_bulk.html" method="post">{% csrf_token %}
     <div class="bulk_dataset_table">
@@ -81,7 +65,13 @@
                         </td>
                         <!-- TODO:  use ajax to poll status of each file upload.
                         Will be handy if lots of large files -->
-                        <td class="status_cell">{{ dataset_form.status }}</td>
+                        <td class="status_cell">
+                            {% if dataset_form.status == "1" %}
+                            <img class="loading_img" src="/static/portal/img/fail.png" width="20" height="auto">
+                            {% else %}
+                            <img class="loading_img" src="/static/portal/img/success.png" width="20" height="auto">
+                            {% endif %}
+                        </td>
                         <td class="errortext">{{ dataset_form.non_field_errors }}</td>
                     </tr>
                 {% endfor %}

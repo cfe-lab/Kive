@@ -11,15 +11,15 @@ import os
 import glob
 import shutil
 import json
-import inspect
 import tempfile
+import inspect
 
 from django.conf import settings
 from django.utils import timezone
 from django.core.files import File
 from django.db import transaction
 
-from archive.models import Dataset, Run, RunStep, RunSIC
+from archive.models import Dataset, Run, RunStep, RunSIC, MethodOutput
 from sandbox.execute import Sandbox, sandbox_glob
 from fleet.slurmlib import SlurmScheduler
 
@@ -80,42 +80,38 @@ class Manager(object):
 
     def _add_idletask(self, newidletask):
         """Add a task for the manager to perform during her idle time.
-        The newidletask must be a function that accepts a single argument of
-        type comparable to time.time() and returns nothing.
-        The argument provides the time limit after which a task must return from its
-        task.
+        The newidletask must be a generator that accepts a single argument of
+        type comparable to time.time() when it calls (yield) .
+        The argument provides the time limit after which a task must interrupt its task
+        and wait for the next allotted time.
 
-        For example, the structure of an idle task would typically be of the form:
+        For example, the structure of an idle task would typically be:
 
-        def my_idle_task(time_to_stop):
-           something_todo = True
-           while (time.time() < time_to_stop and something_todo:
-              do a small amount of work
-              something_todo = checkwork()
+        def my_idle_task(some_useful_args):
+           init_my_stuff()
+           while True:
+              time_to_stop = (yield)
+              if (time.time() < time_to_stop) and something_todo():
+                 do a small amount of work
         """
-        try:
-            argspecs = inspect.getargspec(newidletask)
-        except TypeError:
-            raise RuntimeError("add_idletask: Expecting a function as a task")
-        func_isok = (len(argspecs.args) == 1 and argspecs.varargs is None
-                     and argspecs.keywords is None
-                     and argspecs.defaults is None)
-        if func_isok:
+        if inspect.isgenerator(newidletask):
+            # we prime the generator so that it advances to the first time that
+            # it encounters a 'time_to_stop = (yield)' statement.
+            newidletask.next()
             self.idle_job_queue.append(newidletask)
         else:
-            print "argspecs", argspecs
-            raise RuntimeError("add_idletask: idle task function must have exactly one argument")
+            raise RuntimeError("add_idletask: Expecting a generator as a task")
 
     def _do_idle_tasks(self, time_limit):
-        """Perform registered idle tasks once each, or until time runs out.
+        """Perform the registered idle tasks once each, or until time runs out.
         Idle tasks are called in a round-robin fashion.
         """
         num_tasks = len(self.idle_job_queue)
         num_done = 0
         while (time.time() < time_limit) and num_done < num_tasks:
-            mgr_logger.debug("Running an idle task..")
-            job_to_do = self.idle_job_queue[0]
-            job_to_do(time_limit)
+            mgr_logger.info("Running an idle task..")
+            jobtodo = self.idle_job_queue[0]
+            jobtodo.send(time_limit)
             self.idle_job_queue.rotate(1)
             num_done += 1
 
@@ -217,11 +213,17 @@ class Manager(object):
         """
         Poll the database for new jobs, and handle running of sandboxes.
         """
-        ext_check_interval = datetime.timedelta(days=settings.EXTERNAL_FILE_CHECK_DAYS,
-                                                hours=settings.EXTERNAL_FILE_CHECK_HOURS,
-                                                minutes=settings.EXTERNAL_FILE_CHECK_MINUTES)
-        if ext_check_interval > datetime.timedelta():
-            self._add_idletask(lambda t: Dataset.idle_externalcheck(t))
+        # add any idle tasks that should be performed in the mainloop here
+        # --
+        # check for consistency of external files:
+        # self._add_idletask(lambda t: Dataset.idle_externalcheck(t))
+        # --
+        # purge old files from Dataset:
+        self._add_idletask(Dataset.idle_dataset_purge())
+        # make Dataset sub-directories for next month
+        self._add_idletask(Dataset.idle_create_next_month_upload_dir())
+        # purge old log files
+        self._add_idletask(MethodOutput.idle_logfile_purge())
 
         time_to_purge = None
         while True:

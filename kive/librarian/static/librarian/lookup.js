@@ -8,12 +8,16 @@ $(document).ready(function(){
 
     self.file_io = (window.File && window.FileReader && window.FileList && window.Blob);
     self.md5_sum = null;
-
+    self.ffname = null;
+    self.ffsize = null;
+    
     function handleFiles(files) {
         var reader = new FileReader();
         reader.onloadend = function(e) {
             self.md5_sum = md5(e.target.result);
-
+	    self.ffname = files[0].name;
+	    self.ffsize = files[0].size;
+	    
             $('#no_file').hide();
             $('#file_loaded').show();
 
@@ -96,7 +100,7 @@ $(document).ready(function(){
             e.stopPropagation();
             e.preventDefault();
 
-            window.location.href = "/datasets_lookup/" + self.md5_sum;
+            window.location.href = "/datasets_lookup/" + encodeURIComponent(self.ffname) + "/" + self.ffsize + "/" + self.md5_sum;
         });
     } else {
         $('#upload_file').show();

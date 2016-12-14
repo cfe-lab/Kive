@@ -1,21 +1,17 @@
 "use strict";
 import {
     CanvasState, CanvasContextMenu, CanvasListeners,
-    PipelineReviser, PipelineSubmit, REDRAW_INTERVAL
+    Pipeline, buildPipelineSubmit, REDRAW_INTERVAL
 } from "./pipeline_all";
 import { ViewDialog, OutputDialog, MethodDialog, InputDialog, Dialog } from "./pipeline_dialogs";
 import 'jquery';
-import '/static/portal/noxss.js';
-
-declare var noXSS: any;
-noXSS();
 
 /**
  * DIRECTORY:
  *
  * Part 1/8: Initialize CanvasState with event listeners.
- * Part 2/8: Prepare Pipeline completeness check.
- * Part 3/8: Load initial pipeline data if present.
+ * Part 2/8: Load initial pipeline data if present.
+ * Part 3/8: Prepare Pipeline completeness check.
  * Part 4/8: Initialize Dialogs (Family, revision, add, add input, add method, add output, and view)
  * Part 5/8: Initialize the submission of this page
  * Part 6/8: Initialize CanvasContextMenu and register actions
@@ -45,7 +41,22 @@ CanvasListeners.initKeyListeners(canvasState);
 CanvasListeners.initResizeListeners(canvasState);
 
 /**
- * Part 2/8: Prepare Pipeline completeness check.
+ * Part 2/8: Load initial pipeline data if present.
+ */
+let parent_revision_id;
+let text = $("#initial_data").text();
+let loader = new Pipeline(canvasState);
+if (text) {
+    loader.setUpdateCtrl('#id_update');
+    loader.setRevertCtrl('#id_revert');
+    loader.loadFromString(text);
+    parent_revision_id = loader.pipeline.id;
+    loader.draw();
+    $(canvas).hide().fadeIn();
+}
+
+/**
+ * Part 3/8: Prepare Pipeline completeness check.
  */
 interface BtnFunction extends Function { $btn?: JQuery; }
 var pipelineCheckCompleteness: BtnFunction = function() {
@@ -59,26 +70,8 @@ var pipelineCheckCompleteness: BtnFunction = function() {
     }
     $submit_btn.addClass(is).removeClass(isnt);
 };
-function initPipelineCheck() {
-    canvas.addEventListener('CanvasStateChange', () => pipelineCheckCompleteness(), false);
-    pipelineCheckCompleteness();
-}
-
-/**
- * Part 3/8: Load initial pipeline data if present.
- */
-let parent_revision_id;
-let initialData = $("#initial_data");
-let text;
-if (initialData.length && (text = initialData.text())) {
-    let loader = new PipelineReviser(text);
-    loader.load(canvasState, initPipelineCheck);
-    loader.setUpdateCtrl($('#id_update'));
-    loader.setRevertCtrl($('#id_revert'));
-    parent_revision_id = loader.pipelineRaw.id;
-} else {
-    initPipelineCheck();
-}
+canvas.addEventListener('CanvasStateChange', () => pipelineCheckCompleteness(), false);
+pipelineCheckCompleteness();
 
 /**
  * Part 4/8: Initialize Dialogs (Family, revision, add, add input, add method, add output, and view)
@@ -128,11 +121,11 @@ $view_menu.find('#autolayout_btn').click(
 /**
  * Part 5/8: Initialize the submission of this page
  */
-$('#id_pipeline_form').submit(PipelineSubmit.buildSubmit(
+$('#id_pipeline_form').submit(buildPipelineSubmit(
     canvasState,
-    $('#id_pipeline_action'),
+    $('#id_pipeline_action').val(),
     $('#id_family_name'),   $('#id_family_desc'),
-    $('#id_family_pk'),
+    parseInt($('#id_family_pk').val(), 10),
     $('#id_revision_name'), $('#id_revision_desc'),
     parent_revision_id,
     $('#published'),

@@ -16,8 +16,6 @@
     <script type="text/javascript">
 
     $(function(){
-        noXSS();
-
         var table = new permissions.MethodFamiliesTable(
             $("#methodfamilies"),
             {{ is_user_admin|lower }},
@@ -78,6 +76,6 @@ in common.
     <table id="methodfamilies"></table>
 </div>
 
-<a href="/method_new">Create a new method family</a>
+<a class="button" href="/method_new">+&ensp;<span class="button-lbl">Create a new method family</span></a>
 
 {% endblock %}

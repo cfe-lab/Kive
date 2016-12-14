@@ -19,8 +19,8 @@ class KiveRunFailedException(Exception):
 
 
 def is_client_error(code):
-    return code >= 400 and code <= 499
+    return 400 <= code <= 499
 
 
 def is_server_error(code):
-    return code >= 500 and code <= 599
+    return 500 <= code <= 599

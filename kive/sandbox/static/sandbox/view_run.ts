@@ -5,10 +5,6 @@ import {
     Pipeline, REDRAW_INTERVAL
 } from "static/pipeline/pipeline_all";
 import 'jquery';
-import '/static/portal/noxss.js';
-
-declare var noXSS: any;
-noXSS();
 
 const RUN_ID         = parseInt($('#run_id').val(), 10);
 const PIPELINE_ID    = parseInt($('#run_pipeline_id').val(), 10);

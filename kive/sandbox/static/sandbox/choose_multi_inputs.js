@@ -1,7 +1,4 @@
 $(function() {
-    // Security stuff to prevent cross-site scripting.
-    noXSS();
-
     // "final" vars (should never change)
     // "const" keyword is not well supported otherwise it would be of use here
     var IS_USER_ADMIN = false, // Never show admin tools on this page
@@ -187,7 +184,7 @@ $(function() {
             if (this.hasOwnProperty('auto_fill')) {
                 for (i = 0; (cell_index = this.auto_fill[i]); i++) {
                     row.children('td:nth-child(' + cell_index + ')').replaceWith(
-                        this.find('tr:last td:nth-child(' + cell_index + ')').clone(true)//with data and events
+                        this.find('tr:last td:nth-child(' + cell_index + ')').clone(true) // with data and events
                     );
                 }
             }
@@ -518,7 +515,7 @@ $(function() {
             var first_selected = $all_trs.filter('.selected').eq(0),
                 selected_nextUntil = first_selected.nextUntil($this);
 
-            if (selected_nextUntil.length == first_selected.nextAll().length) {
+            if (selected_nextUntil.length === first_selected.nextAll().length) {
                 first_selected.prevUntil($this).add($this).addClass('selected');
             } else {
                 selected_nextUntil.add($this).addClass('selected');
@@ -528,12 +525,28 @@ $(function() {
             $this.addClass('selected');
         }
     };
+    var updateRunNamePlaceholder = function(dataset_name, $tr) {
+        var row_run_name = $tr.find('.run-name');
+        var placeholder = row_run_name.attr('placeholder');
+        var new_placeholder;
+        if (placeholder.match(/ on /i)) {
+            placeholder = placeholder.replace(/ on .+$/ig, " on " + dataset_name);
+        } else {
+            placeholder += " on " + dataset_name;
+        }
+        row_run_name.attr('placeholder', placeholder);
+    };
+    var resetRunNamePlaceholder = function($tr) {
+        var row_run_name = $tr.find('.run-name');
+        row_run_name.attr('placeholder',
+            uiFactory.pipelineInputRow().find('.run-name').attr('placeholder')
+        );
+    };
     var addSelectedDatasetsToInput = function(e) {
         var selected_vals = dataset_search_dialog.find('.search_results .selected .primary'),
             receiving_cell = $('button.receiving'),
-            receiving_cell_selector = 'td:nth-child(' +
-                (receiving_cell.parent().index() + 1) +
-                ')',// css pseudo-class is 1-indexed
+            receiving_cell_index = receiving_cell.parent().index() + 1, // css pseudo-class is 1-indexed
+            receiving_cell_selector = 'td:nth-child(' + receiving_cell_index + ')',
             receiving_row = receiving_cell.closest('tr'),
             blank_input_queue = receiving_row
                 .nextAll().addBack()
@@ -571,6 +584,11 @@ $(function() {
                 );
 
                 next_blank_input.replaceWith(last_filled_input);
+    
+                /* default name based on first input - update placeholder name */
+                if (receiving_cell_index === 2) {
+                    updateRunNamePlaceholder(selected_val.text(), last_filled_input.closest('tr'));
+                }
 
                 // shift filled cell out of queue
                 blank_input_queue = blank_input_queue.not(next_blank_input);
@@ -620,6 +638,14 @@ $(function() {
         ;
 
         $old_td.replaceWith( $new_td = uiFactory.plusButtonCell( $old_td.data() ) );
+        
+        /**
+         * Default run name based on first input dataset
+         * Need to reset this back to naming scheme based on timestamp
+         */
+        if ($new_td.index() === 1) {
+            resetRunNamePlaceholder($row);
+        }
 
         if (auto_fill_index > -1) {
             auto_fill.splice(auto_fill_index, 1);
@@ -628,7 +654,7 @@ $(function() {
     var removeRunRow = function() {
         var length = dataset_input_table.find('tr').length;
         if (length > 1) { 
-            if (length == 2) {
+            if (length === 2) {
                 dataset_input_table.addClass('single-run');
             }
             var $row = $(this).closest('tr');
@@ -670,7 +696,9 @@ $(function() {
             value = $(this).val();
             if (actions.hasOwnProperty(value)) {
                 actions[value]();
-            } else return;
+            } else {
+                return;
+            }
 
             filter_set.remove('createdafter');
             filter_set.add(
@@ -737,11 +765,11 @@ $(function() {
         }
     };
     set_dataset.options_menu.show = function() {
-        $.fn.show.call(set_dataset.options_menu);//need to call show() from the jQuery object because we're overloading menu.show()
+        $.fn.show.call(set_dataset.options_menu); // need to call show() from the jQuery object because we're overloading menu.show()
         set_dataset.options_btn.addClass('active');
     };
     set_dataset.options_menu.hide = function() {
-        $.fn.hide.call(set_dataset.options_menu);//need to call hide() from the jQuery object because we're overloading menu.hide()
+        $.fn.hide.call(set_dataset.options_menu); // need to call hide() from the jQuery object because we're overloading menu.hide()
         set_dataset.options_btn.removeClass('active');
     };
     set_dataset.options_menu.choose = function(e) {
@@ -758,12 +786,12 @@ $(function() {
             fill_successful
         ;// css pseudo-class is 1-indexed
 
-        if (action == 'fill-column') {
+        if (action === 'fill-column') {
             fill_successful = dataset_input_table.fillColumn(selected_val, receiving_cell_selector);
             if (fill_successful && auto_fill.indexOf(receiving_cell_1index) > -1) {
                 auto_fill.splice(auto_fill.indexOf(receiving_cell_1index), 1);
             }
-        } else if (action == 'auto-fill-column') {
+        } else if (action === 'auto-fill-column') {
             fill_successful = dataset_input_table.fillColumn(selected_val, receiving_cell_selector);
             if (fill_successful) {
                 auto_fill.push(receiving_cell_1index);
@@ -801,7 +829,9 @@ $(function() {
         return this_fn.fake_el.width();
     };
     $.fn.caretTarget = function(offset, start) {
-        if (!this.is('input')) return null;
+        if (!this.is('input')) {
+            return null;
+        }
         var pos = start || 1,
             px_offset = [],
             text = this.val() || this.text(),
@@ -849,7 +879,7 @@ $(function() {
                 carat_is_on_boundary = this.selectionStart <= prefix_length,
                 key_is_back_or_left = [8,37].indexOf(e.keyCode) > -1,
                 key_is_up_or_home = [36,38].indexOf(e.keyCode) > -1,
-                select_all_cmd = e.keyCode == 65 && (e.metaKey || e.ctrlKey)
+                select_all_cmd = e.keyCode === 65 && (e.metaKey || e.ctrlKey)
             ;
 
             if (carat_is_on_boundary && key_is_back_or_left ||
@@ -896,7 +926,7 @@ $(function() {
                     e.pageY < input_height + input_offset.top && 
                     e.pageX < input_offset.left;
 
-            if (active_input == e.target) {
+            if (active_input === e.target) {
                 select_end = Math.max(
                     prefix_length,
                     $active_input.caretTarget(e.offsetX, prefix_length)

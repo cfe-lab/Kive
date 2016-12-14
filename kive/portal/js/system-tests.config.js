@@ -5,6 +5,7 @@ System.config({
         'jasmine-html' : 'portal/js/jasmine-2.3.4/jasmine-html.js',
         'jasmine-boot' : 'portal/js/jasmine-2.3.4/boot.js',
         'jasmine-jquery' : 'portal/js/jasmine-jquery.js',
+        'jasmine-ajax' : 'portal/js/mock-ajax.js',
         'imagediff' : 'portal/js/imagediff.js',
         'jquery' : 'portal/static/portal/jquery-2.0.3.min.js'
     },

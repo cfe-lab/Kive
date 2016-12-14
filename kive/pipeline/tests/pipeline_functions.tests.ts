@@ -1,6 +1,7 @@
-import { CanvasWrapper } from "../static/pipeline/drydock_objects";
-import { CanvasState } from "../static/pipeline/drydock";
-import { Pipeline } from "../static/pipeline/pipeline_load";
+import { CanvasWrapper } from "../static/pipeline/canvas/drydock_objects";
+import { CanvasState } from "../static/pipeline/canvas/drydock";
+import { Pipeline } from "../static/pipeline/io/pipeline_load";
+import { serializePipeline } from "../static/pipeline/io/serializer";
 import "jasmine";
 import 'jasmine-html';
 import 'imagediff';
@@ -302,7 +303,7 @@ describe("Pipeline functions", function() {
 
     describe('Load', function(){
         it('should load pipeline from API', function() {
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            loadApiPipeline(this.canvasState, this.api_pipeline);
         });
 
         it('should draw pipeline from API', function() {
@@ -317,7 +318,7 @@ describe("Pipeline functions", function() {
         });
 
         it('should find pipeline nodes from API', function() {
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            loadApiPipeline(this.canvasState, this.api_pipeline);
 
             var input1  = this.canvasState.findNodeByLabel('input1'),
                 input2  = this.canvasState.findNodeByLabel('input2'),
@@ -346,7 +347,7 @@ describe("Pipeline functions", function() {
     describe('Connections', function(){
 
         it('should connect inputs to methods API', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            loadApiPipeline(this.canvasState, this.api_pipeline);
 
             var input1 = this.canvasState.findNodeByLabel('input1'),
                 input2 = this.canvasState.findNodeByLabel('input2'),
@@ -361,7 +362,7 @@ describe("Pipeline functions", function() {
         });
 
         it('should connect methods API', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            loadApiPipeline(this.canvasState, this.api_pipeline);
 
             var prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
                 remap  = this.canvasState.findNodeByLabel('remap.py');
@@ -370,7 +371,7 @@ describe("Pipeline functions", function() {
         });
 
         it('should connect methods to outputs API', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            loadApiPipeline(this.canvasState, this.api_pipeline);
 
             var remap   = this.canvasState.findNodeByLabel('remap.py'),
                 remapc  = this.canvasState.findNodeByLabel('remap_counts'),
@@ -388,18 +389,18 @@ describe("Pipeline functions", function() {
         });
 
         it('should ignore order of cables_in when wiring', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
-                expectedImage;
+            let pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             pipeline.draw();
-            expectedImage = imagediff.toImageData(this.rawCanvas);
 
             // Now reverse the order of the cables_in
+            let expectedCanvas = imagediff.createCanvas(600, 300);
+            let expectedCanvasState = new CanvasState(expectedCanvas, true);
             this.api_pipeline.steps[1].cables_in.reverse();
-            pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            pipeline = loadApiPipeline(expectedCanvasState, this.api_pipeline);
             pipeline.draw();
 
             expect(this.rawCanvas).toImageDiffEqual(
-                expectedImage);
+                expectedCanvas);
         });
     });
 
@@ -697,7 +698,7 @@ describe("Pipeline functions", function() {
     function loadAndSerialize(canvasState, api_pipeline, additional_args?) {
         var pipeline = loadApiPipeline(canvasState, api_pipeline);
         pipeline.draw();
-        return pipeline.serialize(additional_args);
+        return serializePipeline(canvasState, additional_args);
     }
 
     describe('Serialize', function(){
@@ -756,6 +757,8 @@ describe("Pipeline functions", function() {
                 expect(ser_step.name).toBe(api_step.name);
                 expect(ser_step.step_num).toBe(api_step.step_num);
                 expect(ser_step.transformation).toBe(api_step.transformation);
+                expect(ser_step.x).toBeCloseTo(api_step.x, 8);
+                expect(ser_step.y).toBeCloseTo(api_step.y, 8);
 
             });
         });
@@ -789,13 +792,16 @@ describe("Pipeline functions", function() {
 
             // TODO: These (inputs) should really be sorted by dataset_idx
             $.each(serialized.outcables, function(index, ser_output){
-                var api_output = self.api_pipeline.outcables[index];
+                var api_outcable = self.api_pipeline.outcables[index];
+                var api_output = self.api_pipeline.outputs[index];
 
-                expect(ser_output.output_cdt).toBe(api_output.output_cdt);
-                expect(ser_output.output_idx).toBe(api_output.output_idx);
-                expect(ser_output.output_name).toBe(api_output.output_name);
-                expect(ser_output.source_dataset_name).toBe(api_output.source_dataset_name);
-                expect(ser_output.source_step).toBe(api_output.source_step);
+                expect(ser_output.output_cdt).toBe(api_outcable.output_cdt);
+                expect(ser_output.output_idx).toBe(api_outcable.output_idx);
+                expect(ser_output.output_name).toBe(api_outcable.output_name);
+                expect(ser_output.source_dataset_name).toBe(api_outcable.source_dataset_name);
+                expect(ser_output.source_step).toBe(api_outcable.source_step);
+                expect(ser_output.x).toBeCloseTo(api_output.x, 8);
+                expect(ser_output.y).toBeCloseTo(api_output.y, 8);
             });
         });
 
@@ -808,7 +814,7 @@ describe("Pipeline functions", function() {
                 name: "French"
             };
             pipeline.draw();
-            var data = pipeline.serialize(),
+            var data = serializePipeline(this.canvasState),
                 step = data.steps[0];
 
             expect(step.new_code_resource_revision_id).toBe(
@@ -825,7 +831,7 @@ describe("Pipeline functions", function() {
                 name: "French"
             }];
             pipeline.draw();
-            var data = pipeline.serialize(),
+            var data = serializePipeline(this.canvasState),
                 step = data.steps[0];
 
             expect(step.new_dependency_ids).toEqual(

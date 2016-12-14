@@ -6,15 +6,15 @@
         this.registerColumn("#", "revision_number");
         this.registerLinkColumn("Name", "", "display_name", "view_url");
         this.registerColumn("", function($td, revision) {
-            $("<a>").attr("href", revision.absolute_url).text("Revise").appendTo($td);
+            $("<a>").attr("href", revision.absolute_url).addClass('button').text("Revise").appendTo($td);
+        });
+        this.registerColumn("", function($td, revision) {
+            if (revision.content_file.length !== 0) {
+                $('<a>').text('Download').addClass('button').attr('href', revision.download_url).appendTo($td);
+            }
         });
         this.registerColumn("Description", "revision_desc");
         this.registerDateTimeColumn("Date", "revision_DateTime");
-        this.registerColumn("", function($td, revision) {
-            if (revision.content_file.length !== 0) {
-                $('<a>').text('Download').attr('href', revision.download_url).appendTo($td);
-            }
-        });
         this.registerStandardColumn("user");
         this.registerStandardColumn("users_allowed");
         this.registerStandardColumn("groups_allowed");

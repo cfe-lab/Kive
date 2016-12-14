@@ -136,6 +136,15 @@ Once you have set up your production server, this is how to deploy a new release
     
         sudo -u apache ls /  # Just test that you can log in as apache
         sudo -u apache LD_LIBRARY_PATH=$LD_LIBRARY_PATH PATH=$PATH ./manage.py runfleet --workers 191 &>/dev/null &
+
+    On CentOS 6, it's more complicated.
+
+        sudo su kiveuser
+        scl enable python27 bash
+        source ~/vkive/bin/activate
+        module load openmpi/gnu/1.6.5
+        cd /usr/local/share/Kive/kive
+        mpirun -np 1 ./manage.py runfleet --workers 191 &
         
 10. Restart apache:
 
@@ -258,11 +267,13 @@ To update Javascript generated from TypeScript (.ts) files, you must have the
 TypeScript compiler installed, which should happen when you run `npm install`.
 Don't edit any js file which has a ts equivalent as these changes will be
 overwritten. When editing ts files, it is useful to have the compiler run in
-watch mode as a background task using `tsc -w`. Be sure to adhere to Kive's
-TypeScript style by running `grunt tslint` on your contributions.
+watch mode as a background task using `npm run ts-watch`. Be sure to adhere to
+Kive's TypeScript style by running `grunt tslint` on your contributions.
 
 A similar pattern is true for CSS and Sass files. You can run the Sass compiler
-in watch mode using `sass --watch`.
+in watch mode using `npm run sass-watch`.
+
+Run both the TypeScript and Sass watchers simultaneously with `npm run watch-all`.
 
 ### Updating embedded icon files ###
 

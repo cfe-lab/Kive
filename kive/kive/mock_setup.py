@@ -1,6 +1,7 @@
-from contextlib import contextmanager
+from collections import defaultdict
+from functools import partial
 from itertools import chain
-from mock import Mock, PropertyMock
+from mock import Mock, MagicMock, patch
 import os
 import sys
 
@@ -9,7 +10,6 @@ from django.apps import apps
 from django.db import connections
 from django.db.utils import ConnectionHandler, NotSupportedError
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
 
 
 if not apps.ready:
@@ -25,7 +25,8 @@ if not apps.ready:
     db['PASSWORD'] = '****'
     db['USER'] = '**Database disabled for unit tests**'
     ConnectionHandler.__getitem__ = Mock(name='mock_connection')
-    mock_ops = ConnectionHandler.__getitem__.return_value.ops  # @UndefinedVariable
+    # noinspection PyUnresolvedReferences
+    mock_ops = ConnectionHandler.__getitem__.return_value.ops
 
     def compiler(queryset, connection, using, **kwargs):
         result = Mock(name='mock_connection.ops.compiler()')
@@ -40,95 +41,155 @@ if not apps.ready:
 # Can move back to the top if this pull request is accepted:
 # https://github.com/stphivos/django-mock-queries/pull/14
 from django_mock_queries.query import MockSet  # @IgnorePep8
+import django_mock_queries.utils
+import django_mock_queries.constants
 
 
-def setup_mock_relations(*models):
+def patched_get_attribute(obj, attr, default=None):
+    result = obj
+    comparison = None
+    parts = attr.split('__')
+
+    for p in parts:
+        if p in django_mock_queries.constants.COMPARISONS:
+            comparison = p
+        elif result is None:
+            break
+        else:
+            result = getattr(result, p, None)
+
+    value = result if result is not None else default
+    return value, comparison
+
+# Remove this monkey patch after pull request is merged and released:
+# https://github.com/stphivos/django-mock-queries/pull/16
+django_mock_queries.utils.get_attribute = patched_get_attribute
+
+
+class MockOneToManyMap(object):
+    def __init__(self, original):
+        """ Wrap a mock mapping around the original one-to-many relation. """
+        self.map = defaultdict(partial(MockSet, cls=original.field.model))
+        self.original = original
+
+    def __get__(self, instance, owner):
+        """ Look in the map to see if there is a related set.
+
+        If not, create a new set.
+        """
+
+        if instance is None:
+            # Call was to the class, not an object.
+            return self
+
+        return self.map[id(instance)]
+
+    def __set__(self, instance, value):
+        """ Set a related object for an instance. """
+
+        self.map[id(instance)] = value
+
+    def __getattr__(self, name):
+        """ Delegate all other calls to the original. """
+
+        return getattr(self.original, name)
+
+
+class MockOneToOneMap(object):
+    def __init__(self, original):
+        """ Wrap a mock mapping around the original one-to-one relation. """
+        self.map = {}
+        self.original = original
+
+    def __get__(self, instance, owner):
+        """ Look in the map to see if there is a related object.
+
+        If not (the default) raise the expected exception.
+        """
+
+        if instance is None:
+            # Call was to the class, not an object.
+            return self
+
+        rel_obj = self.map.get(id(instance))
+        if rel_obj is None:
+            raise self.original.RelatedObjectDoesNotExist(
+                "Mock %s has no %s." % (
+                    owner.__name__,
+                    self.original.related.get_accessor_name()
+                )
+            )
+        return rel_obj
+
+    def __set__(self, instance, value):
+        """ Set a related object for an instance. """
+
+        self.map[id(instance)] = value
+
+    def __getattr__(self, name):
+        """ Delegate all other calls to the original. """
+
+        return getattr(self.original, name)
+
+
+# noinspection PyUnresolvedReferences
+def setup_mock_relations(testcase, *models):
     for model in models:
+        if isinstance(model.save, MagicMock):
+            # already mocked, so skip it
+            continue
         model_name = model._meta.object_name
-        model.old_relations = {}
-        model.old_objects = model.objects
-        model.old_save = model.save
-        model.protected = {}
+        patcher = patch.object(model, 'save', Mock(name=model_name + '.save'))
+        patcher.start()
+        testcase.addCleanup(patcher.stop)
+        patcher = patch.object(model, 'objects', MockSet(mock_name=model_name + '.objects', cls=model))
+        patcher.start()
+        testcase.addCleanup(patcher.stop)
         for related_object in chain(model._meta.related_objects,
                                     model._meta.many_to_many):
             name = related_object.name
-            old_relation = getattr(model, name, None)
-            if old_relation is not None:
-                # type_name = type(old_relation).__name__
-                # expected_types = {'ReverseManyToOneDescriptor',
-                #                   'ManyToManyDescriptor',
-                #                   'ReverseOneToOneDescriptor'}
-                # assert type_name in expected_types, model_name + '.' + name + ': ' + type_name
-                model.old_relations[name] = old_relation
-                if related_object.one_to_one:
-                    new_relation = PropertyMock(side_effect=ObjectDoesNotExist)
-                else:
-                    new_relation = MockSet(cls=old_relation.field.model)
-                setattr(model, name, new_relation)
-        model.objects = MockSet(mock_name=model_name + '.objects', cls=model)
-        model.save = Mock(name=model_name + '.save')
-
-
-def teardown_mock_relations(*models):
-    for model in models:
-        old_save = getattr(model, 'old_save', None)
-        if old_save is not None:
-            model.save = old_save
-            del model.old_save
-        old_objects = getattr(model, 'old_objects', None)
-        if old_objects is not None:
-            model.objects = old_objects
-            del model.old_objects
-        old_relations = getattr(model, 'old_relations', None)
-        if old_relations is not None:
-            for name, relation in old_relations.iteritems():
-                setattr(model, name, relation)
-            del model.old_relations
-
-
-@contextmanager
-def mock_relations(*models):
-    """ Mock all related field managers to make pure unit tests possible.
-
-    with mock_relations(Dataset):
-        dataset = Dataset()
-        check = dataset.content_checks.create()  # returns mock object
-    """
-    try:
-        setup_mock_relations(*models)
-        yield
-
-    finally:
-        teardown_mock_relations(*models)
+            if name in model.__dict__:
+                # Only mock direct relations, not inherited ones.
+                old_relation = getattr(model, name, None)
+                if old_relation is not None:
+                    # type_name = type(old_relation).__name__
+                    # expected_types = {'ReverseManyToOneDescriptor',
+                    #                   'ManyToManyDescriptor',
+                    #                   'ReverseOneToOneDescriptor'}
+                    # assert type_name in expected_types, model_name + '.' + name + ': ' + type_name
+                    if related_object.one_to_one:
+                        new_relation = MockOneToOneMap(old_relation)
+                    else:
+                        new_relation = MockOneToManyMap(old_relation)
+                    patcher = patch.object(model, name, new_relation)
+                    patcher.start()
+                    testcase.addCleanup(patcher.stop)
 
 
 def mocked_relations(*models):
-    """ A decorator version of mock_relations.
+    """ Mock all related field managers to make pure unit tests possible.
 
     This can decorate a method or a class. Decorating a class is equivalent to
     decorating all the methods whose names start with "test_".
+
+    @mocked_relations(Dataset):
+    def test_dataset(self):
+        dataset = Dataset()
+        check = dataset.content_checks.create()  # returns a ContentCheck object
     """
     def decorator(target):
         if isinstance(target, type):
             original_setup = target.setUp
-            original_teardown = target.tearDown
 
-            def setUp(testcase):
-                setup_mock_relations(*models)
+            def full_setup(testcase):
+                setup_mock_relations(testcase, *models)
                 original_setup(testcase)
 
-            def tearDown(testcase):
-                try:
-                    original_teardown(testcase)
-                finally:
-                    teardown_mock_relations(*models)
-
-            target.setUp = setUp
-            target.tearDown = tearDown
+            target.setUp = full_setup
             return target
 
-        def wrapped(*args, **kwargs):
-            with mock_relations(*models):
-                return target(*args, **kwargs)
+        def wrapped(testcase, *args, **kwargs):
+            setup_mock_relations(testcase, *models)
+            return target(testcase, *args, **kwargs)
         return wrapped
     return decorator

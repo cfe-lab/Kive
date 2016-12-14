@@ -6,7 +6,7 @@
 "use strict";
 import {
     CanvasObject, CNode, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet, Connector,
-    CanvasWrapper
+    CanvasWrapper, STATUS_COLOR_MAP
 } from "./drydock_objects";
 import { Geometry, Point, Rectangle } from "./geometry";
 import 'jquery';
@@ -367,6 +367,10 @@ export class CanvasState {
         this.valid = false;
     };
 
+    getAspectRatio(): [ number, number ] {
+        return [ this.width / this.scale, this.height / this.scale ];
+    }
+
     /*
      * Helper functions for CanvasState.autoLayout.
      */
@@ -456,7 +460,8 @@ export class CanvasState {
             matrixIndexOf:            CanvasState.matrixIndexOf,
             addConnectedNodesOut:     CanvasState.addConnectedNodesOut,
             addConnectedInputNodesIn: CanvasState.addConnectedInputNodesIn,
-            insertIntoLayer:          CanvasState.insertIntoLayer
+            insertIntoLayer:          CanvasState.insertIntoLayer,
+            phaseOrderMethods:        CanvasState.phaseOrderMethods
         };
     }
 
@@ -585,9 +590,9 @@ export class CanvasState {
     /**
      * Align selected nodes along the named axis.
      * 
-     * @param axis: a string from ["x", "y", "iso_x", "iso_y", "iso_z"]
+     * @param axis: a string from ["x", "y", "iso_x", "iso_y"]
      */
-    alignSelection (axis: string): void {
+    alignSelection (axis: "x"|"y"|"iso_x"|"iso_y"): void {
         /* @todo
          * if nodes are too close together then they will collide and then get pushed back out.
          * when this "push back out" happens, it should happen -only- on the axis of alignment.
@@ -1109,6 +1114,9 @@ export class CanvasState {
         this.exec_order = [];
         this.selection = [];
 
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transforms
+        this.setScale(this.scale);
+
         this.dispatchChangeEvent({ reset: true });
     }
 
@@ -1144,6 +1152,13 @@ export class CanvasState {
         // draw output end-zone -when- dragging a connector from a MethodNode
         if (draggingFromMethodOut && this.can_edit) {
             this.outputZone.draw(this.ctx);
+        }
+
+        // draw colour-coded statuses
+        ctx.lineWidth = 5;
+        for (let shape of this.shapes.filter(shape => shape.status)) {
+            ctx.strokeStyle = STATUS_COLOR_MAP[shape.status] || 'black';
+            shape.highlight(ctx);
         }
 
         // draw selection ring

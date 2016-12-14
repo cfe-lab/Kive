@@ -8,12 +8,12 @@ from metadata.models import CompoundDatatype
 from method.models import Method, MethodFamily, CodeResourceRevision,\
     CodeResource, MethodDependency
 from transformation.models import TransformationInput, TransformationOutput,\
-    XputStructure, Transformation
+    XputStructure, Transformation, TransformationXput
 from django.contrib.auth.models import User
 from pipeline.models import Pipeline
 
 
-@mocked_relations(Method, Transformation, TransformationInput, TransformationOutput)
+@mocked_relations(Method, Transformation, TransformationXput, TransformationInput, TransformationOutput)
 class MethodMockTests(TestCase):
     def test_with_family_unicode(self):
         """ expect "Method revision name and family name" """
@@ -130,6 +130,7 @@ class MethodMockTests(TestCase):
 
     def test_many_nonconsective_inputs_scrambled_checkInputIndices_bad(self):
         """Test input index check, badly-indexed multi-input case."""
+
         driver = CodeResourceRevision(coderesource=CodeResource())
 
         foo = Method(driver=driver, family=MethodFamily())
@@ -158,6 +159,7 @@ class MethodMockTests(TestCase):
 
     def test_one_valid_output_checkOutputIndices_good(self):
         """Test output index check, one well-indexed output case."""
+
         driver = CodeResourceRevision(coderesource=CodeResource())
 
         foo = Method(driver=driver, family=MethodFamily())
@@ -169,6 +171,7 @@ class MethodMockTests(TestCase):
 
     def test_many_valid_outputs_scrambled_checkOutputIndices_good(self):
         """Test output index check, well-indexed multi-output (scrambled order) case."""
+
         driver = CodeResourceRevision(coderesource=CodeResource())
 
         foo = Method(driver=driver, family=MethodFamily())
@@ -181,6 +184,7 @@ class MethodMockTests(TestCase):
 
     def test_one_invalid_output_checkOutputIndices_bad(self):
         """Test output index check, one badly-indexed output case."""
+
         driver = CodeResourceRevision(coderesource=CodeResource())
 
         foo = Method(driver=driver, family=MethodFamily())
@@ -199,6 +203,7 @@ class MethodMockTests(TestCase):
 
     def test_many_invalid_outputs_scrambled_checkOutputIndices_bad(self):
         """Test output index check, badly-indexed multi-output case."""
+
         driver = CodeResourceRevision(coderesource=CodeResource())
 
         foo = Method(driver=driver, family=MethodFamily())
@@ -292,18 +297,12 @@ class MethodMockTests(TestCase):
                                   max_row=max_row)
         parent = self.create_parent()
 
-        def get_input_structure(self):
-            if self.dataset_idx == 2:
-                return structure
-            raise XputStructure.DoesNotExist
-
-        def get_output_structure(self):
+        def get_structure(self):
             if self.dataset_idx == 1:
                 return structure
             raise XputStructure.DoesNotExist
 
-        TransformationInput.structure = property(get_input_structure)
-        TransformationOutput.structure = property(get_output_structure)
+        TransformationXput.structure = property(get_structure)
         expected_inputs = {inp.dataset_idx for inp in parent.inputs}
         expected_outputs = {out.dataset_idx for out in parent.outputs}
 
@@ -328,8 +327,6 @@ class MethodMockTests(TestCase):
         driver = CodeResourceRevision()
         user = User()
         m1 = Method(revision_name='A', driver=driver, user=user)
-        m1.inputs = MockSet(cls=TransformationInput)
-        m1.outputs = MockSet(cls=TransformationOutput)
         for i in range(2):
             inp = m1.inputs.create(dataset_name='a_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -340,8 +337,6 @@ class MethodMockTests(TestCase):
             out.transformationoutput = out
 
         m2 = Method(revision_name='B', driver=driver, user=user)
-        m2.inputs = MockSet(cls=TransformationInput)
-        m2.outputs = MockSet(cls=TransformationOutput)
         for i in range(2):
             inp = m2.inputs.create(dataset_name='b_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -358,8 +353,6 @@ class MethodMockTests(TestCase):
         driver2 = CodeResourceRevision()
         user = User()
         m1 = Method(revision_name='A', driver=driver1, user=user)
-        m1.inputs = MockSet(cls=TransformationInput)
-        m1.outputs = MockSet(cls=TransformationOutput)
         for i in range(2):
             inp = m1.inputs.create(dataset_name='a_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -370,8 +363,6 @@ class MethodMockTests(TestCase):
             out.transformationoutput = out
 
         m2 = Method(revision_name='B', driver=driver2, user=user)
-        m2.inputs = MockSet(cls=TransformationInput)
-        m2.outputs = MockSet(cls=TransformationOutput)
         for i in range(2):
             inp = m2.inputs.create(dataset_name='b_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -387,8 +378,6 @@ class MethodMockTests(TestCase):
         driver = CodeResourceRevision()
         user = User()
         m1 = Method(revision_name='A', driver=driver, user=user)
-        m1.inputs = MockSet(cls=TransformationInput)
-        m1.outputs = MockSet(cls=TransformationOutput)
         for i in range(1):
             inp = m1.inputs.create(dataset_name='a_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -399,8 +388,6 @@ class MethodMockTests(TestCase):
             out.transformationoutput = out
 
         m2 = Method(revision_name='B', driver=driver, user=user)
-        m2.inputs = MockSet(cls=TransformationInput)
-        m2.outputs = MockSet(cls=TransformationOutput)
         for i in range(2):
             inp = m2.inputs.create(dataset_name='b_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -416,8 +403,6 @@ class MethodMockTests(TestCase):
         driver = CodeResourceRevision()
         user = User()
         m1 = Method(revision_name='A', driver=driver, user=user)
-        m1.inputs = MockSet(cls=TransformationInput)
-        m1.outputs = MockSet(cls=TransformationOutput)
         for i in range(2):
             inp = m1.inputs.create(dataset_name='a_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -428,8 +413,6 @@ class MethodMockTests(TestCase):
             out.transformationoutput = out
 
         m2 = Method(revision_name='B', driver=driver, user=user)
-        m2.inputs = MockSet(cls=TransformationInput)
-        m2.outputs = MockSet(cls=TransformationOutput)
         for i in range(2):
             inp = m2.inputs.create(dataset_name='b_in_{}'.format(i),
                                    dataset_idx=i + 1)
@@ -442,7 +425,7 @@ class MethodMockTests(TestCase):
         self.assertFalse(m1.is_identical(m2))
 
 
-@mocked_relations(Method, MethodDependency)
+@mocked_relations(Method, MethodDependency, Transformation)
 class MethodDependencyMockTests(TestCase):
     def setUp(self):
         driver = CodeResourceRevision(
@@ -566,18 +549,18 @@ class MethodDependencyMockTests(TestCase):
         self.assertEqual(expected_filepaths, filepaths)
 
 
-@mocked_relations(Method, MethodFamily)
+@mocked_relations(Method, MethodFamily, Transformation)
 class MethodUpdateMockTests(TestCase):
     def setUp(self):
         self.family = MethodFamily()
         self.old_method = self.family.members.create(family=self.family,
                                                      revision_number=1,
-                                                     id=101)
+                                                     pk=101)
         self.old_method.method = self.old_method
 
         self.new_method = self.family.members.create(family=self.family,
                                                      revision_number=2,
-                                                     id=102)
+                                                     pk=102)
         self.new_method.method = self.new_method
 
     def test_find_update_not_found(self):
@@ -590,10 +573,9 @@ class MethodUpdateMockTests(TestCase):
 
         self.assertEqual(self.new_method, update)
 
-    @mocked_relations(Pipeline, Transformation)
+    @mocked_relations(Pipeline)
     def test_find_update_not_found_from_transformation(self):
-        del Transformation.method
-        transformation = Transformation(id=self.new_method.id)
+        transformation = Transformation(pk=self.new_method.pk)
         transformation.method = self.new_method
         update = transformation.find_update()
 

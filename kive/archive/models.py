@@ -11,12 +11,14 @@ import logging
 from operator import attrgetter, itemgetter
 import os
 import time
+from datetime import datetime, timedelta
 import shutil
 
 from django.db import models, transaction
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.urlresolvers import reverse
 from django.core.validators import MinValueValidator
+from django.conf import settings
 from django.utils.encoding import python_2_unicode_compatible
 from django.utils import timezone
 from django.contrib.auth.models import User, Group
@@ -25,6 +27,7 @@ import archive.exceptions
 from constants import maxlengths, groups, runstates, runcomponentstates
 from datachecking.models import ContentCheckLog, IntegrityCheckLog
 from librarian.models import Dataset, ExecRecord
+import librarian.filewalker as filewalker
 import metadata.models
 import stopwatch.models
 from pipeline.models import Pipeline
@@ -2887,6 +2890,14 @@ class ExecLog(stopwatch.models.Stopwatch):
         return True
 
 
+class SafeContext:
+    def __enter__(self):
+        pass
+
+    def __exit__(self, *args):
+        pass
+
+
 class MethodOutput(models.Model):
     """
     Logged output of the execution of a method.
@@ -2921,6 +2932,12 @@ class MethodOutput(models.Model):
     output_redacted = models.BooleanField(default=False)
     error_redacted = models.BooleanField(default=False)
     code_redacted = models.BooleanField(default=False)
+
+    logger = logging.getLogger('archive.MethodOutput')
+    filepurger = filewalker.FilePurger(os.path.join(settings.MEDIA_ROOT, UPLOAD_DIR),
+                                       grace_period_hrs=settings.LOGFILE_GRACE_PERIOD_HRS,
+                                       walk_period_hrs=settings.LOGFILE_PURGE_SCAN_PERIOD_HRS,
+                                       logger=logger)
 
     def get_absolute_log_url(self):
         """
@@ -2970,3 +2987,96 @@ class MethodOutput(models.Model):
         self.code_redacted = True
         self.save()
         self.execlog.record.redact()
+
+    @staticmethod
+    def _active_log_files():
+        """ Return the absolute file names of the log files of any running or pending
+        runs.
+        """
+        pending_runs = archive.models.Run.objects.filter(start_time=None)
+        running_runs = archive.models.Run.objects.filter(end_time=None)
+        all_active_runs = pending_runs | running_runs
+        for run in all_active_runs:
+            for component in run.get_all_atomic_runcomponents():
+                execlog = component.log if hasattr(component, 'log') else None
+                if execlog is not None:
+                    methodoutput = execlog.methodoutput if hasattr(execlog, 'methodoutput') else None
+                    if methodoutput is not None:
+                        yield os.path.join(settings.MEDIA_ROOT, methodoutput.error_log.name)
+                        yield os.path.join(settings.MEDIA_ROOT, methodoutput.output_log.name)
+
+    @classmethod
+    def idle_logfile_purge(cls,
+                           max_storage=settings.LOGFILE_MAX_STORAGE,
+                           target_size=settings.LOGFILE_TARGET_STORAGE):
+        # get batches of max 5 files at a time when we have to purge
+        BATCH_SIZE = 5
+        while True:
+            time_to_stop = (yield None)
+            cls.logger.debug('hello from idle_logfile_purge')
+
+            exclude_set = set(MethodOutput._active_log_files())
+            cls.logger.debug('Found %d active log files', len(exclude_set))
+            for ff in exclude_set:
+                cls.logger.debug("--%s", ff)
+            # recalculate the total file size, while allowing for interruptions
+            # the resulting total file size will be in cls.filepurger._totsize once
+            # we have finished the file system scanning
+            checker = cls.filepurger.regenerator(exclude_set)
+            try:
+                while True:
+                    time_to_stop = (yield None)
+                    checker.send(time_to_stop)
+            except StopIteration:
+                pass
+            cls.logger.debug('finished regenerating file cache')
+            cls.logger.debug("\n".join(["%s: %s" % itm for itm in cls.filepurger.get_scaninfo().items()]))
+            if time.time() < time_to_stop and cls.filepurger._totsize > max_storage:
+                cls.logger.info("Purge cycle started, total size = %d > max_storage=%d",
+                                cls.filepurger._totsize, max_storage)
+                tot_size_deleted = 0
+                for ftup in cls.filepurger.next_to_purge(BATCH_SIZE, exclude_set,
+                                                         target_size,
+                                                         dodelete=True):
+                    if ftup is None:
+                        # we have run out of time: abruptly exit from the for loop
+                        break
+                    else:
+                        # remove the file
+                        abspath, fsize = ftup
+                        tot_size_deleted += fsize
+                        relpath = os.path.relpath(abspath, settings.MEDIA_ROOT)
+                        cls.logger.debug("Looking for file '%s' in db" % relpath)
+                        err_qset = MethodOutput.objects.filter(error_log=relpath)
+                        out_qset = MethodOutput.objects.filter(output_log=relpath)
+                        qs = err_qset | out_qset
+                        methodoutput = qs.first()
+                        if methodoutput is None:
+                            # a file unknown to the database
+                            # NOTE: must be defensive here: the file might have
+                            # moved in the mean-time (#481)
+                            cls.logger.debug("Deleting file '%s'" % abspath)
+                            try:
+                                with SafeContext():
+                                    filedate = os.path.getmtime(abspath)
+                                    file_age = datetime.now() - datetime.fromtimestamp(filedate)
+                                    if file_age > timedelta(hours=1):
+                                        cls.logger.warn('No MethodOutput matches file %r, deleting it.',
+                                                        relpath)
+                                        os.remove(abspath)
+                            except OSError:
+                                cls.warn("Failed to remove file %r", relpath)
+                        else:
+                            cls.logger.debug("Found a methodoutput id=%d, deleting '%s'" % (methodoutput.id, relpath))
+                            if methodoutput.error_log == relpath:
+                                methodoutput.error_log.delete(save=True)
+                            elif methodoutput.output_log == relpath:
+                                methodoutput.output_log.delete(save=True)
+                            else:
+                                cls.logger.error("mismatch in log file purge")
+                            methodoutput.save()
+                # -- report purging progress
+                cls.logger.info("Purge cycle completed, deleted size %d", tot_size_deleted)
+            else:
+                cls.logger.info("Purge cycle skipped, total size = %d < max_storage=%d",
+                                cls.filepurger._totsize, max_storage)

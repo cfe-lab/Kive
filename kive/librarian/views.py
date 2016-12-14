@@ -1,7 +1,7 @@
 """
 librarian views
 """
-import hashlib
+import urllib
 import logging
 import mimetypes
 import os
@@ -19,7 +19,7 @@ from django.utils.encoding import DjangoUnicodeDecodeError
 
 from librarian.forms import DatasetForm, DatasetDetailsForm, BulkAddDatasetForm, BulkDatasetUpdateForm,\
     ArchiveAddDatasetForm
-from archive.models import Run
+from archive.models import RunInput
 from librarian.models import Dataset
 from portal.views import admin_check
 from metadata.models import CompoundDatatype
@@ -302,33 +302,33 @@ class BulkDatasetDisplay:
 @login_required
 def datasets_add_archive(request):
     """
-    Add datasets in bulk to db.  Redirect to /datasets_bulk view so user can examine upload status of each dataset.
+    Add datasets in bulk to db from an archive file (zip or tarfile).
+    Redirect to /datasets_bulk view so user can examine upload status of each dataset.
     """
-    # Redirect to page to allow user to view status of added datasets.
     c = {}
-    t = loader.get_template('librarian/datasets_bulk.html')
-    archive_add_dataset_form = None
-
     # If we got posted to, try to create DB entries
     if request.method == 'POST':
         try:
             archive_add_dataset_form = ArchiveAddDatasetForm(
                 data=request.POST,
                 files=request.FILES,
-                user=request.user
+                user=request.user,
             )
-
-            # Try to add new datasets
-            if archive_add_dataset_form.is_valid():
+            # Try to add new datasets. If this fails, we return to our current page
+            is_ok = archive_add_dataset_form.is_valid()
+            if is_ok:
                 add_results = archive_add_dataset_form.create_datasets(request.user)
+                is_ok = len(add_results) > 0
+            if is_ok:
+                t = loader.get_template('librarian/datasets_bulk.html')
             else:
-                # TODO: change this
-                c.update({'archiveAddDatasetForm': archive_add_dataset_form})
+                # give up and let user try again
+                t = loader.get_template('librarian/datasets_add_archive.html')
+                c = {'archiveAddDatasetForm': archive_add_dataset_form}
                 return HttpResponse(t.render(c, request))
 
             # New datasets added, generate a response
             archive_display_results = []
-
             # Fill in default values for the form fields
             for i in range(len(add_results)):
                 archive_display_result = {}
@@ -401,7 +401,7 @@ def datasets_add_bulk(request):
             else:
                 # The form is already annotated with the appropriate errors, so we can bail.
                 c.update({'bulkAddDatasetForm': bulk_add_dataset_form})
-                return HttpResponse(t.render(c))
+                return HttpResponse(t.render(c, request))
 
             # Generate response.
             bulk_display_results = []
@@ -513,39 +513,60 @@ def datasets_bulk(request):
 
 
 @login_required
-def dataset_lookup(request, md5_checksum=None):
-    if md5_checksum is None and request.method == 'POST':
-        checksum = hashlib.md5()
-        if 'file' in request.FILES:
-            for chunk in request.FILES['file'].chunks():
-                checksum.update(chunk)
-            md5_checksum = checksum.hexdigest()
+def dataset_lookup(request, filename=None, filesize=None, md5_checksum=None):
+    """Perform a lookup for runs involving a particular file.
+    The search is performed on the basis of the md5_checksum, NOT the file name.
+    The file name is only displayed in the HTML template.
 
-    datasets = librarian.models.Dataset.filter_by_user(request.user).filter(
-        MD5_checksum=md5_checksum).exclude(file_source=None)
+    filename: a string that has been encoded using encodeURIComponent in javascript.
+    See lookup.js for details.
 
-    datasets_as_inputs = []
-    runs = Run.objects.filter(inputs__dataset__MD5_checksum=md5_checksum)
+    filesize: the size of the file in bytes. Note that this is a string.
+    This is used in the following way:
+     a) the user is warned if the size is zero
+     b) the user is warned if the size is smaller than 1K
 
-    for run in runs:
-        for input in [x for x in run.inputs.all() if x.dataset.MD5_checksum == md5_checksum]:
-            breakout = False
-            for d in datasets_as_inputs:
-                if d["run_id"] == run.id and d["dataset"].id == input.dataset.id:
-                    breakout = True
-                    continue
-            if breakout:
-                continue
+    The number of datasets displayed is limited to DISPLAY_LIMIT .
+    If more matches are found, a warning is displayed.
 
-            datasets_as_inputs += [{
-                "run": run.run,
-                "pipeline": run.pipeline,
-                "dataset": input.dataset
-            }]
+    """
+    # previous versions of this code seemed to expect a POST request.
+    # However, in actual fact, we are sent a GET request, where the three parameters
+    # have been calculated in the browser in javascript
+    if request.method == 'POST':
+        raise RuntimeError("NOT expecting a POST ")
+    DISPLAY_LIMIT = 50
+    ONE_KB = 1024
+    if filename is None or filesize is None or md5_checksum is None:
+        raise RuntimeError("filename or md5_sum is missing")
+    try:
+        filesize_int = int(filesize)
+    except:
+        raise RuntimeError("integer conversion error")
+    filename = urllib.unquote(filename)
+    dataset_query = librarian.models.Dataset.filter_by_user(request.user).filter(
+        MD5_checksum=md5_checksum).exclude(file_source=None).order_by('-date_created')
+    num_datasets = len(dataset_query)
+    datasets = list(dataset_query[:DISPLAY_LIMIT])
 
+    q_set_a = RunInput.objects.filter(dataset__user=request.user)
+    runinput_query = q_set_a.filter(dataset__MD5_checksum=md5_checksum).order_by('-dataset__date_created')
+
+    num_runinputs = len(runinput_query)
+    runinputs = list(runinput_query[:DISPLAY_LIMIT])
     t = loader.get_template('librarian/dataset_lookup.html')
-    c = {'datasets': datasets, 'datasets_as_inputs': datasets_as_inputs, 'md5': md5_checksum}
-
+    c = {'datasets': datasets,
+         'num_datasets': num_datasets,
+         'toomany_datasets': num_datasets > DISPLAY_LIMIT,
+         'runinputs': runinputs,
+         'num_runinputs': num_runinputs,
+         'toomany_runinputs': num_runinputs > DISPLAY_LIMIT,
+         'md5': md5_checksum,
+         'search_term': filename,
+         'display_limit_num': DISPLAY_LIMIT,
+         'file_size': filesize,
+         'file_is_empty': filesize_int == 0,
+         'file_is_small': 0 < filesize_int < ONE_KB}
     return HttpResponse(t.render(c, request))
 
 

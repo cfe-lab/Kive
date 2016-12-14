@@ -5,81 +5,85 @@ from unittest import TestCase
 from django.core.exceptions import ValidationError
 from mock import PropertyMock, call
 
-from kive.mock_setup import mock_relations  # Import before any Django models
-from django_mock_queries.query import MockSet
+from kive.mock_setup import mocked_relations  # Import before any Django models
 from constants import datatypes
 from metadata.models import CompoundDatatype, CompoundDatatypeMember, Datatype
 from method.models import Method
 from pipeline.models import Pipeline, PipelineFamily, PipelineStep,\
-    PipelineStepInputCable, PipelineOutputCable
+    PipelineStepInputCable, PipelineOutputCable, PipelineCable
 from transformation.models import TransformationInput, XputStructure,\
-    TransformationOutput
+    TransformationOutput, Transformation
 
 
+@mocked_relations(Pipeline,
+                  PipelineStep,
+                  Method,
+                  Transformation,
+                  CompoundDatatype,
+                  Datatype,
+                  PipelineCable,
+                  PipelineStepInputCable,
+                  PipelineOutputCable,
+                  XputStructure)
 class PipelineMockTests(TestCase):
     """Tests for basic Pipeline functionality."""
     def test_pipeline_no_inputs_no_steps(self):
         """A Pipeline with no inputs and no steps is clean but not complete."""
-        with mock_relations(Pipeline):
-            p = Pipeline(family=PipelineFamily())
+        p = Pipeline(family=PipelineFamily())
 
-            p.clean()
+        p.clean()
 
-            self.assertRaisesRegexp(
-                ValidationError,
-                re.escape("Pipeline {} has no steps".format(p)),
-                p.complete_clean
-            )
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape("Pipeline {} has no steps".format(p)),
+            p.complete_clean
+        )
 
     """Tests for basic Pipeline functionality."""
     def test_pipeline_one_valid_input_no_steps(self):
         """A Pipeline with one valid input, but no steps, is clean but not complete."""
-        with mock_relations(Pipeline):
-            p = Pipeline(family=PipelineFamily())
-            self.add_inputs(p, TransformationInput(dataset_idx=1))
+        p = Pipeline(family=PipelineFamily())
+        self.add_inputs(p, TransformationInput(dataset_idx=1))
 
-            p.clean()
+        p.clean()
 
-            self.assertRaisesRegexp(
-                ValidationError,
-                re.escape("Pipeline {} has no steps".format(p)),
-                p.complete_clean
-            )
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape("Pipeline {} has no steps".format(p)),
+            p.complete_clean
+        )
 
     def test_pipeline_one_invalid_input_clean(self):
         """A Pipeline with one input not numbered "1" is not clean."""
-        with mock_relations(Pipeline):
-            p = Pipeline(family=PipelineFamily())
-            self.add_inputs(p, TransformationInput(dataset_idx=4))
+        p = Pipeline(family=PipelineFamily())
+        self.add_inputs(p, TransformationInput(dataset_idx=4))
 
-            error = "Inputs are not consecutively numbered starting from 1"
-            self.assertRaisesRegexp(ValidationError, error, p.clean)
-            self.assertRaisesRegexp(ValidationError, error, p.complete_clean)
+        error = "Inputs are not consecutively numbered starting from 1"
+        self.assertRaisesRegexp(ValidationError, error, p.clean)
+        self.assertRaisesRegexp(ValidationError, error, p.complete_clean)
 
     def test_pipeline_many_valid_inputs_clean(self):
         """A Pipeline with multiple, properly indexed inputs is clean."""
-        with mock_relations(Pipeline):
-            p = Pipeline(family=PipelineFamily())
-            self.add_inputs(p,
-                            TransformationInput(dataset_idx=2),
-                            TransformationInput(dataset_idx=1),
-                            TransformationInput(dataset_idx=3))
+        p = Pipeline(family=PipelineFamily())
+        self.add_inputs(p,
+                        TransformationInput(dataset_idx=2),
+                        TransformationInput(dataset_idx=1),
+                        TransformationInput(dataset_idx=3))
 
-            p.clean()
+        p.clean()
 
     def test_pipeline_many_invalid_inputs_clean(self):
         """A Pipeline with multiple, badly indexed inputs is not clean."""
-        with mock_relations(Pipeline):
-            p = Pipeline(family=PipelineFamily())
-            self.add_inputs(p,
-                            TransformationInput(dataset_idx=2),
-                            TransformationInput(dataset_idx=3),
-                            TransformationInput(dataset_idx=4))
+        p = Pipeline(family=PipelineFamily())
+        self.add_inputs(p,
+                        TransformationInput(dataset_idx=2),
+                        TransformationInput(dataset_idx=3),
+                        TransformationInput(dataset_idx=4))
 
-            self.assertRaisesRegexp(
-                ValidationError,
-                "Inputs are not consecutively numbered starting from 1",
-                p.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            "Inputs are not consecutively numbered starting from 1",
+            p.clean)
 
     def test_pipeline_one_valid_step_clean(self):
         """A Pipeline with one validly indexed step and input is clean.
@@ -110,36 +114,34 @@ class PipelineMockTests(TestCase):
 
     def test_pipeline_many_valid_steps_clean(self):
         """Test step index check, well-indexed multi-step case."""
-        with mock_relations(Pipeline, PipelineStep, Method):
-            p = Pipeline(family=PipelineFamily())
-            self.add_inputs(p,
-                            TransformationInput(dataset_idx=1))
-            m = Method()
-            self.add_inputs(m,
-                            TransformationInput(dataset_idx=1))
-            p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=2))
-            p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=1))
-            p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=3))
+        p = Pipeline(family=PipelineFamily())
+        self.add_inputs(p,
+                        TransformationInput(dataset_idx=1))
+        m = Method()
+        self.add_inputs(m,
+                        TransformationInput(dataset_idx=1))
+        p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=2))
+        p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=1))
+        p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=3))
 
-            p.clean()
+        p.clean()
 
     def test_pipeline_many_invalid_steps_clean(self):
         """Test step index check, badly-indexed multi-step case."""
-        with mock_relations(Pipeline, PipelineStep, Method):
-            p = Pipeline(family=PipelineFamily())
-            self.add_inputs(p,
-                            TransformationInput(dataset_idx=1))
-            m = Method()
-            self.add_inputs(m,
-                            TransformationInput(dataset_idx=1))
-            p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=1))
-            p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=4))
-            p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=5))
+        p = Pipeline(family=PipelineFamily())
+        self.add_inputs(p,
+                        TransformationInput(dataset_idx=1))
+        m = Method()
+        self.add_inputs(m,
+                        TransformationInput(dataset_idx=1))
+        p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=1))
+        p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=4))
+        p.steps.add(PipelineStep(pipeline=p, transformation=m, step_num=5))
 
-            self.assertRaisesRegexp(
-                    ValidationError,
-                    "Steps are not consecutively numbered starting from 1",
-                    p.clean)
+        self.assertRaisesRegexp(
+                ValidationError,
+                "Steps are not consecutively numbered starting from 1",
+                p.clean)
 
     def test_pipeline_one_step_valid_cabling_clean(self):
         """Test good step cabling, one-step pipeline."""
@@ -180,32 +182,26 @@ class PipelineMockTests(TestCase):
 
     def test_pipeline_oneStep_invalid_cabling_incorrect_cdt_clean(self):
         """Bad cabling: input is of wrong CompoundDatatype."""
-        with mock_relations(Pipeline,
-                            PipelineStep,
-                            Method,
-                            CompoundDatatype,
-                            Datatype,
-                            PipelineStepInputCable):
-            p = Pipeline(family=PipelineFamily())
-            self.add_inputs(p, self.create_input(datatypes.INT_PK, dataset_idx=1))
-            m = Method()
-            self.add_inputs(m, self.create_input(datatypes.STR_PK, dataset_idx=1))
+        p = Pipeline(family=PipelineFamily())
+        self.add_inputs(p, self.create_input(datatypes.INT_PK, dataset_idx=1))
+        m = Method()
+        self.add_inputs(m, self.create_input(datatypes.STR_PK, dataset_idx=1))
 
-            step1 = PipelineStep(pipeline=p, transformation=m, step_num=1)
-            p.steps.add(step1)
+        step1 = PipelineStep(pipeline=p, transformation=m, step_num=1)
+        p.steps.add(step1)
 
-            cable = PipelineStepInputCable(pipelinestep=step1,
-                                           source_step=0,
-                                           source=p.inputs.all()[0],
-                                           dest=m.inputs.all()[0])
-            cable.pipelinestepinputcable = cable
-            step1.cables_in.add(cable)
+        cable = PipelineStepInputCable(pipelinestep=step1,
+                                       source_step=0,
+                                       source=p.inputs.all()[0],
+                                       dest=m.inputs.all()[0])
+        cable.pipelinestepinputcable = cable
+        step1.cables_in.add(cable)
 
-            cable.clean()
-            self.assertRaisesRegexp(
-                ValidationError,
-                'Custom wiring required for cable "{}"'.format(cable),
-                cable.clean_and_completely_wired)
+        cable.clean()
+        self.assertRaisesRegexp(
+            ValidationError,
+            'Custom wiring required for cable "{}"'.format(cable),
+            cable.clean_and_completely_wired)
 
     def test_pipeline_oneStep_cabling_minrow_constraint_may_be_breached_clean(self):
         """ Unverifiable cabling
@@ -699,7 +695,7 @@ class PipelineMockTests(TestCase):
         Create outputs from output cablings; also change the output cablings
         and recreate the outputs to see if they're correct.
         """
-        with mock_relations(XputStructure), self.create_valid_pipeline() as p:
+        with self.create_valid_pipeline() as p:
             p.outcables.all()[0].output_name = 'step1_out'
             Pipeline.outputs = PropertyMock('Pipeline.outputs')
             Pipeline.outputs.create.return_value = TransformationOutput()
@@ -709,11 +705,12 @@ class PipelineMockTests(TestCase):
             self.assertEqual(
                 [call(y=0, x=0, dataset_idx=1, dataset_name='step1_out')],
                 p.outputs.create.call_args_list)
-            self.assertEqual(1, XputStructure.save.call_count)  # @UndefinedVariable
+            # noinspection PyUnresolvedReferences
+            self.assertEqual(1, XputStructure.save.call_count)
 
     def test_create_outputs_multi_step(self):
         """Testing create_outputs with a multi-step pipeline."""
-        with mock_relations(XputStructure), self.create_valid_pipeline() as p:
+        with self.create_valid_pipeline() as p:
             self.add_step(p)
             p.outcables.all()[0].output_name = 'step1_out'
             p.outcables.all()[1].output_name = 'step2_out'
@@ -726,50 +723,42 @@ class PipelineMockTests(TestCase):
                 [call(y=0, x=0, dataset_idx=1, dataset_name='step1_out'),
                  call(y=0, x=0, dataset_idx=2, dataset_name='step2_out')],
                 p.outputs.create.call_args_list)
-            self.assertEqual(2, XputStructure.save.call_count)  # @UndefinedVariable
+            # noinspection PyUnresolvedReferences
+            self.assertEqual(2, XputStructure.save.call_count)
 
     @contextmanager
     def create_valid_pipeline(self):
-        with mock_relations(Pipeline,
-                            PipelineStep,
-                            Method,
-                            CompoundDatatype,
-                            Datatype,
-                            PipelineStepInputCable,
-                            PipelineOutputCable):
-            p = Pipeline(family=PipelineFamily())
-            self.add_inputs(p, self.create_input(datatypes.STR_PK, dataset_idx=1))
-            m = Method()
-            m.method = m
-            self.add_inputs(m, self.create_input(datatypes.STR_PK, dataset_idx=1))
-            self.add_outputs(m, self.create_output(datatypes.STR_PK, dataset_idx=1))
+        p = Pipeline(family=PipelineFamily())
+        self.add_inputs(p, self.create_input(datatypes.STR_PK, dataset_idx=1))
+        m = Method()
+        m.method = m
+        self.add_inputs(m, self.create_input(datatypes.STR_PK, dataset_idx=1))
+        self.add_outputs(m, self.create_output(datatypes.STR_PK, dataset_idx=1))
 
-            step1 = PipelineStep(pipeline=p, transformation=m, step_num=1)
-            p.steps.add(step1)
+        step1 = PipelineStep(pipeline=p, transformation=m, step_num=1)
+        p.steps.add(step1)
 
-            cable = PipelineStepInputCable(pipelinestep=step1,
-                                           source_step=0,
-                                           source=p.inputs.all()[0],
-                                           dest=m.inputs.all()[0])
-            cable.pipelinestepinputcable = cable
-            step1.cables_in.add(cable)
+        cable = PipelineStepInputCable(pipelinestep=step1,
+                                       source_step=0,
+                                       source=p.inputs.all()[0],
+                                       dest=m.inputs.all()[0])
+        cable.pipelinestepinputcable = cable
+        step1.cables_in.add(cable)
 
-            outcable = PipelineOutputCable(
-                pipeline=p,
-                output_idx=1,
-                source_step=1,
-                source=m.outputs.all()[0],
-                output_cdt=m.outputs.all()[0].get_cdt())
-            p.outcables.add(outcable)
+        outcable = PipelineOutputCable(
+            pipeline=p,
+            output_idx=1,
+            source_step=1,
+            source=m.outputs.all()[0],
+            output_cdt=m.outputs.all()[0].get_cdt())
+        p.outcables.add(outcable)
 
-            yield p
+        yield p
 
     def add_step(self, pipeline):
         prev_step = pipeline.steps[-1]
         m = Method()
         m.method = m
-        m.inputs = MockSet()
-        m.outputs = MockSet()
         self.add_inputs(m, self.create_input(datatypes.STR_PK, dataset_idx=1))
         self.add_outputs(m, self.create_output(datatypes.STR_PK, dataset_idx=1))
         step = PipelineStep(pipeline=pipeline,
@@ -783,7 +772,6 @@ class PipelineMockTests(TestCase):
             source=prev_step.transformation.outputs[0],
             dest=m.inputs[0])
         cable.pipelinestepinputcable = cable
-        step.cables_in = MockSet()
         step.cables_in.add(cable)
         outcable = PipelineOutputCable(
             pipeline=pipeline,
@@ -810,7 +798,6 @@ class PipelineMockTests(TestCase):
     def set_structure(self, xput, column_datatype_ids):
         if column_datatype_ids:
             cdt = CompoundDatatype()
-            cdt.members = MockSet()
             for datatype_id in column_datatype_ids:
                 cdt.members.add(CompoundDatatypeMember(
                     datatype=Datatype(id=datatype_id)))
@@ -818,6 +805,8 @@ class PipelineMockTests(TestCase):
 
     def add_inputs(self, transformation, *inputs):
         """ Wire up the inputs to a mocked transformation.
+
+        :param Transformation transformation: inputs will be added to this
         """
         for t_input in inputs:
             t_input.transformationinput = t_input
@@ -826,6 +815,8 @@ class PipelineMockTests(TestCase):
 
     def add_outputs(self, transformation, *outputs):
         """ Wire up the outputs to a mocked transformation.
+
+        :param Transformation transformation: outputs will be added to this
         """
         for t_output in outputs:
             t_output.transformationoutput = t_output
@@ -834,10 +825,10 @@ class PipelineMockTests(TestCase):
 
 
 class PipelineUpdateMockTests(TestCase):
+    @mocked_relations(Pipeline)
     def test_no_steps(self):
-        with mock_relations(Pipeline):
-            pipeline = Pipeline()
+        pipeline = Pipeline()
 
-            updates = pipeline.find_step_updates()
+        updates = pipeline.find_step_updates()
 
-            self.assertEqual([], updates)
+        self.assertEqual([], updates)

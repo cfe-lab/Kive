@@ -24,7 +24,7 @@
         });
         this.registerColumn("", function($td, dataset) {
             if (dataset.has_data) {
-                $('<a>').text('Download').attr('href', dataset.download_url).appendTo($td);
+                $('<a>').text('Download').addClass('button').attr('href', dataset.download_url).appendTo($td);
             }
         });
         this.registerStandardColumn("user");

@@ -1,6 +1,5 @@
 require('shelljs/global');
 
-
 module.exports = function (grunt) {
     
     // Project configuration.
@@ -69,7 +68,7 @@ module.exports = function (grunt) {
                                         console.log('Inlining ' + p1 + '...');
                                     }
                                     cmd += 'base64';
-                                    img = exec(cmd, {silent: true}).output.replace(/\s/g, '');
+                                    img = exec(cmd, {silent: true}).stdout.replace(/\s/g, '');
                                 } else {
                                     console.log('Inlining ' + p1 + '...');
                                     img = grunt.file.read(filename, {encoding: "base64"});

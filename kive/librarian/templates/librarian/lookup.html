@@ -9,6 +9,7 @@
 
 {% block javascript %}
     <script type="text/javascript" src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
     <script type="text/javascript" src="/static/librarian/md5.js"></script>
     <script type="text/javascript" src="/static/librarian/lookup.js"></script>
 {% endblock %}
@@ -19,7 +20,7 @@
 
 {% block content %}
     <a href="usr.html" rel="prev">Back to user's portal</a>
-    <h2>Find pipeline</h2>
+    <h2>Find pipelines involving a file</h2>
 
     <div id="file_io_compat">
         <div id="dropzone">
@@ -36,7 +37,7 @@
         </div>
     <span>Or click <a id="filesel" href="#">here</a> to select a file.</span>
     </div>
-    <form action="/datasets_lookup/" method="POST" enctype="multipart/form-data">
+    <form action="/funnydatasets_lookup/" method="POST" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="file" name="file" id="upload_file" style="display:none">
         <input id='continuebtn' type="submit"  value="Search" disabled/>

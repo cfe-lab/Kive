@@ -1,7 +1,11 @@
 System.config({
     paths: {
         'static/pipeline/pipeline_all': '/static/pipeline/pipeline_all',
-        'jquery' : '/static/portal/jquery-2.0.3.min.js'
+        jquery : '/static/portal/jquery-2.0.3.min.js',
+        noXss  : '/static/portal/noxss.js'
+    },
+    bundles: {
+        noXss: ['jquery']
     },
     // packages tells the System loader how to load when no filename and/or no extension
     packages: {

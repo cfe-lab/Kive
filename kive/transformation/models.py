@@ -282,6 +282,7 @@ class Transformation(metadata.models.AccessControl):
 
     def find_update(self):
         update = self.definite.family.members.latest('revision_number')
+        members = list(self.definite.family.members.all())
         return update if update.pk != self.pk else None
 
 
@@ -305,19 +306,11 @@ class TransformationXput(models.Model):
 
     @property
     def is_input(self):
-        try:
-            self.transformationinput
-        except TransformationXput.DoesNotExist:
-            return False
-        return True
+        return hasattr(self, 'transformationinput')
 
     @property
     def is_output(self):
-        try:
-            self.transformationoutput
-        except TransformationXput.DoesNotExist:
-            return False
-        return True
+        return hasattr(self, 'transformationoutput')
 
     @property
     def definite(self):
