@@ -343,7 +343,6 @@ class Foreman(object):
         self.sandbox = Sandbox(run=run)
         # A flag to indicate that this Foreman is in the process of terminating its Run and Sandbox.
         self.shutting_down = False
-        self.scheduler = SlurmScheduler()
         self.priority = run.priority
 
     def monitor_queue(self):
@@ -358,8 +357,8 @@ class Foreman(object):
             else:
                 our_slurm_jobs.append(task_dict["setup"])
                 our_slurm_jobs.append(task_dict["driver"])
-                our_slurm_jobs.append(task_dict["bookkeepping"])
-        task_accounting_info = self.scheduler.get_accounting_info(our_slurm_jobs)
+                our_slurm_jobs.append(task_dict["bookkeeping"])
+        task_accounting_info = SlurmScheduler.get_accounting_info(our_slurm_jobs)
 
         # These flags reflect the status from the actual execution, not
         # the states of the RunComponents in the database.  (We may have to

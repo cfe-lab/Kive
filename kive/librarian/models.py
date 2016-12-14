@@ -648,6 +648,21 @@ class Dataset(metadata.models.AccessControl):
         ccl.add_missing_output()
         return ccl
 
+    def mark_file_not_stable(self, start_time, end_time, execlog, checking_user):
+        """Mark a Dataset as having had an unstable file size.
+
+        INPUTS
+        start_time      time when we started checking for the file
+        end_time        time when check for file finished
+        execlog         ExecLog of execution which did not produce
+                        output
+        checking_user   user that discovered the missing output
+        """
+        ccl = self.content_checks.create(start_time=start_time, end_time=end_time, execlog=execlog, user=checking_user)
+        ccl.add_file_not_stable()
+        return ccl
+
+
     @classmethod
     def create_empty(cls, user=None, cdt=None, users_allowed=None, groups_allowed=None,
                      file_source=None, instance=None):
@@ -771,6 +786,9 @@ class Dataset(metadata.models.AccessControl):
                 )
                 file_access_utils.configure_sandbox_permissions(run_dir)
 
+                # Note that this may raise a VerificationMethodError if a CustomConstraint
+                # verification method fails.  We allow the error to propagate
+                # up.
                 content_check = new_dataset.check_file_contents(
                     file_path_to_check=file_path,
                     file_handle=file_handle,
@@ -780,6 +798,7 @@ class Dataset(metadata.models.AccessControl):
                     execlog=None,
                     checking_user=user
                 )
+
                 shutil.rmtree(run_dir)
                 if content_check.is_fail():
                     if content_check.baddata.bad_header:
@@ -908,6 +927,9 @@ class Dataset(metadata.models.AccessControl):
         If not raw, checks the file and returns CCL with/without a
         corresponding BadData.
 
+        RAISES
+        VerificationMethodError if the verification method fails to run.
+
         PRE
         Should never be called twice on the same dataset, as
         this would overwrite num_rows to a potentially new value?
@@ -934,11 +956,18 @@ class Dataset(metadata.models.AccessControl):
 
         my_CDT = self.get_cdt()
 
-        with file_access_utils.FileReadHandler(file_path=file_path_to_check,
-                                               file_handle=file_handle, access_mode="rb") as f:
-            csv_summary = my_CDT.summarize_CSV(f, summary_path, ccl)
+        # This may raise a VerificationMethodError; if so, then throw away the ContentCheckLog.
+        try:
+            with file_access_utils.FileReadHandler(file_path=file_path_to_check,
+                                                   file_handle=file_handle, access_mode="rb") as f:
+                csv_summary = my_CDT.summarize_CSV(f, summary_path, ccl)
+        except metadata.models.VerificationMethodError:
+            self.logger.error("ContentCheckLog for file %s failed because the verification method failed",
+                              file_path_to_check)
+            ccl.delete()
+            raise
 
-        if ("bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary):
+        if "bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary:
             self.logger.warn("malformed header")
             ccl.add_bad_header()
             ccl.stop(save=True, clean=True)

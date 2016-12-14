@@ -222,25 +222,34 @@ def confirm_file_created(path,
 
     Returns the resulting MD5 of the copied file.
     """
-    curr_file_size = os.stat(path).st_size
+    curr_file_size = os.stat(path).st_size if os.path.exists(path) else None
 
     start_time = timezone.now()
     wait_time = random.uniform(wait_min, wait_max)
-    for num_tries in range(max_num_tries):
-        pre_md5_time = timezone.now()
-        # While we're waiting, we compute the MD5.
-        with open(path, "rb") as f:
-            curr_md5 = compute_md5(f)
-        post_md5_time = timezone.now()
+    curr_md5 = None
 
-        seconds_elapsed = (post_md5_time - pre_md5_time).total_seconds()
+    for num_tries in range(max_num_tries):
+        if os.path.exists(path):
+            pre_md5_time = timezone.now()
+            # While we're waiting, we compute the MD5.
+            with open(path, "rb") as f:
+                curr_md5 = compute_md5(f)
+            post_md5_time = timezone.now()
+
+            seconds_elapsed = (post_md5_time - pre_md5_time).total_seconds()
+        else:
+            seconds_elapsed = 0
+
         if seconds_elapsed < wait_time:
             time.sleep(wait_time - seconds_elapsed)
 
-        new_file_size = os.stat(path).st_size
-        if new_file_size == curr_file_size:
-            # File appears to be done.
-            return curr_md5
+        new_file_size = None
+        if os.path.exists(path):
+            new_file_size = os.stat(path).st_size
+            if new_file_size == curr_file_size:
+                # File appears to be done and hasn't changed since our last file size check
+                # (so the MD5 is OK).
+                return curr_md5
 
         if num_tries < max_num_tries:
             # Having reached here, we know that the file changed and we haven't given up yet.
@@ -253,13 +262,25 @@ def confirm_file_created(path,
 
     # We give up.
     end_time = timezone.now()
-    raise FileCreationError(
-        "File {} did not reach a stable file size; checked {} times over {} seconds.".format(
-            path,
-            max_num_tries,
-            (end_time - start_time).total_seconds()
+    if curr_md5 is not None:
+        e = FileCreationError(
+            "File {} did not reach a stable file size; checked {} times over {} seconds.".format(
+                path,
+                max_num_tries,
+                (end_time - start_time).total_seconds()
+            )
         )
-    )
+        e.md5 = curr_md5
+    else:
+        e = FileCreationError(
+            "File {} was not created; checked {} times over {} seconds.".format(
+                path,
+                max_num_tries,
+                (end_time - start_time).total_seconds()
+            )
+        )
+        e.file_not_created = True
+    raise e
 
 
 class FileReadHandler:

@@ -179,6 +179,9 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
     - failing_cells: dict of non-conforming cells in the file,
       entries keyed by (rownum, colnum) contain list of tests failed.
 
+    RAISES
+    VerificationMethodError if the verification method fails somehow.
+
     ASSUMPTIONS
     1) content_check_log may only be None if this function is being called
     with Datatypes as columns, not CompoundDatatypeMembers.
@@ -226,7 +229,11 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
         # If this is called with Datatypes, content_check_log will be None,
         # so it's OK to pass it to Datatype.check_custom_constraint.
         LOGGER.debug("Checking custom constraints on column {}".format(col))
-        result = columns[col-1].check_custom_constraint(column_paths[col], column_files[col].name, content_check_log)
+        result = columns[col-1].check_custom_constraint(
+            column_paths[col],
+            column_files[col].name,
+            content_check_log
+        )
         for row, error in result.items():
             if row > num_rows:
                 if columns[col-1].__class__.__name__ == "Datatype":
@@ -234,8 +241,14 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
                 else:
                     datatype = columns[col-1].datatype
 
-                raise ValueError('Verification method for Datatype "{}" indicated an error in row {}, but only {} rows '
-                                 'were checked'.format(datatype, row, num_rows))
+                raise ValueError(
+                    'Verification method for Datatype "{}" indicated an error in row {}, '
+                    'but only {} rows were checked'.format(
+                        datatype,
+                        row,
+                        num_rows
+                    )
+                )
             cell = (row, col)
             if cell in failing_cells:
                 failing_cells[cell].extend(error)
@@ -595,6 +608,10 @@ class AccessControl(models.Model):
         addable_groups = Group.objects.exclude(pk__in=group_pks_already_allowed)
 
         return addable_users, addable_groups
+
+
+class VerificationMethodError(Exception):
+    pass
 
 
 @python_2_unicode_compatible
@@ -1239,6 +1256,10 @@ class Datatype(AccessControl):
         failing_cells       a dictionary of cells which failed a custom
                             constraint (see summarize_CSV)
 
+        RAISES
+        IOError, FileCreationError (if the verifier method fails to install properly)
+        VerificationMethodError (if the verifier method fails somehow)
+
         ASSUMPTIONS
         1) this Datatype has a CustomConstraint.
         2) summary_path has been set up using setup_verification_path.
@@ -1277,10 +1298,12 @@ class Datatype(AccessControl):
         is_done = False
         while not is_done:
             time.sleep(check_interval)
-            curr_state = self.get_state()
-            is_done = curr_state in SlurmScheduler.STOPPED_SET
+            curr_state = job.get_state()
             self.logger.debug("Waiting for %s (state = %s)", job, curr_state)
-        return_code = SlurmScheduler.ret_dct[curr_state]
+            is_done = curr_state in SlurmScheduler.STOPPED_SET
+
+        job_info = SlurmScheduler.get_accounting_info([job])[job.job_id]
+        return_code = job_info["return_code"]
 
         # The method's driver has been called and has completed: now keep the record.
         with transaction.atomic():
@@ -1298,6 +1321,30 @@ class Datatype(AccessControl):
 
             verification_log.clean()
             verification_log.save()
+
+        if job_info["state"] in SlurmScheduler.CANCELLED_STATES:
+            raise VerificationMethodError(
+                "Verification method of Datatype {} was cancelled when run on file {}".format(
+                    self,
+                    input_path
+                )
+            )
+        elif job_info["state"] in SlurmScheduler.FAILED_STATES:
+            raise VerificationMethodError(
+                "Verification method of Datatype {} failed when run on file {} (return code {})".format(
+                    self,
+                    input_path,
+                    return_code
+                )
+            )
+        elif return_code != 0:
+            raise VerificationMethodError(
+                "Verification method of Datatype {} produced return code {} when run on file {}".format(
+                    self,
+                    return_code,
+                    input_path
+                )
+            )
 
         return self._check_verification_output(summary_path, output_path)
 
@@ -1324,6 +1371,9 @@ class Datatype(AccessControl):
                         CustomConstraint and we do not check them
                         recursively).
 
+        RAISES
+        RuntimeError if summarize_CSV raises one.
+
         ASSUMPTIONS
         1) This is called from inside check_custom_constraint.
         """
@@ -1338,7 +1388,9 @@ class Datatype(AccessControl):
         # failed_row), and we will define NaturalNumber to have no
         # CustomConstraint, so that no deeper recursion will happen.
         with open(output_path, "r") as test_out:
-            output_summary = VERIF_OUT.summarize_CSV(test_out, os.path.join(summary_path, "SHOULDNEVERBEWRITTENTO"))
+            dummy_path = os.path.join(summary_path, "SHOULDNEVERBEWRITTENTO")
+            output_summary = VERIF_OUT.summarize_CSV(test_out, dummy_path)
+        assert not os.path.exists(dummy_path)
 
         if "bad_num_cols" in output_summary:
             raise ValueError(('Output of verification method for Datatype "{}" had the wrong number of columns'
@@ -1349,13 +1401,6 @@ class Datatype(AccessControl):
 
         if "failing_cells" in output_summary:
             raise ValueError('Output of verification method for Datatype "{}" had malformed entries'.format(self))
-
-        # This should really never happen.
-        # Should this really be a value error? The previous checks are for
-        # problems with the user's code, but this one is for ours. Seems
-        # inconsistent. -RM
-        if os.path.exists(os.path.join(summary_path, "SHOULDNEVERBEWRITTENTO")):
-            raise ValueError('Verification output CDT "{}" has been corrupted'.format(VERIF_OUT))
 
         # Collect the row numbers of incorrect entries in this column.
         failing_cells = {}
@@ -1667,6 +1712,8 @@ class CompoundDatatypeMember(models.Model):
         """
         Exactly the same as Datatype.check_custom_constraint(), except
         we create a VerificationLog.
+
+        May raise a VerificationMethodError if the verification method fails somehow.
         """
         verif_log = content_check_log.verification_logs.create(CDTM=self)
         return self.datatype.check_custom_constraint(summary_path, input_path, verif_log)
@@ -1910,6 +1957,9 @@ class CompoundDatatype(AccessControl):
         - num_rows: number of rows in the CSV
         - failing_cells: dict of non-conforming cells in the file.
           Entries keyed by (rownum, colnum) contain list of tests failed.
+
+        RAISES
+        VerificationMethodError if the verification method fails somehow
 
         ASSUMPTIONS
         1) content_check_log may only be None if this function is being called

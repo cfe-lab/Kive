@@ -25,6 +25,7 @@ from datachecking.models import IntegrityCheckLog
 from fleet.exceptions import StopExecution
 from fleet.slurmlib import SlurmScheduler
 from file_access_utils import copy_and_confirm, FileCreationError
+from metadata.models import VerificationMethodError
 
 
 logger = logging.getLogger("Sandbox")
@@ -1426,6 +1427,10 @@ class Sandbox:
             ).definite
         curr_ER = None
 
+        make_dataset = curr_record.keeps_output()
+        dataset_name = curr_record.output_name()
+        dataset_desc = curr_record.output_description()
+
         recover = recovering_record is not None
         invoking_record = recovering_record or curr_record
         if recover:
@@ -1560,12 +1565,19 @@ class Sandbox:
 
         # Run cable (this completes the ExecLog).
         cable_failed = False
+        file_size_unstable = False
         try:
             md5 = cable.run_cable(input_dataset_path, output_path, curr_record, curr_log)
         except OSError:
+            # The cable was trivial and failed during linking.
             cable_failed = True
-        except FileCreationError:
+        except FileCreationError as e:
+            # Cable either failed during linking or after running (non-trivial).
             cable_failed = True
+            if hasattr(e, "md5"):
+                # Cable failed on running.
+                md5 = e.md5
+                file_size_unstable = True
 
         # Here, we're authoring/modifying an ExecRecord, so we use a transaction.
         preexisting_ER = curr_ER is not None
@@ -1573,25 +1585,42 @@ class Sandbox:
         while not succeeded_yet:
             try:
                 with transaction.atomic():
-                    missing_output = False
+                    bad_output = False
                     start_time = timezone.now()
 
                     if cable_failed:
                         end_time = timezone.now()
+                        bad_output = True
+
                         # It's conceivable that the linking could fail in the
                         # trivial case; in which case we should associate a "missing data"
                         # check to input_dataset == output_dataset.
                         if cable.is_trivial():
                             output_dataset = input_dataset
-                        if curr_ER is None:
-                            output_dataset = librarian.models.Dataset.create_empty(
-                                cdt=output_CDT,
-                                file_source=curr_record
-                            )
+                        elif curr_ER is None:
+                            if not file_size_unstable:
+                                output_dataset = librarian.models.Dataset.create_empty(
+                                    cdt=output_CDT,
+                                    file_source=curr_record
+                                )
+                            else:
+                                output_dataset = librarian.models.Dataset.create_dataset(
+                                    output_path,
+                                    cdt=output_CDT,
+                                    keep_file=make_dataset,
+                                    name=dataset_name,
+                                    description=dataset_desc,
+                                    file_source=curr_record,
+                                    check=False,
+                                    precomputed_md5=md5
+                                )
                         else:
                             output_dataset = curr_ER.execrecordouts.first().dataset
-                        output_dataset.mark_missing(start_time, end_time, curr_log, user)
-                        missing_output = True
+
+                        if not file_size_unstable:
+                            output_dataset.mark_missing(start_time, end_time, curr_log, user)
+                        else:
+                            output_dataset.mark_file_not_stable(start_time, end_time, curr_log, user)
 
                         # Update state variables.
                         curr_record.finish_failure(save=True)
@@ -1603,9 +1632,6 @@ class Sandbox:
 
                     else:
                         # Do we need to keep this output?
-                        make_dataset = curr_record.keeps_output()
-                        dataset_name = curr_record.output_name()
-                        dataset_desc = curr_record.output_description()
                         if not make_dataset:
                             logger.debug("Cable doesn't keep output: not creating a dataset")
 
@@ -1651,13 +1677,15 @@ class Sandbox:
         ####
         # Check outputs
         ####
-        if not missing_output:
+        if not bad_output:
             # Case 1: the cable is trivial.  Don't check the integrity, it was already checked
             # when it was first written to the sandbox.
             if cable.is_trivial():
                 logger.debug("Cable is trivial; skipping integrity check")
 
             else:
+
+                verification_method_failed = False
                 # Case 2a: ExecRecord already existed and its output had been properly vetted.
                 # Case 2b: this was a recovery.
                 # Check the integrity of the output.
@@ -1674,10 +1702,19 @@ class Sandbox:
                     logger.debug("Output has no complete content check; performing content check")
                     summary_path = "{}_summary".format(output_path)
                     # Perform content check.  Note: if this fails, it will notify all RunComponents using it.
-                    check = output_dataset.check_file_contents(output_path, summary_path, cable.min_rows_out,
-                                                               cable.max_rows_out, curr_log, user)
+                    try:
+                        check = output_dataset.check_file_contents(
+                            output_path,
+                            summary_path,
+                            cable.min_rows_out,
+                            cable.max_rows_out,
+                            curr_log,
+                            user
+                        )
+                    except VerificationMethodError:
+                        verification_method_failed = True
 
-                if check.is_fail():
+                if verification_method_failed or check.is_fail():
                     curr_record.finish_failure(save=True)
 
         logger.debug("DONE EXECUTING %s '%s'", type(cable).__name__, cable)
@@ -1829,8 +1866,6 @@ class Sandbox:
                     curr_ER.quarantine_runcomponents()  # this is transaction'd
 
             # Install the code.
-            # FIXME double-check that this is reasonable tomorrow
-            # Also keep checking on all instances of method.install
             try:
                 method.install(step_run_dir)
             except (IOError, FileCreationError):
@@ -1923,6 +1958,7 @@ class Sandbox:
         bad_execution = False
         bad_output_found = False
         integrity_checks = {}  # {output_idx: check}
+        md5s = {}  # {output_idx: md5}
         try:
             succeeded_yet = False
             while not succeeded_yet:
@@ -1935,82 +1971,121 @@ class Sandbox:
                         output_datasets = []
                         logger.debug("ExecLog.is_successful() == %s", not bad_execution)
 
-                        if not recover:
-                            if preexisting_ER:
+                        # if not recover:
+                        if preexisting_ER:
+                            if not recover:
                                 logger.debug("Filling in pre-existing ExecRecord with PipelineStep outputs")
                             else:
-                                logger.debug("Creating new Datasets for PipelineStep outputs")
+                                logger.debug("Examining outputs of pre-existing ExecRecord after recovery")
+                        else:
+                            logger.debug("Creating new Datasets for PipelineStep outputs")
 
-                            for i, curr_output in enumerate(pipelinestep.outputs):
-                                output_path = output_paths[i]
-                                output_CDT = curr_output.get_cdt()
+                        for i, curr_output in enumerate(pipelinestep.outputs):
+                            output_path = output_paths[i]
+                            output_CDT = curr_output.get_cdt()
 
-                                # Check that the file exists, as we did for cables.
-                                start_time = timezone.now()
-                                if not file_access_utils.file_exists(output_path):
-                                    end_time = timezone.now()
-                                    if preexisting_ER:
-                                        output_dataset = curr_ER.get_execrecordout(curr_output).dataset
+                            # Check that the file exists, as we did for cables.
+                            start_time = timezone.now()
+                            file_confirmed = True
+
+                            try:
+                                md5s[i] = file_access_utils.confirm_file_created(output_path)
+                            except FileCreationError as e:
+                                logger.error("File at %s was not properly created.", output_path, exc_info=True)
+                                file_confirmed = False
+
+                                if hasattr(e, "md5"):
+                                    md5s[i] = e.md5
+                                else:
+                                    md5s[i] = None
+
+                            if not file_confirmed:
+                                end_time = timezone.now()
+                                bad_output_found = True
+
+                                if preexisting_ER:
+                                    output_dataset = curr_ER.get_execrecordout(curr_output).dataset
+                                    if md5s[i] is None:
+                                        output_dataset.mark_missing(start_time, end_time, curr_log, user)
                                     else:
-                                        output_dataset = librarian.models.Dataset.create_empty(
-                                            cdt=output_CDT, file_source=curr_RS)
+                                        output_dataset.mark_file_not_stable(start_time, end_time, curr_log, user)
+
+                                elif md5s[i] is None:
+                                    output_dataset = librarian.models.Dataset.create_empty(
+                                        cdt=output_CDT,
+                                        file_source=curr_RS
+                                    )
                                     output_dataset.mark_missing(start_time, end_time, curr_log, user)
 
-                                    bad_output_found = True
+                                else:
+                                    output_dataset = librarian.models.Dataset.create_dataset(
+                                        output_path,
+                                        cdt=output_CDT,
+                                        keep_file=make_dataset,
+                                        name=dataset_name,
+                                        description=dataset_desc,
+                                        file_source=curr_RS,
+                                        check=False,
+                                        precomputed_md5=md5s[i]
+                                    )
+                                    output_dataset.mark_file_not_stable(start_time, end_time, curr_log, user)
+
+                            else:
+                                # If necessary, create new Dataset for output, and create the Dataset
+                                # if it's to be retained.
+                                dataset_name = curr_RS.output_name(curr_output)
+                                dataset_desc = curr_RS.output_description(curr_output)
+                                make_dataset = curr_RS.keeps_output(curr_output)
+
+                                if preexisting_ER:
+                                    if make_dataset:
+                                        # Wrap in a transaction to prevent
+                                        # concurrent authoring of Datasets to
+                                        # an existing Dataset.
+                                        output_ERO = curr_ER.get_execrecordout(curr_output)
+                                        with transaction.atomic():
+                                            output_dataset = Dataset.objects.select_for_update().filter(
+                                                pk=output_ERO.dataset.pk).first()
+                                            if not output_dataset.has_data():
+                                                check = output_dataset.check_integrity(
+                                                    output_path,
+                                                    checking_user=user,
+                                                    execlog=curr_log,
+                                                    notify_all=True,
+                                                    newly_computed_MD5=md5s[i]
+                                                )
+                                                integrity_checks[i] = check
+                                                if not check.is_fail():
+                                                    output_dataset.register_file(output_path)
 
                                 else:
-                                    # If necessary, create new Dataset for output, and create the Dataset
-                                    # if it's to be retained.
-                                    dataset_name = curr_RS.output_name(curr_output)
-                                    dataset_desc = curr_RS.output_description(curr_output)
-                                    make_dataset = curr_RS.keeps_output(curr_output)
+                                    output_dataset = librarian.models.Dataset.create_dataset(
+                                        output_path,
+                                        cdt=output_CDT,
+                                        keep_file=make_dataset,
+                                        name=dataset_name,
+                                        description=dataset_desc,
+                                        file_source=curr_RS,
+                                        check=False
+                                    )
+                                    logger.debug("First time seeing file: saved md5 %s",
+                                                 output_dataset.MD5_checksum)
 
-                                    if preexisting_ER:
-                                        if make_dataset:
-                                            # Wrap in a transaction to prevent
-                                            # concurrent authoring of Datasets to
-                                            # an existing Dataset.
-                                            output_ERO = curr_ER.get_execrecordout(curr_output)
-                                            with transaction.atomic():
-                                                output_dataset = Dataset.objects.select_for_update().filter(
-                                                    pk=output_ERO.dataset.pk).first()
-                                                if not output_dataset.has_data():
-                                                    check = output_dataset.check_integrity(
-                                                        output_path,
-                                                        checking_user=user,
-                                                        execlog=curr_log,
-                                                        notify_all=True)
-                                                    integrity_checks[i] = check
-                                                    if not check.is_fail():
-                                                        output_dataset.register_file(output_path)
+                            output_datasets.append(output_dataset)
 
-                                    else:
-                                        output_dataset = librarian.models.Dataset.create_dataset(
-                                            output_path,
-                                            cdt=output_CDT,
-                                            keep_file=make_dataset,
-                                            name=dataset_name,
-                                            description=dataset_desc,
-                                            file_source=curr_RS,
-                                            check=False
-                                        )
-                                        logger.debug("First time seeing file: saved md5 %s",
-                                                     output_dataset.MD5_checksum)
-                                output_datasets.append(output_dataset)
+                        # Create ExecRecord if there isn't already one.
+                        if not preexisting_ER:
+                            # Make new ExecRecord, linking it to the ExecLog
+                            logger.debug("Creating fresh ExecRecord")
+                            curr_ER = librarian.models.ExecRecord.create(
+                                curr_log,
+                                pipelinestep,
+                                inputs_after_cable,
+                                output_datasets
+                            )
 
-                            # Create ExecRecord if there isn't already one.
-                            if not preexisting_ER:
-                                # Make new ExecRecord, linking it to the ExecLog
-                                logger.debug("Creating fresh ExecRecord")
-                                curr_ER = librarian.models.ExecRecord.create(
-                                    curr_log,
-                                    pipelinestep,
-                                    inputs_after_cable,
-                                    output_datasets
-                                )
-
-                            # Link ExecRecord to RunStep (it may already have been linked; that's fine).
-                            curr_RS.link_execrecord(curr_ER, False)
+                        # Link ExecRecord to RunStep (it may already have been linked; that's fine).
+                        curr_RS.link_execrecord(curr_ER, False)
 
                     succeeded_yet = True
                 except (OperationalError, InternalError):
@@ -2021,11 +2096,13 @@ class Sandbox:
                     )
                     time.sleep(wait_time)
 
-            # Check outputs.
+            # Having confirmed their existence, we can now perform proper integrity/content
+            # checks on the outputs.
             for i, curr_output in enumerate(pipelinestep.outputs):
                 output_path = output_paths[i]
                 output_dataset = curr_ER.get_execrecordout(curr_output).dataset
                 check = None
+                verification_method_failed = False
 
                 if bad_execution:
                     logger.debug("Execution was unsuccessful; no check on %s was done", output_path)
@@ -2034,51 +2111,51 @@ class Sandbox:
 
                 # Recovering or filling in old ER? Yes.
                 elif preexisting_ER:
+                    # Perform integrity check.
+                    logger.debug("Dataset has been computed before, checking integrity of %s",
+                                 output_dataset)
+                    check = integrity_checks.get(i)
+                    if check is None:
+                        check = output_dataset.check_integrity(output_path, user, curr_log,
+                                                               newly_computed_MD5=md5s[i])
 
-                    file_is_present = True
-                    if recover:
-                        # Check that the file exists as in the non-recovery case.
-                        start_time = timezone.now()
-                        if not file_access_utils.file_exists(output_path):
-                            end_time = timezone.now()
-                            check = output_dataset.mark_missing(start_time, end_time, curr_log, user)
-                            logger.debug("During recovery, output (%s) is missing", output_path)
-                            file_is_present = False
-
-                    if file_is_present:
-                        # Perform integrity check.
-                        logger.debug("Dataset has been computed before, checking integrity of %s",
-                                     output_dataset)
-                        check = integrity_checks.get(i)
-                        if check is None:
-                            check = output_dataset.check_integrity(output_path, user, curr_log)
-
-                        # We may also need to perform a content check if there isn't a complete
-                        # one already.
-                        if not check.is_fail() and not output_dataset.content_checks.filter(
-                                end_time__isnull=False).exists():
-                            logger.debug("Output has no complete content check; performing content check")
-                            summary_path = "{}_summary".format(output_path)
+                    # We may also need to perform a content check if there isn't a complete
+                    # one already.
+                    if not check.is_fail() and not output_dataset.content_checks.filter(
+                            end_time__isnull=False).exists():
+                        logger.debug("Output has no complete content check; performing content check")
+                        summary_path = "{}_summary".format(output_path)
+                        try:
                             check = output_dataset.check_file_contents(
-                                output_path, summary_path, curr_output.get_min_row(),
-                                curr_output.get_max_row(), curr_log, user)
+                                output_path,
+                                summary_path,
+                                curr_output.get_min_row(),
+                                curr_output.get_max_row(),
+                                curr_log,
+                                user
+                            )
+                        except VerificationMethodError:
+                            verification_method_failed = True
 
                 # Recovering or filling in old ER? No.
                 else:
                     # Perform content check.
                     logger.debug("%s is new data - performing content check", output_dataset)
                     summary_path = "{}_summary".format(output_path)
-                    check = output_dataset.check_file_contents(
-                        output_path,
-                        summary_path,
-                        curr_output.get_min_row(),
-                        curr_output.get_max_row(),
-                        curr_log,
-                        user
-                    )
+                    try:
+                        check = output_dataset.check_file_contents(
+                            output_path,
+                            summary_path,
+                            curr_output.get_min_row(),
+                            curr_output.get_max_row(),
+                            curr_log,
+                            user
+                        )
+                    except VerificationMethodError:
+                        verification_method_failed = True
 
                 # Check OK? No.
-                if check and check.is_fail():
+                if verification_method_failed or (check and check.is_fail()):
                     logger.warn("%s failed for %s", check.__class__.__name__, output_path)
                     bad_output_found = True
 

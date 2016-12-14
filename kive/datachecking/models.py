@@ -46,6 +46,12 @@ class ContentCheckLog(stopwatch.models.Stopwatch):
         baddata.clean()
         baddata.save()
 
+    def add_file_not_stable(self):
+        """Add a BadData for a file with unstable file size."""
+        baddata = BadData(contentchecklog=self, file_not_stable=True)
+        baddata.clean()
+        baddata.save()
+
     def add_bad_num_rows(self):
         """Add a BadData for bad number of rows."""
         baddata = BadData(contentchecklog=self, bad_num_rows=True)
@@ -102,10 +108,15 @@ class BadData(models.Model):
     missing_output = models.BooleanField(default=False)
     bad_header = models.NullBooleanField()
     bad_num_rows = models.NullBooleanField()
+    # Set this if the file was created but the file size never properly
+    # stabilized.  This would likely be due to issues with the filesystem.
+    file_not_stable = models.NullBooleanField()
 
     def __str__(self):
         if self.missing_output:
             return "missing output"
+        elif self.file_not_stable:
+            return "file not stable"
         elif self.bad_header:
             return "malformed header"
         elif self.bad_num_rows:
@@ -126,20 +137,20 @@ class BadData(models.Model):
         cleaning them.
         """
         if self.missing_output:
-            if self.bad_header != None:
+            if self.bad_header is not None:
                 raise ValidationError(
                     "BadData \"{}\" represents missing output; bad_header should not be set".
                     format(self))
             
-            if self.bad_num_rows != None:
+            if self.bad_num_rows is not None:
                 raise ValidationError(
                     "BadData \"{}\" represents missing output; bad_num_rows should not be set".
                     format(self))
 
             return
                 
-        if self.bad_header != None:
-            if self.bad_num_rows != None:
+        if self.bad_header is not None:
+            if self.bad_num_rows is not None:
                 raise ValidationError(
                     "BadData \"{}\" has a malformed header; bad_num_rows should not be set".
                     format(self))

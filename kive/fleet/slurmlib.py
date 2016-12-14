@@ -6,8 +6,6 @@ import subprocess as sp
 from datetime import datetime
 import re
 
-import time
-
 import logging
 
 logger = logging.getLogger("fleet.slurmlib")
@@ -324,7 +322,7 @@ class SlurmScheduler:
         """
         Get detailed information, i.e. sacct, on the specified job(s).
 
-        job_id_iter is an iterable that must contain job IDs (integers) of previously
+        job_id_iter is an iterable that must contain job handles of previously
         submitted jobs.
         If this list is None, or empty, information about all jobs on the
         queue is returned.
@@ -335,6 +333,7 @@ class SlurmScheduler:
           - start_time (datetime object)
           - end_time (datetime object)
           - return_code (int)
+          - state (string)
           - signal (int: the signal number that caused termination of this step, or 0 if
             it ended normally)
         """
