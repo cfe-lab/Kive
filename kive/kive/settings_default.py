@@ -282,9 +282,6 @@ LOGFILE_GRACE_PERIOD_HRS = 1.0
 LOGFILE_PURGE_SCAN_PERIOD_HRS = 12.0
 
 
-
-
-
 # Worker account configuration
 
 # The system user that actually runs the code.  This user:
