@@ -941,7 +941,7 @@ class Manager(object):
             # Some jobs in the queue have been started:
             # if we have time, do some idle tasks until time_to_poll and
             # then check and see if anything has finished.
-            if time.time() < time_to_poll:
+            if settings.DO_IDLE_TASKS and time.time() < time_to_poll:
                 self._do_idle_tasks(time_to_poll)
 
             if not self.wait_for_polling(time_to_poll):
