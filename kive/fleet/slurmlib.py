@@ -121,8 +121,9 @@ class SlurmScheduler:
     RESIZING = "RESIZING"
     SUSPENDED = "SUSPENDED"
     TIMEOUT = "TIMEOUT"
+    PENDING = "PENDING"
 
-    RUNNING_STATES = set([RUNNING, COMPLETING, PREEMPTED, RESIZING, SUSPENDED])
+    RUNNING_STATES = set([PENDING, RUNNING, COMPLETING, PREEMPTED, RESIZING, SUSPENDED])
     CANCELLED_STATES = set([CANCELLED, BOOT_FAIL, DEADLINE, NODE_FAIL, TIMEOUT])
     FAILED_STATES = set([FAILED])
 
@@ -318,7 +319,7 @@ class SlurmScheduler:
         return retdct
 
     @classmethod
-    def get_accounting_info(cls, job_id_iter=None):
+    def get_accounting_info(cls, job_handle_iter=None):
         """
         Get detailed information, i.e. sacct, on the specified job(s).
 
@@ -340,9 +341,9 @@ class SlurmScheduler:
         # The --parsable2 option creates parsable output: fields are separated by a pipe, with
         # no trailing pipe (the difference between --parsable2 and --parsable).
         cmd_lst = ["sacct", "--parsable2", "--format", "JobID,JobName,Start,End,State,ExitCode"]
-        if job_id_iter is not None and len(job_id_iter) > 0:
+        if job_handle_iter is not None and len(job_handle_iter) > 0:
             cmd_lst.append("-j")
-            cmd_lst.append(",".join(["{}".format(job_id) for job_id in job_id_iter]))
+            cmd_lst.append(",".join(["{}".format(handle.job_id) for handle in job_handle_iter]))
         logger.debug('Running command "{}"'.format(" ".join(cmd_lst)))
         try:
             sacct_output = sp.check_output(cmd_lst)
@@ -351,8 +352,8 @@ class SlurmScheduler:
             logger.error("sacct output: '%s' ", e.output)
             raise
 
-        lines = sacct_output.split('\n')
-        logger.debug("read %d lines", len(lines))
+        lines = sacct_output.strip().split('\n')
+        logger.debug("read %d lines (including header)", len(lines))
         name_tuple = tuple([s.strip() for s in lines[0].split("|")])
         accounting_info = {}
 

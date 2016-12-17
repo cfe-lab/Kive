@@ -2751,13 +2751,15 @@ class ExecLog(stopwatch.models.Stopwatch):
         """
         Checks completeness of this ExecLog.
 
-        The execution must have ended (i.e. end_time is
-        set) and a MethodOutput must be in place if appropriate.
+        If it belongs to a cable, then it must have its end time set.
+        A MethodOutput must be in place if appropriate.
         """
-        if not self.has_ended():
+        # This no longer holds for Method execution, as the ExecLog start and end time
+        # get set by the Manager when it monitors the queue.
+        if self.record.is_cable() and not self.has_ended():
             return False
 
-        if self.record.is_step() and self.record.runstep.pipelinestep.transformation.is_method():
+        elif self.record.is_step() and self.record.runstep.pipelinestep.transformation.is_method():
             if not hasattr(self, "methodoutput") or self.methodoutput is None:
                 return False
 

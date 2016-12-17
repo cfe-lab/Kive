@@ -271,13 +271,11 @@ DATASET_MAX_STORAGE = 5 << 40  # TB
 # When to stop purging
 DATASET_TARGET_STORAGE = 2 << 40  # TB
 
-# only dataset files older than this period will be considered for purging
+# Only dataset files older than this period will be considered for purging.
 DATASET_GRACE_PERIOD_HRS = 1.0
 
-# set the frequency with which the dataset directory is rescanned for files to purge.
+# Set the frequency with which the dataset directory is rescanned for files to purge.
 DATASET_PURGE_SCAN_PERIOD_HRS = 12.0
-
-
 
 # When to start purging old logfiles
 LOGFILE_MAX_STORAGE = 5 << 40  # TB
@@ -289,10 +287,6 @@ LOGFILE_GRACE_PERIOD_HRS = 1.0
 
 # set the frequency with which the Log directory is rescanned for files to purge.
 LOGFILE_PURGE_SCAN_PERIOD_HRS = 12.0
-
-
-
-
 
 # Worker account configuration
 

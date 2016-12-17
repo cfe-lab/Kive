@@ -1889,7 +1889,7 @@ class Sandbox:
 
         return curr_RS
 
-    def submit_step_execution(self, step_execute_info, after_okay=None):
+    def submit_step_execution(self, step_execute_info, after_okay=None, wrap=True):
         """
         Submit the step execution to Slurm.
 
@@ -1898,7 +1898,7 @@ class Sandbox:
         before the step execution can proceed.
         """
         # From here on the code is assumed to not be corrupted, and all the required files
-        # are in their right places.
+        # are to be placed in their right places.
         curr_RS = step_execute_info.runstep
 
         input_paths = [x.output_path for x in step_execute_info.cable_info_list]
@@ -1912,18 +1912,51 @@ class Sandbox:
         )
 
         logger.debug("Submitting driver '%s', task_pk %d", driver.coderesource.filename, curr_RS.pk)
-        job_handle = curr_RS.pipelinestep.transformation.definite.submit_code(
-            step_execute_info.step_run_dir,
-            input_paths,
-            step_execute_info.output_paths,
-            step_execute_info.driver_stdout_path(),
-            step_execute_info.driver_stderr_path(),
-            after_okay=after_okay,
-            uid=self.uid,
-            gid=self.gid,
-            priority=curr_RS.top_level_run.priority,
-            job_name=job_name
-        )
+        if not wrap:
+            job_handle = curr_RS.pipelinestep.transformation.definite.submit_code(
+                step_execute_info.step_run_dir,
+                input_paths,
+                step_execute_info.output_paths,
+                step_execute_info.driver_stdout_path(),
+                step_execute_info.driver_stderr_path(),
+                after_okay=after_okay,
+                uid=self.uid,
+                gid=self.gid,
+                priority=curr_RS.top_level_run.priority,
+                job_name=job_name
+            )
+        else:
+            # Wrap the driver in a script.
+            driver_template = """\
+#! /usr/bin/env bash
+{} {} {}
+"""
+            wrapped_driver_fd, wrapped_driver_path = tempfile.mkstemp(prefix=driver.coderesource.filename)
+            with os.fdopen(wrapped_driver_fd, "wb") as f:
+                f.write(
+                    driver_template.format(
+                        os.path.join(step_execute_info.step_run_dir, driver.coderesource.filename),
+                        " ".join(input_paths),
+                        " ".join(step_execute_info.output_paths)
+                    )
+                )
+
+            job_handle = SlurmScheduler.submit_job(
+                step_execute_info.step_run_dir,
+                wrapped_driver_path,
+                [],
+                self.uid,
+                self.gid,
+                self.run.priority,
+                step_execute_info.threads_required,
+                step_execute_info.driver_stdout_path(),
+                step_execute_info.driver_stderr_path(),
+                job_name=job_name
+            )
+
+            # Stick the path to the job handle so it can be disposed of later.
+            job_handle.wrapped_driver_path = wrapped_driver_path
+
         logger.debug("Submitted task with pk=%d; Slurm job ID=%d", curr_RS.pk, job_handle.job_id)
         return job_handle
 
