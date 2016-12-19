@@ -5,7 +5,7 @@ import os
 import re
 
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.core.urlresolvers import reverse, resolve
 from django.contrib.auth.models import User, Group
 
@@ -23,6 +23,7 @@ from kive.tests import DuckContext
 samplecode_path = "../samplecode"
 
 
+@skipIfDBFeature('is_mocked')
 class MetadataTestCase(TestCase):
     """
     Set up a database state for unit testing.
@@ -2404,6 +2405,7 @@ class CompoundDatatypeTests(MetadataTestCase):
         self.assertEqual(t5, [[], [int_fail], [float_fail], [bool_fail], []])
 
 
+@skipIfDBFeature('is_mocked')
 class DatatypeApiTests(TestCase):
 
     def setUp(self):
@@ -2471,6 +2473,7 @@ class DatatypeApiTests(TestCase):
         self.assertEquals(end_count, start_count - 1)
 
 
+@skipIfDBFeature('is_mocked')
 class CompoundDatatypeApiTests(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
@@ -2596,6 +2599,7 @@ class CompoundDatatypeApiTests(TestCase):
         self.assertEqual(col2.datatype, self.string_dt)
 
 
+@skipIfDBFeature('is_mocked')
 class AccessControlTests(TestCase):
     """
     Tests of functionality of the AccessControl abstract class.
@@ -2695,6 +2699,7 @@ class AccessControlTests(TestCase):
         self.assertSetEqual(set(self.groups_to_intersect), set(groups_qs))
 
 
+@skipIfDBFeature('is_mocked')
 class CompoundDatatypeSerializerTests(TestCase):
 
     def setUp(self):

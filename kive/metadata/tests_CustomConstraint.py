@@ -7,7 +7,7 @@ import shutil
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.conf import settings
 
 from metadata.models import Datatype, CompoundDatatype, CustomConstraint, everyone_group
@@ -318,6 +318,7 @@ class CustomConstraintTestPreamble(object):
         self.assertEqual(verif_log.start_time <= verif_log.end_time, True)
 
 
+@skipIfDBFeature('is_mocked')
 class CustomConstraintTests(CustomConstraintTestPreamble, TestCase):
 
     def test_summarize_CSV_no_output(self):
@@ -479,6 +480,7 @@ class CustomConstraintTests(CustomConstraintTestPreamble, TestCase):
                                 dt.clean)
 
 
+@skipIfDBFeature('is_mocked')
 class CustomConstraintTestsWithExecution(CustomConstraintTestPreamble, TestCase):
     def test_execute_pipeline_content_check_good(self):
         """

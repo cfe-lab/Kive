@@ -18,7 +18,7 @@ from django.core.files import File
 from django.core.urlresolvers import resolve
 from django.db import transaction
 
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.test import force_authenticate
@@ -42,6 +42,7 @@ from portal.utils import update_all_contenttypes
 samplecode_path = metadata.tests.samplecode_path
 
 
+@skipIfDBFeature('is_mocked')
 class FileAccessTests(TestCase):
     serialized_rollback = True
 
@@ -218,6 +219,7 @@ class FileAccessTests(TestCase):
         tools.fd_count_logger.debug("FieldFile is open: {}".format(not test_crr.content_file.closed))
 
 
+@skipIfDBFeature('is_mocked')
 class MethodTestCase(TestCase):
     """
     Set up a database state for unit testing.
@@ -737,6 +739,7 @@ class MethodFamilyTests(MethodTestCase):
         self.assertEqual(unicode(self.DNAcomp_mf), "DNAcomplement")
 
 
+@skipIfDBFeature('is_mocked')
 class NonReusableMethodTests(TestCase):
     def setUp(self):
         # An unpredictable, non-reusable user.
@@ -916,6 +919,7 @@ with open(outfile, "wb") as f:
         self.assertListEqual(list(runstep.find_compatible_ERs([])), [])
 
 
+@skipIfDBFeature('is_mocked')
 class MethodFamilyApiTests(BaseTestCases.ApiTestCase):
     fixtures = ['demo']
 
@@ -970,6 +974,7 @@ class MethodFamilyApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(end_count, start_count - 1)
 
 
+@skipIfDBFeature('is_mocked')
 class CodeResourceApiTests(BaseTestCases.ApiTestCase):
     fixtures = ["removal"]
 
@@ -1116,6 +1121,7 @@ echo "Hello World"
         case.crd.grant_everyone_access()
 
 
+@skipIfDBFeature('is_mocked')
 class CodeResourceRevisionSerializerTests(TestCase):
     fixtures = ["removal"]
 
@@ -1173,6 +1179,7 @@ class CodeResourceRevisionSerializerTests(TestCase):
         self.assertTrue("staged_file" in crr_s.errors)
 
 
+@skipIfDBFeature('is_mocked')
 class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
     fixtures = ["removal"]
 
@@ -1355,6 +1362,7 @@ def method_test_setup(case):
     ]
 
 
+@skipIfDBFeature('is_mocked')
 class MethodSerializerTests(TestCase):
     fixtures = ["removal"]
 
@@ -1405,6 +1413,7 @@ class MethodSerializerTests(TestCase):
         self.assertEquals(new_dep_2.path, "configuration.dat")
 
 
+@skipIfDBFeature('is_mocked')
 class MethodApiTests(BaseTestCases.ApiTestCase):
     fixtures = ['simple_run']
 
@@ -1471,6 +1480,7 @@ class MethodApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(new_method.outputs.count(), 1)
 
 
+@skipIfDBFeature('is_mocked')
 class InvokeCodeTests(TestCase):
     """
     Tests of Method.invoke_code with and without using an SSH user.

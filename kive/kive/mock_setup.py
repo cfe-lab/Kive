@@ -2,68 +2,8 @@ from collections import defaultdict
 from functools import partial
 from itertools import chain
 from mock import Mock, MagicMock, patch
-import os
-import sys
 
-import django
-from django.apps import apps
-from django.db import connections
-from django.db.utils import ConnectionHandler, NotSupportedError
-from django.conf import settings
-
-
-if not apps.ready:
-    # Do the Django set up when running as a stand-alone unit test.
-    # That's why this module has to be imported before any Django models.
-    if 'DJANGO_SETTINGS_MODULE' not in os.environ:
-        os.environ['DJANGO_SETTINGS_MODULE'] = 'kive.settings'
-    settings.LOGGING['handlers']['console']['level'] = 'CRITICAL'
-    django.setup()
-
-    # Disable database access, these are pure unit tests.
-    db = connections.databases['default']
-    db['PASSWORD'] = '****'
-    db['USER'] = '**Database disabled for unit tests**'
-    ConnectionHandler.__getitem__ = Mock(name='mock_connection')
-    # noinspection PyUnresolvedReferences
-    mock_ops = ConnectionHandler.__getitem__.return_value.ops
-
-    def compiler(queryset, connection, using, **kwargs):
-        result = Mock(name='mock_connection.ops.compiler()')
-        result.execute_sql.side_effect = NotSupportedError(
-            "Mock database tried to execute SQL for {} model.".format(
-                queryset.model._meta.object_name))
-        return result
-    mock_execute = mock_ops.compiler.return_value.side_effect = compiler
-    mock_ops.integer_field_range.return_value = (-sys.maxint - 1, sys.maxint)
-
-# Import after the Django configuration has been mocked out.
-# Can move back to the top if this pull request is accepted:
-# https://github.com/stphivos/django-mock-queries/pull/14
-from django_mock_queries.query import MockSet  # @IgnorePep8
-import django_mock_queries.utils
-import django_mock_queries.constants
-
-
-def patched_get_attribute(obj, attr, default=None):
-    result = obj
-    comparison = None
-    parts = attr.split('__')
-
-    for p in parts:
-        if p in django_mock_queries.constants.COMPARISONS:
-            comparison = p
-        elif result is None:
-            break
-        else:
-            result = getattr(result, p, None)
-
-    value = result if result is not None else default
-    return value, comparison
-
-# Remove this monkey patch after pull request is merged and released:
-# https://github.com/stphivos/django-mock-queries/pull/16
-django_mock_queries.utils.get_attribute = patched_get_attribute
+from django_mock_queries.query import MockSet
 
 
 class MockOneToManyMap(object):
