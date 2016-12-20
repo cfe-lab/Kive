@@ -446,8 +446,9 @@ class Foreman(object):
                             # Something went wrong, so we bail.
                             failed = True
                             terminated_during = "bookkeeping"
+
             else:
-                cable_info = task_accounting_info[task_dict["cable"].job_id]
+                cable_info = task_accounting_info.get(task_dict["cable"].job_id, None)
 
                 cable_state = cable_info["state"] if cable_info is not None else None
                 if cable_state is None or cable_state in SlurmScheduler.RUNNING_STATES:
@@ -483,6 +484,8 @@ class Foreman(object):
                     task.finish_failure()
                 else:
                     task.cancel()
+
+            self.tasks_in_progress.pop(task)
 
             # At this point, the task has either run to completion or been
             # terminated either through failure or cancellation.
@@ -741,6 +744,7 @@ class Foreman(object):
         self.sandbox.run.refresh_from_db()
         stop_subruns_if_possible = False
 
+        finished_task.refresh_from_db()
         if finished_task.is_successful():
             if self.sandbox.run.is_failing() or self.sandbox.run.is_cancelling():
                 assert self.shutting_down
