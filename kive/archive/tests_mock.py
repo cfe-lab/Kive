@@ -826,18 +826,18 @@ class RunOutputsSerializerMockTests(TestCase):
 
     def test_run_outputs(self):
         pipeline = Pipeline()
-        pipeline.outputs = MockSet(TransformationOutput(dataset_idx=1,
-                                                        dataset_name='foo'),
-                                   TransformationOutput(dataset_idx=2,
-                                                        dataset_name='bar'))
+        pipeline.outputs.add(TransformationOutput(dataset_idx=1,
+                                                  dataset_name='foo'),
+                             TransformationOutput(dataset_idx=2,
+                                                  dataset_name='bar'))
         for o in pipeline.outputs:
             o.transformationoutput = o
         run = Run(id=1234, pipeline=pipeline)
         execrecord1 = ExecRecord()
-        execrecord1.execrecordouts = MockSet(ExecRecordOut(dataset=Dataset()))
+        execrecord1.execrecordouts.add(ExecRecordOut(dataset=Dataset()))
         execrecord2 = ExecRecord()
-        execrecord2.execrecordouts = MockSet(ExecRecordOut(dataset=Dataset()))
-        run.runoutputcables = MockSet(
+        execrecord2.execrecordouts.add(ExecRecordOut(dataset=Dataset()))
+        run.runoutputcables.add(
             RunOutputCable(execrecord=execrecord1,
                            pipelineoutputcable=PipelineOutputCable(pipeline=pipeline,
                                                                    output_name='foo')),

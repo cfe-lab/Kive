@@ -697,8 +697,8 @@ class PipelineMockTests(TestCase):
         """
         with self.create_valid_pipeline() as p:
             p.outcables.all()[0].output_name = 'step1_out'
-            Pipeline.outputs = PropertyMock('Pipeline.outputs')
-            Pipeline.outputs.create.return_value = TransformationOutput()
+            Transformation.outputs = PropertyMock('Transformation.outputs')
+            Transformation.outputs.create.return_value = TransformationOutput()
 
             p.create_outputs()
 
@@ -714,8 +714,8 @@ class PipelineMockTests(TestCase):
             self.add_step(p)
             p.outcables.all()[0].output_name = 'step1_out'
             p.outcables.all()[1].output_name = 'step2_out'
-            Pipeline.outputs = PropertyMock('Pipeline.outputs')
-            Pipeline.outputs.create.return_value = TransformationOutput()
+            Transformation.outputs = PropertyMock('Transformation.outputs')
+            Transformation.outputs.create.return_value = TransformationOutput()
 
             p.create_outputs()
 

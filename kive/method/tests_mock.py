@@ -425,9 +425,11 @@ class MethodMockTests(TestCase):
         self.assertFalse(m1.is_identical(m2))
 
 
-@mocked_relations(Method, MethodDependency, Transformation)
 class MethodDependencyMockTests(TestCase):
     def setUp(self):
+        patcher = mocked_relations(Method, MethodDependency, Transformation)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         driver = CodeResourceRevision(
             coderesource=CodeResource(filename='driver.py'))
         self.method = Method(driver=driver, family=MethodFamily())
@@ -549,9 +551,11 @@ class MethodDependencyMockTests(TestCase):
         self.assertEqual(expected_filepaths, filepaths)
 
 
-@mocked_relations(Method, MethodFamily, Transformation)
 class MethodUpdateMockTests(TestCase):
     def setUp(self):
+        patcher = mocked_relations(Method, MethodFamily, Transformation)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.family = MethodFamily()
         self.old_method = self.family.members.create(family=self.family,
                                                      revision_number=1,

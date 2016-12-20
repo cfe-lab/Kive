@@ -1,7 +1,8 @@
+import weakref
 from collections import defaultdict
 from functools import partial
 from itertools import chain
-from mock import Mock, MagicMock, patch
+from mock import Mock, MagicMock, patch, ClassTypes
 
 from django_mock_queries.query import MockSet
 
@@ -9,7 +10,7 @@ from django_mock_queries.query import MockSet
 class MockOneToManyMap(object):
     def __init__(self, original):
         """ Wrap a mock mapping around the original one-to-many relation. """
-        self.map = defaultdict(partial(MockSet, cls=original.field.model))
+        self.map = {}
         self.original = original
 
     def __get__(self, instance, owner):
@@ -22,12 +23,22 @@ class MockOneToManyMap(object):
             # Call was to the class, not an object.
             return self
 
-        return self.map[id(instance)]
+        instance_id = id(instance)
+        entry = self.map.get(instance_id)
+        old_instance = related_objects = None
+        if entry is not None:
+            old_instance_weak, related_objects = entry
+            old_instance = old_instance_weak()
+        if entry is None or old_instance is None:
+            related_objects = MockSet(cls=self.original.field.model)
+            self.__set__(instance, related_objects)
+
+        return related_objects
 
     def __set__(self, instance, value):
         """ Set a related object for an instance. """
 
-        self.map[id(instance)] = value
+        self.map[id(instance)] = (weakref.ref(instance), value)
 
     def __getattr__(self, name):
         """ Delegate all other calls to the original. """
@@ -51,20 +62,24 @@ class MockOneToOneMap(object):
             # Call was to the class, not an object.
             return self
 
-        rel_obj = self.map.get(id(instance))
-        if rel_obj is None:
+        entry = self.map.get(id(instance))
+        old_instance = related_object = None
+        if entry is not None:
+            old_instance_weak, related_object = entry
+            old_instance = old_instance_weak()
+        if entry is None or old_instance is None:
             raise self.original.RelatedObjectDoesNotExist(
                 "Mock %s has no %s." % (
                     owner.__name__,
                     self.original.related.get_accessor_name()
                 )
             )
-        return rel_obj
+        return related_object
 
     def __set__(self, instance, value):
         """ Set a related object for an instance. """
 
-        self.map[id(instance)] = value
+        self.map[id(instance)] = (weakref.ref(instance), value)
 
     def __getattr__(self, name):
         """ Delegate all other calls to the original. """
@@ -72,19 +87,34 @@ class MockOneToOneMap(object):
         return getattr(self.original, name)
 
 
-# noinspection PyUnresolvedReferences
-def setup_mock_relations(testcase, *models):
+# noinspection PyProtectedMember
+def mocked_relations(*models):
+    """ Mock all related field managers to make pure unit tests possible.
+
+    The resulting patcher can be used just like one from the mock module:
+    As a test method decorator, a test class decorator, a context manager,
+    or by just calling start() and stop().
+
+    @mocked_relations(Dataset):
+    def test_dataset(self):
+        dataset = Dataset()
+        check = dataset.content_checks.create()  # returns a ContentCheck object
+    """
+    # noinspection PyUnresolvedReferences
+    patch_object = patch.object
+    patchers = []
     for model in models:
         if isinstance(model.save, MagicMock):
             # already mocked, so skip it
             continue
         model_name = model._meta.object_name
-        patcher = patch.object(model, 'save', Mock(name=model_name + '.save'))
-        patcher.start()
-        testcase.addCleanup(patcher.stop)
-        patcher = patch.object(model, 'objects', MockSet(mock_name=model_name + '.objects', cls=model))
-        patcher.start()
-        testcase.addCleanup(patcher.stop)
+        patchers.append(patch_object(model, 'save', new_callable=partial(
+            Mock,
+            name=model_name + '.save')))
+        patchers.append(patch_object(model, 'objects', new_callable=partial(
+            MockSet,
+            mock_name=model_name + '.objects',
+            cls=model)))
         for related_object in chain(model._meta.related_objects,
                                     model._meta.many_to_many):
             name = related_object.name
@@ -92,44 +122,79 @@ def setup_mock_relations(testcase, *models):
                 # Only mock direct relations, not inherited ones.
                 old_relation = getattr(model, name, None)
                 if old_relation is not None:
-                    # type_name = type(old_relation).__name__
-                    # expected_types = {'ReverseManyToOneDescriptor',
-                    #                   'ManyToManyDescriptor',
-                    #                   'ReverseOneToOneDescriptor'}
-                    # assert type_name in expected_types, model_name + '.' + name + ': ' + type_name
                     if related_object.one_to_one:
-                        new_relation = MockOneToOneMap(old_relation)
+                        new_callable = partial(MockOneToOneMap, old_relation)
                     else:
-                        new_relation = MockOneToManyMap(old_relation)
-                    patcher = patch.object(model, name, new_relation)
-                    patcher.start()
-                    testcase.addCleanup(patcher.stop)
+                        new_callable = partial(MockOneToManyMap, old_relation)
+                    patchers.append(patch_object(model,
+                                                 name,
+                                                 new_callable=new_callable))
+    return PatcherChain(patchers, pass_mocks=False)
 
 
-def mocked_relations(*models):
-    """ Mock all related field managers to make pure unit tests possible.
+class PatcherChain(object):
+    """ Chain a list of mock patchers into one.
 
-    This can decorate a method or a class. Decorating a class is equivalent to
-    decorating all the methods whose names start with "test_".
-
-    @mocked_relations(Dataset):
-    def test_dataset(self):
-        dataset = Dataset()
-        check = dataset.content_checks.create()  # returns a ContentCheck object
+    The resulting patcher can be used just like one from the mock module:
+    As a test method decorator, a test class decorator, a context manager,
+    or by just calling start() and stop().
     """
-    def decorator(target):
-        if isinstance(target, type):
-            original_setup = target.setUp
+    def __init__(self, patchers, pass_mocks=True):
+        """ Initialize a patcher.
 
-            def full_setup(testcase):
-                setup_mock_relations(testcase, *models)
-                original_setup(testcase)
+        :param patchers: a list of patchers that should all be applied
+        :param pass_mocks: True if any mock objects created by the patchers
+        should be passed to any decorated test methods.
+        """
+        self.patchers = patchers
+        self.pass_mocks = pass_mocks
 
-            target.setUp = full_setup
-            return target
+    def __call__(self, func):
+        if isinstance(func, ClassTypes):
+            return self.decorate_class(func)
+        return self.decorate_callable(func)
 
-        def wrapped(testcase, *args, **kwargs):
-            setup_mock_relations(testcase, *models)
-            return target(testcase, *args, **kwargs)
-        return wrapped
-    return decorator
+    def decorate_class(self, cls):
+        for attr in dir(cls):
+            # noinspection PyUnresolvedReferences
+            if not attr.startswith(patch.TEST_PREFIX):
+                continue
+
+            attr_value = getattr(cls, attr)
+            if not hasattr(attr_value, "__call__"):
+                continue
+
+            setattr(cls, attr, self(attr_value))
+        return cls
+
+    def decorate_callable(self, target):
+        """ Called as a decorator. """
+
+        # noinspection PyUnusedLocal
+        def absorb_mocks(test_case, *args):
+            return target(test_case)
+
+        should_absorb = not (self.pass_mocks or isinstance(target, ClassTypes))
+        result = absorb_mocks if should_absorb else target
+        for patcher in self.patchers:
+            result = patcher(result)
+        return result
+
+    def __enter__(self):
+        """ Starting a context manager.
+
+        All the patched objects are passed as a list to the with statement.
+        """
+        return [patcher.__enter__() for patcher in self.patchers]
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """ Ending a context manager. """
+        for patcher in self.patchers:
+            patcher.__exit__(exc_type, exc_val, exc_tb)
+
+    def start(self):
+        return [patcher.start() for patcher in self.patchers]
+
+    def stop(self):
+        for patcher in self.patchers:
+            patcher.stop()
