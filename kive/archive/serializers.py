@@ -203,20 +203,28 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                         output.size = None
                         output.is_ok = False
                     else:
-                        if not methodoutput.output_log:
+                        if methodoutput.output_log is None:
                             output.date = output.size = 'removed'
                             output.url = output.redaction_plan = None
                         else:
-                            output.id = methodoutput.id
-                            output.date = execlog.end_time
-                            output.size = methodoutput.output_log.size
-                            output.url = reverse('methodoutput-detail',
-                                                 kwargs={'pk': methodoutput.id},
-                                                 request=request)
-                            output.redaction_plan = reverse(
-                                'methodoutput-output-redaction-plan',
-                                kwargs={'pk': methodoutput.id},
-                                request=request)
+                            ismissing = False
+                            try:
+                                output.size = methodoutput.output_log.size
+                            except OSError:
+                                ismissing = True
+                            if ismissing:
+                                output.date = output.size = 'missing'
+                                output.url = output.redaction_plan = None
+                            else:
+                                output.url = reverse('methodoutput-detail',
+                                                     kwargs={'pk': methodoutput.id},
+                                                     request=request)
+                                output.id = methodoutput.id
+                                output.date = execlog.end_time
+                                output.redaction_plan = reverse(
+                                    'methodoutput-output-redaction-plan',
+                                    kwargs={'pk': methodoutput.id},
+                                    request=request)
                     outputs.append(output)
                 except ValueError as e:
                     print "stdout serializer", e
@@ -247,20 +255,28 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                         output.size = None
                         output.is_ok = False
                     else:
-                        if not methodoutput.error_log:
+                        if methodoutput.error_log is None:
                             output.date = output.size = 'removed'
                             output.url = output.redaction_plan = None
                         else:
-                            output.id = methodoutput.id
-                            output.size = methodoutput.error_log.size
-                            output.date = execlog.end_time
-                            output.url = reverse('methodoutput-detail',
-                                                 kwargs={'pk': methodoutput.id},
-                                                 request=request)
-                            output.redaction_plan = reverse(
-                                'methodoutput-error-redaction-plan',
-                                kwargs={'pk': methodoutput.id},
-                                request=request)
+                            ismissing = False
+                            try:
+                                output.size = methodoutput.error_log.size
+                            except OSError:
+                                ismissing = False
+                            if ismissing:
+                                output.date = output.size = 'missing'
+                                output.url = output.redaction_plan = None
+                            else:
+                                output.id = methodoutput.id
+                                output.date = execlog.end_time
+                                output.url = reverse('methodoutput-detail',
+                                                     kwargs={'pk': methodoutput.id},
+                                                     request=request)
+                                output.redaction_plan = reverse(
+                                    'methodoutput-error-redaction-plan',
+                                    kwargs={'pk': methodoutput.id},
+                                    request=request)
                     outputs.append(output)
                 except ValueError as e:
                     print "stderr serializer", e
