@@ -215,6 +215,7 @@ class Manager(object):
     """
 
     def __init__(self, interface, quit_idle=False, history=0):
+        self.shutdown_exception = None
         self.quit_idle = quit_idle
         self.interface = interface
 
@@ -962,8 +963,9 @@ class Manager(object):
             self._startup()
             self.main_loop()
             mgr_logger.info("Manager shutting down.")
-        except:
+        except Exception as ex:
             mgr_logger.error("Manager failed.", exc_info=True)
+            self.shutdown_exception = ex
         self.interface.shut_down_fleet()
 
     @classmethod
@@ -1013,6 +1015,8 @@ class Manager(object):
 
         If no history is retained, return None.
         """
+        if self.shutdown_exception is not None:
+            raise self.shutdown_exception
         if self.history_queue.maxlen == 0 or len(self.history_queue) == 0:
             return None
 

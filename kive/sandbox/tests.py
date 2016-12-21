@@ -9,7 +9,7 @@ from mock import call, patch
 from django.contrib.auth.models import User
 from django.core.files import File
 from django.core.files.base import ContentFile
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.utils import timezone
 
 from archive.models import Run, RunComponent
@@ -167,6 +167,7 @@ def execute_tests_environment_load(case):
     case.pX_raw = Pipeline.objects.get(revision_name="pX_raw")
 
 
+@skipIfDBFeature('is_mocked')
 class ExecuteTestsBase(TestCase):
     fixtures = ['execute_tests']
 
@@ -1587,6 +1588,7 @@ class SandboxTests(ExecuteTestsBase):
                                 lambda: Manager.execute_pipeline(self.myUser, p, [self.dataset]))
 
 
+@skipIfDBFeature('is_mocked')
 class RestoreReusableDatasetTest(TestCase):
     """
     Scenario where an output is marked as reusable, and it needs to be restored.

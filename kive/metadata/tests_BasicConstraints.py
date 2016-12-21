@@ -1,7 +1,7 @@
 """
 Unit tests for Shipyard's BasicConstraint class and functionality relating to it.
 """
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.core.exceptions import ValidationError
 
 from metadata.models import *
@@ -9,6 +9,7 @@ from metadata.models import *
 from constants import datatypes
 
 
+@skipIfDBFeature('is_mocked')
 class BasicConstraintTestSetup(TestCase):
     fixtures = ["initial_data", "initial_groups", "initial_user"]
 
@@ -21,6 +22,7 @@ class BasicConstraintTestSetup(TestCase):
         self.INT = Datatype.objects.get(pk=datatypes.INT_PK)
         self.FLOAT = Datatype.objects.get(pk=datatypes.FLOAT_PK)
         self.BOOL = Datatype.objects.get(pk=datatypes.BOOL_PK)
+
 
 class BasicConstraintCleanTests(BasicConstraintTestSetup):
 

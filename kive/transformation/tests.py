@@ -1,10 +1,11 @@
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.contrib.auth.models import User
 
 from transformation.models import *
 from metadata.models import *
 
 
+@skipIfDBFeature('is_mocked')
 class TransformationTestCase(TestCase):
     def setUp(self):
         self.transf_user = User.objects.create_user('transformer', 'morethanmeetstheeye@aol.com', 'rodimus')

@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.conf import settings
@@ -18,6 +18,7 @@ from archive.models import Run
 import file_access_utils
 
 
+@skipIfDBFeature('is_mocked')
 class SandboxRMTestCase(TestCase):
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
@@ -26,6 +27,7 @@ class SandboxRMTestCase(TestCase):
         tools.destroy_sandbox_testing_tools_environment(self)
 
 
+@skipIfDBFeature('is_mocked')
 class ExecuteResultTestsRM(TestCase):
     """
     Tests on the results of executing Pipelines.
@@ -281,6 +283,7 @@ class ExecuteResultTestsRM(TestCase):
         self.assertEqual(outcable_input_dataset.num_rows(), outcable_output_dataset.num_rows())
 
 
+@skipIfDBFeature('is_mocked')
 class ExecuteDiscardedIntermediateTests(TestCase):
     fixtures = ["execute_discarded_intermediate_tests_rm"]
 
@@ -330,6 +333,7 @@ class ExecuteDiscardedIntermediateTests(TestCase):
         self.assertTrue(run.is_successful())
 
 
+@skipIfDBFeature('is_mocked')
 class BadRunTests(TestCase):
     """
     Tests for when things go wrong during Pipeline execution.
@@ -392,6 +396,7 @@ class BadRunTests(TestCase):
         self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().dataset])
 
 
+@skipIfDBFeature('is_mocked')
 class FindDatasetTests(TestCase):
     """
     Tests for first_generator_of_dataset.

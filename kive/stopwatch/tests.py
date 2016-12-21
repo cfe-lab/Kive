@@ -3,7 +3,7 @@ Tests on the Stopwatch functionality used in Run, RunAtomic, etc.
 """
 import re
 
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 
@@ -11,6 +11,7 @@ import kive.testing_utils as tools
 from pipeline.models import PipelineFamily
 
 
+@skipIfDBFeature('is_mocked')
 class StopwatchTests(TestCase):
     fixtures = ["em_sandbox_test_environment"]
 

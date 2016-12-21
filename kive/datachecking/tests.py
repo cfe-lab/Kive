@@ -5,7 +5,7 @@ when you run "manage.py test".
 Replace this with more appropriate tests for your application.
 """
 
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.contrib.auth.models import User
 
 import shutil
@@ -18,6 +18,7 @@ from librarian.models import *
 import kive.testing_utils as tools
 
 
+@skipIfDBFeature('is_mocked')
 class BlankableTestCase(TestCase):
 
     def setUp(self):

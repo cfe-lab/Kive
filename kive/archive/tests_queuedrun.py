@@ -7,7 +7,7 @@ import copy
 from mock import patch
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.core.urlresolvers import reverse, resolve
 from django.utils import timezone
 from django.contrib.auth.models import Group
@@ -27,6 +27,7 @@ from kive.tests import install_fixture_files, restore_production_files, DuckCont
 from fleet.workers import Manager
 
 
+@skipIfDBFeature('is_mocked')
 class RemoveRedactRunInProgress(TestCase):
     fixtures = ["em_sandbox_test_environment"]
 
@@ -153,6 +154,7 @@ class RemoveRedactRunInProgress(TestCase):
         )
 
 
+@skipIfDBFeature('is_mocked')
 class RemoveRedactRunJustStarting(TestCase):
     """
     Removal/redaction of stuff used in an unstarted run should be allowed.
@@ -221,6 +223,7 @@ class RemoveRedactRunJustStarting(TestCase):
         # )
 
 
+@skipIfDBFeature('is_mocked')
 class RestoreReusableDatasetTest(TestCase):
     """
     Scenario where an output is marked as reusable, and it needs to be restored.
@@ -264,6 +267,7 @@ class RestoreReusableDatasetTest(TestCase):
         self.assertEqual(expected_execrecord_count, ExecRecord.objects.count())
 
 
+@skipIfDBFeature('is_mocked')
 class GarbageCollectionTest(TestCase):
     """
     Tests of sandbox garbage collection.
@@ -352,6 +356,7 @@ class GarbageCollectionTest(TestCase):
         self.assertFalse(os.path.exists(self.mock_sandbox_path))
 
 
+@skipIfDBFeature('is_mocked')
 class RunApiTests(TestCase):
     # This fixture has the result of sandbox.tests.execute_tests_environment_setup,
     # as well of setting up another Pipeline; this other Pipeline and the resulting
@@ -623,6 +628,7 @@ class RunApiTests(TestCase):
         self.assertEquals(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
+@skipIfDBFeature('is_mocked')
 class RunSerializerTestBase(TestCase):
     fixtures = ["em_sandbox_test_environment"]
 

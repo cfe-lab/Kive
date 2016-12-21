@@ -16,26 +16,7 @@ You will need to follow all the installation instructions in the INSTALL file,
 then open the source code in a Python IDE. You will also need to install some
 packages to run the tests.
 
-    pip install mock
-
-Our tests use the `django-mock-queries` package, but we needed some extra
-features. We are currently using a forked version with our extra features,
-but hopefully those features will get merged back into the main project after
-we create a pull request. For now, clone our forked version and install it from
-source.
-
-    cd ~/git
-    git clone https://github.com/cfe-lab/django-mock-queries.git
-    sudo python django-mock-queries/setup.py
-
-If you already had the main version installed, uninstall it with pip, and then
-check to see if you need to manually delete the files.
-
-    sudo pip uninstall django-mock-queries
-    locate django_mock_queries/query.py
-    ls /usr/local/lib/python2.7/dist-packages/django_mock_queries
-    sudo rm /usr/local/lib/python2.7.dist-packages/django_mock_queries/*
-    sudo python django-mock-queries/setup.py
+    pip install -r requirements-dev.txt
 
 If you want to see what's currently being worked on, check out the [waffle board][waffle].
 
@@ -215,7 +196,7 @@ That still takes several minutes to run, so you may want to run a subset of the
 fastest tests: the [mock tests][mock]. These tests don't access a database, so
 they are extremely fast. You can run them all with this command:
 
-    python -m unittest discover -p 'tests_mock.py'
+    ./manage.py test --settings kive.settings_mocked
 
 Testing with a SQLite database may have slightly different behaviour from 
 the PostgreSQL database, so you should occasionally run the tests with 

@@ -11,7 +11,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.base import File
 from django.core.urlresolvers import resolve
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.reverse import reverse
@@ -34,6 +34,7 @@ import kive.testing_utils as tools
 samplecode_path = tools.samplecode_path
 
 
+@skipIfDBFeature('is_mocked')
 class PipelineTestCase(TestCase):
     """
     Set up a database state for unit testing Pipeline.
@@ -2354,6 +2355,7 @@ def create_pipeline_deserialization_environment(case):
     }
 
 
+@skipIfDBFeature('is_mocked')
 class PipelineSerializerTests(TestCase):
     """
     Tests of PipelineSerializer and its offshoots.
@@ -2576,6 +2578,7 @@ class PipelineSerializerTests(TestCase):
         self.assertTrue(pl.published)
 
 
+@skipIfDBFeature('is_mocked')
 class PipelineApiTests(BaseTestCases.ApiTestCase):
     fixtures = ['simple_run']
 
@@ -2778,6 +2781,7 @@ class PipelineApiTests(BaseTestCases.ApiTestCase):
         self.assertFalse(version_to_publish.published)
 
 
+@skipIfDBFeature('is_mocked')
 class PipelineFamilyApiTests(BaseTestCases.ApiTestCase):
     fixtures = ['simple_run']
 

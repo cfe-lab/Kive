@@ -119,12 +119,11 @@ def restore_production_files():
         return
 
     for target in targets:
-        target_path = os.path.join(settings.MEDIA_ROOT, target)
-        if os.path.isdir(target_path):
-            shutil.rmtree(target_path)
-
         dir_to_restore = os.path.join(stash_dir, target)
         if os.path.isdir(dir_to_restore):
+            target_path = os.path.join(settings.MEDIA_ROOT, target)
+            if os.path.isdir(target_path):
+                shutil.rmtree(target_path)
             shutil.move(dir_to_restore, target_path)
 
     shutil.rmtree(stash_dir)
