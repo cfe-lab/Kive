@@ -170,12 +170,6 @@ def dataset_view(request, dataset_id):
         t = loader.get_template("librarian/raw_dataset_view.html")
 
         # Test whether this is a binary file or not.
-        file_path = None
-        if dataset.dataset_file:
-            file_path = dataset.dataset_file.path
-        elif dataset.external_path:
-            file_path = dataset.external_absolute_path()
-
         # Read 1000 characters.
         with dataset.get_open_file_handle() as data_handle:
             sample_content = data_handle.read(1000)
@@ -294,8 +288,10 @@ class BulkDatasetDisplay:
     """
     Helper class for displaying
     """
-    STATUS_FAIL = 1
-    STATUS_SUCCESS = 0
+    # NOTE: these must be strings because they are read within a template file
+    # datasets_bulk.html
+    STATUS_FAIL = "1"
+    STATUS_SUCCESS = "0"
 
 
 @login_required
@@ -313,62 +309,81 @@ def datasets_add_archive(request):
                 files=request.FILES,
                 user=request.user,
             )
-            # Try to add new datasets. If this fails, we return to our current page
+            # Try to retrieve new datasets. If this fails, we return to our current page
             is_ok = archive_add_dataset_form.is_valid()
             if is_ok:
-                add_results = archive_add_dataset_form.create_datasets(request.user)
+                CDT_obj, add_results = archive_add_dataset_form.create_datasets(request.user)
                 is_ok = len(add_results) > 0
-            if is_ok:
-                t = loader.get_template('librarian/datasets_bulk.html')
-            else:
+            if not is_ok:
                 # give up and let user try again
                 t = loader.get_template('librarian/datasets_add_archive.html')
                 c = {'archiveAddDatasetForm': archive_add_dataset_form}
                 return HttpResponse(t.render(c, request))
+            # have some files in the archive, lets display them
+            # NOTE: at this point, we have a list of files in the archive.
+            # some files might be legit, others not.
+            # we have to cobble together information from add_results and the form cleaned data
+            # for display.
+            uploaded_files = archive_add_dataset_form.cleaned_data["dataset_file"]
 
-            # New datasets added, generate a response
+            if len(uploaded_files) != len(add_results):
+                raise RuntimeError("List length mismatch")
+            t = loader.get_template('librarian/datasets_bulk.html')
+            # Now have add_results, a list of elements e, where e is either
+            # a dataset if the dataset was successfully created
+            # or
+            # a dict if a dataset was not successfully created
+            # Generate a response
             archive_display_results = []
             # Fill in default values for the form fields
-            for i in range(len(add_results)):
-                archive_display_result = {}
-                uploaded_files = archive_add_dataset_form.cleaned_data["dataset_file"]
-                if isinstance(add_results[i], basestring):
-                    archive_display_result["name"] = ""
-                    archive_display_result["description"] = ""
-                    archive_display_result["orig_filename"] = ""
-                    archive_display_result["filesize"] = ""
-                    archive_display_result["md5"] = ""
-                    archive_display_result["id"] = ""
+            for add_result, upload_info in zip(add_results, uploaded_files):
+                display_result = {}
+                if isinstance(add_result, dict):
+                    # the dataset is invalid
+                    display_result["name"] = add_result["name"]
+                    display_result["description"] = ""
+                    display_result["orig_filename"] = add_result["name"]
+                    display_result["filesize"] = add_result["size"]
+                    display_result["md5"] = ""
+                    display_result["id"] = ""
+                    display_result["is_valid"] = False
                 else:
-                    archive_display_result["name"] = add_results[i].name
-                    archive_display_result["description"] = add_results[i].description
+                    display_result["name"] = add_result.name
+                    display_result["description"] = add_result.description
                     # This is the original filename as uploaded by the client, not the filename as stored
                     # on the file server.
-                    archive_display_result["orig_filename"] = uploaded_files[i].name
-                    archive_display_result["filesize"] = add_results[i].get_formatted_filesize()
-                    archive_display_result["md5"] = add_results[i].compute_md5()
-                    archive_display_result["id"] = add_results[i].id
+                    display_result["orig_filename"] = upload_info[1].name
+                    display_result["filesize"] = add_result.get_formatted_filesize()
+                    display_result["md5"] = add_result.compute_md5()
+                    display_result["id"] = add_result.id
+                    display_result["is_valid"] = True
+                archive_display_results.append(display_result)
 
-                archive_display_results.extend([archive_display_result])
-
-            BulkDatasetUpdateFormSet = formset_factory(form=BulkDatasetUpdateForm, max_num=len(archive_display_results))
+            # now create forms from the display results.
+            BulkDatasetUpdateFormSet = formset_factory(form=BulkDatasetUpdateForm,
+                                                       max_num=len(archive_display_results))
             bulk_dataset_update_formset = BulkDatasetUpdateFormSet(initial=archive_display_results)
 
             # Fill in the attributes that are not fields in the form
-            # These are not set by the BulkDatasetUpdateFormSet(initial=...) parameter
-            for i in range(0, len(add_results)):
-                dataset_form = bulk_dataset_update_formset[i]
-                if dataset_form.initial.get("name"):
-                    dataset_form.dataset = add_results[i]
-                    dataset_form.err_msg = ""
+            # These are not set by the BulkDatasetUpdateFormSet(initial=...) parameter,
+            # so we have to tweak the forms after they have been created
+            for dataset_form, display_result, add_result in zip(bulk_dataset_update_formset,
+                                                                archive_display_results,
+                                                                add_results):
+                if display_result["is_valid"]:
+                    dataset_form.dataset = add_result
                     dataset_form.status = BulkDatasetDisplay.STATUS_SUCCESS
                 else:
                     dataset_form.dataset = Dataset()
-                    dataset_form.err_msg = add_results[i]
+                    dataset_form.non_field_errors = add_result["errstr"]
                     dataset_form.status = BulkDatasetDisplay.STATUS_FAIL
 
-            c.update({"bulk_dataset_formset": bulk_dataset_update_formset})
-
+            # finally, add some other pertinent information which the template will display
+            num_files_added = sum([a["is_valid"] for a in archive_display_results])
+            c["bulk_dataset_formset"] = bulk_dataset_update_formset
+            c["num_files_selected"] = len(add_results)
+            c["num_files_added"] = num_files_added
+            c["cdt_typestr"] = "Unstructured" if CDT_obj is None else CDT_obj
         except ValidationError as e:
             LOGGER.exception(e.message)
             archive_add_dataset_form.add_error(None, e)
@@ -377,8 +392,7 @@ def datasets_add_archive(request):
 
     else:  # return an empty form for the user to fill in
         t = loader.get_template('librarian/datasets_add_archive.html')
-        archive_dataset_form = ArchiveAddDatasetForm(user=request.user)
-        c.update({'archiveAddDatasetForm': archive_dataset_form})
+        c['archiveAddDatasetForm'] = ArchiveAddDatasetForm(user=request.user)
 
     return HttpResponse(t.render(c, request))
 
@@ -386,75 +400,89 @@ def datasets_add_archive(request):
 @login_required
 def datasets_add_bulk(request):
     """
-    Add datasets in bulk to db.  Redirect to /datasets_bulk view so user can examine upload status of each dataset.
+    Add datasets in bulk to db.  Redirect to /datasets_bulk view so user can examine upload
+    status of each dataset.
     """
     # Redirect to page to allow user to view status of added datasets.
     c = {}
-    t = loader.get_template('librarian/datasets_bulk.html')
     if request.method == 'POST':
         try:
             # Add new datasets.
-            bulk_add_dataset_form = BulkAddDatasetForm(data=request.POST, files=request.FILES, user=request.user)
-            if bulk_add_dataset_form.is_valid():
-                add_results = bulk_add_dataset_form.create_datasets(request.user)
-            else:
-                # The form is already annotated with the appropriate errors, so we can bail.
-                c.update({'bulkAddDatasetForm': bulk_add_dataset_form})
+            bulk_add_dataset_form = BulkAddDatasetForm(data=request.POST,
+                                                       files=request.FILES,
+                                                       user=request.user)
+            isok = bulk_add_dataset_form.is_valid()
+            if isok:
+                CDT_obj, add_results = bulk_add_dataset_form.create_datasets(request.user)
+                isok = len(add_results) > 0
+            if not isok:
+                # give up and let user try again
+                t = loader.get_template('librarian/datasets_add_bulk.html')
+                c = {'bulkAddDatasetForm': bulk_add_dataset_form}
                 return HttpResponse(t.render(c, request))
 
             # Generate response.
+            uploaded_files = bulk_add_dataset_form.cleaned_data["dataset_files"]
+            if len(uploaded_files) != len(add_results):
+                raise RuntimeError("List length mismatch")
+
+            t = loader.get_template('librarian/datasets_bulk.html')
             bulk_display_results = []
             # Fill in default values for the form fields
-            for i in range(len(add_results)):
-                bulk_display_result = {}
-                uploaded_files = bulk_add_dataset_form.cleaned_data["dataset_files"]
-                if isinstance(add_results[i], basestring):
-                    bulk_display_result["name"] = ""
-                    bulk_display_result["description"] = ""
-                    bulk_display_result["orig_filename"] = ""
-                    bulk_display_result["filesize"] = ""
-                    bulk_display_result["md5"] = ""
-                    bulk_display_result["id"] = ""
+            for add_result, upload_info in zip(add_results, uploaded_files):
+                display_result = {}
+                if isinstance(add_result, dict):
+                    # dataset is invalid
+                    display_result["name"] = add_result["name"]
+                    display_result["description"] = ""
+                    display_result["orig_filename"] = add_result["name"]
+                    display_result["filesize"] = add_result["size"]
+                    display_result["md5"] = ""
+                    display_result["id"] = ""
+                    display_result["is_valid"] = False
                 else:
-                    bulk_display_result["name"] = add_results[i].name
-                    bulk_display_result["description"] = add_results[i].description
+                    display_result["name"] = add_result.name
+                    display_result["description"] = add_result.description
                     # This is the original filename as uploaded by the client, not the filename as stored
                     # on the file server.
-                    bulk_display_result["orig_filename"] = uploaded_files[i].name
-                    bulk_display_result["filesize"] = add_results[i].get_formatted_filesize()
-                    bulk_display_result["md5"] = add_results[i].compute_md5()
-                    bulk_display_result["id"] = add_results[i].id
+                    display_result["orig_filename"] = upload_info[1].name
+                    display_result["filesize"] = add_result.get_formatted_filesize()
+                    display_result["md5"] = add_result.compute_md5()
+                    display_result["id"] = add_result.id
+                    display_result["is_valid"] = True
+                bulk_display_results.append(display_result)
 
-                bulk_display_results.extend([bulk_display_result])
             BulkDatasetUpdateFormSet = formset_factory(form=BulkDatasetUpdateForm, max_num=len(bulk_display_results))
             bulk_dataset_update_formset = BulkDatasetUpdateFormSet(initial=bulk_display_results)
 
             # Fill in the attributes that are not fields in the form
             # These are not set by the BulkDatasetUpdateFormSet(initial=...) parameter
-
-            for i in range(0, len(add_results)):
-                dataset_form = bulk_dataset_update_formset[i]
-                if dataset_form.initial.get("name"):
-                    dataset_form.dataset = add_results[i]
-                    dataset_form.err_msg = ""
+            for dataset_form, display_result, add_result in zip(bulk_dataset_update_formset,
+                                                                bulk_display_results,
+                                                                add_results):
+                if display_result["is_valid"]:
+                    dataset_form.dataset = add_result
                     dataset_form.status = BulkDatasetDisplay.STATUS_SUCCESS
                 else:
                     dataset_form.dataset = Dataset()
-                    dataset_form.err_msg = add_results[i]
+                    dataset_form.non_field_errors = add_result["errstr"]
                     dataset_form.status = BulkDatasetDisplay.STATUS_FAIL
 
-            c.update({"bulk_dataset_formset": bulk_dataset_update_formset})
+            # finally, add some other pertinent information which the template will display
+            num_files_added = sum([a["is_valid"] for a in bulk_display_results])
+            c["bulk_dataset_formset"] = bulk_dataset_update_formset
+            c["num_files_selected"] = len(add_results)
+            c["num_files_added"] = num_files_added
+            c["cdt_typestr"] = "Unstructured" if CDT_obj is None else CDT_obj
 
         except ValidationError as e:
             LOGGER.exception(e.message)
             bulk_add_dataset_form.add_error(None, e)
-            t = loader.get_template('librarian/datasets_add_bulk.html')
             c.update({'bulkAddDatasetForm': bulk_add_dataset_form})
 
     else:  # return an empty form for the user to fill in
         t = loader.get_template('librarian/datasets_add_bulk.html')
-        bulk_dataset_form = BulkAddDatasetForm(user=request.user)
-        c.update({'bulkAddDatasetForm': bulk_dataset_form})
+        c.update({'bulkAddDatasetForm': BulkAddDatasetForm(user=request.user)})
 
     return HttpResponse(t.render(c, request))
 
