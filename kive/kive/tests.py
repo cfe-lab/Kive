@@ -1,3 +1,4 @@
+import errno
 import os
 import shutil
 from StringIO import StringIO
@@ -109,6 +110,14 @@ def remove_fixture_files():
     Helper that removes all FieldFiles used by a test fixture.
     """
     check_media_root_is_test()
+    try:
+        os.makedirs(settings.MEDIA_ROOT)
+        # If that succeeded, then the folder is empty.
+        return
+    except OSError as ex:
+        if ex.errno != errno.EEXIST:
+            raise
+
     for dirname in os.listdir(settings.MEDIA_ROOT):
         target_path = os.path.join(settings.MEDIA_ROOT, dirname)
         shutil.rmtree(target_path)

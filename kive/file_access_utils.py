@@ -73,7 +73,7 @@ def create_sandbox_base_path(raise_if_exists=False):
     """ Confirm that the Sandboxes folder exists, and return its path. """
     path = sandbox_base_path()
     try:
-        os.mkdir(path)
+        os.makedirs(path)
     except OSError as ex:
         if ex.errno != errno.EEXIST or raise_if_exists:
             raise
