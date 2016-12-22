@@ -203,7 +203,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                         output.size = None
                         output.is_ok = False
                     else:
-                        if methodoutput.output_log is None:
+                        if not methodoutput.output_log:
                             output.date = output.size = 'removed'
                             output.url = output.redaction_plan = None
                         else:
@@ -242,7 +242,6 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     output.is_ok = True
                     if retcode is not None and retcode != 0:
                         output.errors.append('return code {}'.format(retcode))
-                        output.is_ok = False
                     if execlog.start_time is None:
                         output.display = 'Did not run'
                         output.date = None
@@ -255,7 +254,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                         output.size = None
                         output.is_ok = False
                     else:
-                        if methodoutput.error_log is None:
+                        if not methodoutput.error_log:
                             output.date = output.size = 'removed'
                             output.url = output.redaction_plan = None
                         else:
@@ -263,7 +262,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                             try:
                                 output.size = methodoutput.error_log.size
                             except OSError:
-                                ismissing = False
+                                ismissing = True
                             if ismissing:
                                 output.date = output.size = 'missing'
                                 output.url = output.redaction_plan = None

@@ -1,5 +1,6 @@
 from unittest.case import TestCase
 
+
 from mock import Mock, patch
 
 from django.utils import timezone
@@ -928,6 +929,8 @@ class RunOutputsSerializerMockTests(TestCase):
 
     @patch('archive.serializers.reverse', return_value='/some/url')
     def test_step_outputs_error(self, mock_reverse):
+        """ The return code is nonzero, but the stderr and stdout files exist.
+        """
         pipeline = Pipeline()
         run = Run(id=1234, pipeline=pipeline)
         step = RunStep(pipelinestep=PipelineStep(step_num=1,
@@ -958,8 +961,8 @@ class RunOutputsSerializerMockTests(TestCase):
                                              'errors': ['return code 1'],
                                              'filename': None,
                                              'id': 99,
-                                             'is_invalid': True,
-                                             'is_ok': False,
+                                             'is_invalid': False,
+                                             'is_ok': True,
                                              'name': 'step_1_stderr',
                                              'redaction_plan': '/some/url',
                                              'size': u'10\xa0bytes',
@@ -975,9 +978,13 @@ class RunOutputsSerializerMockTests(TestCase):
         self.assertEqual(expected_data, data)
 
     @patch('archive.serializers.reverse', return_value='/some/url')
-    def test_step_outputs_missing(self, mock_reverse):
+    def test_step_outputs_purged(self, mock_reverse):
         """A runstep that ran successfully (return_code = 0), but whose
-        output file is missing (removed to save disk space) """
+        output file is missing (removed to save disk space)
+
+        In this case, the MethodOutput fields for the file entries will be None, in contrast
+        to the test case below (files missing).
+        """
         pipeline = Pipeline()
         run = Run(id=1234, pipeline=pipeline)
         step = RunStep(pipelinestep=PipelineStep(step_num=1,
@@ -1008,6 +1015,59 @@ class RunOutputsSerializerMockTests(TestCase):
                                              'name': 'step_1_stderr',
                                              'redaction_plan': None,
                                              'size': 'removed',
+                                             'step_name': '',
+                                             'type': 'stderr',
+                                             'url': None}],
+                         'input_summary': [],
+                         'id': 1234}
+
+        data = RunOutputsSerializer(run).data
+        self.maxDiff = None
+        self.assertEqual(expected_data['output_summary'], data['output_summary'])
+        self.assertEqual(expected_data, data)
+
+    @patch('archive.serializers.reverse', return_value='/some/url')
+    def test_step_outputs_missing(self, mock_reverse):
+        """A runstep that ran successfully (return_code = 0), but whose
+        stdout and stderr file is missing due to some external error.
+        In this case, the MethodOutput fields for stdout and stderr must be nonzero on the db,
+        but the files must be missing on the file system.
+        """
+        pipeline = Pipeline()
+        run = Run(id=1234, pipeline=pipeline)
+        step = RunStep(pipelinestep=PipelineStep(step_num=1,
+                                                 name='foo.py'))
+        step.log = ExecLog(start_time='11 May 2015', end_time='12 May 2015')
+        OUTNAME = "foo.stdout"
+        ERRNAME = "foo.stderr"
+        step.log.methodoutput = MethodOutput(id=99, return_code=0,
+                                             output_log=OUTNAME,
+                                             error_log=ERRNAME)
+        # now the files exist in the db, but not in the file system.
+        run.runsteps = MockSet(step)
+        expected_data = {'output_summary': [{'date': 'missing',
+                                             'display': 'Standard out',
+                                             'errors': [],
+                                             'filename': None,
+                                             'id': None,
+                                             'is_invalid': False,
+                                             'is_ok': True,
+                                             'name': 'step_1_stdout',
+                                             'redaction_plan': None,
+                                             'size': 'missing',
+                                             'step_name': '1: foo.py',
+                                             'type': 'stdout',
+                                             'url': None},
+                                            {'date': 'missing',
+                                             'display': 'Standard error',
+                                             'errors': [],
+                                             'filename': None,
+                                             'id': None,
+                                             'is_invalid': False,
+                                             'is_ok': True,
+                                             'name': 'step_1_stderr',
+                                             'redaction_plan': None,
+                                             'size': 'missing',
                                              'step_name': '',
                                              'type': 'stderr',
                                              'url': None}],
