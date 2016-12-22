@@ -2,11 +2,12 @@
 # while still using PostgreSQL for thoroughness.
 # Use it by running ./manage.py test --settings=kive.muted_test_settings
 
+import os
 from settings import *  # @UnusedWildImport
 
 # Disable logging to console so test output isn't polluted.
 LOGGING['handlers']['console']['level'] = 'CRITICAL'
 
-MEDIA_ROOT += '_testing'  # Avoid overwriting developer data files.
+MEDIA_ROOT = os.path.join(MEDIA_ROOT, 'Testing')  # Avoid overwriting developer data files.
 
 FLEET_POLLING_INTERVAL = 0.1  # Speed up short runs during tests.

@@ -85,9 +85,9 @@ def dummy_file(content, name='dummy_file'):
 
 
 def check_media_root_is_test():
-    if not settings.MEDIA_ROOT.endswith('_testing'):
+    if os.path.basename(settings.MEDIA_ROOT) != 'Testing':
         raise RuntimeError(
-            "MEDIA_ROOT doesn't end with '_testing', use test settings.")
+            "MEDIA_ROOT doesn't end with 'Testing', use test settings.")
 
 
 def install_fixture_files(fixture_name):
