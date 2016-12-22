@@ -36,7 +36,7 @@ from pipeline.models import Pipeline, PipelineFamily
 
 import file_access_utils
 import kive.testing_utils as tools
-from kive.tests import BaseTestCases, DuckContext, install_fixture_files, restore_production_files
+from kive.tests import BaseTestCases, DuckContext, install_fixture_files, remove_fixture_files
 
 
 def ER_from_record(record):
@@ -546,7 +546,7 @@ class RemovalTests(TestCase):
 
     def tearDown(self):
         tools.clean_up_all_files()
-        restore_production_files()
+        remove_fixture_files()
 
     def removal_plan_tester(self, obj_to_remove, datasets=None, ERs=None, runs=None, pipelines=None, pfs=None,
                             methods=None, mfs=None, CDTs=None, DTs=None, CRRs=None, CRs=None,

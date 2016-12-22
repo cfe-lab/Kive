@@ -1,5 +1,4 @@
 import weakref
-from collections import defaultdict
 from functools import partial
 from itertools import chain
 from mock import Mock, MagicMock, patch, ClassTypes

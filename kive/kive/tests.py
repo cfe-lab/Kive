@@ -9,15 +9,6 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 
 from metadata.models import kive_user
 
-stash_dir = "StashedWhileTesting"
-targets = ["CodeResources",
-           "Datasets",
-           "Logs",
-           "Sandboxes",
-           "VerificationLogs",
-           "VerificationScripts",
-           "StagedFiles"]
-
 
 class DuckRequest(object):
     """ A fake request used to test serializers. """
@@ -33,13 +24,16 @@ class DuckRequest(object):
 
 class DuckContext(dict):
     """ A fake context used to test serializers. """
-    def __init__(self, user=None):
+    def __init__(self, user=None, **kwargs):
+        super(DuckContext, self).__init__(**kwargs)
         self['request'] = DuckRequest(user=user)
 
 
 class BaseTestCases:
     """ A class to hide our base classes so they won't be executed as tests.
     """
+    def __init__(self):
+        pass
 
     class ApiTestCase(TestCase):
         """
@@ -86,44 +80,35 @@ def dummy_file(content, name='dummy_file'):
     data_file = StringIO(content)
     data_file.name = name
     data_file.__enter__ = lambda: None
-    data_file.__exit__ = lambda type, value, traceback: None
+    data_file.__exit__ = lambda extype, value, traceback: None
     return data_file
+
+
+def check_media_root_is_test():
+    if not settings.MEDIA_ROOT.endswith('_testing'):
+        raise RuntimeError(
+            "MEDIA_ROOT doesn't end with '_testing', use test settings.")
 
 
 def install_fixture_files(fixture_name):
     """
     Helper that installs the FieldFiles for a given fixture.
     """
+    remove_fixture_files()  # Remove any leftovers
     fixture_files_path = os.path.join("FixtureFiles", fixture_name)
     assert os.path.isdir(fixture_files_path)
 
-    os.makedirs(stash_dir)  # We want this to fail if it already exists.
-
-    for target in targets:
+    for target in os.listdir(fixture_files_path):
         target_path = os.path.join(settings.MEDIA_ROOT, target)
-        if os.path.isdir(target_path):
-            shutil.move(target_path, os.path.join(stash_dir, target))
-
         dir_to_install = os.path.join(fixture_files_path, target)
-        if os.path.isdir(dir_to_install):
-            shutil.copytree(dir_to_install, target_path)
-        else:
-            os.mkdir(target_path)
+        shutil.copytree(dir_to_install, target_path)
 
 
-def restore_production_files():
+def remove_fixture_files():
     """
-    Helper that removes all FieldFiles used by a test fixture and puts the stashed files back.
+    Helper that removes all FieldFiles used by a test fixture.
     """
-    if not os.path.isdir(stash_dir):
-        return
-
-    for target in targets:
-        dir_to_restore = os.path.join(stash_dir, target)
-        if os.path.isdir(dir_to_restore):
-            target_path = os.path.join(settings.MEDIA_ROOT, target)
-            if os.path.isdir(target_path):
-                shutil.rmtree(target_path)
-            shutil.move(dir_to_restore, target_path)
-
-    shutil.rmtree(stash_dir)
+    check_media_root_is_test()
+    for dirname in os.listdir(settings.MEDIA_ROOT):
+        target_path = os.path.join(settings.MEDIA_ROOT, dirname)
+        shutil.rmtree(target_path)

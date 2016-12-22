@@ -1630,7 +1630,7 @@ def create_method_test_environment(case):
 
     # Some data.
     case.scratch_dir = tempfile.mkdtemp(
-        dir=file_access_utils.sandbox_base_path()
+        dir=file_access_utils.create_sandbox_base_path()
     )
     file_access_utils.configure_sandbox_permissions(case.scratch_dir)
     try:

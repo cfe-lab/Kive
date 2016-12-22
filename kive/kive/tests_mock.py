@@ -1,8 +1,7 @@
-from unittest.case import TestCase
-
 from mock import patch, MagicMock, PropertyMock
 from django.contrib.auth.models import Group, Permission
 from django.db.models.fields.related_descriptors import ManyToManyDescriptor
+from django.test import TestCase
 
 from kive.mock_setup import MockOneToOneMap, MockOneToManyMap, PatcherChain, mocked_relations
 from django_mock_queries.query import MockSet

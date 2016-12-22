@@ -16,7 +16,7 @@ from archive.models import Run, RunComponent
 from constants import datatypes
 from datachecking.models import IntegrityCheckLog, MD5Conflict
 from kive.testing_utils import clean_up_all_files
-from kive.tests import install_fixture_files, restore_production_files
+from kive.tests import install_fixture_files, remove_fixture_files
 from librarian.models import Dataset, DatasetStructure, ExternalFileDirectory, ExecRecord
 from metadata.models import Datatype, CompoundDatatype, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
@@ -177,7 +177,7 @@ class ExecuteTestsBase(TestCase):
 
     def tearDown(self):
         clean_up_all_files()
-        restore_production_files()
+        remove_fixture_files()
 
     def check_run_OK(self, run):
         for step in run.runsteps.all():
@@ -1609,7 +1609,7 @@ class RestoreReusableDatasetTest(TestCase):
         install_fixture_files("restore_reusable_dataset")
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
     def test_load_run_plan(self):
         pipeline = Pipeline.objects.get(revision_name='sums only')

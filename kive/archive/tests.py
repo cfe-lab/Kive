@@ -26,7 +26,7 @@ from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, Dataset, DatasetStructure
 
-from kive.tests import BaseTestCases, install_fixture_files, restore_production_files
+from kive.tests import BaseTestCases, install_fixture_files, remove_fixture_files
 from method.models import Method, MethodFamily, CodeResource
 from pipeline.models import Pipeline, PipelineStep, PipelineFamily
 from kive.mock_setup import mocked_relations
@@ -497,7 +497,7 @@ class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
         tools.load_archive_test_environment(self)
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
 
 class RunComponentTests(ArchiveTestCase):
@@ -720,7 +720,7 @@ class RunComponentInvokedBySubsequentTests(TestCase):
         install_fixture_files("run_pipelines_recovering_reused_step")
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
     def test_clean_execlogs_runcomponent_invoked_by_subsequent_runcomponent(self):
         """
@@ -1245,7 +1245,7 @@ class RunComponentTooManyChecks(TestCase):
         self.user_bob = User.objects.get(username="bob")
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
     def test_RunStep_clean_too_many_integrity_checks(self):
         """RunStep should have <=1 integrity check for each output."""
@@ -2843,7 +2843,7 @@ class StateMachineActualExecutionTests(TestCase):
         tools.load_archive_no_runs_test_environment(self)
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
     def setup_incorrectly_random_method(self):
         """

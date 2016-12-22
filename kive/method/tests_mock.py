@@ -1,9 +1,8 @@
-from unittest.case import TestCase
-
 from django.core.exceptions import ValidationError
-
-from kive.mock_setup import mocked_relations  # Import before any Django models
+from django.test import TestCase
 from django_mock_queries.query import MockSet
+
+from kive.mock_setup import mocked_relations
 from metadata.models import CompoundDatatype
 from method.models import Method, MethodFamily, CodeResourceRevision,\
     CodeResource, MethodDependency

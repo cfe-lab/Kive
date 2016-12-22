@@ -23,7 +23,7 @@ from pipeline.models import Pipeline, PipelineFamily
 from metadata.models import kive_user, everyone_group
 from kive.testing_utils import clean_up_all_files
 from kive import settings
-from kive.tests import install_fixture_files, restore_production_files, DuckContext
+from kive.tests import install_fixture_files, remove_fixture_files, DuckContext
 from fleet.workers import Manager
 
 
@@ -243,7 +243,7 @@ class RestoreReusableDatasetTest(TestCase):
         install_fixture_files("restore_reusable_dataset")
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
     def execute_pipeline(self, pipeline):
         dataset = Dataset.objects.get(name="pairs")
@@ -388,7 +388,7 @@ class RunApiTests(TestCase):
 
     def tearDown(self):
         clean_up_all_files()
-        restore_production_files()
+        remove_fixture_files()
 
     def test_run_index(self, expected_runs=1):
         request = self.factory.get(self.run_list_path)
@@ -672,7 +672,7 @@ class RunSerializerTestBase(TestCase):
         )
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
 
 class RunSerializerTests(RunSerializerTestBase):

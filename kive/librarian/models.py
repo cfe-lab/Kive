@@ -750,7 +750,7 @@ class Dataset(metadata.models.AccessControl):
             if cdt is not None and check:
                 run_dir = tempfile.mkdtemp(
                     prefix="SD{}_".format(new_dataset.pk),
-                    dir=file_access_utils.sandbox_base_path()
+                    dir=file_access_utils.create_sandbox_base_path()
                 )
                 file_access_utils.configure_sandbox_permissions(run_dir)
 

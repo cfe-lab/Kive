@@ -107,7 +107,7 @@ class Sandbox:
         # top-level Pipeline.
         self.sandbox_path = sandbox_path or tempfile.mkdtemp(
             prefix=sandbox_prefix.format(self.user, self.run.pk),
-            dir=file_access_utils.sandbox_base_path())
+            dir=file_access_utils.create_sandbox_base_path())
 
         self.run.sandbox_path = self.sandbox_path
         self.run.save()

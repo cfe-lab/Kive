@@ -11,7 +11,7 @@ import os.path
 from librarian.models import Dataset
 import kive.testing_utils as tools
 from pipeline.models import Pipeline, PipelineFamily
-from kive.tests import install_fixture_files, restore_production_files
+from kive.tests import install_fixture_files, remove_fixture_files
 from method.models import Method
 from fleet.workers import Manager
 from archive.models import Run
@@ -71,7 +71,7 @@ class ExecuteResultTestsRM(TestCase):
 
     def tearDown(self):
         tools.clean_up_all_files()
-        restore_production_files()
+        remove_fixture_files()
 
     def test_execute_pipeline_run(self):
         """
@@ -304,7 +304,7 @@ class ExecuteDiscardedIntermediateTests(TestCase):
 
     def tearDown(self):
         tools.clean_up_all_files()
-        restore_production_files()
+        remove_fixture_files()
 
     def test_discard_intermediate_file(self):
         """
@@ -407,7 +407,7 @@ class FindDatasetTests(TestCase):
         install_fixture_files('find_datasets')
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
     def test_find_dataset_pipeline_input_and_step_output(self):
         """

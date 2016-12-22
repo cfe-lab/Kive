@@ -1,8 +1,6 @@
-from unittest.case import TestCase
-
-
 from mock import Mock, patch
 
+from django.test import TestCase
 from django.utils import timezone
 
 from kive.mock_setup import mocked_relations

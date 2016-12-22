@@ -69,6 +69,17 @@ def sandbox_base_path():
     return os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
 
 
+def create_sandbox_base_path(raise_if_exists=False):
+    """ Confirm that the Sandboxes folder exists, and return its path. """
+    path = sandbox_base_path()
+    try:
+        os.mkdir(path)
+    except OSError as ex:
+        if ex.errno != errno.EEXIST or raise_if_exists:
+            raise
+    return path
+
+
 def configure_sandbox_permissions(path):
     """
     Ensure that the specified path has the correct group and permissions.

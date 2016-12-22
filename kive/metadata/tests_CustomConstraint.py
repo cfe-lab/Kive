@@ -30,8 +30,9 @@ class CustomConstraintTestPreamble(object):
         tools.create_sandbox_testing_tools_environment(self)
         self.user_oscar = User.objects.create_user('oscar', 'oscar@thegrouch.com', 'garbage')
         self.user_oscar.groups.add(everyone_group())
+        sandbox_base_path = file_access_utils.create_sandbox_base_path()
         self.workdir = tempfile.mkdtemp(
-            dir=os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
+            dir=sandbox_base_path
         )
         file_access_utils.configure_sandbox_permissions(self.workdir)
 

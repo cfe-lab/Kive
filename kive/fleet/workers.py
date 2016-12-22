@@ -21,6 +21,7 @@ from django.conf import settings
 from django.utils import timezone
 
 import archive.models
+import file_access_utils
 from archive.models import Dataset, Run, ExceedsSystemCapabilities, MethodOutput
 from sandbox.execute import Sandbox, sandbox_glob
 from fleet.exceptions import StopExecution
@@ -985,6 +986,10 @@ class Manager(object):
         and so a precondition is that sys.argv[1] is the management script used to invoke
         the tests.
         """
+        if settings.FLEET_POLLING_INTERVAL >= 1:
+            raise RuntimeError('FLEET_POLLING_INTERVAL has not been overridden.')
+        file_access_utils.create_sandbox_base_path()
+
         name = name or ""
         description = description or ""
         run = pipeline.pipeline_instances.create(user=user, name=name, description=description)
