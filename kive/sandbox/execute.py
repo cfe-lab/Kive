@@ -73,19 +73,10 @@ class Sandbox:
         the file system, along with dataset_fs_map/socket_map/etc.
 
         INPUTS
-        user          User running the pipeline.*
-        my_pipeline   Pipeline to run.*
-        inputs        Ordered list of datasets to feed into the pipeline.*
-        users_allowed   Iterable (e.g. list or QuerySet) of Users.*
-        groups_allowed  Iterable of Groups.*
-        sandbox_path  Where on the filesystem to execute.*
         run           A Run object to fill in (e.g. if we're starting this using the fleet);
-                      if None, we create our own.
-
-        * parameter is ignored if run is specified
 
         PRECONDITIONS
-        inputs must have real data
+        run.inputs must have real data
         """
         self.run = run
         user = run.user

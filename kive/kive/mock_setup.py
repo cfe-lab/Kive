@@ -86,6 +86,16 @@ class MockOneToOneMap(object):
         return getattr(self.original, name)
 
 
+def find_all_models(models):
+    """ Yield all models and their parents. """
+    for model in models:
+        yield model
+        # noinspection PyProtectedMember
+        for parent in model._meta.parents.keys():
+            for parent_model in find_all_models((parent,)):
+                yield parent_model
+
+
 # noinspection PyProtectedMember
 def mocked_relations(*models):
     """ Mock all related field managers to make pure unit tests possible.
@@ -102,7 +112,7 @@ def mocked_relations(*models):
     # noinspection PyUnresolvedReferences
     patch_object = patch.object
     patchers = []
-    for model in models:
+    for model in find_all_models(models):
         if isinstance(model.save, MagicMock):
             # already mocked, so skip it
             continue
@@ -110,10 +120,11 @@ def mocked_relations(*models):
         patchers.append(patch_object(model, 'save', new_callable=partial(
             Mock,
             name=model_name + '.save')))
-        patchers.append(patch_object(model, 'objects', new_callable=partial(
-            MockSet,
-            mock_name=model_name + '.objects',
-            cls=model)))
+        if hasattr(model, 'objects'):
+            patchers.append(patch_object(model, 'objects', new_callable=partial(
+                MockSet,
+                mock_name=model_name + '.objects',
+                cls=model)))
         for related_object in chain(model._meta.related_objects,
                                     model._meta.many_to_many):
             name = related_object.name
@@ -195,5 +206,5 @@ class PatcherChain(object):
         return [patcher.start() for patcher in self.patchers]
 
     def stop(self):
-        for patcher in self.patchers:
+        for patcher in reversed(self.patchers):
             patcher.stop()

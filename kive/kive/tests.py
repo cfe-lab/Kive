@@ -30,7 +30,7 @@ class DuckContext(dict):
         self['request'] = DuckRequest(user=user)
 
 
-class BaseTestCases:
+class BaseTestCases(object):
     """ A class to hide our base classes so they won't be executed as tests.
     """
     def __init__(self):

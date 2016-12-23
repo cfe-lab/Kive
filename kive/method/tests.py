@@ -19,16 +19,19 @@ from django.core.urlresolvers import resolve
 from django.db import transaction
 
 from django.test import TestCase, skipIfDBFeature
+from mock import patch
 from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.test import force_authenticate
 
-from constants import datatypes
+from constants import datatypes, users
 import file_access_utils
+from kive.mock_setup import mocked_relations
 from kive.tests import BaseTestCases
 import librarian.models
-from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
+from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user, KiveUser
 import metadata.tests
+from method.ajax import MethodViewSet
 from method.models import CodeResource, CodeResourceRevision, \
     Method, MethodFamily, MethodDependency
 from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
@@ -1433,29 +1436,6 @@ class MethodApiTests(BaseTestCases.ApiTestCase):
 
         method_test_setup(self)
 
-    def test_list(self):
-        """
-        Test the API list view.
-        """
-        request = self.factory.get(self.list_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.list_view(request, pk=None)
-
-        self.assertEquals(len(response.data), 6)
-        self.assertEquals(response.data[0]['revision_name'], 'mC_name')
-
-    def test_detail(self):
-        request = self.factory.get(self.detail_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.data['revision_name'], 'mB_name')
-
-    def test_removal_plan(self):
-        request = self.factory.get(self.removal_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.removal_view(request, pk=self.detail_pk)
-        self.assertEquals(response.data['Methods'], 1)
-
     def test_removal(self):
         start_count = Method.objects.all().count()
 
@@ -1478,6 +1458,123 @@ class MethodApiTests(BaseTestCases.ApiTestCase):
 
         self.assertEquals(new_method.inputs.count(), 2)
         self.assertEquals(new_method.outputs.count(), 1)
+
+
+class MethodApiMockTests(BaseTestCases.ApiTestCase):
+    def setUp(self):
+        patcher = mocked_relations(Method, MethodFamily, User, KiveUser)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        user = User(pk=users.KIVE_USER_PK)
+        User.objects.add(user)
+        User.objects.model = User
+        Method.objects.model = Method
+
+        kive_user_instance = KiveUser(pk=users.KIVE_USER_PK, username="kive")
+        KiveUser.objects.add(kive_user_instance)
+
+        # noinspection PyUnresolvedReferences
+        patcher2 = patch.object(MethodViewSet, 'queryset', Method.objects)
+        patcher2.start()
+        self.addCleanup(patcher2.stop)
+
+        super(MethodApiMockTests, self).setUp()
+
+        self.list_path = reverse("method-list")
+        self.detail_pk = 43
+        self.detail_path = reverse("method-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("method-removal-plan",
+                                    kwargs={'pk': self.detail_pk})
+
+        self.list_view, _, _ = resolve(self.list_path)
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+        Method.objects.add(Method(pk=42,
+                                  user=kive_user_instance,
+                                  revision_name='mA_name turnip',
+                                  revision_desc='A_desc'),
+                           Method(pk=43,
+                                  user=kive_user_instance,
+                                  revision_name='mB_name',
+                                  revision_desc='B_desc'),
+                           Method(pk=44,
+                                  user=kive_user_instance,
+                                  revision_name='mC_name',
+                                  revision_desc='C_desc turnip'))
+
+    def test_list(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 3)
+        self.assertEquals(response.data[2]['revision_name'], 'mC_name')
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['revision_name'], 'mB_name')
+
+    def test_removal_plan(self):
+        request = self.factory.get(self.removal_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.removal_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['Methods'], 1)
+
+    def test_filter_description(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=description&filters[0][val]=B_desc")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['revision_name'], 'mB_name')
+
+    def test_filter_smart(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=smart&filters[0][val]=turnip")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 2)
+        self.assertEquals(response.data[0]['revision_name'], 'mA_name turnip')
+        self.assertEquals(response.data[1]['revision_desc'], 'C_desc turnip')
+
+    def test_filter_user(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=user&filters[0][val]=kive")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 3)
+
+    def test_filter_unknown(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=bogus&filters[0][val]=kive")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals({u'detail': u'Unknown filter key: bogus'},
+                          response.data)
 
 
 @skipIfDBFeature('is_mocked')
