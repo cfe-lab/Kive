@@ -18,11 +18,11 @@ from rest_framework import status
 from archive.models import Run, ExecLog
 from archive.serializers import RunSerializer, RunBatchSerializer
 from archive.exceptions import SandboxActiveException, RunNotFinished
+from file_access_utils import create_sandbox_base_path
 from librarian.models import ExecRecord, Dataset
 from pipeline.models import Pipeline, PipelineFamily
 from metadata.models import kive_user, everyone_group
 from kive.testing_utils import clean_up_all_files
-from kive import settings
 from kive.tests import install_fixture_files, remove_fixture_files, DuckContext
 from fleet.workers import Manager
 
@@ -290,7 +290,7 @@ class GarbageCollectionTest(TestCase):
         # A phony directory that we mock-run a Pipeline in.
         self.mock_sandbox_path = tempfile.mkdtemp(
             prefix="user{}_run{}_".format(self.noop_run.user, self.noop_run.pk),
-            dir=os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH))
+            dir=create_sandbox_base_path())
 
     def test_reap_nonexistent_sandbox_path(self):
         """
