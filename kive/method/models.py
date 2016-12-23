@@ -29,7 +29,6 @@ import os
 import stat
 import hashlib
 import logging
-import shutil
 
 
 @python_2_unicode_compatible

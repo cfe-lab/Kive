@@ -7,18 +7,21 @@ import unittest
 import tempfile
 import shutil
 import os.path
+import time
 
 from librarian.models import Dataset
 import kive.testing_utils as tools
 from pipeline.models import Pipeline, PipelineFamily
-from kive.tests import install_fixture_files, restore_production_files
+from kive.tests import install_fixture_files, restore_production_files, BaseTestCases
 from method.models import Method
 from fleet.workers import Manager
 from archive.models import Run
+from fleet.slurmlib import SlurmScheduler
 import file_access_utils
 
 
-class SandboxRMTestCase(TestCase):
+#class SandboxRMTestCase(TestCase):
+class SandboxRMTestCase(BaseTestCases.SlurmExecutionTestCase):
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
 
@@ -127,12 +130,27 @@ class ExecuteResultTestsRM(TestCase):
         tmpdir = tempfile.mkdtemp(dir=file_access_utils.sandbox_base_path())
         file_access_utils.configure_sandbox_permissions(tmpdir)
         outfile = os.path.join(tmpdir, "output")
-        complement_popen = self.method_complement.invoke_code(
+        stdout_path = os.path.join(tmpdir, "stdout.txt")
+        stderr_path = os.path.join(tmpdir, "stderr.txt")
+
+        self.method_complement.install(tmpdir)
+
+        complement_job_handle = self.method_complement.submit_code(
             tmpdir,
             [self.dataset_labdata.dataset_file.file.name],
-            [outfile]
+            [outfile],
+            stdout_path,
+            stderr_path
         )
-        complement_popen.wait()
+
+        is_done = False
+        while not is_done:
+            time.sleep(settings.DEFAULT_SLURM_CHECK_INTERVAL)
+            accounting_info = SlurmScheduler.get_accounting_info([complement_job_handle])
+            curr_state = accounting_info["state"]
+            print "Waiting for {} (state = {})".format(complement_job_handle, curr_state)
+            is_done = curr_state == SlurmScheduler.COMPLETED
+
         labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
         shutil.rmtree(tmpdir)
 
@@ -281,7 +299,7 @@ class ExecuteResultTestsRM(TestCase):
         self.assertEqual(outcable_input_dataset.num_rows(), outcable_output_dataset.num_rows())
 
 
-class ExecuteDiscardedIntermediateTests(TestCase):
+class ExecuteDiscardedIntermediateTests(BaseTestCases.SlurmExecutionTestCase):
     fixtures = ["execute_discarded_intermediate_tests_rm"]
 
     def setUp(self):
@@ -330,7 +348,7 @@ class ExecuteDiscardedIntermediateTests(TestCase):
         self.assertTrue(run.is_successful())
 
 
-class BadRunTests(TestCase):
+class BadRunTests(BaseTestCases.SlurmExecutionTestCase):
     """
     Tests for when things go wrong during Pipeline execution.
     """
@@ -392,7 +410,7 @@ class BadRunTests(TestCase):
         self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().dataset])
 
 
-class FindDatasetTests(TestCase):
+class FindDatasetTests(BaseTestCases.SlurmExecutionTestCase):
     """
     Tests for first_generator_of_dataset.
     """

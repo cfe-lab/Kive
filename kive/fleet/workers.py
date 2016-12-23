@@ -35,7 +35,7 @@ class Manager(object):
     The manager is responsible for handling new Run requests and
     creating Foreman objects to execute each one.
     """
-    def __init__(self, quit_idle=False, history=0):
+    def __init__(self, quit_idle=False, history=0, test=False):
         self.quit_idle = quit_idle
 
         # This keeps track of runs and the order in which they were most recently
@@ -49,6 +49,9 @@ class Manager(object):
 
         # A queue of functions to call during idle time.
         self.idle_job_queue = deque()
+
+        # Denotes whether this is part of a Django test.
+        self.test = test
 
     def monitor_queue(self, time_to_stop):
         """
@@ -109,7 +112,7 @@ class Manager(object):
         num_tasks = len(self.idle_job_queue)
         num_done = 0
         while (time.time() < time_limit) and num_done < num_tasks:
-            mgr_logger.info("Running an idle task..")
+            mgr_logger.info("Running an idle task....")
             jobtodo = self.idle_job_queue[0]
             jobtodo.send(time_limit)
             self.idle_job_queue.rotate(1)
@@ -126,15 +129,26 @@ class Manager(object):
         mgr_logger.debug("Pending runs: {}".format(pending_runs))
 
         for run_to_process in pending_runs:
-            foreman = Foreman(run_to_process)
-            self.runs.append(run_to_process)
-            self.runs_in_progress[run_to_process] = foreman
+            foreman = Foreman(run_to_process, test=self.test)
             foreman.start_run()
 
-            mgr_logger.info("Started run id %d, pipeline %s, user %s",
-                            run_to_process.pk,
-                            run_to_process.pipeline,
-                            run_to_process.user)
+            run_to_process.refresh_from_db()
+            if run_to_process.is_successful():
+                # Well, that was easy.
+                mgr_logger.info("Run id %d, pipeline %s, user %s completely reused",
+                                run_to_process.pk,
+                                run_to_process.pipeline,
+                                run_to_process.user)
+                if self.history_queue.maxlen > 0:
+                    self.history_queue.append(run_to_process)
+            else:
+                self.runs.append(run_to_process)
+                self.runs_in_progress[run_to_process] = foreman
+                mgr_logger.info("Started run id %d, pipeline %s, user %s",
+                                run_to_process.pk,
+                                run_to_process.pipeline,
+                                run_to_process.user)
+
             mgr_logger.debug("Active runs: {}".format(self.runs_in_progress.keys()))
 
             if time.time() > time_to_stop:
@@ -285,7 +299,8 @@ class Manager(object):
                          users_allowed=None,
                          groups_allowed=None,
                          name=None,
-                         description=None):
+                         description=None,
+                         test=True):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
@@ -309,7 +324,7 @@ class Manager(object):
 
         # The run is already in the queue, so we can just start the manager and let it exit
         # when it finishes.
-        manager = cls(quit_idle=True, history=1)
+        manager = cls(quit_idle=True, history=1, test=test)
         manager.main_procedure()
         return manager
 
@@ -330,7 +345,7 @@ class Foreman(object):
     """
     Coordinates the execution of a Run in a Sandbox.
     """
-    def __init__(self, run):
+    def __init__(self, run, test=False):
         # tasks_in_progress tracks the Slurm IDs of currently running tasks:
         # If the task is a RunStep:
         # task -|--> {
@@ -349,6 +364,8 @@ class Foreman(object):
         # A flag to indicate that this Foreman is in the process of terminating its Run and Sandbox.
         self.shutting_down = False
         self.priority = run.priority
+        # A flag indicating whether this is part of a Django test.
+        self.test = test
 
     def monitor_queue(self):
         """
@@ -408,6 +425,7 @@ class Foreman(object):
                     elif driver_state in SlurmScheduler.CANCELLED_STATES:
                         # This was externally cancelled, so we get ready to bail.
                         cancelled = True
+                        terminated_during = "driver"
 
                     else:
                         # Having reached here, we know that the driver ran to completion,
@@ -457,25 +475,26 @@ class Foreman(object):
                     continue
                 elif cable_state in SlurmScheduler.CANCELLED_STATES:
                     cancelled = True
+                    terminated_during = "cable processing"
                 elif cable_state in SlurmScheduler.FAILED_STATES:
                     # Something went wrong, so we get ready to bail.
                     failed = True
+                    terminated_during = "cable processing"
 
             # Having reached here, we know we're done with this task.
             if os.path.exists(task_dict["info_path"]):
                 os.remove(task_dict["info_path"])
             if failed or cancelled:
                 foreman_logger.error(
-                    'Run "%s" (pk=%d, Pipeline: %s, User: %s) %s during %s '
-                    'while handling task %s (pk=%d)',
+                    'Run "%s" (pk=%d, Pipeline: %s, User: %s) %s while handling task %s (pk=%d) during %s',
                     self.sandbox.run,
                     self.sandbox.run.pk,
                     self.sandbox.pipeline,
                     self.sandbox.user,
                     "failed" if failed else "cancelled",
-                    terminated_during,
                     task,
-                    task.pk
+                    task.pk,
+                    terminated_during
                 )
 
                 if failed:
@@ -603,10 +622,15 @@ class Foreman(object):
         with os.fdopen(cable_execute_dict_fd, "wb") as f:
             f.write(json.dumps(cable_info.dict_repr()))
 
+        arg_list = []
+        if self.test:
+            arg_list.append("--settings")
+            arg_list.append("kive.settings_test_fleet_pg")
+
         cable_slurm_handle = SlurmScheduler.submit_job(
             settings.KIVE_HOME,
             "manage.py",
-            [settings.CABLE_HELPER_COMMAND, cable_execute_dict_path],
+            [settings.CABLE_HELPER_COMMAND] + arg_list + [cable_execute_dict_path],
             self.sandbox.uid,
             self.sandbox.gid,
             self.sandbox.run.priority,
@@ -643,12 +667,15 @@ class Foreman(object):
         with os.fdopen(step_execute_dict_fd, "wb") as f:
             f.write(json.dumps(step_info.dict_repr()))
 
-        arg_list = [step_execute_dict_path]
+        arg_list = []
+        if self.test:
+            arg_list.append("--settings")
+            arg_list.append("kive.settings_test_fleet_pg")
 
         setup_slurm_handle = SlurmScheduler.submit_job(
             settings.KIVE_HOME,
             "manage.py",
-            [settings.STEP_HELPER_COMMAND] + arg_list,
+            [settings.STEP_HELPER_COMMAND] + arg_list + [step_execute_dict_path],
             self.sandbox.uid,
             self.sandbox.gid,
             self.sandbox.run.priority,
@@ -669,11 +696,11 @@ class Foreman(object):
         driver_slurm_handle = self.sandbox.submit_step_execution(step_info, after_okay=[setup_slurm_handle])
 
         # Last, submit a job for the bookkeeping.
-        arg_list = ["--bookkeeping"] + arg_list
+        # arg_list = ["--bookkeeping"] + arg_list
         bookkeeping_slurm_handle = SlurmScheduler.submit_job(
             settings.KIVE_HOME,
             "manage.py",
-            [settings.STEP_HELPER_COMMAND] + arg_list,
+            [settings.STEP_HELPER_COMMAND] + ["--bookkeeping"] + arg_list + [step_execute_dict_path],
             self.sandbox.uid,
             self.sandbox.gid,
             self.sandbox.run.priority,

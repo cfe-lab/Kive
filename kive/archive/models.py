@@ -1150,7 +1150,9 @@ class RunComponent(stopwatch.models.Stopwatch):
 
         Optionally this will mark all parent Runs as running.
         """
-        assert self._runcomponentstate_id == runcomponentstates.SUCCESSFUL_PK
+        assert self._runcomponentstate_id == runcomponentstates.SUCCESSFUL_PK, (
+            "RunComponentState {} != Successful".format(self._runcomponentstate)
+        )
         assert self.has_ended()
         self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.RUNNING_PK)
         if save:
@@ -1164,7 +1166,9 @@ class RunComponent(stopwatch.models.Stopwatch):
         """
         End this running RunComponent successfully.
         """
-        assert self._runcomponentstate_id == runcomponentstates.RUNNING_PK
+        assert self._runcomponentstate_id == runcomponentstates.RUNNING_PK, (
+            "RunComponentState {} != Running".format(self._runcomponentstate)
+        )
         self._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.SUCCESSFUL_PK)
         if not self.has_ended():
             self.stop(save=False)
