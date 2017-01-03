@@ -8,6 +8,7 @@ import time
 import datetime
 import itertools
 import os
+import stat
 import glob
 import shutil
 import json
@@ -21,11 +22,14 @@ from django.db import transaction
 
 from archive.models import Dataset, Run, RunStep, RunSIC, MethodOutput, ExecLog
 from sandbox.execute import Sandbox, sandbox_glob
-from fleet.slurmlib import SlurmScheduler
+import fleet.slurmlib
 
 mgr_logger = logging.getLogger("fleet.Manager")
 foreman_logger = logging.getLogger("fleet.Foreman")
 worker_logger = logging.getLogger("fleet.Worker")
+
+
+MANAGE_PY = "manage.py"
 
 
 class Manager(object):
@@ -35,7 +39,8 @@ class Manager(object):
     The manager is responsible for handling new Run requests and
     creating Foreman objects to execute each one.
     """
-    def __init__(self, quit_idle=False, history=0):
+    def __init__(self, quit_idle=False, history=0,
+                 slurm_sched_class=fleet.slurmlib.SlurmScheduler):
         self.quit_idle = quit_idle
 
         # This keeps track of runs and the order in which they were most recently
@@ -49,6 +54,23 @@ class Manager(object):
 
         # A queue of functions to call during idle time.
         self.idle_job_queue = deque()
+
+        self.slurm_sched_class = slurm_sched_class
+        # when we start up, check to see whether slurm is running...
+        # we do want to be able to switch this off, e.g. when running tests.
+        slurm_is_ok = self.slurm_sched_class.slurm_is_alive()
+        mgr_logger.info("Slurm is OK: %s" % slurm_is_ok)
+        if not slurm_is_ok:
+            mgr_logger.error("Slurm cannot be contacted, exiting")
+            raise RuntimeError("Slurm is not running")
+        # also check for the existence of MANAGE_PY at the correct location.
+        # If this file is not present, the sbatch commands will crash terribly
+        manage_fp = os.path.join(settings.KIVE_HOME, MANAGE_PY)
+        if not os.access(manage_fp, os.X_OK):
+            mgr_logger.error("An executable '%s' was not found" % manage_fp)
+            mgr_logger.error("settings.KIVE_HOME = %s", settings.KIVE_HOME)
+            raise RuntimeError("'%s' not found" % manage_fp)
+        mgr_logger.info("manager script found at '%s'" % manage_fp)
 
     def monitor_queue(self, time_to_stop):
         """
@@ -126,7 +148,7 @@ class Manager(object):
         mgr_logger.debug("Pending runs: {}".format(pending_runs))
 
         for run_to_process in pending_runs:
-            foreman = Foreman(run_to_process)
+            foreman = Foreman(run_to_process, self.slurm_sched_class)
             self.runs.append(run_to_process)
             self.runs_in_progress[run_to_process] = foreman
             foreman.start_run()
@@ -255,7 +277,7 @@ class Manager(object):
             # Some jobs in the queue have been started:
             # if we have time, do some idle tasks until poll_until and
             # then check and see if anything has finished.
-            if time.time() < poll_until:
+            if settings.DO_IDLE_TASKS and time.time() < poll_until:
                 self._do_idle_tasks(poll_until)
 
             if self.quit_idle and not self.runs_in_progress:
@@ -330,7 +352,7 @@ class Foreman(object):
     """
     Coordinates the execution of a Run in a Sandbox.
     """
-    def __init__(self, run):
+    def __init__(self, run, slurm_sched_class):
         # tasks_in_progress tracks the Slurm IDs of currently running tasks:
         # If the task is a RunStep:
         # task -|--> {
@@ -344,6 +366,7 @@ class Foreman(object):
         #     "cable": [cable handle],
         #     "info_path": [path of file specifying details of execution]
         # }
+        self.slurm_sched_class = slurm_sched_class
         self.tasks_in_progress = {}
         self.sandbox = Sandbox(run=run)
         # A flag to indicate that this Foreman is in the process of terminating its Run and Sandbox.
@@ -363,7 +386,7 @@ class Foreman(object):
                 our_slurm_jobs.append(task_dict["setup"])
                 our_slurm_jobs.append(task_dict["driver"])
                 our_slurm_jobs.append(task_dict["bookkeeping"])
-        task_accounting_info = SlurmScheduler.get_accounting_info(our_slurm_jobs)
+        task_accounting_info = self.slurm_sched_class.get_accounting_info(our_slurm_jobs)
 
         # These flags reflect the status from the actual execution, not
         # the states of the RunComponents in the database.  (We may have to
@@ -385,14 +408,14 @@ class Foreman(object):
                 bookkeeping_info = task_accounting_info.get(task_dict["bookkeeping"].job_id, None)
 
                 setup_state = setup_info["state"] if setup_info is not None else None
-                if setup_state is None or setup_state in SlurmScheduler.RUNNING_STATES:
+                if setup_state is None or setup_state in self.slurm_sched_class.RUNNING_STATES:
                     # This is still going, so we move on.
                     still_running.extend([task_dict["setup"], task_dict["driver"], task_dict["bookkeeping"]])
                     continue
-                elif setup_state in SlurmScheduler.CANCELLED_STATES:
+                elif setup_state in self.slurm_sched_class.CANCELLED_STATES:
                     cancelled = True
                     terminated_during = "setup"
-                elif setup_state in SlurmScheduler.FAILED_STATES:
+                elif setup_state in self.slurm_sched_class.FAILED_STATES:
                     # Something went wrong, so we get ready to bail.
                     failed = True
                     terminated_during = "setup"
@@ -402,10 +425,10 @@ class Foreman(object):
                     # Note that we don't check on whether it's in FAILED_STATES, because
                     # that will be handled in the bookkeeping stage.
                     driver_state = driver_info["state"] if driver_info is not None else None
-                    if driver_state is None or driver_state in SlurmScheduler.RUNNING_STATES:
+                    if driver_state is None or driver_state in self.slurm_sched_class.RUNNING_STATES:
                         still_running.extend([task_dict["driver"], task_dict["bookkeeping"]])
                         continue
-                    elif driver_state in SlurmScheduler.CANCELLED_STATES:
+                    elif driver_state in self.slurm_sched_class.CANCELLED_STATES:
                         # This was externally cancelled, so we get ready to bail.
                         cancelled = True
 
@@ -413,11 +436,11 @@ class Foreman(object):
                         # Having reached here, we know that the driver ran to completion,
                         # successfully or no.  As such, we remove the wrapped driver if necessary
                         # and fill in the ExecLog.
-                        if hasattr(task_dict["driver"], "wrapped_driver_path"):
-                            driver_path = task_dict["driver"].wrapped_driver_path
-                            if os.path.exists(driver_path):
-                                os.remove(task_dict["driver"].wrapped_driver_path)
-
+                        # SCO do not remove for debugging..
+                        # if hasattr(task_dict["driver"], "wrapped_driver_path"):
+                            # driver_path = task_dict["driver"].wrapped_driver_path
+                            # if os.path.exists(driver_path):
+                            #    os.remove(task_dict["driver"].wrapped_driver_path)
                         task.refresh_from_db()
                         task_log = ExecLog.objects.get(record=task)  # weirdly, task.log doesn't appear to be set
                         with transaction.atomic():
@@ -436,13 +459,13 @@ class Foreman(object):
 
                         # Check on the bookkeeping script.
                         bookkeeping_state = bookkeeping_info["state"] if bookkeeping_info is not None else None
-                        if bookkeeping_state is None or bookkeeping_state in SlurmScheduler.RUNNING_STATES:
+                        if bookkeeping_state is None or bookkeeping_state in self.slurm_sched_class.RUNNING_STATES:
                             still_running.append(task_dict["bookkeeping"])
                             continue
-                        elif bookkeeping_state in SlurmScheduler.CANCELLED_STATES:
+                        elif bookkeeping_state in self.slurm_sched_class.CANCELLED_STATES:
                             cancelled = True
                             terminated_during = "bookkeeping"
-                        elif bookkeeping_state in SlurmScheduler.FAILED_STATES:
+                        elif bookkeeping_state in self.slurm_sched_class.FAILED_STATES:
                             # Something went wrong, so we bail.
                             failed = True
                             terminated_during = "bookkeeping"
@@ -451,13 +474,13 @@ class Foreman(object):
                 cable_info = task_accounting_info.get(task_dict["cable"].job_id, None)
 
                 cable_state = cable_info["state"] if cable_info is not None else None
-                if cable_state is None or cable_state in SlurmScheduler.RUNNING_STATES:
+                if cable_state is None or cable_state in self.slurm_sched_class.RUNNING_STATES:
                     # This is still going, so we move on.
                     still_running.append(task_dict["cable"])
                     continue
-                elif cable_state in SlurmScheduler.CANCELLED_STATES:
+                elif cable_state in self.slurm_sched_class.CANCELLED_STATES:
                     cancelled = True
-                elif cable_state in SlurmScheduler.FAILED_STATES:
+                elif cable_state in self.slurm_sched_class.FAILED_STATES:
                     # Something went wrong, so we get ready to bail.
                     failed = True
 
@@ -505,11 +528,13 @@ class Foreman(object):
                 self.sandbox.user,
                 self.priority
             )
-            SlurmScheduler.set_job_priority(still_running, self.priority)
+            self.slurm_sched_class.set_job_priority(still_running, self.priority)
 
     def start_run(self):
         """
         Receive a request to start a pipeline running.
+        This is the entry point for the foreman after having been created
+        by the Manager.
         """
         self.sandbox.advance_pipeline()
 
@@ -596,16 +621,16 @@ class Foreman(object):
         # We need to get some information about the cable: the step that it feeds (RunSIC)
         # or that it's fed by (RunOutputCable), and the input/output that it feeds/is fed by.
         # We need this so that we can write the stderr and stdout to the appropriate locations.
-        cable_record = cable_info.cable_record
+        # cable_record = cable_info.cable_record
 
         # Submit the job.
         cable_execute_dict_fd, cable_execute_dict_path = tempfile.mkstemp()
         with os.fdopen(cable_execute_dict_fd, "wb") as f:
             f.write(json.dumps(cable_info.dict_repr()))
 
-        cable_slurm_handle = SlurmScheduler.submit_job(
+        cable_slurm_handle = self.slurm_sched_class.submit_job(
             settings.KIVE_HOME,
-            "manage.py",
+            MANAGE_PY,
             [settings.CABLE_HELPER_COMMAND, cable_execute_dict_path],
             self.sandbox.uid,
             self.sandbox.gid,
@@ -643,37 +668,64 @@ class Foreman(object):
         with os.fdopen(step_execute_dict_fd, "wb") as f:
             f.write(json.dumps(step_info.dict_repr()))
 
-        arg_list = [step_execute_dict_path]
+        # NOTE: wrapping the setup script is not required, but can be useful for debugging.
+        dowrap = False
 
-        setup_slurm_handle = SlurmScheduler.submit_job(
-            settings.KIVE_HOME,
-            "manage.py",
-            [settings.STEP_HELPER_COMMAND] + arg_list,
-            self.sandbox.uid,
-            self.sandbox.gid,
-            self.sandbox.run.priority,
-            step_info.threads_required,
-            step_info.setup_stdout_path(),
-            step_info.setup_stderr_path(),
-            job_name="run{}_step{}_setup".format(runstep.top_level_run.pk,
-                                                 runstep.get_coordinates())
-        )
-
-        # Next, submit a job for the driver itself.  Because the driver isn't in place until
-        # the bookkeeping is finished, we need to (lightly) wrap the driver.
-        driver_string = """\
-#!/bin/bash
+        if dowrap:
+            # write a mini wrapper
+            driver_template = """\
+#! /usr/bin/env bash
+# python -c "import time; print 'start time', time.time()"
+cd {}
+# pwd
 {} {} {}
+# python -c "import time; print 'stop time', time.time()"
 """
+            wrapped_driver_fd, wrapped_driver_path = tempfile.mkstemp(dir=step_info.step_run_dir,
+                                                                      prefix="setty")
+            # make the job script executable
+            os.fchmod(wrapped_driver_fd, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            with os.fdopen(wrapped_driver_fd, "wb") as f:
+                f.write(driver_template.format(settings.KIVE_HOME,
+                                               MANAGE_PY,
+                                               settings.STEP_HELPER_COMMAND,
+                                               step_execute_dict_path))
+            setup_slurm_handle = self.slurm_sched_class.submit_job(
+                settings.KIVE_HOME,
+                wrapped_driver_path,
+                [],
+                self.sandbox.uid,
+                self.sandbox.gid,
+                self.sandbox.run.priority,
+                step_info.threads_required,
+                step_info.setup_stdout_path(),
+                step_info.setup_stderr_path(),
+                job_name="r{}s{}_setup".format(runstep.top_level_run.pk,
+                                               runstep.get_coordinates())
+            )
+        else:
+            setup_slurm_handle = self.slurm_sched_class.submit_job(
+                settings.KIVE_HOME,
+                MANAGE_PY,
+                [settings.STEP_HELPER_COMMAND, step_execute_dict_path],
+                self.sandbox.uid,
+                self.sandbox.gid,
+                self.sandbox.run.priority,
+                step_info.threads_required,
+                step_info.setup_stdout_path(),
+                step_info.setup_stderr_path(),
+                job_name="r{}s{}_setup".format(runstep.top_level_run.pk,
+                                               runstep.get_coordinates())
+            )
 
-        driver_slurm_handle = self.sandbox.submit_step_execution(step_info, after_okay=[setup_slurm_handle])
+        driver_slurm_handle = self.sandbox.submit_step_execution(step_info,
+                                                                 after_okay=[setup_slurm_handle])
 
         # Last, submit a job for the bookkeeping.
-        arg_list = ["--bookkeeping"] + arg_list
-        bookkeeping_slurm_handle = SlurmScheduler.submit_job(
+        bookkeeping_slurm_handle = self.slurm_sched_class.submit_job(
             settings.KIVE_HOME,
-            "manage.py",
-            [settings.STEP_HELPER_COMMAND] + arg_list,
+            MANAGE_PY,
+            [settings.STEP_HELPER_COMMAND, "--bookkeeping", step_execute_dict_path],
             self.sandbox.uid,
             self.sandbox.gid,
             self.sandbox.run.priority,
@@ -681,8 +733,8 @@ class Foreman(object):
             step_info.bookkeeping_stdout_path(),
             step_info.bookkeeping_stderr_path(),
             after_any=[driver_slurm_handle],
-            job_name="run{}_step{}_bookkeeping".format(runstep.top_level_run.pk,
-                                                       runstep.get_coordinates())
+            job_name="r{}s{}_bookkeeping".format(runstep.top_level_run.pk,
+                                                 runstep.get_coordinates())
         )
 
         return {
@@ -959,9 +1011,9 @@ class Foreman(object):
         for task, task_dict in self.tasks_in_progress.iteritems():
             if isinstance(task, RunStep):
                 for job in ("setup", "driver", "bookkeeping"):
-                    SlurmScheduler.job_cancel(task_dict[job])
+                    self.slurm_sched_class.job_cancel(task_dict[job])
             else:
-                SlurmScheduler.job_cancel(task_dict["cable"])
+                self.slurm_sched_class.job_cancel(task_dict["cable"])
 
             if os.path.exists(task_dict["info_path"]):
                 os.remove(task_dict["info_path"])

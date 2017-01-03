@@ -1,7 +1,9 @@
 """
 Basic file-checking functionality used by Kive.
 """
-import hashlib, glob, os
+import hashlib
+import glob
+import os
 import errno
 import grp
 import stat
@@ -21,10 +23,10 @@ logger = logging.getLogger("file_access_utils")
 def can_create_new_file(file_to_create):
     """
     Tests whether the specified file can be created.
-    
+
     This tests whether something already exists there, and
     if not, whether the containing directory's permissions
-    will allow us to create this file (and whatever 
+    will allow us to create this file (and whatever
     subdirectories are required).
 
     Return (True, None) if we can create this file; return

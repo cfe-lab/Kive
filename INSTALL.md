@@ -296,6 +296,8 @@ Make sure that accounting is switched on:
     # LOGGING AND ACCOUNTING
     JobCompType=jobcomp/filetxt
     JobCompLoc=/var/log/slurm-llnl/job_completions
+    AccountingStorageType=accounting_storage/filetxt
+    AccountingStorageLoc=/var/log/slurm-llnl/accounting
 
 Use the simple, built-in scheduler
 
@@ -308,12 +310,20 @@ Now the two daemons can be started:
     sudo service slurmd start
     sudo service slurmctld start
 
-The installation can be tested by running the 'squeue' command, which should complete
-without errors and show an empty queue:
+The installation can be tested by running two commands, both which should complete without 
+errors:
+a) the 'squeue' command will show an empty queue:
 
     Nibbler:/etc/slurm-llnl> squeue
                  JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
     Nibbler:/etc/slurm-llnl> 
+
+b) the 'sacct' command, will show an empty job history:
+
+    Nibbler:/var/log/slurm-llnl> sacct
+       JobID    JobName  Partition    Account  AllocCPUS      State ExitCode 
+    ------------ ---------- ---------- ---------- ---------- ---------- -------- 
+
 
 Installing scandir
 ------------------

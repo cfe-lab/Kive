@@ -3,6 +3,7 @@ from sandbox.execute import Sandbox
 from fleet.exceptions import StopExecution
 import json
 import sys
+import time
 import logging
 
 worker_logger = logging.getLogger("fleet.Worker")
@@ -25,6 +26,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        worker_logger.debug("start time : %f" % time.time())
         with open(options["step_execution_info_json"], "rb") as f:
             step_execute_dict = json.loads(f.read())
 
@@ -41,3 +43,4 @@ class Command(BaseCommand):
                 sys.exit(102)
         else:
             Sandbox.step_execution_bookkeeping(step_execute_dict)
+        worker_logger.debug("stop time : %f" % time.time())

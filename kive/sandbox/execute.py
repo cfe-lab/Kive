@@ -3,6 +3,7 @@
 from collections import defaultdict
 import logging
 import os
+import stat
 import random
 import tempfile
 import time
@@ -106,7 +107,8 @@ class Sandbox:
         inputs = [x.dataset for x in run.inputs.order_by("index")]
         sandbox_path = run.sandbox_path
 
-        self.logger = logging.getLogger(self.__class__.__name__)
+        self.logger = logger
+        # logging.getLogger(self.__class__.__name__)
         self.user = user
         self.pipeline = my_pipeline
         self.inputs = inputs
@@ -748,7 +750,9 @@ class Sandbox:
             elif curr_RS.is_running():
                 all_complete = False
 
-            # FIXME check that this is all the possible states that it can be in after r_o_p_s
+            else:
+                # FIXME check that this is all the possible states that it can be in after r_o_p_s
+                raise RuntimeError("unhandled case !\n")
 
         # Now go through the output cables and do the same.
         for outcable in pipeline_to_resume.outcables.order_by("output_idx"):
@@ -1731,6 +1735,11 @@ class Sandbox:
         Prepare to carry out the task specified by step_execute_dict.
 
         This is intended to be run as a Slurm job, so is a static method.
+        I.e. in fleet.workers.Managersubmit_runstep():
+            a dict containing pertinent information about the required run is written into a JSON file.
+            Then, using sbatch, a slurm job that calls  'manage.py step_helper' is submitted.
+        Upon execution by slurm, that command retrieves the dict from the json file and calls
+        this static method with the dict as an argument.
 
         Precondition: the task must be ready to go, i.e. its inputs must all be in place.  Also
         it should not have been run previously.  This should not be a RunStep representing a Pipeline.
@@ -1889,28 +1898,38 @@ class Sandbox:
 
         return curr_RS
 
-    def submit_step_execution(self, step_execute_info, after_okay=None, wrap=True):
+    def submit_step_execution(self, step_execute_info, after_okay, wrap=True):
         """
         Submit the step execution to Slurm.
 
         step_execute_info is an object of class RunStepExecuteInfo.
-        dependencies is a list of Slurm job IDs that must be completed (successfully)
-        before the step execution can proceed.
+        fter_okay is a list of Slurm job handles; These are submitted jobs that must be
+        completed (successfully) before the execution of this driver can proceed.
+
+        NOTE: under 'normal circumstances', i.e. when submitting the driver to slurm
+        wrap must be true for this to succeed.
+        This is because at the time of submission, the driver code has not been installed yet,
+        and slurm submission will fail.
+        The way of getting around this problem is the following:
+        a) at slurm submission time:
+            create a small shell script wrapper which calls the not-yet existing driver.
+        b) at slurm run time:
+           the setup script, which must run successfully before this one is started,
+           has copied the driver into place, which the wrapper code now can run.
         """
-        # From here on the code is assumed to not be corrupted, and all the required files
-        # are to be placed in their right places.
+        # From here on the code is assumed not to be corrupted, and all the required files
+        # have been placed in their right places.
         curr_RS = step_execute_info.runstep
 
         input_paths = [x.output_path for x in step_execute_info.cable_info_list]
         # Driver name
         driver = curr_RS.pipelinestep.transformation.definite.driver
 
-        job_name = "run{}_step{}_driver[{}]".format(
+        job_name = "r{}s{}driver[{}]".format(
             curr_RS.top_level_run.pk,
             curr_RS.get_coordinates(),
             driver.coderesource.filename
         )
-
         logger.debug("Submitting driver '%s', task_pk %d", driver.coderesource.filename, curr_RS.pk)
         if not wrap:
             job_handle = curr_RS.pipelinestep.transformation.definite.submit_code(
@@ -1929,18 +1948,24 @@ class Sandbox:
             # Wrap the driver in a script.
             driver_template = """\
 #! /usr/bin/env bash
-{} {} {}
+# python -c "import time; print 'start time', time.time()"
+./{} {} {}
+# python -c "import time; print 'stop time', time.time()"
+
 """
-            wrapped_driver_fd, wrapped_driver_path = tempfile.mkstemp(prefix=driver.coderesource.filename)
+            wrapped_driver_fd, wrapped_driver_path = tempfile.mkstemp(dir=step_execute_info.step_run_dir,
+                                                                      prefix=driver.coderesource.filename)
+            # make the job script executable
+            os.fchmod(wrapped_driver_fd, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            # os.path.join(step_execute_info.step_run_dir, driver.coderesource.filename),
             with os.fdopen(wrapped_driver_fd, "wb") as f:
                 f.write(
                     driver_template.format(
-                        os.path.join(step_execute_info.step_run_dir, driver.coderesource.filename),
+                        driver.coderesource.filename,
                         " ".join(input_paths),
                         " ".join(step_execute_info.output_paths)
                     )
                 )
-
             job_handle = SlurmScheduler.submit_job(
                 step_execute_info.step_run_dir,
                 wrapped_driver_path,
@@ -1951,13 +1976,14 @@ class Sandbox:
                 step_execute_info.threads_required,
                 step_execute_info.driver_stdout_path(),
                 step_execute_info.driver_stderr_path(),
+                after_okay=after_okay,
                 job_name=job_name
             )
 
             # Stick the path to the job handle so it can be disposed of later.
             job_handle.wrapped_driver_path = wrapped_driver_path
-
-        logger.debug("Submitted task with pk=%d; Slurm job ID=%d", curr_RS.pk, job_handle.job_id)
+        logger.debug("Submitted task with pk=%d; Slurm job ID=%d, wrapper name=%s",
+                     curr_RS.pk, job_handle.job_id, wrapped_driver_path)
         return job_handle
 
     @staticmethod
@@ -2037,7 +2063,7 @@ class Sandbox:
                                 bad_output_found = True
 
                                 if preexisting_ER:
-                                    output_dataset = curr_ER.get_execrecordout(curr_output).dataset
+                                    output_dataset = preexisting_ER.get_execrecordout(curr_output).dataset
                                     if md5s[i] is None:
                                         output_dataset.mark_missing(start_time, end_time, curr_log, user)
                                     else:
@@ -2049,8 +2075,10 @@ class Sandbox:
                                         file_source=curr_RS
                                     )
                                     output_dataset.mark_missing(start_time, end_time, curr_log, user)
-
                                 else:
+                                    dataset_name = curr_RS.output_name(curr_output)
+                                    dataset_desc = curr_RS.output_description(curr_output)
+                                    make_dataset = curr_RS.keeps_output(curr_output)
                                     output_dataset = librarian.models.Dataset.create_dataset(
                                         output_path,
                                         cdt=output_CDT,
@@ -2075,7 +2103,7 @@ class Sandbox:
                                         # Wrap in a transaction to prevent
                                         # concurrent authoring of Datasets to
                                         # an existing Dataset.
-                                        output_ERO = curr_ER.get_execrecordout(curr_output)
+                                        output_ERO = preexisting_ER.get_execrecordout(curr_output)
                                         with transaction.atomic():
                                             output_dataset = Dataset.objects.select_for_update().filter(
                                                 pk=output_ERO.dataset.pk).first()
