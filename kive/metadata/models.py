@@ -1296,6 +1296,7 @@ class Datatype(AccessControl):
         )
 
         is_done = False
+        # FIXME this might not work -- change to use SlurmScheduler.get_accounting_info
         while not is_done:
             time.sleep(check_interval)
             curr_state = job.get_state()

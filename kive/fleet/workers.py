@@ -131,7 +131,7 @@ class Manager(object):
         num_tasks = len(self.idle_job_queue)
         num_done = 0
         while (time.time() < time_limit) and num_done < num_tasks:
-            mgr_logger.info("Running an idle task..")
+            mgr_logger.info("Running an idle task....")
             jobtodo = self.idle_job_queue[0]
             jobtodo.send(time_limit)
             self.idle_job_queue.rotate(1)
@@ -153,10 +153,23 @@ class Manager(object):
             self.runs_in_progress[run_to_process] = foreman
             foreman.start_run()
 
-            mgr_logger.info("Started run id %d, pipeline %s, user %s",
-                            run_to_process.pk,
-                            run_to_process.pipeline,
-                            run_to_process.user)
+            run_to_process.refresh_from_db()
+            if run_to_process.is_successful():
+                # Well, that was easy.
+                mgr_logger.info("Run id %d, pipeline %s, user %s completely reused",
+                                run_to_process.pk,
+                                run_to_process.pipeline,
+                                run_to_process.user)
+                if self.history_queue.maxlen > 0:
+                    self.history_queue.append(run_to_process)
+            else:
+                self.runs.append(run_to_process)
+                self.runs_in_progress[run_to_process] = foreman
+                mgr_logger.info("Started run id %d, pipeline %s, user %s",
+                                run_to_process.pk,
+                                run_to_process.pipeline,
+                                run_to_process.user)
+
             mgr_logger.debug("Active runs: {}".format(self.runs_in_progress.keys()))
 
             if time.time() > time_to_stop:
@@ -307,7 +320,8 @@ class Manager(object):
                          users_allowed=None,
                          groups_allowed=None,
                          name=None,
-                         description=None):
+                         description=None,
+                         test=True):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
@@ -331,7 +345,8 @@ class Manager(object):
 
         # The run is already in the queue, so we can just start the manager and let it exit
         # when it finishes.
-        manager = cls(quit_idle=True, history=1)
+        manager = cls(quit_idle=True, history=1,
+                      slurm_sched_class=fleet.slurmlib.DummySlurmScheduler)
         manager.main_procedure()
         return manager
 
@@ -431,6 +446,7 @@ class Foreman(object):
                     elif driver_state in self.slurm_sched_class.CANCELLED_STATES:
                         # This was externally cancelled, so we get ready to bail.
                         cancelled = True
+                        terminated_during = "driver"
 
                     else:
                         # Having reached here, we know that the driver ran to completion,
@@ -480,25 +496,26 @@ class Foreman(object):
                     continue
                 elif cable_state in self.slurm_sched_class.CANCELLED_STATES:
                     cancelled = True
+                    terminated_during = "cable processing"
                 elif cable_state in self.slurm_sched_class.FAILED_STATES:
                     # Something went wrong, so we get ready to bail.
                     failed = True
+                    terminated_during = "cable processing"
 
             # Having reached here, we know we're done with this task.
             if os.path.exists(task_dict["info_path"]):
                 os.remove(task_dict["info_path"])
             if failed or cancelled:
                 foreman_logger.error(
-                    'Run "%s" (pk=%d, Pipeline: %s, User: %s) %s during %s '
-                    'while handling task %s (pk=%d)',
+                    'Run "%s" (pk=%d, Pipeline: %s, User: %s) %s while handling task %s (pk=%d) during %s',
                     self.sandbox.run,
                     self.sandbox.run.pk,
                     self.sandbox.pipeline,
                     self.sandbox.user,
                     "failed" if failed else "cancelled",
-                    terminated_during,
                     task,
-                    task.pk
+                    task.pk,
+                    terminated_during
                 )
 
                 if failed:
@@ -670,7 +687,6 @@ class Foreman(object):
 
         # NOTE: wrapping the setup script is not required, but can be useful for debugging.
         dowrap = False
-
         if dowrap:
             # write a mini wrapper
             driver_template = """\
