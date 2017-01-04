@@ -147,9 +147,12 @@ class ExecuteResultTestsRM(TestCase):
         while not is_done:
             time.sleep(settings.DEFAULT_SLURM_CHECK_INTERVAL)
             accounting_info = SlurmScheduler.get_accounting_info([complement_job_handle])
-            curr_state = accounting_info["state"]
-            print "Waiting for {} (state = {})".format(complement_job_handle, curr_state)
-            is_done = curr_state == SlurmScheduler.COMPLETED
+            if len(accounting_info) > 0:
+                curr_state = accounting_info[complement_job_handle.job_id]["state"]
+                print "Waiting for {} (state = {})".format(complement_job_handle, curr_state)
+                is_done = curr_state == SlurmScheduler.COMPLETED
+            else:
+                print "Job {} has not been queued yet".format(complement_job_handle)
 
         labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
         shutil.rmtree(tmpdir)
@@ -345,6 +348,32 @@ class ExecuteDiscardedIntermediateTests(BaseTestCases.SlurmExecutionTestCase):
             [self.dataset_labdata]
         ).get_last_run()
 
+        # Dump the logs.
+        setup_log_names = (
+            "setup_out.txt",
+            "setup_err.txt",
+        )
+        bookkeeping_log_names = (
+            "bookkeeping_out.txt",
+            "bookkeeping_err.txt"
+        )
+        for step in (1, 2):
+            print "===="
+            print "Logs for step {}".format(step)
+            print "===="
+
+            driver_log_names = (
+                "step{}_stdout.txt".format(step),
+                "step{}_stderr.txt".format(step)
+            )
+            for log_name in setup_log_names + driver_log_names + bookkeeping_log_names:
+                log_path = os.path.join(run.sandbox_path, "step{}".format(step), "logs", log_name)
+                print "----"
+                print log_path
+                print "----"
+                with open(log_path, "rb") as f:
+                    print f.read()
+
         self.assertTrue(run.is_successful())
 
 
@@ -362,29 +391,29 @@ class BadRunTests(BaseTestCases.SlurmExecutionTestCase):
         for rsic in runstep.RSICs.all():
             self.assertTrue(rsic.is_successful())
 
-    @unittest.skipIf(
-        settings.KIVE_SANDBOX_WORKER_ACCOUNT,
-        "OSError will not be thrown when using SSH to the Kive sandbox worker account"
-    )
-    def test_code_bad_execution(self):
-        """
-        If the user's code causes subprocess to throw an OSError, the ExecLog should have a -1 return code.
-
-        Note that this doesn't occur if using ssh to an unprivileged account for execution.
-        """
-        run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_faulty, [self.dataset_grandpa]).get_last_run()
-        runstep1 = run.runsteps.first()
-        log = runstep1.log
-        interm_dataset = runstep1.execrecord.execrecordouts.first().dataset
-
-        self.cable_tester(runstep1)
-        self.assertTrue(runstep1.is_failed())
-
-        self.assertTrue(run.is_failed())
-
-        self.assertEqual(log.is_successful(), False)
-        self.assertEqual(log.methodoutput.return_code, -1)
-        self.assertEqual(log.missing_outputs(), [interm_dataset])
+    # @unittest.skipIf(
+    #     settings.KIVE_SANDBOX_WORKER_ACCOUNT,
+    #     "OSError will not be thrown when using SSH to the Kive sandbox worker account"
+    # )
+    # def test_code_bad_execution(self):
+    #     """
+    #     If the user's code causes subprocess to throw an OSError, the ExecLog should have a -1 return code.
+    #
+    #     Note that this doesn't occur if using ssh to an unprivileged account for execution.
+    #     """
+    #     run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_faulty, [self.dataset_grandpa]).get_last_run()
+    #     runstep1 = run.runsteps.first()
+    #     log = runstep1.log
+    #     interm_dataset = runstep1.execrecord.execrecordouts.first().dataset
+    #
+    #     self.cable_tester(runstep1)
+    #     self.assertTrue(runstep1.is_failed())
+    #
+    #     self.assertTrue(run.is_failed())
+    #
+    #     self.assertEqual(log.is_successful(), False)
+    #     self.assertEqual(log.methodoutput.return_code, -1)
+    #     self.assertEqual(log.missing_outputs(), [interm_dataset])
 
     def test_method_fails(self):
         """Properly handle a failed method in a pipeline."""

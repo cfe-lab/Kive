@@ -15,7 +15,6 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 
 from metadata.models import kive_user
 
-stash_dir = "StashedWhileTesting"
 targets = ["CodeResources",
            "Datasets",
            "Logs",
@@ -159,12 +158,12 @@ def install_fixture_files(fixture_name):
     fixture_files_path = os.path.join("FixtureFiles", fixture_name)
     assert os.path.isdir(fixture_files_path)
 
-    os.makedirs(stash_dir)  # We want this to fail if it already exists.
+    os.makedirs(settings.TESTING_FILE_STASH)  # We want this to fail if it already exists.
 
     for target in targets:
         target_path = os.path.join(settings.MEDIA_ROOT, target)
         if os.path.isdir(target_path):
-            shutil.move(target_path, os.path.join(stash_dir, target))
+            shutil.move(target_path, os.path.join(settings.TESTING_FILE_STASH, target))
 
         dir_to_install = os.path.join(fixture_files_path, target)
         if os.path.isdir(dir_to_install):
@@ -177,7 +176,7 @@ def restore_production_files():
     """
     Helper that removes all FieldFiles used by a test fixture and puts the stashed files back.
     """
-    if not os.path.isdir(stash_dir):
+    if not os.path.isdir(settings.TESTING_FILE_STASH):
         return
 
     for target in targets:
@@ -185,8 +184,8 @@ def restore_production_files():
         if os.path.isdir(target_path):
             shutil.rmtree(target_path)
 
-        dir_to_restore = os.path.join(stash_dir, target)
+        dir_to_restore = os.path.join(settings.TESTING_FILE_STASH, target)
         if os.path.isdir(dir_to_restore):
             shutil.move(dir_to_restore, target_path)
 
-    shutil.rmtree(stash_dir)
+    shutil.rmtree(settings.TESTING_FILE_STASH)

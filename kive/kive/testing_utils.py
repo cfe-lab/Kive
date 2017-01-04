@@ -2242,7 +2242,8 @@ def create_grandpa_sandbox_environment(case):
     case.coderev_faulty = make_first_revision(
         "faulty",
         "a script...?",
-        "faulty.sh", "",
+        "faulty.sh",
+        "",
         case.user_grandpa
     )
     case.method_faulty = make_first_method(

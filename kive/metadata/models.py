@@ -1296,14 +1296,22 @@ class Datatype(AccessControl):
         )
 
         is_done = False
-        # FIXME this might not work -- change to use SlurmScheduler.get_accounting_info
+        job_info = None
         while not is_done:
             time.sleep(check_interval)
-            curr_state = job.get_state()
-            self.logger.debug("Waiting for %s (state = %s)", job, curr_state)
-            is_done = curr_state in SlurmScheduler.STOPPED_SET
+            accounting_info = SlurmScheduler.get_accounting_info([job])
+            if len(accounting_info) > 0:
+                job_info = accounting_info[job.job_id]
+                curr_state = job_info["state"]
+                print "Waiting for {} (state = {})".format(job, curr_state)
+                is_done = (
+                    curr_state == SlurmScheduler.COMPLETED or
+                    curr_state in SlurmScheduler.CANCELLED_STATES or
+                    curr_state in SlurmScheduler.FAILED_STATES
+                )
+            else:
+                print "Job {} has not been queued yet".format(job)
 
-        job_info = SlurmScheduler.get_accounting_info([job])[job.job_id]
         return_code = job_info["return_code"]
 
         # The method's driver has been called and has completed: now keep the record.

@@ -49,7 +49,7 @@ class Manager(object):
         # This maps run -|-> foreman
         self.runs_in_progress = {}
 
-        # A queue of recently-completed runs, to a maximum specified by history.
+        # A queue of recently-completed Sandboxes, to a maximum specified by history.
         self.history_queue = deque(maxlen=history)
 
         # A queue of functions to call during idle time.
@@ -92,7 +92,7 @@ class Manager(object):
                 # All done, so remove it from our map.
                 self.runs_in_progress.pop(run)
                 if self.history_queue.maxlen > 0:
-                    self.history_queue.append(run)
+                    self.history_queue.append(foreman.sandbox)
             else:
                 # Add it back to the end of the queue.
                 self.runs.append(run)
@@ -161,7 +161,7 @@ class Manager(object):
                                 run_to_process.pipeline,
                                 run_to_process.user)
                 if self.history_queue.maxlen > 0:
-                    self.history_queue.append(run_to_process)
+                    self.history_queue.append(foreman.sandbox)
             else:
                 self.runs.append(run_to_process)
                 self.runs_in_progress[run_to_process] = foreman
@@ -359,8 +359,8 @@ class Manager(object):
         if self.history_queue.maxlen == 0 or len(self.history_queue) == 0:
             return None
 
-        last_completed_run = self.history_queue.pop()
-        return last_completed_run
+        last_completed_sdbx = self.history_queue.pop()
+        return last_completed_sdbx.run
 
 
 class Foreman(object):
