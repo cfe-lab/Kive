@@ -263,6 +263,9 @@ SANDBOX_PURGE_DAYS = 1
 SANDBOX_PURGE_HOURS = 0
 SANDBOX_PURGE_MINUTES = 0
 
+# Whether the fleet Manager should run idle tasks.
+DO_IDLE_TASKS = True
+
 # Keep this many of the most recent Sandboxes for any PipelineFamily.
 SANDBOX_KEEP_RECENT = 10
 

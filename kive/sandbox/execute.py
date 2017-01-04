@@ -75,19 +75,10 @@ class Sandbox:
         the file system, along with dataset_fs_map/socket_map/etc.
 
         INPUTS
-        user          User running the pipeline.*
-        my_pipeline   Pipeline to run.*
-        inputs        Ordered list of datasets to feed into the pipeline.*
-        users_allowed   Iterable (e.g. list or QuerySet) of Users.*
-        groups_allowed  Iterable of Groups.*
-        sandbox_path  Where on the filesystem to execute.*
         run           A Run object to fill in (e.g. if we're starting this using the fleet);
-                      if None, we create our own.
-
-        * parameter is ignored if run is specified
 
         PRECONDITIONS
-        inputs must have real data
+        run.inputs must have real data
         """
         self.slurm_scheduler = SlurmScheduler()
 
@@ -121,7 +112,7 @@ class Sandbox:
         # top-level Pipeline.
         self.sandbox_path = sandbox_path or tempfile.mkdtemp(
             prefix=sandbox_prefix.format(self.user, self.run.pk),
-            dir=file_access_utils.sandbox_base_path())
+            dir=file_access_utils.create_sandbox_base_path())
 
         self.run.sandbox_path = self.sandbox_path
         self.run.save()

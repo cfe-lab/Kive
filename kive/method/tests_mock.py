@@ -1,9 +1,8 @@
-from unittest.case import TestCase
-
 from django.core.exceptions import ValidationError
-
-from kive.mock_setup import mocked_relations  # Import before any Django models
+from django.test import TestCase
 from django_mock_queries.query import MockSet
+
+from kive.mock_setup import mocked_relations
 from metadata.models import CompoundDatatype
 from method.models import Method, MethodFamily, CodeResourceRevision,\
     CodeResource, MethodDependency
@@ -425,9 +424,11 @@ class MethodMockTests(TestCase):
         self.assertFalse(m1.is_identical(m2))
 
 
-@mocked_relations(Method, MethodDependency, Transformation)
 class MethodDependencyMockTests(TestCase):
     def setUp(self):
+        patcher = mocked_relations(Method, MethodDependency, Transformation)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         driver = CodeResourceRevision(
             coderesource=CodeResource(filename='driver.py'))
         self.method = Method(driver=driver, family=MethodFamily())
@@ -549,9 +550,11 @@ class MethodDependencyMockTests(TestCase):
         self.assertEqual(expected_filepaths, filepaths)
 
 
-@mocked_relations(Method, MethodFamily, Transformation)
 class MethodUpdateMockTests(TestCase):
     def setUp(self):
+        patcher = mocked_relations(Method, MethodFamily, Transformation)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.family = MethodFamily()
         self.old_method = self.family.members.create(family=self.family,
                                                      revision_number=1,

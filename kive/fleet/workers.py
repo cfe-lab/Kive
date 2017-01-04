@@ -21,6 +21,7 @@ from django.core.files import File
 from django.db import transaction
 
 from archive.models import Dataset, Run, RunStep, RunSIC, MethodOutput, ExecLog
+import file_access_utils
 from sandbox.execute import Sandbox, sandbox_glob
 import fleet.slurmlib
 
@@ -41,6 +42,7 @@ class Manager(object):
     """
     def __init__(self, quit_idle=False, history=0,
                  slurm_sched_class=fleet.slurmlib.SlurmScheduler):
+        self.shutdown_exception = None
         self.quit_idle = quit_idle
 
         # This keeps track of runs and the order in which they were most recently
@@ -306,11 +308,12 @@ class Manager(object):
         try:
             self.main_loop()
             mgr_logger.info("Manager shutting down.")
-        except:
+        except Exception as ex:
             mgr_logger.error("Manager failed.", exc_info=True)
 
         for foreman in self.runs_in_progress.itervalues():
             foreman.cancel_all_slurm_jobs()
+            self.shutdown_exception = ex
 
     @classmethod
     def execute_pipeline(cls,
@@ -329,6 +332,10 @@ class Manager(object):
         and so a precondition is that sys.argv[1] is the management script used to invoke
         the tests.
         """
+        if settings.FLEET_POLLING_INTERVAL >= 1:
+            raise RuntimeError('FLEET_POLLING_INTERVAL has not been overridden.')
+        file_access_utils.create_sandbox_base_path()
+
         name = name or ""
         description = description or ""
         run = pipeline.pipeline_instances.create(user=user, name=name, description=description)
@@ -356,6 +363,8 @@ class Manager(object):
 
         If no history is retained, return None.
         """
+        if self.shutdown_exception is not None:
+            raise self.shutdown_exception
         if self.history_queue.maxlen == 0 or len(self.history_queue) == 0:
             return None
 

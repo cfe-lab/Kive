@@ -7,7 +7,7 @@ import copy
 from mock import patch
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.core.urlresolvers import reverse, resolve
 from django.utils import timezone
 from django.contrib.auth.models import Group
@@ -18,15 +18,16 @@ from rest_framework import status
 from archive.models import Run, ExecLog
 from archive.serializers import RunSerializer, RunBatchSerializer
 from archive.exceptions import SandboxActiveException, RunNotFinished
+from file_access_utils import create_sandbox_base_path
 from librarian.models import ExecRecord, Dataset
 from pipeline.models import Pipeline, PipelineFamily
 from metadata.models import kive_user, everyone_group
 from kive.testing_utils import clean_up_all_files
-from kive import settings
-from kive.tests import install_fixture_files, restore_production_files, DuckContext
+from kive.tests import install_fixture_files, remove_fixture_files, DuckContext
 from fleet.workers import Manager
 
 
+@skipIfDBFeature('is_mocked')
 class RemoveRedactRunInProgress(TestCase):
     fixtures = ["em_sandbox_test_environment"]
 
@@ -153,6 +154,7 @@ class RemoveRedactRunInProgress(TestCase):
         )
 
 
+@skipIfDBFeature('is_mocked')
 class RemoveRedactRunJustStarting(TestCase):
     """
     Removal/redaction of stuff used in an unstarted run should be allowed.
@@ -221,6 +223,7 @@ class RemoveRedactRunJustStarting(TestCase):
         # )
 
 
+@skipIfDBFeature('is_mocked')
 class RestoreReusableDatasetTest(TestCase):
     """
     Scenario where an output is marked as reusable, and it needs to be restored.
@@ -240,7 +243,7 @@ class RestoreReusableDatasetTest(TestCase):
         install_fixture_files("restore_reusable_dataset")
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
     def execute_pipeline(self, pipeline):
         dataset = Dataset.objects.get(name="pairs")
@@ -264,6 +267,7 @@ class RestoreReusableDatasetTest(TestCase):
         self.assertEqual(expected_execrecord_count, ExecRecord.objects.count())
 
 
+@skipIfDBFeature('is_mocked')
 class GarbageCollectionTest(TestCase):
     """
     Tests of sandbox garbage collection.
@@ -286,7 +290,7 @@ class GarbageCollectionTest(TestCase):
         # A phony directory that we mock-run a Pipeline in.
         self.mock_sandbox_path = tempfile.mkdtemp(
             prefix="user{}_run{}_".format(self.noop_run.user, self.noop_run.pk),
-            dir=os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH))
+            dir=create_sandbox_base_path())
 
     def test_reap_nonexistent_sandbox_path(self):
         """
@@ -352,6 +356,7 @@ class GarbageCollectionTest(TestCase):
         self.assertFalse(os.path.exists(self.mock_sandbox_path))
 
 
+@skipIfDBFeature('is_mocked')
 class RunApiTests(TestCase):
     # This fixture has the result of sandbox.tests.execute_tests_environment_setup,
     # as well of setting up another Pipeline; this other Pipeline and the resulting
@@ -383,7 +388,7 @@ class RunApiTests(TestCase):
 
     def tearDown(self):
         clean_up_all_files()
-        restore_production_files()
+        remove_fixture_files()
 
     def test_run_index(self, expected_runs=1):
         request = self.factory.get(self.run_list_path)
@@ -623,6 +628,7 @@ class RunApiTests(TestCase):
         self.assertEquals(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
+@skipIfDBFeature('is_mocked')
 class RunSerializerTestBase(TestCase):
     fixtures = ["em_sandbox_test_environment"]
 
@@ -666,7 +672,7 @@ class RunSerializerTestBase(TestCase):
         )
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
 
 class RunSerializerTests(RunSerializerTestBase):

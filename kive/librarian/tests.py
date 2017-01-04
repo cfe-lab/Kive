@@ -16,7 +16,7 @@ from StringIO import StringIO
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib.auth.models import User, Group
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.core.urlresolvers import reverse, resolve
 from django.core.files import File
 from django.core.files.base import ContentFile
@@ -36,7 +36,7 @@ from pipeline.models import Pipeline, PipelineFamily
 
 import file_access_utils
 import kive.testing_utils as tools
-from kive.tests import BaseTestCases, DuckContext, install_fixture_files, restore_production_files
+from kive.tests import BaseTestCases, DuckContext, install_fixture_files, remove_fixture_files
 
 
 def ER_from_record(record):
@@ -69,6 +69,7 @@ def ER_from_PSIC(run, PS, PSIC):
     return ER_from_record(myRSIC)
 
 
+@skipIfDBFeature('is_mocked')
 class LibrarianTestCase(TestCase):
     """
     Set up a database state for unit testing the librarian app.
@@ -383,6 +384,7 @@ class DatasetStructureTests(LibrarianTestCase):
         self.assertEqual(self.triplet_3_rows_dataset.structure.num_rows, 3)
 
 
+@skipIfDBFeature('is_mocked')
 class FindCompatibleERTests(TestCase):
     fixtures = ['simple_run']
 
@@ -484,6 +486,7 @@ class FindCompatibleERTests(TestCase):
         self.assertIn(execrecord, rs2.find_compatible_ERs(input_datasets))
 
 
+@skipIfDBFeature('is_mocked')
 class RemovalTests(TestCase):
     fixtures = ["removal"]
 
@@ -543,7 +546,7 @@ class RemovalTests(TestCase):
 
     def tearDown(self):
         tools.clean_up_all_files()
-        restore_production_files()
+        remove_fixture_files()
 
     def removal_plan_tester(self, obj_to_remove, datasets=None, ERs=None, runs=None, pipelines=None, pfs=None,
                             methods=None, mfs=None, CDTs=None, DTs=None, CRRs=None, CRs=None,
@@ -1063,6 +1066,7 @@ class RemovalTests(TestCase):
         )
 
 
+@skipIfDBFeature('is_mocked')
 class DatasetWithFileTests(TestCase):
 
     def setUp(self):
@@ -1098,6 +1102,7 @@ class DatasetWithFileTests(TestCase):
         self.assertRaisesRegexp(ValidationError, msg, ds1.validate_uniqueness_on_upload)
 
 
+@skipIfDBFeature('is_mocked')
 class DatasetApiTests(BaseTestCases.ApiTestCase):
 
     def setUp(self):
@@ -1291,6 +1296,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
             "Test data for a test that tests test data")
 
 
+@skipIfDBFeature('is_mocked')
 class DatasetSerializerTests(TestCase):
     """
     Tests of DatasetSerializer.
@@ -1659,6 +1665,7 @@ baz
             self.assertEquals(dataset.dataset_file.read(), self.raw_file_contents)
 
 
+@skipIfDBFeature('is_mocked')
 class ExternalFileTests(TestCase):
 
     def setUp(self):

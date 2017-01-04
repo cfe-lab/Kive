@@ -22,6 +22,14 @@
 <h2>Added Datasets</h2>
 
 <form id="bulkDatasetDisplayForm" name="bulkDatasetDisplayForm" action="/datasets_bulk.html" method="post">{% csrf_token %}
+  <div>
+    <table >
+      <thead> <tr> <th> Variable </th> <th> Value </th> </tr> </thead>
+	<tr> <td> File Type </td> <td> {{ cdt_typestr }} </td> </tr>
+	<tr> <td> Number of selected datasets  </td> <td> {{ num_files_selected }} </td> </tr>
+	<tr> <td> Number of successfully added datasets </td> <td> {{ num_files_added }} </td> </tr>
+	</table>
+    </div>
     <div class="bulk_dataset_table">
         <table id="uploadProgressTable">
             <thead>
@@ -78,7 +86,7 @@
             </tbody>
         </table>
     </div>
-    <input type="submit" id="editBulkDatasets" name="editBulkDatasets" value="Submit" />
+    <input type="submit" id="editBulkDatasets" name="editBulkDatasets" value="OK" />
 </form>
 
 {% endblock %}

@@ -1,12 +1,12 @@
 from contextlib import contextmanager
 import re
-from unittest import TestCase
 
 from django.core.exceptions import ValidationError
+from django.test import TestCase
 from mock import PropertyMock, call
 
-from kive.mock_setup import mocked_relations  # Import before any Django models
 from constants import datatypes
+from kive.mock_setup import mocked_relations
 from metadata.models import CompoundDatatype, CompoundDatatypeMember, Datatype
 from method.models import Method
 from pipeline.models import Pipeline, PipelineFamily, PipelineStep,\
@@ -697,8 +697,8 @@ class PipelineMockTests(TestCase):
         """
         with self.create_valid_pipeline() as p:
             p.outcables.all()[0].output_name = 'step1_out'
-            Pipeline.outputs = PropertyMock('Pipeline.outputs')
-            Pipeline.outputs.create.return_value = TransformationOutput()
+            Transformation.outputs = PropertyMock('Transformation.outputs')
+            Transformation.outputs.create.return_value = TransformationOutput()
 
             p.create_outputs()
 
@@ -714,8 +714,8 @@ class PipelineMockTests(TestCase):
             self.add_step(p)
             p.outcables.all()[0].output_name = 'step1_out'
             p.outcables.all()[1].output_name = 'step2_out'
-            Pipeline.outputs = PropertyMock('Pipeline.outputs')
-            Pipeline.outputs.create.return_value = TransformationOutput()
+            Transformation.outputs = PropertyMock('Transformation.outputs')
+            Transformation.outputs.create.return_value = TransformationOutput()
 
             p.create_outputs()
 

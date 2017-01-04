@@ -1,9 +1,8 @@
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.conf import settings
 
-import unittest
 import tempfile
 import shutil
 import os.path
@@ -12,7 +11,7 @@ import time
 from librarian.models import Dataset
 import kive.testing_utils as tools
 from pipeline.models import Pipeline, PipelineFamily
-from kive.tests import install_fixture_files, restore_production_files, BaseTestCases
+from kive.tests import install_fixture_files, remove_fixture_files, BaseTestCases
 from method.models import Method
 from fleet.workers import Manager
 from archive.models import Run
@@ -20,7 +19,7 @@ from fleet.slurmlib import SlurmScheduler
 import file_access_utils
 
 
-#class SandboxRMTestCase(TestCase):
+@skipIfDBFeature('is_mocked')
 class SandboxRMTestCase(BaseTestCases.SlurmExecutionTestCase):
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
@@ -29,6 +28,7 @@ class SandboxRMTestCase(BaseTestCases.SlurmExecutionTestCase):
         tools.destroy_sandbox_testing_tools_environment(self)
 
 
+@skipIfDBFeature('is_mocked')
 class ExecuteResultTestsRM(TestCase):
     """
     Tests on the results of executing Pipelines.
@@ -72,7 +72,7 @@ class ExecuteResultTestsRM(TestCase):
 
     def tearDown(self):
         tools.clean_up_all_files()
-        restore_production_files()
+        remove_fixture_files()
 
     def test_execute_pipeline_run(self):
         """
@@ -302,6 +302,7 @@ class ExecuteResultTestsRM(TestCase):
         self.assertEqual(outcable_input_dataset.num_rows(), outcable_output_dataset.num_rows())
 
 
+@skipIfDBFeature('is_mocked')
 class ExecuteDiscardedIntermediateTests(BaseTestCases.SlurmExecutionTestCase):
     fixtures = ["execute_discarded_intermediate_tests_rm"]
 
@@ -322,7 +323,7 @@ class ExecuteDiscardedIntermediateTests(BaseTestCases.SlurmExecutionTestCase):
 
     def tearDown(self):
         tools.clean_up_all_files()
-        restore_production_files()
+        remove_fixture_files()
 
     def test_discard_intermediate_file(self):
         """
@@ -348,35 +349,10 @@ class ExecuteDiscardedIntermediateTests(BaseTestCases.SlurmExecutionTestCase):
             [self.dataset_labdata]
         ).get_last_run()
 
-        # Dump the logs.
-        setup_log_names = (
-            "setup_out.txt",
-            "setup_err.txt",
-        )
-        bookkeeping_log_names = (
-            "bookkeeping_out.txt",
-            "bookkeeping_err.txt"
-        )
-        for step in (1, 2):
-            print "===="
-            print "Logs for step {}".format(step)
-            print "===="
-
-            driver_log_names = (
-                "step{}_stdout.txt".format(step),
-                "step{}_stderr.txt".format(step)
-            )
-            for log_name in setup_log_names + driver_log_names + bookkeeping_log_names:
-                log_path = os.path.join(run.sandbox_path, "step{}".format(step), "logs", log_name)
-                print "----"
-                print log_path
-                print "----"
-                with open(log_path, "rb") as f:
-                    print f.read()
-
         self.assertTrue(run.is_successful())
 
 
+@skipIfDBFeature('is_mocked')
 class BadRunTests(BaseTestCases.SlurmExecutionTestCase):
     """
     Tests for when things go wrong during Pipeline execution.
@@ -439,6 +415,7 @@ class BadRunTests(BaseTestCases.SlurmExecutionTestCase):
         self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().dataset])
 
 
+@skipIfDBFeature('is_mocked')
 class FindDatasetTests(BaseTestCases.SlurmExecutionTestCase):
     """
     Tests for first_generator_of_dataset.
@@ -449,7 +426,7 @@ class FindDatasetTests(BaseTestCases.SlurmExecutionTestCase):
         install_fixture_files('find_datasets')
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
     def test_find_dataset_pipeline_input_and_step_output(self):
         """
