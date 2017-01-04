@@ -327,3 +327,6 @@ CONFIRM_COPY_WAIT_MAX = 7
 CONFIRM_FILE_CREATED_RETRIES = 5
 CONFIRM_FILE_CREATED_WAIT_MIN = 8
 CONFIRM_FILE_CREATED_WAIT_MAX = 12
+
+# The settings file the fleet should use.  Leave as None if it should just use the normal one.
+FLEET_SETTINGS = None

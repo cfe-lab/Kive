@@ -18,3 +18,6 @@ CONFIRM_COPY_WAIT_MAX = 0.15
 CONFIRM_FILE_CREATED_RETRIES = 5
 CONFIRM_FILE_CREATED_WAIT_MIN = 0.1
 CONFIRM_FILE_CREATED_WAIT_MAX = 0.15
+
+# An alternate settings file for the fleet to use.
+FLEET_SETTINGS = "kive.settings_test_fleet_pg"

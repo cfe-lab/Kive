@@ -40,8 +40,12 @@ class Manager(object):
     The manager is responsible for handling new Run requests and
     creating Foreman objects to execute each one.
     """
-    def __init__(self, quit_idle=False, history=0,
-                 slurm_sched_class=fleet.slurmlib.SlurmScheduler):
+    def __init__(
+            self,
+            quit_idle=False,
+            history=0,
+            slurm_sched_class=fleet.slurmlib.SlurmScheduler
+    ):
         self.shutdown_exception = None
         self.quit_idle = quit_idle
 
@@ -324,11 +328,11 @@ class Manager(object):
                          groups_allowed=None,
                          name=None,
                          description=None,
-                         test=True):
+                         slurm_sched_class=fleet.slurmlib.DummySlurmScheduler):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
-        This will create a run and start a fleet to run it.  This is only used for testing,
+        This will create a run and start a fleet to run it.  This is mainly used for testing,
         and so a precondition is that sys.argv[1] is the management script used to invoke
         the tests.
         """
@@ -352,8 +356,11 @@ class Manager(object):
 
         # The run is already in the queue, so we can just start the manager and let it exit
         # when it finishes.
-        manager = cls(quit_idle=True, history=1,
-                      slurm_sched_class=fleet.slurmlib.DummySlurmScheduler)
+        manager = cls(
+            quit_idle=True,
+            history=1,
+            slurm_sched_class=slurm_sched_class
+        )
         manager.main_procedure()
         return manager
 
@@ -654,10 +661,14 @@ class Foreman(object):
         with os.fdopen(cable_execute_dict_fd, "wb") as f:
             f.write(json.dumps(cable_info.dict_repr()))
 
+        fleet_settings = []
+        if settings.FLEET_SETTINGS is not None:
+            fleet_settings = ["--settings", settings.FLEET_SETTINGS]
+
         cable_slurm_handle = self.slurm_sched_class.submit_job(
             settings.KIVE_HOME,
             MANAGE_PY,
-            [settings.CABLE_HELPER_COMMAND, cable_execute_dict_path],
+            [settings.CABLE_HELPER_COMMAND] + fleet_settings + [cable_execute_dict_path],
             self.sandbox.uid,
             self.sandbox.gid,
             self.sandbox.run.priority,
@@ -686,6 +697,10 @@ class Foreman(object):
         Return a dictionary containing SlurmJobHandles for each, as well as
         the path of the execution info dictionary file used by the step.
         """
+        fleet_settings = []
+        if settings.FLEET_SETTINGS is not None:
+            fleet_settings = ["--settings", settings.FLEET_SETTINGS]
+
         # First, serialize the task execution information.
         step_info = self.sandbox.step_execute_info[(runstep.run, runstep.pipelinestep)]
 
@@ -701,7 +716,7 @@ class Foreman(object):
             driver_template = """\
 #! /usr/bin/env bash
 # python -c "import time; print 'start time', time.time()"
-cd {}
+# cd {}
 # pwd
 {} {} {}
 # python -c "import time; print 'stop time', time.time()"
@@ -711,14 +726,18 @@ cd {}
             # make the job script executable
             os.fchmod(wrapped_driver_fd, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
             with os.fdopen(wrapped_driver_fd, "wb") as f:
-                f.write(driver_template.format(settings.KIVE_HOME,
-                                               MANAGE_PY,
-                                               settings.STEP_HELPER_COMMAND,
-                                               step_execute_dict_path))
+                f.write(
+                    driver_template.format(
+                        settings.KIVE_HOME,
+                        MANAGE_PY,
+                        settings.STEP_HELPER_COMMAND,
+                        " ".join(fleet_settings + [step_execute_dict_path])
+                    )
+                )
             setup_slurm_handle = self.slurm_sched_class.submit_job(
                 settings.KIVE_HOME,
                 wrapped_driver_path,
-                [],
+                fleet_settings,
                 self.sandbox.uid,
                 self.sandbox.gid,
                 self.sandbox.run.priority,
@@ -732,7 +751,7 @@ cd {}
             setup_slurm_handle = self.slurm_sched_class.submit_job(
                 settings.KIVE_HOME,
                 MANAGE_PY,
-                [settings.STEP_HELPER_COMMAND, step_execute_dict_path],
+                [settings.STEP_HELPER_COMMAND] + fleet_settings + [step_execute_dict_path],
                 self.sandbox.uid,
                 self.sandbox.gid,
                 self.sandbox.run.priority,
@@ -743,14 +762,16 @@ cd {}
                                                runstep.get_coordinates())
             )
 
-        driver_slurm_handle = self.sandbox.submit_step_execution(step_info,
-                                                                 after_okay=[setup_slurm_handle])
+        driver_slurm_handle = self.sandbox.submit_step_execution(
+            step_info,
+            after_okay=[setup_slurm_handle]
+        )
 
         # Last, submit a job for the bookkeeping.
         bookkeeping_slurm_handle = self.slurm_sched_class.submit_job(
             settings.KIVE_HOME,
             MANAGE_PY,
-            [settings.STEP_HELPER_COMMAND, "--bookkeeping", step_execute_dict_path],
+            [settings.STEP_HELPER_COMMAND, "--bookkeeping"] + fleet_settings + [step_execute_dict_path],
             self.sandbox.uid,
             self.sandbox.gid,
             self.sandbox.run.priority,
