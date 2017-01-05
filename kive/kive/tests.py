@@ -36,7 +36,7 @@ class BaseTestCases(object):
     def __init__(self):
         pass
 
-    class ApiTestCase(TestCase):
+    class ApiTestCase(TestCase, object):
         """
         Base test case used for all API testing.
 

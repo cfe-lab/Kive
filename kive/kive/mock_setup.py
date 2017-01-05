@@ -1,7 +1,7 @@
 import weakref
 from functools import partial
 from itertools import chain
-from mock import Mock, MagicMock, patch, ClassTypes
+from mock import Mock, patch
 
 from django_mock_queries.query import MockSet
 
@@ -29,7 +29,8 @@ class MockOneToManyMap(object):
             old_instance_weak, related_objects = entry
             old_instance = old_instance_weak()
         if entry is None or old_instance is None:
-            related_objects = MockSet(cls=self.original.field.model)
+            related = getattr(self.original, 'related', self.original)
+            related_objects = MockSet(cls=related.field.model)
             self.__set__(instance, related_objects)
 
         return related_objects
@@ -113,7 +114,7 @@ def mocked_relations(*models):
     patch_object = patch.object
     patchers = []
     for model in find_all_models(models):
-        if isinstance(model.save, MagicMock):
+        if isinstance(model.save, Mock):
             # already mocked, so skip it
             continue
         model_name = model._meta.object_name
@@ -128,6 +129,8 @@ def mocked_relations(*models):
         for related_object in chain(model._meta.related_objects,
                                     model._meta.many_to_many):
             name = related_object.name
+            if name not in model.__dict__ and related_object.one_to_many:
+                name += '_set'
             if name in model.__dict__:
                 # Only mock direct relations, not inherited ones.
                 old_relation = getattr(model, name, None)
@@ -160,7 +163,7 @@ class PatcherChain(object):
         self.pass_mocks = pass_mocks
 
     def __call__(self, func):
-        if isinstance(func, ClassTypes):
+        if isinstance(func, type):
             return self.decorate_class(func)
         return self.decorate_callable(func)
 
@@ -184,7 +187,7 @@ class PatcherChain(object):
         def absorb_mocks(test_case, *args):
             return target(test_case)
 
-        should_absorb = not (self.pass_mocks or isinstance(target, ClassTypes))
+        should_absorb = not (self.pass_mocks or isinstance(target, type))
         result = absorb_mocks if should_absorb else target
         for patcher in self.patchers:
             result = patcher(result)

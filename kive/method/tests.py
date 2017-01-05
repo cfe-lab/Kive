@@ -223,7 +223,7 @@ class FileAccessTests(TestCase):
 
 
 @skipIfDBFeature('is_mocked')
-class MethodTestCase(TestCase):
+class MethodTestCase(TestCase, object):
     """
     Set up a database state for unit testing.
 
@@ -857,7 +857,7 @@ with open(outfile, "wb") as f:
                                                           self.user_rob)
         self.test_nonreusable.create_input(dataset_name="numbers", dataset_idx=1,
                                            compounddatatype=self.increment_in_1_cdt)
-        _step1 = self.test_nonreusable.steps.create(
+        self.test_nonreusable.steps.create(
             step_num=1,
             transformation=self.rng_method,
             name="source of randomness"
@@ -1609,10 +1609,8 @@ class InvokeCodeTests(TestCase):
         self.passthrough_method.full_clean()
 
         # Stake out a place on the filesystem for this file.
-        try:
-            fd, self.passthrough_input_name = tempfile.mkstemp(dir=file_access_utils.sandbox_base_path())
-        finally:
-            os.close(fd)
+        fd, self.passthrough_input_name = tempfile.mkstemp(dir=file_access_utils.sandbox_base_path())
+        os.close(fd)
 
         # Write to this file.
         with open(self.passthrough_input_name, "w") as f:

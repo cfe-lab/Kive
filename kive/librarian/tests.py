@@ -38,39 +38,31 @@ import file_access_utils
 import kive.testing_utils as tools
 from kive.tests import BaseTestCases, DuckContext, install_fixture_files, remove_fixture_files
 
+FROM_FILE_END = 2
 
-def ER_from_record(record):
+
+def er_from_record(record):
     """
     Helper function to create an ExecRecord from an Run, RunStep, or
     RunOutputCable (record), by creating a throwaway ExecLog.
     """
-    myEL = ExecLog(record=record, invoking_record=record)
-    myEL.start_time = timezone.now()
+    exec_log = ExecLog(record=record, invoking_record=record)
+    exec_log.start_time = timezone.now()
     time.sleep(1)
-    myEL.end_time = timezone.now()
-    myEL.save()
+    exec_log.end_time = timezone.now()
+    exec_log.save()
     if record.__class__.__name__ == "RunStep":
-        output = MethodOutput(execlog=myEL, return_code=0)
+        output = MethodOutput(execlog=exec_log, return_code=0)
         output.save()
-        myEL.methodoutput = output
-        myEL.save()
-    myER = ExecRecord(generator=myEL)
-    myER.save()
-    return(myER)
-
-
-def ER_from_PSIC(run, PS, PSIC):
-    """
-    Helper function to create an ExecRecord associated to a
-    PipelineStepInputCable, for a particular run and pipeline step.
-    """
-    myRS = run.runsteps.create(pipelinestep=PS)
-    myRSIC = PSIC.psic_instances.create(dest_runstep=myRS)
-    return ER_from_record(myRSIC)
+        exec_log.methodoutput = output
+        exec_log.save()
+    exec_record = ExecRecord(generator=exec_log)
+    exec_record.save()
+    return exec_record
 
 
 @skipIfDBFeature('is_mocked')
-class LibrarianTestCase(TestCase):
+class LibrarianTestCase(TestCase, object):
     """
     Set up a database state for unit testing the librarian app.
 
@@ -316,6 +308,7 @@ Bob,tw3nty
         for f in data_files:
             f.close()
         bulk_dataset_csv.close()
+        # noinspection PyTypeChecker
         for i, dataset in enumerate(datasets):
 
             self.assertEqual(dataset.clean(), None)
@@ -338,7 +331,7 @@ Bob,tw3nty
         self.singlet_dataset.dataset_file.open()
         orig_contents = self.singlet_dataset.dataset_file.read()
         self.singlet_dataset.dataset_file.close()
-        orig_MD5 = self.singlet_dataset.MD5_checksum
+        orig_md5 = self.singlet_dataset.MD5_checksum
 
         # ... and then we corrupt it.
         self.singlet_dataset.MD5_checksum = "corruptedmd5"
@@ -349,7 +342,7 @@ Bob,tw3nty
             description="Usurps self.singlet_dataset",
             user=self.myUser,
             dataset_file=ContentFile(orig_contents),
-            MD5_checksum=orig_MD5
+            MD5_checksum=orig_md5
         )
         usurping_ds.save()
 
@@ -548,26 +541,26 @@ class RemovalTests(TestCase):
         tools.clean_up_all_files()
         remove_fixture_files()
 
-    def removal_plan_tester(self, obj_to_remove, datasets=None, ERs=None, runs=None, pipelines=None, pfs=None,
-                            methods=None, mfs=None, CDTs=None, DTs=None, CRRs=None, CRs=None,
+    def removal_plan_tester(self, obj_to_remove, datasets=None, ers=None, runs=None, pipelines=None, pfs=None,
+                            methods=None, mfs=None, cdts=None, dts=None, crrs=None, crs=None,
                             external_files=None):
         removal_plan = obj_to_remove.build_removal_plan()
         self.assertSetEqual(removal_plan["Datasets"], set(datasets) if datasets is not None else set())
-        self.assertSetEqual(removal_plan["ExecRecords"], set(ERs) if ERs is not None else set())
+        self.assertSetEqual(removal_plan["ExecRecords"], set(ers) if ers is not None else set())
         self.assertSetEqual(removal_plan["Runs"], set(runs) if runs is not None else set())
         self.assertSetEqual(removal_plan["Pipelines"], set(pipelines) if pipelines is not None else set())
         self.assertSetEqual(removal_plan["PipelineFamilies"], set(pfs) if pfs is not None else set())
         self.assertSetEqual(removal_plan["Methods"], set(methods) if methods is not None else set())
         self.assertSetEqual(removal_plan["MethodFamilies"], set(mfs) if mfs is not None else set())
-        self.assertSetEqual(removal_plan["CompoundDatatypes"], set(CDTs) if CDTs is not None else set())
-        self.assertSetEqual(removal_plan["Datatypes"], set(DTs) if DTs is not None else set())
-        self.assertSetEqual(removal_plan["CodeResourceRevisions"], set(CRRs) if CRRs is not None else set())
-        self.assertSetEqual(removal_plan["CodeResources"], set(CRs) if CRs is not None else set())
+        self.assertSetEqual(removal_plan["CompoundDatatypes"], set(cdts) if cdts is not None else set())
+        self.assertSetEqual(removal_plan["Datatypes"], set(dts) if dts is not None else set())
+        self.assertSetEqual(removal_plan["CodeResourceRevisions"], set(crrs) if crrs is not None else set())
+        self.assertSetEqual(removal_plan["CodeResources"], set(crs) if crs is not None else set())
         self.assertSetEqual(removal_plan["ExternalFiles"], set(external_files) if external_files is not None else set())
 
     def test_run_build_removal_plan(self):
         """Removing a Run should remove all intermediate/output data and ExecRecords, and all Runs that reused it."""
-        self.removal_plan_tester(self.first_run, datasets=self.produced_data, ERs=self.execrecords,
+        self.removal_plan_tester(self.first_run, datasets=self.produced_data, ers=self.execrecords,
                                  runs={self.first_run, self.second_run})
 
     def test_reused_run_build_removal_plan(self):
@@ -579,7 +572,7 @@ class RemovalTests(TestCase):
         self.removal_plan_tester(
             self.input_DS,
             datasets=self.produced_data.union({self.input_DS}),
-            ERs=self.execrecords,
+            ers=self.execrecords,
             runs={self.first_run, self.second_run}
         )
 
@@ -609,7 +602,7 @@ class RemovalTests(TestCase):
         self.removal_plan_tester(
             self.input_DS,
             datasets=self.produced_data.union({self.input_DS}),
-            ERs=self.execrecords,
+            ers=self.execrecords,
             runs={self.first_run, self.second_run},
             external_files={self.input_DS}
         )
@@ -618,33 +611,33 @@ class RemovalTests(TestCase):
         """Removing data produced by the Run should have the same effect as removing the Run itself."""
         produced_dataset = list(self.produced_data)[0]
 
-        self.removal_plan_tester(produced_dataset, datasets=self.produced_data, ERs=self.execrecords,
+        self.removal_plan_tester(produced_dataset, datasets=self.produced_data, ers=self.execrecords,
                                  runs={self.first_run, self.second_run})
 
     def test_step_ER_build_removal_plan(self):
         """Removing the ExecRecord of the first RunStep should be like removing the whole Run."""
-        first_step_ER = self.first_run.runsteps.get(pipelinestep__step_num=1).execrecord
+        first_step_er = self.first_run.runsteps.get(pipelinestep__step_num=1).execrecord
 
-        self.removal_plan_tester(first_step_ER, datasets=self.produced_data, ERs=self.execrecords,
+        self.removal_plan_tester(first_step_er, datasets=self.produced_data, ers=self.execrecords,
                                  runs={self.first_run, self.second_run})
 
     def test_rsic_ER_build_removal_plan(self):
         """Removing the ExecRecord of a RunSIC should be like removing the whole Run."""
-        first_RSIC_ER = self.first_run.runsteps.get(pipelinestep__step_num=1).RSICs.first().execrecord
+        first_rsic_er = self.first_run.runsteps.get(pipelinestep__step_num=1).RSICs.first().execrecord
 
-        self.removal_plan_tester(first_RSIC_ER, datasets=self.produced_data, ERs=self.execrecords,
+        self.removal_plan_tester(first_rsic_er, datasets=self.produced_data, ers=self.execrecords,
                                  runs={self.first_run, self.second_run})
 
     def test_roc_ER_build_removal_plan(self):
         """Removing the ExecRecord of a RunOutputCable should be like removing the whole Run."""
-        first_ROC_ER = self.first_run.runoutputcables.first().execrecord
+        first_roc_er = self.first_run.runoutputcables.first().execrecord
 
-        self.removal_plan_tester(first_ROC_ER, datasets=self.produced_data, ERs=self.execrecords,
+        self.removal_plan_tester(first_roc_er, datasets=self.produced_data, ers=self.execrecords,
                                  runs={self.first_run, self.second_run})
 
     def test_pipeline_build_removal_plan(self):
         """Removing a Pipeline."""
-        self.removal_plan_tester(self.noop_pl, datasets=self.produced_data, ERs=self.execrecords,
+        self.removal_plan_tester(self.noop_pl, datasets=self.produced_data, ers=self.execrecords,
                                  runs={self.first_run, self.second_run}, pipelines={self.noop_pl, self.p_nested})
 
     def test_nested_pipeline_build_removal_plan(self):
@@ -653,7 +646,7 @@ class RemovalTests(TestCase):
 
     def test_pipelinefamily_build_removal_plan(self):
         """Removing a PipelineFamily removes everything that goes along with it."""
-        self.removal_plan_tester(self.noop_plf, datasets=self.produced_data, ERs=self.execrecords,
+        self.removal_plan_tester(self.noop_plf, datasets=self.produced_data, ers=self.execrecords,
                                  runs={self.first_run, self.second_run}, pipelines={self.noop_pl, self.p_nested},
                                  pfs={self.noop_plf})
 
@@ -662,7 +655,7 @@ class RemovalTests(TestCase):
         self.removal_plan_tester(
             self.nuc_seq_noop,
             datasets=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
-            ERs=self.execrecords.union(self.two_step_execrecords),
+            ers=self.execrecords.union(self.two_step_execrecords),
             runs={self.first_run, self.second_run, self.two_step_run},
             pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop}
@@ -675,7 +668,7 @@ class RemovalTests(TestCase):
             datasets=self.produced_data.union(
                 {self.two_step_intermediate_data, self.two_step_output_data}
             ),
-            ERs=self.execrecords.union(self.two_step_execrecords),
+            ers=self.execrecords.union(self.two_step_execrecords),
             runs={self.first_run, self.second_run, self.two_step_run},
             pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop},
@@ -687,11 +680,11 @@ class RemovalTests(TestCase):
         self.removal_plan_tester(
             self.noop_crr,
             datasets=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
-            ERs=self.execrecords.union(self.two_step_execrecords),
+            ers=self.execrecords.union(self.two_step_execrecords),
             runs={self.first_run, self.second_run, self.two_step_run},
             pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop, self.raw_pass_through},
-            CRRs={self.noop_crr}
+            crrs={self.noop_crr}
         )
 
     def test_method_nodep_build_removal_plan(self):
@@ -703,12 +696,12 @@ class RemovalTests(TestCase):
         self.removal_plan_tester(
             self.noop_cr,
             datasets=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
-            ERs=self.execrecords.union(self.two_step_execrecords),
+            ers=self.execrecords.union(self.two_step_execrecords),
             runs={self.first_run, self.second_run, self.two_step_run},
             pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop, self.raw_pass_through},
-            CRRs={self.noop_crr},
-            CRs={self.noop_cr}
+            crrs={self.noop_crr},
+            crs={self.noop_cr}
         )
 
     def test_cdt_build_removal_plan(self):
@@ -724,11 +717,11 @@ class RemovalTests(TestCase):
         self.removal_plan_tester(
             self.one_col_nuc_seq,
             datasets=all_data,
-            ERs=self.execrecords.union(self.two_step_execrecords),
+            ers=self.execrecords.union(self.two_step_execrecords),
             runs={self.first_run, self.second_run, self.two_step_run},
             pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop},
-            CDTs={self.one_col_nuc_seq}
+            cdts={self.one_col_nuc_seq}
         )
 
     def test_dt_build_removal_plan(self):
@@ -744,41 +737,41 @@ class RemovalTests(TestCase):
         self.removal_plan_tester(
             self.nuc_seq,
             datasets=all_data,
-            ERs=self.execrecords.union(self.two_step_execrecords),
+            ers=self.execrecords.union(self.two_step_execrecords),
             runs={self.first_run, self.second_run, self.two_step_run},
             pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop},
-            CDTs={self.one_col_nuc_seq},
-            DTs={self.nuc_seq}
+            cdts={self.one_col_nuc_seq},
+            dts={self.nuc_seq}
         )
 
     def remove_tester(self, obj_to_remove):
         removal_plan = obj_to_remove.build_removal_plan()
 
         dataset_pks = [x.pk for x in removal_plan["Datasets"]]
-        ER_pks = [x.pk for x in removal_plan["ExecRecords"]]
+        er_pks = [x.pk for x in removal_plan["ExecRecords"]]
         run_pks = [x.pk for x in removal_plan["Runs"]]
         pipeline_pks = [x.pk for x in removal_plan["Pipelines"]]
         pf_pks = [x.pk for x in removal_plan["PipelineFamilies"]]
         method_pks = [x.pk for x in removal_plan["Methods"]]
         mf_pks = [x.pk for x in removal_plan["MethodFamilies"]]
-        CDT_pks = [x.pk for x in removal_plan["CompoundDatatypes"]]
-        DT_pks = [x.pk for x in removal_plan["Datatypes"]]
-        CRR_pks = [x.pk for x in removal_plan["CodeResourceRevisions"]]
-        CR_pks = [x.pk for x in removal_plan["CodeResources"]]
+        cdt_pks = [x.pk for x in removal_plan["CompoundDatatypes"]]
+        dt_pks = [x.pk for x in removal_plan["Datatypes"]]
+        crr_pks = [x.pk for x in removal_plan["CodeResourceRevisions"]]
+        cr_pks = [x.pk for x in removal_plan["CodeResources"]]
 
         obj_to_remove.remove()
         self.assertFalse(Dataset.objects.filter(pk__in=dataset_pks).exists())
-        self.assertFalse(ExecRecord.objects.filter(pk__in=ER_pks).exists())
+        self.assertFalse(ExecRecord.objects.filter(pk__in=er_pks).exists())
         self.assertFalse(Run.objects.filter(pk__in=run_pks).exists())
         self.assertFalse(Pipeline.objects.filter(pk__in=pipeline_pks).exists())
         self.assertFalse(PipelineFamily.objects.filter(pk__in=pf_pks).exists())
         self.assertFalse(Method.objects.filter(pk__in=method_pks).exists())
         self.assertFalse(MethodFamily.objects.filter(pk__in=mf_pks).exists())
-        self.assertFalse(CompoundDatatype.objects.filter(pk__in=CDT_pks).exists())
-        self.assertFalse(Datatype.objects.filter(pk__in=DT_pks).exists())
-        self.assertFalse(CodeResourceRevision.objects.filter(pk__in=CRR_pks).exists())
-        self.assertFalse(CodeResource.objects.filter(pk__in=CR_pks).exists())
+        self.assertFalse(CompoundDatatype.objects.filter(pk__in=cdt_pks).exists())
+        self.assertFalse(Datatype.objects.filter(pk__in=dt_pks).exists())
+        self.assertFalse(CodeResourceRevision.objects.filter(pk__in=crr_pks).exists())
+        self.assertFalse(CodeResource.objects.filter(pk__in=cr_pks).exists())
 
     def test_pipeline_remove(self):
         """
@@ -842,18 +835,18 @@ class RemovalTests(TestCase):
 
     def test_step_ER_remove(self):
         """Removing the ExecRecord of the first RunStep should be like removing the whole Run."""
-        first_step_ER = self.first_run.runsteps.get(pipelinestep__step_num=1).execrecord
-        self.remove_tester(first_step_ER)
+        first_step_er = self.first_run.runsteps.get(pipelinestep__step_num=1).execrecord
+        self.remove_tester(first_step_er)
 
     def test_rsic_ER_remove(self):
         """Removing the ExecRecord of a RunSIC should be like removing the whole Run."""
-        first_RSIC_ER = self.first_run.runsteps.get(pipelinestep__step_num=1).RSICs.first().execrecord
-        self.remove_tester(first_RSIC_ER)
+        first_rsic_er = self.first_run.runsteps.get(pipelinestep__step_num=1).RSICs.first().execrecord
+        self.remove_tester(first_rsic_er)
 
     def test_roc_ER_remove(self):
         """Removing the ExecRecord of a RunOutputCable should be like removing the whole Run."""
-        first_ROC_ER = self.first_run.runoutputcables.first().execrecord
-        self.remove_tester(first_ROC_ER)
+        first_roc_er = self.first_run.runoutputcables.first().execrecord
+        self.remove_tester(first_roc_er)
 
     def dataset_redaction_plan_tester(self, dataset_to_redact, datasets=None, output_logs=None, error_logs=None,
                                       return_codes=None, external_files=None):
@@ -1179,7 +1172,6 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         """
         num_cols = 12
         num_files = 2
-        FROM_FILE_END = 2
 
         with tempfile.TemporaryFile() as f:
             data = ','.join(map(str, range(num_cols)))
