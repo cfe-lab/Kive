@@ -1,117 +1,47 @@
 
-# a low level interface to slurm using the calls to sbatch, scancel and squeue via Popen.
+# a low level interface to slurm using the calls to sbatch, scancel and sacct via Popen.
 
 import os.path
-import subprocess as sp
+import logging
+
 import multiprocessing as mp
 import Queue
-
-from datetime import datetime
 import re
+import subprocess as sp
+from datetime import datetime
 
-import logging
 
 logger = logging.getLogger("fleet.slurmlib")
 
 
 class SlurmJobHandle:
     def __init__(self, job_id, slurm_sched_class):
+        assert isinstance(job_id, str), "job_id must be a string!"
         self.job_id = job_id
         self.slurm_sched_class = slurm_sched_class
 
     def get_state(self):
         """ Get the current state of this job.
-        The 'jobstate': value can be one of the following predefined constants
+        The 'jobstate': value can be one of the predefined constants
         defined in SlurmScheduler:
 
-        PREC_WAIT: preceding jobs need to be successfully completed
-                   before this one can be run.
-
-        RESO_WAIT: The preceding jobs have completed successfully,
-                   and the jobs is waiting in the job queue
-                   for computational resources.
-        RUNNING:   This job is under way.
-
-        RUN_FAILED:    This job failed during its execution.
-                   'exit_code' will contain an exit code (int)
-                   'failed_reason' will contain a descriptive string of the error.
-
-        CANCELLED: This job was cancelled 'by the user' after it was submitted or
-                   did not run because a preceding run failed to
-                   complete successfully.
-
-        SUCC_COMPLETED: This jobs has successfully completed (return code of zero).
-
         NOTE: If you want the states of many jobhandles at the same time, it is more
-        efficient to use SlurmScheduler.get_job_states() directly.
-
+        efficient to use SlurmScheduler.get_accounting_info() directly.
         """
-        # return self.slurm_sched_class.get_job_states([self])[0]
-        return self.slurm_sched_class.get_accounting_info([self])[self.job_id]
+        rdct = self.slurm_sched_class.get_accounting_info([self])[self.job_id]
+        return rdct['state']
 
     def __str__(self):
         return "slurm job_id {}".format(self.job_id)
 
 
 class BaseSlurmScheduler:
-    # All possible run states we expose to the outside
+    # All possible run states we expose to the outside. In fact, these are states as
+    # reported by sacct.
     # These states will be reported by SlurmJobHandle.getstate() and
-    # SlurmScheduler.get_job_states()
-    PREC_WAIT = 'PREC_WAIT'
-    RESO_WAIT = 'RESO_WAIT'
-    RUNNING = 'RUNNING'
-    RUN_FAILED = 'RUN_FAILED'
-    CANCELLED = 'CANCELLED'
-    SUCC_COMPLETED = 'SUCC_COMPLETED'
-    UNKNOWN = 'UNKNOWN_STATE'
-
-    STILL_RUNNING_SET = frozenset([PREC_WAIT, RESO_WAIT, RUNNING])
-    # stopped: stopped for whatever reason
-    STOPPED_SET = frozenset([RUN_FAILED, CANCELLED, SUCC_COMPLETED])
-
-    # NOTE: These are runstates for internal use. They are strings as reported by squeue
-    # PD (pending), R (running), CA (cancelled), CF(configuring), CG (completing),
-    # CD  (completed),  F (failed), TO (timeout), NF (node failure) and SE (special exit state)
-    _SLURM_STATE_PENDING = 'PD'
-    _SLURM_STATE_RUNNING = 'R'
-    _SLURM_STATE_CANCELLED = 'CA'
-    _SLURM_STATE_CONFIGURING = 'CF'
-    _SLURM_STATE_COMPLETING = 'CG'
-    _SLURM_STATE_COMPLETED = 'CD'
-    _SLURM_STATE_FAILED = 'F'
-    _SLURM_STATE_TIME_OUT = 'TO'
-    _SLURM_STATE_NODE_FAILURE = 'NF'
-    _SLURM_STATE_SPECIAL_EXIT = 'SE'
-    # add this one for internal bookkeeping
-    _SLURM_STATE_UNKNOWN = 'UKN'
-
-    _slurm_state_set = frozenset([_SLURM_STATE_PENDING, _SLURM_STATE_RUNNING,
-                                  _SLURM_STATE_CANCELLED, _SLURM_STATE_CONFIGURING,
-                                  _SLURM_STATE_COMPLETING, _SLURM_STATE_COMPLETED,
-                                  _SLURM_STATE_FAILED, _SLURM_STATE_TIME_OUT,
-                                  _SLURM_STATE_NODE_FAILURE, _SLURM_STATE_SPECIAL_EXIT,
-                                  _SLURM_STATE_UNKNOWN])
-    _slurm_run_set = frozenset([_SLURM_STATE_RUNNING, _SLURM_STATE_CONFIGURING,
-                                _SLURM_STATE_COMPLETING])
-    _slurm_failed_set = frozenset([_SLURM_STATE_FAILED, _SLURM_STATE_TIME_OUT,
-                                   _SLURM_STATE_NODE_FAILURE, _SLURM_STATE_SPECIAL_EXIT])
-    _trans_dct = {'FAILED': _SLURM_STATE_FAILED,
-                  'COMPLETED': _SLURM_STATE_COMPLETED,
-                  'CANCELLED': _SLURM_STATE_CANCELLED}
-
-    _myjobdct = {}
-    _slurm_jobcomp_file = "/var/log/slurm-llnl/job_completions"
-    _last_file_pos = 0
-
-    # A lookup that maps Slurm completion states to integers.
-    ret_dct = {
-        CANCELLED: -2,
-        RUN_FAILED: -1,
-        SUCC_COMPLETED: 0
-    }
-
-    # States as reported by sacct.
-    # RUNNING, RESIZING, SUSPENDED, COMPLETED, CANCELLED, FAILED, TIMEOUT, PREEMPTED, BOOT_FAIL, DEADLINE or NODE_FAIL
+    # SlurmScheduler.get_accounting_info()
+    # RUNNING, RESIZING, SUSPENDED, COMPLETED, CANCELLED, FAILED, TIMEOUT,
+    # PREEMPTED, BOOT_FAIL, DEADLINE or NODE_FAIL
     BOOT_FAIL = "BOOT_FAIL"
     CANCELLED = "CANCELLED"
     COMPLETED = "COMPLETED"
@@ -128,40 +58,34 @@ class BaseSlurmScheduler:
     TIMEOUT = "TIMEOUT"
     PENDING = "PENDING"
 
+    # include an unknown state (no accounting information available)
+    UNKNOWN = 'UNKNOWN'
+
     RUNNING_STATES = set([PENDING, RUNNING, COMPLETING, PREEMPTED, RESIZING, SUSPENDED])
     CANCELLED_STATES = set([CANCELLED, BOOT_FAIL, DEADLINE, NODE_FAIL, TIMEOUT])
     FAILED_STATES = set([FAILED])
+    SUCCESS_STATES = set([COMPLETED])
 
-    @classmethod
-    def _slurmtosched_state(cls, slurm_job_state, job_reason=None):
-        """Translate the SLURM job state into a Scheduler job state """
-        if slurm_job_state not in cls._slurm_state_set:
-            raise RuntimeError('illegal slurm state')
+    ALL_STATES = RUNNING_STATES | CANCELLED_STATES | FAILED_STATES | SUCCESS_STATES | set([UNKNOWN])
 
-        if slurm_job_state in cls._slurm_run_set:
-            return cls.RUNNING
-        elif slurm_job_state in cls._slurm_failed_set:
-            return cls.RUN_FAILED
-        elif slurm_job_state == cls._SLURM_STATE_PENDING:
-            # NOTE: there can be a number of reasons, including
-            # "(Resources)", ('Priority') and ('None')
-            # just map everything except (dependency) to resource wait
-            if job_reason == '(Dependency)':
-                return cls.PREC_WAIT
-            else:
-                return cls.RESO_WAIT
-        elif slurm_job_state == cls._SLURM_STATE_CANCELLED:
-            return cls.CANCELLED
-        elif cls._SLURM_STATE_COMPLETED:
-            return cls.SUCC_COMPLETED
-        else:
-            logger.error("slurm_job_state: '%s'" % slurm_job_state)
-            raise RuntimeError('failed translation')
+    STOPPED_SET = ALL_STATES - RUNNING_STATES - set([UNKNOWN])
+
+    FINISHED_SET = FAILED_STATES | SUCCESS_STATES
 
     @classmethod
     def slurm_is_alive(cls):
         """Return True if the slurm configuration is adequate for Kive's purposes."""
         raise NotImplementedError
+
+    @classmethod
+    def slurm_ident(cls):
+        """Return a string with some pertinent information about the slurm configuration."""
+        raise NotImplementedError
+
+    @classmethod
+    def shutdown(cls):
+        """This routine should be called by the Manager when it exits the main loop."""
+        pass
 
     @classmethod
     def submit_job(cls,
@@ -221,16 +145,19 @@ class BaseSlurmScheduler:
     @classmethod
     def get_accounting_info(cls, job_handle_iter=None):
         """
-        Get detailed information, i.e. sacct, on the specified job(s).
+        Get detailed information via sacct, on the specified job(s).
 
         job_id_iter is an iterable that must contain job handles of previously
         submitted jobs.
         If this list is None, or empty, information about all jobs on the
-        queue is returned.
+        accounting system is returned.
+        Note that, under slurm, when a job A that is dependent on a pending job B,
+        in encountered, no accounting information for job A is available.
 
         Returns a dictionary which maps job IDs to a dictionary containing
         the following fields:
           - job_name (string)
+          - job_id (string)
           - start_time (datetime object)
           - end_time (datetime object)
           - return_code (int)
@@ -282,11 +209,10 @@ class SlurmScheduler(BaseSlurmScheduler):
         after_okay = after_okay if after_okay is not None else []
         after_any = after_any if after_any is not None else []
         if (len(after_okay) > 0) or (len(after_any) > 0):
-            sdeplst = ["%s:%s" % (lstr, ":".join(["%d" % jh.job_id for jh in lst])) for lst, lstr
+            sdeplst = ["%s:%s" % (lstr, ":".join([jh.job_id for jh in lst])) for lst, lstr
                        in [(after_okay, 'afterok'), (after_any, 'afterany')] if len(lst) > 0]
-            cmd_lst.append("--dependency=%s" % ",".join(sdeplst))
-            cmd_lst.append("--kill-on-invalid-dep=yes")
-
+            cmd_lst.extend(["--dependency=%s" % ",".join(sdeplst),
+                            "--kill-on-invalid-dep=yes"])
         cmd_lst.append(os.path.join(workingdir, driver_name))
         cmd_lst.extend(driver_arglst)
         logger.debug(" ".join(cmd_lst))
@@ -299,7 +225,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         if out_str.startswith("Submitted"):
             cl = out_str.split()
             try:
-                job_id = int(cl[3])
+                job_id = cl[3]
             except:
                 logger.error("sbatch completed with '%s'", out_str)
                 raise RuntimeError("cannot parse sbatch output")
@@ -345,13 +271,32 @@ class SlurmScheduler(BaseSlurmScheduler):
         return is_alive
 
     @classmethod
+    def slurm_ident(cls):
+        """Return a string with some pertinent information about the slurm configuration."""
+        cmd_lst = ["sinfo"]
+        logger.debug(" ".join(cmd_lst))
+        try:
+            out_str = sp.check_output(cmd_lst)
+        except sp.CalledProcessError as E:
+            logger.error("sinfo returned an error code '%s'" % E.returncode)
+            logger.error("sinfo wrote this: '%s' " % E.output)
+            raise
+        # NOTE: sinfo adds an empty line to the end of its output. Remove that here.
+        lns = [ln for ln in out_str.split('\n') if ln]
+        logger.debug("read %d lines" % len(lns))
+        nametup = tuple([s.strip() for s in lns[0].split()])
+        dctlst = [dict(zip(nametup, [s.strip() for s in ln.split()])) for ln in lns[1:]]
+        info_str = ", ".join(["%s: %s: %s" % (dct['PARTITION'], dct['AVAIL'], dct['NODES']) for dct in dctlst])
+        return 'Real Slurm: ' + info_str
+
+    @classmethod
     def _do_squeue(cls, job_id_iter=None):
         """Get the status of jobs currently on the queue.
         NOTE: this is an internal helper routine, the user probably wants to
         use SlurmScheduler.get_job_states() to get states of a number of previously
         submitted slurm jobs.
 
-        job_id_iter is an iterable that must contain job ids (integers) of previously
+        job_id_iter is an iterable that must contain job ids (strings) of previously
         submitted jobs.
         If this list is None, or empty, information about all jobs on the
         queue is returned.
@@ -369,35 +314,27 @@ class SlurmScheduler(BaseSlurmScheduler):
         See the squeue man pages for more information about these entries.
         """
         cmd_lst = ["squeue"]
-        if job_id_iter is not None and len(job_id_iter) > 0:
-            cmd_lst.append("-j")
-            cmd_lst.append(",".join(["%d" % id for id in job_id_iter]))
+        has_jlst = job_id_iter is not None and len(job_id_iter) > 0
+        if has_jlst:
+            cmd_lst.extend(["-j", ",".join(job_id_iter)])
         logger.debug(" ".join(cmd_lst))
         try:
             out_str = sp.check_output(cmd_lst)
         except sp.CalledProcessError as E:
             logger.error("squeue returned an error code '%s'" % E.returncode)
-            logger.error("squeue write this: '%s' " % E.output)
+            logger.error("squeue wrote this: '%s' " % E.output)
             raise
-        lns = out_str.split('\n')
+        lns = [ln for ln in out_str.split('\n') if ln]
         logger.debug("read %d lines" % len(lns))
-        nametup = tuple([s.strip() for s in lns[0].split()])
-        retdct = {}
-        i = 1
-        while i < len(lns)-1:
-            valtup = tuple([s.strip() for s in lns[i].split()])
-            newdct = dict(zip(nametup, valtup))
-            # convert the jobid string into an integer
-            jobid = newdct['JOBID'] = int(newdct['JOBID'])
-            retdct[jobid] = newdct
-            i += 1
+        namelst = [s.strip() for s in lns[0].split()]
+        dctlst = [dict(zip(namelst, [s.strip() for s in ln.split()])) for ln in lns[1:]]
+        retdct = dict((d['JOBID'], d) for d in dctlst)
         # NOTE: we should always return a dict entry for every jobid requested.
         # However, if the job queue is empty, or a job has finished,
         # squeue will not return information about it.
         # In those cases, set the dict['ST'] = 'UKN'  (to denote unknown)
-        if job_id_iter is not None and len(job_id_iter) > 0:
-            missing_set = set(job_id_iter) - set(retdct.keys())
-            for jobid in missing_set:
+        if has_jlst:
+            for jobid in set(job_id_iter) - set(retdct.keys()):
                 retdct[jobid] = {'JOBID': jobid, 'ST': cls._SLURM_STATE_UNKNOWN}
         return retdct
 
@@ -405,10 +342,11 @@ class SlurmScheduler(BaseSlurmScheduler):
     def get_accounting_info(cls, job_handle_iter=None):
         # The --parsable2 option creates parsable output: fields are separated by a pipe, with
         # no trailing pipe (the difference between --parsable2 and --parsable).
-        cmd_lst = ["sacct", "--parsable2", "--format", "JobID,JobName,Start,End,State,ExitCode"]
-        if job_handle_iter is not None and len(job_handle_iter) > 0:
-            cmd_lst.append("-j")
-            cmd_lst.append(",".join(["{}".format(handle.job_id) for handle in job_handle_iter]))
+        cmd_lst = ["sacct", "--parsable2", "--format", "JobID,JobName,Start,End,State,Priority,ExitCode"]
+        have_job_handles = job_handle_iter is not None and len(job_handle_iter) > 0
+        if have_job_handles:
+            cmd_lst.extend(["-j",
+                            ",".join(["{}".format(handle.job_id) for handle in job_handle_iter])])
         logger.debug('Running command "{}"'.format(" ".join(cmd_lst)))
         try:
             sacct_output = sp.check_output(cmd_lst)
@@ -427,7 +365,8 @@ class SlurmScheduler(BaseSlurmScheduler):
             raw_job_dict = dict(zip(name_tuple, values))
 
             # Pre-process the fields.
-            job_id = int(raw_job_dict["JobID"])
+            job_id = raw_job_dict["JobID"]
+            priority = int(raw_job_dict["Priority"])
 
             # Create proper DateTime objects with the following format string.
             date_format = "%Y-%m-%dT%H:%M:%S"
@@ -441,93 +380,43 @@ class SlurmScheduler(BaseSlurmScheduler):
             # Split sacct's ExitCode field, which looks like "[return code]:[signal]".
             return_code, signal = (int(x) for x in raw_job_dict["ExitCode"].split(":"))
 
+            curstate = raw_job_dict["State"]
+            if curstate not in cls.ALL_STATES:
+                raise RuntimeError("received undefined state from sacct '%s'" % curstate)
             accounting_info[job_id] = {
                 "job_name": raw_job_dict["JobName"],
                 "start_time": start_time,
                 "end_time": end_time,
                 "return_code": return_code,
-                "state": raw_job_dict["State"],
-                "signal": signal
+                "state": curstate,
+                "signal": signal,
+                "job_id": job_id,
+                "priority": priority
             }
-
+        # make sure all requested job handles have an entry...
+        if have_job_handles:
+            needset = set((jh.job_id for jh in job_handle_iter))
+            gotset = set(accounting_info.keys())
+            for missing_pid in needset - gotset:
+                accounting_info[missing_pid] = {'job_name': "",
+                                                'start_time': None,
+                                                'end_time': None,
+                                                'return_code': None,
+                                                'state': BaseSlurmScheduler.UNKNOWN,
+                                                'signal': None,
+                                                'job_id': missing_pid,
+                                                "priority": None}
         return accounting_info
-
-    @classmethod
-    def OLDget_job_states(cls, jobhandle_lst):
-        """ Return a list of job states. Each element i in this list corresponds
-        to the state of jobhandle i.
-
-        Strategy:
-        a) see if we know already (this is quick)
-        b) see if squeue knows (do not update our own table from this, as the state
-           is likely to change quite soon.
-        c) see if slurm accounting knows. Also update our table at this time.
-        d) give up and return an unknown state.
-        """
-        # we keep track of those job_ids that we are still looking for in a tofind_set
-        # we keep the found states in a found_dct
-        tofind_set = set([j.job_id for j in jobhandle_lst])
-        # try a)
-        common_set = tofind_set & set(cls._myjobdct.keys())
-        found_dct = dict([itm for itm in cls._myjobdct.items() if itm[0] in common_set])
-        tofind_set -= common_set
-        if tofind_set:
-            # try b)
-            squeue_dct = cls._do_squeue(tofind_set)
-            for job_id, job_state_dct in squeue_dct.iteritems():
-                job_state = job_state_dct['ST']
-                job_reason = job_state_dct.get('NODELIST(REASON)', None)
-                if job_state != cls._SLURM_STATE_UNKNOWN:
-                    found_dct[job_id] = cls._slurmtosched_state(job_state, job_reason)
-                    tofind_set.remove(job_id)
-        if tofind_set:
-            # try c)
-            # NOTE: as slurm is writing to this file as we are reading from it,
-            # we might get a malformed line, which we should just ignore
-            # In addition, we keep track of the position after the last successfully
-            # read line, so that next time, we can start from there...
-            # NOTE that this strategy will fail if the logfile file is rotated by some
-            # cron job or such-like.
-            # NOTE: an example of an accounting line is:
-            # JobId=223 UserId=walter(1005) GroupId=walter(1005) Name=sleep01.sh \
-            #    JobState=COMPLETED Partition=scotest TimeLimit=UNLIMITED \
-            #    StartTime=2016-10-25T10:04:21 EndTime=2016-10-25T10:04:31 NodeList=Nibbler \
-            #    NodeCnt=1 ProcCnt=12 WorkDir=/home/walter/scotesting/slurm-test-01
-            # we just extract JobId and JobState.
-            with open(cls._slurm_jobcomp_file, "r") as fi:
-                fi.seek(cls._last_file_pos)
-                line_is_ok = True
-                ll = fi.readline()
-                while ll and line_is_ok:
-                    clst = ll.split()
-                    jobid_str = clst[0]
-                    state_str = clst[4]
-                    if jobid_str.startswith('JobId'):
-                        jlst = jobid_str.split("=")
-                        ljob_id = int(jlst[1])
-                    else:
-                        line_is_ok = False
-                    if state_str.startswith('JobState'):
-                        jlst = state_str.split("=")
-                        ljob_state = cls._slurmtosched_state(cls._trans_dct[jlst[1]])
-                    else:
-                        line_is_ok = False
-                    if line_is_ok:
-                        logger.debug("adding from file: %d %s" % (ljob_id, ljob_state))
-                        cls._myjobdct[ljob_id] = ljob_state
-                        found_dct[ljob_id] = ljob_state
-                        cls._last_file_pos = fi.tell()
-                        ll = fi.readline()
-            # --
-        # now return the list in the correct order, filling in those states not
-        # found with an unknown state
-        return [found_dct.get(jh.job_id, cls.UNKNOWN) for jh in jobhandle_lst]
 
     @classmethod
     def set_job_priority(cls, jobhandle_lst, priority):
         """Set the priority of the specified jobs."""
-        cmd_list = ["scontrol", "update", "JobID={}".format(",".join(jobhandle_lst)),
-                    "Priority={}".format(priority)]
+        if jobhandle_lst is None or len(jobhandle_lst) == 0:
+            raise RuntimeError("no jobhandles provided")
+        jhstr = ",".join([jh.job_id for jh in jobhandle_lst])
+        # NOTE: setting 'Priority' instead of 'Nice' here results in a non-zero exit code
+        cmd_list = ["scontrol", "update", "JobID={}".format(jhstr),
+                    "Nice={}".format(priority)]
         try:
             _ = sp.check_output(cmd_list)
         except sp.CalledProcessError as e:
@@ -538,70 +427,113 @@ class SlurmScheduler(BaseSlurmScheduler):
 sco_pid = 100
 
 
-class workerproc(mp.Process):
+def startit(wdir, dname, arglst, stdout, stderr):
+    """ Start a process with a command.
+    NOTE: shell MUST be False here, otherwise the popen.wait() will NOT wait
+    for completion of the command.
+    """
+    act_cmdstr = "cd %s;  ./%s  %s" % (wdir,
+                                       dname,
+                                       " ".join(arglst))
+    # act_cmdstr = "%s/%s %s" % (wdir, dname, " ".join(arglst))
+    cclst = ["/bin/bash", "-c", '%s' % act_cmdstr]
+    p = sp.Popen(cclst, shell=False, stdout=stdout, stderr=stderr)
+    return p
+
+
+def callit(wdir, dname, arglst, stdout, stderr):
+    popen = startit(wdir, dname, arglst, stdout, stderr)
+    popen.wait()
+    return popen.returncode
+
+
+class workerproc:
 
     def __init__(self, jdct):
-        mp.Process.__init__(self)
         self._jdct = jdct
         global sco_pid
-        self.sco_pid = sco_pid
+        self.sco_pid = "%d" % sco_pid
         sco_pid += 1
         self.sco_retcode = None
         self.start_time = None
         self.end_time = None
+        self.set_runstate(BaseSlurmScheduler.PENDING)
+        self.prio = jdct["prio_level"]
 
-    def run(self):
+    def do_run(self):
         """Invoke the code described in the _jdct"""
+        self.set_runstate(BaseSlurmScheduler.RUNNING)
         j = self._jdct
-        act_cmdstr = "cd %s;  ./%s  %s" % (j["workingdir"],
-                                           j["driver_name"],
-                                           " ".join(j["driver_arglst"]))
-        cclst = ["/bin/bash", "-c", "%s" % act_cmdstr]
 
         stdout = open(j["stdoutfile"], "w")
         stderr = open(j["stderrfile"], "w")
+        self.popen = startit(j["workingdir"], j["driver_name"],
+                             j["driver_arglst"], stdout, stderr)
 
-        # print "popen", cclst
-        # self._p = sp.Popen(cclst, shell=False, stdout=stdout, stderr=stderr)
-        self.sco_retcode = sp.call(cclst, stdout=stdout, stderr=stderr)
-        print "call retty", os.strerror(self.sco_retcode)
-
-    def ready_to_start(self, findct):
+    def check_ready_state(self, findct):
+        """ Return a 2 tuple of Boolean:
+        is_ready_to run, will_never_run
+        """
         j = self._jdct
         after_any = j["after_any"]
         after_okay = j["after_okay"]
-        # catch the most common case first
+        # catch the most common case first: there are no dependencies
         any_cond = after_any is None
         okay_cond = after_okay is None
         if any_cond and okay_cond:
-            return True
+            return True, False
+        any_cancel = okay_cancel = False
+        finset = set(findct.iterkeys())
         if not any_cond:
             checkset = set([jhandle.job_id for jhandle in after_any])
-            finset = set(findct.iterkeys())
+            common_set = checkset & finset
+            # if any jobs in common set are cancelled, we will never run
+            any_cancel = any((findct[jid].iscancelled() for jid in common_set))
             any_cond = checkset <= finset
         if not okay_cond:
             checkset = set([jhandle.job_id for jhandle in after_okay])
-            ok_set = set((proc.sco_pid for proc in findct.itervalues() if proc.sco_retcode == 0))
+            stat_dct = {BaseSlurmScheduler.CANCELLED: set(),
+                        BaseSlurmScheduler.COMPLETED: set(),
+                        BaseSlurmScheduler.FAILED: set()}
+            common_set = checkset & finset
+            for pid in common_set:
+                proc = findct[pid]
+                stat_dct[proc.get_runstate()].add(proc.sco_pid)
+            ok_set = stat_dct[BaseSlurmScheduler.COMPLETED]
+            okay_cancel = (stat_dct[BaseSlurmScheduler.FAILED] != set()) or\
+                          (stat_dct[BaseSlurmScheduler.CANCELLED] != set())
             okay_cond = checkset <= ok_set
-        return any_cond and okay_cond
+        has_cancel = any_cancel or okay_cancel
+        if has_cancel:
+            is_ready = False
+        else:
+            is_ready = any_cond and okay_cond
+        return is_ready, has_cancel
+
+    def do_cancel(self):
+        if hasattr(self, "popen"):
+            self.popen.kill()
+        self.end_time = self.start_time = datetime.now()
+        self.set_runstate(BaseSlurmScheduler.CANCELLED)
 
     def is_finished(self):
-        # return hasattr(self, '_p') and self._p.returncode is not None
-        self.sco_retcode is not None
-
-    def runstate(self):
-        if self.start_time is None:
-            return BaseSlurmScheduler.PENDING
+        self.popen.poll()
+        self.sco_retcode = self.popen.returncode
+        if self.sco_retcode is not None:
+            self.my_state = BaseSlurmScheduler.COMPLETED if self.sco_retcode == 0 else BaseSlurmScheduler.FAILED
+            return True
         else:
-            # we have started
-            if self.end_time is None:
-                return BaseSlurmScheduler.RUNNING
-            else:
-                # we have finished
-                if self.sco_retcode == 0:
-                    return BaseSlurmScheduler.COMPLETED
-                else:
-                    return BaseSlurmScheduler.FAILED
+            return False
+
+    def iscancelled(self):
+        return self.get_runstate() in BaseSlurmScheduler.CANCELLED_STATES
+
+    def get_runstate(self):
+        return self.my_state
+
+    def set_runstate(self, newstate):
+        assert newstate in BaseSlurmScheduler.ALL_STATES, "illegal state '%s'" % newstate
+        self.my_state = newstate
 
     def get_state_dct(self):
         j = self._jdct
@@ -610,8 +542,10 @@ class workerproc(mp.Process):
             "start_time": self.start_time,
             "end_time": self.end_time,
             "return_code": self.sco_retcode,
-            "state": self.runstate(),
-            "signal": None
+            "state": self.get_runstate(),
+            "signal": None,
+            "job_id": self.sco_pid,
+            "priority": self.prio
         }
 
 
@@ -620,53 +554,92 @@ class DummySlurmScheduler(BaseSlurmScheduler):
     mproc = None
 
     @staticmethod
+    def _docancel(can_pid, waitdct, rundct, findct):
+        """Cancel the job with the provided pid.
+        return 0 iff successful.
+        """
+        if can_pid in waitdct:
+            proc = waitdct.pop(can_pid)
+            proc.do_cancel()
+            findct[can_pid] = proc
+            return 0
+        if can_pid in rundct:
+            proc = rundct.pop(can_pid)
+            proc.do_cancel()
+            findct[can_pid] = proc
+            return 0
+        if can_pid in findct:
+            findct[can_pid].do_cancel()
+            return 0
+        return -1
+
+    @staticmethod
+    def _setprio(jidlst, prio, waitdct, rundct, findct):
+        """ Set the priority levels of the jobs in jidlst.
+        """
+        jset = set(jidlst)
+        for s, dct in [(set(dct.keys()) & jset, dct) for dct in [waitdct, rundct, findct]]:
+            for jid in s:
+                dct[jid].prio = prio
+        # NOTE: we have not checked whether all elements in jidlst have been found.
+        # ignore this for now
+        return 0
+
+    @staticmethod
     def masterproc(jobqueue, resultqueue):
         waitdct = {}
         rundct = {}
         findct = {}
         while True:
-            # print "masterproc!"
             try:
-                jdct = jobqueue.get(block=False, timeout=1)
+                jtup = jobqueue.get(block=False, timeout=1)
             except Queue.Empty:
-                jdct = None
-            # print "GOOLY", jdct
-            if jdct is not None:
-                if isinstance(jdct, dict):
+                jtup = None
+            if jtup is not None:
+                assert isinstance(jtup, tuple), 'Tuple expected'
+                assert len(jtup) == 2, 'tuple length 2 expected'
+                cmd, payload = jtup
+                if cmd == 'new':
                     # received a new submission
                     # create a worker process, but don't necessarily start it
-                    newproc = workerproc(jdct)
-                    print "YAHOOO", newproc.sco_pid
+                    newproc = workerproc(payload)
                     # return the job id of the submitted job
                     assert newproc.sco_pid is not None, "newproc pid is NONE"
                     waitdct[newproc.sco_pid] = newproc
                     resultqueue.put(newproc.sco_pid)
-                elif isinstance(jdct, set):
-                    print "query_set"
-                    resultqueue.put(DummySlurmScheduler._getstates(jdct, waitdct, rundct, findct))
+                elif cmd == 'query':
+                    resultqueue.put(DummySlurmScheduler._getstates(payload, waitdct, rundct, findct))
+                elif cmd == 'cancel':
+                    resultqueue.put(DummySlurmScheduler._docancel(payload, waitdct, rundct, findct))
+                elif cmd == 'prio':
+                    jhlst, prio = payload
+                    resultqueue.put(DummySlurmScheduler._setprio(jhlst, prio, waitdct, rundct, findct))
                 else:
-                    print "WEIRD request ", jdct
+                    raise RuntimeError("masterproc: WEIRD request '%s'" % cmd)
 
             # lets update our worker dicts
             # first the waiting dct
+            rdylst = []
             for pid, proc in waitdct.items():
-                if proc.ready_to_start(findct):
-                    print "starting", pid
+                is_ready_to_run, will_never_run = proc.check_ready_state(findct)
+                if will_never_run:
                     del waitdct[pid]
-                    proc.start_time = datetime.now()
-                    proc.start()
-                    rundct[pid] = proc
-            # next the rundct
-            for pid, proc in rundct.items():
-                if proc.is_finished():
-                    # the job has finished
-                    print "finished", pid
-                    proc.end_time = datetime.now()
-                    del rundct[pid]
+                    proc.do_cancel()
                     findct[pid] = proc
-                else:
-                    # print "still running", pid
-                    pass
+                if is_ready_to_run:
+                    rdylst.append(proc)
+            # start the procs in rdylst in order of priority (high first)
+            for proc in sorted(rdylst, key=lambda p: p.prio, reverse=True):
+                del waitdct[proc.sco_pid]
+                proc.start_time = datetime.now()
+                proc.do_run()
+                rundct[proc.sco_pid] = proc
+            # next, check the rundct
+            for proc in [p for p in rundct.values() if p.is_finished()]:
+                proc.end_time = datetime.now()
+                del rundct[proc.sco_pid]
+                findct[proc.sco_pid] = proc
+
     @staticmethod
     def _getstates(qset, waitdct, rundct, findct):
         """Given a query set of job_ids, return a dict of each job's state."""
@@ -680,9 +653,8 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                        (qset & runset, rundct),
                        (qset & finset, findct)]:
             wp_lst.extend([dct[pid] for pid in s])
-
         return dict([(wp.sco_pid, wp.get_state_dct()) for wp in wp_lst])
-            
+
     @classmethod
     def _init_masterproc(cls):
         jq = cls._jobqueue = mp.Queue()
@@ -693,7 +665,14 @@ class DummySlurmScheduler(BaseSlurmScheduler):
     @classmethod
     def slurm_is_alive(cls):
         """Return True if the slurm configuration is adequate for Kive's purposes."""
+        if cls.mproc is None:
+            cls._init_masterproc()
         return True
+
+    @classmethod
+    def slurm_ident(cls):
+        """Return a string with some pertinent information about the slurm configuration."""
+        return "Dummy Slurm"
 
     @classmethod
     def submit_job(cls,
@@ -713,13 +692,10 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         if cls.mproc is None:
             cls._init_masterproc()
 
-        # make sure the job script exists ans is executable
+        # make sure the job script exists and is executable
         full_path = os.path.join(workingdir, driver_name)
-        print "FULLY", full_path
         if not os.path.isfile(full_path):
             raise sp.CalledProcessError(cmd=full_path, output=None, returncode=-1)
-        print "OKEY"
-        
         jdct = dict([('workingdir', workingdir),
                      ('driver_name', driver_name),
                      ('driver_arglst', driver_arglst),
@@ -732,9 +708,8 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                      ('after_okay', after_okay),
                      ('after_any', after_any),
                      ('job_name', job_name)])
-        cls._jobqueue.put(jdct)
+        cls._jobqueue.put(('new', jdct))
         jid = cls._resqueue.get()
-        print "RET", jid
         return SlurmJobHandle(jid, cls)
 
     @classmethod
@@ -742,7 +717,12 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         """Cancel a given job given its jobhandle.
         Raise an exception if an error occurs, otherwise return nothing.
         """
-        pass
+        if cls.mproc is None:
+            cls._init_masterproc()
+        cls._jobqueue.put(('cancel', jobhandle.job_id))
+        res = cls._resqueue.get()
+        if res != 0:
+            raise sp.CalledProcessError(returncode=res)
 
     @classmethod
     def get_accounting_info(cls, job_handle_iter=None):
@@ -757,6 +737,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         Returns a dictionary which maps job IDs to a dictionary containing
         the following fields:
           - job_name (string)
+          - job_id (string)
           - start_time (datetime object)
           - end_time (datetime object)
           - return_code (int)
@@ -764,16 +745,27 @@ class DummySlurmScheduler(BaseSlurmScheduler):
           - signal (int: the signal number that caused termination of this step, or 0 if
             it ended normally)
         """
+        if cls.mproc is None:
+            cls._init_masterproc()
         if job_handle_iter is not None and len(job_handle_iter) > 0:
             query_set = set((jh.job_id for jh in job_handle_iter))
         else:
             query_set = set()
-        print "QUERY", query_set
-        cls._jobqueue.put(query_set)
+        cls._jobqueue.put(('query', query_set))
         accounting_info = cls._resqueue.get()
         return accounting_info
 
     @classmethod
     def set_job_priority(cls, jobhandle_lst, priority):
         """Set the priority of the specified jobs."""
-        pass
+        if cls.mproc is None:
+            cls._init_masterproc()
+        cls._jobqueue.put(('prio', ([jh.job_id for jh in jobhandle_lst], priority)))
+        res = cls._resqueue.get()
+        if res != 0:
+            raise sp.CalledProcessError(returncode=res)
+
+    @classmethod
+    def shutdown(cls):
+        cls.mproc.terminate()
+        cls.mproc = None

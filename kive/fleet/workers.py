@@ -63,6 +63,8 @@ class Manager(object):
         if not slurm_is_ok:
             mgr_logger.error("Slurm cannot be contacted, exiting")
             raise RuntimeError("Slurm is not running")
+        # log some slurm information
+        mgr_logger.info("Slurm identifies as: '%s'" % self.slurm_sched_class.slurm_ident())
         # also check for the existence of MANAGE_PY at the correct location.
         # If this file is not present, the sbatch commands will crash terribly
         manage_fp = os.path.join(settings.KIVE_HOME, MANAGE_PY)
@@ -84,8 +86,11 @@ class Manager(object):
             except IndexError:
                 # There are no active runs.
                 return
+            try:
+                foreman = self.runs_in_progress[run]
+            except KeyError:
+                raise RuntimeError("run in not found in runs_in_progress")
 
-            foreman = self.runs_in_progress[run]
             foreman.monitor_queue()
             run.refresh_from_db()
             if run.is_complete():
@@ -311,6 +316,7 @@ class Manager(object):
 
         for foreman in self.runs_in_progress.itervalues():
             foreman.cancel_all_slurm_jobs()
+        self.slurm_sched_class.shutdown()
 
     @classmethod
     def execute_pipeline(cls,
@@ -321,7 +327,7 @@ class Manager(object):
                          groups_allowed=None,
                          name=None,
                          description=None,
-                         test=True):
+                         slurm_sched_class=fleet.slurmlib.DummySlurmScheduler):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
@@ -346,7 +352,7 @@ class Manager(object):
         # The run is already in the queue, so we can just start the manager and let it exit
         # when it finishes.
         manager = cls(quit_idle=True, history=1,
-                      slurm_sched_class=fleet.slurmlib.DummySlurmScheduler)
+                      slurm_sched_class=slurm_sched_class)
         manager.main_procedure()
         return manager
 
