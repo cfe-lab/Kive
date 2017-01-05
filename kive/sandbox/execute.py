@@ -1972,7 +1972,7 @@ class Sandbox:
 
             # Stick the path to the job handle so it can be disposed of later.
             job_handle.wrapped_driver_path = wrapped_driver_path
-        logger.debug("Submitted task with pk=%d; Slurm job ID=%d, wrapper name=%s",
+        logger.debug("Submitted task with pk=%d; Slurm job ID=%s, wrapper name=%s",
                      curr_RS.pk, job_handle.job_id, wrapped_driver_path)
         return job_handle
 

@@ -282,7 +282,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         after_okay = after_okay if after_okay is not None else []
         after_any = after_any if after_any is not None else []
         if (len(after_okay) > 0) or (len(after_any) > 0):
-            sdeplst = ["%s:%s" % (lstr, ":".join(["%d" % jh.job_id for jh in lst])) for lst, lstr
+            sdeplst = ["%s:%s" % (lstr, ":".join(["%s" % jh.job_id for jh in lst])) for lst, lstr
                        in [(after_okay, 'afterok'), (after_any, 'afterany')] if len(lst) > 0]
             cmd_lst.append("--dependency=%s" % ",".join(sdeplst))
             cmd_lst.append("--kill-on-invalid-dep=yes")
@@ -299,7 +299,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         if out_str.startswith("Submitted"):
             cl = out_str.split()
             try:
-                job_id = int(cl[3])
+                job_id = cl[3]
             except:
                 logger.error("sbatch completed with '%s'", out_str)
                 raise RuntimeError("cannot parse sbatch output")
@@ -336,6 +336,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         except sp.CalledProcessError:
             is_alive = False
         logger.info("squeue passed: %s" % is_alive)
+
         if is_alive:
             try:
                 cls.get_accounting_info()
@@ -387,8 +388,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         while i < len(lns)-1:
             valtup = tuple([s.strip() for s in lns[i].split()])
             newdct = dict(zip(nametup, valtup))
-            # convert the jobid string into an integer
-            jobid = newdct['JOBID'] = int(newdct['JOBID'])
+            jobid = newdct['JOBID']
             retdct[jobid] = newdct
             i += 1
         # NOTE: we should always return a dict entry for every jobid requested.
@@ -427,7 +427,7 @@ class SlurmScheduler(BaseSlurmScheduler):
             raw_job_dict = dict(zip(name_tuple, values))
 
             # Pre-process the fields.
-            job_id = int(raw_job_dict["JobID"])
+            job_id = raw_job_dict["JobID"]
 
             # Create proper DateTime objects with the following format string.
             date_format = "%Y-%m-%dT%H:%M:%S"

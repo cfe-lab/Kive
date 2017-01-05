@@ -149,10 +149,7 @@ class ExecuteResultTestsRM(TestCase):
             accounting_info = SlurmScheduler.get_accounting_info([complement_job_handle])
             if len(accounting_info) > 0:
                 curr_state = accounting_info[complement_job_handle.job_id]["state"]
-                print "Waiting for {} (state = {})".format(complement_job_handle, curr_state)
                 is_done = curr_state == SlurmScheduler.COMPLETED
-            else:
-                print "Job {} has not been queued yet".format(complement_job_handle)
 
         labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
         shutil.rmtree(tmpdir)
@@ -545,7 +542,7 @@ class RawTests(SandboxRMTestCase):
     def test_execute_pipeline_raw(self):
         """Execute a raw Pipeline."""
         run = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
-        run = Run.objects.get(pk=run.pk)
+        run.refresh_from_db()
         self.assertTrue(run.is_successful())
 
     def test_execute_pipeline_raw_twice(self):

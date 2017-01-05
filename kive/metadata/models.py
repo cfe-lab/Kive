@@ -1303,14 +1303,21 @@ class Datatype(AccessControl):
             if len(accounting_info) > 0:
                 job_info = accounting_info[job.job_id]
                 curr_state = job_info["state"]
-                print "Waiting for {} (state = {})".format(job, curr_state)
+                self.logger.info(
+                    "Waiting for %s (state = %s)",
+                    job,
+                    curr_state
+                )
                 is_done = (
                     curr_state == SlurmScheduler.COMPLETED or
                     curr_state in SlurmScheduler.CANCELLED_STATES or
                     curr_state in SlurmScheduler.FAILED_STATES
                 )
             else:
-                print "Job {} has not been queued yet".format(job)
+                self.logger.info(
+                    "Job %s has not been queued yet",
+                    job
+                )
 
         return_code = job_info["return_code"]
 

@@ -328,7 +328,7 @@ class Manager(object):
                          groups_allowed=None,
                          name=None,
                          description=None,
-                         slurm_sched_class=fleet.slurmlib.DummySlurmScheduler):
+                         slurm_sched_class=fleet.slurmlib.SlurmScheduler):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
