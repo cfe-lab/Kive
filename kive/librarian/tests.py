@@ -20,16 +20,19 @@ from django.test import TestCase, skipIfDBFeature
 from django.core.urlresolvers import reverse, resolve
 from django.core.files import File
 from django.core.files.base import ContentFile
+from mock import patch
 
 from rest_framework.test import force_authenticate, APIRequestFactory
 from rest_framework import status
 
 from archive.models import ExecLog, MethodOutput, Run, RunStep, RunComponentState
-from constants import datatypes, groups, runcomponentstates
+from constants import datatypes, groups, runcomponentstates, users
 from datachecking.models import MD5Conflict
+from kive.mock_setup import mocked_relations
+from librarian.ajax import ExternalFileDirectoryViewSet
 from librarian.models import Dataset, ExecRecord, ExternalFileDirectory
 from librarian.serializers import DatasetSerializer
-from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
+from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group, KiveUser
 from method.models import CodeResource, CodeResourceRevision, Method, \
     MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
@@ -1655,6 +1658,134 @@ baz
         dataset.dataset_file.open("rb")
         with dataset.dataset_file:
             self.assertEquals(dataset.dataset_file.read(), self.raw_file_contents)
+
+
+class ExternalFileDirectoryApiMockTests(BaseTestCases.ApiTestCase):
+    def setUp(self):
+        patcher = mocked_relations(ExternalFileDirectory, User, KiveUser)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        user = User(pk=users.KIVE_USER_PK)
+        User.objects.add(user)
+        User.objects.model = User
+        ExternalFileDirectory.objects.model = ExternalFileDirectory
+
+        kive_user_instance = KiveUser(pk=users.KIVE_USER_PK, username="kive")
+        KiveUser.objects.add(kive_user_instance)
+
+        # noinspection PyUnresolvedReferences
+        patcher2 = patch.object(ExternalFileDirectoryViewSet,
+                                'queryset',
+                                ExternalFileDirectory.objects)
+        patcher2.start()
+        self.addCleanup(patcher2.stop)
+
+        super(ExternalFileDirectoryApiMockTests, self).setUp()
+
+        self.list_path = reverse("externalfiledirectory-list")
+        self.detail_pk = 43
+        self.detail_path = reverse("externalfiledirectory-detail",
+                                   kwargs={'pk': self.detail_pk})
+
+        self.list_view, _, _ = resolve(self.list_path)
+        self.detail_view, _, _ = resolve(self.detail_path)
+
+        ExternalFileDirectory.objects.add(ExternalFileDirectory(id=42,
+                                                                name="apples",
+                                                                path="/bank/apples"),
+                                          ExternalFileDirectory(id=43,
+                                                                name="cherries",
+                                                                path="/dock/cherries"),
+                                          ExternalFileDirectory(id=44,
+                                                                name="bananas",
+                                                                path="/dock/bananas"))
+
+    def test_list(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 3)
+        self.assertEquals(response.data[2]['name'], 'bananas')
+
+    def test_filter_smart(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=smart&filters[0][val]=ban")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 2)
+        self.assertEquals(response.data[0]['name'], 'bananas')
+        self.assertEquals(response.data[1]['path'], '/bank/apples')
+
+    def test_filter_name(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=name&filters[0][val]=ban")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'bananas')
+
+    def test_filter_path(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=path&filters[0][val]=bank")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['path'], '/bank/apples')
+
+    def test_filter_unknown(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=bogus&filters[0][val]=kive")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals({u'detail': u'Unknown filter key: bogus'},
+                          response.data)
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['name'], 'cherries')
+
+    @patch('os.walk')
+    def test_list_files(self, mock_walk):
+        mock_walk.return_value = [('/dock/cherries', [], ['foo.txt', 'bar.txt'])]
+        expected_data = {
+            'url': u'http://testserver/api/externalfiledirectories/43/',
+            'pk': 43,
+            'list_files': [('/dock/cherries/foo.txt', '[cherries]/foo.txt'),
+                           ('/dock/cherries/bar.txt', '[cherries]/bar.txt')],
+            'name': u'cherries',
+            'path': u'/dock/cherries'
+        }
+        path = reverse("externalfiledirectory-list-files",
+                       kwargs={'pk': self.detail_pk})
+
+        view, _, _ = resolve(path)
+        request = self.factory.get(path)
+        force_authenticate(request, user=self.kive_user)
+        response = view(request, pk=self.detail_pk)
+        self.assertDictEqual(expected_data, response.data)
 
 
 @skipIfDBFeature('is_mocked')
