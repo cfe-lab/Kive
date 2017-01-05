@@ -1823,37 +1823,6 @@ class RunStep(RunComponent):
                 raise ValidationError('RunStep "{}" generated Dataset "{}" but it is not in its ExecRecord'
                                       .format(self, out_data))
 
-    def _clean_not_reused(self):
-        """
-        Check coherence of a RunStep which has decided not to reuse an
-        ExecRecord:
-
-         - if it does not have a log, then it shouldn't have generated any Datasets or have an ExecRecord;
-         - if ExecRecord is in place then it must have invoked logs.
-
-        This is a helper for clean().  Returns False if clean() should terminate at this step
-        and True if it should continue.
-
-        PRE
-        This RunStep has reused = False (has decided not to reuse an ExecRecord).
-        """
-        if not self.has_log():
-            general_error = '{} "{}" is not reused and does not have a log'.format(
-                self.__class__.__name__, self)
-            if self.has_data():
-                raise ValidationError("{} so should not have generated any Datasets".format(general_error))
-            if self.execrecord:
-                raise ValidationError("{}; execrecord should not be set".format(general_error))
-            return False
-
-        # On the flipside....
-        if self.execrecord is not None and not self.invoked_logs.exists():
-            raise ValidationError(
-                '{} "{}" is not reused and has not invoked any ExecLogs but does have an ExecRecord'.format(
-                    self.__class__.__name__, self))
-
-        return True
-
     def clean(self):
         """
         Check coherence of this RunStep.
@@ -2785,15 +2754,13 @@ class ExecLog(stopwatch.models.Stopwatch):
         """
         Checks completeness of this ExecLog.
 
-        If it belongs to a cable, then it must have its end time set.
-        A MethodOutput must be in place if appropriate.
+        The execution must have ended (i.e. end_time is
+        set) and a MethodOutput must be in place if appropriate.
         """
-        # This no longer holds for Method execution, as the ExecLog start and end time
-        # get set by the Manager when it monitors the queue.
-        if self.record.is_cable() and not self.has_ended():
+        if not self.has_ended():
             return False
 
-        elif self.record.is_step() and self.record.runstep.pipelinestep.transformation.is_method():
+        if self.record.is_step() and self.record.runstep.pipelinestep.transformation.is_method():
             if not hasattr(self, "methodoutput") or self.methodoutput is None:
                 return False
 
