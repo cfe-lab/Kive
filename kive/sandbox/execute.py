@@ -18,8 +18,7 @@ from django.conf import settings
 from archive.models import RunStep, Run, ExecLog, RunSIC, RunCable, RunComponent, RunOutputCable
 from constants import dirnames, extensions, runcomponentstates
 import file_access_utils
-import librarian.models
-from librarian.models import Dataset
+from librarian.models import Dataset, ExecRecord
 import pipeline.models
 from method.models import Method
 from datachecking.models import IntegrityCheckLog
@@ -76,19 +75,10 @@ class Sandbox:
         the file system, along with dataset_fs_map/socket_map/etc.
 
         INPUTS
-        user          User running the pipeline.*
-        my_pipeline   Pipeline to run.*
-        inputs        Ordered list of datasets to feed into the pipeline.*
-        users_allowed   Iterable (e.g. list or QuerySet) of Users.*
-        groups_allowed  Iterable of Groups.*
-        sandbox_path  Where on the filesystem to execute.*
         run           A Run object to fill in (e.g. if we're starting this using the fleet);
-                      if None, we create our own.
-
-        * parameter is ignored if run is specified
 
         PRECONDITIONS
-        inputs must have real data
+        run.inputs must have real data
         """
         self.slurm_scheduler = SlurmScheduler()
 
@@ -122,7 +112,7 @@ class Sandbox:
         # top-level Pipeline.
         self.sandbox_path = sandbox_path or tempfile.mkdtemp(
             prefix=sandbox_prefix.format(self.user, self.run.pk),
-            dir=file_access_utils.sandbox_base_path())
+            dir=file_access_utils.create_sandbox_base_path())
 
         self.run.sandbox_path = self.sandbox_path
         self.run.save()
@@ -1422,7 +1412,7 @@ class Sandbox:
         """
         # Retrieve info from the database using the PKs passed.
         curr_record = RunComponent.objects.get(pk=cable_execute_dict["cable_record_pk"]).definite
-        input_dataset = librarian.models.Dataset.objects.get(pk=cable_execute_dict["input_dataset_pk"])
+        input_dataset = Dataset.objects.get(pk=cable_execute_dict["input_dataset_pk"])
         output_path = cable_execute_dict["output_path"]
         recovering_record = None
         if cable_execute_dict["recovering_record_pk"] is not None:
@@ -1448,7 +1438,7 @@ class Sandbox:
             try:
                 with transaction.atomic():
                     if cable_execute_dict["execrecord_pk"] is not None:
-                        curr_ER = librarian.models.ExecRecord.objects.get(pk=cable_execute_dict["execrecord_pk"])
+                        curr_ER = ExecRecord.objects.get(pk=cable_execute_dict["execrecord_pk"])
                         can_reuse = curr_record.check_ER_usable(curr_ER)
                     else:
                         curr_ER, can_reuse = curr_record.get_suitable_ER(input_dataset)
@@ -1603,12 +1593,12 @@ class Sandbox:
                             output_dataset = input_dataset
                         elif curr_ER is None:
                             if not file_size_unstable:
-                                output_dataset = librarian.models.Dataset.create_empty(
+                                output_dataset = Dataset.create_empty(
                                     cdt=output_CDT,
                                     file_source=curr_record
                                 )
                             else:
-                                output_dataset = librarian.models.Dataset.create_dataset(
+                                output_dataset = Dataset.create_dataset(
                                     output_path,
                                     cdt=output_CDT,
                                     keep_file=make_dataset,
@@ -1645,7 +1635,7 @@ class Sandbox:
                                 output_dataset.register_file(output_path)
 
                         else:
-                            output_dataset = librarian.models.Dataset.create_dataset(
+                            output_dataset = Dataset.create_dataset(
                                 output_path,
                                 cdt=output_CDT,
                                 keep_file=make_dataset,
@@ -1661,7 +1651,7 @@ class Sandbox:
                         if curr_ER is None:
                             logger.debug("No ExecRecord already in use - creating fresh cable ExecRecord")
                             # Make ExecRecord, linking it to the ExecLog.
-                            curr_ER = librarian.models.ExecRecord.create(
+                            curr_ER = ExecRecord.create(
                                 curr_log,
                                 cable,
                                 [input_dataset],
@@ -1802,14 +1792,14 @@ class Sandbox:
             # waited on the queue.  If this isn't a recovery, we can just stop.
             if recover:
                 assert preexisting_ER
-                curr_ER = librarian.models.ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
+                curr_ER = ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
             else:
                 succeeded_yet = False
                 while not succeeded_yet:
                     try:
                         with transaction.atomic():
                             if preexisting_ER:
-                                curr_ER = librarian.models.ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
+                                curr_ER = ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
 
                                 if curr_ER.generator.record.is_quarantined():
                                     logger.debug(
@@ -1982,7 +1972,7 @@ class Sandbox:
 
             # Stick the path to the job handle so it can be disposed of later.
             job_handle.wrapped_driver_path = wrapped_driver_path
-        logger.debug("Submitted task with pk=%d; Slurm job ID=%d, wrapper name=%s",
+        logger.debug("Submitted task with pk=%d; Slurm job ID=%s, wrapper name=%s",
                      curr_RS.pk, job_handle.job_id, wrapped_driver_path)
         return job_handle
 
@@ -1997,6 +1987,9 @@ class Sandbox:
         curr_RS = RunStep.objects.get(pk=step_execute_dict["runstep_pk"])
         curr_log = curr_RS.log
         preexisting_ER = step_execute_dict["execrecord_pk"] is not None
+        curr_ER = None
+        if preexisting_ER:
+            curr_ER = ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
         pipelinestep = curr_RS.pipelinestep
         output_paths = step_execute_dict["output_paths"]
         user = User.objects.get(pk=step_execute_dict["user_pk"])
@@ -2042,6 +2035,9 @@ class Sandbox:
                         for i, curr_output in enumerate(pipelinestep.outputs):
                             output_path = output_paths[i]
                             output_CDT = curr_output.get_cdt()
+                            dataset_name = curr_RS.output_name(curr_output)
+                            dataset_desc = curr_RS.output_description(curr_output)
+                            make_dataset = curr_RS.keeps_output(curr_output)
 
                             # Check that the file exists, as we did for cables.
                             start_time = timezone.now()
@@ -2070,16 +2066,13 @@ class Sandbox:
                                         output_dataset.mark_file_not_stable(start_time, end_time, curr_log, user)
 
                                 elif md5s[i] is None:
-                                    output_dataset = librarian.models.Dataset.create_empty(
+                                    output_dataset = Dataset.create_empty(
                                         cdt=output_CDT,
                                         file_source=curr_RS
                                     )
                                     output_dataset.mark_missing(start_time, end_time, curr_log, user)
                                 else:
-                                    dataset_name = curr_RS.output_name(curr_output)
-                                    dataset_desc = curr_RS.output_description(curr_output)
-                                    make_dataset = curr_RS.keeps_output(curr_output)
-                                    output_dataset = librarian.models.Dataset.create_dataset(
+                                    output_dataset = Dataset.create_dataset(
                                         output_path,
                                         cdt=output_CDT,
                                         keep_file=make_dataset,
@@ -2094,16 +2087,14 @@ class Sandbox:
                             else:
                                 # If necessary, create new Dataset for output, and create the Dataset
                                 # if it's to be retained.
-                                dataset_name = curr_RS.output_name(curr_output)
-                                dataset_desc = curr_RS.output_description(curr_output)
-                                make_dataset = curr_RS.keeps_output(curr_output)
-
                                 if preexisting_ER:
-                                    if make_dataset:
+                                    output_ERO = curr_ER.get_execrecordout(curr_output)
+                                    if not make_dataset:
+                                        output_dataset = output_ERO.dataset
+                                    else:
                                         # Wrap in a transaction to prevent
                                         # concurrent authoring of Datasets to
                                         # an existing Dataset.
-                                        output_ERO = preexisting_ER.get_execrecordout(curr_output)
                                         with transaction.atomic():
                                             output_dataset = Dataset.objects.select_for_update().filter(
                                                 pk=output_ERO.dataset.pk).first()
@@ -2120,7 +2111,7 @@ class Sandbox:
                                                     output_dataset.register_file(output_path)
 
                                 else:
-                                    output_dataset = librarian.models.Dataset.create_dataset(
+                                    output_dataset = Dataset.create_dataset(
                                         output_path,
                                         cdt=output_CDT,
                                         keep_file=make_dataset,
@@ -2138,7 +2129,7 @@ class Sandbox:
                         if not preexisting_ER:
                             # Make new ExecRecord, linking it to the ExecLog
                             logger.debug("Creating fresh ExecRecord")
-                            curr_ER = librarian.models.ExecRecord.create(
+                            curr_ER = ExecRecord.create(
                                 curr_log,
                                 pipelinestep,
                                 inputs_after_cable,
@@ -2146,7 +2137,8 @@ class Sandbox:
                             )
 
                         # Link ExecRecord to RunStep (it may already have been linked; that's fine).
-                        curr_RS.link_execrecord(curr_ER, False)
+                        # It's possible that reused may be either True or False (e.g. this is a recovery).
+                        curr_RS.link_execrecord(curr_ER, curr_RS.reused)
 
                     succeeded_yet = True
                 except (OperationalError, InternalError):

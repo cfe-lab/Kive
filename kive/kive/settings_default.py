@@ -263,6 +263,9 @@ SANDBOX_PURGE_DAYS = 1
 SANDBOX_PURGE_HOURS = 0
 SANDBOX_PURGE_MINUTES = 0
 
+# Whether the fleet Manager should run idle tasks.
+DO_IDLE_TASKS = True
+
 # Keep this many of the most recent Sandboxes for any PipelineFamily.
 SANDBOX_KEEP_RECENT = 10
 
@@ -324,3 +327,8 @@ CONFIRM_COPY_WAIT_MAX = 7
 CONFIRM_FILE_CREATED_RETRIES = 5
 CONFIRM_FILE_CREATED_WAIT_MIN = 8
 CONFIRM_FILE_CREATED_WAIT_MAX = 12
+
+# The settings file the fleet should use.  Leave as None if it should just use the normal one.
+FLEET_SETTINGS = None
+# Whether or not to use the dummy Slurm scheduler.
+TEST_WITH_DUMMY_SLURM = False

@@ -1630,7 +1630,7 @@ def create_method_test_environment(case):
 
     # Some data.
     case.scratch_dir = tempfile.mkdtemp(
-        dir=file_access_utils.sandbox_base_path()
+        dir=file_access_utils.create_sandbox_base_path()
     )
     file_access_utils.configure_sandbox_permissions(case.scratch_dir)
     try:
@@ -2242,7 +2242,8 @@ def create_grandpa_sandbox_environment(case):
     case.coderev_faulty = make_first_revision(
         "faulty",
         "a script...?",
-        "faulty.sh", "",
+        "faulty.sh",
+        "",
         case.user_grandpa
     )
     case.method_faulty = make_first_method(

@@ -14,8 +14,9 @@ from django.core.exceptions import ValidationError
 from django.core.files import File
 from django.core.files.base import ContentFile
 from django.utils import timezone
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.core.urlresolvers import reverse, resolve
+from django_mock_queries.query import MockSet
 from rest_framework import status
 from rest_framework.test import force_authenticate
 
@@ -25,7 +26,7 @@ from datachecking.models import BadData
 from file_access_utils import compute_md5
 from librarian.models import ExecRecord, Dataset, DatasetStructure
 
-from kive.tests import BaseTestCases, install_fixture_files, restore_production_files
+from kive.tests import BaseTestCases, install_fixture_files, remove_fixture_files
 from method.models import Method, MethodFamily, CodeResource
 from pipeline.models import Pipeline, PipelineStep, PipelineFamily
 from kive.mock_setup import mocked_relations
@@ -487,6 +488,7 @@ class ArchiveTestCaseHelpers(object):
             return
 
 
+@skipIfDBFeature('is_mocked')
 class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
     fixtures = ["archive_test_environment"]
 
@@ -495,7 +497,7 @@ class ArchiveTestCase(TestCase, ArchiveTestCaseHelpers):
         tools.load_archive_test_environment(self)
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
 
 class RunComponentTests(ArchiveTestCase):
@@ -710,6 +712,7 @@ class RunComponentTests(ArchiveTestCase):
                     rc.definite.clean())
 
 
+@skipIfDBFeature('is_mocked')
 class RunComponentInvokedBySubsequentTests(TestCase):
     fixtures = ["run_pipelines_recovering_reused_step"]
 
@@ -717,7 +720,7 @@ class RunComponentInvokedBySubsequentTests(TestCase):
         install_fixture_files("run_pipelines_recovering_reused_step")
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
     def test_clean_execlogs_runcomponent_invoked_by_subsequent_runcomponent(self):
         """
@@ -1230,6 +1233,7 @@ class RunStepTests(ArchiveTestCase):
         self.assertFalse(self.step_E3_RS.keeps_output(self.C3_rawout))
 
 
+@skipIfDBFeature('is_mocked')
 class RunComponentTooManyChecks(TestCase):
     """
     Tests that check clean() on the case where a RunComponent has too much datachecking.
@@ -1241,7 +1245,7 @@ class RunComponentTooManyChecks(TestCase):
         self.user_bob = User.objects.get(username="bob")
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
     def test_RunStep_clean_too_many_integrity_checks(self):
         """RunStep should have <=1 integrity check for each output."""
@@ -2591,6 +2595,7 @@ class ExecLogTests(ArchiveTestCase):
         self.assertFalse(execlog.is_successful())
 
 
+@skipIfDBFeature('is_mocked')
 class GetCoordinatesTests(TestCase, ArchiveTestCaseHelpers):
     fixtures = ['archive_test_environment']
     """Tests of the get_coordinates functions of all Run and RunComponent classes."""
@@ -2667,6 +2672,7 @@ class GetCoordinatesTests(TestCase, ArchiveTestCaseHelpers):
             self.assertEquals(roc.get_coordinates(), (2,))
 
 
+@skipIfDBFeature('is_mocked')
 class GetCoordinatesOnDeepNestedRunTests(TestCase):
     fixtures = ['deep_nested_run']
 
@@ -2828,6 +2834,7 @@ class ExecLogIsCompleteIsSuccessfulTests(ArchiveTestCase):
         self.assertFalse(self.step_E1_RS.log.is_successful())
 
 
+@skipIfDBFeature('is_mocked')
 class StateMachineActualExecutionTests(TestCase):
     fixtures = ["archive_no_runs_test_environment"]
 
@@ -2836,7 +2843,7 @@ class StateMachineActualExecutionTests(TestCase):
         tools.load_archive_no_runs_test_environment(self)
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
     def setup_incorrectly_random_method(self):
         """
@@ -3360,6 +3367,7 @@ with open(sys.argv[2], "wb") as f:
         mock_run_quarantine.assert_called_once_with(run1, recurse_upward=True, save=True)
 
 
+@skipIfDBFeature('is_mocked')
 class TopLevelRunTests(TestCase, ArchiveTestCaseHelpers):
     fixtures = ['archive_test_environment']
 
@@ -3385,6 +3393,7 @@ class TopLevelRunTests(TestCase, ArchiveTestCaseHelpers):
                 self.assertEquals(self.pE_run, roc.top_level_run)
 
 
+@skipIfDBFeature('is_mocked')
 class TopLevelRunOnDeepNestedRunTests(TestCase):
     fixtures = ['deep_nested_run']
 
@@ -3412,6 +3421,7 @@ class TopLevelRunOnDeepNestedRunTests(TestCase):
                 self.assertEquals(self.deep_nested_run, roc.top_level_run)
 
 
+@skipIfDBFeature('is_mocked')
 class RunStepReuseFailedExecRecordTests(TestCase):
     def setUp(self):
         tools.create_grandpa_sandbox_environment(self)
@@ -3473,6 +3483,7 @@ class RunStepReuseFailedExecRecordTests(TestCase):
         self.assertTrue(bad_ccl.baddata.missing_output)
 
 
+@skipIfDBFeature('is_mocked')
 class MethodOutputApiTests(BaseTestCases.ApiTestCase):
     fixtures = ['simple_run']
 
@@ -3543,6 +3554,7 @@ class MethodOutputApiTests(BaseTestCases.ApiTestCase):
         self.assertTrue(method_output.is_output_redacted())
 
 
+@skipIfDBFeature('is_mocked')
 class RunIncreasePermissionsNestedRunTests(TestCase):
     """
     Tests of Run.increase_permissions_from_json with nested Runs.
@@ -3591,6 +3603,7 @@ class RunIncreasePermissionsNestedRunTests(TestCase):
                 self.assertTrue(ds.groups_allowed.filter(pk=groups.DEVELOPERS_PK))
 
 
+@skipIfDBFeature('is_mocked')
 class RunIncreasePermissionsCustomCableTests(TestCase):
     """
     Tests of Run.increase_permissions_from_json with custom cables.
@@ -3653,6 +3666,7 @@ class RunIncreasePermissionsCustomCableTests(TestCase):
                 self.assertTrue(ds.groups_allowed.filter(pk=groups.DEVELOPERS_PK))
 
 
+@skipIfDBFeature('is_mocked')
 class GetAllAtomicRunComponentsTests(TestCase):
     """
     Tests of Run.get_all_atomic_runcomponents.
@@ -3718,6 +3732,7 @@ class GetAllAtomicRunComponentsTests(TestCase):
         self.assertSetEqual(set(atomics), set(all_rcs))
 
 
+@skipIfDBFeature('is_mocked')
 class EligiblePermissionsTests(TestCase):
     fixtures = ["run_pipelines_recovering_reused_step"]
 
@@ -3880,6 +3895,7 @@ class EligiblePermissionsTests(TestCase):
         )
 
 
+@skipIfDBFeature('is_mocked')
 class CancelComponentsTests(TestCase):
     """
     Tests of Run.cancel_unfinished and Run.cancel_unstarted.
@@ -4309,14 +4325,20 @@ class RunBatchTests(TestCase):
 
         self.assertFalse(rb.all_runs_complete())
 
+    @mocked_relations(User, Group)
     def test_eligible_permissions_no_runs(self):
         """
         Testing that the eligible permissions on an empty RunBatch are everything.
         """
+        expected_users = {'Joe', 'Suzy'}
+        User.objects.add(*expected_users)
+        expected_groups = {'Floor 1', 'Floor 2'}
+        Group.objects.add(*expected_groups)
+
         rb = RunBatch()
         eligible_users, eligible_groups = rb.eligible_permissions()
-        self.assertSetEqual(set(eligible_users), set(User.objects.all()))
-        self.assertSetEqual(set(eligible_groups), set(Group.objects.all()))
+        self.assertEqual(set(eligible_users), expected_users)
+        self.assertEqual(set(eligible_groups), expected_groups)
 
     def test_eligible_permissions_not_all_runs_complete(self):
         """
@@ -4330,20 +4352,20 @@ class RunBatchTests(TestCase):
             rb.eligible_permissions
         )
 
+    @mocked_relations(User, Group)
     def test_eligible_permissions_runs_have_permissions(self):
         """
         Testing the eligible permissions on a non-trivial RunBatch.
         """
-        user_1 = User.objects.create_user("userone", "user1@ponzi.io", "user1")
-        user_2 = User.objects.create_user("usertwo", "user2@ponzi.io", "user2")
-        user_3 = User.objects.create_user("userthree", "user3@ponzi.io", "user3")
+        user_1 = User("userone", "user1@ponzi.io", "user1", pk=1)
+        user_2 = User("usertwo", "user2@ponzi.io", "user2", pk=2)
+        user_3 = User("userthree", "user3@ponzi.io", "user3", pk=3)
+        User.objects.add(user_1, user_2, user_3)
 
-        group_1 = Group(name="groupone")
-        group_2 = Group(name="grouptwo")
-        group_3 = Group(name="groupthree")
-        group_1.save()
-        group_2.save()
-        group_3.save()
+        group_1 = Group(name="groupone", pk=101)
+        group_2 = Group(name="grouptwo", pk=102)
+        group_3 = Group(name="groupthree", pk=103)
+        Group.objects.add(group_1, group_2, group_3)
 
         rb = RunBatch()
 
@@ -4353,37 +4375,37 @@ class RunBatchTests(TestCase):
 
         run1.eligible_permissions = Mock(
             return_value=[
-                User.objects.filter(pk__in=[user_1.pk, user_2.pk]),
-                Group.objects.filter(pk__in=[group_1.pk, group_2.pk])
+                MockSet(user_1, user_2),
+                MockSet(group_1, group_2)
             ]
         )
         run2.eligible_permissions = Mock(
             return_value=[
-                User.objects.filter(pk__in=[user_2.pk, user_3.pk]),
-                Group.objects.filter(pk__in=[group_2.pk, group_3.pk])
+                MockSet(user_2, user_3),
+                MockSet(group_2, group_3)
             ]
         )
 
         # run3 has Everyone permissions, so should pose no limits.
         run3.eligible_permissions = Mock(
             return_value=[
-                User.objects.all(),
-                Group.objects.all()
+                MockSet(user_1, user_2, user_3),
+                MockSet(group_1, group_2, group_3)
             ]
         )
 
         rb.runs.add(run1, run2, run3)
 
         eligible_users, eligible_groups = rb.eligible_permissions()
-        self.assertSetEqual(set(eligible_users), {user_2})
-        self.assertSetEqual(set(eligible_groups), {group_2})
+        self.assertEqual(set(eligible_users), {user_2})
+        self.assertEqual(set(eligible_groups), {group_2})
 
         # This run grants no one access.
         run4 = Run(_runstate_id=runstates.SUCCESSFUL_PK)
         run4.eligible_permissions = Mock(
             return_value=[
-                User.objects.none(),
-                Group.objects.none()
+                MockSet(),
+                MockSet()
             ]
         )
         rb.runs.add(run4)

@@ -7,7 +7,7 @@ import shutil
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.conf import settings
 
 from metadata.models import Datatype, CompoundDatatype, CustomConstraint, everyone_group
@@ -30,8 +30,9 @@ class CustomConstraintTestPreamble(object):
         tools.create_sandbox_testing_tools_environment(self)
         self.user_oscar = User.objects.create_user('oscar', 'oscar@thegrouch.com', 'garbage')
         self.user_oscar.groups.add(everyone_group())
+        sandbox_base_path = file_access_utils.create_sandbox_base_path()
         self.workdir = tempfile.mkdtemp(
-            dir=os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
+            dir=sandbox_base_path
         )
         file_access_utils.configure_sandbox_permissions(self.workdir)
 
@@ -318,6 +319,7 @@ class CustomConstraintTestPreamble(object):
         self.assertEqual(verif_log.start_time <= verif_log.end_time, True)
 
 
+@skipIfDBFeature('is_mocked')
 class CustomConstraintTests(CustomConstraintTestPreamble, TestCase):
 
     def test_summarize_CSV_no_output(self):
@@ -479,6 +481,7 @@ class CustomConstraintTests(CustomConstraintTestPreamble, TestCase):
                                 dt.clean)
 
 
+@skipIfDBFeature('is_mocked')
 class CustomConstraintTestsWithExecution(CustomConstraintTestPreamble, TestCase):
     def test_execute_pipeline_content_check_good(self):
         """

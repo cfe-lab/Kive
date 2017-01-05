@@ -1,12 +1,12 @@
 from datetime import datetime
 import os
-from unittest.case import TestCase
 
 from django.core.exceptions import ValidationError
+from django.test import TestCase
 from mock import PropertyMock, Mock
-
-from kive.mock_setup import mocked_relations  # Import before any Django models
 from django_mock_queries.query import MockSet
+
+from kive.mock_setup import mocked_relations
 from constants import datatypes, runcomponentstates
 from datachecking.models import BadData, CellError, ContentCheckLog
 from kive.tests import dummy_file

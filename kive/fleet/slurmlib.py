@@ -262,6 +262,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         except sp.CalledProcessError:
             is_alive = False
         logger.info("squeue passed: %s" % is_alive)
+
         if is_alive:
             try:
                 cls.get_accounting_info()
@@ -367,7 +368,6 @@ class SlurmScheduler(BaseSlurmScheduler):
             # Pre-process the fields.
             job_id = raw_job_dict["JobID"]
             priority = int(raw_job_dict["Priority"])
-
             # Create proper DateTime objects with the following format string.
             date_format = "%Y-%m-%dT%H:%M:%S"
             start_time = None

@@ -1,8 +1,9 @@
-from unittest.case import TestCase
+from mock import patch, MagicMock, PropertyMock
+from django.contrib.auth.models import Group, Permission
+from django.db.models.fields.related_descriptors import ManyToManyDescriptor
+from django.test import TestCase
 
-from mock import patch
-
-from kive.mock_setup import MockOneToOneMap, MockOneToManyMap
+from kive.mock_setup import MockOneToOneMap, MockOneToManyMap, PatcherChain, mocked_relations
 from django_mock_queries.query import MockSet
 
 
@@ -142,3 +143,145 @@ class MockOneToManyTests(TestCase):
     @patch.object(DummyModel, 'children', MockOneToManyMap(DummyModel.children))
     def test_delegation(self):
         self.assertEqual(DummyModel.children.example_attribute, 'Something')
+
+
+# noinspection PyUnusedLocal
+def zero_sum(items):
+    return 0
+
+
+class PatcherChainTest(TestCase):
+    patch_mock_max = patch('__builtin__.max')
+    patch_zero_sum = patch('__builtin__.sum', zero_sum)
+
+    @patch_zero_sum
+    def test_patch_dummy(self):
+        sum_result = sum([1, 2, 3])
+
+        self.assertEqual(0, sum_result)
+
+    @patch_mock_max
+    def test_patch_mock(self, mock_max):
+        mock_max.return_value = 42
+        max_result = max([1, 2, 3])
+
+        self.assertEqual(42, max_result)
+
+    @PatcherChain([patch_zero_sum, patch_mock_max])
+    def test_patch_both(self, mock_max):
+        sum_result = sum([1, 2, 3])
+        mock_max.return_value = 42
+        max_result = max([1, 2, 3])
+
+        self.assertEqual(0, sum_result)
+        self.assertEqual(42, max_result)
+
+    @PatcherChain([patch_mock_max, patch_zero_sum])
+    def test_patch_both_reversed(self, mock_max):
+        sum_result = sum([1, 2, 3])
+        mock_max.return_value = 42
+        max_result = max([1, 2, 3])
+
+        self.assertEqual(0, sum_result)
+        self.assertEqual(42, max_result)
+
+    @PatcherChain([patch_mock_max], pass_mocks=False)
+    def test_mocks_not_passed(self):
+        """ Create a new mock, but don't pass it to the test method. """
+
+    def test_context_manager(self):
+        with PatcherChain([PatcherChainTest.patch_mock_max,
+                           PatcherChainTest.patch_zero_sum]) as mocks:
+            sum_result = sum([1, 2, 3])
+            mocks[0].return_value = 42
+            max_result = max([1, 2, 3])
+
+            self.assertEqual(0, sum_result)
+            self.assertEqual(42, max_result)
+            self.assertEqual(2, len(mocks))
+            self.assertIs(zero_sum, mocks[1])
+
+    def test_start(self):
+        patcher = PatcherChain([PatcherChainTest.patch_mock_max,
+                                PatcherChainTest.patch_zero_sum])
+        mocks = patcher.start()
+        self.addCleanup(patcher.stop)
+
+        sum_result = sum([1, 2, 3])
+        mocks[0].return_value = 42
+        max_result = max([1, 2, 3])
+
+        self.assertEqual(0, sum_result)
+        self.assertEqual(42, max_result)
+        self.assertEqual(2, len(mocks))
+        self.assertIs(zero_sum, mocks[1])
+
+
+@PatcherChain([patch('__builtin__.max'), patch('__builtin__.sum', zero_sum)],
+              pass_mocks=False)
+class PatcherChainOnClassTest(TestCase):
+    def test_patch_dummy(self):
+        sum_result = sum([1, 2, 3])
+
+        self.assertEqual(0, sum_result)
+
+    def test_patch_mock(self):
+        max_result = max([1, 2, 3])
+
+        self.assertIsInstance(max_result, MagicMock)
+
+    def test_patch_both(self):
+        sum_result = sum([1, 2, 3])
+        max_result = max([1, 2, 3])
+
+        self.assertEqual(0, sum_result)
+        self.assertIsInstance(max_result, MagicMock)
+
+
+class MockedRelationsTest(TestCase):
+    @mocked_relations(Group)
+    def test_decorator(self):
+        group = Group()
+
+        self.assertEqual(0, group.permissions.count())
+        group.permissions.add(Permission())
+        self.assertEqual(1, group.permissions.count())
+
+    def test_context_manager(self):
+        group = Group()
+        with mocked_relations(Group):
+            self.assertEqual(0, group.permissions.count())
+            group.permissions.add(Permission())
+            self.assertEqual(1, group.permissions.count())
+
+    def test_reusing_patcher(self):
+        patcher = mocked_relations(Group)
+        with patcher:
+            self.assertEqual(0, Group.objects.count())
+            Group.objects.add(Group())
+            self.assertEqual(1, Group.objects.count())
+
+        with patcher:
+            self.assertEqual(0, Group.objects.count())
+            Group.objects.add(Group())
+            self.assertEqual(1, Group.objects.count())
+
+    @mocked_relations(Group)
+    def test_relation_with_garbage_collection(self):
+        self.longMessage = True
+        for group_index in range(10):
+            group = Group()
+            self.assertEqual(0,
+                             group.permissions.count(),
+                             'group_index: {}'.format(group_index))
+            group.permissions.add(Permission())
+            self.assertEqual(1, group.permissions.count())
+            del group
+
+    def test_replaces_other_mocks(self):
+        self.assertIsInstance(Group.permissions, ManyToManyDescriptor)
+
+        with mocked_relations(Group):
+            Group.permissions = PropertyMock('Group.permissions')
+
+        self.assertIsInstance(Group.permissions, ManyToManyDescriptor)

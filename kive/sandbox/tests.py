@@ -9,14 +9,14 @@ from mock import call, patch
 from django.contrib.auth.models import User
 from django.core.files import File
 from django.core.files.base import ContentFile
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.utils import timezone
 
 from archive.models import Run, RunComponent
 from constants import datatypes
 from datachecking.models import IntegrityCheckLog, MD5Conflict
 from kive.testing_utils import clean_up_all_files
-from kive.tests import install_fixture_files, restore_production_files
+from kive.tests import install_fixture_files, remove_fixture_files
 from librarian.models import Dataset, DatasetStructure, ExternalFileDirectory, ExecRecord
 from metadata.models import Datatype, CompoundDatatype, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
@@ -167,6 +167,7 @@ def execute_tests_environment_load(case):
     case.pX_raw = Pipeline.objects.get(revision_name="pX_raw")
 
 
+@skipIfDBFeature('is_mocked')
 class ExecuteTestsBase(TestCase):
     fixtures = ['execute_tests']
 
@@ -176,7 +177,7 @@ class ExecuteTestsBase(TestCase):
 
     def tearDown(self):
         clean_up_all_files()
-        restore_production_files()
+        remove_fixture_files()
 
     def check_run_OK(self, run):
         for step in run.runsteps.all():
@@ -1587,6 +1588,7 @@ class SandboxTests(ExecuteTestsBase):
                                 lambda: Manager.execute_pipeline(self.myUser, p, [self.dataset]))
 
 
+@skipIfDBFeature('is_mocked')
 class RestoreReusableDatasetTest(TestCase):
     """
     Scenario where an output is marked as reusable, and it needs to be restored.
@@ -1607,7 +1609,7 @@ class RestoreReusableDatasetTest(TestCase):
         install_fixture_files("restore_reusable_dataset")
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
     def test_load_run_plan(self):
         pipeline = Pipeline.objects.get(revision_name='sums only')

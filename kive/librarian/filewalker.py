@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import time
+import logging
 from datetime import datetime
 
 # PEP 471: scandir will be standard from python 3.5 onward
@@ -28,7 +29,7 @@ def consumer(func):
 
 
 @consumer
-def iter_walk(dirname, exclude_set, grace_time_limit_ts):
+def iter_walk(dirname, exclude_set, grace_time_limit_ts, logger):
     """
     Walk the file system, returning files if they are older than
     grace_time_limit_ts
@@ -41,18 +42,23 @@ def iter_walk(dirname, exclude_set, grace_time_limit_ts):
     because of too deep a traversal), it could be rewritten.
     """
     (yield)
-    for dir_entry in scandir.scandir(dirname):
-        if (not dir_entry.name.startswith(".")) and dir_entry.path not in exclude_set:
-            try:
-                stat = dir_entry.stat(follow_symlinks=False)
-                if dir_entry.is_file() and stat.st_atime < grace_time_limit_ts:
-                    yield dir_entry
-                elif dir_entry.is_dir():
-                    for fn in iter_walk(dir_entry.path, exclude_set, grace_time_limit_ts):
-                        yield fn
-            except OSError:
-                # some sort of permission or access error, simply skip this entry
-                pass
+    try:
+        for dir_entry in scandir.scandir(dirname):
+            if (not dir_entry.name.startswith(".")) and dir_entry.path not in exclude_set:
+                try:
+                    stat = dir_entry.stat(follow_symlinks=False)
+                    if dir_entry.is_file() and stat.st_atime < grace_time_limit_ts:
+                        yield dir_entry
+                    elif dir_entry.is_dir():
+                        for fn in iter_walk(dir_entry.path,
+                                            exclude_set,
+                                            grace_time_limit_ts, logger):
+                            yield fn
+                except OSError:
+                    # some sort of permission or access error, simply skip this entry
+                    logger.exception("iter_walk inner")
+    except OSError:
+        logger.exception("iter_walk outer")
 
 
 class fileclass(object):
@@ -252,11 +258,14 @@ class FilePurger:
         for later analysis.
         This routine is used for development purposes, not in production.
         """
+        logger = logging.getLogger(__name__)
         with open(dump_fname, "w") as csvfile:
             wr = csv.DictWriter(csvfile,
                                 fieldnames=["filename", "size", "atime"])
             wr.writeheader()
-            for dir_entry in iter_walk(dirname, exclude_set=set(), grace_time_limit_ts=time.time()):
+            for dir_entry in iter_walk(dirname, set(),
+                                       time.time(),
+                                       logger):
                 wr.writerow(fileclass(dir_entry)._get_dict())
 
     def _read_dumpfile(self, dump_fname, gracetime_hrs):
@@ -309,7 +318,7 @@ class FilePurger:
         self._empty_cache()
         # in order to help us return in time, we try to return slightly earlier.
         SAFETY_MARGIN_SECS = 0.5
-        iwalk = iter_walk(self.dirname, exclude_set, grace_time_limit)
+        iwalk = iter_walk(self.dirname, exclude_set, grace_time_limit, self.logger)
         try:
             while True:
                 time_to_stop = (yield False)

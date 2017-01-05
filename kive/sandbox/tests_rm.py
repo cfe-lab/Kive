@@ -1,9 +1,8 @@
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.conf import settings
 
-import unittest
 import tempfile
 import shutil
 import os.path
@@ -12,7 +11,7 @@ import time
 from librarian.models import Dataset
 import kive.testing_utils as tools
 from pipeline.models import Pipeline, PipelineFamily
-from kive.tests import install_fixture_files, restore_production_files, BaseTestCases
+from kive.tests import install_fixture_files, remove_fixture_files, BaseTestCases
 from method.models import Method
 from fleet.workers import Manager
 from archive.models import Run
@@ -20,7 +19,7 @@ from fleet.slurmlib import SlurmScheduler
 import file_access_utils
 
 
-#class SandboxRMTestCase(TestCase):
+@skipIfDBFeature('is_mocked')
 class SandboxRMTestCase(BaseTestCases.SlurmExecutionTestCase):
     def setUp(self):
         tools.create_sandbox_testing_tools_environment(self)
@@ -29,6 +28,7 @@ class SandboxRMTestCase(BaseTestCases.SlurmExecutionTestCase):
         tools.destroy_sandbox_testing_tools_environment(self)
 
 
+@skipIfDBFeature('is_mocked')
 class ExecuteResultTestsRM(TestCase):
     """
     Tests on the results of executing Pipelines.
@@ -72,7 +72,7 @@ class ExecuteResultTestsRM(TestCase):
 
     def tearDown(self):
         tools.clean_up_all_files()
-        restore_production_files()
+        remove_fixture_files()
 
     def test_execute_pipeline_run(self):
         """
@@ -147,9 +147,9 @@ class ExecuteResultTestsRM(TestCase):
         while not is_done:
             time.sleep(settings.DEFAULT_SLURM_CHECK_INTERVAL)
             accounting_info = SlurmScheduler.get_accounting_info([complement_job_handle])
-            curr_state = accounting_info["state"]
-            print "Waiting for {} (state = {})".format(complement_job_handle, curr_state)
-            is_done = curr_state == SlurmScheduler.COMPLETED
+            if len(accounting_info) > 0:
+                curr_state = accounting_info[complement_job_handle.job_id]["state"]
+                is_done = curr_state == SlurmScheduler.COMPLETED
 
         labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
         shutil.rmtree(tmpdir)
@@ -299,6 +299,7 @@ class ExecuteResultTestsRM(TestCase):
         self.assertEqual(outcable_input_dataset.num_rows(), outcable_output_dataset.num_rows())
 
 
+@skipIfDBFeature('is_mocked')
 class ExecuteDiscardedIntermediateTests(BaseTestCases.SlurmExecutionTestCase):
     fixtures = ["execute_discarded_intermediate_tests_rm"]
 
@@ -319,7 +320,7 @@ class ExecuteDiscardedIntermediateTests(BaseTestCases.SlurmExecutionTestCase):
 
     def tearDown(self):
         tools.clean_up_all_files()
-        restore_production_files()
+        remove_fixture_files()
 
     def test_discard_intermediate_file(self):
         """
@@ -348,6 +349,7 @@ class ExecuteDiscardedIntermediateTests(BaseTestCases.SlurmExecutionTestCase):
         self.assertTrue(run.is_successful())
 
 
+@skipIfDBFeature('is_mocked')
 class BadRunTests(BaseTestCases.SlurmExecutionTestCase):
     """
     Tests for when things go wrong during Pipeline execution.
@@ -362,29 +364,29 @@ class BadRunTests(BaseTestCases.SlurmExecutionTestCase):
         for rsic in runstep.RSICs.all():
             self.assertTrue(rsic.is_successful())
 
-    @unittest.skipIf(
-        settings.KIVE_SANDBOX_WORKER_ACCOUNT,
-        "OSError will not be thrown when using SSH to the Kive sandbox worker account"
-    )
-    def test_code_bad_execution(self):
-        """
-        If the user's code causes subprocess to throw an OSError, the ExecLog should have a -1 return code.
-
-        Note that this doesn't occur if using ssh to an unprivileged account for execution.
-        """
-        run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_faulty, [self.dataset_grandpa]).get_last_run()
-        runstep1 = run.runsteps.first()
-        log = runstep1.log
-        interm_dataset = runstep1.execrecord.execrecordouts.first().dataset
-
-        self.cable_tester(runstep1)
-        self.assertTrue(runstep1.is_failed())
-
-        self.assertTrue(run.is_failed())
-
-        self.assertEqual(log.is_successful(), False)
-        self.assertEqual(log.methodoutput.return_code, -1)
-        self.assertEqual(log.missing_outputs(), [interm_dataset])
+    # @unittest.skipIf(
+    #     settings.KIVE_SANDBOX_WORKER_ACCOUNT,
+    #     "OSError will not be thrown when using SSH to the Kive sandbox worker account"
+    # )
+    # def test_code_bad_execution(self):
+    #     """
+    #     If the user's code causes subprocess to throw an OSError, the ExecLog should have a -1 return code.
+    #
+    #     Note that this doesn't occur if using ssh to an unprivileged account for execution.
+    #     """
+    #     run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_faulty, [self.dataset_grandpa]).get_last_run()
+    #     runstep1 = run.runsteps.first()
+    #     log = runstep1.log
+    #     interm_dataset = runstep1.execrecord.execrecordouts.first().dataset
+    #
+    #     self.cable_tester(runstep1)
+    #     self.assertTrue(runstep1.is_failed())
+    #
+    #     self.assertTrue(run.is_failed())
+    #
+    #     self.assertEqual(log.is_successful(), False)
+    #     self.assertEqual(log.methodoutput.return_code, -1)
+    #     self.assertEqual(log.missing_outputs(), [interm_dataset])
 
     def test_method_fails(self):
         """Properly handle a failed method in a pipeline."""
@@ -410,6 +412,7 @@ class BadRunTests(BaseTestCases.SlurmExecutionTestCase):
         self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().dataset])
 
 
+@skipIfDBFeature('is_mocked')
 class FindDatasetTests(BaseTestCases.SlurmExecutionTestCase):
     """
     Tests for first_generator_of_dataset.
@@ -420,7 +423,7 @@ class FindDatasetTests(BaseTestCases.SlurmExecutionTestCase):
         install_fixture_files('find_datasets')
 
     def tearDown(self):
-        restore_production_files()
+        remove_fixture_files()
 
     def test_find_dataset_pipeline_input_and_step_output(self):
         """
@@ -539,7 +542,7 @@ class RawTests(SandboxRMTestCase):
     def test_execute_pipeline_raw(self):
         """Execute a raw Pipeline."""
         run = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
-        run = Run.objects.get(pk=run.pk)
+        run.refresh_from_db()
         self.assertTrue(run.is_successful())
 
     def test_execute_pipeline_raw_twice(self):

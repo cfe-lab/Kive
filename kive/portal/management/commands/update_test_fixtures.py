@@ -45,6 +45,8 @@ class FixtureBuilder(object):
         print "--------"
         call_command('reset')
 
+        settings.FLEET_POLLING_INTERVAL = 0.1  # Make short steps run faster.
+
         before_filename = 'test_fixture_before.json'
         self.dump_all_data(before_filename)
 
@@ -103,6 +105,18 @@ class FixtureBuilder(object):
             # ... in with the new.
             if os.path.isdir(target_path):
                 shutil.copytree(target_path, fixture_files_path)
+                self.remove_empty_folders(fixture_files_path)
+
+    def remove_empty_folders(self, path):
+        is_empty = True
+        for name in os.listdir(path):
+            child_path = os.path.join(path, name)
+            if os.path.isdir(child_path):
+                self.remove_empty_folders(child_path)
+            if os.path.exists(child_path):
+                is_empty = False
+        if is_empty:
+            os.rmdir(path)
 
     def fillpathset(self, orgset):
         """ Given a set of directory name strings, create a new set of strings that contains
