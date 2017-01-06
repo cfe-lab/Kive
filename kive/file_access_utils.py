@@ -1,14 +1,23 @@
 """
 Basic file-checking functionality used by Kive.
 """
-import hashlib, glob, os
+import glob
 import errno
 import grp
+import hashlib
+import logging
+import os
+import random
+import shutil
 import stat
+import time
 
 from django.conf import settings
+from django.utils import timezone
 
 from constants import dirnames
+
+logger = logging.getLogger("file_access_utils")
 
 
 def can_create_new_file(file_to_create):
@@ -47,7 +56,7 @@ def can_create_new_file(file_to_create):
                 if not os.access(output_dir, os.F_OK):
                     reason = "output directory \"{}\" could not be created".format(output_dir)
                     is_okay = False
-                    return (is_okay, reason)
+                    return is_okay, reason
 
         else:
             output_dir = "."
@@ -59,7 +68,7 @@ def can_create_new_file(file_to_create):
             reason = "insufficient permissions on run path \"{}\"".format(output_dir)
             is_okay = False
 
-    return (is_okay, reason)
+    return is_okay, reason
 
 
 def sandbox_base_path():
@@ -161,6 +170,108 @@ def file_exists(path):
         raise
 
 
+def copy_and_confirm(source,
+                     destination,
+                     max_num_tries=settings.CONFIRM_COPY_RETRIES,
+                     wait_min=settings.CONFIRM_COPY_WAIT_MIN,
+                     wait_max=settings.CONFIRM_COPY_WAIT_MAX):
+    """
+    A function that copies the file at source to destination and confirms that it was successful.
+    Raises an IOError if the copy failed; raises FileCreationError if the
+    resulting file fails confirmation.
+    """
+    shutil.copyfile(source, destination)
+    confirm_file_copy(source, destination, max_num_tries, wait_min, wait_max)
+
+
+def confirm_file_copy(source,
+                      destination,
+                      max_num_tries=settings.CONFIRM_COPY_RETRIES,
+                      wait_min=settings.CONFIRM_COPY_WAIT_MIN,
+                      wait_max=settings.CONFIRM_COPY_WAIT_MAX):
+    """
+    A function to confirm that a file was copied properly.
+    """
+    orig_file_size = os.stat(source).st_size
+
+    total_wait_time = 0
+    for num_tries in range(max_num_tries):
+        new_file_size = os.stat(destination).st_size
+        if new_file_size == orig_file_size:
+            # Looks like the file copied properly.
+            return
+
+        wait_time = random.uniform(wait_min, wait_max)
+        logger.warning("File %s appears to not be finished copying to %s; "
+                       "waiting %f seconds before retrying.",
+                       source, destination, wait_time)
+        time.sleep(wait_time)
+        total_wait_time += wait_time
+
+    # Check one last time.
+    new_file_size = os.stat(destination).st_size
+    if new_file_size != orig_file_size:
+        raise FileCreationError(
+            "File {} failed to copy to {}; checked {} times over {} seconds.".format(
+                source,
+                destination,
+                max_num_tries,
+                total_wait_time
+            )
+        )
+
+
+def confirm_file_created(path,
+                         max_num_tries=settings.CONFIRM_FILE_CREATED_RETRIES,
+                         wait_min=settings.CONFIRM_FILE_CREATED_WAIT_MIN,
+                         wait_max=settings.CONFIRM_FILE_CREATED_WAIT_MAX):
+    """
+    Confirm that the file is finished being created.
+    It does this by checking periodically whether the file size has changed.
+    After a certain amount of time has passed without any changes, it declares
+    that it is fine.
+    Returns the resulting MD5 of the copied file.
+    """
+    curr_file_size = os.stat(path).st_size
+
+    start_time = timezone.now()
+    wait_time = random.uniform(wait_min, wait_max)
+    for num_tries in range(max_num_tries):
+        pre_md5_time = timezone.now()
+        # While we're waiting, we compute the MD5.
+        with open(path, "rb") as f:
+            curr_md5 = compute_md5(f)
+        post_md5_time = timezone.now()
+
+        seconds_elapsed = (post_md5_time - pre_md5_time).total_seconds()
+        if seconds_elapsed < wait_time:
+            time.sleep(wait_time - seconds_elapsed)
+
+        new_file_size = os.stat(path).st_size
+        if new_file_size == curr_file_size:
+            # File appears to be done.
+            return curr_md5
+
+        if num_tries < max_num_tries:
+            # Having reached here, we know that the file changed and we haven't given up yet.
+            wait_time = random.uniform(wait_min, wait_max)
+            logger.warning("File %s appears not to have been fully created yet; "
+                           "waiting %f seconds before retrying.",
+                           path,
+                           wait_time)
+            curr_file_size = new_file_size
+
+    # We give up.
+    end_time = timezone.now()
+    raise FileCreationError(
+        "File {} did not reach a stable file size; checked {} times over {} seconds.".format(
+            path,
+            max_num_tries,
+            (end_time - start_time).total_seconds()
+        )
+    )
+
+
 class FileReadHandler:
     """
     Helper class for retrieving a file handle in with-clauses
@@ -192,6 +303,10 @@ class FileReadHandler:
             self.file_handle.seek(0)
         return self.file_handle
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, extype, value, traceback):
         if self.file_path:
             self.file_handle.close()
+
+
+class FileCreationError(Exception):
+    pass

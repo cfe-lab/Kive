@@ -23,6 +23,7 @@ import pipeline.models
 from method.models import Method
 from datachecking.models import IntegrityCheckLog
 from fleet.exceptions import StopExecution
+from file_access_utils import copy_and_confirm, FileCreationError
 
 
 logger = logging.getLogger("Sandbox")
@@ -1444,12 +1445,18 @@ class Sandbox:
             copy_start = timezone.now()
             fail_now = False
             try:
-                shutil.copyfile(file_path, input_dataset_path)
-            except IOError:
-                copy_end = timezone.now()
+                copy_and_confirm(file_path, input_dataset_path)
+            except (IOError, FileCreationError):
                 logger.error("[%d] could not copy file %s to file %s.",
-                             worker_rank, file_path, input_dataset_path)
+                             worker_rank,
+                             file_path,
+                             input_dataset_path,
+                             exc_info=True)
+                fail_now = True
+            finally:
+                copy_end = timezone.now()
 
+            if fail_now:
                 with transaction.atomic():
                     # Create a failed IntegrityCheckLog.
                     iic = IntegrityCheckLog(
@@ -1462,57 +1469,21 @@ class Sandbox:
                     )
                     iic.clean()
                     iic.save()
-                    fail_now = True
 
-            if not fail_now:
-                # A bit of defensive code to ensure that the file copied properly.
-                orig_file_size = os.stat(file_path).st_size
-
-                num_tries = 0
-                total_wait_time = 0
-                while num_tries < 3:
-                    num_tries += 1
-                    new_file_size = os.stat(input_dataset_path).st_size
-                    if new_file_size == orig_file_size:
-                        # Looks like the file copied properly.
-                        break
-
-                    if num_tries < 3:
-                        wait_time = random.uniform(3, 7)
-                        logger.warning("[%d] file %s appears to not be finished copying to %s; "
-                                       "waiting %f seconds before retrying.",
-                                       worker_rank, file_path, input_dataset_path, wait_time)
-                        time.sleep(wait_time)
-                        total_wait_time += wait_time
-                    else:
-                        copy_end = timezone.now()
-                        logger.warning("[%d] file %s failed to copy to %s; "
-                                       "checked three times over %f seconds.",
-                                       worker_rank, file_path, input_dataset_path, total_wait_time)
-
-                        with transaction.atomic():
-                            # Create a failed IntegrityCheckLog.
-                            iic = IntegrityCheckLog(
-                                dataset=input_dataset,
-                                runcomponent=curr_record,
-                                read_failed=True,
-                                start_time=copy_start,
-                                end_time=copy_end,
-                                user=user
-                            )
-                            iic.clean()
-                            iic.save()
-                            fail_now = True
-
-            if not fail_now:
+            else:
                 # Perform an integrity check since we've just copied this file to the sandbox for the
                 # first time.
                 logger.debug("[%d] Checking file just copied to sandbox for integrity.",
                              worker_rank)
-                check = input_dataset.check_integrity(input_dataset_path, user, execlog=None, runcomponent=curr_record)
+                check = input_dataset.check_integrity(
+                    input_dataset_path,
+                    user,
+                    execlog=None,
+                    runcomponent=curr_record)
 
                 fail_now = check.is_fail()
 
+            # Check again in case it failed in the previous else block.
             if fail_now:
                 curr_record.cancel_running(save=True)
                 return curr_record
@@ -1531,7 +1502,16 @@ class Sandbox:
         curr_log = archive.models.ExecLog.create(curr_record, invoking_record)
 
         # Run cable (this completes the ExecLog).
-        cable.run_cable(input_dataset_path, output_path, curr_record, curr_log)
+        cable_failed = False
+        try:
+            md5 = cable.run_cable(input_dataset_path, output_path, curr_record, curr_log)
+        except (OSError, FileCreationError):
+            cable_failed = True
+            logger.error("[%d] could not run cable %s to file %s.",
+                         worker_rank,
+                         input_dataset_path,
+                         output_path,
+                         exc_info=True)
 
         # Here, we're authoring/modifying an ExecRecord, so we use a transaction.
         preexisting_ER = curr_ER is not None
@@ -1541,7 +1521,7 @@ class Sandbox:
                 with transaction.atomic():
                     missing_output = False
                     start_time = timezone.now()
-                    if not file_access_utils.file_exists(output_path):
+                    if cable_failed:
                         end_time = timezone.now()
                         # It's conceivable that the linking could fail in the
                         # trivial case; in which case we should associate a "missing data"
@@ -1587,7 +1567,8 @@ class Sandbox:
                                 name=dataset_name,
                                 description=dataset_desc,
                                 file_source=curr_record,
-                                check=False
+                                check=False,
+                                precomputed_md5=md5
                             )
 
                     # Link the ExecRecord to curr_record if necessary, creating it if necessary also.
@@ -1634,7 +1615,10 @@ class Sandbox:
                     logger.debug("[%d] Performing integrity check of trivial or previously generated output",
                                  worker_rank)
                     # Perform integrity check.  Note: if this fails, it will notify all RunComponents using it.
-                    check = output_dataset.check_integrity(output_path, user, curr_log)
+                    check = output_dataset.check_integrity(output_path,
+                                                           user,
+                                                           curr_log,
+                                                           newly_computed_MD5=md5)
 
                 # Case 3: the Dataset, one way or another, is not properly vetted.
                 else:

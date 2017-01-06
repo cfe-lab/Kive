@@ -566,6 +566,8 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         """
         Install this Method's code into the specified path.
 
+        RAISES: IOError, FileCreationError
+
         PRE: install_path exists and has all the sufficient permissions for us
         to write our files into.
         """
@@ -573,10 +575,9 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         self.logger.debug("Writing code to {}".format(install_path))
 
         destination_path = os.path.join(install_path, base_name)
-        with open(destination_path, "w") as f:
-            self.driver.content_file.open()
-            with self.driver.content_file:
-                shutil.copyfileobj(self.driver.content_file, f)
+        # This may raise an exception; we will propagate it up.
+        file_access_utils.copy_and_confirm(self.driver.content_file.path, destination_path)
+
         # Make sure this is written with read, write, and execute
         # permission.
         os.chmod(destination_path, stat.S_IRWXU)
@@ -596,10 +597,8 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
             # Write the dependency.
             dep_path = os.path.join(dep_dir, dep.get_filename())
-            with open(dep_path, "wb") as f:
-                dep.requirement.content_file.open()
-                with dep.requirement.content_file:
-                    shutil.copyfileobj(dep.requirement.content_file, f)
+            # This may raise an exception.
+            file_access_utils.copy_and_confirm(dep.requirement.content_file.path, dep_path)
 
     def run_code(self,
                  run_path,

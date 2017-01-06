@@ -686,7 +686,7 @@ class Dataset(metadata.models.AccessControl):
     # FIXME what does it do for num_rows when file_path is unset?
     def create_dataset(cls, file_path, user=None, users_allowed=None, groups_allowed=None, cdt=None, keep_file=True,
                        name=None, description=None, file_source=None, check=True, file_handle=None,
-                       instance=None, externalfiledirectory=None):
+                       instance=None, externalfiledirectory=None, precomputed_md5=None):
         """
         Helper function to make defining SDs and Datasets faster.
 
@@ -742,7 +742,9 @@ class Dataset(metadata.models.AccessControl):
             new_dataset.externalfiledirectory = externalfiledirectory
             new_dataset.external_path = external_path
 
-            if new_dataset.is_raw():
+            if precomputed_md5 is not None:
+                new_dataset.MD5_checksum = precomputed_md5
+            elif new_dataset.is_raw():
                 new_dataset.set_MD5(file_path, file_handle)
             else:
                 new_dataset.set_MD5_and_count_rows(file_path, file_handle)

@@ -25,6 +25,7 @@ import transformation.models
 import metadata.models
 import librarian.models
 from constants import maxlengths
+from file_access_utils import confirm_file_copy, confirm_file_created, FileCreationError
 
 logger = logging.getLogger(__name__)
 
@@ -815,7 +816,7 @@ class PipelineCable(models.Model):
         curr_log.start(save=True)
 
         if self.is_trivial():
-            self.logger.debug("Trivial cable, making sym link: os.link({},{})".format(source, output_path))
+            self.logger.debug("Trivial cable, making link: os.link({},{})".format(source, output_path))
             source_stat = os.stat(source)
 
             try:
@@ -835,6 +836,18 @@ class PipelineCable(models.Model):
                         logger.debug("Link was actually successful; moving on")
                     else:
                         raise
+
+            # This isn't actually a "copy", but we perform the check anyway.
+            try:
+                confirm_file_copy(source, output_path)
+            except FileCreationError:
+                logger.warning(
+                    "FileCreationError occurred while linking %s to %s",
+                    source,
+                    output_path,
+                    exc_info=True
+                )
+
             curr_log.stop(save=True, clean=True)
             return
 
@@ -871,10 +884,15 @@ class PipelineCable(models.Model):
 
                     output_csv.writerow(dest_row)
 
+        # Confirm that the file wrote correctly.
+        md5 = confirm_file_created(output_path)
+
         # Now give it the correct end_time
         curr_log.stop(save=False, clean=False)
         curr_log.complete_clean()
         curr_log.save()
+
+        return md5
 
     def _wires_match(self, other_cable):
         """
