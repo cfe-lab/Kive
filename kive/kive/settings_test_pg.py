@@ -21,5 +21,3 @@ CONFIRM_FILE_CREATED_WAIT_MAX = 0.15
 
 # An alternate settings file for the fleet to use.
 FLEET_SETTINGS = "kive.settings_test_fleet_pg"
-# Whether or not to use the dummy Slurm scheduler.
-TEST_WITH_DUMMY_SLURM = False

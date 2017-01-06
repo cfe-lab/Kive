@@ -1,14 +1,17 @@
-
-# a low level interface to slurm using the calls to sbatch, scancel and sacct via Popen.
+# A low level interface to slurm using the calls to sbatch, scancel and squeue via Popen.
 
 import os.path
 import logging
 
 import multiprocessing as mp
 import Queue
+
+import pytz
 import re
 import subprocess as sp
 from datetime import datetime
+
+from django.utils.timezone import get_default_timezone_name
 
 
 logger = logging.getLogger("fleet.slurmlib")
@@ -370,12 +373,15 @@ class SlurmScheduler(BaseSlurmScheduler):
             priority = int(raw_job_dict["Priority"])
             # Create proper DateTime objects with the following format string.
             date_format = "%Y-%m-%dT%H:%M:%S"
+            curr_timezone = get_default_timezone_name()
             start_time = None
             if raw_job_dict["Start"] != "Unknown":
                 start_time = datetime.strptime(raw_job_dict["Start"], date_format)
+                start_time = pytz.timezone(curr_timezone).localize(start_time)
             end_time = None
             if raw_job_dict["End"] != "Unknown":
                 end_time = datetime.strptime(raw_job_dict["End"], date_format)
+                end_time = pytz.timezone(curr_timezone).localize(end_time)
 
             # Split sacct's ExitCode field, which looks like "[return code]:[signal]".
             return_code, signal = (int(x) for x in raw_job_dict["ExitCode"].split(":"))

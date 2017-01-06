@@ -2835,7 +2835,7 @@ class ExecLogIsCompleteIsSuccessfulTests(ArchiveTestCase):
 
 
 @skipIfDBFeature('is_mocked')
-class StateMachineActualExecutionTests(TestCase):
+class StateMachineActualExecutionTests(BaseTestCases.SlurmExecutionTestCase):
     fixtures = ["archive_no_runs_test_environment"]
 
     def setUp(self):
@@ -3422,7 +3422,7 @@ class TopLevelRunOnDeepNestedRunTests(TestCase):
 
 
 @skipIfDBFeature('is_mocked')
-class RunStepReuseFailedExecRecordTests(TestCase):
+class RunStepReuseFailedExecRecordTests(BaseTestCases.SlurmExecutionTestCase):
     def setUp(self):
         tools.create_grandpa_sandbox_environment(self)
         tools.make_words_dataset(self)

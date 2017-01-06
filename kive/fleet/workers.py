@@ -160,8 +160,6 @@ class Manager(object):
 
         for run_to_process in pending_runs:
             foreman = Foreman(run_to_process, self.slurm_sched_class)
-            self.runs.append(run_to_process)
-            self.runs_in_progress[run_to_process] = foreman
             foreman.start_run()
 
             run_to_process.refresh_from_db()
@@ -500,7 +498,7 @@ class Foreman(object):
                             # Now, we can submit the bookkeeping task, and the next time around we'll
                             # watch for it.
                             bookkeeping_job = self.submit_runstep_bookkeeping(task, task_dict["info_path"])
-                            self.tasks_in_progress["bookkeeping"] = bookkeeping_job
+                            self.tasks_in_progress[task]["bookkeeping"] = bookkeeping_job
                             continue
 
                 else:
@@ -1045,7 +1043,7 @@ class Foreman(object):
 
         else:
             self.sandbox.run.refresh_from_db()
-            mgr_logger.info(
+            foreman_logger.info(
                 'Cleaning up %s run "%s" (pk=%d, Pipeline: %s, User: %s)',
                 self.sandbox.run.get_state_name(),
                 self.sandbox.run,

@@ -1335,8 +1335,8 @@ class Datatype(AccessControl):
                     verification_log.error_log.save(stderr_path, File(err_f))
                     verification_log.output_log.save(stdout_path, File(out_f))
 
-            verification_log.clean()
-            verification_log.save()
+                verification_log.clean()
+                verification_log.save()
 
         if job_info["state"] in SlurmScheduler.CANCELLED_STATES:
             raise VerificationMethodError(

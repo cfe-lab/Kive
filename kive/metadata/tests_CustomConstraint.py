@@ -7,8 +7,7 @@ import shutil
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
-from django.test import TestCase, skipIfDBFeature
-from django.conf import settings
+from django.test import TestCase, TransactionTestCase, skipIfDBFeature
 
 from metadata.models import Datatype, CompoundDatatype, CustomConstraint, everyone_group
 from method.models import MethodFamily, CodeResource
@@ -273,11 +272,14 @@ class CustomConstraintTestPreamble(object):
         prototype_cdt = CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK)
         prototype_file = self._setup_datafile(
             prototype_cdt,
-            [["hello", "False"],
-             ["hell", "True"],
-             ["hel", "False"],
-             ["he", "True"],
-             ["h", "False"]])
+            [
+                ["hello", "False"],
+                ["hell", "True"],
+                ["hel", "False"],
+                ["he", "True"],
+                ["h", "False"]
+            ]
+        )
         prototype_SD = Dataset.create_dataset(
             prototype_file,
             user=self.user_oscar,
@@ -475,14 +477,16 @@ class CustomConstraintTests(CustomConstraintTestPreamble, TestCase):
         CustomConstraints.
         """
         dt = self._test_setup_prototype_bad()
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('The prototype for Datatype "{}" indicates the value "{}" should be '
-                                          'invalid, but it passed all constraints'.format(dt, "hello")),
-                                dt.clean)
+        self.assertRaisesRegexp(
+            ValidationError,
+            re.escape('The prototype for Datatype "{}" indicates the value "{}" should be '
+                      'invalid, but it passed all constraints'.format(dt, "hello")),
+            dt.clean
+        )
 
 
 @skipIfDBFeature('is_mocked')
-class CustomConstraintTestsWithExecution(CustomConstraintTestPreamble, TestCase):
+class CustomConstraintTestsWithExecution(CustomConstraintTestPreamble, TransactionTestCase):
     def test_execute_pipeline_content_check_good(self):
         """
         Test the integrity of the ContentCheck created while running a
