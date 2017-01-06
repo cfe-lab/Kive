@@ -8,7 +8,7 @@ before_install:
 install: "pip install -r requirements-dev.txt"
 before_script:
     - sed "s/\[YOUR DB NAME HERE\]/kive/;s/\[YOUR DB USER NAME HERE\]/postgres/;s/\[YOUR DB USER PASSWORD HERE\]//;s#MEDIA_ROOT = ''#MEDIA_ROOT = '/tmp'#" kive/kive/settings_default.py > kive/kive/settings.py
-script: "cd kive && ./manage.py test --setting kive.settings_mocked && coverage run manage.py test --setting kive.settings_test_pg"
+script: "cd kive && ./manage.py test --setting kive.settings_mocked && coverage run --include='./*' --omit='*/migrations/*','*/management/*' manage.py test --setting kive.settings_test_pg"
 
 after_success:
     - pip install codecov
