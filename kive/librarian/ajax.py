@@ -132,7 +132,7 @@ class DatasetViewSet(RemovableModelViewSet,
             if value == '':
                 return queryset.filter(structure__isnull=True)
             else:
-                return queryset.filter(structure__compounddatatype=value)
+                return queryset.filter(structure__compounddatatype_id=int(value))
         if key == 'md5':
             return queryset.filter(MD5_checksum=value)
 

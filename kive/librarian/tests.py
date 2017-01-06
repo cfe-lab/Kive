@@ -2,6 +2,7 @@
 Shipyard models pertaining to the librarian app.
 """
 
+from datetime import datetime
 import os
 import random
 import re
@@ -20,19 +21,19 @@ from django.test import TestCase, skipIfDBFeature
 from django.core.urlresolvers import reverse, resolve
 from django.core.files import File
 from django.core.files.base import ContentFile
+from django.utils.timezone import get_default_timezone
 from mock import patch
 
 from rest_framework.test import force_authenticate, APIRequestFactory
 from rest_framework import status
 
 from archive.models import ExecLog, MethodOutput, Run, RunStep, RunComponentState
-from constants import datatypes, groups, runcomponentstates, users
+from constants import datatypes, groups, runcomponentstates
 from datachecking.models import MD5Conflict
-from kive.mock_setup import mocked_relations
-from librarian.ajax import ExternalFileDirectoryViewSet
-from librarian.models import Dataset, ExecRecord, ExternalFileDirectory
+from librarian.ajax import ExternalFileDirectoryViewSet, DatasetViewSet
+from librarian.models import Dataset, ExecRecord, ExternalFileDirectory, DatasetStructure
 from librarian.serializers import DatasetSerializer
-from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group, KiveUser
+from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, \
     MethodFamily
 from pipeline.models import Pipeline, PipelineFamily
@@ -1098,6 +1099,182 @@ class DatasetWithFileTests(TestCase):
         self.assertRaisesRegexp(ValidationError, msg, ds1.validate_uniqueness_on_upload)
 
 
+class DatasetApiMockTests(BaseTestCases.ApiTestCase):
+
+    def setUp(self):
+        self.mock_viewset(DatasetViewSet)
+        super(DatasetApiMockTests, self).setUp()
+        # num_cols = 12
+
+        self.list_path = reverse("dataset-list")
+        self.list_view, _, _ = resolve(self.list_path)
+
+        self.detail_pk = 43
+        self.detail_path = reverse("dataset-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.redaction_path = reverse("dataset-redaction-plan",
+                                      kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("dataset-removal-plan",
+                                    kwargs={'pk': self.detail_pk})
+
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.redaction_view, _, _ = resolve(self.redaction_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+        tz = get_default_timezone()
+        apples = Dataset(pk=42,
+                         name='apples',
+                         description='chosen',
+                         date_created=datetime(2017, 1, 1, tzinfo=tz),
+                         user=self.kive_kive_user)
+        cherries = Dataset(pk=43,
+                           name='cherries',
+                           date_created=datetime(2017, 1, 2, tzinfo=tz),
+                           MD5_checksum='1234',
+                           user=self.kive_kive_user)
+        bananas = Dataset(pk=44,
+                          name='bananas',
+                          date_created=datetime(2017, 1, 3, tzinfo=tz),
+                          file_source=RunStep(),
+                          user=self.kive_kive_user)
+        Dataset.objects.add(apples,
+                            cherries,
+                            bananas)
+        apples.structure = DatasetStructure(compounddatatype_id=5)
+        bananas.structure = DatasetStructure(compounddatatype_id=6)
+
+    def test_list(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 3)
+        self.assertEquals(response.data[2]['name'], 'bananas')
+
+    def test_filter_smart(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=smart&filters[0][val]=ch")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 2)
+        self.assertEquals(response.data[0]['name'], 'cherries')
+        self.assertEquals(response.data[1]['description'], 'chosen')
+
+    def test_filter_name(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=name&filters[0][val]=ch")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'cherries')
+
+    def test_filter_description(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=description&filters[0][val]=ch")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['description'], 'chosen')
+
+    def test_filter_user(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=user&filters[0][val]=kive")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 3)
+
+    def test_filter_uploaded(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=uploaded")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 2)
+
+    def test_filter_raw(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=cdt")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'cherries')
+
+    def test_filter_cdt(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=cdt&filters[0][val]=5")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'apples')
+
+    def test_filter_md5(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=md5&filters[0][val]=1234")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'cherries')
+
+    def test_filter_date(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=createdafter&filters[0][val]=02 Jan 2017 0:00" +
+            "&filters[1][key]=createdbefore&filters[1][val]=02 Jan 2017 0:00")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'cherries')
+
+    def test_filter_unknown(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=bogus&filters[0][val]=kive")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals({u'detail': u'Unknown filter key: bogus'},
+                          response.data)
+
+
 @skipIfDBFeature('is_mocked')
 class DatasetApiTests(BaseTestCases.ApiTestCase):
 
@@ -1146,27 +1323,6 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         for d in Dataset.objects.all():
             d.dataset_file.delete()
 
-    def test_dataset_list(self, expected_entries=0):
-        """
-        Test the API list view.
-        """
-        request = self.factory.get(self.list_path)
-
-        force_authenticate(request, user=self.kive_user)
-        resp = self.list_view(request).data
-
-        self.assertEquals(len(resp), expected_entries + self.n_preexisting_datasets)
-        self.assertEquals(resp[-1]['description'],
-                          "Test data for a test that tests test data")
-
-    def test_dataset_detail(self):
-        request = self.factory.get(self.detail_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(
-            response.data['description'],
-            "Test data for a test that tests test data")
-
     def test_dataset_add(self):
         """
         Test adding a Dataset via the API.
@@ -1199,7 +1355,13 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
                 self.assertIsNone(resp.get('errors'))
                 self.assertEquals(resp['name'], "My cool file %d" % i)
 
-        self.test_dataset_list(expected_entries=num_files)
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        resp = self.list_view(request).data
+
+        self.assertEquals(len(resp), num_files + self.n_preexisting_datasets)
+        self.assertEquals(resp[-1]['description'],
+                          "Test data for a test that tests test data")
 
     def test_dataset_add_duplicate(self):
         """
@@ -1662,25 +1824,7 @@ baz
 
 class ExternalFileDirectoryApiMockTests(BaseTestCases.ApiTestCase):
     def setUp(self):
-        patcher = mocked_relations(ExternalFileDirectory, User, KiveUser)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-        user = User(pk=users.KIVE_USER_PK)
-        User.objects.add(user)
-        User.objects.model = User
-        ExternalFileDirectory.objects.model = ExternalFileDirectory
-
-        kive_user_instance = KiveUser(pk=users.KIVE_USER_PK, username="kive")
-        KiveUser.objects.add(kive_user_instance)
-
-        # noinspection PyUnresolvedReferences
-        patcher2 = patch.object(ExternalFileDirectoryViewSet,
-                                'queryset',
-                                ExternalFileDirectory.objects)
-        patcher2.start()
-        self.addCleanup(patcher2.stop)
-
+        self.mock_viewset(ExternalFileDirectoryViewSet)
         super(ExternalFileDirectoryApiMockTests, self).setUp()
 
         self.list_path = reverse("externalfiledirectory-list")

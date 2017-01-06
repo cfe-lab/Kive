@@ -4,11 +4,15 @@ import shutil
 from StringIO import StringIO
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.test import TestCase
+from mock import patch
 
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from metadata.models import kive_user
+from constants import users
+from kive.mock_setup import mocked_relations
+from metadata.models import kive_user, KiveUser
 
 
 class DuckRequest(object):
@@ -54,6 +58,27 @@ class BaseTestCases(object):
         def setUp(self):
             self.factory = APIRequestFactory()
             self.kive_user = kive_user()
+
+        def mock_viewset(self, viewset_class):
+            model = viewset_class.queryset.model
+            patcher = mocked_relations(model, User, KiveUser)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+            user = User(pk=users.KIVE_USER_PK)
+            User.objects.add(user)
+            User.objects.model = User
+            model.objects.model = model
+
+            self.kive_kive_user = KiveUser(pk=users.KIVE_USER_PK, username="kive")
+            KiveUser.objects.add(self.kive_kive_user)
+
+            # noinspection PyUnresolvedReferences
+            patcher2 = patch.object(viewset_class,
+                                    'queryset',
+                                    model.objects)
+            patcher2.start()
+            self.addCleanup(patcher2.stop)
 
         def test_auth(self):
             """

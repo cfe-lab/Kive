@@ -19,17 +19,15 @@ from django.core.urlresolvers import resolve
 from django.db import transaction
 
 from django.test import TestCase, skipIfDBFeature
-from mock import patch
 from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.test import force_authenticate
 
-from constants import datatypes, users
+from constants import datatypes
 import file_access_utils
-from kive.mock_setup import mocked_relations
 from kive.tests import BaseTestCases
 import librarian.models
-from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user, KiveUser
+from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
 import metadata.tests
 from method.ajax import MethodViewSet
 from method.models import CodeResource, CodeResourceRevision, \
@@ -1462,23 +1460,7 @@ class MethodApiTests(BaseTestCases.ApiTestCase):
 
 class MethodApiMockTests(BaseTestCases.ApiTestCase):
     def setUp(self):
-        patcher = mocked_relations(Method, MethodFamily, User, KiveUser)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-        user = User(pk=users.KIVE_USER_PK)
-        User.objects.add(user)
-        User.objects.model = User
-        Method.objects.model = Method
-
-        kive_user_instance = KiveUser(pk=users.KIVE_USER_PK, username="kive")
-        KiveUser.objects.add(kive_user_instance)
-
-        # noinspection PyUnresolvedReferences
-        patcher2 = patch.object(MethodViewSet, 'queryset', Method.objects)
-        patcher2.start()
-        self.addCleanup(patcher2.stop)
-
+        self.mock_viewset(MethodViewSet)
         super(MethodApiMockTests, self).setUp()
 
         self.list_path = reverse("method-list")
@@ -1493,15 +1475,15 @@ class MethodApiMockTests(BaseTestCases.ApiTestCase):
         self.removal_view, _, _ = resolve(self.removal_path)
 
         Method.objects.add(Method(pk=42,
-                                  user=kive_user_instance,
+                                  user=self.kive_kive_user,
                                   revision_name='mA_name turnip',
                                   revision_desc='A_desc'),
                            Method(pk=43,
-                                  user=kive_user_instance,
+                                  user=self.kive_kive_user,
                                   revision_name='mB_name',
                                   revision_desc='B_desc'),
                            Method(pk=44,
-                                  user=kive_user_instance,
+                                  user=self.kive_kive_user,
                                   revision_name='mC_name',
                                   revision_desc='C_desc turnip'))
 
