@@ -1,0 +1,5 @@
+[run]
+include=./*
+omit=
+    */migrations/*
+    */management/*

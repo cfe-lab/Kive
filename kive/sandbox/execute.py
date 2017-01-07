@@ -1831,18 +1831,9 @@ class Sandbox:
 
                             # Check that the file exists, as we did for cables.
                             start_time = timezone.now()
-                            if not file_access_utils.file_exists(output_path):
-                                end_time = timezone.now()
-                                if preexisting_ER:
-                                    output_dataset = curr_ER.get_execrecordout(curr_output).dataset
-                                else:
-                                    output_dataset = librarian.models.Dataset.create_empty(
-                                        cdt=output_CDT, file_source=curr_RS)
-                                output_dataset.mark_missing(start_time, end_time, curr_log, user)
-
-                                bad_output_found = True
-
-                            else:
+                            output_dataset = None
+                            try:
+                                md5 = file_access_utils.confirm_file_created(output_path)
                                 # If necessary, create new Dataset for output, and create the Dataset
                                 # if it's to be retained.
                                 dataset_name = curr_RS.output_name(curr_output)
@@ -1863,7 +1854,8 @@ class Sandbox:
                                                     output_path,
                                                     checking_user=user,
                                                     execlog=curr_log,
-                                                    notify_all=True)
+                                                    notify_all=True,
+                                                    newly_computed_MD5=md5)
                                                 integrity_checks[i] = check
                                                 if not check.is_fail():
                                                     output_dataset.register_file(output_path)
@@ -1876,11 +1868,24 @@ class Sandbox:
                                         name=dataset_name,
                                         description=dataset_desc,
                                         file_source=curr_RS,
-                                        check=False
-                                    )
+                                        check=False,
+                                        precomputed_md5=md5)
                                     logger.debug("[%d] First time seeing file: saved md5 %s",
                                                  worker_rank, output_dataset.MD5_checksum)
-                            output_datasets.append(output_dataset)
+                            except FileCreationError:
+                                logger.warn('Output not created.', exc_info=True)
+                                end_time = timezone.now()
+                                if preexisting_ER:
+                                    output_dataset = curr_ER.get_execrecordout(curr_output).dataset
+                                else:
+                                    output_dataset = librarian.models.Dataset.create_empty(
+                                        cdt=output_CDT, file_source=curr_RS)
+                                output_dataset.mark_missing(start_time, end_time, curr_log, user)
+
+                                bad_output_found = True
+
+                            if output_dataset is not None:
+                                output_datasets.append(output_dataset)
 
                         # Create ExecRecord if there isn't already one.
                         if not preexisting_ER:
