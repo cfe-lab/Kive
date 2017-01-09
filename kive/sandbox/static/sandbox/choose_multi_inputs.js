@@ -258,9 +258,8 @@ $(function() {
             d_scroll,
             search_table_loaded;
 
-        // dialog_state will allow the dialog to have disjunct states according to which input is at hand.
-        // when a different input is selected, the old input's dialog is saved, and the new one is loaded
-        // from memory (or else cleared).
+        // dialog_state will allow the dialog to change the compound datatype
+        // filter to match the selected input.
         // defining dialog_state's properties in this way makes them unenumerable and immutable.
         Object.defineProperties(dialog_state, {
             init: {
@@ -272,55 +271,50 @@ $(function() {
                     });
                 }
             },
-            save: {
-                enumerable: false,
-                value: function(input_name) {
-                    var dlg = dataset_search_dialog;
-                    this[input_name] = {
-                        search:  $('input[name="smart"]', dlg).val(),
-                        creator: $('#creator').val(),
-                        date_added: $('#date_added').val(),
-                        date_last_run: $('#date_last_run').val(),
-                        table: {
-                            page: dataset_search_table.page,
-                            filters: $('.asf-active-filters', dlg).children().detach()
-                        }
-                    };
-                }
-            },
             load: {
                 enumerable: false,
                 value: function(name, compounddatatype_id, input_index) {
                     var state = this[name],
-                        dst = dataset_search_table;
+                        dst = dataset_search_table,
+                        current_cdt_id,
+                        skip_trigger = true,
+                        is_new = true,
+                        is_changed = false;
 
-                    dataset_search_dialog.find('input[name="smart"]')
-                                        .val( state.search        || '' );
-                    $('#creator')       .val( state.creator       || '' );
-                    $('#date_added')    .val( state.date_added    || '' );
-                    $('#date_last_run') .val( state.date_last_run || '' );
+                    $.each(dst.filterSet.getFilters(), function() {
+                        is_new = false;
+                        if (this.key === 'cdt') {
+                            current_cdt_id = this.val;
+                        }
+                    });
+                    if (is_new) {
+                        // default filter set
+                        dst.filterSet.add('uploaded', undefined, skip_trigger);
+                        is_changed = true;
+                    }
+                    if (current_cdt_id !== compounddatatype_id) {
+                        if (current_cdt_id !== undefined) {
+                            dst.filterSet.remove('cdt', current_cdt_id, skip_trigger);
+                        }
+                        if (compounddatatype_id !== undefined) {
+                            dst.filterSet.add('cdt', compounddatatype_id, skip_trigger).hide();
+                        }
+                        is_changed = true;
+                    }
 
                     dst.compounddatatype_id = compounddatatype_id;
                     dst.input_index = input_index;
                     dst.input_name = name;
-                    if (state.table !== undefined) {
+                    if (is_changed) {
                         dst.page = 1;
-                        dataset_search_dialog.find('.asf-active-filters')
-                            .empty()
-                            .append(state.table.filters)
-                        ;
-                    } else {
-                        // default filter set
-                        dst.filterSet.add('uploaded', undefined, true);// 3rd arg = skip reload
-                        dst.filterSet.add('cdt', compounddatatype_id, true).hide();
+                        search_table_loaded = false;
+                        dst.reloadTable(function() {
+                            search_table_loaded = true;
+                            if (above_box.opened) {
+                                dataset_search_table.checkOverflow();
+                            }
+                        });
                     }
-                    search_table_loaded = false;
-                    dst.reloadTable(function() {
-                        search_table_loaded = true;
-                        if (above_box.opened) {
-                            dataset_search_table.checkOverflow();
-                        }
-                    });
                     dst.$table.removeClass('none-selected-error');
                 }
             }
@@ -407,11 +401,8 @@ $(function() {
 
             cellWidth = $empty_input.outerWidth();
 
-            // Save/load dialog state according to the input
+            // Load dialog state according to the input
             if (input_name !== outgoing_input_name) {
-                if (outgoing_input_name) {
-                    dialog_state.save(outgoing_input_name);
-                }
                 dialog_state.load(
                     input_name,
                     $empty_input.data('cdt'),
