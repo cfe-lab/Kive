@@ -7,7 +7,8 @@ System.config({
         'jasmine-jquery' : 'portal/js/jasmine-jquery.js',
         'jasmine-ajax' : 'portal/js/mock-ajax.js',
         'imagediff' : 'portal/js/imagediff.js',
-        'jquery' : 'portal/static/portal/jquery-2.0.3.min.js'
+        jquery_raw : '/static/portal/jquery-2.0.3.min.js',
+        jquery : '/static/portal/noxss_jq.js'
     },
     meta: {
         // meaning [baseURL]/vendor/angular.js when no other rules are present

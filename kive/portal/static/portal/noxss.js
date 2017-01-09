@@ -32,6 +32,20 @@ var installNoXss = function($) {
                 }
             }
         });
+        
+        /*
+         * Debugger for tracking which jQuery instance we installed this on.
+        
+        window.mycounter = window.mycounter || 0;
+        if ($.mycounter !== undefined) {
+            $.mycounter.push(window.mycounter++);
+        } else {
+            $.mycounter = [ window.mycounter++ ];
+        }
+        console.log('NoXss instances on this jQuery instance: ', $.mycounter);
+        
+         */
+        
         installNoXss = function() {
             console.log('No-XSS already installed.');
         };

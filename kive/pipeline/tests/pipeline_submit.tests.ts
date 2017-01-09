@@ -118,6 +118,13 @@ describe("Pipeline Submit class", function() {
         $error.remove();
     });
 
+    it('should attach a CSRF token to each AJAX request', function() {
+        expect($.ajaxSettings.beforeSend).not.toBeUndefined();
+        expect($.ajaxSettings.beforeSend.toString()).toMatch(
+            /\.setRequestHeader\s*\(\s*["']X-CSRFToken["']\s*,\s*[A-Za-z_\$]+\s*\)/
+        );
+    });
+
     describe('should throw an error when', function() {
 
         let $dummy = $('#nonexistent');
