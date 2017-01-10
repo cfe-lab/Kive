@@ -562,12 +562,14 @@ class Foreman(object):
                     terminated_during
                 )
 
-                if failed:
-                    assert task.has_started()
-                    # Mark it as failed.
-                    task.finish_failure()
-                else:
-                    task.cancel()
+                task.refresh_from_db()
+                if not task.is_complete():  # it may have been properly handled already in setup or bookkeeping
+                    if failed:
+                        assert task.has_started()
+                        # Mark it as failed.
+                        task.finish_failure()
+                    else:
+                        task.cancel()
 
             self.tasks_in_progress.pop(task)
 
@@ -695,7 +697,7 @@ class Foreman(object):
 
         cable_slurm_handle = self.slurm_sched_class.submit_job(
             settings.KIVE_HOME,
-            MANAGE_PY,
+            os.path.join(settings.KIVE_HOME, MANAGE_PY),
             [settings.CABLE_HELPER_COMMAND] + fleet_settings + [cable_execute_dict_path],
             self.sandbox.uid,
             self.sandbox.gid,
@@ -760,7 +762,7 @@ class Foreman(object):
                 f.write(
                     driver_template.format(
                         settings.KIVE_HOME,
-                        MANAGE_PY,
+                        os.path.join(settings.KIVE_HOME, MANAGE_PY),
                         settings.STEP_HELPER_COMMAND,
                         " ".join(fleet_settings + [step_execute_dict_path])
                     )
@@ -781,7 +783,7 @@ class Foreman(object):
         else:
             setup_slurm_handle = self.slurm_sched_class.submit_job(
                 settings.KIVE_HOME,
-                MANAGE_PY,
+                os.path.join(settings.KIVE_HOME, MANAGE_PY),
                 [settings.STEP_HELPER_COMMAND] + fleet_settings + [step_execute_dict_path],
                 self.sandbox.uid,
                 self.sandbox.gid,
@@ -795,7 +797,8 @@ class Foreman(object):
 
         driver_slurm_handle = self.sandbox.submit_step_execution(
             step_info,
-            after_okay=[setup_slurm_handle]
+            after_okay=[setup_slurm_handle],
+            slurm_sched_class=self.slurm_sched_class
         )
 
         return {
@@ -827,7 +830,7 @@ class Foreman(object):
 
         bookkeeping_slurm_handle = self.slurm_sched_class.submit_job(
             settings.KIVE_HOME,
-            MANAGE_PY,
+            os.path.join(settings.KIVE_HOME, MANAGE_PY),
             [settings.STEP_HELPER_COMMAND, "--bookkeeping"] + fleet_settings + [step_execute_dict_path],
             self.sandbox.uid,
             self.sandbox.gid,

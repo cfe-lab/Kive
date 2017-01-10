@@ -3460,7 +3460,6 @@ class RunStepReuseFailedExecRecordTests(BaseTestCases.SlurmExecutionTestCase):
 
         # The first Pipeline should fail.  The second will reuse the first step's ExecRecord, and will not
         # throw an exception, even though the ExecRecord doesn't provide the necessary output.
-        import fleet.slurmlib
         run_1 = Manager.execute_pipeline(
             self.user_grandpa,
             failing_pipeline,

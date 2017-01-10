@@ -11,7 +11,7 @@ import re
 import subprocess as sp
 from datetime import datetime
 
-from django.utils.timezone import get_default_timezone_name
+import django.utils.timezone as timezone
 
 
 logger = logging.getLogger("fleet.slurmlib")
@@ -375,7 +375,7 @@ class SlurmScheduler(BaseSlurmScheduler):
                 priority = int(raw_job_dict["Priority"])
             # Create proper DateTime objects with the following format string.
             date_format = "%Y-%m-%dT%H:%M:%S"
-            curr_timezone = get_default_timezone_name()
+            curr_timezone = timezone.get_default_timezone_name()
             start_time = None
             if raw_job_dict["Start"] != "Unknown":
                 start_time = datetime.strptime(raw_job_dict["Start"], date_format)
@@ -440,10 +440,7 @@ def startit(wdir, dname, arglst, stdout, stderr):
     NOTE: shell MUST be False here, otherwise the popen.wait() will NOT wait
     for completion of the command.
     """
-    act_cmdstr = "cd %s;  ./%s  %s" % (wdir,
-                                       dname,
-                                       " ".join(arglst))
-    # act_cmdstr = "%s/%s %s" % (wdir, dname, " ".join(arglst))
+    act_cmdstr = "cd {}; {} {}".format(wdir, dname, " ".join(arglst))
     cclst = ["/bin/bash", "-c", '%s' % act_cmdstr]
     p = sp.Popen(cclst, shell=False, stdout=stdout, stderr=stderr)
     return p
@@ -521,7 +518,7 @@ class workerproc:
     def do_cancel(self):
         if hasattr(self, "popen"):
             self.popen.kill()
-        self.end_time = self.start_time = datetime.now()
+        self.end_time = self.start_time = timezone.now()
         self.set_runstate(BaseSlurmScheduler.CANCELLED)
 
     def is_finished(self):
@@ -639,12 +636,12 @@ class DummySlurmScheduler(BaseSlurmScheduler):
             # start the procs in rdylst in order of priority (high first)
             for proc in sorted(rdylst, key=lambda p: p.prio, reverse=True):
                 del waitdct[proc.sco_pid]
-                proc.start_time = datetime.now()
+                proc.start_time = timezone.now()
                 proc.do_run()
                 rundct[proc.sco_pid] = proc
             # next, check the rundct
             for proc in [p for p in rundct.values() if p.is_finished()]:
-                proc.end_time = datetime.now()
+                proc.end_time = timezone.now()
                 del rundct[proc.sco_pid]
                 findct[proc.sco_pid] = proc
 

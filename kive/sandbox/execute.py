@@ -23,7 +23,6 @@ import pipeline.models
 from method.models import Method
 from datachecking.models import IntegrityCheckLog
 from fleet.exceptions import StopExecution
-from fleet.slurmlib import SlurmScheduler
 from file_access_utils import copy_and_confirm, FileCreationError
 from metadata.models import VerificationMethodError
 
@@ -80,8 +79,6 @@ class Sandbox:
         PRECONDITIONS
         run.inputs must have real data
         """
-        self.slurm_scheduler = SlurmScheduler()
-
         if settings.KIVE_SANDBOX_WORKER_ACCOUNT:
             pwd_info = pwd.getpwnam(settings.KIVE_SANDBOX_WORKER_ACCOUNT)
             self.uid = pwd_info.pw_uid
@@ -1888,7 +1885,7 @@ class Sandbox:
 
         return curr_RS
 
-    def submit_step_execution(self, step_execute_info, after_okay, wrap=True):
+    def submit_step_execution(self, step_execute_info, after_okay, slurm_sched_class, wrap=True):
         """
         Submit the step execution to Slurm.
 
@@ -1932,31 +1929,29 @@ class Sandbox:
                 uid=self.uid,
                 gid=self.gid,
                 priority=curr_RS.top_level_run.priority,
-                job_name=job_name
+                job_name=job_name,
+                slurm_sched_class=slurm_sched_class
             )
         else:
             # Wrap the driver in a script.
             driver_template = """\
 #! /usr/bin/env bash
-# python -c "import time; print 'start time', time.time()"
-./{} {} {}
-# python -c "import time; print 'stop time', time.time()"
+{} {} {}
 
 """
             wrapped_driver_fd, wrapped_driver_path = tempfile.mkstemp(dir=step_execute_info.step_run_dir,
                                                                       prefix=driver.coderesource.filename)
-            # make the job script executable
+            # Make sure the job script is executable.
             os.fchmod(wrapped_driver_fd, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-            # os.path.join(step_execute_info.step_run_dir, driver.coderesource.filename),
             with os.fdopen(wrapped_driver_fd, "wb") as f:
                 f.write(
                     driver_template.format(
-                        driver.coderesource.filename,
+                        os.path.join(step_execute_info.step_run_dir, driver.coderesource.filename),
                         " ".join(input_paths),
                         " ".join(step_execute_info.output_paths)
                     )
                 )
-            job_handle = SlurmScheduler.submit_job(
+            job_handle = slurm_sched_class.submit_job(
                 step_execute_info.step_run_dir,
                 wrapped_driver_path,
                 [],
@@ -1986,10 +1981,8 @@ class Sandbox:
         # Break out step_execute_dict.
         curr_RS = RunStep.objects.get(pk=step_execute_dict["runstep_pk"])
         curr_log = curr_RS.log
-        preexisting_ER = step_execute_dict["execrecord_pk"] is not None
-        curr_ER = None
-        if preexisting_ER:
-            curr_ER = ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
+        curr_ER = (None if step_execute_dict["execrecord_pk"] is None
+                   else ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"]))
         pipelinestep = curr_RS.pipelinestep
         output_paths = step_execute_dict["output_paths"]
         user = User.objects.get(pk=step_execute_dict["user_pk"])
@@ -2024,7 +2017,7 @@ class Sandbox:
                         logger.debug("ExecLog.is_successful() == %s", not bad_execution)
 
                         # if not recover:
-                        if preexisting_ER:
+                        if curr_ER is not None:
                             if not recover:
                                 logger.debug("Filling in pre-existing ExecRecord with PipelineStep outputs")
                             else:
@@ -2058,8 +2051,8 @@ class Sandbox:
                                 end_time = timezone.now()
                                 bad_output_found = True
 
-                                if preexisting_ER:
-                                    output_dataset = preexisting_ER.get_execrecordout(curr_output).dataset
+                                if curr_ER is not None:
+                                    output_dataset = curr_ER.get_execrecordout(curr_output).dataset
                                     if md5s[i] is None:
                                         output_dataset.mark_missing(start_time, end_time, curr_log, user)
                                     else:
@@ -2087,7 +2080,7 @@ class Sandbox:
                             else:
                                 # If necessary, create new Dataset for output, and create the Dataset
                                 # if it's to be retained.
-                                if preexisting_ER:
+                                if curr_ER is not None:
                                     output_ERO = curr_ER.get_execrecordout(curr_output)
                                     if not make_dataset:
                                         output_dataset = output_ERO.dataset
@@ -2126,7 +2119,7 @@ class Sandbox:
                             output_datasets.append(output_dataset)
 
                         # Create ExecRecord if there isn't already one.
-                        if not preexisting_ER:
+                        if curr_ER is None:
                             # Make new ExecRecord, linking it to the ExecLog
                             logger.debug("Creating fresh ExecRecord")
                             curr_ER = ExecRecord.create(
@@ -2163,7 +2156,7 @@ class Sandbox:
                     logger.debug("Bad output found; no check on %s was done", output_path)
 
                 # Recovering or filling in old ER? Yes.
-                elif preexisting_ER:
+                elif curr_ER is not None:
                     # Perform integrity check.
                     logger.debug("Dataset has been computed before, checking integrity of %s",
                                  output_dataset)
