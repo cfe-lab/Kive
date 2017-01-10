@@ -370,7 +370,9 @@ class SlurmScheduler(BaseSlurmScheduler):
 
             # Pre-process the fields.
             job_id = raw_job_dict["JobID"]
-            priority = int(raw_job_dict["Priority"])
+            priority = None
+            if raw_job_dict["Priority"] != "":
+                priority = int(raw_job_dict["Priority"])
             # Create proper DateTime objects with the following format string.
             date_format = "%Y-%m-%dT%H:%M:%S"
             curr_timezone = get_default_timezone_name()

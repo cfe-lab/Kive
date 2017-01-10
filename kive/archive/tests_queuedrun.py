@@ -23,7 +23,8 @@ from librarian.models import ExecRecord, Dataset
 from pipeline.models import Pipeline, PipelineFamily
 from metadata.models import kive_user, everyone_group
 from kive.testing_utils import clean_up_all_files
-from kive.tests import install_fixture_files, remove_fixture_files, DuckContext
+from kive.tests import install_fixture_files, remove_fixture_files, DuckContext,\
+    BaseTestCases
 from fleet.workers import Manager
 
 
@@ -224,7 +225,7 @@ class RemoveRedactRunJustStarting(TestCase):
 
 
 @skipIfDBFeature('is_mocked')
-class RestoreReusableDatasetTest(TestCase):
+class RestoreReusableDatasetTest(BaseTestCases.SlurmExecutionTestCase):
     """
     Scenario where an output is marked as reusable, and it needs to be restored.
 

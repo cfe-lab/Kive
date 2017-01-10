@@ -441,7 +441,10 @@ class Foreman(object):
                     setup_info = task_accounting_info.get(task_dict["setup"].job_id, None)
                     driver_info = task_accounting_info.get(task_dict["driver"].job_id, None)
 
-                    setup_state = setup_info["state"] if setup_info is not None else None
+                    setup_state = None
+                    if setup_info is not None and setup_info["state"] != fleet.slurmlib.BaseSlurmScheduler.UNKNOWN:
+                        setup_state = setup_info["state"]
+
                     if setup_state is None or setup_state in self.slurm_sched_class.RUNNING_STATES:
                         # This is still going, so we move on.
                         still_running.extend([task_dict["setup"], task_dict["driver"]])
@@ -458,7 +461,11 @@ class Foreman(object):
                         # Having reached here, we know that setup is all clear, so check on the driver.
                         # Note that we don't check on whether it's in FAILED_STATES, because
                         # that will be handled in the bookkeeping stage.
-                        driver_state = driver_info["state"] if driver_info is not None else None
+                        driver_state = None
+                        if (driver_info is not None and
+                                driver_info["state"] != fleet.slurmlib.BaseSlurmScheduler.UNKNOWN):
+                            driver_state = driver_info["state"]
+
                         if driver_state is None or driver_state in self.slurm_sched_class.RUNNING_STATES:
                             still_running.append(task_dict["driver"])
                             continue
@@ -503,9 +510,12 @@ class Foreman(object):
 
                 else:
                     bookkeeping_info = task_accounting_info.get(task_dict["bookkeeping"].job_id, None)
-
                     # Check on the bookkeeping script.
-                    bookkeeping_state = bookkeeping_info["state"] if bookkeeping_info is not None else None
+                    bookkeeping_state = None
+                    if (bookkeeping_info is not None and
+                            bookkeeping_info["state"] != fleet.slurmlib.BaseSlurmScheduler.UNKNOWN):
+                        bookkeeping_state = bookkeeping_info["state"]
+
                     if bookkeeping_state is None or bookkeeping_state in self.slurm_sched_class.RUNNING_STATES:
                         still_running.append(task_dict["bookkeeping"])
                         continue
@@ -519,8 +529,11 @@ class Foreman(object):
 
             else:
                 cable_info = task_accounting_info.get(task_dict["cable"].job_id, None)
+                cable_state = None
+                if (cable_info is not None and
+                        cable_info["state"] != fleet.slurmlib.BaseSlurmScheduler.UNKNOWN):
+                    cable_state = cable_info["state"]
 
-                cable_state = cable_info["state"] if cable_info is not None else None
                 if cable_state is None or cable_state in self.slurm_sched_class.RUNNING_STATES:
                     # This is still going, so we move on.
                     still_running.append(task_dict["cable"])
@@ -1094,7 +1107,10 @@ class Foreman(object):
         """
         for task, task_dict in self.tasks_in_progress.iteritems():
             if isinstance(task, RunStep):
-                for job in ("setup", "driver", "bookkeeping"):
+                parts_to_kill = ("setup", "driver")
+                if "bookkeeping" in task_dict:
+                    parts_to_kill = parts_to_kill + ("bookkeeping",)
+                for job in parts_to_kill:
                     self.slurm_sched_class.job_cancel(task_dict[job])
             else:
                 self.slurm_sched_class.job_cancel(task_dict["cable"])
