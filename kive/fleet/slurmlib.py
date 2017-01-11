@@ -266,7 +266,7 @@ class BaseSlurmScheduler:
 class SlurmScheduler(BaseSlurmScheduler):
 
     _qnames = None
-    # fleet_settings = [] if settings.FLEET_SETTINGS is None else ["--settings", settings.FLEET_SETTINGS]
+    fleet_settings = [] if settings.FLEET_SETTINGS is None else ["--settings", settings.FLEET_SETTINGS]
 
     @classmethod
     def submit_job(cls,
