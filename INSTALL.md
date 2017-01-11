@@ -304,21 +304,20 @@ Use the simple, built-in scheduler
     # SCHEDULING
     FastSchedule=1
     SchedulerType=sched/builtin
-
-Kive requires three slurm partitions (job queues) of differing priority to be defined
-in order to work. On startup Kive (look for the code in using kive/fleet/slurmlib.py 
- slurm_is_alive()), Kive will check the slurm configuration.
+    
+By default, Kive requires three slurm partitions (job queues) of differing priority to be defined
+in order to work. On startup, Kive will check the slurm configuration.
  
- a) If there are exactly three slurm partitions defined overall, Kive will attempt to use these
-    regardless of their name and proceed to step c)
- b) If there are more than three slurm partitions defined overall, Kive will only select
-    those whose name begins with 'kive' and proceed to step c)
-	NOTE: This allows the definition of slurm partitions on a computer installation to be used
-	for other, non-kive purposes, e.g. for general computation.
- c) The three selected partitions must be in the 'up' state and be of different priority.
-    The values of the priorities chosen does not matter. Kive always submits jobs to slurm 
-	with an explicit partition name, so the default partition definition has no 
-	impact on Kive's behaviour.
+1. If there are exactly three slurm partitions defined overall, Kive will attempt to use these
+   regardless of their name and proceed to step 3.
+2. If there are more than three slurm partitions defined overall, Kive will only select
+   those whose name begins with 'kive' and proceed to step 3.
+   NOTE: This allows the definition of slurm partitions on a computer installation to be used
+   for other, non-kive purposes, e.g. for general computation.
+3. The three selected partitions must be in the 'up' state and be of different priority.
+   The values of the priorities chosen does not matter. Kive always submits jobs to slurm 
+   with an explicit partition name, so the default partition definition has no 
+   impact on Kive's behaviour.
 
 As an example, the following lines define four slurm queues, three of which will be used by Kive,
 and a fourth default one can be used for general purpose computation. In this way, no more 
@@ -330,6 +329,21 @@ than 12 single-CPU slurm jobs will run on the host Nibbler at any one time.
     PartitionName=kive-medium Priority=2000 Nodes=ALL Default=NO  MaxTime=INFINITE State=UP Shared=YES:12
     PartitionName=kive-fast   Priority=3000 Nodes=ALL Default=NO  MaxTime=INFINITE State=UP Shared=YES:12
     PartitionName=sco-fast    Priority=3500 Nodes=ALL Default=YES MaxTime=INFINITE State=UP Shared=YES:12
+    
+Your Slurm queue configuration may also be customized by setting `SLURM_QUEUES` in `kive/settings.py`.
+This should take the form of a list of tuples, ordered from lowest priority to highest priority, 
+where each tuple contains:
+
+* the name Kive uses to refer to this priority level
+* the name Slurm uses to refer to this queue  
+
+For example, with the same queues as above, your `SLURM_QUEUES` setting might look like:
+
+    SLURM_QUEUES = [
+        ("Low priority", "kive-slow"),
+        ("Medium priority", "kive-medium"),
+        ("High priority", "kive-fast")
+    ]
 
 Now the two daemons can be started:
 
