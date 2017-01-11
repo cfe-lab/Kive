@@ -11,6 +11,8 @@ MEDIA_ROOT = os.path.join(MEDIA_ROOT, 'Testing')  # Avoid overwriting developer 
 LOGGING['handlers']['console']['level'] = 'CRITICAL'
 
 # Speed up short runs during tests.
+DEFAULT_SLURM_CHECK_INTERVAL = 0.5
+
 FLEET_POLLING_INTERVAL = 0.1
 CONFIRM_COPY_RETRIES = 5
 CONFIRM_COPY_WAIT_MIN = 0.1

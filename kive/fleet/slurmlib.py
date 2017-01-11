@@ -400,8 +400,13 @@ class SlurmScheduler(BaseSlurmScheduler):
 
     @classmethod
     def _partitions_are_ok(cls):
-        """Determine whether we can call sinfo and that we have three
-        partitions of different priorities.
+        """
+        Determine whether we can call sinfo.
+
+        If SLURM_QUEUES is not None in the settings, then it will check that those partitions
+        exist and are up.
+
+        Otherwise, it will attempt to configure itself with partitions as follows:
         If there are exactly three partitions defined in the 'up' state, kive will check their
         priorities and use them.
         If more than three are defined, kive will chose those partitions whose names
@@ -409,49 +414,82 @@ class SlurmScheduler(BaseSlurmScheduler):
         of we raise an exception.
         NOTE: set the cls._qnames dictionary iff we return True here
         """
-        cmd_lst = ['sinfo', '-a', '-O', 'available,partitionname,priority']
-        dictlst = cls._call_to_dict(cmd_lst)
-        logger.debug("got information of %d partitions" % len(dictlst))
+        if settings.SLURM_QUEUES is not None:
+            # Use sinfo to check that all queues are up.
+            slurm_queue_names = [x[1] for x in settings.SLURM_QUEUES]
+            logger.debug("Calling sinfo to get information on queues: {}".format(slurm_queue_names))
+            cmd_list = ["sinfo", "-O", "partitionname,available", "-p", ",".join(slurm_queue_names)]
+            queue_info_list = cls._call_to_dict(cmd_list)
 
-        # NOTE: the keys are 'AVAIL', 'PARTITION' and 'PRIORITY'
-        uplst = [dct for dct in dictlst if dct['AVAIL'] == 'up']
-        logger.debug("found %d partitions in 'up' state" % len(uplst))
-        if len(uplst) < 3:
-            logger.error("slurm partition config error: want 3, but have %d 'up' partitions" % len(uplst))
-            return False
+            down_slurm_queues = []
+            slurm_queue_status = {}  # maps partition names to True (queue is up) or False (queue is down)
 
-        if len(uplst) > 3:
-            # choose only those beginning with 'kive'
-            kivelst = [dct for dct in uplst if dct['PARTITION'].startswith('kive')]
+            for partition_name, available in queue_info_list:
+                curr_queue_up = available == "Up"
+                slurm_queue_status[partition_name] = curr_queue_up
+                if not curr_queue_up:
+                    down_slurm_queues.append(partition_name)
+
+            missing_slurm_queues = [x for x in slurm_queue_names if x not in slurm_queue_status]
+
+            errors = []
+            if len(missing_slurm_queues) > 0:
+                errors.append("Slurm queues {} are not configured".format(missing_slurm_queues))
+            if len(down_slurm_queues) > 0:
+                errors.append("Slurm queues {} are unavailable".format(down_slurm_queues))
+
+            if len(errors) > 0:
+                logger.error("Slurm partition configuration error:\n" + "\n".join(errors))
+                return False
+
+            # Having reached here, we know the queues are OK.  Set up _qnames and _revlookup.
+            kive_queue_names = [x[0] for x in settings.SLURM_QUEUES]
+            cls._qnames = dict(zip(kive_queue_names, slurm_queue_names))
+            cls._revlookup = dict(zip(slurm_queue_names, kive_queue_names))
+            return True
+
         else:
-            kivelst = uplst
-        # now we must have three remaining entries of differing priorities.
-        if len(kivelst) != 3:
-            logger.error('slurm partition config error: want 3, but have %d partitions' % len(kivelst))
-            return False
+            cmd_lst = ['sinfo', '-a', '-O', 'available,partitionname,priority']
+            dictlst = cls._call_to_dict(cmd_lst)
+            logger.debug("got information of %d partitions" % len(dictlst))
 
-        priolst = [(int(dct['PRIORITY']), dct['PARTITION']) for dct in kivelst]
-        prioset = set([p for p, n in priolst])
-        if len(prioset) != 3:
-            logger.error('slurm partition config error: must have 3 different prio levels, but got %d' % len(prioset))
-            return False
+            # NOTE: the keys are 'AVAIL', 'PARTITION' and 'PRIORITY'
+            uplst = [dct for dct in dictlst if dct['AVAIL'] == 'up']
+            logger.debug("found %d partitions in 'up' state" % len(uplst))
+            if len(uplst) < 3:
+                logger.error("slurm partition config error: want 3, but have %d 'up' partitions" % len(uplst))
+                return False
 
-        partnames = [n for p, n in sorted(priolst, key=lambda a: a[0])]
-        priokeys = [cls.PRIO_LOW, cls.PRIO_MEDIUM, cls.PRIO_HIGH]
-        dd = cls._qnames = dict(zip(priokeys, partnames))
-        logger.info('prio mapping: ', " ".join(["%s:%s" % (pk, dd[pk]) for pk in priokeys]))
-        # create a reverse lookup table: qnames -> priovalues
-        cls._revlookup = dict(zip(partnames, priokeys))
-        return True
+            if len(uplst) > 3:
+                # choose only those beginning with 'kive'
+                kivelst = [dct for dct in uplst if dct['PARTITION'].startswith('kive')]
+            else:
+                kivelst = uplst
+            # now we must have three remaining entries of differing priorities.
+            if len(kivelst) != 3:
+                logger.error('slurm partition config error: want 3, but have %d partitions' % len(kivelst))
+                return False
+
+            priolst = [(int(dct['PRIORITY']), dct['PARTITION']) for dct in kivelst]
+            prioset = set([p for p, n in priolst])
+            if len(prioset) != 3:
+                logger.error('slurm partition config error: must have 3 different prio levels, but got %d' % len(prioset))
+                return False
+
+            partnames = [n for p, n in sorted(priolst, key=lambda a: a[0])]
+            priokeys = [cls.PRIO_LOW, cls.PRIO_MEDIUM, cls.PRIO_HIGH]
+            dd = cls._qnames = dict(zip(priokeys, partnames))
+            logger.info('prio mapping: ', " ".join(["%s:%s" % (pk, dd[pk]) for pk in priokeys]))
+            # create a reverse lookup table: qnames -> priovalues
+            cls._revlookup = dict(zip(partnames, priokeys))
+            return True
 
     @classmethod
     def slurm_ident(cls):
         """Return a string with some pertinent information about the slurm configuration."""
         if cls._qnames is None:
             raise RuntimeError("Must call slurm_is_alive before slurm_ident")
-        priokeys = [cls.PRIO_LOW, cls.PRIO_MEDIUM, cls.PRIO_HIGH]
-        dd = cls._qnames
-        info_str = ", ".join(["%s:%s" % (pk, dd[pk]) for pk in priokeys])
+        info_str = ", ".join(["{}:{}".format(kive_name, cls._qnames[kive_name]) for kive_name in cls._qnames])
         return 'Real Slurm: ' + info_str
 
     @classmethod
@@ -585,7 +623,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         """
         if cls._qnames is None:
             raise RuntimeError("Must call slurm_is_alive before setting job priority")
-        if priority not in cls.PRIO_SET:
+        if priority not in cls._qnames:
             raise RuntimeError("Illegal priority '%s' " % priority)
         if jobhandle_lst is None or len(jobhandle_lst) == 0:
             raise RuntimeError("no jobhandles provided")
@@ -692,9 +730,11 @@ class SlurmScheduler(BaseSlurmScheduler):
 
 
 sco_pid = 100
-dummypriotable = {BaseSlurmScheduler.PRIO_LOW: 0,
-                  BaseSlurmScheduler.PRIO_MEDIUM: 1,
-                  BaseSlurmScheduler.PRIO_HIGH: 2}
+dummypriotable = {
+    BaseSlurmScheduler.PRIO_LOW: 0,
+    BaseSlurmScheduler.PRIO_MEDIUM: 1,
+    BaseSlurmScheduler.PRIO_HIGH: 2
+}
 
 
 def startit(wdir, dname, arglst, stdout, stderr):
@@ -1188,7 +1228,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         step_execute_dict = step_info.dict_repr()
 
         # Submit a job for the setup.
-        step_execute_dict_path = info_path  # FIXME Scotty don't delete this, it'll go into the accounting info
+        step_execute_dict_path = info_path
         if info_path is None:
             step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp()
             with os.fdopen(step_execute_dict_fd, "wb") as f:

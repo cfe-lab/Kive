@@ -311,8 +311,15 @@ KIVE_PROCESSING_GROUP = "kiveprocessing"
 # Number of rows to display on the View Dataset page.
 DATASET_DISPLAY_MAX = 100
 
-# An integer representing the default priority for jobs submitted to Slurm.
-DEFAULT_SLURM_PRIORITY = 1000
+# A list, ordered from lowest-priority to highest-priority, of Slurm queues to
+# be used by Kive.  Fill these in with the names of the queues as you have them
+# defined on your system.  The tuples contain the name Slurm will use for the
+# queue as well as the actual Slurm name.
+SLURM_QUEUES = [
+    ("Low priority", "LOW_PRIO"),
+    ("Medium priority", "MEDIUM_PRIO"),
+    ("High priority", "HIGH_PRIO")
+]
 # Number of seconds between checking Slurm for job information.
 DEFAULT_SLURM_CHECK_INTERVAL = 5
 
