@@ -1,4 +1,4 @@
-# A low level interface to slurm using the calls to sbatch, scancel and squeue via Popen.
+# A low level interface to slurm using the calls to sbatch, scancel and squeue via Popen
 
 import os.path
 import logging
@@ -8,7 +8,6 @@ import json
 import multiprocessing as mp
 import Queue
 
-import pytz
 import re
 import subprocess as sp
 from datetime import datetime
@@ -264,7 +263,7 @@ class BaseSlurmScheduler:
 class SlurmScheduler(BaseSlurmScheduler):
 
     _qnames = None
-    fleet_settings = [] if settings.FLEET_SETTINGS is None else ["--settings", settings.FLEET_SETTINGS]
+    # fleet_settings = [] if settings.FLEET_SETTINGS is None else ["--settings", settings.FLEET_SETTINGS]
 
     @classmethod
     def submit_job(cls,
@@ -689,10 +688,8 @@ def callit(wdir, dname, arglst, stdout, stderr):
     return popen.returncode
 
 
-class workerproc:
-
-    def __init__(self, jdct):
-        self._jdct = jdct
+class dummyjobstate:
+    def __init__(self, priolevel, jobname):
         global sco_pid
         self.sco_pid = "%d" % sco_pid
         sco_pid += 1
@@ -701,8 +698,47 @@ class workerproc:
         self.start_time = None
         self.end_time = None
         self.set_runstate(BaseSlurmScheduler.PENDING)
-        self.prio_name = pname = jdct["prio_level"]
-        self.prio_num = dummypriotable[pname]
+        self.prio_name = priolevel
+        try:
+            self.prio_num = dummypriotable[priolevel]
+        except:
+            raise RuntimeError('illegal priolevel')
+        self.jobname = jobname
+
+    def iscancelled(self):
+        return self.get_runstate() in BaseSlurmScheduler.CANCELLED_STATES
+
+    def get_runstate(self):
+        return self.my_state
+
+    def set_runstate(self, newstate):
+        if newstate in BaseSlurmScheduler.ALL_STATES:
+            self.my_state = newstate
+        else:
+            raise RuntimeError("illegal state '%s'" % newstate)
+
+    def get_state_dct(self):
+        cls = BaseSlurmScheduler
+        rdct = {
+            cls.ACC_JOB_NAME: self.jobname,
+            cls.ACC_START_TIME: self.start_time,
+            cls.ACC_END_TIME: self.end_time,
+            cls.ACC_SUBMIT_TIME: self.submit_time,
+            cls.ACC_RETURN_CODE: self.sco_retcode,
+            cls.ACC_STATE: self.get_runstate(),
+            cls.ACC_SIGNAL: None,
+            cls.ACC_JOB_ID: self.sco_pid,
+            cls.ACC_PRIORITY: self.prio_name
+        }
+        assert set(rdct.keys()) == BaseSlurmScheduler.ACC_SET, "weird state keys"
+        return rdct
+
+
+class dummyworkerproc(dummyjobstate):
+
+    def __init__(self, jdct):
+        dummyjobstate.__init__(jdct["prio_level"], jdct["job_name"])
+        self._jdct = jdct
 
     def do_run(self):
         """Invoke the code described in the _jdct"""
@@ -769,37 +805,12 @@ class workerproc:
         else:
             return False
 
-    def iscancelled(self):
-        return self.get_runstate() in BaseSlurmScheduler.CANCELLED_STATES
-
-    def get_runstate(self):
-        return self.my_state
-
-    def set_runstate(self, newstate):
-        assert newstate in BaseSlurmScheduler.ALL_STATES, "illegal state '%s'" % newstate
-        self.my_state = newstate
-
-    def get_state_dct(self):
-        j = self._jdct
-        cls = BaseSlurmScheduler
-        rdct = {
-            cls.ACC_JOB_NAME: j["job_name"],
-            cls.ACC_START_TIME: self.start_time,
-            cls.ACC_END_TIME: self.end_time,
-            cls.ACC_SUBMIT_TIME: self.submit_time,
-            cls.ACC_RETURN_CODE: self.sco_retcode,
-            cls.ACC_STATE: self.get_runstate(),
-            cls.ACC_SIGNAL: None,
-            cls.ACC_JOB_ID: self.sco_pid,
-            cls.ACC_PRIORITY: self.prio_name
-        }
-        assert set(rdct.keys()) == BaseSlurmScheduler.ACC_SET, "weird state keys"
-        return rdct
-
 
 class DummySlurmScheduler(BaseSlurmScheduler):
 
     mproc = None
+
+    DUMMY_FAIL = -1
 
     @staticmethod
     def _docancel(can_pid, waitdct, rundct, findct):
@@ -839,6 +850,24 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         return 0
 
     @staticmethod
+    def _do_fin_job(jdct, findct):
+        """ Create an entry in findct for a completed runcable
+        Return the sco_pid iff successful, otherwise return DUMMY_FAIL.
+        """
+        try:
+            newproc = dummyjobstate(jdct["prio_level"], jdct["job_name"])
+            # set the state based on the exit code.
+            if jdct['return_code'] == 0:
+                newproc.set_runstate(BaseSlurmScheduler.COMPLETED)
+            else:
+                newproc.set_runstate(BaseSlurmScheduler.FAILED)
+            pid = newproc.sco_pid
+            findct[pid] = newproc
+        except RuntimeError:
+            pid = DummySlurmScheduler.DUMMY_FAIL
+        return pid
+
+    @staticmethod
     def masterproc(jobqueue, resultqueue):
 
         waitdct = {}
@@ -856,7 +885,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                 if cmd == 'new':
                     # received a new submission
                     # create a worker process, but don't necessarily start it
-                    newproc = workerproc(payload)
+                    newproc = dummyworkerproc(payload)
                     newproc.submit_time = datetime.now()
                     # return the job id of the submitted job
                     assert newproc.sco_pid is not None, "newproc pid is NONE"
@@ -869,6 +898,8 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                 elif cmd == 'prio':
                     jhlst, prio = payload
                     resultqueue.put(DummySlurmScheduler._setprio(jhlst, prio, waitdct, rundct, findct))
+                elif cmd == 'finstep':
+                    resultqueue.put(DummySlurmScheduler._do_fin_job(payload, findct))
                 else:
                     raise RuntimeError("masterproc: WEIRD request '%s'" % cmd)
 
@@ -1030,6 +1061,15 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         cls.mproc = None
 
     @classmethod
+    def _int_to_prio(cls, intprio):
+        if intprio < 0:
+            return cls.PRIO_LOW
+        elif intprio == 0:
+            return cls.PRIO_MEDIUM
+        else:
+            return cls.PRIO_HIGH
+
+    @classmethod
     def submit_runcable(cls, runcable, sandbox):
         """
         Submit (and process!) a RunCable for processing.
@@ -1043,24 +1083,27 @@ class DummySlurmScheduler(BaseSlurmScheduler):
             f.write(json.dumps(cable_info_dict))
 
         Sandbox.finish_cable(cable_info_dict)
-        # Return a SlurmJobHandle and the path we just wrote cable_info_dict to.
-
-        # FIXME for Scotty: here we need a SlurmJobHandle, and to notify masterproc that the cable finished
-        # (always successfully).  For the accounting info:
-
-        # workingdir: settings.KIVE_HOME,
-        # driver_name: os.path.join(settings.KIVE_HOME, MANAGE_PY),
-        # driver_arglist: [settings.CABLE_HELPER_COMMAND] + cls.fleet_settings + [cable_execute_dict_path],
-        # user_id: sandbox.uid,
-        # group_id: sandbox.gid,
-        # prio_level: sandbox.run.priority,
-        # num_cpus: cable_info.threads_required,
-        # stdoutfile: cable_info.stdout_path,
-        # stderrfile: cable_info.stderr_path,
-        # job_name: "run{}_cable{}".format(runcable.parent_run.pk, runcable.pk)
-        # return code: 0 (if this actually goes in here at all)
-
-        job_handle = None  # FIXME fill this in with the dummy handle you just created
+        driver_arglst = [settings.CABLE_HELPER_COMMAND] + cls.fleet_settings + [cable_execute_dict_path]
+        job_name = "run{}_cable{}".format(runcable.parent_run.pk, runcable.pk)
+        slurmprio = cls._int_to_prio(sandbox.run.priority)
+        jdct = dict([('workingdir', settings.KIVE_HOME),
+                     ('driver_name', os.path.join(settings.KIVE_HOME, MANAGE_PY)),
+                     ('driver_arglst', driver_arglst),
+                     ('user_id', sandbox.uid),
+                     ('group_id', sandbox.gid),
+                     ('prio_level', slurmprio)
+                     ('num_cpus', cable_info.threads_required),
+                     ('stdoutfile', cable_info.stdout_path),
+                     ('stderrfile', cable_info.stderr_path),
+                     ('after_okay', None),
+                     ('after_any', None),
+                     ('job_name', job_name),
+                     ('return_code', 0)])
+        cls._jobqueue.put(('finstep', jdct))
+        jid = cls._resqueue.get()
+        if jid == DummySlurmScheduler.DUMMY_FAIL:
+            raise sp.CalledProcessError()
+        job_handle = SlurmJobHandle(jid, cls)
         return job_handle, cable_execute_dict_path
 
     @classmethod
@@ -1087,22 +1130,27 @@ class DummySlurmScheduler(BaseSlurmScheduler):
             exit_code = 101
         elif curr_RS.is_cancelled():
             exit_code = 102
-
-        # FIXME for Scotty: dummy up a handle for this and notify masterproc.  For the accounting info:
-        # workingdir: settings.KIVE_HOME,
-        # driver_name: os.path.join(settings.KIVE_HOME, MANAGE_PY),
-        # driver_arglist: [settings.STEP_HELPER_COMMAND] + cls.fleet_settings + [step_execute_dict_path],
-        # user_id: sandbox.uid,
-        # group_id: sandbox.gid,
-        # prio_level: sandbox.run.priority,
-        # num_cpus: step_info.threads_required,
-        # stdoutfile: step_info.setup_stdout_path(),
-        # stderrfile: step_info.setup_stderr_path(),
-        # job_name: "r{}s{}_setup".format(runstep.top_level_run.pk,
-        #                                 runstep.get_coordinates())
-        # return code: exit_code
-
-        setup_slurm_handle = None  # FIXME for Scotty: put the dummy handle here
+        driver_arglst = [settings.STEP_HELPER_COMMAND] + cls.fleet_settings + [step_execute_dict_path]
+        job_name = "r{}s{}_setup".format(runstep.top_level_run.pk, runstep.get_coordinates())
+        slurmprio = cls._int_to_prio(sandbox.run.priority)
+        jdct = dict([('workingdir', settings.KIVE_HOME),
+                     ('driver_name', os.path.join(settings.KIVE_HOME, MANAGE_PY)),
+                     ('driver_arglst', driver_arglst),
+                     ('user_id', sandbox.uid),
+                     ('group_id', sandbox.gid),
+                     ('prio_level', slurmprio),
+                     ('num_cpus', step_info.threads_required),
+                     ('stdoutfile', step_info.stdout_path),
+                     ('stderrfile', step_info.stderr_path),
+                     ('after_okay', None),
+                     ('after_any', None),
+                     ('job_name', job_name),
+                     ('return_code', exit_code)])
+        cls._jobqueue.put(('finstep', jdct))
+        jid = cls._resqueue.get()
+        if jid == DummySlurmScheduler.DUMMY_FAIL:
+            raise sp.CalledProcessError()
+        setup_slurm_handle = SlurmJobHandle(jid, cls)
         return setup_slurm_handle, step_execute_dict_path
 
     @classmethod
@@ -1121,20 +1169,26 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                 f.write(json.dumps(step_execute_dict))
 
         Sandbox.step_execution_bookkeeping(step_execute_dict)
-
-        # FIXME for Scotty: dummy up a handle and inform masterproc.  Accounting info:
-        # workingdir: settings.KIVE_HOME,
-        # driver_name: os.path.join(settings.KIVE_HOME, MANAGE_PY),
-        # driver_arglist: [settings.STEP_HELPER_COMMAND, "--bookkeeping"] + cls.fleet_settings + [step_execute_dict_path],
-        # user_id: sandbox.uid,
-        # group_id: sandbox.gid,
-        # prio_level: sandbox.run.priority,
-        # num_cpus: step_info.threads_required,
-        # stdoutfile: step_info.bookkeeping_stdout_path(),
-        # stderrfile: step_info.bookkeeping_stderr_path(),
-        # job_name: "r{}s{}_bookkeeping".format(runstep.top_level_run.pk,
-        #                                       runstep.get_coordinates())
-        # return code: 0
-
-        bookkeeping_slurm_handle = None  # FIXME for Scotty: put the dummy handle here
+        driver_arglst = [settings.STEP_HELPER_COMMAND, "--bookkeeping"] + cls.fleet_settings + [step_execute_dict_path]
+        job_name = "r{}s{}_bookkeeping".format(runstep.top_level_run.pk,
+                                               runstep.get_coordinates())
+        slurmprio = cls._int_to_prio(sandbox.run.priority)
+        jdct = dict([('workingdir', settings.KIVE_HOME),
+                     ('driver_name', os.path.join(settings.KIVE_HOME, MANAGE_PY)),
+                     ('driver_arglst', driver_arglst),
+                     ('user_id', sandbox.uid),
+                     ('group_id', sandbox.gid),
+                     ('prio_level', slurmprio),
+                     ('num_cpus', step_info.threads_required),
+                     ('stdoutfile', step_info.stdout_path),
+                     ('stderrfile', step_info.stderr_path),
+                     ('after_okay', None),
+                     ('after_any', None),
+                     ('job_name', job_name),
+                     ('return_code', 0)])
+        cls._jobqueue.put(('finstep', jdct))
+        jid = cls._resqueue.get()
+        if jid == DummySlurmScheduler.DUMMY_FAIL:
+            raise sp.CalledProcessError()
+        bookkeeping_slurm_handle = SlurmJobHandle(jid, cls)
         return bookkeeping_slurm_handle
