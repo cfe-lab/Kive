@@ -29,7 +29,7 @@ class SlurmJobHandle:
         efficient to use SlurmScheduler.get_accounting_info() directly.
         """
         rdct = self.slurm_sched_class.get_accounting_info([self])[self.job_id]
-        return rdct['state']
+        return rdct[BaseSlurmScheduler.ACC_STATE]
 
     def __str__(self):
         return "slurm job_id {}".format(self.job_id)
@@ -57,11 +57,11 @@ class BaseSlurmScheduler:
     SUSPENDED = "SUSPENDED"
     TIMEOUT = "TIMEOUT"
     PENDING = "PENDING"
-
+    WAITING = 'WAITING'
     # include an unknown state (no accounting information available)
     UNKNOWN = 'UNKNOWN'
 
-    RUNNING_STATES = set([PENDING, RUNNING, COMPLETING, PREEMPTED, RESIZING, SUSPENDED])
+    RUNNING_STATES = set([PENDING, WAITING, RUNNING, COMPLETING, PREEMPTED, RESIZING, SUSPENDED])
     CANCELLED_STATES = set([CANCELLED, BOOT_FAIL, DEADLINE, NODE_FAIL, TIMEOUT])
     FAILED_STATES = set([FAILED])
     SUCCESS_STATES = set([COMPLETED])
@@ -71,6 +71,42 @@ class BaseSlurmScheduler:
     STOPPED_SET = ALL_STATES - RUNNING_STATES - set([UNKNOWN])
 
     FINISHED_SET = FAILED_STATES | SUCCESS_STATES
+
+    # We define three priority levels when submitting jobs and reporting priorities
+    # with get_accounting_info
+    PRIO_LOW = 'LOW_PRIO'
+    PRIO_MEDIUM = 'MEDIUM_PRIO'
+    PRIO_HIGH = 'HIGH_PRIO'
+    PRIO_SET = frozenset([PRIO_LOW, PRIO_MEDIUM, PRIO_HIGH])
+
+    # get_accounting_info() returns a dictionary containing the following keys.
+    ACC_JOB_NAME = 'job_name'
+    ACC_START_TIME = 'start_time'
+    ACC_END_TIME = 'end_time'
+    ACC_SUBMIT_TIME = 'submit_time'
+    ACC_RETURN_CODE = 'return_code'
+    ACC_STATE = 'state'
+    ACC_SIGNAL = 'signal'
+    ACC_JOB_ID = 'job_id'
+    ACC_PRIORITY = 'priority'
+    ACC_SET = frozenset([ACC_JOB_NAME, ACC_START_TIME, ACC_END_TIME,
+                         ACC_SUBMIT_TIME, ACC_RETURN_CODE, ACC_STATE,
+                         ACC_SIGNAL, ACC_JOB_ID, ACC_PRIORITY])
+
+    @classmethod
+    def _empty_info_dct(cls, jobid):
+        """Return an accounting dict for a job for which we have no accounting information."""
+        rdct = {cls.ACC_JOB_NAME: "",
+                cls.ACC_START_TIME: None,
+                cls.ACC_END_TIME: None,
+                cls.ACC_SUBMIT_TIME: None,
+                cls.ACC_RETURN_CODE: None,
+                cls.ACC_STATE: BaseSlurmScheduler.UNKNOWN,
+                cls.ACC_SIGNAL: None,
+                cls.ACC_JOB_ID: jobid,
+                cls.ACC_PRIORITY: None}
+        assert set(rdct.keys()) == cls.ACC_SET, "messed up empty_info_dct"
+        return rdct
 
     @classmethod
     def slurm_is_alive(cls):
@@ -112,7 +148,7 @@ class BaseSlurmScheduler:
         driver_arglst (list of strings): arguments to the driver_name executable.
         user_id, group_id (integers): the unix user under whose account the jobs will
         be executed .
-        prio_level (integer) : a positive number >0. Higher values have higher priority.
+        prio_level: one of the three elements in PRIO_SET.
         num_cpus: the number of CPU's (in a slurm sense) to reserve for this job.
 
         stdoutfile, stderrfile (strings or None): file names into which the job's
@@ -155,15 +191,25 @@ class BaseSlurmScheduler:
         in encountered, no accounting information for job A is available.
 
         Returns a dictionary which maps job IDs to a dictionary containing
-        the following fields:
-          - job_name (string)
-          - job_id (string)
-          - start_time (datetime object)
-          - end_time (datetime object)
-          - return_code (int)
-          - state (string)
-          - signal (int: the signal number that caused termination of this step, or 0 if
-            it ended normally)
+        the following fields defined above:
+        - ACC_JOB_NAME (string)
+        - ACC_JOB_ID (string)
+        - ACC_START_TIME (datetime object)
+        - ACC_END_TIME (datetime object)
+        - ACC_SUBMIT_TIME (datetime object)
+        - ACC_RETURN_CODE (int)
+        - ACC_STATE (string, must be contained in ALL_STATES defined above)
+        - ACC_SIGNAL (int: the signal number that caused termination of this step, or 0 if
+        it ended normally)
+        - ACC_PRIORITY (string, must be contained in PRIO_SET define above)
+
+        All of these keys will be defined in all dictionaries returned.
+        Note that if no accounting information is available for a jobid,
+        then the values of the dict will be as follows:
+        a) ACC_STATE will map to BaseSlurmScheduler.UNKNOWN
+        b) ACC_JOB_ID will contain the job_id
+        c) all other entries will map to None or "".
+        See _empty_info_dct() above for details.
         """
         raise NotImplementedError
 
@@ -174,6 +220,8 @@ class BaseSlurmScheduler:
 
 
 class SlurmScheduler(BaseSlurmScheduler):
+
+    _qnames = None
 
     @classmethod
     def submit_job(cls,
@@ -190,14 +238,17 @@ class SlurmScheduler(BaseSlurmScheduler):
                    after_any=None,
                    job_name=None):
         job_name = job_name or driver_name
-
+        if prio_level not in cls.PRIO_SET:
+            raise RuntimeError("prio_level not a valid priority")
+        if cls._qnames is None:
+            raise RuntimeError("Must call slurm_is_alive before submitting jobs")
+        partname = cls._qnames[prio_level]
         cmd_lst = ["sbatch", "-D", workingdir, "--gid={}".format(group_id),
-                   "-J", re.escape(job_name), "--priority={}".format(prio_level),
+                   "-J", re.escape(job_name), "-p", partname,
                    "-s", "--uid={}".format(user_id),
                    "-c", str(num_cpus),
                    "--export=PYTHONPATH={}".format(workingdir)]
         # "--get-user-env",
-
         if stdoutfile:
             cmd_lst.append("--output=%s" % stdoutfile)
         if stderrfile:
@@ -241,7 +292,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         """
         cmd_lst = ["scancel", "{}".format(jobhandle.job_id)]
         try:
-            _ = sp.check_output(cmd_lst)
+            sp.check_output(cmd_lst)
         except sp.CalledProcessError as e:
             logger.error("scancel returned an error code '%s'", e.returncode)
             logger.error("scancel wrote this: '%s' ", e.output)
@@ -253,48 +304,112 @@ class SlurmScheduler(BaseSlurmScheduler):
         We have two requirements:
         a) slurm control daemon can be reached (fur submitting jobs).
            This is tested by running 'squeue' and checking for exceptions.
-        b) slurm accounting is configured properly.
+        b) There are three partitions of differing priorities that we can use.
+           This is checked by running 'sinfo' and checking its state.
+        c) slurm accounting is configured properly.
            This is tested by running 'sacct' and checking for exceptions.
         """
         is_alive = True
         try:
             cls._do_squeue()
         except sp.CalledProcessError:
+            logger.exception("_do_squeue")
             is_alive = False
         logger.info("squeue passed: %s" % is_alive)
-
+        if is_alive:
+            try:
+                is_alive = cls._partitions_are_ok()
+            except:
+                is_alive = False
+                logger.exception("partitions_are_ok")
+            logger.info("sinfo (checking partitions) passed: %s" % is_alive)
         if is_alive:
             try:
                 cls.get_accounting_info()
             except:
                 is_alive = False
+                logger.exception("get_accounting_info")
             logger.info("sacct passed: %s" % is_alive)
         return is_alive
 
     @classmethod
-    def slurm_ident(cls):
-        """Return a string with some pertinent information about the slurm configuration."""
-        cmd_lst = ["sinfo"]
+    def _call_to_dict(cls, cmd_lst, splitchar=None):
+        """ Helper routine:
+        Call a slurm command provided in cmd_lst and parse the tabular output, returning
+        a list of dictionaries.
+        The first lines of the output should be the table headings, which are used
+        as the dictionary keys.
+        """
         logger.debug(" ".join(cmd_lst))
         try:
             out_str = sp.check_output(cmd_lst)
-        except sp.CalledProcessError as E:
-            logger.error("sinfo returned an error code '%s'" % E.returncode)
-            logger.error("sinfo wrote this: '%s' " % E.output)
+        except sp.CalledProcessError as e:
+            logger.error("%s returned an error code '%s'", cmd_lst[0], e.returncode)
+            logger.error("it wrote this: '%s' ", e.output)
             raise
-        # NOTE: sinfo adds an empty line to the end of its output. Remove that here.
+        # NOTE: sinfo et al add an empty line to the end of its output. Remove that here.
         lns = [ln for ln in out_str.split('\n') if ln]
         logger.debug("read %d lines" % len(lns))
-        nametup = tuple([s.strip() for s in lns[0].split()])
-        dctlst = [dict(zip(nametup, [s.strip() for s in ln.split()])) for ln in lns[1:]]
-        info_str = ", ".join(["%s: %s: %s" % (dct['PARTITION'], dct['AVAIL'], dct['NODES']) for dct in dctlst])
+        nametup = tuple([s.strip() for s in lns[0].split(splitchar)])
+        return [dict(zip(nametup, [s.strip() for s in ln.split(splitchar)])) for ln in lns[1:]]
+
+    @classmethod
+    def _partitions_are_ok(cls):
+        """Determine whether we can call sinfo and that we have three
+        partitions of different priorities.
+        If there are exactly three partitions defined in the 'up' state, kive will check their
+        priorities and use them.
+        If more than three are defined, kive will chose those partitions whose names
+        start with 'kive'. There must be exactly three of these that are 'up'
+        of we raise an exception.
+        NOTE: set the cls._qnames dictionary iff we return True here
+        """
+        cmd_lst = ['sinfo', '-a', '-O', 'available,partitionname,priority']
+        dictlst = cls._call_to_dict(cmd_lst)
+        logger.debug("got information of %d partitions" % len(dictlst))
+        # NOTE: the keys are 'AVAIL', 'PARTITION' and 'PRIORITY'
+        uplst = [dct for dct in dictlst if dct['AVAIL'] == 'up']
+        logger.debug("found %d partitions in 'up' state" % len(uplst))
+        if len(uplst) < 3:
+            logger.error("slurm partition config error: want 3, but have %d 'up' partitions" % len(uplst))
+            return False
+        if len(uplst) > 3:
+            # choose only those beginning with 'kive'
+            kivelst = [dct for dct in uplst if dct['PARTITION'].startswith('kive')]
+        else:
+            kivelst = uplst
+        # now we must have three remaining entries of differing priorities.
+        if len(kivelst) != 3:
+            logger.error('slurm partition config error: want 3, but have %d partitions' % len(kivelst))
+            return False
+        priolst = [(int(dct['PRIORITY']), dct['PARTITION']) for dct in kivelst]
+        prioset = set([p for p, n in priolst])
+        if len(prioset) != 3:
+            logger.error('slurm partition config error: must have 3 different prio levels, but got %d' % len(prioset))
+            return False
+        partnames = [n for p, n in sorted(priolst, key=lambda a: a[0])]
+        priokeys = [cls.PRIO_LOW, cls.PRIO_MEDIUM, cls.PRIO_HIGH]
+        dd = cls._qnames = dict(zip(priokeys, partnames))
+        logger.info('prio mapping: ', " ".join(["%s:%s" % (pk, dd[pk]) for pk in priokeys]))
+        # create a reverse lookup table: qnames -> priovalues
+        cls._revlookup = dict(zip(partnames, priokeys))
+        return True
+
+    @classmethod
+    def slurm_ident(cls):
+        """Return a string with some pertinent information about the slurm configuration."""
+        if cls._qnames is None:
+            raise RuntimeError("Must call slurm_is_alive before slurm_ident")
+        priokeys = [cls.PRIO_LOW, cls.PRIO_MEDIUM, cls.PRIO_HIGH]
+        dd = cls._qnames
+        info_str = ", ".join(["%s:%s" % (pk, dd[pk]) for pk in priokeys])
         return 'Real Slurm: ' + info_str
 
     @classmethod
-    def _do_squeue(cls, job_id_iter=None):
+    def _do_squeue(cls, opts=None, job_id_iter=None):
         """Get the status of jobs currently on the queue.
         NOTE: this is an internal helper routine, the user probably wants to
-        use SlurmScheduler.get_job_states() to get states of a number of previously
+        use SlurmScheduler.get_accounting_info() to get states of a number of previously
         submitted slurm jobs.
 
         job_id_iter is an iterable that must contain job ids (strings) of previously
@@ -315,116 +430,116 @@ class SlurmScheduler(BaseSlurmScheduler):
         See the squeue man pages for more information about these entries.
         """
         cmd_lst = ["squeue"]
+        if opts is not None:
+            cmd_lst.extend(opts)
         has_jlst = job_id_iter is not None and len(job_id_iter) > 0
         if has_jlst:
             cmd_lst.extend(["-j", ",".join(job_id_iter)])
-        logger.debug(" ".join(cmd_lst))
-        try:
-            out_str = sp.check_output(cmd_lst)
-        except sp.CalledProcessError as E:
-            logger.error("squeue returned an error code '%s'" % E.returncode)
-            logger.error("squeue wrote this: '%s' " % E.output)
-            raise
-        lns = [ln for ln in out_str.split('\n') if ln]
-        logger.debug("read %d lines" % len(lns))
-        namelst = [s.strip() for s in lns[0].split()]
-        dctlst = [dict(zip(namelst, [s.strip() for s in ln.split()])) for ln in lns[1:]]
-        retdct = dict((d['JOBID'], d) for d in dctlst)
-        # NOTE: we should always return a dict entry for every jobid requested.
-        # However, if the job queue is empty, or a job has finished,
-        # squeue will not return information about it.
-        # In those cases, set the dict['ST'] = 'UKN'  (to denote unknown)
-        if has_jlst:
-            for jobid in set(job_id_iter) - set(retdct.keys()):
-                retdct[jobid] = {'JOBID': jobid, 'ST': cls._SLURM_STATE_UNKNOWN}
-        return retdct
+        return cls._call_to_dict(cmd_lst, splitchar=' ')
 
     @classmethod
     def get_accounting_info(cls, job_handle_iter=None):
+        """ NOTE: sacct only provides information about jobs that are running or have completed.
+        It does not provide information about jobs waiting in the queues.
+        We therefore call squeue to get any pending jobs first, and then access sacct
+        for all other information.
+        """
+        if cls._qnames is None:
+            raise RuntimeError("Must call slurm_is_alive before get_accounting_info")
+        have_job_handles = job_handle_iter is not None and len(job_handle_iter) > 0
+        idlst = [jh.job_id for jh in job_handle_iter] if have_job_handles else None
+        rdctlst = cls._do_squeue(opts=['--format=%i %j %P %V',
+                                       '-p', ",".join(cls._qnames.values())],
+                                 job_id_iter=idlst)
+        accounting_info = {}
+        # Create proper DateTime objects with the following format string.
+        date_format = "%Y-%m-%dT%H:%M:%S"
+        # keys are: JOBID NAME PARTITION SUBMIT_TIME
+        for rdct in rdctlst:
+            priority = cls._revlookup.get(rdct["PARTITION"], None)
+            if priority is not None:
+                job_id = rdct["JOBID"]
+                accdct = cls._empty_info_dct(job_id)
+                accdct[cls.ACC_PRIORITY] = priority
+                sub_time = rdct["SUBMIT_TIME"]
+                accdct[cls.ACC_SUBMIT_TIME] = datetime.strptime(sub_time, date_format) \
+                    if sub_time != 'Unknown' else None
+                accdct[cls.ACC_JOB_NAME] = rdct["NAME"]
+                accdct[cls.ACC_STATE] = BaseSlurmScheduler.WAITING
+                accounting_info[job_id] = accdct
+        # now get accounting information
         # The --parsable2 option creates parsable output: fields are separated by a pipe, with
         # no trailing pipe (the difference between --parsable2 and --parsable).
-        cmd_lst = ["sacct", "--parsable2", "--format", "JobID,JobName,Start,End,State,Priority,ExitCode"]
-        have_job_handles = job_handle_iter is not None and len(job_handle_iter) > 0
+        cmd_lst = ["sacct", "--parsable2", "--format",
+                   "JobID,JobName,Start,End,State,Partition,Submit,ExitCode"]
         if have_job_handles:
-            cmd_lst.extend(["-j",
-                            ",".join(["{}".format(handle.job_id) for handle in job_handle_iter])])
-        logger.debug('Running command "{}"'.format(" ".join(cmd_lst)))
-        try:
-            sacct_output = sp.check_output(cmd_lst)
-        except sp.CalledProcessError as e:
-            logger.error("sacct returned an error code '%s'", e.returncode)
-            logger.error("sacct output: '%s' ", e.output)
-            raise
-
-        lines = sacct_output.strip().split('\n')
-        logger.debug("read %d lines (including header)", len(lines))
-        name_tuple = tuple([s.strip() for s in lines[0].split("|")])
-        accounting_info = {}
-
-        for line in lines[1:]:  # skip the header line
-            values = tuple([s.strip() for s in line.split("|")])
-            raw_job_dict = dict(zip(name_tuple, values))
-
+            cmd_lst.extend(["-j", ",".join(idlst)])
+        for raw_job_dict in cls._call_to_dict(cmd_lst, splitchar='|'):
             # Pre-process the fields.
-            job_id = raw_job_dict["JobID"]
-            priority = int(raw_job_dict["Priority"])
-            # Create proper DateTime objects with the following format string.
-            date_format = "%Y-%m-%dT%H:%M:%S"
-            start_time = None
-            if raw_job_dict["Start"] != "Unknown":
-                start_time = datetime.strptime(raw_job_dict["Start"], date_format)
-            end_time = None
-            if raw_job_dict["End"] != "Unknown":
-                end_time = datetime.strptime(raw_job_dict["End"], date_format)
+            # There might be non-kive slurm partitions. Only report those jobs in partitions
+            # we know about, as defined in the list of partition names.
+            priority = cls._revlookup.get(raw_job_dict["Partition"], None)
+            if priority is not None:
+                job_id = raw_job_dict["JobID"]
+                tdct = {}
+                for field_name, field_val in [(fn, raw_job_dict[fn]) for fn in ["Start", "End", "Submit"]]:
+                    tdct[field_name] = datetime.strptime(field_val, date_format) if field_val != 'Unknown' else None
+                # Split sacct's ExitCode field, which looks like "[return code]:[signal]".
+                return_code, signal = (int(x) for x in raw_job_dict["ExitCode"].split(":"))
 
-            # Split sacct's ExitCode field, which looks like "[return code]:[signal]".
-            return_code, signal = (int(x) for x in raw_job_dict["ExitCode"].split(":"))
-
-            curstate = raw_job_dict["State"]
-            if curstate not in cls.ALL_STATES:
-                raise RuntimeError("received undefined state from sacct '%s'" % curstate)
-            accounting_info[job_id] = {
-                "job_name": raw_job_dict["JobName"],
-                "start_time": start_time,
-                "end_time": end_time,
-                "return_code": return_code,
-                "state": curstate,
-                "signal": signal,
-                "job_id": job_id,
-                "priority": priority
-            }
+                curstate = raw_job_dict["State"]
+                if curstate not in cls.ALL_STATES:
+                    raise RuntimeError("received undefined state from sacct '%s'" % curstate)
+                accounting_info[job_id] = {
+                    cls.ACC_JOB_NAME: raw_job_dict["JobName"],
+                    cls.ACC_START_TIME: tdct["Start"],
+                    cls.ACC_END_TIME: tdct["End"],
+                    cls.ACC_SUBMIT_TIME: tdct["Submit"],
+                    cls.ACC_RETURN_CODE: return_code,
+                    cls.ACC_STATE: curstate,
+                    cls.ACC_SIGNAL: signal,
+                    cls.ACC_JOB_ID: job_id,
+                    cls.ACC_PRIORITY: priority
+                }
         # make sure all requested job handles have an entry...
         if have_job_handles:
-            needset = set((jh.job_id for jh in job_handle_iter))
+            needset = set(idlst)
             gotset = set(accounting_info.keys())
             for missing_pid in needset - gotset:
-                accounting_info[missing_pid] = {'job_name': "",
-                                                'start_time': None,
-                                                'end_time': None,
-                                                'return_code': None,
-                                                'state': BaseSlurmScheduler.UNKNOWN,
-                                                'signal': None,
-                                                'job_id': missing_pid,
-                                                "priority": None}
+                accounting_info[missing_pid] = cls._empty_info_dct(missing_pid)
         return accounting_info
 
     @classmethod
     def set_job_priority(cls, jobhandle_lst, priority):
-        """Set the priority of the specified jobs."""
+        """Attempt to set the priority of the specified jobs.
+        If a job is already running (rather than still pending) or has completed,
+        this routine silently fails.
+        """
+        if cls._qnames is None:
+            raise RuntimeError("Must call slurm_is_alive before setting job priority")
+        if priority not in cls.PRIO_SET:
+            raise RuntimeError("Illegal priority '%s' " % priority)
         if jobhandle_lst is None or len(jobhandle_lst) == 0:
             raise RuntimeError("no jobhandles provided")
-        jhstr = ",".join([jh.job_id for jh in jobhandle_lst])
-        # NOTE: setting 'Priority' instead of 'Nice' here results in a non-zero exit code
-        cmd_list = ["scontrol", "update", "JobID={}".format(jhstr),
-                    "Nice={}".format(priority)]
+        cmd_list = ["scontrol", "update", "job",
+                    ",".join([jh.job_id for jh in jobhandle_lst]),
+                    "Partition={}".format(cls._qnames[priority])]
+        logger.debug(" ".join(cmd_list))
         try:
-            _ = sp.check_output(cmd_list)
+            sp.check_output(cmd_list)
         except sp.CalledProcessError as e:
-            logger.error("scontrol returned an error code '%s'", e.returncode)
-            logger.error("scontrol wrote this: '%s' ", e.output)
-            raise
+            logger.debug("scontrol returned an error code '%s'", e.returncode)
+            logger.debug("scontrol wrote this: '%s' ", e.output)
+            # scontrol returns 1 if a job is already running or has completed
+            # catch this case silently, but raise an exception in all other cases.
+            if e.returncode != 1:
+                raise
+
 
 sco_pid = 100
+dummypriotable = {BaseSlurmScheduler.PRIO_LOW: 0,
+                  BaseSlurmScheduler.PRIO_MEDIUM: 1,
+                  BaseSlurmScheduler.PRIO_HIGH: 2}
 
 
 def startit(wdir, dname, arglst, stdout, stderr):
@@ -455,11 +570,13 @@ class workerproc:
         self.sco_pid = "%d" % sco_pid
         sco_pid += 1
         self.sco_retcode = None
+        self.submit_time = None
         self.start_time = None
         self.end_time = None
         self.set_runstate(BaseSlurmScheduler.PENDING)
-        self.prio = jdct["prio_level"]
-
+        self.prio_name = pname = jdct["prio_level"]
+        self.prio_num = dummypriotable[pname]
+    
     def do_run(self):
         """Invoke the code described in the _jdct"""
         self.set_runstate(BaseSlurmScheduler.RUNNING)
@@ -537,22 +654,26 @@ class workerproc:
 
     def get_state_dct(self):
         j = self._jdct
-        return {
-            "job_name": j["job_name"],
-            "start_time": self.start_time,
-            "end_time": self.end_time,
-            "return_code": self.sco_retcode,
-            "state": self.get_runstate(),
-            "signal": None,
-            "job_id": self.sco_pid,
-            "priority": self.prio
+        cls = BaseSlurmScheduler
+        rdct = {
+            cls.ACC_JOB_NAME: j["job_name"],
+            cls.ACC_START_TIME: self.start_time,
+            cls.ACC_END_TIME: self.end_time,
+            cls.ACC_SUBMIT_TIME: self.submit_time,
+            cls.ACC_RETURN_CODE: self.sco_retcode,
+            cls.ACC_STATE: self.get_runstate(),
+            cls.ACC_SIGNAL: None,
+            cls.ACC_JOB_ID: self.sco_pid,
+            cls.ACC_PRIORITY: self.prio_name
         }
+        assert set(rdct.keys()) == BaseSlurmScheduler.ACC_SET, "weird state keys"
+        return rdct
 
 
 class DummySlurmScheduler(BaseSlurmScheduler):
 
     mproc = None
-
+    
     @staticmethod
     def _docancel(can_pid, waitdct, rundct, findct):
         """Cancel the job with the provided pid.
@@ -574,19 +695,25 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         return -1
 
     @staticmethod
-    def _setprio(jidlst, prio, waitdct, rundct, findct):
+    def _setprio(jidlst, prio_name, waitdct, rundct, findct):
         """ Set the priority levels of the jobs in jidlst.
         """
+        prio_num = dummypriotable.get(prio_name, None)
+        if prio_num is None:
+            return -1
         jset = set(jidlst)
         for s, dct in [(set(dct.keys()) & jset, dct) for dct in [waitdct, rundct, findct]]:
             for jid in s:
-                dct[jid].prio = prio
+                dd = dct[jid]
+                dd.prio_name = prio_name
+                dd.prio_num = prio_num
         # NOTE: we have not checked whether all elements in jidlst have been found.
         # ignore this for now
         return 0
 
     @staticmethod
     def masterproc(jobqueue, resultqueue):
+
         waitdct = {}
         rundct = {}
         findct = {}
@@ -603,6 +730,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                     # received a new submission
                     # create a worker process, but don't necessarily start it
                     newproc = workerproc(payload)
+                    newproc.submit_time = datetime.now()
                     # return the job id of the submitted job
                     assert newproc.sco_pid is not None, "newproc pid is NONE"
                     waitdct[newproc.sco_pid] = newproc
@@ -629,7 +757,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                 if is_ready_to_run:
                     rdylst.append(proc)
             # start the procs in rdylst in order of priority (high first)
-            for proc in sorted(rdylst, key=lambda p: p.prio, reverse=True):
+            for proc in sorted(rdylst, key=lambda p: p.prio_num, reverse=True):
                 del waitdct[proc.sco_pid]
                 proc.start_time = datetime.now()
                 proc.do_run()
@@ -691,7 +819,8 @@ class DummySlurmScheduler(BaseSlurmScheduler):
 
         if cls.mproc is None:
             cls._init_masterproc()
-
+        if prio_level not in cls.PRIO_SET:
+            raise RuntimeError("prio_level not a valid priority")
         # make sure the job script exists and is executable
         full_path = os.path.join(workingdir, driver_name)
         if not os.path.isfile(full_path):
@@ -740,6 +869,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
           - job_id (string)
           - start_time (datetime object)
           - end_time (datetime object)
+          - submit_time (datetime object)
           - return_code (int)
           - state (string)
           - signal (int: the signal number that caused termination of this step, or 0 if
@@ -760,6 +890,8 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         """Set the priority of the specified jobs."""
         if cls.mproc is None:
             cls._init_masterproc()
+        if priority not in cls.PRIO_SET:
+            raise RuntimeError("prio_level not a valid priority")
         cls._jobqueue.put(('prio', ([jh.job_id for jh in jobhandle_lst], priority)))
         res = cls._resqueue.get()
         if res != 0:
