@@ -323,12 +323,13 @@ in order to work. On startup Kive (look for the code in using kive/fleet/slurmli
 As an example, the following lines define four slurm queues, three of which will be used by Kive,
 and a fourth default one can be used for general purpose computation. In this way, no more 
 than 12 single-CPU slurm jobs will run on the host Nibbler at any one time.
-# COMPUTE NODES
-NodeName=Nibbler CPUs=12 State=UNKNOWN
-PartitionName=kive-slow   Priority=1000 Nodes=ALL Default=NO  MaxTime=INFINITE State=UP Shared=YES:12
-PartitionName=kive-medium Priority=2000 Nodes=ALL Default=NO  MaxTime=INFINITE State=UP Shared=YES:12
-PartitionName=kive-fast   Priority=3000 Nodes=ALL Default=NO  MaxTime=INFINITE State=UP Shared=YES:12
-PartitionName=sco-fast    Priority=3500 Nodes=ALL Default=YES MaxTime=INFINITE State=UP Shared=YES:12
+
+    # COMPUTE NODES
+    NodeName=Nibbler CPUs=12 State=UNKNOWN
+    PartitionName=kive-slow   Priority=1000 Nodes=ALL Default=NO  MaxTime=INFINITE State=UP Shared=YES:12
+    PartitionName=kive-medium Priority=2000 Nodes=ALL Default=NO  MaxTime=INFINITE State=UP Shared=YES:12
+    PartitionName=kive-fast   Priority=3000 Nodes=ALL Default=NO  MaxTime=INFINITE State=UP Shared=YES:12
+    PartitionName=sco-fast    Priority=3500 Nodes=ALL Default=YES MaxTime=INFINITE State=UP Shared=YES:12
 
 Now the two daemons can be started:
 
@@ -352,12 +353,12 @@ b) the 'sacct' command, will show an empty job history:
 c) the 'sinfo' command should show partitions compatible with the above requirements.
    For example: 
 
-   Nibbler:/etc/slurm-llnl> sinfo -a -O available,partitionname,priority
-   AVAIL               PARTITION           PRIORITY
-   up                  kive-slow           1000
-   up                  kive-medium         2000
-   up                  kive-fast           3000
-   up                  sco-fast            3500
+    Nibbler:/etc/slurm-llnl> sinfo -a -O available,partitionname,priority
+    AVAIL               PARTITION           PRIORITY
+    up                  kive-slow           1000
+    up                  kive-medium         2000
+    up                  kive-fast           3000
+    up                  sco-fast            3500
 
 
 
