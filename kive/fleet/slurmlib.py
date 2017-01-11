@@ -104,6 +104,8 @@ class BaseSlurmScheduler:
                          ACC_SUBMIT_TIME, ACC_RETURN_CODE, ACC_STATE,
                          ACC_SIGNAL, ACC_JOB_ID, ACC_PRIORITY])
 
+    TIME_UNKNOWN = "Unknown"
+
     @classmethod
     def _empty_info_dct(cls, jobid):
         """Return an accounting dict for a job for which we have no accounting information."""
@@ -410,12 +412,14 @@ class SlurmScheduler(BaseSlurmScheduler):
         cmd_lst = ['sinfo', '-a', '-O', 'available,partitionname,priority']
         dictlst = cls._call_to_dict(cmd_lst)
         logger.debug("got information of %d partitions" % len(dictlst))
+
         # NOTE: the keys are 'AVAIL', 'PARTITION' and 'PRIORITY'
         uplst = [dct for dct in dictlst if dct['AVAIL'] == 'up']
         logger.debug("found %d partitions in 'up' state" % len(uplst))
         if len(uplst) < 3:
             logger.error("slurm partition config error: want 3, but have %d 'up' partitions" % len(uplst))
             return False
+
         if len(uplst) > 3:
             # choose only those beginning with 'kive'
             kivelst = [dct for dct in uplst if dct['PARTITION'].startswith('kive')]
@@ -425,11 +429,13 @@ class SlurmScheduler(BaseSlurmScheduler):
         if len(kivelst) != 3:
             logger.error('slurm partition config error: want 3, but have %d partitions' % len(kivelst))
             return False
+
         priolst = [(int(dct['PRIORITY']), dct['PARTITION']) for dct in kivelst]
         prioset = set([p for p, n in priolst])
         if len(prioset) != 3:
             logger.error('slurm partition config error: must have 3 different prio levels, but got %d' % len(prioset))
             return False
+
         partnames = [n for p, n in sorted(priolst, key=lambda a: a[0])]
         priokeys = [cls.PRIO_LOW, cls.PRIO_MEDIUM, cls.PRIO_HIGH]
         dd = cls._qnames = dict(zip(priokeys, partnames))
@@ -489,28 +495,40 @@ class SlurmScheduler(BaseSlurmScheduler):
         """
         if cls._qnames is None:
             raise RuntimeError("Must call slurm_is_alive before get_accounting_info")
+
         have_job_handles = job_handle_iter is not None and len(job_handle_iter) > 0
         idlst = [jh.job_id for jh in job_handle_iter] if have_job_handles else None
         rdctlst = cls._do_squeue(opts=['--format=%i %j %P %V',
                                        '-p', ",".join(cls._qnames.values())],
                                  job_id_iter=idlst)
+
         accounting_info = {}
-        # Create proper DateTime objects with the following format string.
+        # Create proper datetime objects with the following format string.
         date_format = "%Y-%m-%dT%H:%M:%S"
-        # keys are: JOBID NAME PARTITION SUBMIT_TIME
+        # We also want to make our datetime objects timezone-aware.
+        curr_timezone = timezone.get_default_timezone_name()
+
+        # Keys are: JOBID NAME PARTITION SUBMIT_TIME
         for rdct in rdctlst:
             priority = cls._revlookup.get(rdct["PARTITION"], None)
             if priority is not None:
                 job_id = rdct["JOBID"]
                 accdct = cls._empty_info_dct(job_id)
                 accdct[cls.ACC_PRIORITY] = priority
+
+                # Localize the submission time.
                 sub_time = rdct["SUBMIT_TIME"]
-                accdct[cls.ACC_SUBMIT_TIME] = datetime.strptime(sub_time, date_format) \
-                    if sub_time != 'Unknown' else None
+                if sub_time == cls.TIME_UNKNOWN:
+                    accdct[cls.ACC_SUBMIT_TIME] = None
+                else:
+                    raw_sub_time = datetime.strptime(sub_time, date_format)
+                    accdct[cls.ACC_SUBMIT_TIME] = pytz.timezone(curr_timezone).localize(raw_sub_time)
+
                 accdct[cls.ACC_JOB_NAME] = rdct["NAME"]
                 accdct[cls.ACC_STATE] = BaseSlurmScheduler.WAITING
                 accounting_info[job_id] = accdct
-        # now get accounting information
+
+        # Now get accounting information.
         # The --parsable2 option creates parsable output: fields are separated by a pipe, with
         # no trailing pipe (the difference between --parsable2 and --parsable).
         cmd_lst = ["sacct", "--parsable2", "--format",
@@ -525,8 +543,15 @@ class SlurmScheduler(BaseSlurmScheduler):
             if priority is not None:
                 job_id = raw_job_dict["JobID"]
                 tdct = {}
+
+                # Localize any datetime objects.
                 for field_name, field_val in [(fn, raw_job_dict[fn]) for fn in ["Start", "End", "Submit"]]:
-                    tdct[field_name] = datetime.strptime(field_val, date_format) if field_val != 'Unknown' else None
+                    if field_val == cls.TIME_UNKNOWN:
+                        tdct[field_name] = None
+                    else:
+                        raw_datetime = datetime.strptime(field_val, date_format)
+                        tdct[field_name] = pytz.timezone(curr_timezone).localize(raw_datetime)
+
                 # Split sacct's ExitCode field, which looks like "[return code]:[signal]".
                 return_code, signal = (int(x) for x in raw_job_dict["ExitCode"].split(":"))
 
