@@ -672,42 +672,15 @@ class Foreman(object):
 
     def submit_runcable(self, runcable):
         """
-        Submit a RunCable to Slurm for processing.
-
-        This will use the cable helper management command defined in settings.
+        Submit a RunCable for processing.
 
         Return a dictionary containing the SlurmJobHandle for the cable helper,
         as well as the path of the execution info dictionary file used by the step.
         """
-        # First, serialize the task execution information.
-        cable_info = self.sandbox.cable_execute_info[(runcable.parent_run, runcable.component)]
-        # We need to get some information about the cable: the step that it feeds (RunSIC)
-        # or that it's fed by (RunOutputCable), and the input/output that it feeds/is fed by.
-        # We need this so that we can write the stderr and stdout to the appropriate locations.
-        # cable_record = cable_info.cable_record
-
-        # Submit the job.
-        cable_execute_dict_fd, cable_execute_dict_path = tempfile.mkstemp()
-        with os.fdopen(cable_execute_dict_fd, "wb") as f:
-            f.write(json.dumps(cable_info.dict_repr()))
-
-        fleet_settings = []
-        if settings.FLEET_SETTINGS is not None:
-            fleet_settings = ["--settings", settings.FLEET_SETTINGS]
-
-        cable_slurm_handle = self.slurm_sched_class.submit_job(
-            settings.KIVE_HOME,
-            os.path.join(settings.KIVE_HOME, MANAGE_PY),
-            [settings.CABLE_HELPER_COMMAND] + fleet_settings + [cable_execute_dict_path],
-            self.sandbox.uid,
-            self.sandbox.gid,
-            self.sandbox.run.priority,
-            cable_info.threads_required,
-            cable_info.stdout_path,
-            cable_info.stderr_path,
-            job_name="run{}_cable{}".format(runcable.parent_run.pk, runcable.pk)
+        cable_slurm_handle, cable_execute_dict_path = self.slurm_sched_class.submit_runcable(
+            runcable,
+            self.sandbox
         )
-
         return {
             "cable": cable_slurm_handle,
             "info_path": cable_execute_dict_path
@@ -730,70 +703,14 @@ class Foreman(object):
         Return a dictionary containing SlurmJobHandles for each, as well as
         the path of the execution info dictionary file used by the step.
         """
-        fleet_settings = []
-        if settings.FLEET_SETTINGS is not None:
-            fleet_settings = ["--settings", settings.FLEET_SETTINGS]
-
         # First, serialize the task execution information.
         step_info = self.sandbox.step_execute_info[(runstep.run, runstep.pipelinestep)]
 
-        # Submit a job for the setup.
-        step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp()
-        with os.fdopen(step_execute_dict_fd, "wb") as f:
-            f.write(json.dumps(step_info.dict_repr()))
-
-        # NOTE: wrapping the setup script is not required, but can be useful for debugging.
-        dowrap = False
-        if dowrap:
-            # write a mini wrapper
-            driver_template = """\
-#! /usr/bin/env bash
-# python -c "import time; print 'start time', time.time()"
-# cd {}
-# pwd
-{} {} {}
-# python -c "import time; print 'stop time', time.time()"
-"""
-            wrapped_driver_fd, wrapped_driver_path = tempfile.mkstemp(dir=step_info.step_run_dir,
-                                                                      prefix="setty")
-            # make the job script executable
-            os.fchmod(wrapped_driver_fd, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-            with os.fdopen(wrapped_driver_fd, "wb") as f:
-                f.write(
-                    driver_template.format(
-                        settings.KIVE_HOME,
-                        os.path.join(settings.KIVE_HOME, MANAGE_PY),
-                        settings.STEP_HELPER_COMMAND,
-                        " ".join(fleet_settings + [step_execute_dict_path])
-                    )
-                )
-            setup_slurm_handle = self.slurm_sched_class.submit_job(
-                settings.KIVE_HOME,
-                wrapped_driver_path,
-                fleet_settings,
-                self.sandbox.uid,
-                self.sandbox.gid,
-                self.sandbox.run.priority,
-                step_info.threads_required,
-                step_info.setup_stdout_path(),
-                step_info.setup_stderr_path(),
-                job_name="r{}s{}_setup".format(runstep.top_level_run.pk,
-                                               runstep.get_coordinates())
-            )
-        else:
-            setup_slurm_handle = self.slurm_sched_class.submit_job(
-                settings.KIVE_HOME,
-                os.path.join(settings.KIVE_HOME, MANAGE_PY),
-                [settings.STEP_HELPER_COMMAND] + fleet_settings + [step_execute_dict_path],
-                self.sandbox.uid,
-                self.sandbox.gid,
-                self.sandbox.run.priority,
-                step_info.threads_required,
-                step_info.setup_stdout_path(),
-                step_info.setup_stderr_path(),
-                job_name="r{}s{}_setup".format(runstep.top_level_run.pk,
-                                               runstep.get_coordinates())
-            )
+        setup_slurm_handle, step_execute_dict_path = self.slurm_sched_class.submit_step_setup(
+            runstep,
+            step_info,
+            self.sandbox
+        )
 
         driver_slurm_handle = self.sandbox.submit_step_execution(
             step_info,
@@ -815,34 +732,11 @@ class Foreman(object):
         and the Foreman has completed the ExecLog.  It uses the same step execution
         information path as submit_runstep.
         """
-        fleet_settings = []
-        if settings.FLEET_SETTINGS is not None:
-            fleet_settings = ["--settings", settings.FLEET_SETTINGS]
-
-        step_info = self.sandbox.step_execute_info[(runstep.run, runstep.pipelinestep)]
-
-        # Submit a job for the setup.
-        step_execute_dict_path = info_path
-        if info_path is None:
-            step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp()
-            with os.fdopen(step_execute_dict_fd, "wb") as f:
-                f.write(json.dumps(step_info.dict_repr()))
-
-        bookkeeping_slurm_handle = self.slurm_sched_class.submit_job(
-            settings.KIVE_HOME,
-            os.path.join(settings.KIVE_HOME, MANAGE_PY),
-            [settings.STEP_HELPER_COMMAND, "--bookkeeping"] + fleet_settings + [step_execute_dict_path],
-            self.sandbox.uid,
-            self.sandbox.gid,
-            self.sandbox.run.priority,
-            step_info.threads_required,
-            step_info.bookkeeping_stdout_path(),
-            step_info.bookkeeping_stderr_path(),
-            job_name="r{}s{}_bookkeeping".format(runstep.top_level_run.pk,
-                                                 runstep.get_coordinates())
+        return self.slurm_sched_class.submit_step_bookkeeping(
+            runstep,
+            info_path,
+            self.sandbox
         )
-
-        return bookkeeping_slurm_handle
 
     def worker_finished(self, finished_task):
         """Handle bookkeeping when a worker finishes."""

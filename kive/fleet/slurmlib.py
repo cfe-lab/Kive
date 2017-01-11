@@ -2,6 +2,8 @@
 
 import os.path
 import logging
+import tempfile
+import json
 
 import multiprocessing as mp
 import Queue
@@ -12,9 +14,15 @@ import subprocess as sp
 from datetime import datetime
 
 import django.utils.timezone as timezone
+from django.conf import settings
+
+from sandbox.execute import Sandbox
+from fleet.exceptions import StopExecution
 
 
 logger = logging.getLogger("fleet.slurmlib")
+
+MANAGE_PY = "manage.py"
 
 
 class SlurmJobHandle:
@@ -175,8 +183,41 @@ class BaseSlurmScheduler:
         """Set the priority of the specified jobs."""
         raise NotImplementedError
 
+    @classmethod
+    def submit_runcable(cls, runcable, sandbox):
+        """
+        Submit a RunCable for processing.
+
+        Return a tuple containing the SlurmJobHandle for the cable helper,
+        as well as the path of the execution info dictionary file used by the step.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def submit_step_setup(cls, runstep, sandbox):
+        """
+        Submit the setup portion of a RunStep.
+
+        Returns a tuple containing the SlurmJobHandle of the resulting task,
+        and the path of the JSON file written out for the task.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def submit_step_bookkeeping(cls, runstep, info_path, sandbox):
+        """
+        Submit the bookkeeping part of a RunStep.
+
+        This is to be called after the driver part of a RunStep has been finished
+        and the Foreman has completed the ExecLog.  It uses the same step execution
+        information path as produced by submit_step_setup.
+        """
+        raise NotImplementedError
+
 
 class SlurmScheduler(BaseSlurmScheduler):
+
+    fleet_settings = [] if settings.FLEET_SETTINGS is None else ["--settings", settings.FLEET_SETTINGS]
 
     @classmethod
     def submit_job(cls,
@@ -431,6 +472,94 @@ class SlurmScheduler(BaseSlurmScheduler):
             logger.error("scontrol returned an error code '%s'", e.returncode)
             logger.error("scontrol wrote this: '%s' ", e.output)
             raise
+
+    @classmethod
+    def submit_runcable(cls, runcable, sandbox):
+        """
+        Submit a RunCable to Slurm for processing.
+        """
+        # First, serialize the task execution information.
+        cable_info = sandbox.cable_execute_info[(runcable.parent_run, runcable.component)]
+
+        # Submit the job.
+        cable_execute_dict_fd, cable_execute_dict_path = tempfile.mkstemp()
+        with os.fdopen(cable_execute_dict_fd, "wb") as f:
+            f.write(json.dumps(cable_info.dict_repr()))
+
+        cable_slurm_handle = cls.submit_job(
+            settings.KIVE_HOME,
+            os.path.join(settings.KIVE_HOME, MANAGE_PY),
+            [settings.CABLE_HELPER_COMMAND] + cls.fleet_settings + [cable_execute_dict_path],
+            sandbox.uid,
+            sandbox.gid,
+            sandbox.run.priority,
+            cable_info.threads_required,
+            cable_info.stdout_path,
+            cable_info.stderr_path,
+            job_name="run{}_cable{}".format(runcable.parent_run.pk, runcable.pk)
+        )
+
+        return cable_slurm_handle, cable_execute_dict_path
+
+    @classmethod
+    def submit_step_setup(cls, runstep, sandbox):
+        """
+        Submit the setup portion of a RunStep to Slurm.
+
+        This uses the step helper management command defined in settings.
+        """
+        # First, serialize the task execution information.
+        step_info = sandbox.step_execute_info[(runstep.run, runstep.pipelinestep)]
+
+        step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp()
+        with os.fdopen(step_execute_dict_fd, "wb") as f:
+            f.write(json.dumps(step_info.dict_repr()))
+
+        setup_slurm_handle = cls.submit_job(
+            settings.KIVE_HOME,
+            os.path.join(settings.KIVE_HOME, MANAGE_PY),
+            [settings.STEP_HELPER_COMMAND] + cls.fleet_settings + [step_execute_dict_path],
+            sandbox.uid,
+            sandbox.gid,
+            sandbox.run.priority,
+            step_info.threads_required,
+            step_info.setup_stdout_path(),
+            step_info.setup_stderr_path(),
+            job_name="r{}s{}_setup".format(runstep.top_level_run.pk,
+                                           runstep.get_coordinates())
+        )
+        return setup_slurm_handle, step_execute_dict_path
+
+    @classmethod
+    def submit_step_bookkeeping(cls, runstep, info_path, sandbox):
+        """
+        Submit the bookkeeping part of a RunStep to Slurm.
+        """
+        step_info = sandbox.step_execute_info[(runstep.run, runstep.pipelinestep)]
+
+        # Submit a job for the setup.
+        step_execute_dict_path = info_path
+        if info_path is None:
+            step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp()
+            with os.fdopen(step_execute_dict_fd, "wb") as f:
+                f.write(json.dumps(step_info.dict_repr()))
+
+        bookkeeping_slurm_handle = cls.submit_job(
+            settings.KIVE_HOME,
+            os.path.join(settings.KIVE_HOME, MANAGE_PY),
+            [settings.STEP_HELPER_COMMAND, "--bookkeeping"] + cls.fleet_settings + [step_execute_dict_path],
+            sandbox.uid,
+            sandbox.gid,
+            sandbox.run.priority,
+            step_info.threads_required,
+            step_info.bookkeeping_stdout_path(),
+            step_info.bookkeeping_stderr_path(),
+            job_name="r{}s{}_bookkeeping".format(runstep.top_level_run.pk,
+                                                 runstep.get_coordinates())
+        )
+
+        return bookkeeping_slurm_handle
+
 
 sco_pid = 100
 
@@ -774,3 +903,113 @@ class DummySlurmScheduler(BaseSlurmScheduler):
     def shutdown(cls):
         cls.mproc.terminate()
         cls.mproc = None
+
+    @classmethod
+    def submit_runcable(cls, runcable, sandbox):
+        """
+        Submit (and process!) a RunCable for processing.
+        """
+        # Recreate the procedure in the cable_helper management command.
+        cable_info = sandbox.cable_execute_info[(runcable.parent_run, runcable.component)]
+        cable_info_dict = cable_info.dict_repr()
+
+        cable_execute_dict_fd, cable_execute_dict_path = tempfile.mkstemp()
+        with os.fdopen(cable_execute_dict_fd, "wb") as f:
+            f.write(json.dumps(cable_info_dict))
+
+        Sandbox.finish_cable(cable_info_dict)
+        # Return a SlurmJobHandle and the path we just wrote cable_info_dict to.
+
+        # FIXME for Scotty: here we need a SlurmJobHandle, and to notify masterproc that the cable finished
+        # (always successfully).  For the accounting info:
+
+        # workingdir: settings.KIVE_HOME,
+        # driver_name: os.path.join(settings.KIVE_HOME, MANAGE_PY),
+        # driver_arglist: [settings.CABLE_HELPER_COMMAND] + cls.fleet_settings + [cable_execute_dict_path],
+        # user_id: sandbox.uid,
+        # group_id: sandbox.gid,
+        # prio_level: sandbox.run.priority,
+        # num_cpus: cable_info.threads_required,
+        # stdoutfile: cable_info.stdout_path,
+        # stderrfile: cable_info.stderr_path,
+        # job_name: "run{}_cable{}".format(runcable.parent_run.pk, runcable.pk)
+        # return code: 0 (if this actually goes in here at all)
+
+        job_handle = None  # FIXME fill this in with the dummy handle you just created
+        return job_handle, cable_execute_dict_path
+
+    @classmethod
+    def submit_step_setup(cls, runstep, sandbox):
+        """
+        Submit the setup portion of a RunStep.
+        """
+        # First, serialize the task execution information.
+        step_info = sandbox.step_execute_info[(runstep.run, runstep.pipelinestep)]
+        step_execute_dict = step_info.dict_repr()
+
+        step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp()
+        with os.fdopen(step_execute_dict_fd, "wb") as f:
+            f.write(json.dumps(step_execute_dict))
+
+        exit_code = 0
+        try:
+            curr_RS = Sandbox.step_execution_setup(step_execute_dict)
+        except StopExecution:
+            logger.exception("Execution was stopped during setup.")
+            exit_code = 103
+
+        if curr_RS.is_failed():
+            exit_code = 101
+        elif curr_RS.is_cancelled():
+            exit_code = 102
+
+        # FIXME for Scotty: dummy up a handle for this and notify masterproc.  For the accounting info:
+        # workingdir: settings.KIVE_HOME,
+        # driver_name: os.path.join(settings.KIVE_HOME, MANAGE_PY),
+        # driver_arglist: [settings.STEP_HELPER_COMMAND] + cls.fleet_settings + [step_execute_dict_path],
+        # user_id: sandbox.uid,
+        # group_id: sandbox.gid,
+        # prio_level: sandbox.run.priority,
+        # num_cpus: step_info.threads_required,
+        # stdoutfile: step_info.setup_stdout_path(),
+        # stderrfile: step_info.setup_stderr_path(),
+        # job_name: "r{}s{}_setup".format(runstep.top_level_run.pk,
+        #                                 runstep.get_coordinates())
+        # return code: exit_code
+
+        setup_slurm_handle = None  # FIXME for Scotty: put the dummy handle here
+        return setup_slurm_handle, step_execute_dict_path
+
+    @classmethod
+    def submit_step_bookkeeping(cls, runstep, info_path, sandbox):
+        """
+        Submit the bookkeeping part of a RunStep.
+        """
+        step_info = sandbox.step_execute_info[(runstep.run, runstep.pipelinestep)]
+        step_execute_dict = step_info.dict_repr()
+
+        # Submit a job for the setup.
+        step_execute_dict_path = info_path  # FIXME Scotty don't delete this, it'll go into the accounting info
+        if info_path is None:
+            step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp()
+            with os.fdopen(step_execute_dict_fd, "wb") as f:
+                f.write(json.dumps(step_execute_dict))
+
+        Sandbox.step_execution_bookkeeping(step_execute_dict)
+
+        # FIXME for Scotty: dummy up a handle and inform masterproc.  Accounting info:
+        # workingdir: settings.KIVE_HOME,
+        # driver_name: os.path.join(settings.KIVE_HOME, MANAGE_PY),
+        # driver_arglist: [settings.STEP_HELPER_COMMAND, "--bookkeeping"] + cls.fleet_settings + [step_execute_dict_path],
+        # user_id: sandbox.uid,
+        # group_id: sandbox.gid,
+        # prio_level: sandbox.run.priority,
+        # num_cpus: step_info.threads_required,
+        # stdoutfile: step_info.bookkeeping_stdout_path(),
+        # stderrfile: step_info.bookkeeping_stderr_path(),
+        # job_name: "r{}s{}_bookkeeping".format(runstep.top_level_run.pk,
+        #                                       runstep.get_coordinates())
+        # return code: 0
+
+        bookkeeping_slurm_handle = None  # FIXME for Scotty: put the dummy handle here
+        return bookkeeping_slurm_handle
