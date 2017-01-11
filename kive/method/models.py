@@ -581,7 +581,8 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                     uid=None,
                     gid=None,
                     priority=None,
-                    job_name=None):
+                    job_name=None,
+                    slurm_sched_class=SlurmScheduler):
         """
         Submit this Method to Slurm for execution.
 
@@ -613,7 +614,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         priority = priority or settings.DEFAULT_SLURM_PRIORITY
         job_name = job_name or self.driver.coderesource.filename
 
-        job_handle = SlurmScheduler.submit_job(
+        job_handle = slurm_sched_class.submit_job(
             run_path,
             self.driver.coderesource.filename,
             input_paths + output_paths,

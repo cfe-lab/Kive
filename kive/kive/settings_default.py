@@ -330,5 +330,3 @@ CONFIRM_FILE_CREATED_WAIT_MAX = 12
 
 # The settings file the fleet should use.  Leave as None if it should just use the normal one.
 FLEET_SETTINGS = None
-# Whether or not to use the dummy Slurm scheduler.
-TEST_WITH_DUMMY_SLURM = False

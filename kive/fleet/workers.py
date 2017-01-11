@@ -160,8 +160,6 @@ class Manager(object):
 
         for run_to_process in pending_runs:
             foreman = Foreman(run_to_process, self.slurm_sched_class)
-            self.runs.append(run_to_process)
-            self.runs_in_progress[run_to_process] = foreman
             foreman.start_run()
 
             run_to_process.refresh_from_db()
@@ -417,9 +415,11 @@ class Foreman(object):
             if "cable" in task_dict:
                 our_slurm_jobs.append(task_dict["cable"])
             else:
-                our_slurm_jobs.append(task_dict["setup"])
-                our_slurm_jobs.append(task_dict["driver"])
-                our_slurm_jobs.append(task_dict["bookkeeping"])
+                if "bookkeeping" in task_dict:
+                    our_slurm_jobs.append(task_dict["bookkeeping"])
+                else:
+                    our_slurm_jobs.append(task_dict["setup"])
+                    our_slurm_jobs.append(task_dict["driver"])
         task_accounting_info = self.slurm_sched_class.get_accounting_info(our_slurm_jobs)
 
         # These flags reflect the status from the actual execution, not
@@ -437,78 +437,103 @@ class Foreman(object):
 
             # Check on the status of the jobs.
             if isinstance(task, RunStep):
-                setup_info = task_accounting_info.get(task_dict["setup"].job_id, None)
-                driver_info = task_accounting_info.get(task_dict["driver"].job_id, None)
-                bookkeeping_info = task_accounting_info.get(task_dict["bookkeeping"].job_id, None)
+                if "bookkeeping" not in task_dict:
+                    setup_info = task_accounting_info.get(task_dict["setup"].job_id, None)
+                    driver_info = task_accounting_info.get(task_dict["driver"].job_id, None)
 
-                setup_state = setup_info["state"] if setup_info is not None else None
-                if setup_state is None or setup_state in self.slurm_sched_class.RUNNING_STATES:
-                    # This is still going, so we move on.
-                    still_running.extend([task_dict["setup"], task_dict["driver"], task_dict["bookkeeping"]])
-                    continue
-                elif setup_state in self.slurm_sched_class.CANCELLED_STATES:
-                    cancelled = True
-                    terminated_during = "setup"
-                elif setup_state in self.slurm_sched_class.FAILED_STATES:
-                    # Something went wrong, so we get ready to bail.
-                    failed = True
-                    terminated_during = "setup"
+                    setup_state = None
+                    if setup_info is not None and setup_info["state"] != fleet.slurmlib.BaseSlurmScheduler.UNKNOWN:
+                        setup_state = setup_info["state"]
 
-                else:
-                    # Having reached here, we know that setup is all clear, so check on the driver.
-                    # Note that we don't check on whether it's in FAILED_STATES, because
-                    # that will be handled in the bookkeeping stage.
-                    driver_state = driver_info["state"] if driver_info is not None else None
-                    if driver_state is None or driver_state in self.slurm_sched_class.RUNNING_STATES:
-                        still_running.extend([task_dict["driver"], task_dict["bookkeeping"]])
+                    if setup_state is None or setup_state in self.slurm_sched_class.RUNNING_STATES:
+                        # This is still going, so we move on.
+                        still_running.extend([task_dict["setup"], task_dict["driver"]])
                         continue
-                    elif driver_state in self.slurm_sched_class.CANCELLED_STATES:
-                        # This was externally cancelled, so we get ready to bail.
+                    elif setup_state in self.slurm_sched_class.CANCELLED_STATES:
                         cancelled = True
-                        terminated_during = "driver"
+                        terminated_during = "setup"
+                    elif setup_state in self.slurm_sched_class.FAILED_STATES:
+                        # Something went wrong, so we get ready to bail.
+                        failed = True
+                        terminated_during = "setup"
 
                     else:
-                        # Having reached here, we know that the driver ran to completion,
-                        # successfully or no.  As such, we remove the wrapped driver if necessary
-                        # and fill in the ExecLog.
-                        # SCO do not remove for debugging..
-                        # if hasattr(task_dict["driver"], "wrapped_driver_path"):
-                            # driver_path = task_dict["driver"].wrapped_driver_path
-                            # if os.path.exists(driver_path):
-                            #    os.remove(task_dict["driver"].wrapped_driver_path)
-                        task.refresh_from_db()
-                        task_log = ExecLog.objects.get(record=task)  # weirdly, task.log doesn't appear to be set
-                        with transaction.atomic():
-                            task_log.start_time = driver_info["start_time"]
-                            task_log.end_time = driver_info["end_time"]
-                            task_log.methodoutput.return_code = driver_info["return_code"]
+                        # Having reached here, we know that setup is all clear, so check on the driver.
+                        # Note that we don't check on whether it's in FAILED_STATES, because
+                        # that will be handled in the bookkeeping stage.
+                        driver_state = None
+                        if (driver_info is not None and
+                                driver_info["state"] != fleet.slurmlib.BaseSlurmScheduler.UNKNOWN):
+                            driver_state = driver_info["state"]
 
-                            step_execute_info = self.sandbox.step_execute_info[(task.parent_run, task.pipelinestep)]
-                            with open(step_execute_info.driver_stdout_path(), "rb") as f:
-                                task_log.methodoutput.output_log.save(f.name, File(f))
-                            with open(step_execute_info.driver_stderr_path(), "rb") as f:
-                                task_log.methodoutput.error_log.save(f.name, File(f))
-
-                            task_log.methodoutput.save()
-                            task_log.save()
-
-                        # Check on the bookkeeping script.
-                        bookkeeping_state = bookkeeping_info["state"] if bookkeeping_info is not None else None
-                        if bookkeeping_state is None or bookkeeping_state in self.slurm_sched_class.RUNNING_STATES:
-                            still_running.append(task_dict["bookkeeping"])
+                        if driver_state is None or driver_state in self.slurm_sched_class.RUNNING_STATES:
+                            still_running.append(task_dict["driver"])
                             continue
-                        elif bookkeeping_state in self.slurm_sched_class.CANCELLED_STATES:
+                        elif driver_state in self.slurm_sched_class.CANCELLED_STATES:
+                            # This was externally cancelled, so we get ready to bail.
                             cancelled = True
-                            terminated_during = "bookkeeping"
-                        elif bookkeeping_state in self.slurm_sched_class.FAILED_STATES:
-                            # Something went wrong, so we bail.
-                            failed = True
-                            terminated_during = "bookkeeping"
+                            terminated_during = "driver"
+
+                        else:
+                            # Having reached here, we know that the driver ran to completion,
+                            # successfully or no.  As such, we remove the wrapped driver if necessary
+                            # and fill in the ExecLog.
+
+                            # SCO do not remove for debugging..
+                            # if hasattr(task_dict["driver"], "wrapped_driver_path"):
+                                # driver_path = task_dict["driver"].wrapped_driver_path
+                                # if os.path.exists(driver_path):
+                                #    os.remove(task_dict["driver"].wrapped_driver_path)
+
+                            # Weirdly, task.log doesn't appear to be set even if you refresh task from the database,
+                            # so we explicitly retrieve it.
+                            task_log = ExecLog.objects.get(record=task)
+                            with transaction.atomic():
+                                task_log.start_time = driver_info["start_time"]
+                                task_log.end_time = driver_info["end_time"]
+                                task_log.methodoutput.return_code = driver_info["return_code"]
+
+                                step_execute_info = self.sandbox.step_execute_info[(task.parent_run, task.pipelinestep)]
+                                with open(step_execute_info.driver_stdout_path(), "rb") as f:
+                                    task_log.methodoutput.output_log.save(f.name, File(f))
+                                with open(step_execute_info.driver_stderr_path(), "rb") as f:
+                                    task_log.methodoutput.error_log.save(f.name, File(f))
+
+                                task_log.methodoutput.save()
+                                task_log.save()
+
+                            # Now, we can submit the bookkeeping task, and the next time around we'll
+                            # watch for it.
+                            bookkeeping_job = self.submit_runstep_bookkeeping(task, task_dict["info_path"])
+                            self.tasks_in_progress[task]["bookkeeping"] = bookkeeping_job
+                            continue
+
+                else:
+                    bookkeeping_info = task_accounting_info.get(task_dict["bookkeeping"].job_id, None)
+                    # Check on the bookkeeping script.
+                    bookkeeping_state = None
+                    if (bookkeeping_info is not None and
+                            bookkeeping_info["state"] != fleet.slurmlib.BaseSlurmScheduler.UNKNOWN):
+                        bookkeeping_state = bookkeeping_info["state"]
+
+                    if bookkeeping_state is None or bookkeeping_state in self.slurm_sched_class.RUNNING_STATES:
+                        still_running.append(task_dict["bookkeeping"])
+                        continue
+                    elif bookkeeping_state in self.slurm_sched_class.CANCELLED_STATES:
+                        cancelled = True
+                        terminated_during = "bookkeeping"
+                    elif bookkeeping_state in self.slurm_sched_class.FAILED_STATES:
+                        # Something went wrong, so we bail.
+                        failed = True
+                        terminated_during = "bookkeeping"
 
             else:
                 cable_info = task_accounting_info.get(task_dict["cable"].job_id, None)
+                cable_state = None
+                if (cable_info is not None and
+                        cable_info["state"] != fleet.slurmlib.BaseSlurmScheduler.UNKNOWN):
+                    cable_state = cable_info["state"]
 
-                cable_state = cable_info["state"] if cable_info is not None else None
                 if cable_state is None or cable_state in self.slurm_sched_class.RUNNING_STATES:
                     # This is still going, so we move on.
                     still_running.append(task_dict["cable"])
@@ -537,12 +562,14 @@ class Foreman(object):
                     terminated_during
                 )
 
-                if failed:
-                    assert task.has_started()
-                    # Mark it as failed.
-                    task.finish_failure()
-                else:
-                    task.cancel()
+                task.refresh_from_db()
+                if not task.is_complete():  # it may have been properly handled already in setup or bookkeeping
+                    if failed:
+                        assert task.has_started()
+                        # Mark it as failed.
+                        task.finish_failure()
+                    else:
+                        task.cancel()
 
             self.tasks_in_progress.pop(task)
 
@@ -645,42 +672,15 @@ class Foreman(object):
 
     def submit_runcable(self, runcable):
         """
-        Submit a RunCable to Slurm for processing.
-
-        This will use the cable helper management command defined in settings.
+        Submit a RunCable for processing.
 
         Return a dictionary containing the SlurmJobHandle for the cable helper,
         as well as the path of the execution info dictionary file used by the step.
         """
-        # First, serialize the task execution information.
-        cable_info = self.sandbox.cable_execute_info[(runcable.parent_run, runcable.component)]
-        # We need to get some information about the cable: the step that it feeds (RunSIC)
-        # or that it's fed by (RunOutputCable), and the input/output that it feeds/is fed by.
-        # We need this so that we can write the stderr and stdout to the appropriate locations.
-        # cable_record = cable_info.cable_record
-
-        # Submit the job.
-        cable_execute_dict_fd, cable_execute_dict_path = tempfile.mkstemp()
-        with os.fdopen(cable_execute_dict_fd, "wb") as f:
-            f.write(json.dumps(cable_info.dict_repr()))
-
-        fleet_settings = []
-        if settings.FLEET_SETTINGS is not None:
-            fleet_settings = ["--settings", settings.FLEET_SETTINGS]
-
-        cable_slurm_handle = self.slurm_sched_class.submit_job(
-            settings.KIVE_HOME,
-            MANAGE_PY,
-            [settings.CABLE_HELPER_COMMAND] + fleet_settings + [cable_execute_dict_path],
-            self.sandbox.uid,
-            self.sandbox.gid,
-            self.sandbox.run.priority,
-            cable_info.threads_required,
-            cable_info.stdout_path,
-            cable_info.stderr_path,
-            job_name="run{}_cable{}".format(runcable.parent_run.pk, runcable.pk)
+        cable_slurm_handle, cable_execute_dict_path = self.slurm_sched_class.submit_runcable(
+            runcable,
+            self.sandbox
         )
-
         return {
             "cable": cable_slurm_handle,
             "info_path": cable_execute_dict_path
@@ -690,108 +690,53 @@ class Foreman(object):
         """
         Submit a RunStep to Slurm for processing.
 
-        The RunStep will proceed in three parts:
+        A RunStep proceeds in four parts:
          - setup
          - driver
+         - Foreman finishes the ExecLog
          - bookkeeping
-        all of which will be submitted to Slurm, with dependencies so that
-        each relies on the last.
+        The first two parts, and the last part, are handled by tasks submitted
+        to Slurm.  The third part is performed by the Foreman.  This function
+        submits the first two, with a dependency so that
+        the driver relies on the setup.
 
         Return a dictionary containing SlurmJobHandles for each, as well as
         the path of the execution info dictionary file used by the step.
         """
-        fleet_settings = []
-        if settings.FLEET_SETTINGS is not None:
-            fleet_settings = ["--settings", settings.FLEET_SETTINGS]
-
         # First, serialize the task execution information.
         step_info = self.sandbox.step_execute_info[(runstep.run, runstep.pipelinestep)]
 
-        # Submit a job for the setup.
-        step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp()
-        with os.fdopen(step_execute_dict_fd, "wb") as f:
-            f.write(json.dumps(step_info.dict_repr()))
-
-        # NOTE: wrapping the setup script is not required, but can be useful for debugging.
-        dowrap = False
-        if dowrap:
-            # write a mini wrapper
-            driver_template = """\
-#! /usr/bin/env bash
-# python -c "import time; print 'start time', time.time()"
-# cd {}
-# pwd
-{} {} {}
-# python -c "import time; print 'stop time', time.time()"
-"""
-            wrapped_driver_fd, wrapped_driver_path = tempfile.mkstemp(dir=step_info.step_run_dir,
-                                                                      prefix="setty")
-            # make the job script executable
-            os.fchmod(wrapped_driver_fd, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-            with os.fdopen(wrapped_driver_fd, "wb") as f:
-                f.write(
-                    driver_template.format(
-                        settings.KIVE_HOME,
-                        MANAGE_PY,
-                        settings.STEP_HELPER_COMMAND,
-                        " ".join(fleet_settings + [step_execute_dict_path])
-                    )
-                )
-            setup_slurm_handle = self.slurm_sched_class.submit_job(
-                settings.KIVE_HOME,
-                wrapped_driver_path,
-                fleet_settings,
-                self.sandbox.uid,
-                self.sandbox.gid,
-                self.sandbox.run.priority,
-                step_info.threads_required,
-                step_info.setup_stdout_path(),
-                step_info.setup_stderr_path(),
-                job_name="r{}s{}_setup".format(runstep.top_level_run.pk,
-                                               runstep.get_coordinates())
-            )
-        else:
-            setup_slurm_handle = self.slurm_sched_class.submit_job(
-                settings.KIVE_HOME,
-                MANAGE_PY,
-                [settings.STEP_HELPER_COMMAND] + fleet_settings + [step_execute_dict_path],
-                self.sandbox.uid,
-                self.sandbox.gid,
-                self.sandbox.run.priority,
-                step_info.threads_required,
-                step_info.setup_stdout_path(),
-                step_info.setup_stderr_path(),
-                job_name="r{}s{}_setup".format(runstep.top_level_run.pk,
-                                               runstep.get_coordinates())
-            )
+        setup_slurm_handle, step_execute_dict_path = self.slurm_sched_class.submit_step_setup(
+            runstep,
+            step_info,
+            self.sandbox
+        )
 
         driver_slurm_handle = self.sandbox.submit_step_execution(
             step_info,
-            after_okay=[setup_slurm_handle]
-        )
-
-        # Last, submit a job for the bookkeeping.
-        bookkeeping_slurm_handle = self.slurm_sched_class.submit_job(
-            settings.KIVE_HOME,
-            MANAGE_PY,
-            [settings.STEP_HELPER_COMMAND, "--bookkeeping"] + fleet_settings + [step_execute_dict_path],
-            self.sandbox.uid,
-            self.sandbox.gid,
-            self.sandbox.run.priority,
-            step_info.threads_required,
-            step_info.bookkeeping_stdout_path(),
-            step_info.bookkeeping_stderr_path(),
-            after_any=[driver_slurm_handle],
-            job_name="r{}s{}_bookkeeping".format(runstep.top_level_run.pk,
-                                                 runstep.get_coordinates())
+            after_okay=[setup_slurm_handle],
+            slurm_sched_class=self.slurm_sched_class
         )
 
         return {
             "setup": setup_slurm_handle,
             "driver": driver_slurm_handle,
-            "bookkeeping": bookkeeping_slurm_handle,
             "info_path": step_execute_dict_path
         }
+
+    def submit_runstep_bookkeeping(self, runstep, info_path):
+        """
+        Submit the bookkeeping part of a RunStep.
+
+        This is to be called after the driver part of a RunStep has been finished
+        and the Foreman has completed the ExecLog.  It uses the same step execution
+        information path as submit_runstep.
+        """
+        return self.slurm_sched_class.submit_step_bookkeeping(
+            runstep,
+            info_path,
+            self.sandbox
+        )
 
     def worker_finished(self, finished_task):
         """Handle bookkeeping when a worker finishes."""
@@ -1008,7 +953,7 @@ class Foreman(object):
 
         else:
             self.sandbox.run.refresh_from_db()
-            mgr_logger.info(
+            foreman_logger.info(
                 'Cleaning up %s run "%s" (pk=%d, Pipeline: %s, User: %s)',
                 self.sandbox.run.get_state_name(),
                 self.sandbox.run,
@@ -1059,7 +1004,10 @@ class Foreman(object):
         """
         for task, task_dict in self.tasks_in_progress.iteritems():
             if isinstance(task, RunStep):
-                for job in ("setup", "driver", "bookkeeping"):
+                parts_to_kill = ("setup", "driver")
+                if "bookkeeping" in task_dict:
+                    parts_to_kill = parts_to_kill + ("bookkeeping",)
+                for job in parts_to_kill:
                     self.slurm_sched_class.job_cancel(task_dict[job])
             else:
                 self.slurm_sched_class.job_cancel(task_dict["cable"])

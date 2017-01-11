@@ -525,11 +525,7 @@ class Dataset(metadata.models.AccessControl):
         abs_path = self.external_absolute_path()
         if abs_path is not None:
             if os.path.exists(abs_path) and os.access(abs_path, os.R_OK):
-                # the external file exists, has it been changed?
-                return self.check_md5()
-            else:
-                # external file might have been removed...
-                return False
+                return True
         return False
 
     def has_structure(self):

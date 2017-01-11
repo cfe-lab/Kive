@@ -155,7 +155,7 @@ def get_builtin_types(datatypes):
     return set([datatype.get_builtin_type() for datatype in datatypes])
 
 
-def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
+def summarize_CSV(columns, data_csv):
     """
     SYNOPSIS
     Inspect a CSV file, whose columns are expected to contain instances
@@ -167,7 +167,7 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
                         to which the columns of the file are supposed to conform
     data_csv            csv.reader object set to the first line of data (NOT
                         the header)
-    summary_path        working directory to run verification methods in
+    summary_path        working directory to run verification methods in FIXME get rid of this
     content_check_log   should be provided if this function is called as part
                         of a check on a Dataset
 
@@ -177,7 +177,7 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
 
     - num_rows: number of rows
     - failing_cells: dict of non-conforming cells in the file,
-      entries keyed by (rownum, colnum) contain list of tests failed.
+      entries keyed by (row_num, colnum) contain list of tests failed.
 
     RAISES
     VerificationMethodError if the verification method fails somehow.
@@ -189,71 +189,22 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
     the length of the columns parameter).
     """
     summary = {}
-    # We will use this lookup table while we're reading through the CSV
-    # file to see which columns need to be copied out into their own
-    # file.
-    cols_with_cc = [i for i, c in enumerate(columns, start=1) if c.has_custom_constraint()]
-    column_files = dict.fromkeys(cols_with_cc)  # files to write columns to
-    column_paths = dict.fromkeys(cols_with_cc)  # working directories to do checks in
-    plural = "" if len(cols_with_cc) == 1 else "s"
-    LOGGER.debug("{} column{} with custom constraints found".format(len(cols_with_cc), plural))
 
-    # Each column with custom constraints gets a file handle where
-    # the results of the verification method will be written.
-    try:
-        for column in cols_with_cc:
-            LOGGER.debug("Setting up verification path for column {}".format(column))
-            column_test_path = os.path.join(summary_path, "col{}".format(column))
-            input_file_path = _setup_verification_path(column_test_path)
-            configure_sandbox_permissions(column_test_path)
-            LOGGER.debug("Verification path was set up, column {} will be written to {}"
-                         .format(column, input_file_path))
-            column_paths[column] = column_test_path
-            column_files[column] = open(input_file_path, "a")
+    # Check basic constraints and count rows.
+    failing_cells = {}
+    row_num = 0
+    for row_num, row in enumerate(data_csv, start=1):
+        for col_num, col in enumerate(columns, start=1):
+            curr_cell_value = row[col_num-1] if col_num <= len(row) else ''
+            test_result = col.check_basic_constraints(curr_cell_value)
 
-        # Check basic constraints and count rows.
-        num_rows, failing_cells = _check_basic_constraints(columns, data_csv, column_files)
-        summary["num_rows"] = num_rows
-        plural = "" if num_rows == 1 else "s"
-        LOGGER.debug("Checked basic constraints for {} row{}".format(num_rows, plural))
+            if test_result:
+                LOGGER.debug('Value "{}" failed basic constraints'.format(curr_cell_value))
+                failing_cells[(row_num, col_num)] = test_result
 
-    finally:
-        for col in cols_with_cc:
-            if column_files[col]:
-                column_files[col].close()
-
-    # Check custom constraints. Any column that had a CustomConstraint
-    # must be checked using the specified verification method. The
-    # handles in column_files are all closed after the previous block.
-    for col in cols_with_cc:
-        # If this is called with Datatypes, content_check_log will be None,
-        # so it's OK to pass it to Datatype.check_custom_constraint.
-        LOGGER.debug("Checking custom constraints on column {}".format(col))
-        result = columns[col-1].check_custom_constraint(
-            column_paths[col],
-            column_files[col].name,
-            content_check_log
-        )
-        for row, error in result.items():
-            if row > num_rows:
-                if columns[col-1].__class__.__name__ == "Datatype":
-                    datatype = columns[col-1]
-                else:
-                    datatype = columns[col-1].datatype
-
-                raise ValueError(
-                    'Verification method for Datatype "{}" indicated an error in row {}, '
-                    'but only {} rows were checked'.format(
-                        datatype,
-                        row,
-                        num_rows
-                    )
-                )
-            cell = (row, col)
-            if cell in failing_cells:
-                failing_cells[cell].extend(error)
-            else:
-                failing_cells[cell] = error
+    summary["num_rows"] = row_num
+    plural = "" if row_num == 1 else "s"
+    LOGGER.debug("Checked basic constraints for {} row{}".format(row_num, plural))
 
     # If there are any failing cells, then add the dict to summary.
     if failing_cells:
@@ -262,94 +213,6 @@ def summarize_CSV(columns, data_csv, summary_path, content_check_log=None):
         summary["failing_cells"] = failing_cells
 
     return summary
-
-
-def _setup_verification_path(column_test_path):
-    """
-    Set up a path on the file system where we will run the verification
-    method for the column_index'th column of a CSV file.
-
-    INPUTS
-    column_test_path    working directory to check this column in
-
-    OUTPUTS
-    input_file_path     a file name where the data to verify should be written to,
-                        with a header already in place (ie. the file should be
-                        opened in append mode).
-    """
-    verif_in = CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK)
-
-    # Set up the paths
-    # [summary path]/col[colnum]/
-    # [summary path]/col[colnum]/input_data/
-    # [summary path]/col[colnum]/output_data/
-    # [summary path]/col[colnum]/logs/
-
-    # We will use the first to actually run the script; the input file will
-    # go into the second; the output will go into the third; output and
-    # error logs go into the fourth.
-
-    input_data = os.path.join(column_test_path, "input_data")
-    output_data = os.path.join(column_test_path, "output_data")
-    logs = os.path.join(column_test_path, "logs")
-    for workdir in [input_data, output_data, logs]:
-        set_up_directory(workdir)
-        configure_sandbox_permissions(workdir)
-
-    input_file_path = os.path.join(input_data, "to_test.csv")
-
-    # Write a CSV header.
-    with open(input_file_path, "w") as f:
-        verif_in_header = [m.column_name for m in verif_in.members.all()]
-        writer = csv.DictWriter(f, fieldnames=verif_in_header)
-        writer.writeheader()
-    configure_sandbox_permissions(input_file_path)
-
-    return input_file_path
-
-
-def _check_basic_constraints(columns, data_reader, out_handles={}):
-    """
-    Check the basic constraints on a CSV file, and copy the contents of
-    each column to the file handle indicated in out_handles. Return the
-    number of rows processed, and a dictionary of cells where a
-    BasicConstraint was not satisfied. Outputs a tuple (num_rows,
-    failing_cells). Also generate an MD5 checksum for the file by updating
-    the supplied MD5 generator.
-    TODO: Make out_handles CSV writers or DictWriters, not file handles.
-
-    INPUTS
-    columns         list of Datatypes or CDTM's to which the CSV file is
-                    expected to conform
-    data_reader     csv.reader object, open on the CSV file we wish to check.
-                    This should be set to the first row of data (NOT the
-                    header), eg. by calling next() on it once.
-    out_handles     dictionary of file handles, keyed by column index,
-                    where the column should be copied to. If the column
-                    index is not present in the dictionary, don't copy the
-                    column anywhere.
-
-    OUTPUTS
-    num_rows        the number of rows which were processed.
-    failing_cells   a dictionary of failed BasicContraints for cells in
-                    the CSV. Key is (row, column), and value is a list of
-                    BasicConstraints which the cell failed.
-    """
-    failing_cells = {}
-    rownum = 0
-    for rownum, row in enumerate(data_reader, start=1):
-        for colnum, col in enumerate(columns, start=1):
-            curr_cell_value = row[colnum-1] if colnum <= len(row) else ''
-            test_result = col.check_basic_constraints(curr_cell_value)
-
-            if test_result:
-                LOGGER.debug('Value "{}" failed basic constraints'.format(curr_cell_value))
-                failing_cells[(rownum, colnum)] = test_result
-            # TODO: should be print function
-            if colnum in out_handles:
-                out_handles[colnum].write(curr_cell_value + "\n")
-
-    return rownum, failing_cells
 
 
 def who_cannot_access(user, users_allowed, groups_allowed, acs):
@@ -648,13 +511,6 @@ class Datatype(AccessControl):
     def restricts_str(self):
         return ','.join([dt['name'] for dt in self.restricts.values()])
 
-    @property
-    def custom_constraint(self):
-        try:
-            return self.custom_constraint
-        except ObjectDoesNotExist:
-            return None
-
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -712,16 +568,6 @@ class Datatype(AccessControl):
         Does this Datatype have any basic constraints?
         """
         return hasattr(self, "basic_constraints")
-
-    def has_custom_constraint(self):
-        """
-        Does this Datatype have a custom constraint?
-        """
-        try:
-            self.custom_constraint
-        except ObjectDoesNotExist:
-            return False
-        return True
 
     def is_numeric(self):
         """
@@ -1078,16 +924,11 @@ class Datatype(AccessControl):
         1) This Datatype has a prototype, and it is clean
         """
         self.logger.debug('Checking constraints for Datatype "{}" on its prototype'.format(self))
-        summary_path = tempfile.mkdtemp(
-            prefix="Datatype{}_".format(self.pk),
-            dir=os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
-        )
-        configure_sandbox_permissions(summary_path)
 
         with open(self.prototype.dataset_file.path) as f:
             reader = csv.reader(f)
             next(reader)  # skip header - we already know it's good from cleaning the prototype
-            summary = summarize_CSV([self, Datatype.objects.get(pk=datatypes.BOOL_PK)], reader, summary_path)
+            summary = summarize_CSV([self, Datatype.objects.get(pk=datatypes.BOOL_PK)], reader)
 
         try:
             failing_cells = summary["failing_cells"].keys()
@@ -1108,7 +949,6 @@ class Datatype(AccessControl):
                 elif not valid and (rownum, 1) not in failing_cells:
                     raise ValidationError('The prototype for Datatype "{}" indicates the value "{}" should be '
                                           'invalid, but it passed all constraints'.format(self, row[0]))
-        shutil.rmtree(summary_path)
 
     def clean(self):
         """
@@ -1133,10 +973,6 @@ class Datatype(AccessControl):
             if self.has_restriction():
                 self._check_constraint_intervals()
                 self._check_basic_constraints_against_supertypes()
-
-        if self.has_custom_constraint():
-            self.logger.debug('Checking custom constraint for Datatype "{}"'.format(self))
-            self.custom_constraint.clean()
 
         if self.has_prototype():
             self.logger.debug('Cleaning prototype for Datatype "{}"'.format(self))
@@ -1238,206 +1074,16 @@ class Datatype(AccessControl):
 
         return constraints_failed
 
-    def check_custom_constraint(self, summary_path, input_path, verification_log=None,
-                                check_interval=None):
-        """
-        SYNOPSIS
-        Check the one-column CSV file file stored at input_path against this
-        Datatype's CustomConstraint.
-
-        INPUTS
-        summary_path        the work directory where we will run the
-                            verification method
-        input_path          one-column CSV to be checked
-        verification_log    VerificationLog to fill out
-        check_interval      Number of seconds between status queries to Slurm
-
-        OUTPUTS
-        failing_cells       a dictionary of cells which failed a custom
-                            constraint (see summarize_CSV)
-
-        RAISES
-        IOError, FileCreationError (if the verifier method fails to install properly)
-        VerificationMethodError (if the verifier method fails somehow)
-
-        ASSUMPTIONS
-        1) this Datatype has a CustomConstraint.
-        2) summary_path has been set up using setup_verification_path.
-        """
-        check_interval = check_interval or settings.DEFAULT_SLURM_CHECK_INTERVAL
-
-        assert self.has_custom_constraint()
-        # We need to invoke the verification method using run_code.
-        verifier = self.custom_constraint.verification_method
-
-        job_name = verifier.driver.coderesource.filename
-        if verification_log:
-            verification_log.start(save=True)
-            job_name = "dataset{}_cc[{}]".format(
-                verification_log.contentchecklog.dataset.pk,
-                verifier.driver.coderesource.filename
-            )
-
-        # Invoke and wait via Slurm.
-        verifier.install(summary_path)
-
-        output_path = os.path.join(summary_path, "output_data", "failed_row.csv")
-        stdout_path = os.path.join(summary_path, "logs", "stdout.txt")
-        stderr_path = os.path.join(summary_path, "logs", "stderr.txt")
-
-        job = verifier.submit_code(
-            summary_path,
-            [input_path],
-            [output_path],
-            stdout_path,
-            stderr_path,
-            priority=settings.DEFAULT_SLURM_PRIORITY,
-            job_name=job_name
-        )
-
-        is_done = False
-        job_info = None
-        while not is_done:
-            time.sleep(check_interval)
-            accounting_info = SlurmScheduler.get_accounting_info([job])
-            if len(accounting_info) > 0:
-                job_info = accounting_info[job.job_id]
-                curr_state = job_info["state"]
-                self.logger.info(
-                    "Waiting for %s (state = %s)",
-                    job,
-                    curr_state
-                )
-                is_done = (
-                    curr_state == SlurmScheduler.COMPLETED or
-                    curr_state in SlurmScheduler.CANCELLED_STATES or
-                    curr_state in SlurmScheduler.FAILED_STATES
-                )
-            else:
-                self.logger.info(
-                    "Job %s has not been queued yet",
-                    job
-                )
-
-        return_code = job_info["return_code"]
-
-        # The method's driver has been called and has completed: now keep the record.
-        with transaction.atomic():
-            if verification_log:
-                verification_log.stop(save=True, clean=True)
-
-                self.logger.debug('return code is %s for %r.',
-                                  return_code,
-                                  verification_log)
-                verification_log.return_code = return_code
-
-                with open(stdout_path, "rb") as out_f, open(stderr_path, "rb") as err_f:
-                    verification_log.error_log.save(stderr_path, File(err_f))
-                    verification_log.output_log.save(stdout_path, File(out_f))
-
-            verification_log.clean()
-            verification_log.save()
-
-        if job_info["state"] in SlurmScheduler.CANCELLED_STATES:
-            raise VerificationMethodError(
-                "Verification method of Datatype {} was cancelled when run on file {}".format(
-                    self,
-                    input_path
-                )
-            )
-        elif job_info["state"] in SlurmScheduler.FAILED_STATES:
-            raise VerificationMethodError(
-                "Verification method of Datatype {} failed when run on file {} (return code {})".format(
-                    self,
-                    input_path,
-                    return_code
-                )
-            )
-        elif return_code != 0:
-            raise VerificationMethodError(
-                "Verification method of Datatype {} produced return code {} when run on file {}".format(
-                    self,
-                    return_code,
-                    input_path
-                )
-            )
-
-        return self._check_verification_output(summary_path, output_path)
-
-    def _check_verification_output(self, summary_path, output_path):
-        """
-        Check the one-column CSV file, contained at output_path, which
-        was output by a verification method for this Dataype's
-        CustomConstraint. This is a helper function for
-        check_custom_constraint.
-
-        INPUTS
-        summary_path    the working directory where the check on the
-                        CustomConstraint was performed
-        output_path     the CSV file to check, which was output by a
-                        verification method
-
-        OUTPUTS
-        failing_cells   a dictionary of CustomConstraints which were
-                        failed in the original CSV, as indicated by the
-                        verification method's output.  Keys are row
-                        number, and values are lists of failed custom
-                        constraints (currently, these lists may only be
-                        of length 1, since a Datatype may only have one
-                        CustomConstraint and we do not check them
-                        recursively).
-
-        RAISES
-        RuntimeError if summarize_CSV raises one.
-
-        ASSUMPTIONS
-        1) This is called from inside check_custom_constraint.
-        """
-        VERIF_OUT = CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK)
-
-        if not os.path.exists(output_path):
-            raise ValueError('Verification method for Datatype "{}" produced no output'.format(self))
-
-        # Now: open the resulting file, which is at output_path, and make sure
-        # it's OK.  We're going to have to call summarize_CSV on this resulting
-        # file, but that's OK because it must have a CDT (NaturalNumber
-        # failed_row), and we will define NaturalNumber to have no
-        # CustomConstraint, so that no deeper recursion will happen.
-        with open(output_path, "r") as test_out:
-            dummy_path = os.path.join(summary_path, "SHOULDNEVERBEWRITTENTO")
-            output_summary = VERIF_OUT.summarize_CSV(test_out, dummy_path)
-        assert not os.path.exists(dummy_path)
-
-        if "bad_num_cols" in output_summary:
-            raise ValueError(('Output of verification method for Datatype "{}" had the wrong number of columns'
-                              .format(self)))
-
-        if "bad_col_indices" in output_summary:
-            raise ValueError('Output of verification method for Datatype "{}" had a malformed header'.format(self))
-
-        if "failing_cells" in output_summary:
-            raise ValueError('Output of verification method for Datatype "{}" had malformed entries'.format(self))
-
-        # Collect the row numbers of incorrect entries in this column.
-        failing_cells = {}
-        with open(output_path, "rb") as test_out:
-            test_out_csv = csv.reader(test_out)
-            next(test_out_csv)  # skip header
-            for row in test_out_csv:
-                failing_cells[int(row[0])] = [self.custom_constraint]
-
-        return failing_cells
-
     @transaction.atomic
-    def remove(self, rm_verif_method=True):
+    def remove(self):
         """
         Remove this Datatype and anything tied to it from the system.
         """
-        removal_plan = self.build_removal_plan(rm_verif_method=rm_verif_method)
+        removal_plan = self.build_removal_plan()
         remove_helper(removal_plan)
 
     @transaction.atomic
-    def build_removal_plan(self, removal_accumulator=None, rm_verif_method=True):
+    def build_removal_plan(self, removal_accumulator=None):
         removal_plan = removal_accumulator or empty_removal_plan()
         assert self not in removal_plan["Datatypes"]
 
@@ -1473,14 +1119,6 @@ class Datatype(AccessControl):
                 removal_plan = update_removal_plan(
                     removal_plan,
                     cdt.build_removal_plan(removal_plan)
-                )
-
-        if (rm_verif_method and self.has_custom_constraint() and
-                self.custom_constraint.verification_method.user == self.user):
-            if self.custom_constraint.verification_method not in removal_plan["Methods"]:
-                update_removal_plan(
-                    removal_plan,
-                    self.custom_constraint.verification_method.driver.build_removal_plan(removal_plan)
                 )
 
         return removal_plan
@@ -1606,65 +1244,6 @@ class BasicConstraint(models.Model):
                                   .format(self, self.datatype, self.datatype.get_builtin_type()))
 
 
-class CustomConstraint(models.Model):
-    """
-    More complex (level 2) verification of Datatypes.
-
-    These will be specified in the form of Methods that
-    take a CSV of strings (which is the parent of all
-    Datatypes) and return a CSV of integers indicating which rows
-    contain invalid values.
-    """
-    datatype = models.OneToOneField(Datatype, related_name="custom_constraint")
-    verification_method = models.ForeignKey("method.Method", related_name="custom_constraints")
-
-    # Clean: Methods which function as CustomConstraints must take in
-    # a column of strings named "to_test" and returns a column of
-    # positive integers named "failed_row".  We thus need to
-    # hard-code in at least two Datatypes and two CDTs (string,
-    # PositiveInteger (and probably int) so that PositiveInteger can
-    # restrict it), and a CDT for each).  We'll probably need more
-    # later anyway.  Such CDTs will be pre-loaded into the database.
-    def clean(self):
-        """
-        Checks coherence of this CustomConstraint.
-
-        The method used for verification must accept as input
-        a CDT looking like (string to_test); it must return
-        as output a CDT looking like (bool is_valid).
-        """
-        # Check that the users with access to this Datatype must have access to the
-        # verification method.
-        self.datatype.validate_restrict_access([self.verification_method])
-
-        # Pre-defined CDTs that the verification method must use.
-        VERIF_IN = CompoundDatatype.objects.get(pk=CDTs.VERIF_IN_PK)
-        VERIF_OUT = CompoundDatatype.objects.get(pk=CDTs.VERIF_OUT_PK)
-
-        verif_method_in = self.verification_method.inputs.all()
-        verif_method_out = self.verification_method.outputs.all()
-        if verif_method_in.count() != 1 or verif_method_out.count() != 1:
-            raise ValidationError(
-                "CustomConstraint \"{}\" verification method does not have "
-                "exactly one input and one output".format(self))
-        # TODO: Quick and dirty check, test later.
-        if verif_method_in[0].is_raw():
-            raise ValidationError(
-                'Verification method for CustomConstraint "{}" has a raw input'.format(self))
-        if verif_method_out[0].is_raw():
-            raise ValidationError(
-                'Verification method for CustomConstraint "{}" has a raw output'.format(self))
-        if not verif_method_in[0].get_cdt().is_identical(VERIF_IN):
-            raise ValidationError(
-                "CustomConstraint \"{}\" verification method does not have an input CDT identical to VERIF_IN".
-                format(self))
-
-        if not verif_method_out[0].get_cdt().is_identical(VERIF_OUT):
-            raise ValidationError(
-                "CustomConstraint \"{}\" verification method does not have an output CDT identical to VERIF_OUT".
-                format(self))
-
-
 @python_2_unicode_compatible
 class CompoundDatatypeMember(models.Model):
     """
@@ -1717,22 +1296,6 @@ class CompoundDatatypeMember(models.Model):
         return '{}: {}{}'.format(self.column_name,
                                  unicode(self.datatype),
                                  blankable_marker)
-
-    def has_custom_constraint(self):
-        """
-        Does the underlying Datatype have a CustomConstraint?
-        """
-        return self.datatype.has_custom_constraint()
-
-    def check_custom_constraint(self, summary_path, input_path, content_check_log):
-        """
-        Exactly the same as Datatype.check_custom_constraint(), except
-        we create a VerificationLog.
-
-        May raise a VerificationMethodError if the verification method fails somehow.
-        """
-        verif_log = content_check_log.verification_logs.create(CDTM=self)
-        return self.datatype.check_custom_constraint(summary_path, input_path, verif_log)
 
     def check_basic_constraints(self, value):
         """
@@ -2006,8 +1569,7 @@ class CompoundDatatype(AccessControl):
             return summary
 
         # Check the constraints using the module helper.
-        summary.update(summarize_CSV(self.members.order_by("column_idx"), data_csv,
-                                     summary_path, content_check_log))
+        summary.update(summarize_CSV(self.members.order_by("column_idx"), data_csv))
         return summary
 
     def check_constraints(self, row):

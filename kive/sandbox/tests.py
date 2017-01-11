@@ -16,7 +16,7 @@ from archive.models import Run, RunComponent
 from constants import datatypes
 from datachecking.models import IntegrityCheckLog, MD5Conflict
 from kive.testing_utils import clean_up_all_files
-from kive.tests import install_fixture_files, remove_fixture_files
+from kive.tests import install_fixture_files, remove_fixture_files, BaseTestCases
 from librarian.models import Dataset, DatasetStructure, ExternalFileDirectory, ExecRecord
 from metadata.models import Datatype, CompoundDatatype, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
@@ -168,7 +168,7 @@ def execute_tests_environment_load(case):
 
 
 @skipIfDBFeature('is_mocked')
-class ExecuteTestsBase(TestCase):
+class ExecuteTestsBase(BaseTestCases.SlurmExecutionTestCase):
     fixtures = ['execute_tests']
 
     def setUp(self):

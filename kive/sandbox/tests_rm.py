@@ -15,7 +15,7 @@ from kive.tests import install_fixture_files, remove_fixture_files, BaseTestCase
 from method.models import Method
 from fleet.workers import Manager
 from archive.models import Run
-from fleet.slurmlib import SlurmScheduler
+from fleet.slurmlib import SlurmScheduler, DummySlurmScheduler
 import file_access_utils
 
 
@@ -140,16 +140,17 @@ class ExecuteResultTestsRM(TestCase):
             [self.dataset_labdata.dataset_file.file.name],
             [outfile],
             stdout_path,
-            stderr_path
+            stderr_path,
+            slurm_sched_class=DummySlurmScheduler
         )
 
         is_done = False
         while not is_done:
             time.sleep(settings.DEFAULT_SLURM_CHECK_INTERVAL)
-            accounting_info = SlurmScheduler.get_accounting_info([complement_job_handle])
+            accounting_info = DummySlurmScheduler.get_accounting_info([complement_job_handle])
             if len(accounting_info) > 0:
                 curr_state = accounting_info[complement_job_handle.job_id]["state"]
-                is_done = curr_state == SlurmScheduler.COMPLETED
+                is_done = curr_state == DummySlurmScheduler.COMPLETED
 
         labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
         shutil.rmtree(tmpdir)
