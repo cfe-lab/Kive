@@ -708,7 +708,6 @@ class Foreman(object):
 
         setup_slurm_handle, step_execute_dict_path = self.slurm_sched_class.submit_step_setup(
             runstep,
-            step_info,
             self.sandbox
         )
 

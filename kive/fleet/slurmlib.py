@@ -16,7 +16,7 @@ from datetime import datetime
 import django.utils.timezone as timezone
 from django.conf import settings
 
-from sandbox.execute import Sandbox
+# from sandbox.execute import Sandbox
 from fleet.exceptions import StopExecution
 
 
@@ -157,11 +157,16 @@ class BaseSlurmScheduler:
 
         workingdir (string): directory name of the job. slurm will set this to the
         'current directory' when the job is run.
+
         driver_name (string): name of the command to execute as the main job script.
+
         driver_arglst (list of strings): arguments to the driver_name executable.
+
         user_id, group_id (integers): the unix user under whose account the jobs will
-        be executed .
-        prio_level: one of the three elements in PRIO_SET.
+        be executed.
+
+        prio_level (integer): priority level of the job (0 is lowest).
+
         num_cpus: the number of CPU's (in a slurm sense) to reserve for this job.
 
         stdoutfile, stderrfile (strings or None): file names into which the job's
@@ -266,6 +271,8 @@ class BaseSlurmScheduler:
 class SlurmScheduler(BaseSlurmScheduler):
 
     _qnames = None
+    _revlookup = None
+    _ordered_priorities = None
     fleet_settings = [] if settings.FLEET_SETTINGS is None else ["--settings", settings.FLEET_SETTINGS]
 
     @classmethod
@@ -283,7 +290,7 @@ class SlurmScheduler(BaseSlurmScheduler):
                    after_any=None,
                    job_name=None):
         job_name = job_name or driver_name
-        if prio_level not in cls.PRIO_SET:
+        if prio_level not in cls._qnames:
             raise RuntimeError("prio_level not a valid priority")
         if cls._qnames is None:
             raise RuntimeError("Must call slurm_is_alive before submitting jobs")
@@ -443,9 +450,9 @@ class SlurmScheduler(BaseSlurmScheduler):
                 return False
 
             # Having reached here, we know the queues are OK.  Set up _qnames and _revlookup.
-            kive_queue_names = [x[0] for x in settings.SLURM_QUEUES]
-            cls._qnames = dict(zip(kive_queue_names, slurm_queue_names))
-            cls._revlookup = dict(zip(slurm_queue_names, kive_queue_names))
+            cls._ordered_priorities = [x[0] for x in settings.SLURM_QUEUES]
+            cls._qnames = dict(zip(cls._ordered_priorities, slurm_queue_names))
+            cls._revlookup = dict(zip(slurm_queue_names, cls._ordered_priorities))
             return True
 
         else:
@@ -482,6 +489,7 @@ class SlurmScheduler(BaseSlurmScheduler):
             logger.info('prio mapping: ', " ".join(["%s:%s" % (pk, dd[pk]) for pk in priokeys]))
             # create a reverse lookup table: qnames -> priovalues
             cls._revlookup = dict(zip(partnames, priokeys))
+            cls._ordered_priorities = priokeys
             return True
 
     @classmethod
@@ -623,13 +631,16 @@ class SlurmScheduler(BaseSlurmScheduler):
         """
         if cls._qnames is None:
             raise RuntimeError("Must call slurm_is_alive before setting job priority")
-        if priority not in cls._qnames:
-            raise RuntimeError("Illegal priority '%s' " % priority)
         if jobhandle_lst is None or len(jobhandle_lst) == 0:
             raise RuntimeError("no jobhandles provided")
+
+        # priority is an integer; we translate it to one of the Slurm queue names.
+        priority = min(max(0, priority), len(cls._ordered_priorities) - 1)
+        queue_to_use = cls._ordered_priorities[priority]
+
         cmd_list = ["scontrol", "update", "job",
                     ",".join([jh.job_id for jh in jobhandle_lst]),
-                    "Partition={}".format(cls._qnames[priority])]
+                    "Partition={}".format(queue_to_use)]
         logger.debug(" ".join(cmd_list))
         try:
             sp.check_output(cmd_list)
@@ -730,10 +741,10 @@ class SlurmScheduler(BaseSlurmScheduler):
 
 
 sco_pid = 100
-dummypriotable = {
-    BaseSlurmScheduler.PRIO_LOW: 0,
-    BaseSlurmScheduler.PRIO_MEDIUM: 1,
-    BaseSlurmScheduler.PRIO_HIGH: 2
+dummy_priority_by_index = {
+    0: BaseSlurmScheduler.PRIO_LOW,
+    1: BaseSlurmScheduler.PRIO_MEDIUM,
+    2: BaseSlurmScheduler.PRIO_HIGH
 }
 
 
@@ -764,11 +775,9 @@ class dummyjobstate:
         self.start_time = None
         self.end_time = None
         self.set_runstate(BaseSlurmScheduler.PENDING)
-        self.prio_name = priolevel
-        try:
-            self.prio_num = dummypriotable[priolevel]
-        except:
-            raise RuntimeError('illegal priolevel')
+        assert priolevel in dummy_priority_by_index, "{} is an invalid priority".format(priolevel)
+        self.prio_num = priolevel
+        self.prio_name = dummy_priority_by_index[priolevel]
         self.jobname = jobname
 
     def iscancelled(self):
@@ -803,7 +812,7 @@ class dummyjobstate:
 class dummyworkerproc(dummyjobstate):
 
     def __init__(self, jdct):
-        dummyjobstate.__init__(jdct["prio_level"], jdct["job_name"])
+        dummyjobstate.__init__(self, jdct["prio_level"], jdct["job_name"])
         self._jdct = jdct
 
     def do_run(self):
@@ -899,18 +908,18 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         return -1
 
     @staticmethod
-    def _setprio(jidlst, prio_name, waitdct, rundct, findct):
+    def _setprio(jidlst, priority, waitdct, rundct, findct):
         """ Set the priority levels of the jobs in jidlst.
         """
-        prio_num = dummypriotable.get(prio_name, None)
-        if prio_num is None:
-            return -1
         jset = set(jidlst)
         for s, dct in [(set(dct.keys()) & jset, dct) for dct in [waitdct, rundct, findct]]:
             for jid in s:
                 dd = dct[jid]
-                dd.prio_name = prio_name
-                dd.prio_num = prio_num
+
+            assert priority in dummy_priority_by_index, "{} is an invalid priority".format(priority)
+            dd.prio_num = priority
+            dd.prio_name = dummy_priority_by_index[priority]
+
         # NOTE: we have not checked whether all elements in jidlst have been found.
         # ignore this for now
         return 0
@@ -935,7 +944,6 @@ class DummySlurmScheduler(BaseSlurmScheduler):
 
     @staticmethod
     def masterproc(jobqueue, resultqueue):
-
         waitdct = {}
         rundct = {}
         findct = {}
@@ -1043,8 +1051,9 @@ class DummySlurmScheduler(BaseSlurmScheduler):
 
         if cls.mproc is None:
             cls._init_masterproc()
-        if prio_level not in cls.PRIO_SET:
-            raise RuntimeError("prio_level not a valid priority")
+
+        prio_level = min(max(prio_level, 0), 2)
+
         # make sure the job script exists and is executable
         full_path = os.path.join(workingdir, driver_name)
         if not os.path.isfile(full_path):
@@ -1114,8 +1123,9 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         """Set the priority of the specified jobs."""
         if cls.mproc is None:
             cls._init_masterproc()
-        if priority not in cls.PRIO_SET:
-            raise RuntimeError("prio_level not a valid priority")
+
+        priority = min(max(priority, 0), 2)
+
         cls._jobqueue.put(('prio', ([jh.job_id for jh in jobhandle_lst], priority)))
         res = cls._resqueue.get()
         if res != 0:
@@ -1125,15 +1135,6 @@ class DummySlurmScheduler(BaseSlurmScheduler):
     def shutdown(cls):
         cls.mproc.terminate()
         cls.mproc = None
-
-    @classmethod
-    def _int_to_prio(cls, intprio):
-        if intprio < 0:
-            return cls.PRIO_LOW
-        elif intprio == 0:
-            return cls.PRIO_MEDIUM
-        else:
-            return cls.PRIO_HIGH
 
     @classmethod
     def submit_runcable(cls, runcable, sandbox):
@@ -1148,16 +1149,15 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         with os.fdopen(cable_execute_dict_fd, "wb") as f:
             f.write(json.dumps(cable_info_dict))
 
-        Sandbox.finish_cable(cable_info_dict)
-        driver_arglst = [settings.CABLE_HELPER_COMMAND] + cls.fleet_settings + [cable_execute_dict_path]
+        sandbox.__class__.finish_cable(cable_info_dict)
+        driver_arglst = [settings.CABLE_HELPER_COMMAND, cable_execute_dict_path]
         job_name = "run{}_cable{}".format(runcable.parent_run.pk, runcable.pk)
-        slurmprio = cls._int_to_prio(sandbox.run.priority)
         jdct = dict([('workingdir', settings.KIVE_HOME),
                      ('driver_name', os.path.join(settings.KIVE_HOME, MANAGE_PY)),
                      ('driver_arglst', driver_arglst),
                      ('user_id', sandbox.uid),
                      ('group_id', sandbox.gid),
-                     ('prio_level', slurmprio)
+                     ('prio_level', sandbox.run.priority),
                      ('num_cpus', cable_info.threads_required),
                      ('stdoutfile', cable_info.stdout_path),
                      ('stderrfile', cable_info.stderr_path),
@@ -1187,7 +1187,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
 
         exit_code = 0
         try:
-            curr_RS = Sandbox.step_execution_setup(step_execute_dict)
+            curr_RS = sandbox.__class__.step_execution_setup(step_execute_dict)
         except StopExecution:
             logger.exception("Execution was stopped during setup.")
             exit_code = 103
@@ -1196,18 +1196,17 @@ class DummySlurmScheduler(BaseSlurmScheduler):
             exit_code = 101
         elif curr_RS.is_cancelled():
             exit_code = 102
-        driver_arglst = [settings.STEP_HELPER_COMMAND] + cls.fleet_settings + [step_execute_dict_path]
+        driver_arglst = [settings.STEP_HELPER_COMMAND, step_execute_dict_path]
         job_name = "r{}s{}_setup".format(runstep.top_level_run.pk, runstep.get_coordinates())
-        slurmprio = cls._int_to_prio(sandbox.run.priority)
         jdct = dict([('workingdir', settings.KIVE_HOME),
                      ('driver_name', os.path.join(settings.KIVE_HOME, MANAGE_PY)),
                      ('driver_arglst', driver_arglst),
                      ('user_id', sandbox.uid),
                      ('group_id', sandbox.gid),
-                     ('prio_level', slurmprio),
+                     ('prio_level', sandbox.run.priority),
                      ('num_cpus', step_info.threads_required),
-                     ('stdoutfile', step_info.stdout_path),
-                     ('stderrfile', step_info.stderr_path),
+                     ('stdoutfile', step_info.setup_stdout_path()),
+                     ('stderrfile', step_info.setup_stderr_path()),
                      ('after_okay', None),
                      ('after_any', None),
                      ('job_name', job_name),
@@ -1234,20 +1233,19 @@ class DummySlurmScheduler(BaseSlurmScheduler):
             with os.fdopen(step_execute_dict_fd, "wb") as f:
                 f.write(json.dumps(step_execute_dict))
 
-        Sandbox.step_execution_bookkeeping(step_execute_dict)
-        driver_arglst = [settings.STEP_HELPER_COMMAND, "--bookkeeping"] + cls.fleet_settings + [step_execute_dict_path]
+        sandbox.__class__.step_execution_bookkeeping(step_execute_dict)
+        driver_arglst = [settings.STEP_HELPER_COMMAND, "--bookkeeping", step_execute_dict_path]
         job_name = "r{}s{}_bookkeeping".format(runstep.top_level_run.pk,
                                                runstep.get_coordinates())
-        slurmprio = cls._int_to_prio(sandbox.run.priority)
         jdct = dict([('workingdir', settings.KIVE_HOME),
                      ('driver_name', os.path.join(settings.KIVE_HOME, MANAGE_PY)),
                      ('driver_arglst', driver_arglst),
                      ('user_id', sandbox.uid),
                      ('group_id', sandbox.gid),
-                     ('prio_level', slurmprio),
+                     ('prio_level', sandbox.run.priority),
                      ('num_cpus', step_info.threads_required),
-                     ('stdoutfile', step_info.stdout_path),
-                     ('stderrfile', step_info.stderr_path),
+                     ('stdoutfile', step_info.bookkeeping_stdout_path()),
+                     ('stderrfile', step_info.bookkeeping_stderr_path()),
                      ('after_okay', None),
                      ('after_any', None),
                      ('job_name', job_name),

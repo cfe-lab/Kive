@@ -220,8 +220,14 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         on_delete=models.SET_NULL
     )
 
+    # Priority of this Run.  The priority levels are defined in settings, with defaults:
+    # 0: BaseSlurmScheduler.PRIO_LOW
+    # 1: BaseSlurmScheduler.PRIO_MEDIUM
+    # 2: BaseSlurmScheduler.PRIO_HIGH
+    # This integer is the index of the priority level to use, so 0, the default,
+    # is the lowest priority level.
     priority = models.IntegerField(
-        help_text="Priority of this Run",
+        help_text="Priority of this Run (priority levels are defined in settings)",
         default=0
     )
 

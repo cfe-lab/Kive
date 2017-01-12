@@ -468,12 +468,12 @@ def test_set_priority_01():
     print "final states:", priolst
 
 
-def test_set_priority_02():
-    """ Set an illegal job priority. This should raise an exception."""
-    low_prio = SlurmScheduler.PRIO_LOW
-    jobhandles = submit_all(low_prio)
-    with pytest.raises(RuntimeError):
-        SlurmScheduler.set_job_priority(jobhandles, 'HI_PRIO')
+# def test_set_priority_02():
+#     """ Set an illegal job priority. This should raise an exception."""
+#     low_prio = SlurmScheduler.PRIO_LOW
+#     jobhandles = submit_all(low_prio)
+#     with pytest.raises(RuntimeError):
+#         SlurmScheduler.set_job_priority(jobhandles, 'HI_PRIO')
     
     
 def test_acc_info_01():
