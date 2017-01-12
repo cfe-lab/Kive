@@ -762,7 +762,7 @@ def startit(wdir, dname, arglst, stdout, stderr):
     NOTE: shell MUST be False here, otherwise the popen.wait() will NOT wait
     for completion of the command.
     """
-    act_cmdstr = "cd {}; {} {}".format(wdir, dname, " ".join(arglst))
+    act_cmdstr = "cd {}; {} {}".format(wdir, os.path.join(wdir, dname), " ".join(arglst))
     cclst = ["/bin/bash", "-c", '%s' % act_cmdstr]
     p = sp.Popen(cclst, shell=False, stdout=stdout, stderr=stderr)
     return p

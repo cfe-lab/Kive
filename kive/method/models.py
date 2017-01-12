@@ -580,7 +580,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                     after_okay=None,
                     uid=None,
                     gid=None,
-                    priority=None,
+                    priority=0,
                     job_name=None,
                     slurm_sched_class=SlurmScheduler):
         """
@@ -611,7 +611,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         uid = uid or default_uid
         gid = gid or default_gid
 
-        priority = priority or settings.DEFAULT_SLURM_PRIORITY
         job_name = job_name or self.driver.coderesource.filename
 
         job_handle = slurm_sched_class.submit_job(
