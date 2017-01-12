@@ -8,11 +8,8 @@ import time
 import datetime
 import itertools
 import os
-import stat
 import glob
 import shutil
-import json
-import tempfile
 import inspect
 
 from django.conf import settings
@@ -28,9 +25,6 @@ import fleet.slurmlib
 mgr_logger = logging.getLogger("fleet.Manager")
 foreman_logger = logging.getLogger("fleet.Foreman")
 worker_logger = logging.getLogger("fleet.Worker")
-
-
-MANAGE_PY = "manage.py"
 
 
 class Manager(object):
@@ -71,14 +65,6 @@ class Manager(object):
             raise RuntimeError("Slurm is not running")
         # log some slurm information
         mgr_logger.info("Slurm identifies as: '%s'" % self.slurm_sched_class.slurm_ident())
-        # also check for the existence of MANAGE_PY at the correct location.
-        # If this file is not present, the sbatch commands will crash terribly
-        manage_fp = os.path.join(settings.KIVE_HOME, MANAGE_PY)
-        if not os.access(manage_fp, os.X_OK):
-            mgr_logger.error("An executable '%s' was not found" % manage_fp)
-            mgr_logger.error("settings.KIVE_HOME = %s", settings.KIVE_HOME)
-            raise RuntimeError("'%s' not found" % manage_fp)
-        mgr_logger.info("manager script found at '%s'" % manage_fp)
 
     def monitor_queue(self, time_to_stop):
         """

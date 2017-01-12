@@ -382,6 +382,15 @@ class SlurmScheduler(BaseSlurmScheduler):
                 is_alive = False
                 logger.exception("get_accounting_info")
             logger.info("sacct passed: %s" % is_alive)
+        if is_alive:
+            # also check for the existence of MANAGE_PY at the correct location.
+            # If this file is not present, the sbatch commands will crash terribly
+            manage_fp = os.path.join(settings.KIVE_HOME, MANAGE_PY)
+            if not os.access(manage_fp, os.X_OK):
+                logger.error("An executable '%s' was not found" % manage_fp)
+                logger.error("settings.KIVE_HOME = %s", settings.KIVE_HOME)
+                return False
+        logger.info("manager script found at '%s'" % manage_fp)
         return is_alive
 
     @classmethod
