@@ -135,13 +135,17 @@ class ExecuteResultTestsRM(TestCase):
 
         self.method_complement.install(tmpdir)
 
+        # Set up the dummy scheduler.
+        slurm_sched_class = DummySlurmScheduler
+        slurm_sched_class.slurm_is_alive()
+
         complement_job_handle = self.method_complement.submit_code(
             tmpdir,
             [self.dataset_labdata.dataset_file.file.name],
             [outfile],
             stdout_path,
             stderr_path,
-            slurm_sched_class=DummySlurmScheduler
+            slurm_sched_class=slurm_sched_class
         )
 
         is_done = False
@@ -151,6 +155,8 @@ class ExecuteResultTestsRM(TestCase):
             if len(accounting_info) > 0:
                 curr_state = accounting_info[complement_job_handle.job_id]["state"]
                 is_done = curr_state == DummySlurmScheduler.COMPLETED
+
+        slurm_sched_class.shutdown()
 
         labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
         shutil.rmtree(tmpdir)
