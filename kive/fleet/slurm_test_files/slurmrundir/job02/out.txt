@@ -1,0 +1,2 @@
+/home/walter/Kive/kive/fleet/slurm_test_files/slurmrundir/job02
+returning 2

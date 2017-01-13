@@ -83,13 +83,7 @@ class BaseSlurmScheduler:
 
     FINISHED_SET = FAILED_STATES | SUCCESS_STATES
 
-    # We define three priority levels when submitting jobs and reporting priorities
-    # with get_accounting_info
-    # PRIO_LOW = 'LOW_PRIO'
-    # PRIO_MEDIUM = 'MEDIUM_PRIO'
-    # PRIO_HIGH = 'HIGH_PRIO'
-    # PRIO_SET = frozenset([PRIO_LOW, PRIO_MEDIUM, PRIO_HIGH])
-
+    # We define three priority levels that we use internally
     PRIO_LOW = 0
     PRIO_MEDIUM = 1
     PRIO_HIGH = 2
@@ -106,10 +100,11 @@ class BaseSlurmScheduler:
     ACC_STATE = 'state'
     ACC_SIGNAL = 'signal'
     ACC_JOB_ID = 'job_id'
-    ACC_PRIORITY = 'priority'
+    ACC_PRIONUM = 'prio_num'
+    ACC_PRIOSTR = 'prio_str'
     ACC_SET = frozenset([ACC_JOB_NAME, ACC_START_TIME, ACC_END_TIME,
                          ACC_SUBMIT_TIME, ACC_RETURN_CODE, ACC_STATE,
-                         ACC_SIGNAL, ACC_JOB_ID, ACC_PRIORITY])
+                         ACC_SIGNAL, ACC_JOB_ID, ACC_PRIONUM, ACC_PRIOSTR])
 
     TIME_UNKNOWN = "Unknown"
 
@@ -124,7 +119,8 @@ class BaseSlurmScheduler:
                 cls.ACC_STATE: BaseSlurmScheduler.UNKNOWN,
                 cls.ACC_SIGNAL: None,
                 cls.ACC_JOB_ID: jobid,
-                cls.ACC_PRIORITY: None}
+                cls.ACC_PRIONUM: None,
+                cls.ACC_PRIOSTR: ""}
         assert set(rdct.keys()) == cls.ACC_SET, "messed up empty_info_dct"
         return rdct
 
@@ -226,7 +222,8 @@ class BaseSlurmScheduler:
         - ACC_STATE (string, must be contained in ALL_STATES defined above)
         - ACC_SIGNAL (int: the signal number that caused termination of this step, or 0 if
         it ended normally)
-        - ACC_PRIORITY (string, must be contained in PRIO_SET define above)
+        - ACC_PRIONUM (int, must be contained in PRIO_SET define above)
+        - ACC_PRIOSTR (str, a descriptive name for the priority)
 
         All of these keys will be defined in all dictionaries returned.
         Note that if no accounting information is available for a jobid,
@@ -279,8 +276,10 @@ class SlurmScheduler(BaseSlurmScheduler):
 
     # _qnames: a dictionary that maps an element in PRIO_SET to a slurm partition name
     _qnames = None
-    # _revlookup: a dict that maps a slurm partition name to a descriptive string (for reporting)
+    # _revlookup: a dict that maps a slurm partition name to an element in PRIO_SET
     _revlookup = None
+    # _acclookup: a dict that maps a PRIO_SET to a a descriptive string (for reporting)
+    _acclookup = None
     fleet_settings = [] if settings.FLEET_SETTINGS is None else ["--settings", settings.FLEET_SETTINGS]
 
     @classmethod
@@ -289,9 +288,11 @@ class SlurmScheduler(BaseSlurmScheduler):
         a slurm partition name.
         """
         # priority is an integer; we translate it to one of the Slurm queue names.
+        if not isinstance(intprio, int):
+            raise RuntimeError('priority must be an integer')
         intprio = min(max(cls.MIN_PRIO, intprio), cls.MAX_PRIO)
         queue_to_use = cls._qnames[intprio]
-        return queue_to_use
+        return intprio, queue_to_use
 
     @classmethod
     def submit_job(cls,
@@ -308,11 +309,12 @@ class SlurmScheduler(BaseSlurmScheduler):
                    after_any=None,
                    job_name=None):
         job_name = job_name or driver_name
-        if prio_level not in cls._qnames:
-            raise RuntimeError("prio_level not a valid priority")
         if cls._qnames is None:
             raise RuntimeError("Must call slurm_is_alive before submitting jobs")
-        partname = cls._qnames[prio_level]
+        if user_id <= 0 or group_id <= 0 or num_cpus <= 0:
+            full_path = os.path.join(workingdir, driver_name)
+            raise sp.CalledProcessError(cmd=full_path, output=None, returncode=-1)
+        prio_level, partname = cls._int_prio_to_part_name(prio_level)
         cmd_lst = ["sbatch", "-D", workingdir, "--gid={}".format(group_id),
                    "-J", re.escape(job_name), "-p", partname,
                    "-s", "--uid={}".format(user_id),
@@ -487,8 +489,9 @@ class SlurmScheduler(BaseSlurmScheduler):
             # Having reached here, we know the queues are OK.  Set up _qnames and _revlookup
             ordered_prio = sorted(cls.PRIO_SET)
             cls._qnames = dict(zip(ordered_prio, defined_queue_names))
+            cls._revlookup = dict(zip(defined_queue_names, ordered_prio))
             report_names = [x[0] for x in settings.SLURM_QUEUES]
-            cls._revlookup = dict(zip(defined_queue_names, report_names))
+            cls._acclookup = dict(zip(ordered_prio, report_names))
             return True
         else:
             cmd_lst = ['sinfo', '-a', '-O', 'available,partitionname,priority']
@@ -519,11 +522,12 @@ class SlurmScheduler(BaseSlurmScheduler):
                 return False
             partnames = [n for p, n in sorted(priolst, key=lambda a: a[0])]
             ordered_prio = sorted(cls.PRIO_SET)
-            priokeys = ['SLOW-Q', "MEDIUM-Q", 'FAST-Q']
             dd = cls._qnames = dict(zip(ordered_prio, partnames))
             logger.info('prio mapping: ', " ".join(["%d:%s" % (pk, dd[pk]) for pk in ordered_prio]))
             # create a reverse lookup table: qnames -> descriptive strings
-            cls._revlookup = dict(zip(partnames, priokeys))
+            cls._revlookup = dict(zip(partnames, ordered_prio))
+            report_names = ['SLOW-Q', "MEDIUM-Q", 'FAST-Q']
+            cls._acclookup = dict(zip(ordered_prio, report_names))
             return True
 
     @classmethod
@@ -590,11 +594,12 @@ class SlurmScheduler(BaseSlurmScheduler):
 
         # Keys are: JOBID NAME PARTITION SUBMIT_TIME
         for rdct in rdctlst:
-            prio_str = cls._revlookup.get(rdct["PARTITION"], None)
-            if prio_str is not None:
+            prio_num = cls._revlookup.get(rdct["PARTITION"], None)
+            if prio_num is not None:
                 job_id = rdct["JOBID"]
                 accdct = cls._empty_info_dct(job_id)
-                accdct[cls.ACC_PRIORITY] = prio_str
+                accdct[cls.ACC_PRIONUM] = prio_num
+                accdct[cls.ACC_PRIOSTR] = cls._acclookup[prio_num]
 
                 # Localize the submission time.
                 sub_time = rdct["SUBMIT_TIME"]
@@ -619,8 +624,8 @@ class SlurmScheduler(BaseSlurmScheduler):
             # Pre-process the fields.
             # There might be non-kive slurm partitions. Only report those jobs in partitions
             # we know about, as defined in the list of partition names.
-            prio_str = cls._revlookup.get(raw_job_dict["Partition"], None)
-            if prio_str is not None:
+            prio_num = cls._revlookup.get(raw_job_dict["Partition"], None)
+            if prio_num is not None:
                 job_id = raw_job_dict["JobID"]
                 tdct = {}
 
@@ -647,7 +652,8 @@ class SlurmScheduler(BaseSlurmScheduler):
                     cls.ACC_STATE: curstate,
                     cls.ACC_SIGNAL: signal,
                     cls.ACC_JOB_ID: job_id,
-                    cls.ACC_PRIORITY: prio_str
+                    cls.ACC_PRIONUM: prio_num,
+                    cls.ACC_PRIOSTR: cls._acclookup[prio_num]
                 }
         # make sure all requested job handles have an entry...
         if have_job_handles:
@@ -667,9 +673,7 @@ class SlurmScheduler(BaseSlurmScheduler):
             raise RuntimeError("Must call slurm_is_alive before setting job priority")
         if jobhandle_lst is None or len(jobhandle_lst) == 0:
             raise RuntimeError("no jobhandles provided")
-        if intprio not in cls.PRIO_SET:
-            raise RuntimeError("Illegal priority '%d'" % intprio)
-        queue_to_use = cls._int_prio_to_part_name(intprio)
+        intprio, queue_to_use = cls._int_prio_to_part_name(intprio)
 
         cmd_list = ["scontrol", "update", "job",
                     ",".join([jh.job_id for jh in jobhandle_lst]),
@@ -773,8 +777,8 @@ class SlurmScheduler(BaseSlurmScheduler):
         return bookkeeping_slurm_handle
 
 
-sco_pid = 100
-dummy_priority_by_index = {
+_dummy_pid = 100
+_dummy_priority_by_index = {
     BaseSlurmScheduler.PRIO_LOW: 'SLOW-Q',
     BaseSlurmScheduler.PRIO_MEDIUM: 'MEDIUM-Q',
     BaseSlurmScheduler.PRIO_HIGH: 'FAST-Q',
@@ -800,17 +804,16 @@ def callit(wdir, dname, arglst, stdout, stderr):
 
 class dummyjobstate:
     def __init__(self, priolevel, jobname):
-        global sco_pid
-        self.sco_pid = "%d" % sco_pid
-        sco_pid += 1
+        global _dummy_pid
+        self.sco_pid = "%d" % _dummy_pid
+        _dummy_pid += 1
         self.sco_retcode = None
         self.submit_time = None
         self.start_time = None
         self.end_time = None
         self.set_runstate(BaseSlurmScheduler.PENDING)
-        assert priolevel in dummy_priority_by_index, "{} is an invalid priority".format(priolevel)
+        assert priolevel in _dummy_priority_by_index, "{} is an invalid priority".format(priolevel)
         self.prio_num = priolevel
-        self.prio_name = dummy_priority_by_index[priolevel]
         self.jobname = jobname
 
     def iscancelled(self):
@@ -836,7 +839,8 @@ class dummyjobstate:
             cls.ACC_STATE: self.get_runstate(),
             cls.ACC_SIGNAL: None,
             cls.ACC_JOB_ID: self.sco_pid,
-            cls.ACC_PRIORITY: self.prio_name
+            cls.ACC_PRIONUM: self.prio_num,
+            cls.ACC_PRIOSTR: _dummy_priority_by_index[self.prio_num]
         }
         assert set(rdct.keys()) == BaseSlurmScheduler.ACC_SET, "weird state keys"
         return rdct
@@ -941,18 +945,14 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         return -1
 
     @staticmethod
-    def _setprio(jidlst, priority, waitdct, rundct, findct):
+    def _setprio(jidlst, priolevel, waitdct, rundct, findct):
         """ Set the priority levels of the jobs in jidlst.
         """
+        assert priolevel in _dummy_priority_by_index, "{} is an invalid priority".format(priolevel)
         jset = set(jidlst)
         for s, dct in [(set(dct.keys()) & jset, dct) for dct in [waitdct, rundct, findct]]:
             for jid in s:
-                dd = dct[jid]
-
-            assert priority in dummy_priority_by_index, "{} is an invalid priority".format(priority)
-            dd.prio_num = priority
-            dd.prio_name = dummy_priority_by_index[priority]
-
+                dct[jid].prio_num = priolevel
         # NOTE: we have not checked whether all elements in jidlst have been found.
         # ignore this for now
         return 0
@@ -1074,7 +1074,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                    driver_arglst,
                    user_id,
                    group_id,
-                   prio_level,
+                   priority,
                    num_cpus,
                    stdoutfile,
                    stderrfile,
@@ -1084,13 +1084,16 @@ class DummySlurmScheduler(BaseSlurmScheduler):
 
         if cls.mproc is None:
             cls._init_masterproc()
-
-        prio_level = min(max(prio_level, 0), 2)
-
+        if not isinstance(priority, int):
+            raise RuntimeError('priority must be an integer')
+        prio_level = min(max(priority, cls.MIN_PRIO), cls.MAX_PRIO)
         # make sure the job script exists and is executable
         full_path = os.path.join(workingdir, driver_name)
         if not os.path.isfile(full_path):
             raise sp.CalledProcessError(cmd=full_path, output=None, returncode=-1)
+        if user_id <= 0 or group_id <= 0 or num_cpus <= 0:
+            raise sp.CalledProcessError(cmd=full_path, output=None, returncode=-1)
+
         jdct = dict([('workingdir', workingdir),
                      ('driver_name', driver_name),
                      ('driver_arglst', driver_arglst),
@@ -1156,10 +1159,10 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         """Set the priority of the specified jobs."""
         if cls.mproc is None:
             cls._init_masterproc()
-
-        priority = min(max(priority, 0), 2)
-
-        cls._jobqueue.put(('prio', ([jh.job_id for jh in jobhandle_lst], priority)))
+        if not isinstance(priority, int):
+            raise RuntimeError('priority must be an integer')
+        prio_level = min(max(priority, cls.MIN_PRIO), cls.MAX_PRIO)
+        cls._jobqueue.put(('prio', ([jh.job_id for jh in jobhandle_lst], prio_level)))
         res = cls._resqueue.get()
         if res != 0:
             raise sp.CalledProcessError(returncode=res)
