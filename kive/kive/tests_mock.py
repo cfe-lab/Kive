@@ -290,7 +290,7 @@ class MockedRelationsTest(TestCase):
 
 class PatchTests(TestCase):
     def test_exists_raises(self):
-        if not getattr(connection, 'is_mocked'):
+        if not getattr(connection, 'is_mocked', False):
             self.assertTrue(Group.objects.exists())
         else:
             with self.assertRaisesRegexp(
