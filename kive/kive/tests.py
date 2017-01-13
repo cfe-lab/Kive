@@ -46,8 +46,6 @@ class ViewMockTestCase(TestCase, object):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-        # noinspection PyUnresolvedReferences
-        ConnectionHandler.__getitem__.return_value.alias = '**unused**'
         user = User(pk=users.KIVE_USER_PK)
         User.objects.add(user)
         User.objects.model = User

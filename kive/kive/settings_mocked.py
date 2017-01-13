@@ -30,6 +30,10 @@ def patched_mock_django_connection(disabled_features=None):
 
     # noinspection PyUnresolvedReferences
     ConnectionHandler.__getitem__.return_value.ops.compiler.return_value.side_effect = patched_compiler
+    # # noinspection PyUnresolvedReferences
+    ConnectionHandler.__getitem__.return_value.alias = '**unused**'
+
+django_mock_queries.mocks.mock_django_connection = patched_mock_django_connection
 
 # Disable logging to console so test output isn't polluted.
 LOGGING['handlers']['console']['level'] = 'CRITICAL'

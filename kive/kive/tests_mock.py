@@ -1,5 +1,6 @@
 from mock import patch, MagicMock, PropertyMock
 from django.contrib.auth.models import Group, Permission
+from django.db import NotSupportedError, connection
 from django.db.models.fields.related_descriptors import ManyToManyDescriptor
 from django.test import TestCase
 
@@ -285,3 +286,14 @@ class MockedRelationsTest(TestCase):
             Group.permissions = PropertyMock('Group.permissions')
 
         self.assertIsInstance(Group.permissions, ManyToManyDescriptor)
+
+
+class PatchTests(TestCase):
+    def test_exists_raises(self):
+        if not getattr(connection, 'is_mocked'):
+            self.assertTrue(Group.objects.exists())
+        else:
+            with self.assertRaisesRegexp(
+                    NotSupportedError,
+                    "Mock database tried to execute SQL for Group model."):
+                Group.objects.exists()
