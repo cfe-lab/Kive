@@ -2,10 +2,16 @@ import errno
 import os
 import shutil
 from StringIO import StringIO
+from datetime import timedelta
 
 from django.conf import settings
+from django.contrib.auth import SESSION_KEY, HASH_SESSION_KEY, BACKEND_SESSION_KEY
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.contrib.sessions.backends.db import SessionStore
+from django.contrib.sessions.models import Session
+from django.db.utils import ConnectionHandler
+from django.test import TestCase, Client
+from django.utils.timezone import now
 from mock import patch
 
 from rest_framework.test import APIRequestFactory, force_authenticate
@@ -32,6 +38,36 @@ class DuckContext(dict):
     def __init__(self, user=None, **kwargs):
         super(DuckContext, self).__init__(**kwargs)
         self['request'] = DuckRequest(user=user)
+
+
+class ViewMockTestCase(TestCase, object):
+    def create_client(self):
+        patcher = mocked_relations(User, Session)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        # noinspection PyUnresolvedReferences
+        ConnectionHandler.__getitem__.return_value.alias = '**unused**'
+        user = User(pk=users.KIVE_USER_PK)
+        User.objects.add(user)
+        User.objects.model = User
+        # noinspection PyUnresolvedReferences
+        patcher = patch.object(User, '_default_manager', User.objects)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        dummy_session_key = 'dummysession'
+        dummy_session = Session(
+            session_key=dummy_session_key,
+            expire_date=now() + timedelta(days=1),
+            session_data=SessionStore().encode({
+                SESSION_KEY: users.KIVE_USER_PK,
+                HASH_SESSION_KEY: user.get_session_auth_hash(),
+                BACKEND_SESSION_KEY: 'django.contrib.auth.backends.ModelBackend'}))
+        Session.objects.add(dummy_session)
+        client = Client()
+        client.cookies[settings.SESSION_COOKIE_NAME] = dummy_session_key
+        client.force_login(kive_user())
+        return client
 
 
 class BaseTestCases(object):
@@ -67,8 +103,6 @@ class BaseTestCases(object):
 
             user = User(pk=users.KIVE_USER_PK)
             User.objects.add(user)
-            User.objects.model = User
-            model.objects.model = model
 
             self.kive_kive_user = KiveUser(pk=users.KIVE_USER_PK, username="kive")
             KiveUser.objects.add(self.kive_kive_user)

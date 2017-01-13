@@ -518,6 +518,7 @@ class AccessControl(models.Model):
         """ Retrieve a QuerySet of all records of this class that are visible
             to the specified user.
 
+        @param user: user that must be able to see the records
         @param is_admin: override the filter, and just return all records.
         @param queryset: add the filter to an existing queryset instead of
             cls.objects.all()

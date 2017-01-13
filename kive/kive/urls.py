@@ -7,7 +7,7 @@ from kive.kive_router import KiveRouter
 from metadata.ajax import DatatypeViewSet, CompoundDatatypeViewSet
 from method.ajax import MethodViewSet, MethodFamilyViewSet, CodeResourceViewSet, CodeResourceRevisionViewSet
 from pipeline.ajax import PipelineFamilyViewSet, PipelineViewSet
-import portal.ajax
+from portal.ajax import StagedFileViewSet, UserViewSet
 from portal.forms import LoginForm
 
 import portal.views
@@ -36,8 +36,8 @@ router.register(r'pipelinefamilies', PipelineFamilyViewSet)
 router.register(r'pipelines', PipelineViewSet)
 router.register(r'runs', RunViewSet)
 router.register(r'runbatches', RunBatchViewSet)
-router.register(r'stagedfiles', portal.ajax.StagedFileViewSet)
-router.register(r'users', portal.ajax.UserViewSet)
+router.register(r'stagedfiles', StagedFileViewSet)
+router.register(r'users', UserViewSet)
 
 urlpatterns = [
     # '',
@@ -93,7 +93,6 @@ urlpatterns = [
     url(r'^datasets$', librarian.views.datasets, name='datasets'),
     url(r'^dataset_download/(?P<dataset_id>\d+)$', librarian.views.dataset_download, name='dataset_download'),
     url(r'^dataset_view/(?P<dataset_id>\d+)$', librarian.views.dataset_view, name='dataset_view'),
-    url(r'^datasets_add$', librarian.views.datasets_add, name='datasets_add'),
     url(r'^datasets_add_bulk', librarian.views.datasets_add_bulk, name='datasets_add_bulk'),
     url(r'^datasets_bulk', librarian.views.datasets_bulk, name='datasets_bulk'),
     url(r'^datasets_add_archive$', librarian.views.datasets_add_archive, name='datasets_add_archive'),

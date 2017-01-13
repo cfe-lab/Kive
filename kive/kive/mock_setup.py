@@ -4,8 +4,34 @@ from itertools import chain
 from mock import Mock, patch
 
 from django_mock_queries.query import MockSet
+import django_mock_queries.query
 
 
+OriginalMockSet = MockSet
+
+
+# These are some temporary patches to add model and __len__ attributes
+# until we create a pull request for them.
+# noinspection PyPep8Naming
+def MockSet(*args, **kwargs):
+    cls = kwargs.get('cls')
+    mock_set = OriginalMockSet(*args, **kwargs)
+    if cls is not None:
+        mock_set.model = cls
+
+    def mock_length(m):
+        i = -1
+        for i, _ in enumerate(m):
+            pass
+        return i + 1
+    mock_set.__len__ = mock_length
+    return mock_set
+
+django_mock_queries.query.MockSet = MockSet
+
+
+# This has all been submitted in a pull request:
+# https://github.com/stphivos/django-mock-queries/pull/28
 class MockOneToManyMap(object):
     def __init__(self, original):
         """ Wrap a mock mapping around the original one-to-many relation. """
