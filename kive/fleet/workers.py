@@ -260,8 +260,7 @@ class Manager(object):
         # add any idle tasks that should be performed in the mainloop here
         # --
         # check for consistency of external files:
-        # self._add_idletask(lambda t: Dataset.idle_externalcheck(t))
-        # --
+        self._add_idletask(Dataset.idle_external_file_check())
         # purge old files from Dataset:
         self._add_idletask(Dataset.idle_dataset_purge())
         # make Dataset sub-directories for next month

@@ -83,13 +83,9 @@ class BaseSlurmScheduler:
 
     FINISHED_SET = FAILED_STATES | SUCCESS_STATES
 
-    # We define three priority levels that we use internally
-    PRIO_LOW = 0
-    PRIO_MEDIUM = 1
-    PRIO_HIGH = 2
-    PRIO_SET = frozenset([PRIO_LOW, PRIO_MEDIUM, PRIO_HIGH])
-    MIN_PRIO = PRIO_LOW
-    MAX_PRIO = PRIO_HIGH
+    # priorities: the lowest is always 0
+    # subclasses will define MAX_PRIO and PRIO_SET
+    MIN_PRIO = 0
 
     # get_accounting_info() returns a dictionary containing the following keys.
     ACC_JOB_NAME = 'job_name'
@@ -410,7 +406,7 @@ class SlurmScheduler(BaseSlurmScheduler):
                 logger.error("An executable '%s' was not found" % manage_fp)
                 logger.error("settings.KIVE_HOME = %s", settings.KIVE_HOME)
                 return False
-        logger.info("manager script found at '%s'" % manage_fp)
+            logger.info("manager script found at '%s'" % manage_fp)
         return is_alive
 
     @classmethod
@@ -443,18 +439,15 @@ class SlurmScheduler(BaseSlurmScheduler):
         exist and are up.
 
         Otherwise, it will attempt to configure itself with partitions as follows:
-        If there are exactly three partitions defined in the 'up' state, kive will check their
-        priorities and use them.
-        If more than three are defined, kive will chose those partitions whose names
-        start with 'kive'. There must be exactly three of these that are 'up'
-        of we raise an exception.
+        It will look for slurm partitions that are up whose names begin with 'kive'.
         NOTE: set the cls._qnames dictionary iff we return True here
         """
         if settings.SLURM_QUEUES is not None:
-            if len(settings.SLURM_QUEUES) != 3:
-                raise RuntimeError("Require three defined slurm queues")
             # Use sinfo to check that all queues are up.
             defined_queue_names = [x[1] for x in settings.SLURM_QUEUES]
+            if len(defined_queue_names) == 0:
+                logger.error("slurm partition config error: SLURM_QUEUES is lenght 0")
+                return False
             logger.debug("Calling sinfo to get information on queues: {}".
                          format(defined_queue_names))
             defined_queue_set = set(defined_queue_names)
@@ -487,12 +480,8 @@ class SlurmScheduler(BaseSlurmScheduler):
                 return False
 
             # Having reached here, we know the queues are OK.  Set up _qnames and _revlookup
-            ordered_prio = sorted(cls.PRIO_SET)
-            cls._qnames = dict(zip(ordered_prio, defined_queue_names))
-            cls._revlookup = dict(zip(defined_queue_names, ordered_prio))
+            num_queue = len(settings.SLURM_QUEUES)
             report_names = [x[0] for x in settings.SLURM_QUEUES]
-            cls._acclookup = dict(zip(ordered_prio, report_names))
-            return True
         else:
             cmd_lst = ['sinfo', '-a', '-O', 'available,partitionname,priority']
             dictlst = cls._call_to_dict(cmd_lst)
@@ -501,34 +490,29 @@ class SlurmScheduler(BaseSlurmScheduler):
             # NOTE: the keys are 'AVAIL', 'PARTITION' and 'PRIORITY'
             uplst = [dct for dct in dictlst if dct['AVAIL'] == 'up']
             logger.debug("found %d partitions in 'up' state" % len(uplst))
-            if len(uplst) < 3:
-                logger.error("slurm partition config error: want 3, but have %d 'up' partitions" % len(uplst))
+            # choose only those beginning with 'kive'
+            kivelst = [dct for dct in uplst if dct['PARTITION'].startswith('kive')]
+            # now we must have some remaining entries of differing priorities.
+            num_queue = len(kivelst)
+            if num_queue == 0:
+                logger.error("slurm partition config error: have found no 'up' partitions starting with 'kive'")
                 return False
-
-            if len(uplst) > 3:
-                # choose only those beginning with 'kive'
-                kivelst = [dct for dct in uplst if dct['PARTITION'].startswith('kive')]
-            else:
-                kivelst = uplst
-            # now we must have three remaining entries of differing priorities.
-            if len(kivelst) != 3:
-                logger.error('slurm partition config error: want 3, but have %d partitions' % len(kivelst))
-                return False
-
             priolst = [(int(dct['PRIORITY']), dct['PARTITION']) for dct in kivelst]
             prioset = set([p for p, n in priolst])
-            if len(prioset) != 3:
-                logger.error('slurm config error: must have 3 different prio levels, but got %d' % len(prioset))
+            if len(prioset) != num_queue:
+                logger.error('slurm config error: need %d different prio levels, got %d' % (num_queue, len(prioset)))
                 return False
-            partnames = [n for p, n in sorted(priolst, key=lambda a: a[0])]
-            ordered_prio = sorted(cls.PRIO_SET)
-            dd = cls._qnames = dict(zip(ordered_prio, partnames))
-            logger.info('prio mapping: ', " ".join(["%d:%s" % (pk, dd[pk]) for pk in ordered_prio]))
-            # create a reverse lookup table: qnames -> descriptive strings
-            cls._revlookup = dict(zip(partnames, ordered_prio))
-            report_names = ['SLOW-Q', "MEDIUM-Q", 'FAST-Q']
-            cls._acclookup = dict(zip(ordered_prio, report_names))
-            return True
+            defined_queue_names = [n for p, n in sorted(priolst, key=lambda a: a[0])]
+            report_names = defined_queue_names
+        # --
+        ordered_prio = range(num_queue)
+        cls.MAX_PRIO = num_queue-1
+        cls.PRIO_SET = frozenset(ordered_prio)
+        dd = cls._qnames = dict(zip(ordered_prio, defined_queue_names))
+        cls._revlookup = dict(zip(defined_queue_names, ordered_prio))
+        cls._acclookup = dict(zip(ordered_prio, report_names))
+        logger.info('prio mapping: ', " ".join(["%d:%s" % (pk, dd[pk]) for pk in ordered_prio]))
+        return True
 
     @classmethod
     def slurm_ident(cls):
@@ -778,10 +762,11 @@ class SlurmScheduler(BaseSlurmScheduler):
 
 
 _dummy_pid = 100
+_DUMMY_MAX_PRIO = 2
 _dummy_priority_by_index = {
-    BaseSlurmScheduler.PRIO_LOW: 'SLOW-Q',
-    BaseSlurmScheduler.PRIO_MEDIUM: 'MEDIUM-Q',
-    BaseSlurmScheduler.PRIO_HIGH: 'FAST-Q',
+    BaseSlurmScheduler.MIN_PRIO: 'SLOW-Q',
+    BaseSlurmScheduler.MIN_PRIO+1: 'MEDIUM-Q',
+    BaseSlurmScheduler.MIN_PRIO+2: 'FAST-Q',
 }
 
 
@@ -923,6 +908,9 @@ class DummySlurmScheduler(BaseSlurmScheduler):
     mproc = None
 
     DUMMY_FAIL = -1
+
+    MAX_PRIO = _DUMMY_MAX_PRIO
+    PRIO_SET = frozenset(range(BaseSlurmScheduler.MIN_PRIO, MAX_PRIO+1))
 
     @staticmethod
     def _docancel(can_pid, waitdct, rundct, findct):

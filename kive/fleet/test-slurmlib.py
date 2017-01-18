@@ -17,8 +17,10 @@ import fleet.slurmlib as slurmlib
 from django.conf import settings
 
 from django.test import TestCase
-# import kive.testing_utils as tools
 
+# NOTE: Here, select which SlurmScheduler to test.
+# we select the DummySlurmScuduler by default, so that the automatic tests
+# can run without slurm
 # SlurmScheduler = slurmlib.SlurmScheduler
 SlurmScheduler = slurmlib.DummySlurmScheduler
 
@@ -27,6 +29,9 @@ ACC_STATE = slurmlib.BaseSlurmScheduler.ACC_STATE
 ACC_JOB_ID = slurmlib.BaseSlurmScheduler.ACC_JOB_ID
 ACC_PRIONUM = slurmlib.BaseSlurmScheduler.ACC_PRIONUM
 
+PRIO_LOW = SlurmScheduler.MIN_PRIO
+PRIO_MEDIUM = PRIO_LOW + 1
+PRIO_HIGH = PRIO_MEDIUM + 1
 
 # this is the directory where the test jobs to submit to slurm will reside
 # NOTE: the job number 02 must return a non-zero exit code for testing
@@ -62,7 +67,7 @@ def get_accounting_info(jhandles=None):
         gotset = set(curstates.keys())
         assert gotset == jidset, "Did not get results from all submitted jobs"
 
-    cls = slurmlib.BaseSlurmScheduler
+    cls = SlurmScheduler
     for jid, dct in curstates.iteritems():
         # makes sure all required fields are defined
         assert cls.ACC_SET == set(dct.keys()), "inconsistent key set"
@@ -130,7 +135,7 @@ class SlurmTests(TestCase):
     def test_submit_job01(self):
         """ Submitting this job should succeed."""
         print "--test_submit_job01"
-        jhandle = _submit_Njob(1, SlurmScheduler.PRIO_MEDIUM)
+        jhandle = _submit_Njob(1, PRIO_MEDIUM)
         print "submitted job", jhandle
 
     def test_submit_job02(self, lverb=False):
@@ -140,7 +145,7 @@ class SlurmTests(TestCase):
             print "--test_submit_job02"
         user_id = os.getuid()
         group_id = os.getgid()
-        prio = SlurmScheduler.PRIO_MEDIUM
+        prio = PRIO_MEDIUM
         n, m = 1, 2
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % m
@@ -176,7 +181,7 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "---test_submit_job04"
-        jhandle = _submit_Njob(FAIL_JOB_NUMBER, SlurmScheduler.PRIO_MEDIUM)
+        jhandle = _submit_Njob(FAIL_JOB_NUMBER, PRIO_MEDIUM)
         if lverb:
             print "successfully launched job %s, now waiting for its failure..." % jhandle
         time.sleep(2)
@@ -200,7 +205,7 @@ class SlurmTests(TestCase):
         # user_id = os.getuid()
         user_id = 0
         group_id = os.getgid()
-        prio = SlurmScheduler.PRIO_MEDIUM
+        prio = PRIO_MEDIUM
         n = 1
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
@@ -221,7 +226,7 @@ class SlurmTests(TestCase):
         # user_id = os.getuid()
         user_id = 0
         group_id = os.getgid()
-        prio = SlurmScheduler.PRIO_MEDIUM
+        prio = PRIO_MEDIUM
         n = 1
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
@@ -242,7 +247,7 @@ class SlurmTests(TestCase):
         user_id = os.getuid()
         group_id = os.getgid()
         num_cpu = 0
-        prio = SlurmScheduler.PRIO_MEDIUM
+        prio = PRIO_MEDIUM
         n = 1
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
@@ -260,10 +265,10 @@ class SlurmTests(TestCase):
         """Submit one job dependent on the other with an after_okay dependency.
         Both jobs should succeed."""
         print "--test_dep_jobs01_okay"
-        jobid_01 = _submit_Njob(1, SlurmScheduler.PRIO_MEDIUM)
+        jobid_01 = _submit_Njob(1, PRIO_MEDIUM)
         if lverb:
             print "first job", jobid_01
-        jobid_02 = _submit_Njob(3, SlurmScheduler.PRIO_MEDIUM, [jobid_01])
+        jobid_02 = _submit_Njob(3, PRIO_MEDIUM, [jobid_01])
         if lverb:
             print "dependent job", jobid_02
         my_handles = [jobid_01, jobid_02]
@@ -288,10 +293,10 @@ class SlurmTests(TestCase):
         Both jobs should succeed."""
         if lverb:
             print "--test_dep_jobs01_any"
-        jobid_01 = _submit_Njob(1, SlurmScheduler.PRIO_MEDIUM)
+        jobid_01 = _submit_Njob(1, PRIO_MEDIUM)
         if lverb:
             print "first job", jobid_01
-        jobid_02 = _submit_Njob(3, SlurmScheduler.PRIO_MEDIUM, None, [jobid_01])
+        jobid_02 = _submit_Njob(3, PRIO_MEDIUM, None, [jobid_01])
         if lverb:
             print "dependent job", jobid_02
         my_handles = [jobid_01, jobid_02]
@@ -320,10 +325,10 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "--test_dep_jobs02_ok"
-        jobid_01 = _submit_Njob(FAIL_JOB_NUMBER, SlurmScheduler.PRIO_MEDIUM)
+        jobid_01 = _submit_Njob(FAIL_JOB_NUMBER, PRIO_MEDIUM)
         if lverb:
             print "first job that will fail:", jobid_01
-        jobid_02 = _submit_Njob(3, SlurmScheduler.PRIO_MEDIUM, [jobid_01])
+        jobid_02 = _submit_Njob(3, PRIO_MEDIUM, [jobid_01])
         if lverb:
             print "dependent job:", jobid_02
         joblst = [jobid_01, jobid_02]
@@ -351,10 +356,10 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "--test_dep_jobs02_any"
-        jobid_01 = _submit_Njob(FAIL_JOB_NUMBER, SlurmScheduler.PRIO_MEDIUM)
+        jobid_01 = _submit_Njob(FAIL_JOB_NUMBER, PRIO_MEDIUM)
         if lverb:
             print "first job that will fail:", jobid_01
-        jobid_02 = _submit_Njob(3, SlurmScheduler.PRIO_MEDIUM, None, [jobid_01])
+        jobid_02 = _submit_Njob(3, PRIO_MEDIUM, None, [jobid_01])
         print "dependent job:", jobid_02
         joblst = [jobid_01, jobid_02]
         jidlst = [jh.job_id for jh in joblst]
@@ -400,13 +405,13 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "--test_dep_jobs01_multi"
-        jobid_01 = _submit_Njob(FAIL_JOB_NUMBER, SlurmScheduler.PRIO_MEDIUM)
+        jobid_01 = _submit_Njob(FAIL_JOB_NUMBER, PRIO_MEDIUM)
         if lverb:
             print "first job that will fail:", jobid_01
-        jobid_02 = _submit_Njob(3, SlurmScheduler.PRIO_MEDIUM)
+        jobid_02 = _submit_Njob(3, PRIO_MEDIUM)
         if lverb:
             print "second job that will succeed", jobid_02
-        jobid_03 = _submit_Njob(1, SlurmScheduler.PRIO_MEDIUM, [jobid_02], [jobid_01])
+        jobid_03 = _submit_Njob(1, PRIO_MEDIUM, [jobid_02], [jobid_01])
         if lverb:
             print "third job that should run", jobid_02
         joblst = [jobid_01, jobid_02, jobid_03]
@@ -438,7 +443,7 @@ class SlurmTests(TestCase):
         """Submit a job, then cancel it"""
         if lverb:
             print "--test_cancel_jobs01"
-        jobid_01 = _submit_Njob(1, SlurmScheduler.PRIO_MEDIUM)
+        jobid_01 = _submit_Njob(1, PRIO_MEDIUM)
         if lverb:
             print "submitted job", jobid_01
             print "wait for running status..."
@@ -472,11 +477,11 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "---test_cancel_jobs02"
-        jobid_01 = _submit_Njob(1, SlurmScheduler.PRIO_MEDIUM)
+        jobid_01 = _submit_Njob(1, PRIO_MEDIUM)
         if lverb:
             print "started 01:", jobid_01
         time.sleep(2)
-        jobid_02 = _submit_Njob(3, SlurmScheduler.PRIO_MEDIUM, [jobid_01])
+        jobid_02 = _submit_Njob(3, PRIO_MEDIUM, [jobid_01])
         if lverb:
             print "started 02 (dependent on 01):", jobid_02
         joblst = [jobid_01, jobid_02]
@@ -517,7 +522,7 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "--test_get_state_01"
-        jhandle = _submit_Njob(1, SlurmScheduler.PRIO_MEDIUM)
+        jhandle = _submit_Njob(1, PRIO_MEDIUM)
         if lverb:
             print "submitted job", jhandle
         i, NTRY, has_finished = 0, 20, False
@@ -540,8 +545,8 @@ class SlurmTests(TestCase):
             print "--test_set_priority_01"
         # first, submit a number of high prio jobs in order to fill the queue
         # we can only change the priority of a job if it is not yet running
-        low_prio = SlurmScheduler.PRIO_LOW
-        high_prio = SlurmScheduler.PRIO_HIGH
+        low_prio = SlurmScheduler.MIN_PRIO
+        high_prio = low_prio + 1
         for i in xrange(4):
             submit_all(high_prio)
         if lverb:
@@ -577,7 +582,7 @@ class SlurmTests(TestCase):
     def test_set_priority_02(self):
         """Set an illegal job priority type (str instead of int).
         This should raise an exception."""
-        low_prio = SlurmScheduler.PRIO_LOW
+        low_prio = PRIO_LOW
         jobhandles = submit_all(low_prio)
         with self.assertRaises(RuntimeError):
             SlurmScheduler.set_job_priority(jobhandles, 'HI_PRIO')
@@ -585,11 +590,11 @@ class SlurmTests(TestCase):
     def test_set_priority_03(self):
         """Set an job priority that is higher than MAX_PRIO.
         This should simply set the actual priority to MAX_PRIO"""
-        low_prio = SlurmScheduler.PRIO_LOW
+        low_prio = PRIO_LOW
         jobhandles = submit_all(low_prio)
         jidlst = [jh.job_id for jh in jobhandles]
         time.sleep(1)
-        high_prio = SlurmScheduler.PRIO_HIGH
+        high_prio = PRIO_HIGH
         SlurmScheduler.set_job_priority(jobhandles, high_prio+10)
         cs = get_accounting_info(jobhandles)
         priolst = [cs[jid][ACC_PRIONUM] for jid in jidlst]
@@ -607,12 +612,12 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "--test_acc_info_01:"
-        low_prio = SlurmScheduler.PRIO_LOW
+        low_prio = PRIO_LOW
         if lverb:
             print "submitting low_prio jobs..."
         jobhandles = submit_all(low_prio)
         job01 = jobhandles[0]
-        job02 = _submit_Njob(1, SlurmScheduler.PRIO_MEDIUM, [job01])
+        job02 = _submit_Njob(1, PRIO_MEDIUM, [job01])
         jobhandles.append(job02)
         jidlst = [jh.job_id for jh in jobhandles]
         time.sleep(1)
@@ -642,8 +647,8 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "--test_squeue_jobs01"
-        low_prio = SlurmScheduler.PRIO_LOW
-        hi_prio = SlurmScheduler.PRIO_HIGH
+        low_prio = PRIO_LOW
+        hi_prio = PRIO_HIGH
         if lverb:
             print "submitting low_prio jobs..."
         jh_lst = submit_all(low_prio)

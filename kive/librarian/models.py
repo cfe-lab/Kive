@@ -658,7 +658,6 @@ class Dataset(metadata.models.AccessControl):
         ccl.add_file_not_stable()
         return ccl
 
-
     @classmethod
     def create_empty(cls, user=None, cdt=None, users_allowed=None, groups_allowed=None,
                      file_source=None, instance=None):
@@ -1264,8 +1263,7 @@ class Dataset(metadata.models.AccessControl):
         NOTE: We do not need to take into account different month lengths, because
         we run this routine frequently.
         """
-        CHECK_ITERS = 10000
-        numcheck = CHECK_ITERS
+        numcheck = CHECK_ITERS = 10000
         while True:
             (yield None)
             numcheck += 1
@@ -1279,7 +1277,7 @@ class Dataset(metadata.models.AccessControl):
                         if os.path.exists(next_dirname):
                             cls.logger.debug("idle_next_month_upload_dir: directory exists.")
                         else:
-                            os.mkdir(next_dirname)
+                            os.makedirs(next_dirname)
                 except OSError:
                     cls.logger.warn("Could not make directory '%s'", next_dirname)
 
@@ -1314,15 +1312,14 @@ class Dataset(metadata.models.AccessControl):
         while True:
             time_to_stop = (yield None)
             cls.logger.debug('hello from idle_dataset_purge')
-            if time.time() < time_to_stop:
-                active_files = set(os.path.join(settings.MEDIA_ROOT, ds.dataset_file.name)
-                                   for ds in Dataset._active_datasets())
-                up_loaded = set(os.path.join(settings.MEDIA_ROOT, ds.dataset_file.name)
-                                for ds in Dataset.objects.filter(file_source=None).all())
-                exclude_set = active_files | up_loaded
-                cls.logger.debug('Found %d active and uploaded datasets.', len(exclude_set))
-                for ff in exclude_set:
-                    cls.logger.debug('--%s', ff)
+            active_files = set(os.path.join(settings.MEDIA_ROOT, ds.dataset_file.name)
+                               for ds in Dataset._active_datasets())
+            up_loaded = set(os.path.join(settings.MEDIA_ROOT, ds.dataset_file.name)
+                            for ds in Dataset.objects.filter(file_source=None).all())
+            exclude_set = active_files | up_loaded
+            cls.logger.debug('Found %d active and uploaded datasets.', len(exclude_set))
+            for ff in exclude_set:
+                cls.logger.debug('--%s', ff)
             # recalculate the total file size, while allowing for interruptions
             # the resulting total file size will be in cls.filepurger._totsize once
             # we have finished the file system scanning
@@ -1445,7 +1442,7 @@ class Dataset(metadata.models.AccessControl):
                 raise RuntimeError(message)
 
     @classmethod
-    def idle_externalcheck(cls, time_to_stop):
+    def idle_external_file_check(cls):
         """ Perform a consistency check of external files as an idle task.
 
         We search for datasets that fullfil the following criteria:
@@ -1453,33 +1450,36 @@ class Dataset(metadata.models.AccessControl):
         b) sorted in ascending order by last_time_checked
         c) in batches of N at a time.
         """
-        cut_off_time = timezone.now() - timedelta(days=settings.EXTERNAL_FILE_CHECK_DAYS,
-                                                  hours=settings.EXTERNAL_FILE_CHECK_HOURS,
-                                                  minutes=settings.EXTERNAL_FILE_CHECK_MINUTES)
+        BATCH_SIZE = 10
+        while True:
+            time_to_stop = (yield None)
+            cut_off_time = timezone.now() - timedelta(days=settings.EXTERNAL_FILE_CHECK_DAYS,
+                                                      hours=settings.EXTERNAL_FILE_CHECK_HOURS,
+                                                      minutes=settings.EXTERNAL_FILE_CHECK_MINUTES)
 
-        # aset: only external files
-        a_set = Dataset.objects.filter(externalfiledirectory__isnull=False)
-        # bset: only those external files that haven't been checked for some time
-        b_set = a_set.filter(last_time_checked__lt=cut_off_time)
-        # prioritise least recently checked files
-        c_set = b_set.order_by('last_time_checked')
-        # limit number of results returned to 10. This must be the last filter to apply
-        d_set = c_set[:10]
-        did_something = True
-        while time.time() < time_to_stop and did_something:
-            did_something = False
-            for dataset in d_set.all():
-                did_something = True
-                path_name = dataset.external_absolute_path()
-                if path_name is None:
-                    raise RuntimeError("Unexpected None for external dataset path!")
-                kive_name = dataset.name
-                if not os.path.exists(path_name):
-                    cls.logger.warn("missing external file '%s' at '%s'" % (kive_name, path_name))
-                # --update the last_time_checked regardless of
-                # whether we issued a warning or not
-                dataset.last_time_checked = timezone.now()
-                dataset.save()
+            # aset: only external files
+            a_set = Dataset.objects.filter(externalfiledirectory__isnull=False)
+            # bset: only those external files that haven't been checked for some time
+            b_set = a_set.filter(last_time_checked__lt=cut_off_time)
+            # prioritise least recently checked files
+            c_set = b_set.order_by('last_time_checked')
+            # limit number of results returned to 10. This must be the last filter to apply
+            d_set = c_set[:BATCH_SIZE]
+            did_something = True
+            while time.time() < time_to_stop and did_something:
+                did_something = False
+                for dataset in d_set.all():
+                    did_something = True
+                    path_name = dataset.external_absolute_path()
+                    if path_name is None:
+                        raise RuntimeError("Unexpected None for external dataset path!")
+                    kive_name = dataset.name
+                    if not os.path.exists(path_name):
+                        cls.logger.warn("missing external file '%s' at '%s'" % (kive_name, path_name))
+                    # --update the last_time_checked regardless of
+                    # whether we issued a warning or not
+                    dataset.last_time_checked = timezone.now()
+                    dataset.save()
 
     def increase_permissions_from_json(self, permissions_json):
         """

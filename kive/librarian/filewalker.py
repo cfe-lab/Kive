@@ -31,9 +31,11 @@ def consumer(func):
 @consumer
 def iter_walk(dirname, exclude_set, grace_time_limit_ts, logger):
     """
-    Walk the file system, returning files if they are older than
+    Walk the file system, returning dir_entries if they are older than
     grace_time_limit_ts
     and if there names (in absolute path names) are not in the exclude_set (set of strings)
+
+    grace_time_limit_ts may be None, in which case no time check is performed.
 
     See PEP 471 for documentation on how to use scandir().
     https://www.python.org/dev/peps/pep-0471/#os-scandir
@@ -46,9 +48,13 @@ def iter_walk(dirname, exclude_set, grace_time_limit_ts, logger):
         for dir_entry in scandir.scandir(dirname):
             if (not dir_entry.name.startswith(".")) and dir_entry.path not in exclude_set:
                 try:
-                    stat = dir_entry.stat(follow_symlinks=False)
-                    if dir_entry.is_file() and stat.st_atime < grace_time_limit_ts:
-                        yield dir_entry
+                    if dir_entry.is_file():
+                        do_yield = True
+                        if grace_time_limit_ts is not None:
+                            stat = dir_entry.stat(follow_symlinks=False)
+                            do_yield = stat.st_atime < grace_time_limit_ts
+                        if do_yield:
+                            yield dir_entry
                     elif dir_entry.is_dir():
                         for fn in iter_walk(dir_entry.path,
                                             exclude_set,
