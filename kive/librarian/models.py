@@ -1274,15 +1274,14 @@ class Dataset(metadata.models.AccessControl):
         while True:
             time_to_stop = (yield None)
             cls.logger.debug('hello from idle_dataset_purge')
-            if time.time() < time_to_stop:
-                active_files = set(os.path.join(settings.MEDIA_ROOT, ds.dataset_file.name)
-                                   for ds in Dataset._active_datasets())
-                up_loaded = set(os.path.join(settings.MEDIA_ROOT, ds.dataset_file.name)
-                                for ds in Dataset.objects.filter(file_source=None).all())
-                exclude_set = active_files | up_loaded
-                cls.logger.debug('Found %d active and uploaded datasets.', len(exclude_set))
-                for ff in exclude_set:
-                    cls.logger.debug('--%s', ff)
+            active_files = set(os.path.join(settings.MEDIA_ROOT, ds.dataset_file.name)
+                               for ds in Dataset._active_datasets())
+            up_loaded = set(os.path.join(settings.MEDIA_ROOT, ds.dataset_file.name)
+                            for ds in Dataset.objects.filter(file_source=None).all())
+            exclude_set = active_files | up_loaded
+            cls.logger.debug('Found %d active and uploaded datasets.', len(exclude_set))
+            for ff in exclude_set:
+                cls.logger.debug('--%s', ff)
             # recalculate the total file size, while allowing for interruptions
             # the resulting total file size will be in cls.filepurger._totsize once
             # we have finished the file system scanning
