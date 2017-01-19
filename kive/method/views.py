@@ -3,7 +3,7 @@ method.views
 """
 
 from django.db import transaction
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader
@@ -51,7 +51,7 @@ def resource_revisions(request, id):
         coderesource = CodeResource.objects.get(pk=id)
         if not coderesource.can_be_accessed(request.user):
             four_oh_four = True
-    except CodeResource.DoesNotExist:
+    except ObjectDoesNotExist:
         four_oh_four = True
 
     if four_oh_four:
@@ -250,7 +250,7 @@ def resource_revision_add(request, id):
         parent_revision = CodeResourceRevision.objects.get(pk=id)
         if not parent_revision.can_be_accessed(creating_user):
             four_oh_four = True
-    except CodeResourceRevision.DoesNotExist:
+    except ObjectDoesNotExist:
         four_oh_four = True
 
     if four_oh_four:
@@ -389,7 +389,7 @@ def methods(request, id):
         family = MethodFamily.objects.get(pk=id)
         if not family.can_be_accessed(request.user) and not admin_check(request.user):
             four_oh_four = True
-    except MethodFamily.DoesNotExist:
+    except ObjectDoesNotExist:
         four_oh_four = True
 
     if four_oh_four:
