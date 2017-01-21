@@ -532,7 +532,8 @@ class AccessControl(models.Model):
                 raise StandardError('User is not an administrator.')
         else:
             user_plus = KiveUser.kiveify(user)
-            queryset = queryset.filter(user_plus.access_query()).distinct()
+            allowed_items = queryset.filter(user_plus.access_query())
+            queryset = queryset.filter(pk__in=allowed_items)
         return queryset
 
     def grant_everyone_access(self):

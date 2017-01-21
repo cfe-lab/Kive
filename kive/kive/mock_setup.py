@@ -1,10 +1,16 @@
 import weakref
 from functools import partial
 from itertools import chain
-from mock import Mock, patch
+
+from django.db import NotSupportedError
+
+from django_mock_queries.constants import COMPARISON_EXACT, COMPARISON_IEXACT, COMPARISON_CONTAINS, COMPARISON_ICONTAINS, \
+    COMPARISON_GT, COMPARISON_GTE, COMPARISON_LT, COMPARISON_LTE, COMPARISON_IN, COMPARISON_ISNULL
+from mock import Mock, patch, MagicMock
 
 from django_mock_queries.query import MockSet
 import django_mock_queries.query
+import django_mock_queries.utils
 
 
 OriginalMockSet = MockSet
@@ -19,6 +25,14 @@ def MockSet(*args, **kwargs):
     if cls is not None:
         mock_set.model = cls
 
+    def values(*fields):
+        if not fields:
+            raise NotSupportedError('All values not supported.')
+        value_list = [{f: getattr(item, f) for f in fields}
+                      for item in mock_set]
+        return MockSet(*value_list)
+    mock_set.values = MagicMock(side_effect=values)
+
     def mock_length(m):
         i = -1
         for i, _ in enumerate(m):
@@ -28,6 +42,34 @@ def MockSet(*args, **kwargs):
     return mock_set
 
 django_mock_queries.query.MockSet = MockSet
+
+
+def is_match(first, second, comparison=None):
+    if isinstance(first, django_mock_queries.query.MockBase):
+        return any(is_match(item, second, comparison)
+                   for item in first)
+    if (isinstance(first, (int, str)) and
+            isinstance(second, django_mock_queries.query.MockBase)):
+        try:
+            second = [item.pk for item in second]
+        except AttributeError:
+            pass  # Didn't have pk's, keep original items
+    if not comparison:
+        return first == second
+    return {
+        COMPARISON_EXACT: lambda: first == second,
+        COMPARISON_IEXACT: lambda: first.lower() == second.lower(),
+        COMPARISON_CONTAINS: lambda: second in first,
+        COMPARISON_ICONTAINS: lambda: second.lower() in first.lower(),
+        COMPARISON_GT: lambda: first > second,
+        COMPARISON_GTE: lambda: first >= second,
+        COMPARISON_LT: lambda: first < second,
+        COMPARISON_LTE: lambda: first <= second,
+        COMPARISON_IN: lambda: first in second,
+        COMPARISON_ISNULL: lambda: (first is None) == bool(second),
+    }[comparison]()
+
+django_mock_queries.utils.is_match = is_match
 
 
 # This has all been submitted in a pull request:

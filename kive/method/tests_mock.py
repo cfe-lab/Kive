@@ -634,7 +634,8 @@ class CodeResourceViewMockTests(ViewMockTestCase):
                                           filename='existing.txt')
         self.code_resource._state.adding = False
 
-        self.other_code_resource = CodeResource(pk='150', user=User(pk=5))
+        self.other_user = User(pk=5)
+        self.other_code_resource = CodeResource(pk='150', user=self.other_user)
         CodeResource.objects.add(self.code_resource, self.other_code_resource)
 
         self.code_resource_revision = CodeResourceRevision(
@@ -642,8 +643,16 @@ class CodeResourceViewMockTests(ViewMockTestCase):
             user=self.user,
             content_file=self.content_file)
         self.code_resource_revision.coderesource = self.code_resource
-        CodeResourceRevision.objects.add(self.code_resource_revision)
-        KiveUser.objects.add(KiveUser(pk=users.KIVE_USER_PK))
+        self.other_code_resource_revision = CodeResourceRevision(
+            pk='200',
+            user=self.other_user)
+        self.other_code_resource_revision.coderesource = self.other_code_resource
+        self.other_code_resource.revisions.add(self.other_code_resource_revision)
+        CodeResourceRevision.objects.add(self.code_resource_revision,
+                                         self.other_code_resource_revision)
+        k = KiveUser(pk=users.KIVE_USER_PK)
+        k.groups.add(self.dev_group)
+        KiveUser.objects.add(k)
 
     def test_resources(self):
         response = self.client.get(reverse('resources'))
@@ -680,12 +689,23 @@ class CodeResourceViewMockTests(ViewMockTestCase):
         self.assertEqual(404, response.status_code)
 
     def test_resource_revisions_accessible(self):
-        self.other_code_resource.groups_allowed.add(self.everyone)
+        self.other_code_resource.groups_allowed.add(self.dev_group)
         other_id = self.other_code_resource.pk
         response = self.client.get(reverse('resource_revisions',
                                            kwargs=dict(id=other_id)))
 
         self.assertEqual(200, response.status_code)
+        self.assertNotIn('revisions', response.context)
+
+    def test_resource_revisions_accessible_with_child(self):
+        self.other_code_resource.groups_allowed.add(self.dev_group)
+        self.other_code_resource_revision.groups_allowed.add(self.dev_group)
+        other_id = self.other_code_resource.pk
+        response = self.client.get(reverse('resource_revisions',
+                                           kwargs=dict(id=other_id)))
+
+        self.assertEqual(200, response.status_code)
+        self.assertIn('revisions', response.context)
 
     def test_resource_add(self):
         response = self.client.get(reverse('resource_add'))
@@ -749,6 +769,8 @@ class MethodViewMockTests(ViewMockTestCase):
         Group.objects.add(self.dev_group, self.everyone)
         self.user = kive_user()
         self.user.groups.add(self.dev_group)
+        self.other_user = User(pk=5)
+
         self.method_family = MethodFamily(pk='99',
                                           user=self.user)
         MethodFamily.objects.add(self.method_family)
@@ -807,3 +829,45 @@ class MethodViewMockTests(ViewMockTestCase):
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(self.method_family, response.context['family'])
+
+    def test_method_revise_access_denied(self):
+        """ Hides ungranted code revisions. """
+        revision1 = CodeResourceRevision(pk=101,
+                                         revision_name='alpha',
+                                         revision_number=1,
+                                         user=self.user)
+        revision2 = CodeResourceRevision(pk=102,
+                                         revision_name='beta',
+                                         revision_number=2,
+                                         user=self.other_user)
+        self.driver.coderesource.revisions.add(revision1, revision2)
+
+        response = self.client.get(reverse('method_revise',
+                                           kwargs=dict(id='199')))
+
+        self.assertEqual(200, response.status_code)
+        revisions = response.context['method_form']['driver_revisions']
+        self.assertEqual([('101', '1: alpha')],
+                         revisions.field.widget.choices)
+
+    def test_method_revise_access_granted(self):
+        """ Shows granted code revisions. """
+        revision1 = CodeResourceRevision(pk=101,
+                                         revision_name='alpha',
+                                         revision_number=1,
+                                         user=self.user)
+        revision2 = CodeResourceRevision(pk=102,
+                                         revision_name='beta',
+                                         revision_number=2,
+                                         user=self.other_user)
+        revision2.users_allowed.add(self.user)
+        self.driver.coderesource.revisions.add(revision1, revision2)
+
+        response = self.client.get(reverse('method_revise',
+                                           kwargs=dict(id='199')))
+
+        self.assertEqual(200, response.status_code)
+        revisions = response.context['method_form']['driver_revisions']
+        self.assertEqual([('101', '1: alpha'),
+                          ('102', '2: beta')],
+                         revisions.field.widget.choices)

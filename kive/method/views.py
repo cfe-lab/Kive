@@ -12,7 +12,6 @@ from datetime import datetime
 import logging
 import itertools
 
-import metadata.models
 from metadata.models import CompoundDatatype
 from method.models import CodeResource, Method, MethodDependency,\
     MethodFamily, CodeResourceRevision
@@ -90,10 +89,9 @@ def resource_revisions(request, id):
             initial={"name": coderesource.name, "description": coderesource.description}
         )
 
-    # Cast request.user to class KiveUser & grab data
-    curr_user = metadata.models.KiveUser.kiveify(request.user)
-    revisions = coderesource.revisions.filter(curr_user.access_query()).\
-        distinct().order_by('-revision_number')
+    revisions = CodeResourceRevision.filter_by_user(
+        request.user,
+        queryset=coderesource.revisions.all()).order_by('-revision_number')
     if len(revisions) == 0:
         # Go to the resource_revision_add page to create a first revision.
         t = loader.get_template('method/resource_revision_add.html')
@@ -952,8 +950,9 @@ def method_revise(request, id):
     parent_revision = parent_method.driver
     this_code_resource = parent_revision.coderesource
     # Filter the available revisions by user.
-    user_plus = metadata.models.KiveUser.kiveify(creating_user)
-    all_revisions = this_code_resource.revisions.filter(user_plus.access_query()).order_by('-revision_DateTime')
+    all_revisions = CodeResourceRevision.filter_by_user(
+        creating_user,
+        queryset=this_code_resource.revisions.all()).order_by('-revision_DateTime')
 
     if request.method == 'POST':
         # Because there is no CodeResource specified, the second value is of type MethodReviseForm.
