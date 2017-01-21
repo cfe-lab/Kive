@@ -10,4 +10,7 @@ LOGGING['handlers']['console']['level'] = 'CRITICAL'
 
 MEDIA_ROOT = os.path.join(MEDIA_ROOT, 'Testing')  # Avoid overwriting developer data files.
 
-FLEET_POLLING_INTERVAL = 0.1  # Speed up short runs during tests.
+# Speed up short runs during tests.
+FLEET_POLLING_INTERVAL = 0.1
+CONFIRM_FILE_CREATED_WAIT_MIN = 0.01
+CONFIRM_FILE_CREATED_WAIT_MAX = 0.02
