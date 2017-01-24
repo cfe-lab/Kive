@@ -4,7 +4,6 @@
     describe("PermissionsTable", function() {
         beforeEach(function() {
             this.$table = $('<table/>');
-            this.foo = 23;
             this.ExamplesTable = function($table, is_user_admin) {
                 permissions.PermissionsTable.call(this, $table, is_user_admin);
                 this.list_url = "/api/examples/";
@@ -97,7 +96,59 @@
             expect(filters).toEqual([{ key: "name", val: "Bob" }]);
             expect(this.changeCount).toBe(2, 'change count');
         });
-        
+
+        it("should add a date filter", function() {
+            this.filterSet.addDate("created", new Date("2001-03-15 0:00"));
+            var filters = this.filterSet.getFilters();
+
+            expect(filters).toEqual([{ key: "created", val: "15 Mar 2001 0:00" }]);
+        });
+
+        it("should add a date filter with offsets", function() {
+            var yearsOffset = 1,
+                monthsOffset = 2,
+                daysOffset = -3;
+            this.filterSet.addDate(
+                "created",
+                new Date("2001-03-15 0:00"),
+                yearsOffset,
+                monthsOffset,
+                daysOffset);
+            var filters = this.filterSet.getFilters();
+
+            expect(filters).toEqual([{ key: "created", val: "12 May 2002 0:00" }]);
+        });
+
+        it("should stick to the end of the month", function() {
+            var yearsOffset = 0,
+                monthsOffset = 1,
+                daysOffset = 0;
+            this.filterSet.addDate(
+                "created",
+                new Date("2001-01-31 0:00"),
+                yearsOffset,
+                monthsOffset,
+                daysOffset);
+            var filters = this.filterSet.getFilters();
+
+            expect(filters).toEqual([{ key: "created", val: "28 Feb 2001 0:00" }]);
+        });
+
+        it("should wrap around the year end", function() {
+            var yearsOffset = 0,
+                monthsOffset = -1,
+                daysOffset = 0;
+            this.filterSet.addDate(
+                "created",
+                new Date("2001-01-31 0:00"),
+                yearsOffset,
+                monthsOffset,
+                daysOffset);
+            var filters = this.filterSet.getFilters();
+
+            expect(filters).toEqual([{ key: "created", val: "31 Dec 2000 0:00" }]);
+        });
+
         it("should have link to remove a filter", function() {
             this.filterSet.add("name", "Bob");
             var $remove = this.$active.find('.remove');

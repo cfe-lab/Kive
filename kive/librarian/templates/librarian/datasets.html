@@ -31,6 +31,13 @@
 
         if (pairs === null) {
             table.filterSet.add('uploaded');
+            var yearsOffset = 0,
+                monthsOffset = -1;
+            table.filterSet.addDate(
+                    'createdafter',
+                    new Date(),
+                    yearsOffset,
+                    monthsOffset);
         } else {
             storedPage = parseInt(sessionStorage.getItem('datasetPage'), 10);
             table.filterSet.setFromPairs(pairs);

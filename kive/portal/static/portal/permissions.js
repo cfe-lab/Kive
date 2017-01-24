@@ -585,7 +585,30 @@ var permissions = (function() {
         }
         return $filter;
     };
-    
+
+    my.FilterSet.prototype.addDate = function(
+            key,
+            value,
+            yearsOffset,
+            monthsOffset,
+            daysOffset,
+            skip_trigger) {
+        yearsOffset = yearsOffset || 0;
+        monthsOffset = monthsOffset || 0;
+        daysOffset = daysOffset || 0;
+        var newMonth = value.getMonth() + monthsOffset,
+            expectedMonth = ((newMonth + 12) % 12);
+        value.setFullYear(value.getFullYear() + yearsOffset);
+        value.setMonth(newMonth);
+        value.setDate(value.getDate() + daysOffset);
+        if (daysOffset === 0 && value.getMonth() !== expectedMonth) {
+            // We wrapped around into the next month.
+            value.setDate(0);
+        }
+        var textValue = my.formatDate(value);
+        return this.add(key, textValue, skip_trigger);
+    };
+
     my.FilterSet.prototype.addFromForm = function(form) {
         var filterSet = this,
             $fields = $('input[type="text"], input:checked', form);
