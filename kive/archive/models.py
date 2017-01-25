@@ -406,7 +406,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         This does not affect the RunComponents.
         """
-        assert self._runstate_id in [runstates.PENDING_PK, runstates.RUNNING_PK]
+        assert self._runstate_id in [runstates.PENDING_PK,
+                                     runstates.RUNNING_PK,
+                                     runstates.FAILING_PK]
         self._runstate = RunState.objects.get(pk=runstates.CANCELLING_PK)
         if save:
             self.save()
