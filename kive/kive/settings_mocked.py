@@ -1,6 +1,7 @@
 from django.db.utils import ConnectionHandler
 from mock import MagicMock
 
+import django.core.management.commands.loaddata
 from django.db.utils import NotSupportedError
 from django_mock_queries.mocks import monkey_patch_test_db
 import django_mock_queries.mocks
@@ -10,6 +11,7 @@ from kive.settings import *
 
 monkey_patch_test_db()
 
+django.core.management.commands.loaddata.Command.handle = lambda *args, **kwargs: None
 
 original_mock_django_connection = django_mock_queries.mocks.mock_django_connection
 
