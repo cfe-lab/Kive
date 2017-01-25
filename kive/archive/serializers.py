@@ -611,14 +611,15 @@ class RunBatchSerializer(AccessControlSerializer, serializers.ModelSerializer):
         if self.instance is None:
             # We're defining Runs here.
             for i, run_data in enumerate(data.get("runs", []), start=1):
+                loc_users = run_data.get("users_allowed", [])
+                loc_groups = run_data.get("groups_allowed", [])
                 run_has_perms = (data.get("copy_permissions_to_runs") and
-                                 (run_data.get("users_allowed") is not None or
-                                  run_data.get("groups_allowed") is not None))
+                                 (len(loc_users) > 0 or len(loc_groups) > 0))
                 if run_has_perms:
                     # Here, we're overriding the permissions of this Run, so check that they
                     # don't exceed those of the Pipeline, inputs, etc.
-                    allowed_users = run_data.get("users_allowed", [])
-                    allowed_groups = run_data.get("groups_allowed", [])
+                    allowed_users = loc_users
+                    allowed_groups = loc_groups
                     if everyone_group() not in batch_groups_allowed:
                         # This Run has its own permissions defined, and the batch does not have
                         # Everyone permissions.  Check that the Run's permissions don't exceed
