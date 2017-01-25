@@ -884,9 +884,18 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         addable_users, addable_groups = self.pipeline.intersect_permissions(addable_users, addable_groups)
         if include_runbatch and self.runbatch is not None:
             addable_users, addable_groups = self.runbatch.intersect_permissions(addable_users, addable_groups)
+            self.validate_restrict_access([self.runbatch])
 
         for run_input in self.inputs.all():
-            addable_users, addable_groups = run_input.dataset.intersect_permissions(
+            # SCO
+            ds = run_input.dataset
+            # self.validate_restrict_access(ds)
+            # self.validate_restrict_access([self.pipeline])
+            # if self.runbatch is not None:
+            #     self.validate_restrict_access([self.runbatch])
+            #
+            
+            addable_users, addable_groups = ds.intersect_permissions(
                 addable_users,
                 addable_groups
             )

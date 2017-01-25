@@ -341,6 +341,16 @@ class RunInputSerializer(serializers.ModelSerializer):
         fields = ("dataset", "index")
 
 
+def grplst2str(acsiter):
+    """ A helper function for names of Groups """
+    return ",".join([ac.name for ac in acsiter])
+
+
+def usrlst2str(acsiter):
+    """ A helper function for names of Users """
+    return ",".join([ac.username for ac in acsiter])
+
+
 class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
     run_status = serializers.HyperlinkedIdentityField(view_name='run-run-status')
     removal_plan = serializers.HyperlinkedIdentityField(view_name='run-removal-plan')
@@ -440,9 +450,8 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
         groups_allowed = groups_allowed or data.get("groups_allowed", [])
 
         pipeline = data["pipeline"]
-
-        all_access_controlled_objects = [pipeline]
         errors = []
+        inp_datasets = []
         for run_input in data["inputs"]:
             curr_idx = run_input["index"]
             curr_SD = run_input["dataset"]
@@ -450,6 +459,7 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
                 corresp_input = pipeline.inputs.get(dataset_idx=curr_idx)
             except TransformationInput.DoesNotExist:
                 errors.append('Pipeline {} has no input with index {}'.format(pipeline, curr_idx))
+            inp_datasets.append(curr_SD)
 
             if curr_SD.is_raw() and corresp_input.is_raw():
                 continue
@@ -458,13 +468,11 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
                     continue
             else:
                 errors.append('Input {} is incompatible with Dataset {}'.format(corresp_input, curr_SD))
-
-            all_access_controlled_objects.append(curr_SD)
-
         if len(errors) > 0:
             raise serializers.ValidationError(errors)
 
-        # Check that the specified user, users_allowed, and groups_allowed are all okay.
+        # Check Access: that the specified user, users_allowed, and groups_allowed are all okay.
+        all_access_controlled_objects = [pipeline] + inp_datasets
         users_without_access, groups_without_access = who_cannot_access(
             data["user"],
             User.objects.filter(pk__in=[x.pk for x in users_allowed]),
@@ -472,11 +480,9 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
             all_access_controlled_objects)
 
         if len(users_without_access) != 0:
-            errors.append("User(s) {} may not be granted access".format(list(users_without_access)))
-
+            errors.append("User(s) {} may not be granted access".format(usrlst2str(users_without_access)))
         if len(groups_without_access) != 0:
-            errors.append("Group(s) {} may not be granted access".format(list(groups_without_access)))
-
+            errors.append("Group(s) {} may not be granted access".format(grplst2str(groups_without_access)))
         return errors
 
     @staticmethod
@@ -599,54 +605,48 @@ class RunBatchSerializer(AccessControlSerializer, serializers.ModelSerializer):
         # creating this RunBatch and the child Runs.
         batch_users_allowed = data.get("users_allowed") or []
         batch_groups_allowed = data.get("groups_allowed") or []
-
+        # if the list of errors stays empty, we are happy and return data.
+        # Otherwise we raise an error.
         errors = []
-        run_dicts = data.get("runs", [])
-
         if self.instance is None:
             # We're defining Runs here.
-            for i, run_data in enumerate(run_dicts, start=1):
-                if (data.get("copy_permissions_to_runs") and
-                        run_data.get("users_allowed") is None and
-                        run_data.get("groups_allowed") is None):
+            for i, run_data in enumerate(data.get("runs", []), start=1):
+                run_has_perms = (data.get("copy_permissions_to_runs") and
+                                 (run_data.get("users_allowed") is not None or
+                                  run_data.get("groups_allowed") is not None))
+                if run_has_perms:
                     # Here, we're overriding the permissions of this Run, so check that they
                     # don't exceed those of the Pipeline, inputs, etc.
-                    original_errors = RunSerializer.validate_permissions(run_data, users_allowed=batch_users_allowed,
-                                                                         groups_allowed=batch_groups_allowed)
-
-                    errors = [
-                        "{} to run {} (index {})".format(
-                            error,
-                            run_data.get("name", "[blank]"),
-                            i
-                        )
-                        for error in original_errors
-                    ]
-                elif everyone_group() not in batch_groups_allowed:
-                    # This Run has its own permissions defined, and the batch does not have
-                    # Everyone permissions.  Check that they don't exceed
-                    # those of the RunBatch.  Other validation will have already been taken
-                    # care of by field validation on the "runs" field.
-                    extra_users = set(run_data.get("users_allowed", [])).difference(batch_users_allowed)
-                    extra_groups = set(run_data.get("groups_allowed", [])).difference(batch_groups_allowed)
-
-                    if len(extra_users) != 0:
-                        errors.append(
-                            "User(s) {} may not be granted access to run {} (index {})".format(
-                                list(extra_users),
-                                run_data.get("name", "[blank]"),
-                                i
-                            )
-                        )
-
-                    if len(extra_groups) != 0:
-                        errors.append(
-                            "Group(s) {} may not be granted access to run {} (index {})".format(
-                                list(extra_groups),
-                                run_data.get("name", "[blank]"),
-                                i
-                            )
-                        )
+                    allowed_users = run_data.get("users_allowed", [])
+                    allowed_groups = run_data.get("groups_allowed", [])
+                    if everyone_group() not in batch_groups_allowed:
+                        # This Run has its own permissions defined, and the batch does not have
+                        # Everyone permissions.  Check that the Run's permissions don't exceed
+                        # those of the RunBatch.  Other validation will have already been taken
+                        # care of by field validation on the "runs" field.
+                        extra_users = set(allowed_users) - set(batch_users_allowed)
+                        if len(extra_users) != 0:
+                            errors.append(
+                                "User(s) {} may not be granted access to run {} (index {})".format(
+                                    usrlst2str(extra_users),
+                                    run_data.get("name", "[blank]"),
+                                    i))
+                        extra_groups = set(allowed_groups) - set(batch_groups_allowed)
+                        if len(extra_groups) != 0:
+                            errors.append(
+                                "Group(s) {} may not be granted access to run {} (index {})".format(
+                                    grplst2str(extra_groups),
+                                    run_data.get("name", "[blank]"),
+                                    i))
+                else:
+                    allowed_users = batch_users_allowed
+                    allowed_groups = batch_groups_allowed
+                original_errors = RunSerializer.validate_permissions(run_data,
+                                                                     users_allowed=allowed_users,
+                                                                     groups_allowed=allowed_groups)
+                errors.extend(["{} to run {} (index {})".format(error,
+                                                                run_data.get("name", "[blank]"),
+                                                                i) for error in original_errors])
 
         elif permission_change_requested and data.get("copy_permissions_to_runs"):
             # This is an update, make sure that the permissions we're changing are OK with
@@ -663,7 +663,7 @@ class RunBatchSerializer(AccessControlSerializer, serializers.ModelSerializer):
                 if extra_users.exists():
                     errors.append(
                         "User(s) {} may not be granted access to run {}".format(
-                            list(extra_users),
+                            usrlst2str(extra_users),
                             run
                         )
                     )
@@ -671,7 +671,7 @@ class RunBatchSerializer(AccessControlSerializer, serializers.ModelSerializer):
                 if len(extra_groups) != 0:
                     errors.append(
                         "Group(s) {} may not be granted access to run {}".format(
-                            list(extra_groups),
+                            grplst2str(extra_groups),
                             run
                         )
                     )

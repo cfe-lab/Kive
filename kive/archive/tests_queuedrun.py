@@ -16,7 +16,7 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 from rest_framework import status
 
 from archive.models import Run, ExecLog
-from archive.serializers import RunSerializer, RunBatchSerializer
+from archive.serializers import RunSerializer, RunBatchSerializer, grplst2str, usrlst2str
 from archive.exceptions import SandboxActiveException, RunNotFinished
 from file_access_utils import create_sandbox_base_path
 from librarian.models import ExecRecord, Dataset
@@ -849,8 +849,8 @@ class RunSerializerTests(RunSerializerTestBase):
         self.assertEqual(
             set(rtp_serializer.errors["non_field_errors"]),
             set([
-                u"User(s) {} may not be granted access".format([self.kive_user]),
-                u"Group(s) {} may not be granted access".format([everyone_group()])
+                u"User(s) {} may not be granted access".format(usrlst2str([self.kive_user])),
+                u"Group(s) {} may not be granted access".format(grplst2str([everyone_group()]))
             ])
         )
 
@@ -961,26 +961,26 @@ class RunBatchSerializerTests(RunSerializerTestBase):
 
         rb_serializer = RunBatchSerializer(data=serialized_rb, context=self.john_context)
         self.assertFalse(rb_serializer.is_valid())
-        self.assertListEqual(
-            rb_serializer.errors["non_field_errors"],
-            [
-                "User(s) {} may not be granted access to run {} (index {})".format(
-                    [self.kive_user],
-                    self.serialized_run["name"],
-                    1
-                ),
-                "Group(s) {} may not be granted access to run {} (index {})".format(
-                    [everyone_group()],
-                    self.serialized_run["name"],
-                    1
-                ),
-                "User(s) {} may not be granted access to run {} (index {})".format(
-                    [self.kive_user],
-                    second_serialized_run["name"],
-                    2
-                ),
-            ]
-        )
+        # NOTE: use sets here, as the order of the error messages is unimportant
+        expected_set = set([
+            "Group(s) {} may not be granted access to run {} (index {})".format(
+                grplst2str([everyone_group()]),
+                self.serialized_run["name"],
+                1
+            ),
+            "User(s) {} may not be granted access to run {} (index {})".format(
+                usrlst2str([self.kive_user]),
+                self.serialized_run["name"],
+                1
+            ),
+            "User(s) {} may not be granted access to run {} (index {})".format(
+                usrlst2str([self.kive_user]),
+                second_serialized_run["name"],
+                2
+            ),
+        ])
+        got_set = set(rb_serializer.errors["non_field_errors"])
+        self.assertSetEqual(expected_set, got_set)
 
     def test_validate_coherent_permissions(self):
         """
@@ -1028,21 +1028,20 @@ class RunBatchSerializerTests(RunSerializerTestBase):
 
         rb_serializer = RunBatchSerializer(data=serialized_rb, context=self.john_context)
         self.assertFalse(rb_serializer.is_valid())
-        self.assertListEqual(
-            rb_serializer.errors["non_field_errors"],
-            [
-                "User(s) {} may not be granted access to run {} (index {})".format(
-                    [self.kive_user],
-                    self.serialized_run["name"],
-                    1
-                ),
-                "Group(s) {} may not be granted access to run {} (index {})".format(
-                    [everyone_group()],
-                    self.serialized_run["name"],
-                    1
-                )
-            ]
-        )
+        expected_set = set([
+            "User(s) {} may not be granted access to run {} (index {})".format(
+                usrlst2str([self.kive_user]),
+                self.serialized_run["name"],
+                1
+            ),
+            "Group(s) {} may not be granted access to run {} (index {})".format(
+                grplst2str([everyone_group()]),
+                self.serialized_run["name"],
+                1
+            )
+        ])
+        got_set = set(rb_serializer.errors["non_field_errors"])
+        self.assertSetEqual(expected_set, got_set)
 
     def test_validate_everyone_has_access(self):
         """
@@ -1261,15 +1260,15 @@ class RunBatchSerializerTests(RunSerializerTestBase):
             set(update_serializer.errors["non_field_errors"]),
             {
                 "Group(s) {} may not be granted access to run {}".format(
-                    [new_group],
+                    grplst2str([new_group]),
                     run1
                 ),
                 "Group(s) {} may not be granted access to run {}".format(
-                    [new_group],
+                    grplst2str([new_group]),
                     run2,
                 ),
                 "Group(s) {} may not be granted access to run {}".format(
-                    [new_group],
+                    grplst2str([new_group]),
                     run3
                 )
             }

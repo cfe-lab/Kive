@@ -107,9 +107,8 @@ urlpatterns = [
     url(r'^stdout_view/(?P<methodoutput_id>\d+)$', archive.views.stdout_view, name='stdout_view'),
     url(r'^stderr_download/(?P<methodoutput_id>\d+)$', archive.views.stderr_download, name='stderr_download'),
     url(r'^stderr_view/(?P<methodoutput_id>\d+)$', archive.views.stderr_view, name='stderr_view'),
-
     url(r'^choose_pipeline$', sandbox.views.choose_pipeline, name='choose_pipeline'),
-    url(r'^choose_inputs$', sandbox.views.choose_inputs, name='choose_inputs'),
+    url(r'^choose_inputs/$', sandbox.views.choose_inputs, name='choose_inputs'),
     url(r'^runs$', sandbox.views.runs, name='runs'),
     url(r'^view_results/(?P<run_id>\d+)/$', sandbox.views.view_results, name='view_results'),
     url(r'^view_run/(?P<run_id>\d+)$', sandbox.views.view_run, name='view_run'),

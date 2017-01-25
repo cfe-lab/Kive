@@ -716,7 +716,14 @@ $(function() {
                     }
                 }
             ).fail(function(xhr) {
-                showPageError(xhr.responseText, '.pipeline-error', true);
+		jsondct = xhr.responseJSON
+		// console.error("api/runbatches dicty ", jsondct);
+		for (var key in jsondct){
+		    // console.error("wow ", key, jsondct[key]);
+                    showPageError(jsondct[key], ".".concat(key), true);
+		}
+                showPageError("Runs have not been started. Please correct the errors and try again", '.pipeline-error', true);
+
             });
         } else {
             showPageError("Please complete the inputs table or remove any unwanted runs before continuing.", '.pipeline-error');
