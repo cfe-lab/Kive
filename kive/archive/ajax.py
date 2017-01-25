@@ -224,6 +224,8 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
                                      'pipeline__steps',
                                      'not_enough_CPUs',
                                      'user',
+                                     'users_allowed',
+                                     'groups_allowed',
                                      'inputs__dataset')
 
     @staticmethod
