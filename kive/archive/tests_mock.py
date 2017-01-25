@@ -1132,7 +1132,8 @@ class QueuedRunMockTests(TestCase):
         run = Run(pipeline=pipeline, user=user)
         run.start(save=False)
         run.runsteps = MockSet(
-            RunStep(_runcomponentstate_id=runstep_state_id))
+            RunStep(_runcomponentstate_id=runstep_state_id,
+                    pipelinestep=PipelineStep(step_num=1)))
         run.runoutputcables = MockSet(RunOutputCable(
             pipelineoutputcable=pipelineoutputcable))
         return run
