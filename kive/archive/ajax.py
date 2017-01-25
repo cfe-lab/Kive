@@ -89,10 +89,10 @@ class RunPermission(permissions.BasePermission):
     administrators or their owner.
     """
     def has_permission(self, request, view):
-        return (admin_check(request.user) or
-                request.method in permissions.SAFE_METHODS or
+        return (request.method in permissions.SAFE_METHODS or
                 request.method == "POST" or
-                request.method == "PATCH")
+                request.method == "PATCH" or
+                admin_check(request.user))
 
     def has_object_permission(self, request, view, obj):
         if admin_check(request.user):
@@ -222,6 +222,8 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
                                      'pipeline__outcables',
                                      'runoutputcables__pipelineoutputcable',
                                      'pipeline__steps',
+                                     'not_enough_CPUs',
+                                     'user',
                                      'inputs__dataset')
 
     @staticmethod

@@ -597,7 +597,7 @@ var permissions = (function() {
         monthsOffset = monthsOffset || 0;
         daysOffset = daysOffset || 0;
         var newMonth = value.getMonth() + monthsOffset,
-            expectedMonth = ((newMonth + 12) % 12);
+            expectedMonth = (((newMonth % 12) + 12) % 12);
         value.setFullYear(value.getFullYear() + yearsOffset);
         value.setMonth(newMonth);
         value.setDate(value.getDate() + daysOffset);

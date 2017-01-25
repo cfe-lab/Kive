@@ -90,7 +90,10 @@ class Command(BaseCommand):
         if slow_queries:
             print('')
             total_slow_time = sum(map(float, map(itemgetter('time'), slow_queries)))
-            print("Slow queries (total of {:.2f}s):".format(total_slow_time))
+            total_time = sum(map(float, map(itemgetter('time'), active_queries)))
+            print("Slow queries ({:.2f}s for slow and {:.2f}s for all):".format(
+                total_slow_time,
+                total_time))
             for query in slow_queries:
                 print(query)
 
@@ -161,7 +164,7 @@ class Command(BaseCommand):
 
     def test_ajax(self):
         factory = APIRequestFactory()
-        path = reverse('dataset-list')
+        path = reverse('run-status')
         view, _, _ = resolve(path)
         request = factory.get(
             path + '?is_granted=true&page_size=25')

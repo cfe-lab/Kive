@@ -523,8 +523,10 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         except Pipeline.DoesNotExist:
             pipeline_name = "Run"
 
-        inputs = self.inputs.select_related('dataset')
-        first_input = inputs.order_by('index').first()
+        first_input = None
+        for inp in self.inputs.all():
+            first_input = inp
+            break
         if not (first_input and first_input.dataset.has_data()):
             if self.time_queued:
                 return "{} at {}".format(pipeline_name, self.time_queued)
@@ -575,7 +577,8 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         # One of the steps is in progress?
         total_steps = self.pipeline.steps.count()
-        runsteps = self.runsteps.order_by("pipelinestep__step_num")
+        runsteps = sorted(self.runsteps.all(),
+                          key=lambda runstep: runstep.pipelinestep.step_num)
 
         for step in runsteps:
             if step.is_pending():
@@ -976,6 +979,9 @@ class RunInput(models.Model):
     run = models.ForeignKey(Run, related_name="inputs")
     dataset = models.ForeignKey(Dataset, related_name="runinputs")
     index = models.PositiveIntegerField()
+
+    class Meta(object):
+        ordering = ['index']
 
     def clean(self):
         self.run.validate_restrict_access([self.dataset])

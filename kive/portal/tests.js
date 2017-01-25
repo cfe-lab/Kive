@@ -149,6 +149,21 @@
             expect(filters).toEqual([{ key: "created", val: "31 Dec 2000 0:00" }]);
         });
 
+        it("should subtract many months", function() {
+            var yearsOffset = 0,
+                monthsOffset = -37,
+                daysOffset = 0;
+            this.filterSet.addDate(
+                "created",
+                new Date("2004-01-31 0:00"),
+                yearsOffset,
+                monthsOffset,
+                daysOffset);
+            var filters = this.filterSet.getFilters();
+
+            expect(filters).toEqual([{ key: "created", val: "31 Dec 2000 0:00" }]);
+        });
+
         it("should have link to remove a filter", function() {
             this.filterSet.add("name", "Bob");
             var $remove = this.$active.find('.remove');
