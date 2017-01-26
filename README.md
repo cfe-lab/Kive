@@ -85,5 +85,5 @@ What are we working on?
 You can see active tasks on [our project board][waffle], or look at the [current milestone's burndown][burndown].
 
 [waffle]: https://waffle.io/cfe-lab/kive
-[burndown]: http://burndown.io/#cfe-lab/kive
+[burndown]: https://waffle.io/cfe-lab/kive/metrics/burndown
 
