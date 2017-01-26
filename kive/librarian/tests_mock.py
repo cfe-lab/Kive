@@ -234,7 +234,7 @@ Dave,40
 class DatasetViewMockTests(ViewMockTestCase):
     def setUp(self):
         super(DatasetViewMockTests, self).setUp()
-        patcher = mocked_relations(KiveUser, Dataset, Group, CompoundDatatype)
+        patcher = mocked_relations(KiveUser, Dataset, Group, CompoundDatatype, Run)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -290,6 +290,18 @@ class DatasetViewMockTests(ViewMockTestCase):
         self.assertEqual(200, response.status_code)
         self.assertEqual(self.file_content, response.context['sample_content'])
         self.assertEqual('/datasets', response.context['return'])
+
+    def test_dataset_view_output(self):
+        """ Link back to the run that generated the output dataset. """
+        run = Run(id=2000)
+        self.dataset.file_source = RunStep(run=run)
+        response = self.client.get(reverse('dataset_view',
+                                           kwargs=dict(dataset_id='99')))
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(self.file_content, response.context['sample_content'])
+        self.assertEqual('/datasets', response.context['return'])
+        self.assertIs(run, response.context['generating_run'])
 
     def test_dataset_view_run(self):
         response = self.client.get(reverse('dataset_view',

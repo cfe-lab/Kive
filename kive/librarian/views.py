@@ -104,7 +104,9 @@ def dataset_view(request, dataset_id):
     # if it was generated, it's anyone who had access to the generating run.
     addable_users, addable_groups = dataset.other_users_groups()
 
-    if dataset.file_source is not None:
+    if dataset.file_source is None:
+        generating_run = None
+    else:
         generating_run = dataset.file_source.top_level_run
         addable_users.exclude(pk=generating_run.user_id)
         addable_users.exclude(pk__in=generating_run.users_allowed.values_list("pk", flat=True))
@@ -144,7 +146,8 @@ def dataset_view(request, dataset_id):
         "is_owner": dataset.user == request.user,
         "dataset": dataset,
         "return": return_url,
-        "dataset_form": dataset_form
+        "dataset_form": dataset_form,
+        "generating_run": generating_run
     }
 
     rendered_response = None

@@ -3,9 +3,9 @@ $(function() {
     var is_editable = false;
     var lock_icon_path = "/static/portal/img/";
 
-    if (window.hasOwnProperty(is_owner) && is_owner) {
+    if (window.is_owner) {
         is_editable = true;
-    } else if (window.hasOwnProperty(is_admin) && is_admin) {
+    } else if (window.is_admin) {
         // The lock div is only there if the user is an administrator (and not the owner).
         $("#lock").click(function() {
             is_editable = !is_editable;
