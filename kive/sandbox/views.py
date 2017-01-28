@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import HttpResponse, Http404, HttpResponseRedirect
 from django.template import loader
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET
 from django.contrib.auth.models import User, Group
 
 from rest_framework.renderers import JSONRenderer
@@ -43,8 +43,6 @@ def _choose_inputs_for_batch(request,
                              start_form=None,
                              input_error_message=''):
     """Load the input selection page."""
-    context = {}
-
     template = loader.get_template("sandbox/choose_inputs.html")
     pipeline_qs = Pipeline.filter_by_user(request.user).filter(pk=pipeline_pk)
 
@@ -55,10 +53,10 @@ def _choose_inputs_for_batch(request,
     if start_form is None:
         start_form = StartRunBatchForm({"pipeline": pipeline}, pipeline_qs=pipeline_qs)
 
-    context.update({"inputs": pipeline.inputs.order_by("dataset_idx"),
-                    "start_form": start_form,
-                    "input_error_msg": input_error_message,
-                    "pipeline": pipeline})
+    context = {"inputs": pipeline.inputs.order_by("dataset_idx"),
+               "start_form": start_form,
+               "input_error_msg": input_error_message,
+               "pipeline": pipeline}
     return HttpResponse(template.render(context, request))
 
 

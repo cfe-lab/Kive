@@ -2,6 +2,7 @@
 Shipyard models pertaining to the librarian app.
 """
 
+from datetime import datetime
 import os
 import random
 import re
@@ -20,6 +21,8 @@ from django.test import TestCase, skipIfDBFeature
 from django.core.urlresolvers import reverse, resolve
 from django.core.files import File
 from django.core.files.base import ContentFile
+from django.utils.timezone import get_default_timezone
+from mock import patch
 
 from rest_framework.test import force_authenticate, APIRequestFactory
 from rest_framework import status
@@ -27,7 +30,8 @@ from rest_framework import status
 from archive.models import ExecLog, MethodOutput, Run, RunStep, RunComponentState
 from constants import datatypes, groups, runcomponentstates
 from datachecking.models import MD5Conflict
-from librarian.models import Dataset, ExecRecord, ExternalFileDirectory
+from librarian.ajax import ExternalFileDirectoryViewSet, DatasetViewSet
+from librarian.models import Dataset, ExecRecord, ExternalFileDirectory, DatasetStructure
 from librarian.serializers import DatasetSerializer
 from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
 from method.models import CodeResource, CodeResourceRevision, Method, \
@@ -38,39 +42,31 @@ import file_access_utils
 import kive.testing_utils as tools
 from kive.tests import BaseTestCases, DuckContext, install_fixture_files, remove_fixture_files
 
+FROM_FILE_END = 2
 
-def ER_from_record(record):
+
+def er_from_record(record):
     """
     Helper function to create an ExecRecord from an Run, RunStep, or
     RunOutputCable (record), by creating a throwaway ExecLog.
     """
-    myEL = ExecLog(record=record, invoking_record=record)
-    myEL.start_time = timezone.now()
+    exec_log = ExecLog(record=record, invoking_record=record)
+    exec_log.start_time = timezone.now()
     time.sleep(1)
-    myEL.end_time = timezone.now()
-    myEL.save()
+    exec_log.end_time = timezone.now()
+    exec_log.save()
     if record.__class__.__name__ == "RunStep":
-        output = MethodOutput(execlog=myEL, return_code=0)
+        output = MethodOutput(execlog=exec_log, return_code=0)
         output.save()
-        myEL.methodoutput = output
-        myEL.save()
-    myER = ExecRecord(generator=myEL)
-    myER.save()
-    return(myER)
-
-
-def ER_from_PSIC(run, PS, PSIC):
-    """
-    Helper function to create an ExecRecord associated to a
-    PipelineStepInputCable, for a particular run and pipeline step.
-    """
-    myRS = run.runsteps.create(pipelinestep=PS)
-    myRSIC = PSIC.psic_instances.create(dest_runstep=myRS)
-    return ER_from_record(myRSIC)
+        exec_log.methodoutput = output
+        exec_log.save()
+    exec_record = ExecRecord(generator=exec_log)
+    exec_record.save()
+    return exec_record
 
 
 @skipIfDBFeature('is_mocked')
-class LibrarianTestCase(TestCase):
+class LibrarianTestCase(TestCase, object):
     """
     Set up a database state for unit testing the librarian app.
 
@@ -316,6 +312,7 @@ Bob,tw3nty
         for f in data_files:
             f.close()
         bulk_dataset_csv.close()
+        # noinspection PyTypeChecker
         for i, dataset in enumerate(datasets):
 
             self.assertEqual(dataset.clean(), None)
@@ -338,7 +335,7 @@ Bob,tw3nty
         self.singlet_dataset.dataset_file.open()
         orig_contents = self.singlet_dataset.dataset_file.read()
         self.singlet_dataset.dataset_file.close()
-        orig_MD5 = self.singlet_dataset.MD5_checksum
+        orig_md5 = self.singlet_dataset.MD5_checksum
 
         # ... and then we corrupt it.
         self.singlet_dataset.MD5_checksum = "corruptedmd5"
@@ -349,7 +346,7 @@ Bob,tw3nty
             description="Usurps self.singlet_dataset",
             user=self.myUser,
             dataset_file=ContentFile(orig_contents),
-            MD5_checksum=orig_MD5
+            MD5_checksum=orig_md5
         )
         usurping_ds.save()
 
@@ -548,26 +545,26 @@ class RemovalTests(TestCase):
         tools.clean_up_all_files()
         remove_fixture_files()
 
-    def removal_plan_tester(self, obj_to_remove, datasets=None, ERs=None, runs=None, pipelines=None, pfs=None,
-                            methods=None, mfs=None, CDTs=None, DTs=None, CRRs=None, CRs=None,
+    def removal_plan_tester(self, obj_to_remove, datasets=None, ers=None, runs=None, pipelines=None, pfs=None,
+                            methods=None, mfs=None, cdts=None, dts=None, crrs=None, crs=None,
                             external_files=None):
         removal_plan = obj_to_remove.build_removal_plan()
         self.assertSetEqual(removal_plan["Datasets"], set(datasets) if datasets is not None else set())
-        self.assertSetEqual(removal_plan["ExecRecords"], set(ERs) if ERs is not None else set())
+        self.assertSetEqual(removal_plan["ExecRecords"], set(ers) if ers is not None else set())
         self.assertSetEqual(removal_plan["Runs"], set(runs) if runs is not None else set())
         self.assertSetEqual(removal_plan["Pipelines"], set(pipelines) if pipelines is not None else set())
         self.assertSetEqual(removal_plan["PipelineFamilies"], set(pfs) if pfs is not None else set())
         self.assertSetEqual(removal_plan["Methods"], set(methods) if methods is not None else set())
         self.assertSetEqual(removal_plan["MethodFamilies"], set(mfs) if mfs is not None else set())
-        self.assertSetEqual(removal_plan["CompoundDatatypes"], set(CDTs) if CDTs is not None else set())
-        self.assertSetEqual(removal_plan["Datatypes"], set(DTs) if DTs is not None else set())
-        self.assertSetEqual(removal_plan["CodeResourceRevisions"], set(CRRs) if CRRs is not None else set())
-        self.assertSetEqual(removal_plan["CodeResources"], set(CRs) if CRs is not None else set())
+        self.assertSetEqual(removal_plan["CompoundDatatypes"], set(cdts) if cdts is not None else set())
+        self.assertSetEqual(removal_plan["Datatypes"], set(dts) if dts is not None else set())
+        self.assertSetEqual(removal_plan["CodeResourceRevisions"], set(crrs) if crrs is not None else set())
+        self.assertSetEqual(removal_plan["CodeResources"], set(crs) if crs is not None else set())
         self.assertSetEqual(removal_plan["ExternalFiles"], set(external_files) if external_files is not None else set())
 
     def test_run_build_removal_plan(self):
         """Removing a Run should remove all intermediate/output data and ExecRecords, and all Runs that reused it."""
-        self.removal_plan_tester(self.first_run, datasets=self.produced_data, ERs=self.execrecords,
+        self.removal_plan_tester(self.first_run, datasets=self.produced_data, ers=self.execrecords,
                                  runs={self.first_run, self.second_run})
 
     def test_reused_run_build_removal_plan(self):
@@ -579,7 +576,7 @@ class RemovalTests(TestCase):
         self.removal_plan_tester(
             self.input_DS,
             datasets=self.produced_data.union({self.input_DS}),
-            ERs=self.execrecords,
+            ers=self.execrecords,
             runs={self.first_run, self.second_run}
         )
 
@@ -609,7 +606,7 @@ class RemovalTests(TestCase):
         self.removal_plan_tester(
             self.input_DS,
             datasets=self.produced_data.union({self.input_DS}),
-            ERs=self.execrecords,
+            ers=self.execrecords,
             runs={self.first_run, self.second_run},
             external_files={self.input_DS}
         )
@@ -618,33 +615,33 @@ class RemovalTests(TestCase):
         """Removing data produced by the Run should have the same effect as removing the Run itself."""
         produced_dataset = list(self.produced_data)[0]
 
-        self.removal_plan_tester(produced_dataset, datasets=self.produced_data, ERs=self.execrecords,
+        self.removal_plan_tester(produced_dataset, datasets=self.produced_data, ers=self.execrecords,
                                  runs={self.first_run, self.second_run})
 
     def test_step_ER_build_removal_plan(self):
         """Removing the ExecRecord of the first RunStep should be like removing the whole Run."""
-        first_step_ER = self.first_run.runsteps.get(pipelinestep__step_num=1).execrecord
+        first_step_er = self.first_run.runsteps.get(pipelinestep__step_num=1).execrecord
 
-        self.removal_plan_tester(first_step_ER, datasets=self.produced_data, ERs=self.execrecords,
+        self.removal_plan_tester(first_step_er, datasets=self.produced_data, ers=self.execrecords,
                                  runs={self.first_run, self.second_run})
 
     def test_rsic_ER_build_removal_plan(self):
         """Removing the ExecRecord of a RunSIC should be like removing the whole Run."""
-        first_RSIC_ER = self.first_run.runsteps.get(pipelinestep__step_num=1).RSICs.first().execrecord
+        first_rsic_er = self.first_run.runsteps.get(pipelinestep__step_num=1).RSICs.first().execrecord
 
-        self.removal_plan_tester(first_RSIC_ER, datasets=self.produced_data, ERs=self.execrecords,
+        self.removal_plan_tester(first_rsic_er, datasets=self.produced_data, ers=self.execrecords,
                                  runs={self.first_run, self.second_run})
 
     def test_roc_ER_build_removal_plan(self):
         """Removing the ExecRecord of a RunOutputCable should be like removing the whole Run."""
-        first_ROC_ER = self.first_run.runoutputcables.first().execrecord
+        first_roc_er = self.first_run.runoutputcables.first().execrecord
 
-        self.removal_plan_tester(first_ROC_ER, datasets=self.produced_data, ERs=self.execrecords,
+        self.removal_plan_tester(first_roc_er, datasets=self.produced_data, ers=self.execrecords,
                                  runs={self.first_run, self.second_run})
 
     def test_pipeline_build_removal_plan(self):
         """Removing a Pipeline."""
-        self.removal_plan_tester(self.noop_pl, datasets=self.produced_data, ERs=self.execrecords,
+        self.removal_plan_tester(self.noop_pl, datasets=self.produced_data, ers=self.execrecords,
                                  runs={self.first_run, self.second_run}, pipelines={self.noop_pl, self.p_nested})
 
     def test_nested_pipeline_build_removal_plan(self):
@@ -653,7 +650,7 @@ class RemovalTests(TestCase):
 
     def test_pipelinefamily_build_removal_plan(self):
         """Removing a PipelineFamily removes everything that goes along with it."""
-        self.removal_plan_tester(self.noop_plf, datasets=self.produced_data, ERs=self.execrecords,
+        self.removal_plan_tester(self.noop_plf, datasets=self.produced_data, ers=self.execrecords,
                                  runs={self.first_run, self.second_run}, pipelines={self.noop_pl, self.p_nested},
                                  pfs={self.noop_plf})
 
@@ -662,7 +659,7 @@ class RemovalTests(TestCase):
         self.removal_plan_tester(
             self.nuc_seq_noop,
             datasets=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
-            ERs=self.execrecords.union(self.two_step_execrecords),
+            ers=self.execrecords.union(self.two_step_execrecords),
             runs={self.first_run, self.second_run, self.two_step_run},
             pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop}
@@ -675,7 +672,7 @@ class RemovalTests(TestCase):
             datasets=self.produced_data.union(
                 {self.two_step_intermediate_data, self.two_step_output_data}
             ),
-            ERs=self.execrecords.union(self.two_step_execrecords),
+            ers=self.execrecords.union(self.two_step_execrecords),
             runs={self.first_run, self.second_run, self.two_step_run},
             pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop},
@@ -687,11 +684,11 @@ class RemovalTests(TestCase):
         self.removal_plan_tester(
             self.noop_crr,
             datasets=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
-            ERs=self.execrecords.union(self.two_step_execrecords),
+            ers=self.execrecords.union(self.two_step_execrecords),
             runs={self.first_run, self.second_run, self.two_step_run},
             pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop, self.raw_pass_through},
-            CRRs={self.noop_crr}
+            crrs={self.noop_crr}
         )
 
     def test_method_nodep_build_removal_plan(self):
@@ -703,12 +700,12 @@ class RemovalTests(TestCase):
         self.removal_plan_tester(
             self.noop_cr,
             datasets=self.produced_data.union({self.two_step_intermediate_data, self.two_step_output_data}),
-            ERs=self.execrecords.union(self.two_step_execrecords),
+            ers=self.execrecords.union(self.two_step_execrecords),
             runs={self.first_run, self.second_run, self.two_step_run},
             pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop, self.raw_pass_through},
-            CRRs={self.noop_crr},
-            CRs={self.noop_cr}
+            crrs={self.noop_crr},
+            crs={self.noop_cr}
         )
 
     def test_cdt_build_removal_plan(self):
@@ -724,11 +721,11 @@ class RemovalTests(TestCase):
         self.removal_plan_tester(
             self.one_col_nuc_seq,
             datasets=all_data,
-            ERs=self.execrecords.union(self.two_step_execrecords),
+            ers=self.execrecords.union(self.two_step_execrecords),
             runs={self.first_run, self.second_run, self.two_step_run},
             pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop},
-            CDTs={self.one_col_nuc_seq}
+            cdts={self.one_col_nuc_seq}
         )
 
     def test_dt_build_removal_plan(self):
@@ -744,41 +741,41 @@ class RemovalTests(TestCase):
         self.removal_plan_tester(
             self.nuc_seq,
             datasets=all_data,
-            ERs=self.execrecords.union(self.two_step_execrecords),
+            ers=self.execrecords.union(self.two_step_execrecords),
             runs={self.first_run, self.second_run, self.two_step_run},
             pipelines={self.noop_pl, self.p_nested, self.two_step_noop_pl},
             methods={self.nuc_seq_noop},
-            CDTs={self.one_col_nuc_seq},
-            DTs={self.nuc_seq}
+            cdts={self.one_col_nuc_seq},
+            dts={self.nuc_seq}
         )
 
     def remove_tester(self, obj_to_remove):
         removal_plan = obj_to_remove.build_removal_plan()
 
         dataset_pks = [x.pk for x in removal_plan["Datasets"]]
-        ER_pks = [x.pk for x in removal_plan["ExecRecords"]]
+        er_pks = [x.pk for x in removal_plan["ExecRecords"]]
         run_pks = [x.pk for x in removal_plan["Runs"]]
         pipeline_pks = [x.pk for x in removal_plan["Pipelines"]]
         pf_pks = [x.pk for x in removal_plan["PipelineFamilies"]]
         method_pks = [x.pk for x in removal_plan["Methods"]]
         mf_pks = [x.pk for x in removal_plan["MethodFamilies"]]
-        CDT_pks = [x.pk for x in removal_plan["CompoundDatatypes"]]
-        DT_pks = [x.pk for x in removal_plan["Datatypes"]]
-        CRR_pks = [x.pk for x in removal_plan["CodeResourceRevisions"]]
-        CR_pks = [x.pk for x in removal_plan["CodeResources"]]
+        cdt_pks = [x.pk for x in removal_plan["CompoundDatatypes"]]
+        dt_pks = [x.pk for x in removal_plan["Datatypes"]]
+        crr_pks = [x.pk for x in removal_plan["CodeResourceRevisions"]]
+        cr_pks = [x.pk for x in removal_plan["CodeResources"]]
 
         obj_to_remove.remove()
         self.assertFalse(Dataset.objects.filter(pk__in=dataset_pks).exists())
-        self.assertFalse(ExecRecord.objects.filter(pk__in=ER_pks).exists())
+        self.assertFalse(ExecRecord.objects.filter(pk__in=er_pks).exists())
         self.assertFalse(Run.objects.filter(pk__in=run_pks).exists())
         self.assertFalse(Pipeline.objects.filter(pk__in=pipeline_pks).exists())
         self.assertFalse(PipelineFamily.objects.filter(pk__in=pf_pks).exists())
         self.assertFalse(Method.objects.filter(pk__in=method_pks).exists())
         self.assertFalse(MethodFamily.objects.filter(pk__in=mf_pks).exists())
-        self.assertFalse(CompoundDatatype.objects.filter(pk__in=CDT_pks).exists())
-        self.assertFalse(Datatype.objects.filter(pk__in=DT_pks).exists())
-        self.assertFalse(CodeResourceRevision.objects.filter(pk__in=CRR_pks).exists())
-        self.assertFalse(CodeResource.objects.filter(pk__in=CR_pks).exists())
+        self.assertFalse(CompoundDatatype.objects.filter(pk__in=cdt_pks).exists())
+        self.assertFalse(Datatype.objects.filter(pk__in=dt_pks).exists())
+        self.assertFalse(CodeResourceRevision.objects.filter(pk__in=crr_pks).exists())
+        self.assertFalse(CodeResource.objects.filter(pk__in=cr_pks).exists())
 
     def test_pipeline_remove(self):
         """
@@ -842,18 +839,18 @@ class RemovalTests(TestCase):
 
     def test_step_ER_remove(self):
         """Removing the ExecRecord of the first RunStep should be like removing the whole Run."""
-        first_step_ER = self.first_run.runsteps.get(pipelinestep__step_num=1).execrecord
-        self.remove_tester(first_step_ER)
+        first_step_er = self.first_run.runsteps.get(pipelinestep__step_num=1).execrecord
+        self.remove_tester(first_step_er)
 
     def test_rsic_ER_remove(self):
         """Removing the ExecRecord of a RunSIC should be like removing the whole Run."""
-        first_RSIC_ER = self.first_run.runsteps.get(pipelinestep__step_num=1).RSICs.first().execrecord
-        self.remove_tester(first_RSIC_ER)
+        first_rsic_er = self.first_run.runsteps.get(pipelinestep__step_num=1).RSICs.first().execrecord
+        self.remove_tester(first_rsic_er)
 
     def test_roc_ER_remove(self):
         """Removing the ExecRecord of a RunOutputCable should be like removing the whole Run."""
-        first_ROC_ER = self.first_run.runoutputcables.first().execrecord
-        self.remove_tester(first_ROC_ER)
+        first_roc_er = self.first_run.runoutputcables.first().execrecord
+        self.remove_tester(first_roc_er)
 
     def dataset_redaction_plan_tester(self, dataset_to_redact, datasets=None, output_logs=None, error_logs=None,
                                       return_codes=None, external_files=None):
@@ -1102,6 +1099,182 @@ class DatasetWithFileTests(TestCase):
         self.assertRaisesRegexp(ValidationError, msg, ds1.validate_uniqueness_on_upload)
 
 
+class DatasetApiMockTests(BaseTestCases.ApiTestCase):
+
+    def setUp(self):
+        self.mock_viewset(DatasetViewSet)
+        super(DatasetApiMockTests, self).setUp()
+        # num_cols = 12
+
+        self.list_path = reverse("dataset-list")
+        self.list_view, _, _ = resolve(self.list_path)
+
+        self.detail_pk = 43
+        self.detail_path = reverse("dataset-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.redaction_path = reverse("dataset-redaction-plan",
+                                      kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("dataset-removal-plan",
+                                    kwargs={'pk': self.detail_pk})
+
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.redaction_view, _, _ = resolve(self.redaction_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+        tz = get_default_timezone()
+        apples = Dataset(pk=42,
+                         name='apples',
+                         description='chosen',
+                         date_created=datetime(2017, 1, 1, tzinfo=tz),
+                         user=self.kive_kive_user)
+        cherries = Dataset(pk=43,
+                           name='cherries',
+                           date_created=datetime(2017, 1, 2, tzinfo=tz),
+                           MD5_checksum='1234',
+                           user=self.kive_kive_user)
+        bananas = Dataset(pk=44,
+                          name='bananas',
+                          date_created=datetime(2017, 1, 3, tzinfo=tz),
+                          file_source=RunStep(),
+                          user=self.kive_kive_user)
+        Dataset.objects.add(apples,
+                            cherries,
+                            bananas)
+        apples.structure = DatasetStructure(compounddatatype_id=5)
+        bananas.structure = DatasetStructure(compounddatatype_id=6)
+
+    def test_list(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 3)
+        self.assertEquals(response.data[2]['name'], 'bananas')
+
+    def test_filter_smart(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=smart&filters[0][val]=ch")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 2)
+        self.assertEquals(response.data[0]['name'], 'cherries')
+        self.assertEquals(response.data[1]['description'], 'chosen')
+
+    def test_filter_name(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=name&filters[0][val]=ch")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'cherries')
+
+    def test_filter_description(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=description&filters[0][val]=ch")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['description'], 'chosen')
+
+    def test_filter_user(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=user&filters[0][val]=kive")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 3)
+
+    def test_filter_uploaded(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=uploaded")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 2)
+
+    def test_filter_raw(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=cdt")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'cherries')
+
+    def test_filter_cdt(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=cdt&filters[0][val]=5")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'apples')
+
+    def test_filter_md5(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=md5&filters[0][val]=1234")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'cherries')
+
+    def test_filter_date(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=createdafter&filters[0][val]=02 Jan 2017 0:00" +
+            "&filters[1][key]=createdbefore&filters[1][val]=02 Jan 2017 0:00")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'cherries')
+
+    def test_filter_unknown(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=bogus&filters[0][val]=kive")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals({u'detail': u'Unknown filter key: bogus'},
+                          response.data)
+
+
 @skipIfDBFeature('is_mocked')
 class DatasetApiTests(BaseTestCases.ApiTestCase):
 
@@ -1150,27 +1323,6 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         for d in Dataset.objects.all():
             d.dataset_file.delete()
 
-    def test_dataset_list(self, expected_entries=0):
-        """
-        Test the API list view.
-        """
-        request = self.factory.get(self.list_path)
-
-        force_authenticate(request, user=self.kive_user)
-        resp = self.list_view(request).data
-
-        self.assertEquals(len(resp), expected_entries + self.n_preexisting_datasets)
-        self.assertEquals(resp[-1]['description'],
-                          "Test data for a test that tests test data")
-
-    def test_dataset_detail(self):
-        request = self.factory.get(self.detail_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(
-            response.data['description'],
-            "Test data for a test that tests test data")
-
     def test_dataset_add(self):
         """
         Test adding a Dataset via the API.
@@ -1179,7 +1331,6 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         """
         num_cols = 12
         num_files = 2
-        FROM_FILE_END = 2
 
         with tempfile.TemporaryFile() as f:
             data = ','.join(map(str, range(num_cols)))
@@ -1204,7 +1355,13 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
                 self.assertIsNone(resp.get('errors'))
                 self.assertEquals(resp['name'], "My cool file %d" % i)
 
-        self.test_dataset_list(expected_entries=num_files)
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        resp = self.list_view(request).data
+
+        self.assertEquals(len(resp), num_files + self.n_preexisting_datasets)
+        self.assertEquals(resp[-1]['description'],
+                          "Test data for a test that tests test data")
 
     def test_dataset_add_duplicate(self):
         """
@@ -1663,6 +1820,116 @@ baz
         dataset.dataset_file.open("rb")
         with dataset.dataset_file:
             self.assertEquals(dataset.dataset_file.read(), self.raw_file_contents)
+
+
+class ExternalFileDirectoryApiMockTests(BaseTestCases.ApiTestCase):
+    def setUp(self):
+        self.mock_viewset(ExternalFileDirectoryViewSet)
+        super(ExternalFileDirectoryApiMockTests, self).setUp()
+
+        self.list_path = reverse("externalfiledirectory-list")
+        self.detail_pk = 43
+        self.detail_path = reverse("externalfiledirectory-detail",
+                                   kwargs={'pk': self.detail_pk})
+
+        self.list_view, _, _ = resolve(self.list_path)
+        self.detail_view, _, _ = resolve(self.detail_path)
+
+        ExternalFileDirectory.objects.add(ExternalFileDirectory(id=42,
+                                                                name="apples",
+                                                                path="/bank/apples"),
+                                          ExternalFileDirectory(id=43,
+                                                                name="cherries",
+                                                                path="/dock/cherries"),
+                                          ExternalFileDirectory(id=44,
+                                                                name="bananas",
+                                                                path="/dock/bananas"))
+
+    def test_list(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 3)
+        self.assertEquals(response.data[2]['name'], 'bananas')
+
+    def test_filter_smart(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=smart&filters[0][val]=ban")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 2)
+        self.assertEquals(response.data[0]['name'], 'bananas')
+        self.assertEquals(response.data[1]['path'], '/bank/apples')
+
+    def test_filter_name(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=name&filters[0][val]=ban")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'bananas')
+
+    def test_filter_path(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=path&filters[0][val]=bank")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['path'], '/bank/apples')
+
+    def test_filter_unknown(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=bogus&filters[0][val]=kive")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals({u'detail': u'Unknown filter key: bogus'},
+                          response.data)
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['name'], 'cherries')
+
+    @patch('os.walk')
+    def test_list_files(self, mock_walk):
+        mock_walk.return_value = [('/dock/cherries', [], ['foo.txt', 'bar.txt'])]
+        expected_data = {
+            'url': u'http://testserver/api/externalfiledirectories/43/',
+            'pk': 43,
+            'list_files': [('/dock/cherries/foo.txt', '[cherries]/foo.txt'),
+                           ('/dock/cherries/bar.txt', '[cherries]/bar.txt')],
+            'name': u'cherries',
+            'path': u'/dock/cherries'
+        }
+        path = reverse("externalfiledirectory-list-files",
+                       kwargs={'pk': self.detail_pk})
+
+        view, _, _ = resolve(path)
+        request = self.factory.get(path)
+        force_authenticate(request, user=self.kive_user)
+        response = view(request, pk=self.detail_pk)
+        self.assertDictEqual(expected_data, response.data)
 
 
 @skipIfDBFeature('is_mocked')

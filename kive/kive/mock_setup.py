@@ -1,11 +1,79 @@
 import weakref
 from functools import partial
 from itertools import chain
-from mock import Mock, MagicMock, patch, ClassTypes
+
+from django.db import NotSupportedError
+
+from django_mock_queries.constants import COMPARISON_EXACT, COMPARISON_IEXACT, COMPARISON_CONTAINS, COMPARISON_ICONTAINS, \
+    COMPARISON_GT, COMPARISON_GTE, COMPARISON_LT, COMPARISON_LTE, COMPARISON_IN, COMPARISON_ISNULL
+from mock import Mock, patch, MagicMock
 
 from django_mock_queries.query import MockSet
+import django_mock_queries.query
+import django_mock_queries.utils
 
 
+OriginalMockSet = MockSet
+
+
+# These are some temporary patches to add model and __len__ attributes
+# until we create a pull request for them.
+# noinspection PyPep8Naming
+def MockSet(*args, **kwargs):
+    cls = kwargs.get('cls')
+    mock_set = OriginalMockSet(*args, **kwargs)
+    if cls is not None:
+        mock_set.model = cls
+
+    def values(*fields):
+        if not fields:
+            raise NotSupportedError('All values not supported.')
+        value_list = [{f: getattr(item, f) for f in fields}
+                      for item in mock_set]
+        return MockSet(*value_list)
+    mock_set.values = MagicMock(side_effect=values)
+
+    def mock_length(m):
+        i = -1
+        for i, _ in enumerate(m):
+            pass
+        return i + 1
+    mock_set.__len__ = mock_length
+    return mock_set
+
+django_mock_queries.query.MockSet = MockSet
+
+
+def is_match(first, second, comparison=None):
+    if isinstance(first, django_mock_queries.query.MockBase):
+        return any(is_match(item, second, comparison)
+                   for item in first)
+    if (isinstance(first, (int, str)) and
+            isinstance(second, django_mock_queries.query.MockBase)):
+        try:
+            second = [item.pk for item in second]
+        except AttributeError:
+            pass  # Didn't have pk's, keep original items
+    if not comparison:
+        return first == second
+    return {
+        COMPARISON_EXACT: lambda: first == second,
+        COMPARISON_IEXACT: lambda: first.lower() == second.lower(),
+        COMPARISON_CONTAINS: lambda: second in first,
+        COMPARISON_ICONTAINS: lambda: second.lower() in first.lower(),
+        COMPARISON_GT: lambda: first > second,
+        COMPARISON_GTE: lambda: first >= second,
+        COMPARISON_LT: lambda: first < second,
+        COMPARISON_LTE: lambda: first <= second,
+        COMPARISON_IN: lambda: first in second,
+        COMPARISON_ISNULL: lambda: (first is None) == bool(second),
+    }[comparison]()
+
+django_mock_queries.utils.is_match = is_match
+
+
+# This has all been submitted in a pull request:
+# https://github.com/stphivos/django-mock-queries/pull/28
 class MockOneToManyMap(object):
     def __init__(self, original):
         """ Wrap a mock mapping around the original one-to-many relation. """
@@ -29,7 +97,8 @@ class MockOneToManyMap(object):
             old_instance_weak, related_objects = entry
             old_instance = old_instance_weak()
         if entry is None or old_instance is None:
-            related_objects = MockSet(cls=self.original.field.model)
+            related = getattr(self.original, 'related', self.original)
+            related_objects = MockSet(cls=related.field.model)
             self.__set__(instance, related_objects)
 
         return related_objects
@@ -113,7 +182,7 @@ def mocked_relations(*models):
     patch_object = patch.object
     patchers = []
     for model in find_all_models(models):
-        if isinstance(model.save, MagicMock):
+        if isinstance(model.save, Mock):
             # already mocked, so skip it
             continue
         model_name = model._meta.object_name
@@ -128,6 +197,8 @@ def mocked_relations(*models):
         for related_object in chain(model._meta.related_objects,
                                     model._meta.many_to_many):
             name = related_object.name
+            if name not in model.__dict__ and related_object.one_to_many:
+                name += '_set'
             if name in model.__dict__:
                 # Only mock direct relations, not inherited ones.
                 old_relation = getattr(model, name, None)
@@ -160,7 +231,7 @@ class PatcherChain(object):
         self.pass_mocks = pass_mocks
 
     def __call__(self, func):
-        if isinstance(func, ClassTypes):
+        if isinstance(func, type):
             return self.decorate_class(func)
         return self.decorate_callable(func)
 
@@ -184,7 +255,7 @@ class PatcherChain(object):
         def absorb_mocks(test_case, *args):
             return target(test_case)
 
-        should_absorb = not (self.pass_mocks or isinstance(target, ClassTypes))
+        should_absorb = not (self.pass_mocks or isinstance(target, type))
         result = absorb_mocks if should_absorb else target
         for patcher in self.patchers:
             result = patcher(result)

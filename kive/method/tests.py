@@ -19,17 +19,15 @@ from django.core.urlresolvers import resolve
 from django.db import transaction
 
 from django.test import TestCase, skipIfDBFeature
-from mock import patch
 from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.test import force_authenticate
 
-from constants import datatypes, users
+from constants import datatypes
 import file_access_utils
-from kive.mock_setup import mocked_relations
 from kive.tests import BaseTestCases
 import librarian.models
-from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user, KiveUser
+from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
 import metadata.tests
 from method.ajax import MethodViewSet
 from method.models import CodeResource, CodeResourceRevision, \
@@ -223,7 +221,7 @@ class FileAccessTests(TestCase):
 
 
 @skipIfDBFeature('is_mocked')
-class MethodTestCase(TestCase):
+class MethodTestCase(TestCase, object):
     """
     Set up a database state for unit testing.
 
@@ -832,7 +830,7 @@ with open(outfile, "wb") as f:
                                                           self.user_rob)
         self.test_nonreusable.create_input(dataset_name="numbers", dataset_idx=1,
                                            compounddatatype=self.increment_in_1_cdt)
-        _step1 = self.test_nonreusable.steps.create(
+        self.test_nonreusable.steps.create(
             step_num=1,
             transformation=self.rng_method,
             name="source of randomness"
@@ -1437,23 +1435,7 @@ class MethodApiTests(BaseTestCases.ApiTestCase):
 
 class MethodApiMockTests(BaseTestCases.ApiTestCase):
     def setUp(self):
-        patcher = mocked_relations(Method, MethodFamily, User, KiveUser)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-        user = User(pk=users.KIVE_USER_PK)
-        User.objects.add(user)
-        User.objects.model = User
-        Method.objects.model = Method
-
-        kive_user_instance = KiveUser(pk=users.KIVE_USER_PK, username="kive")
-        KiveUser.objects.add(kive_user_instance)
-
-        # noinspection PyUnresolvedReferences
-        patcher2 = patch.object(MethodViewSet, 'queryset', Method.objects)
-        patcher2.start()
-        self.addCleanup(patcher2.stop)
-
+        self.mock_viewset(MethodViewSet)
         super(MethodApiMockTests, self).setUp()
 
         self.list_path = reverse("method-list")
@@ -1468,15 +1450,15 @@ class MethodApiMockTests(BaseTestCases.ApiTestCase):
         self.removal_view, _, _ = resolve(self.removal_path)
 
         Method.objects.add(Method(pk=42,
-                                  user=kive_user_instance,
+                                  user=self.kive_kive_user,
                                   revision_name='mA_name turnip',
                                   revision_desc='A_desc'),
                            Method(pk=43,
-                                  user=kive_user_instance,
+                                  user=self.kive_kive_user,
                                   revision_name='mB_name',
                                   revision_desc='B_desc'),
                            Method(pk=44,
-                                  user=kive_user_instance,
+                                  user=self.kive_kive_user,
                                   revision_name='mC_name',
                                   revision_desc='C_desc turnip'))
 
@@ -1550,90 +1532,3 @@ class MethodApiMockTests(BaseTestCases.ApiTestCase):
 
         self.assertEquals({u'detail': u'Unknown filter key: bogus'},
                           response.data)
-
-
-# @skipIfDBFeature('is_mocked')
-# class InvokeCodeTests(TestCase):
-#     """
-#     Tests of Method.invoke_code with and without using an SSH user.
-#     """
-#     def setUp(self):
-#         # A simple pass-through method.
-#         resource = CodeResource(name="passthrough", filename="passthrough.sh", user=kive_user())
-#         resource.save()
-#
-#         with tempfile.NamedTemporaryFile() as f:
-#             f.write("#!/bin/bash\ncat $1 > $2")
-#             revision = CodeResourceRevision(coderesource=resource, content_file=File(f),
-#                                             user=kive_user())
-#             revision.clean()
-#             revision.save()
-#
-#         self.passthrough_mf = MethodFamily(name="passthrough", user=kive_user())
-#         self.passthrough_mf.save()
-#
-#         self.passthrough_method = Method(
-#             family=self.passthrough_mf, driver=revision,
-#             revision_name="v1", revision_desc="First version",
-#             user=kive_user())
-#         self.passthrough_method.save()
-#         self.passthrough_method.create_input(
-#             compounddatatype=None, dataset_name="initial_data", dataset_idx=1)
-#         self.passthrough_method.create_output(
-#             compounddatatype=None, dataset_name="passthrough_data", dataset_idx=1)
-#         self.passthrough_method.full_clean()
-#
-#         # Stake out a place on the filesystem for this file.
-#         try:
-#             fd, self.passthrough_input_name = tempfile.mkstemp(dir=file_access_utils.sandbox_base_path())
-#         finally:
-#             os.close(fd)
-#
-#         # Write to this file.
-#         with open(self.passthrough_input_name, "w") as f:
-#             f.write("fooooooo")
-#         file_access_utils.configure_sandbox_permissions(self.passthrough_input_name)
-#
-#         self.empty_dir = tempfile.mkdtemp(
-#             dir=file_access_utils.sandbox_base_path()
-#         )
-#         file_access_utils.configure_sandbox_permissions(self.empty_dir)
-#
-#     def tearDown(self):
-#         tools.clean_up_all_files()
-#         # if os.path.exists(self.passthrough_input_name):
-#         #     os.remove(self.passthrough_input_name)
-#         # shutil.rmtree(self.empty_dir)
-#
-#     def test_invoke_code(self, ssh_sandbox_worker_account=None):
-#         """
-#         Invoke a method's code.  By default this works as the normal user (i.e. without using SSH).
-#         """
-#         empty_dir = tempfile.mkdtemp(
-#             dir=file_access_utils.sandbox_base_path()
-#         )
-#         file_access_utils.configure_sandbox_permissions(empty_dir)
-#
-#         output_filename = os.path.join(self.empty_dir, "test_output.dat")
-#         passthrough_popen = self.passthrough_method.invoke_code(
-#             self.empty_dir,
-#             [self.passthrough_input_name],
-#             [output_filename],
-#             ssh_sandbox_worker_account=ssh_sandbox_worker_account
-#         )
-#         passthrough_popen.communicate()
-#
-#         # Check that everything worked OK.
-#         self.assertEqual(passthrough_popen.returncode, 0)
-#         with open(self.passthrough_input_name, "r") as f, open(output_filename, "r") as g:
-#             self.assertEqual(f.read(), g.read())
-#
-#     @unittest.skipIf(
-#         not settings.KIVE_SANDBOX_WORKER_ACCOUNT,
-#         "Kive is not configured to run sandboxes under another account via SSH"
-#     )
-#     def test_invoke_code_with_SSH(self):
-#         """
-#         Invoke a method as the normal user (i.e. without using SSH).
-#         """
-#         self.test_invoke_code(ssh_sandbox_worker_account=settings.KIVE_SANDBOX_WORKER_ACCOUNT)

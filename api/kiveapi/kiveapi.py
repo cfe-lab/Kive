@@ -135,7 +135,7 @@ class KiveAPI(Session):
                     raise KiveMalformedDataException(message)
                 if is_json and 'detail' in json_data:
                     message += ': ' + json_data['detail']
-                raise KiveClientException("Couldn't authorize request!")
+                raise KiveClientException(message)
 
         except ValueError:
             raise KiveMalformedDataException("Malformed response from server! (check server config '%s!')\n%s" %

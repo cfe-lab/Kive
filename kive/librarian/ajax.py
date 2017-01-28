@@ -31,7 +31,7 @@ class ExternalFileDirectoryViewSet(ReadOnlyModelViewSet,
     """
     queryset = ExternalFileDirectory.objects.all()
     serializer_class = ExternalFileDirectorySerializer
-    permission_classes = (permissions.IsAuthenticated, IsGrantedReadCreate)
+    permission_classes = (permissions.IsAuthenticated, )
     pagination_class = StandardPagination
 
     list_files_serializer_class = ExternalFileDirectoryListFilesSerializer
@@ -40,7 +40,8 @@ class ExternalFileDirectoryViewSet(ReadOnlyModelViewSet,
         queryset = super(ExternalFileDirectoryViewSet, self).filter_queryset(queryset)
         return self.apply_filters(queryset)
 
-    def _add_filter(self, queryset, key, value):
+    @staticmethod
+    def _add_filter(queryset, key, value):
         if key == 'smart':
             return queryset.filter(Q(name__icontains=value) |
                                    Q(path__icontains=value))
@@ -51,6 +52,7 @@ class ExternalFileDirectoryViewSet(ReadOnlyModelViewSet,
 
         raise APIException('Unknown filter key: {}'.format(key))
 
+    # noinspection PyUnusedLocal
     @detail_route(methods=['get'])
     def list_files(self, request, pk=None):
         """
@@ -113,7 +115,8 @@ class DatasetViewSet(RemovableModelViewSet,
         queryset = super(DatasetViewSet, self).filter_queryset(queryset)
         return self.apply_filters(queryset)
 
-    def _add_filter(self, queryset, key, value):
+    @staticmethod
+    def _add_filter(queryset, key, value):
         if key == 'smart':
             return queryset.filter(Q(name__icontains=value) |
                                    Q(description__icontains=value))
@@ -129,7 +132,7 @@ class DatasetViewSet(RemovableModelViewSet,
             if value == '':
                 return queryset.filter(structure__isnull=True)
             else:
-                return queryset.filter(structure__compounddatatype=value)
+                return queryset.filter(structure__compounddatatype_id=int(value))
         if key == 'md5':
             return queryset.filter(MD5_checksum=value)
 
@@ -154,6 +157,7 @@ class DatasetViewSet(RemovableModelViewSet,
     def patch_object(self, request, pk=None):
         return Response(DatasetSerializer(self.get_object(), context={'request': request}).data)
 
+    # noinspection PyUnusedLocal
     @detail_route(methods=['get'])
     def download(self, request, pk=None):
         """

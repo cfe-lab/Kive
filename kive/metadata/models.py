@@ -179,9 +179,6 @@ def summarize_CSV(columns, data_csv):
     - failing_cells: dict of non-conforming cells in the file,
       entries keyed by (row_num, colnum) contain list of tests failed.
 
-    RAISES
-    VerificationMethodError if the verification method fails somehow.
-
     ASSUMPTIONS
     1) content_check_log may only be None if this function is being called
     with Datatypes as columns, not CompoundDatatypeMembers.
@@ -216,6 +213,40 @@ def summarize_CSV(columns, data_csv):
 
 
 def who_cannot_access(user, users_allowed, groups_allowed, acs):
+    """
+    Tells which of the specified users and groups cannot access all
+    of the AccessControl objects specified.
+
+    user: a User
+    users_allowed: an iterable of Users
+    groups_allowed: an iterable of Groups
+    acs: a list of AccessControl instances.
+
+    NOTE: This routine returns subsets of users_allowed and groups_allowed only.
+    E.g. if these are empty sets, then empty sets will be returned as well.
+    """
+    allowed_users = set([user]) | set(users_allowed)
+    allowed_groups = set(groups_allowed)
+    all_defined_users = frozenset(User.objects.all())
+    all_defined_groups = frozenset(Group.objects.all())
+    ok_user = all_defined_users
+    ok_group = all_defined_groups
+    for ac in acs:
+        has_everyone = ac.groups_allowed.filter(pk=groups.EVERYONE_PK).exists()
+        cur_user = all_defined_users if has_everyone else set([ac.user]) | (set(ac.users_allowed.all()))
+        cur_group = all_defined_groups if has_everyone else set(ac.groups_allowed.all())
+        ok_user &= cur_user
+        ok_group &= cur_group
+    # Special case: everyone is allowed access to all of the elements of acs.
+    if everyone_group() in ok_group:
+        return set(), set()
+    else:
+        return allowed_users - ok_user, allowed_groups - ok_group
+
+
+# NOTE: this code is critically important, but has been replaced with the above routine.
+# keeping this code here for comparison purposes in case we run into permission issues
+def OLDwho_cannot_access(user, users_allowed, groups_allowed, acs):
     """
     Tells which of the specified users and groups cannot access all of the AccessControl objects specified.
 
@@ -396,6 +427,7 @@ class AccessControl(models.Model):
         """ Retrieve a QuerySet of all records of this class that are visible
             to the specified user.
 
+        @param user: user that must be able to see the records
         @param is_admin: override the filter, and just return all records.
         @param queryset: add the filter to an existing queryset instead of
             cls.objects.all()
@@ -409,7 +441,8 @@ class AccessControl(models.Model):
                 raise StandardError('User is not an administrator.')
         else:
             user_plus = KiveUser.kiveify(user)
-            queryset = queryset.filter(user_plus.access_query()).distinct()
+            allowed_items = queryset.filter(user_plus.access_query())
+            queryset = queryset.filter(pk__in=allowed_items)
         return queryset
 
     def grant_everyone_access(self):
@@ -471,10 +504,6 @@ class AccessControl(models.Model):
         addable_groups = Group.objects.exclude(pk__in=group_pks_already_allowed)
 
         return addable_users, addable_groups
-
-
-class VerificationMethodError(Exception):
-    pass
 
 
 @python_2_unicode_compatible
@@ -1536,9 +1565,6 @@ class CompoundDatatype(AccessControl):
         - num_rows: number of rows in the CSV
         - failing_cells: dict of non-conforming cells in the file.
           Entries keyed by (rownum, colnum) contain list of tests failed.
-
-        RAISES
-        VerificationMethodError if the verification method fails somehow
 
         ASSUMPTIONS
         1) content_check_log may only be None if this function is being called

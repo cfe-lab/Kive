@@ -3,7 +3,7 @@ method.views
 """
 
 from django.db import transaction
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader
@@ -12,7 +12,6 @@ from datetime import datetime
 import logging
 import itertools
 
-import metadata.models
 from metadata.models import CompoundDatatype
 from method.models import CodeResource, Method, MethodDependency,\
     MethodFamily, CodeResourceRevision
@@ -51,7 +50,7 @@ def resource_revisions(request, id):
         coderesource = CodeResource.objects.get(pk=id)
         if not coderesource.can_be_accessed(request.user):
             four_oh_four = True
-    except CodeResource.DoesNotExist:
+    except ObjectDoesNotExist:
         four_oh_four = True
 
     if four_oh_four:
@@ -90,10 +89,9 @@ def resource_revisions(request, id):
             initial={"name": coderesource.name, "description": coderesource.description}
         )
 
-    # Cast request.user to class KiveUser & grab data
-    curr_user = metadata.models.KiveUser.kiveify(request.user)
-    revisions = coderesource.revisions.filter(curr_user.access_query()).\
-        distinct().order_by('-revision_number')
+    revisions = CodeResourceRevision.filter_by_user(
+        request.user,
+        queryset=coderesource.revisions.all()).order_by('-revision_number')
     if len(revisions) == 0:
         # Go to the resource_revision_add page to create a first revision.
         t = loader.get_template('method/resource_revision_add.html')
@@ -250,7 +248,7 @@ def resource_revision_add(request, id):
         parent_revision = CodeResourceRevision.objects.get(pk=id)
         if not parent_revision.can_be_accessed(creating_user):
             four_oh_four = True
-    except CodeResourceRevision.DoesNotExist:
+    except ObjectDoesNotExist:
         four_oh_four = True
 
     if four_oh_four:
@@ -389,7 +387,7 @@ def methods(request, id):
         family = MethodFamily.objects.get(pk=id)
         if not family.can_be_accessed(request.user) and not admin_check(request.user):
             four_oh_four = True
-    except MethodFamily.DoesNotExist:
+    except ObjectDoesNotExist:
         four_oh_four = True
 
     if four_oh_four:
@@ -952,8 +950,9 @@ def method_revise(request, id):
     parent_revision = parent_method.driver
     this_code_resource = parent_revision.coderesource
     # Filter the available revisions by user.
-    user_plus = metadata.models.KiveUser.kiveify(creating_user)
-    all_revisions = this_code_resource.revisions.filter(user_plus.access_query()).order_by('-revision_DateTime')
+    all_revisions = CodeResourceRevision.filter_by_user(
+        creating_user,
+        queryset=this_code_resource.revisions.all()).order_by('-revision_DateTime')
 
     if request.method == 'POST':
         # Because there is no CodeResource specified, the second value is of type MethodReviseForm.

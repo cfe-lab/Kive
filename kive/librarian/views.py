@@ -7,7 +7,7 @@ import mimetypes
 import os
 
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.urlresolvers import reverse
 from django.db import transaction
 from django.forms.formsets import formset_factory
@@ -61,7 +61,7 @@ def dataset_download(request, dataset_id):
     """
     try:
         dataset = librarian.models.Dataset.filter_by_user(request.user).get(pk=dataset_id)
-    except Dataset.DoesNotExist:
+    except ObjectDoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
     with dataset.get_open_file_handle() as data_handle:
@@ -85,25 +85,18 @@ def dataset_view(request, dataset_id):
 
     try:
         if admin_check(request.user):
-            dataset = Dataset.objects.prefetch_related(
-                'structure',
-                'structure__compounddatatype',
-                'structure__compounddatatype__members',
-                'structure__compounddatatype__members__datatype',
-                'structure__compounddatatype__members__datatype__basic_constraints'
-            ).get(pk=dataset_id)
-
+            accessible_datasets = Dataset.objects
         else:
-            accessible_datasets = librarian.models.Dataset.filter_by_user(request.user)
-            dataset = Dataset.objects.prefetch_related(
-                'structure',
-                'structure__compounddatatype',
-                'structure__compounddatatype__members',
-                'structure__compounddatatype__members__datatype',
-                'structure__compounddatatype__members__datatype__basic_constraints'
-            ).get(pk__in=accessible_datasets, pk=dataset_id)
+            accessible_datasets = Dataset.filter_by_user(request.user)
+        dataset = accessible_datasets.prefetch_related(
+            'structure',
+            'structure__compounddatatype',
+            'structure__compounddatatype__members',
+            'structure__compounddatatype__members__datatype',
+            'structure__compounddatatype__members__datatype__basic_constraints'
+        ).get(pk=dataset_id)
 
-    except Dataset.DoesNotExist:
+    except ObjectDoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
     # Figure out which users and groups could be given access to this Dataset.
@@ -111,7 +104,9 @@ def dataset_view(request, dataset_id):
     # if it was generated, it's anyone who had access to the generating run.
     addable_users, addable_groups = dataset.other_users_groups()
 
-    if dataset.file_source is not None:
+    if dataset.file_source is None:
+        generating_run = None
+    else:
         generating_run = dataset.file_source.top_level_run
         addable_users.exclude(pk=generating_run.user_id)
         addable_users.exclude(pk__in=generating_run.users_allowed.values_list("pk", flat=True))
@@ -151,7 +146,8 @@ def dataset_view(request, dataset_id):
         "is_owner": dataset.user == request.user,
         "dataset": dataset,
         "return": return_url,
-        "dataset_form": dataset_form
+        "dataset_form": dataset_form,
+        "generating_run": generating_run
     }
 
     rendered_response = None
@@ -213,76 +209,6 @@ def dataset_view(request, dataset_id):
         )
         rendered_response = t.render(c, request)
     return HttpResponse(rendered_response)
-
-
-@login_required
-def datasets_add(request):
-    """
-    Add datasets to db.
-    """
-    t = loader.get_template('librarian/datasets_add.html')
-    c = {}
-    if request.method == 'POST':
-        # The new Dataset; we need it here for validation purposes.
-        ds = Dataset(user=request.user)
-        df = DatasetForm(request.POST, request.FILES, instance=ds, user=request.user,
-                         prefix="single")
-
-        success = True
-        try:
-            if "singleSubmit" not in df.data:
-                df.add_error(None, "Invalid form submission")
-                success = False
-
-            elif df.is_valid():
-
-                cdt = None
-                if df.cleaned_data['compound_datatype'] != CompoundDatatype.RAW_ID:
-                    cdt = CompoundDatatype.objects.get(pk=df.cleaned_data['compound_datatype'])
-
-                keep_file = True
-                file_path = df.cleaned_data.get("external_path", "")
-                efd = df.cleaned_data.get("externalfiledirectory", None)
-                # Both or neither are specified (this is enforced in form validation).
-                if file_path:
-                    file_path = os.path.join(efd.path, file_path)
-                    keep_file = df.cleaned_data["save_in_db"]
-
-                with transaction.atomic():
-                    ds = Dataset.create_dataset(
-                        file_path=file_path,
-                        user=request.user,
-                        cdt=cdt,
-                        keep_file=keep_file,
-                        name=df.cleaned_data['name'],
-                        description=df.cleaned_data['description'],
-                        file_source=None,
-                        check=True,
-                        file_handle=df.cleaned_data['dataset_file'],
-                        externalfiledirectory=efd,
-                        instance=ds
-                    )
-                    ds.grant_from_json(df.cleaned_data["permissions"])
-
-                    ds.validate_uniqueness_on_upload()
-            else:
-                success = False
-
-        except (AttributeError, ValidationError, ValueError, IOError) as e:
-            LOGGER.exception(e.message)
-            success = False
-            df.add_error(None, e)
-
-        if success:
-            return HttpResponseRedirect("datasets")
-        else:
-            c.update({'singleDataset': df})
-
-    else:  # return an empty formset for the user to fill in
-        df = DatasetForm(user=request.user, prefix="single")
-        c.update({'singleDataset': df})
-
-    return HttpResponse(t.render(c, request))
 
 
 class BulkDatasetDisplay:
@@ -574,7 +500,7 @@ def dataset_lookup(request, filename=None, filesize=None, md5_checksum=None):
     filename = urllib.unquote(filename)
     dataset_query = librarian.models.Dataset.filter_by_user(request.user).filter(
         MD5_checksum=md5_checksum).exclude(file_source=None).order_by('-date_created')
-    num_datasets = len(dataset_query)
+    num_datasets = dataset_query.count()
     datasets = list(dataset_query[:DISPLAY_LIMIT])
 
     q_set_a = RunInput.objects.filter(dataset__user=request.user)

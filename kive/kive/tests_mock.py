@@ -1,10 +1,12 @@
 from mock import patch, MagicMock, PropertyMock
-from django.contrib.auth.models import Group, Permission
+from django.contrib.auth.models import Group, Permission, User
+from django.db import NotSupportedError, connection
 from django.db.models.fields.related_descriptors import ManyToManyDescriptor
 from django.test import TestCase
 
 from kive.mock_setup import MockOneToOneMap, MockOneToManyMap, PatcherChain, mocked_relations
 from django_mock_queries.query import MockSet
+from method.models import CodeResource
 
 
 class DummyChildModel(object):
@@ -285,3 +287,65 @@ class MockedRelationsTest(TestCase):
             Group.permissions = PropertyMock('Group.permissions')
 
         self.assertIsInstance(Group.permissions, ManyToManyDescriptor)
+
+
+class PatchTests(TestCase):
+    def test_exists_raises(self):
+        if not getattr(connection, 'is_mocked', False):
+            self.assertTrue(Group.objects.exists())
+        else:
+            with self.assertRaisesRegexp(
+                    NotSupportedError,
+                    "Mock database tried to execute SQL for Group model."):
+                Group.objects.exists()
+
+    @mocked_relations(User, CodeResource)
+    def test_filter_children(self):
+        bob = User()
+        resource = CodeResource()
+        resource.users_allowed.add(bob)
+        CodeResource.objects.add(resource)
+
+        bob_resources = CodeResource.objects.filter(users_allowed=bob)
+
+        self.assertEqual([resource], list(bob_resources))
+
+    def test_pk_in(self):
+        old_users = MockSet(User(id=1, username='bob'),
+                            User(id=2, username='sue'))
+        all_users = old_users.all()
+        all_users.add(User(id=3, username='timmy'))
+
+        matches = all_users.filter(pk__in=old_users)
+
+        self.assertEqual(list(old_users), list(matches))
+
+    def test_values(self):
+        c = CodeResource(name="foo")
+        q = MockSet(c)
+
+        names = list(q.values('name'))
+
+        self.assertEqual([dict(name='foo')], names)
+
+    def test_all_values(self):
+        c = CodeResource(name="foo")
+        q = MockSet(c)
+
+        with self.assertRaisesMessage(NotSupportedError,
+                                      "All values not supported."):
+            q.values()
+
+    def test_length1(self):
+        q = MockSet(User())
+
+        n = len(q)
+
+        self.assertEqual(1, n)
+
+    def test_length2(self):
+        q = MockSet(User(), User())
+
+        n = len(q)
+
+        self.assertEqual(2, n)

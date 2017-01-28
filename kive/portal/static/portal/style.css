@@ -136,7 +136,7 @@ p {
 }
 pre {
     word-break: break-all;
-    white-space: normal;
+    white-space: pre-wrap;
 }
 a[rel="prev"] {
     display: block;

@@ -25,8 +25,7 @@ import transformation.models
 import metadata.models
 import librarian.models
 from constants import maxlengths
-from file_access_utils import confirm_file_copy, confirm_file_created,\
-    FileCreationError
+from file_access_utils import confirm_file_copy, confirm_file_created, FileCreationError
 
 logger = logging.getLogger(__name__)
 

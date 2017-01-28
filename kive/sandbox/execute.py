@@ -24,8 +24,6 @@ from method.models import Method
 from datachecking.models import IntegrityCheckLog
 from fleet.exceptions import StopExecution
 from file_access_utils import copy_and_confirm, FileCreationError
-from metadata.models import VerificationMethodError
-
 
 logger = logging.getLogger("Sandbox")
 
@@ -1499,18 +1497,16 @@ class Sandbox:
 
             try:
                 copy_and_confirm(file_path, input_dataset_path)
-            except IOError:
+            except (IOError, FileCreationError):
                 logger.error("Could not copy file %s to file %s.",
-                             file_path, input_dataset_path)
-                fail_now = True
-            except FileCreationError as e:
-                logger.error(str(e))
+                             file_path,
+                             input_dataset_path,
+                             exc_info=True)
                 fail_now = True
             finally:
                 copy_end = timezone.now()
 
             if fail_now:
-                # Create a failed IntegrityCheckLog.
                 with transaction.atomic():
                     # Create a failed IntegrityCheckLog.
                     iic = IntegrityCheckLog(
@@ -1559,14 +1555,15 @@ class Sandbox:
         file_size_unstable = False
         try:
             md5 = cable.run_cable(input_dataset_path, output_path, curr_record, curr_log)
-        except OSError:
-            # The cable was trivial and failed during linking.
+        except (OSError, FileCreationError) as e:
             cable_failed = True
-        except FileCreationError as e:
-            # Cable either failed during linking or after running (non-trivial).
-            cable_failed = True
+            logger.error("[%d] could not run cable %s to file %s.",
+                         worker_rank,
+                         input_dataset_path,
+                         output_path,
+                         exc_info=True)
             if hasattr(e, "md5"):
-                # Cable failed on running.
+                # Cable failed on running so there's an MD5 attached.
                 md5 = e.md5
                 file_size_unstable = True
 
@@ -1578,7 +1575,6 @@ class Sandbox:
                 with transaction.atomic():
                     bad_output = False
                     start_time = timezone.now()
-
                     if cable_failed:
                         end_time = timezone.now()
                         bad_output = True
@@ -1675,8 +1671,6 @@ class Sandbox:
                 logger.debug("Cable is trivial; skipping integrity check")
 
             else:
-
-                verification_method_failed = False
                 # Case 2a: ExecRecord already existed and its output had been properly vetted.
                 # Case 2b: this was a recovery.
                 # Check the integrity of the output.
@@ -1685,7 +1679,9 @@ class Sandbox:
                         cable.is_trivial() or recover):
                     logger.debug("Performing integrity check of trivial or previously generated output")
                     # Perform integrity check.  Note: if this fails, it will notify all RunComponents using it.
-                    check = output_dataset.check_integrity(output_path, user, curr_log,
+                    check = output_dataset.check_integrity(output_path,
+                                                           user,
+                                                           curr_log,
                                                            newly_computed_MD5=md5)
 
                 # Case 3: the Dataset, one way or another, is not properly vetted.
@@ -1693,19 +1689,16 @@ class Sandbox:
                     logger.debug("Output has no complete content check; performing content check")
                     summary_path = "{}_summary".format(output_path)
                     # Perform content check.  Note: if this fails, it will notify all RunComponents using it.
-                    try:
-                        check = output_dataset.check_file_contents(
-                            output_path,
-                            summary_path,
-                            cable.min_rows_out,
-                            cable.max_rows_out,
-                            curr_log,
-                            user
-                        )
-                    except VerificationMethodError:
-                        verification_method_failed = True
+                    check = output_dataset.check_file_contents(
+                        output_path,
+                        summary_path,
+                        cable.min_rows_out,
+                        cable.max_rows_out,
+                        curr_log,
+                        user
+                    )
 
-                if verification_method_failed or check.is_fail():
+                if check.is_fail():
                     curr_record.finish_failure(save=True)
 
         logger.debug("DONE EXECUTING %s '%s'", type(cable).__name__, cable)
@@ -2039,7 +2032,7 @@ class Sandbox:
                             try:
                                 md5s[i] = file_access_utils.confirm_file_created(output_path)
                             except FileCreationError as e:
-                                logger.error("File at %s was not properly created.", output_path, exc_info=True)
+                                logger.warn("File at %s was not properly created.", output_path, exc_info=True)
                                 file_confirmed = False
 
                                 if hasattr(e, "md5"):
@@ -2111,7 +2104,8 @@ class Sandbox:
                                         name=dataset_name,
                                         description=dataset_desc,
                                         file_source=curr_RS,
-                                        check=False
+                                        check=False,
+                                        precomputed_md5=md5s[i]
                                     )
                                     logger.debug("First time seeing file: saved md5 %s",
                                                  output_dataset.MD5_checksum)
@@ -2148,7 +2142,6 @@ class Sandbox:
                 output_path = output_paths[i]
                 output_dataset = curr_ER.get_execrecordout(curr_output).dataset
                 check = None
-                verification_method_failed = False
 
                 if bad_execution:
                     logger.debug("Execution was unsuccessful; no check on %s was done", output_path)
@@ -2171,24 +2164,6 @@ class Sandbox:
                             end_time__isnull=False).exists():
                         logger.debug("Output has no complete content check; performing content check")
                         summary_path = "{}_summary".format(output_path)
-                        try:
-                            check = output_dataset.check_file_contents(
-                                output_path,
-                                summary_path,
-                                curr_output.get_min_row(),
-                                curr_output.get_max_row(),
-                                curr_log,
-                                user
-                            )
-                        except VerificationMethodError:
-                            verification_method_failed = True
-
-                # Recovering or filling in old ER? No.
-                else:
-                    # Perform content check.
-                    logger.debug("%s is new data - performing content check", output_dataset)
-                    summary_path = "{}_summary".format(output_path)
-                    try:
                         check = output_dataset.check_file_contents(
                             output_path,
                             summary_path,
@@ -2197,11 +2172,23 @@ class Sandbox:
                             curr_log,
                             user
                         )
-                    except VerificationMethodError:
-                        verification_method_failed = True
+
+                # Recovering or filling in old ER? No.
+                else:
+                    # Perform content check.
+                    logger.debug("%s is new data - performing content check", output_dataset)
+                    summary_path = "{}_summary".format(output_path)
+                    check = output_dataset.check_file_contents(
+                        output_path,
+                        summary_path,
+                        curr_output.get_min_row(),
+                        curr_output.get_max_row(),
+                        curr_log,
+                        user
+                    )
 
                 # Check OK? No.
-                if verification_method_failed or (check and check.is_fail()):
+                if check and check.is_fail():
                     logger.warn("%s failed for %s", check.__class__.__name__, output_path)
                     bad_output_found = True
 

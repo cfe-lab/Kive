@@ -7,7 +7,7 @@ from kive.kive_router import KiveRouter
 from metadata.ajax import DatatypeViewSet, CompoundDatatypeViewSet
 from method.ajax import MethodViewSet, MethodFamilyViewSet, CodeResourceViewSet, CodeResourceRevisionViewSet
 from pipeline.ajax import PipelineFamilyViewSet, PipelineViewSet
-import portal.ajax
+from portal.ajax import StagedFileViewSet, UserViewSet
 from portal.forms import LoginForm
 
 import portal.views
@@ -36,8 +36,8 @@ router.register(r'pipelinefamilies', PipelineFamilyViewSet)
 router.register(r'pipelines', PipelineViewSet)
 router.register(r'runs', RunViewSet)
 router.register(r'runbatches', RunBatchViewSet)
-router.register(r'stagedfiles', portal.ajax.StagedFileViewSet)
-router.register(r'users', portal.ajax.UserViewSet)
+router.register(r'stagedfiles', StagedFileViewSet)
+router.register(r'users', UserViewSet)
 
 urlpatterns = [
     # '',
@@ -93,7 +93,6 @@ urlpatterns = [
     url(r'^datasets$', librarian.views.datasets, name='datasets'),
     url(r'^dataset_download/(?P<dataset_id>\d+)$', librarian.views.dataset_download, name='dataset_download'),
     url(r'^dataset_view/(?P<dataset_id>\d+)$', librarian.views.dataset_view, name='dataset_view'),
-    url(r'^datasets_add$', librarian.views.datasets_add, name='datasets_add'),
     url(r'^datasets_add_bulk', librarian.views.datasets_add_bulk, name='datasets_add_bulk'),
     url(r'^datasets_bulk', librarian.views.datasets_bulk, name='datasets_bulk'),
     url(r'^datasets_add_archive$', librarian.views.datasets_add_archive, name='datasets_add_archive'),
@@ -108,9 +107,8 @@ urlpatterns = [
     url(r'^stdout_view/(?P<methodoutput_id>\d+)$', archive.views.stdout_view, name='stdout_view'),
     url(r'^stderr_download/(?P<methodoutput_id>\d+)$', archive.views.stderr_download, name='stderr_download'),
     url(r'^stderr_view/(?P<methodoutput_id>\d+)$', archive.views.stderr_view, name='stderr_view'),
-
     url(r'^choose_pipeline$', sandbox.views.choose_pipeline, name='choose_pipeline'),
-    url(r'^choose_inputs$', sandbox.views.choose_inputs, name='choose_inputs'),
+    url(r'^choose_inputs/$', sandbox.views.choose_inputs, name='choose_inputs'),
     url(r'^runs$', sandbox.views.runs, name='runs'),
     url(r'^view_results/(?P<run_id>\d+)/$', sandbox.views.view_results, name='view_results'),
     url(r'^view_run/(?P<run_id>\d+)$', sandbox.views.view_run, name='view_run'),

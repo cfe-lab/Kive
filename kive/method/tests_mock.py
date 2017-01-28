@@ -1,14 +1,22 @@
+from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
+from mock import patch
+
 from django.core.exceptions import ValidationError
+from django.core.urlresolvers import reverse
 from django.test import TestCase
+
+from constants import users, groups
 from django_mock_queries.query import MockSet
 
-from kive.mock_setup import mocked_relations
-from metadata.models import CompoundDatatype
+from kive.mock_setup import mocked_relations, PatcherChain
+from kive.tests import ViewMockTestCase
+from metadata.models import CompoundDatatype, KiveUser, kive_user
 from method.models import Method, MethodFamily, CodeResourceRevision,\
     CodeResource, MethodDependency
 from transformation.models import TransformationInput, TransformationOutput,\
     XputStructure, Transformation, TransformationXput
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from pipeline.models import Pipeline
 
 
@@ -583,3 +591,283 @@ class MethodUpdateMockTests(TestCase):
         update = transformation.find_update()
 
         self.assertEqual(update, None)
+
+
+class CodeResourceViewMockTests(ViewMockTestCase):
+    def setUp(self):
+        super(CodeResourceViewMockTests, self).setUp()
+        patcher = mocked_relations(KiveUser,
+                                   CodeResource,
+                                   CodeResourceRevision,
+                                   User,
+                                   Group)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        # noinspection PyUnresolvedReferences
+        patchers = [patch.object(CodeResource,
+                                 '_default_manager',
+                                 CodeResource.objects),
+                    patch.object(CodeResourceRevision,
+                                 '_default_manager',
+                                 CodeResource.objects)]
+
+        def dummy_save(r):
+            r.id = id(r)
+
+        # noinspection PyUnresolvedReferences
+        patchers.append(patch.object(CodeResource, 'save', dummy_save))
+        patcher = PatcherChain(patchers)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        self.client = self.create_client()
+        self.dev_group = Group(pk=groups.DEVELOPERS_PK)
+        self.everyone = Group(pk=groups.EVERYONE_PK)
+        Group.objects.add(self.dev_group, self.everyone)
+        self.user = kive_user()
+        self.user.groups.add(self.dev_group)
+        self.content_file = ContentFile('some text', 'existing.txt')
+        self.code_resource = CodeResource(pk='99',
+                                          user=self.user,
+                                          name='existing',
+                                          filename='existing.txt')
+        self.code_resource._state.adding = False
+
+        self.other_user = User(pk=5)
+        self.other_code_resource = CodeResource(pk='150', user=self.other_user)
+        CodeResource.objects.add(self.code_resource, self.other_code_resource)
+
+        self.code_resource_revision = CodeResourceRevision(
+            pk='199',
+            user=self.user,
+            content_file=self.content_file)
+        self.code_resource_revision.coderesource = self.code_resource
+        self.other_code_resource_revision = CodeResourceRevision(
+            pk='200',
+            user=self.other_user)
+        self.other_code_resource_revision.coderesource = self.other_code_resource
+        self.other_code_resource.revisions.add(self.other_code_resource_revision)
+        CodeResourceRevision.objects.add(self.code_resource_revision,
+                                         self.other_code_resource_revision)
+        k = KiveUser(pk=users.KIVE_USER_PK)
+        k.groups.add(self.dev_group)
+        KiveUser.objects.add(k)
+
+    def test_resources(self):
+        response = self.client.get(reverse('resources'))
+
+        self.assertEqual(200, response.status_code)
+        self.assertFalse(response.context['is_user_admin'])
+
+    def test_resources_admin(self):
+        self.user.is_staff = True
+
+        response = self.client.get(reverse('resources'))
+
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(response.context['is_user_admin'])
+
+    def test_resource_revisions_404(self):
+        response = self.client.get(reverse('resource_revisions',
+                                           kwargs=dict(id='1000')))
+
+        self.assertEqual(404, response.status_code)
+
+    def test_resource_revisions(self):
+        response = self.client.get(reverse('resource_revisions',
+                                           kwargs=dict(id='99')))
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(self.code_resource, response.context['coderesource'])
+
+    def test_resource_revisions_not_accessible(self):
+        other_id = self.other_code_resource.pk
+        response = self.client.get(reverse('resource_revisions',
+                                           kwargs=dict(id=other_id)))
+
+        self.assertEqual(404, response.status_code)
+
+    def test_resource_revisions_accessible(self):
+        self.other_code_resource.groups_allowed.add(self.dev_group)
+        other_id = self.other_code_resource.pk
+        response = self.client.get(reverse('resource_revisions',
+                                           kwargs=dict(id=other_id)))
+
+        self.assertEqual(200, response.status_code)
+        self.assertNotIn('revisions', response.context)
+
+    def test_resource_revisions_accessible_with_child(self):
+        self.other_code_resource.groups_allowed.add(self.dev_group)
+        self.other_code_resource_revision.groups_allowed.add(self.dev_group)
+        other_id = self.other_code_resource.pk
+        response = self.client.get(reverse('resource_revisions',
+                                           kwargs=dict(id=other_id)))
+
+        self.assertEqual(200, response.status_code)
+        self.assertIn('revisions', response.context)
+
+    def test_resource_add(self):
+        response = self.client.get(reverse('resource_add'))
+
+        self.assertEqual(200, response.status_code)
+        self.assertIn('resource_form', response.context)
+
+    def test_resource_add_post(self):
+        filename = "added.txt"
+        upload_file = SimpleUploadedFile(filename, "Hello, World!")
+        response = self.client.post(
+            reverse('resource_add'),
+            data=dict(resource_name='hello.txt',
+                      content_file=upload_file))
+
+        self.assertEqual(302, response.status_code)
+        self.assertEqual('/resources', response.url)
+
+    def test_resource_revision_add(self):
+        response = self.client.get(reverse('resource_revision_add',
+                                           kwargs=dict(id='199')))
+
+        self.assertEqual(200, response.status_code)
+        self.assertIn('revision_form', response.context)
+
+    def test_resource_revision_add_post(self):
+        filename = "added1.txt"
+        upload_file = SimpleUploadedFile(filename, "Hello, World!")
+        response = self.client.post(
+            reverse('resource_revision_add', kwargs=dict(id='199')),
+            data=dict(content_file=upload_file))
+
+        self.assertEqual(302, response.status_code)
+        self.assertEqual('/resources', response.url)
+
+    def test_resource_revision_view(self):
+        response = self.client.get(reverse('resource_revision_view',
+                                           kwargs=dict(id='199')))
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(self.code_resource_revision, response.context['revision'])
+
+
+class MethodViewMockTests(ViewMockTestCase):
+    def setUp(self):
+        super(MethodViewMockTests, self).setUp()
+        patcher = mocked_relations(KiveUser,
+                                   MethodFamily,
+                                   Method,
+                                   CodeResource,
+                                   CodeResourceRevision,
+                                   CompoundDatatype,
+                                   User,
+                                   Group)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        self.client = self.create_client()
+        self.dev_group = Group(pk=groups.DEVELOPERS_PK)
+        self.everyone = Group(pk=groups.EVERYONE_PK)
+        Group.objects.add(self.dev_group, self.everyone)
+        self.user = kive_user()
+        self.user.groups.add(self.dev_group)
+        self.other_user = User(pk=5)
+
+        self.method_family = MethodFamily(pk='99',
+                                          user=self.user)
+        MethodFamily.objects.add(self.method_family)
+
+        self.driver = CodeResourceRevision(user=self.user)
+        self.driver.coderesource = CodeResource()
+        self.method = Method(pk='199', user=self.user)
+        self.method.driver = self.driver
+        self.method.family = self.method_family
+        Method.objects.add(self.method)
+        KiveUser.objects.add(KiveUser(pk=users.KIVE_USER_PK))
+
+    def test_method_families(self):
+        response = self.client.get(reverse('method_families'))
+
+        self.assertEqual(200, response.status_code)
+        self.assertFalse(response.context['is_user_admin'])
+
+    def test_method_families_admin(self):
+        self.user.is_staff = True
+
+        response = self.client.get(reverse('method_families'))
+
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(response.context['is_user_admin'])
+
+    def test_methods_404(self):
+        response = self.client.get(reverse('methods',
+                                           kwargs=dict(id='1000')))
+
+        self.assertEqual(404, response.status_code)
+
+    def test_methods(self):
+        response = self.client.get(reverse('methods',
+                                           kwargs=dict(id='99')))
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(self.method_family, response.context['family'])
+
+    def test_method_view(self):
+        response = self.client.get(reverse('method_view',
+                                           kwargs=dict(id='199')))
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(self.method, response.context['method'])
+
+    def test_method_new(self):
+        response = self.client.get(reverse('method_new'))
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(None, response.context['family'])
+
+    def test_method_revise(self):
+        response = self.client.get(reverse('method_revise',
+                                           kwargs=dict(id='199')))
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(self.method_family, response.context['family'])
+
+    def test_method_revise_access_denied(self):
+        """ Hides ungranted code revisions. """
+        revision1 = CodeResourceRevision(pk=101,
+                                         revision_name='alpha',
+                                         revision_number=1,
+                                         user=self.user)
+        revision2 = CodeResourceRevision(pk=102,
+                                         revision_name='beta',
+                                         revision_number=2,
+                                         user=self.other_user)
+        self.driver.coderesource.revisions.add(revision1, revision2)
+
+        response = self.client.get(reverse('method_revise',
+                                           kwargs=dict(id='199')))
+
+        self.assertEqual(200, response.status_code)
+        revisions = response.context['method_form']['driver_revisions']
+        self.assertEqual([('101', '1: alpha')],
+                         revisions.field.widget.choices)
+
+    def test_method_revise_access_granted(self):
+        """ Shows granted code revisions. """
+        revision1 = CodeResourceRevision(pk=101,
+                                         revision_name='alpha',
+                                         revision_number=1,
+                                         user=self.user)
+        revision2 = CodeResourceRevision(pk=102,
+                                         revision_name='beta',
+                                         revision_number=2,
+                                         user=self.other_user)
+        revision2.users_allowed.add(self.user)
+        self.driver.coderesource.revisions.add(revision1, revision2)
+
+        response = self.client.get(reverse('method_revise',
+                                           kwargs=dict(id='199')))
+
+        self.assertEqual(200, response.status_code)
+        revisions = response.context['method_form']['driver_revisions']
+        self.assertEqual([('101', '1: alpha'),
+                          ('102', '2: beta')],
+                         revisions.field.widget.choices)

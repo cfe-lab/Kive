@@ -1,16 +1,17 @@
 """
 Basic file-checking functionality used by Kive.
 """
-import hashlib
+
 import glob
-import os
 import errno
 import grp
-import stat
-import random
+import hashlib
 import logging
-import time
+import os
+import random
 import shutil
+import stat
+import time
 
 from django.conf import settings
 from django.utils import timezone
@@ -56,7 +57,7 @@ def can_create_new_file(file_to_create):
                 if not os.access(output_dir, os.F_OK):
                     reason = "output directory \"{}\" could not be created".format(output_dir)
                     is_okay = False
-                    return (is_okay, reason)
+                    return is_okay, reason
 
         else:
             output_dir = "."
@@ -68,7 +69,7 @@ def can_create_new_file(file_to_create):
             reason = "insufficient permissions on run path \"{}\"".format(output_dir)
             is_okay = False
 
-    return (is_okay, reason)
+    return is_okay, reason
 
 
 def sandbox_base_path():
@@ -327,7 +328,7 @@ class FileReadHandler:
             self.file_handle.seek(0)
         return self.file_handle
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, extype, value, traceback):
         if self.file_path:
             self.file_handle.close()
 

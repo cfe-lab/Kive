@@ -10,7 +10,7 @@ from kive.serializers import AccessControlSerializer
 
 
 class ExternalFileDirectorySerializer(serializers.ModelSerializer):
-    class Meta():
+    class Meta(object):
         model = ExternalFileDirectory
         fields = (
             'pk',
@@ -28,13 +28,13 @@ class ExternalFileDirectoryListFilesSerializer(ExternalFileDirectorySerializer):
     at a time, as the list_files field may be too slow and/or provide
     too much output.
     """
-    class Meta():
+    class Meta(object):
         model = ExternalFileDirectory
         fields = (
             'pk',
             'url',
             'name',
-            'path'
+            'path',
             'list_files'
         )
 
@@ -63,7 +63,7 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
         required=False
     )
 
-    class Meta():
+    class Meta(object):
         model = Dataset
         fields = (
             'id',

@@ -427,7 +427,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         This does not affect the RunComponents.
         """
-        assert self._runstate_id in [runstates.PENDING_PK, runstates.RUNNING_PK]
+        assert self._runstate_id in [runstates.PENDING_PK,
+                                     runstates.RUNNING_PK,
+                                     runstates.FAILING_PK]
         self._runstate = RunState.objects.get(pk=runstates.CANCELLING_PK)
         if save:
             self.save()
@@ -544,8 +546,10 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         except Pipeline.DoesNotExist:
             pipeline_name = "Run"
 
-        inputs = self.inputs.select_related('dataset')
-        first_input = inputs.order_by('index').first()
+        first_input = None
+        for inp in self.inputs.all():
+            first_input = inp
+            break
         if not (first_input and first_input.dataset.has_data()):
             if self.time_queued:
                 return "{} at {}".format(pipeline_name, self.time_queued)
@@ -596,7 +600,8 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         # One of the steps is in progress?
         total_steps = self.pipeline.steps.count()
-        runsteps = self.runsteps.order_by("pipelinestep__step_num")
+        runsteps = sorted(self.runsteps.all(),
+                          key=lambda runstep: runstep.pipelinestep.step_num)
 
         for step in runsteps:
             if step.is_pending():
@@ -900,9 +905,18 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         addable_users, addable_groups = self.pipeline.intersect_permissions(addable_users, addable_groups)
         if include_runbatch and self.runbatch is not None:
             addable_users, addable_groups = self.runbatch.intersect_permissions(addable_users, addable_groups)
+            self.validate_restrict_access([self.runbatch])
 
         for run_input in self.inputs.all():
-            addable_users, addable_groups = run_input.dataset.intersect_permissions(
+            # SCO
+            ds = run_input.dataset
+            # self.validate_restrict_access(ds)
+            # self.validate_restrict_access([self.pipeline])
+            # if self.runbatch is not None:
+            #     self.validate_restrict_access([self.runbatch])
+            #
+            
+            addable_users, addable_groups = ds.intersect_permissions(
                 addable_users,
                 addable_groups
             )
@@ -997,6 +1011,9 @@ class RunInput(models.Model):
     run = models.ForeignKey(Run, related_name="inputs")
     dataset = models.ForeignKey(Dataset, related_name="runinputs")
     index = models.PositiveIntegerField()
+
+    class Meta(object):
+        ordering = ['index']
 
     def clean(self):
         self.run.validate_restrict_access([self.dataset])

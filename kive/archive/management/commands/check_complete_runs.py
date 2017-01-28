@@ -1,6 +1,7 @@
 from collections import Counter
 from datetime import datetime
 import re
+from operator import itemgetter
 
 from django.core.management.base import BaseCommand
 from django.core.urlresolvers import reverse, resolve
@@ -81,9 +82,24 @@ class Command(BaseCommand):
             result,
             end_count - start_count,
             duration))
+        active_queries = connection.queries[start_count:]
+        min_time = duration.total_seconds() * 0.01
+        slow_queries = [query
+                        for query in active_queries
+                        if float(query['time']) > min_time]
+        if slow_queries:
+            print('')
+            total_slow_time = sum(map(float, map(itemgetter('time'), slow_queries)))
+            total_time = sum(map(float, map(itemgetter('time'), active_queries)))
+            print("Slow queries ({:.2f}s for slow and {:.2f}s for all):".format(
+                total_slow_time,
+                total_time))
+            for query in slow_queries:
+                print(query)
+
         table_counts = Counter()
         table_times = Counter()
-        for query in connection.queries[start_count:]:
+        for query in active_queries:
             m = re.match('SELECT +"([^"]*)"', query['sql'])
             if m:
                 table_counts[m.group(1)] += 1

@@ -133,7 +133,9 @@ class Dataset(metadata.models.AccessControl):
     description = models.TextField(help_text="Description of this Dataset.",
                                    max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
                                    blank=True)
-    date_created = models.DateTimeField(default=timezone.now, help_text="Date of Dataset creation.")
+    date_created = models.DateTimeField(default=timezone.now,
+                                        help_text="Date of Dataset creation.",
+                                        db_index=True)
 
     # Four cases from which Datasets can originate:
     #
@@ -921,9 +923,6 @@ class Dataset(metadata.models.AccessControl):
         If SD is raw, creates a clean CCL.
         If not raw, checks the file and returns CCL with/without a
         corresponding BadData.
-
-        RAISES
-        VerificationMethodError if the verification method fails to run.
 
         PRE
         Should never be called twice on the same dataset, as
