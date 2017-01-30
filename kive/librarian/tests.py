@@ -21,7 +21,8 @@ from django.test import TestCase, skipIfDBFeature
 from django.core.urlresolvers import reverse, resolve
 from django.core.files import File
 from django.core.files.base import ContentFile
-from django.utils.timezone import get_default_timezone
+# from django.utils.timezone import get_default_timezone, get_current_timezone
+from django.utils import timezone
 from mock import patch
 
 from rest_framework.test import force_authenticate, APIRequestFactory
@@ -1121,20 +1122,24 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         self.redaction_view, _, _ = resolve(self.redaction_path)
         self.removal_view, _, _ = resolve(self.removal_path)
 
-        tz = get_default_timezone()
+
+        tz = timezone.get_current_timezone()
+        apples_date = timezone.make_aware(datetime(2017, 1, 1), tz)
         apples = Dataset(pk=42,
                          name='apples',
                          description='chosen',
-                         date_created=datetime(2017, 1, 1, tzinfo=tz),
+                         date_created=apples_date,
                          user=self.kive_kive_user)
+        cherries_date = timezone.make_aware(datetime(2017, 1, 2), tz)
         cherries = Dataset(pk=43,
                            name='cherries',
-                           date_created=datetime(2017, 1, 2, tzinfo=tz),
+                           date_created=cherries_date,
                            MD5_checksum='1234',
                            user=self.kive_kive_user)
+        bananas_date = timezone.make_aware(datetime(2017, 1, 3), tz)
         bananas = Dataset(pk=44,
                           name='bananas',
-                          date_created=datetime(2017, 1, 3, tzinfo=tz),
+                          date_created=bananas_date,
                           file_source=RunStep(),
                           user=self.kive_kive_user)
         Dataset.objects.add(apples,

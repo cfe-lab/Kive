@@ -574,7 +574,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         # Create proper datetime objects with the following format string.
         date_format = "%Y-%m-%dT%H:%M:%S"
         # We also want to make our datetime objects timezone-aware.
-        curr_timezone = timezone.get_default_timezone_name()
+        curr_timezone = timezone.get_current_timezone()
 
         # Keys are: JOBID NAME PARTITION SUBMIT_TIME
         for rdct in rdctlst:
@@ -591,7 +591,7 @@ class SlurmScheduler(BaseSlurmScheduler):
                     accdct[cls.ACC_SUBMIT_TIME] = None
                 else:
                     raw_sub_time = datetime.strptime(sub_time, date_format)
-                    accdct[cls.ACC_SUBMIT_TIME] = pytz.timezone(curr_timezone).localize(raw_sub_time)
+                    accdct[cls.ACC_SUBMIT_TIME] = timezone.make_aware(raw_sub_time, curr_timezone)
 
                 accdct[cls.ACC_JOB_NAME] = rdct["NAME"]
                 accdct[cls.ACC_STATE] = BaseSlurmScheduler.WAITING
@@ -619,7 +619,7 @@ class SlurmScheduler(BaseSlurmScheduler):
                         tdct[field_name] = None
                     else:
                         raw_datetime = datetime.strptime(field_val, date_format)
-                        tdct[field_name] = pytz.timezone(curr_timezone).localize(raw_datetime)
+                        tdct[field_name] = timezone.make_aware(raw_datetime, curr_timezone)
 
                 # Split sacct's ExitCode field, which looks like "[return code]:[signal]".
                 return_code, signal = (int(x) for x in raw_job_dict["ExitCode"].split(":"))
