@@ -125,7 +125,7 @@ Once you have set up your production server, this is how to deploy a new release
         grep STATIC_ROOT kive/settings.py
         cd /path/to/static/..
         sudo rm -Rf static
-        sudo wget https://github.com/cfe-lab/Kive/releases/download/vX.Y/static_root.tar.gz
+        sudo wget https://github.com/cfe-lab/Kive/releases/download/vX.Y/static_root.tar.gz -O static_root.tar.gz
         sudo tar -xzvf static_root.tar.gz
         sudo mv static_root static
         sudo rm static_root.tar.gz
