@@ -337,3 +337,8 @@ CONFIRM_FILE_CREATED_WAIT_MAX = 12
 
 # The settings file the fleet should use.  Leave as None if it should just use the normal one.
 FLEET_SETTINGS = None
+
+# The keyword used by the system's sinfo command to retrieve a queue's priority,
+# and the name of the corresponding column returned.
+SLURM_PRIO_KEYWORD = "priority"
+SLURM_PRIO_COLNAME = "PRIORITY"

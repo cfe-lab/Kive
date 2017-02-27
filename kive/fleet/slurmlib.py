@@ -453,8 +453,15 @@ class SlurmScheduler(BaseSlurmScheduler):
             if len(defined_queue_set) != len(defined_queue_names):
                 logger.error("Slurm partition configuration error: partition names are not unique")
                 return False
-            cmd_list = ["sinfo", "-O", "available,partitionname,priority", "-p", ",".join(defined_queue_names)]
-            # list of dicts. The keys are: AVAIL, PARTITION and PRIORITY
+            cmd_list = [
+                "sinfo",
+                "-O",
+                "available,partitionname,{}".format(settings.SLURM_PRIO_KEYWORD),
+                "-p",
+                ",".join(defined_queue_names)
+            ]
+            # List of dicts. The keys are: AVAIL, PARTITION and whatever is specified in
+            # settings.SLURM_PRIO_COLNAME.
             qn_dct = dict((d['PARTITION'], d) for d in cls._call_to_dict(cmd_list))
             # make sure that all required partitions are up
             errors = []
@@ -469,7 +476,9 @@ class SlurmScheduler(BaseSlurmScheduler):
                 return False
             # make sure that the actual job priorities as defined by sinfo are in the
             # correct order of priority
-            actual_prio_lst = [(qname, int(qn_dct[qname]['PRIORITY'])) for qname in defined_queue_names]
+            actual_prio_lst = [
+                (qname, int(qn_dct[qname][settings.SLURM_PRIO_COLNAME])) for qname in defined_queue_names
+            ]
             if len(set([prio for n, prio in actual_prio_lst])) != len(actual_prio_lst):
                 logger.error("Matching slurm partition priorities")
                 return False
@@ -482,11 +491,16 @@ class SlurmScheduler(BaseSlurmScheduler):
             num_queue = len(settings.SLURM_QUEUES)
             report_names = [x[0] for x in settings.SLURM_QUEUES]
         else:
-            cmd_lst = ['sinfo', '-a', '-O', 'available,partitionname,priority']
+            cmd_lst = [
+                'sinfo',
+                '-a',
+                '-O',
+                'available,partitionname,{}'.format(settings.SLURM_PRIO_KEYWORD)
+            ]
             dictlst = cls._call_to_dict(cmd_lst)
             logger.debug("got information of %d partitions" % len(dictlst))
 
-            # NOTE: the keys are 'AVAIL', 'PARTITION' and 'PRIORITY'
+            # NOTE: the keys are 'AVAIL', 'PARTITION' and settings.SLURM_PRIO_COLNAME
             uplst = [dct for dct in dictlst if dct['AVAIL'] == 'up']
             logger.debug("found %d partitions in 'up' state" % len(uplst))
             # choose only those beginning with 'kive'
@@ -496,7 +510,7 @@ class SlurmScheduler(BaseSlurmScheduler):
             if num_queue == 0:
                 logger.error("slurm partition config error: have found no 'up' partitions starting with 'kive'")
                 return False
-            priolst = [(int(dct['PRIORITY']), dct['PARTITION']) for dct in kivelst]
+            priolst = [(int(dct[settings.SLURM_PRIO_COLNAME]), dct['PARTITION']) for dct in kivelst]
             prioset = set([p for p, n in priolst])
             if len(prioset) != num_queue:
                 logger.error('slurm config error: need %d different prio levels, got %d' % (num_queue, len(prioset)))
