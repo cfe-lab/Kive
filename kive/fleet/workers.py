@@ -61,7 +61,7 @@ class MPIFleetInterface(object):
         return self.comm.Get_rank()
 
     def get_size(self):
-        return self.comm.Get_size()
+        return self.comm.Get_size() + 1  # We no longer merge with parent, so add it back in.
 
     @staticmethod
     def get_hostname():
@@ -98,7 +98,7 @@ class MPIManagerInterface(MPIFleetInterface):
             MPI.COMM_SELF.Spawn(sys.executable,
                                 args=spawn_args,
                                 maxprocs=self.worker_count,
-                                info=mpi_info).Merge()
+                                info=mpi_info)
         )
 
     def send_task_to_worker(self, task_info, worker_rank):
@@ -124,6 +124,9 @@ class MPIManagerInterface(MPIFleetInterface):
 
         return roster
 
+    def get_size(self):
+        return self.worker_count + 1
+
     def stop_run(self, foreman):
         """
         Instructs the foreman to stop the task.  Blocks while waiting for a response.
@@ -140,7 +143,6 @@ class MPIManagerInterface(MPIFleetInterface):
         for rank in range(self.get_size()):
             if rank != self.get_rank():
                 self.comm.send(None, dest=rank, tag=Worker.SHUTDOWN)
-        self.comm.Disconnect()
 
 
 class SingleThreadedManagerInterface(SingleThreadedFleetInterface):
@@ -1036,7 +1038,7 @@ class MPIWorkerInterface(MPIFleetInterface):
     This handles setting up the MPI communicator.
     """
     def __init__(self):
-        super(MPIWorkerInterface, self).__init__(MPI.Comm.Get_parent().Merge())
+        super(MPIWorkerInterface, self).__init__(MPI.Comm.Get_parent())
         self.rank = super(MPIWorkerInterface, self).get_rank()
         self.hostname = super(MPIWorkerInterface, self).get_hostname()
 
@@ -1064,7 +1066,7 @@ class MPIWorkerInterface(MPIFleetInterface):
         worker_logger.error("[%d] Task %s failed.", self.rank, task, exc_info=True)
 
     def close(self):
-        self.comm.Disconnect()
+        pass
 
 
 class SingleThreadedWorkerInterface(SingleThreadedFleetInterface):
