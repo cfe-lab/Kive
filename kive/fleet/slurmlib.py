@@ -8,7 +8,6 @@ import json
 import multiprocessing as mp
 import Queue
 
-import pytz
 import re
 import subprocess as sp
 from datetime import datetime
