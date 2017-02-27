@@ -25,7 +25,6 @@ from rest_framework.test import force_authenticate
 
 from constants import datatypes
 import file_access_utils
-from django_mock_queries.mocks import mocked_relations
 from kive.tests import BaseTestCases
 import librarian.models
 from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
