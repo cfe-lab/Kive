@@ -29,7 +29,7 @@ from kive.tests import BaseTestCases
 import librarian.models
 from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
 import metadata.tests
-from method.ajax import MethodViewSet
+from method.ajax import MethodViewSet, MethodFamilyViewSet
 from method.models import CodeResource, CodeResourceRevision, \
     Method, MethodFamily, MethodDependency
 from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
@@ -895,6 +895,104 @@ with open(outfile, "wb") as f:
         self.assertListEqual(list(runstep.find_compatible_ERs([])), [])
 
 
+class MethodFamilyApiMockTests(BaseTestCases.ApiTestCase):
+    def setUp(self):
+        self.mock_viewset(MethodFamilyViewSet)
+        super(MethodFamilyApiMockTests, self).setUp()
+
+        self.list_path = reverse("methodfamily-list")
+        self.detail_pk = 43
+        self.detail_path = reverse("methodfamily-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("methodfamily-removal-plan",
+                                    kwargs={'pk': self.detail_pk})
+
+        self.list_view, _, _ = resolve(self.list_path)
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+        MethodFamily.objects.add(MethodFamily(pk=42,
+                                              user=self.kive_kive_user,
+                                              name='mA_name turnip',
+                                              description='A_desc'),
+                                 MethodFamily(pk=43,
+                                              user=self.kive_kive_user,
+                                              name='mB_name',
+                                              description='B_desc'),
+                                 MethodFamily(pk=44,
+                                              user=self.kive_kive_user,
+                                              name='mC_name',
+                                              description='C_desc turnip'))
+
+    def test_list(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 3)
+        self.assertEquals(response.data[2]['name'], 'mC_name')
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['name'], 'mB_name')
+
+    def test_removal_plan(self):
+        request = self.factory.get(self.removal_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.removal_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['MethodFamilies'], 1)
+
+    def test_filter_name(self):
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=name&filters[0][val]=turnip")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'mA_name turnip')
+
+    def test_filter_description(self):
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=description&filters[0][val]=B_desc")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'mB_name')
+
+    def test_filter_smart(self):
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=smart&filters[0][val]=turnip")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 2)
+        self.assertEquals(response.data[0]['name'], 'mA_name turnip')
+        self.assertEquals(response.data[1]['description'], 'C_desc turnip')
+
+    def test_filter_user(self):
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=user&filters[0][val]=kive")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 3)
+
+    def test_filter_unknown(self):
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=bogus&filters[0][val]=kive")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals({u'detail': u'Unknown filter key: bogus'},
+                          response.data)
+
+
 @skipIfDBFeature('is_mocked')
 class MethodFamilyApiTests(BaseTestCases.ApiTestCase):
     fixtures = ['demo']
@@ -904,50 +1002,53 @@ class MethodFamilyApiTests(BaseTestCases.ApiTestCase):
 
         self.list_path = reverse("methodfamily-list")
         self.detail_pk = MethodFamily.objects.get(name='sums_and_products').pk
-        self.detail_path = reverse("methodfamily-detail",
-                                   kwargs={'pk': self.detail_pk})
-        self.removal_path = reverse("methodfamily-removal-plan",
-                                    kwargs={'pk': self.detail_pk})
 
         # This should equal metadata.ajax.CompoundDatatypeViewSet.as_view({"get": "list"}).
         self.list_view, _, _ = resolve(self.list_path)
-        self.detail_view, _, _ = resolve(self.detail_path)
-        self.removal_view, _, _ = resolve(self.removal_path)
 
-    def test_list(self):
-        """
-        Test the CompoundDatatype API list view.
-        """
-        request = self.factory.get(self.list_path)
+    def add_dependency(self, family, name):
+        driver = CodeResourceRevision.objects.first()
+        method = family.members.create(user=family.user,
+                                       driver=driver)
+        code_resource = CodeResource.objects.create(name=name,
+                                                    user=family.user)
+        revision = code_resource.revisions.create(user=family.user)
+        MethodDependency.objects.create(method=method, requirement=revision)
+
+    def test_filter_code_dependency(self):
+        target_family = MethodFamily.objects.get(pk=self.detail_pk)
+        other_family = MethodFamily.objects.exclude(pk=self.detail_pk).first()
+        self.add_dependency(target_family, 'target_code')
+        self.add_dependency(other_family, 'other_code')
+
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=code&filters[0][val]=target")
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        # There are four CDTs loaded into the Database by default.
-        self.assertEquals(len(response.data), 7)
-        self.assertEquals(response.data[6]['name'], 'sums_and_products')
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'sums_and_products')
 
-    def test_detail(self):
-        request = self.factory.get(self.detail_path)
+    def add_driver(self, family, name):
+        code_resource = CodeResource.objects.create(name=name,
+                                                    user=family.user)
+        driver = code_resource.revisions.create(user=family.user)
+        family.members.create(user=family.user, driver=driver)
+
+    def test_filter_code_driver(self):
+        target_family = MethodFamily.objects.get(pk=self.detail_pk)
+        other_family = MethodFamily.objects.exclude(pk=self.detail_pk).first()
+        self.add_driver(target_family, 'target_code')
+        self.add_driver(target_family, 'target2_code')  # test dups
+        self.add_driver(other_family, 'other_code')
+
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=code&filters[0][val]=target")
         force_authenticate(request, user=self.kive_user)
-        response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.data['name'], 'sums_and_products')
+        response = self.list_view(request, pk=None)
 
-    def test_removal_plan(self):
-        request = self.factory.get(self.removal_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.removal_view(request, pk=self.detail_pk)
-        self.assertEquals(response.data['MethodFamilies'], 1)
-
-    def test_removal(self):
-        start_count = MethodFamily.objects.all().count()
-
-        request = self.factory.delete(self.detail_path)
-        force_authenticate(request, user=self.kive_user)
-        response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
-
-        end_count = MethodFamily.objects.all().count()
-        self.assertEquals(end_count, start_count - 1)
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'sums_and_products')
 
 
 @skipIfDBFeature('is_mocked')

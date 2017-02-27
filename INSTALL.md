@@ -41,6 +41,7 @@ virtualenv as follows:
 
     # Create a bootstrap environment in the kive user's home folder
     sudo su kiveuser
+    cd ~
     curl -O https://pypi.python.org/packages/source/v/virtualenv/virtualenv-X.Y.Z.tar.gz
     tar xzf virtualenv-X.Y.Z.tar.gz
     python virtualenv-X.Y.Z/virtualenv.py vbootstrap
@@ -386,6 +387,9 @@ be installed separately before then. Install it using pip:
 
 Installing OpenMPI and mpi4py
 -----------------------------
+Test that MPI is installed correctly with this command:
+
+    python -c "from mpi4py import MPI"
 
 ### Ubuntu
 
@@ -735,11 +739,16 @@ code on a developer workstation.
 
         python manage.py runserver
 
+    If you are running under Apache, configure Django with [mod_wsgi] to point at the
+    Python code and the static files. Don't forget to configure SSL.
+
 4. Navigate to `localhost:8000` in your web browser!
 5. To launch a fleet manager and workers, you need to run the following command
     and replace X with the number of workers you want:
 
         python manage.py runfleet --workers X
+
+[mod_wsgi]: https://docs.djangoproject.com/en/1.9/howto/deployment/wsgi/modwsgi/
     
 Creating a UML diagram of the backend
 -------------------------------------
