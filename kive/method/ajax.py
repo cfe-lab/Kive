@@ -177,6 +177,8 @@ class MethodFamilyViewSet(CleanCreateModelMixin,
         insensitive)
     * filters[n][key]=user&filters[n][val]=match - username of creator contains the value (case
         insensitive)
+    * filters[n][key]=code&filters[n][val]=match - name of driver or dependency
+        contains the value (case insensitive)
     """
     queryset = MethodFamily.objects.all()
     serializer_class = MethodFamilySerializer
@@ -217,6 +219,11 @@ class MethodFamilyViewSet(CleanCreateModelMixin,
             return queryset.filter(description__icontains=value)
         if key == "user":
             return queryset.filter(user__username__icontains=value)
+        if key == "code":
+            all_matches = queryset.filter(
+                Q(members__driver__coderesource__name__icontains=value) |
+                Q(members__dependencies__requirement__coderesource__name__icontains=value))
+            return queryset.filter(pk__in=all_matches)
 
         raise APIException('Unknown filter key: {}'.format(key))
 
