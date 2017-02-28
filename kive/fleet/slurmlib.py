@@ -698,7 +698,11 @@ class SlurmScheduler(BaseSlurmScheduler):
         cable_info = sandbox.cable_execute_info[(runcable.parent_run, runcable.component)]
 
         # Submit the job.
-        cable_execute_dict_fd, cable_execute_dict_path = tempfile.mkstemp()
+        cable_execute_dict_fd, cable_execute_dict_path = tempfile.mkstemp(
+            dir=cable_info.cable_info_dir,
+            prefix="cable_info",
+            suffix=".json"
+        )
         with os.fdopen(cable_execute_dict_fd, "wb") as f:
             f.write(json.dumps(cable_info.dict_repr()))
 
@@ -1193,7 +1197,11 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         cable_info = sandbox.cable_execute_info[(runcable.parent_run, runcable.component)]
         cable_info_dict = cable_info.dict_repr()
 
-        cable_execute_dict_fd, cable_execute_dict_path = tempfile.mkstemp()
+        cable_execute_dict_fd, cable_execute_dict_path = tempfile.mkstemp(
+            dir=cable_info.cable_info_dir,
+            prefix="cable_info",
+            suffix=".json"
+        )
         with os.fdopen(cable_execute_dict_fd, "wb") as f:
             f.write(json.dumps(cable_info_dict))
 
