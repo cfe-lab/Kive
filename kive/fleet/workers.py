@@ -459,9 +459,10 @@ class Foreman(object):
                             cancelled = True
                             terminated_during = "driver"
 
-                        else:
+                        elif driver_info["start_time"] is not None and driver_info["end_time"] is not None:
                             # Having reached here, we know that the driver ran to completion,
-                            # successfully or no.  As such, we remove the wrapped driver if necessary
+                            # successfully or no, and has the start and end times properly set.
+                            # As such, we remove the wrapped driver if necessary
                             # and fill in the ExecLog.
 
                             # SCO do not remove for debugging..
@@ -491,6 +492,20 @@ class Foreman(object):
                             # watch for it.
                             bookkeeping_job = self.submit_runstep_bookkeeping(task, task_dict["info_path"])
                             self.tasks_in_progress[task]["bookkeeping"] = bookkeeping_job
+                            continue
+
+                        else:
+                            # The driver is finished, but sacct hasn't properly gotten the start and end times.
+                            # For all intents and purposes, this is still running.
+                            foreman_logger.debug(
+                                "Driver of task %s appears complete but sacct hasn't set start/end times properly",
+                                str(task)
+                            )
+                            foreman_logger.debug(
+                                "sacct returned the following: %s",
+                                str(driver_info)
+                            )
+                            still_running.append(task_dict["driver"])
                             continue
 
                 else:
