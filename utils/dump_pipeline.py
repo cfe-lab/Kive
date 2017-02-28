@@ -8,13 +8,21 @@ from datetime import datetime, timedelta
 import errno
 import json
 import logging
-from operator import itemgetter
+from itertools import groupby
+from operator import itemgetter, attrgetter
 import os
 from urlparse import urlparse
 
 from requests.adapters import HTTPAdapter
 
 from kiveapi import KiveAPI
+
+
+def recent_pipelines(all_pipelines):
+    for family, pipelines in groupby(all_pipelines, attrgetter('family')):
+        for i, pipeline in enumerate(pipelines):
+            if i < 3:
+                yield pipeline
 
 
 def main():
@@ -43,18 +51,24 @@ def main():
     kive.mount('https://', HTTPAdapter(max_retries=20))
     kive.login(config['username'], config['password'])
 
-    pipelines = kive.get_pipelines()
+    all_pipelines = kive.get_pipelines()
+    pipelines = list(recent_pipelines(all_pipelines))
     hostname = urlparse(kive.server_url).hostname
     print 'Recent pipelines from {}:'.format(hostname)
-    for pipeline in pipelines[:5]:
-        print '{}, id {}'.format(pipeline, pipeline.pipeline_id)
+    for pipeline in pipelines:
+        print '{} - {}, id {}'.format(pipeline.family,
+                                      pipeline,
+                                      pipeline.pipeline_id)
     pipeline_request = raw_input("Enter pipeline id to dump, or 'm' for more:")
     if pipeline_request == 'm':
-        for pipeline in pipelines[5:]:
-            print '{}, id {}'.format(pipeline, pipeline.pipeline_id)
+        for pipeline in all_pipelines:
+            print '{} - {}, id {}'.format(pipeline.family,
+                                          pipeline,
+                                          pipeline.pipeline_id)
         pipeline_request = raw_input("Enter pipeline id to dump:")
     pipeline_id = int(pipeline_request)
-    dump_folder = 'utils/dump/{}_pipeline{}'.format(hostname, pipeline_id)
+    dump_folder = os.path.abspath(
+        'dump/{}_pipeline{}'.format(hostname, pipeline_id))
 
     if not os.path.isdir(dump_folder):
         os.makedirs(dump_folder)
@@ -94,7 +108,7 @@ def main():
     used_revisions = set()
     pipeline_wrapper = kive.get_pipeline(pipeline_id)
     pipeline = pipeline_wrapper.details
-    print 'Dumping {}.'.format(pipeline_wrapper)
+    print 'Dumping {} in {}.'.format(pipeline_wrapper, dump_folder)
     dump = {}
     for input_item in pipeline['inputs']:
         del input_item['x']
@@ -137,12 +151,14 @@ def main():
     with open(os.path.join(dump_folder, pipeline_filename), 'w') as f:
         json.dump(dump, f, indent=4, sort_keys=True)
 
+    pipeline_deadline = datetime.now() + timedelta(seconds=90)
     filename_counts = Counter()
     for revision in used_revisions:
         filename = revision['coderesource']['filename']
         filename_counts[filename] += 1
         response = kive.get(revision.url, is_json=False, stream=True)
-        deadline = datetime.now() + timedelta(seconds=10)
+        deadline = max(pipeline_deadline,
+                       datetime.now() + timedelta(seconds=10))
         is_complete = True
         with open(os.path.join(dump_folder, filename), 'w') as f:
             for block in response.iter_content():
