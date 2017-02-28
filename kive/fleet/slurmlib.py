@@ -524,7 +524,10 @@ class SlurmScheduler(BaseSlurmScheduler):
         dd = cls._qnames = dict(zip(ordered_prio, defined_queue_names))
         cls._revlookup = dict(zip(defined_queue_names, ordered_prio))
         cls._acclookup = dict(zip(ordered_prio, report_names))
-        logger.info('prio mapping: ', " ".join(["%d:%s" % (pk, dd[pk]) for pk in ordered_prio]))
+        logger.info(
+            'prio mapping: %s',
+            " ".join(["{}:{}".format(pk, dd[pk]) for pk in ordered_prio])
+        )
         return True
 
     @classmethod
@@ -724,7 +727,11 @@ class SlurmScheduler(BaseSlurmScheduler):
         # First, serialize the task execution information.
         step_info = sandbox.step_execute_info[(runstep.run, runstep.pipelinestep)]
 
-        step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp()
+        step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp(
+            dir=step_info.step_run_dir,
+            prefix="step_info",
+            suffix=".json"
+        )
         with os.fdopen(step_execute_dict_fd, "wb") as f:
             f.write(json.dumps(step_info.dict_repr()))
 
@@ -753,7 +760,11 @@ class SlurmScheduler(BaseSlurmScheduler):
         # Submit a job for the setup.
         step_execute_dict_path = info_path
         if info_path is None:
-            step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp()
+            step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp(
+                dir=step_info.step_run_dir,
+                prefix="step_info",
+                suffix=".json"
+            )
             with os.fdopen(step_execute_dict_fd, "wb") as f:
                 f.write(json.dumps(step_info.dict_repr()))
 
@@ -1218,7 +1229,11 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         step_info = sandbox.step_execute_info[(runstep.run, runstep.pipelinestep)]
         step_execute_dict = step_info.dict_repr()
 
-        step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp()
+        step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp(
+            dir=step_info.step_run_dir,
+            prefix="step_info",
+            suffix=".json"
+        )
         with os.fdopen(step_execute_dict_fd, "wb") as f:
             f.write(json.dumps(step_execute_dict))
 
@@ -1266,7 +1281,11 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         # Submit a job for the setup.
         step_execute_dict_path = info_path
         if info_path is None:
-            step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp()
+            step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp(
+                dir=step_info.step_run_dir,
+                prefix="step_info",
+                suffix=".json"
+            )
             with os.fdopen(step_execute_dict_fd, "wb") as f:
                 f.write(json.dumps(step_execute_dict))
 

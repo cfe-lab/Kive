@@ -619,7 +619,8 @@ class Sandbox:
                         curr_RS,
                         step_inputs[input_cable.dest.dataset_idx-1],
                         cable_path,
-                        log_dir
+                        log_dir,
+                        run_dir
                     )
                     cable_info_list.append(cable_exec_info)
 
@@ -795,7 +796,8 @@ class Sandbox:
                 run_to_resume,
                 source_dataset,
                 output_path,
-                source_step_execution_info.log_dir
+                source_step_execution_info.log_dir,
+                source_step_execution_info.step_run_dir
             )
 
             cr = cable_exec_info.cable_record
@@ -822,7 +824,7 @@ class Sandbox:
         return incables_completed, steps_completed, outcables_completed
 
     def reuse_or_prepare_cable(self, cable, parent_record, input_dataset, output_path,
-                               log_dir):
+                               log_dir, cable_info_dir):
         """
         Attempt to reuse the cable; prepare it for finishing if unable.
         """
@@ -935,6 +937,7 @@ class Sandbox:
             os.path.join(log_dir,
                          "{}{}_stderr.txt".format(cable_type_str, cable_idx))
         )
+        exec_info.set_cable_info_dir(cable_info_dir)
 
         self.cable_execute_info[(curr_record.parent_run, cable)] = exec_info
 
@@ -1090,7 +1093,8 @@ class Sandbox:
                 curr_RS,
                 inputs[i],
                 cable_path,
-                log_dir
+                log_dir,
+                step_run_dir
             )
             cable_info_list.append(cable_exec_info)
 
@@ -2587,6 +2591,7 @@ class RunCableExecuteInfo:
         self.could_be_reused = could_be_reused
         self.stdout_path = None
         self.stderr_path = None
+        self.cable_info_dir = None
 
     def flag_for_recovery(self, recovering_record, by_step=None):
         assert self.recovering_record is None
@@ -2610,7 +2615,8 @@ class RunCableExecuteInfo:
             "recovering_record_pk": self.recovering_record.pk if self.recovering_record is not None else None,
             "by_step_pk": None if self.by_step is None else self.by_step.pk,
             "threads_required": self.threads_required,
-            "ready_to_go": self.ready_to_go
+            "ready_to_go": self.ready_to_go,
+            "cable_info_dir": self.cable_info_dir
         }
 
     def set_stdout_path(self, stdout_path):
@@ -2618,3 +2624,6 @@ class RunCableExecuteInfo:
 
     def set_stderr_path(self, stderr_path):
         self.stderr_path = stderr_path
+
+    def set_cable_info_dir(self, cable_info_dir):
+        self.cable_info_dir = cable_info_dir
