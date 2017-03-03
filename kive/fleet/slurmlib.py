@@ -119,7 +119,8 @@ class BaseSlurmScheduler:
                 cls.ACC_SIGNAL: None,
                 cls.ACC_JOB_ID: jobid,
                 cls.ACC_PRIONUM: None,
-                cls.ACC_PRIOSTR: ""}
+                cls.ACC_PRIOSTR: "",
+                cls.ACC_RAW_STATE_STRING: BaseSlurmScheduler.UNKNOWN}
         assert set(rdct.keys()) == cls.ACC_SET, "messed up empty_info_dct"
         return rdct
 
