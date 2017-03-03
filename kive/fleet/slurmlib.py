@@ -52,6 +52,8 @@ class BaseSlurmScheduler:
     # SlurmScheduler.get_accounting_info()
     # RUNNING, RESIZING, SUSPENDED, COMPLETED, CANCELLED, FAILED, TIMEOUT,
     # PREEMPTED, BOOT_FAIL, DEADLINE or NODE_FAIL
+    # Note that they can occasionally have more details too, such as a
+    # state "CANCELLED by [uid]".
     BOOT_FAIL = "BOOT_FAIL"
     CANCELLED = "CANCELLED"
     COMPLETED = "COMPLETED"
@@ -97,6 +99,7 @@ class BaseSlurmScheduler:
     ACC_JOB_ID = 'job_id'
     ACC_PRIONUM = 'prio_num'
     ACC_PRIOSTR = 'prio_str'
+    ACC_RAW_STATE_STRING = "raw_state_string"
     ACC_SET = frozenset([ACC_JOB_NAME, ACC_START_TIME, ACC_END_TIME,
                          ACC_SUBMIT_TIME, ACC_RETURN_CODE, ACC_STATE,
                          ACC_SIGNAL, ACC_JOB_ID, ACC_PRIONUM, ACC_PRIOSTR])
@@ -655,20 +658,27 @@ class SlurmScheduler(BaseSlurmScheduler):
                 # Split sacct's ExitCode field, which looks like "[return code]:[signal]".
                 return_code, signal = (int(x) for x in raw_job_dict["ExitCode"].split(":"))
 
-                curstate = raw_job_dict["State"]
-                if curstate not in cls.ALL_STATES:
-                    raise RuntimeError("received undefined state from sacct '%s'" % curstate)
+                current_state = ""
+                for state_str in cls.ALL_STATES:
+                    if raw_job_dict["State"].startswith(state_str):
+                        current_state = state_str
+                        break
+                if current_state == "":
+                    raise RuntimeError(
+                        "received undefined state from sacct: '{}'".format(raw_job_dict["State"])
+                    )
                 accounting_info[job_id] = {
                     cls.ACC_JOB_NAME: raw_job_dict["JobName"],
                     cls.ACC_START_TIME: tdct["Start"],
                     cls.ACC_END_TIME: tdct["End"],
                     cls.ACC_SUBMIT_TIME: tdct["Submit"],
                     cls.ACC_RETURN_CODE: return_code,
-                    cls.ACC_STATE: curstate,
+                    cls.ACC_STATE: current_state,
                     cls.ACC_SIGNAL: signal,
                     cls.ACC_JOB_ID: job_id,
                     cls.ACC_PRIONUM: prio_num,
-                    cls.ACC_PRIOSTR: cls._acclookup[prio_num]
+                    cls.ACC_PRIOSTR: cls._acclookup[prio_num],
+                    cls.ACC_RAW_STATE_STRING: raw_job_dict["State"]
                 }
         # make sure all requested job handles have an entry...
         if have_job_handles:
@@ -868,7 +878,8 @@ class dummyjobstate:
             cls.ACC_SIGNAL: None,
             cls.ACC_JOB_ID: self.sco_pid,
             cls.ACC_PRIONUM: self.prio_num,
-            cls.ACC_PRIOSTR: _dummy_priority_by_index[self.prio_num]
+            cls.ACC_PRIOSTR: _dummy_priority_by_index[self.prio_num],
+            cls.ACC_RAW_STATE_STRING: self.get_runstate()
         }
         assert set(rdct.keys()) == BaseSlurmScheduler.ACC_SET, "weird state keys"
         return rdct

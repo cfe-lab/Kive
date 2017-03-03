@@ -187,8 +187,14 @@ class Manager(object):
                 run_to_stop.cancel_components()
 
                 with transaction.atomic():
+                    # Start anything that hadn't been started yet, i.e. in the Pending state.
+                    if not run_to_stop.has_started():
+                        run_to_stop.start(save=True)
+
+                    # Cancel anything that is running (leave stuff that's Failing or already Cancelling).
                     if run_to_stop.is_running():
                         run_to_stop.cancel(save=True)
+
                     run_to_stop.stop(save=True)
                 continue
 
@@ -978,7 +984,7 @@ class Foreman(object):
             self.sandbox.run.start(save=True)
 
         if self.sandbox.run.is_complete():
-            # This run already completed, so we ignore this call.
+            # This run already completed, so we ignore this call.92
             mgr_logger.warn("Run (pk=%d) is already complete; ignoring stop request.", self.run.pk)
             return
 
