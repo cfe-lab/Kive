@@ -102,7 +102,8 @@ class BaseSlurmScheduler:
     ACC_RAW_STATE_STRING = "raw_state_string"
     ACC_SET = frozenset([ACC_JOB_NAME, ACC_START_TIME, ACC_END_TIME,
                          ACC_SUBMIT_TIME, ACC_RETURN_CODE, ACC_STATE,
-                         ACC_SIGNAL, ACC_JOB_ID, ACC_PRIONUM, ACC_PRIOSTR])
+                         ACC_SIGNAL, ACC_JOB_ID, ACC_PRIONUM, ACC_PRIOSTR,
+                         ACC_RAW_STATE_STRING])
 
     TIME_UNKNOWN = "Unknown"
 
@@ -422,12 +423,12 @@ class SlurmScheduler(BaseSlurmScheduler):
         logger.debug(" ".join(cmd_lst))
         stderr_fd, stderr_path = tempfile.mkstemp()
         try:
-            with os.open(stderr_fd, "w") as f:
+            with os.fdopen(stderr_fd, "w") as f:
                 out_str = sp.check_output(cmd_lst, stderr=f)
         except sp.CalledProcessError as e:
             logger.error("%s returned an error code '%s'", cmd_lst[0], e.returncode)
             logger.error("it wrote this: '%s' ", e.output)
-            with os.open(stderr_fd, "r") as f:
+            with os.fdopen(stderr_fd, "r") as f:
                 logger.error("stderr: \n%s", f.read())
             raise
         finally:
