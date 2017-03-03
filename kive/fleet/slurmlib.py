@@ -417,12 +417,18 @@ class SlurmScheduler(BaseSlurmScheduler):
         as the dictionary keys.
         """
         logger.debug(" ".join(cmd_lst))
+        stderr_fd, stderr_path = tempfile.mkstemp()
         try:
-            out_str = sp.check_output(cmd_lst)
+            with os.open(stderr_fd, "w") as f:
+                out_str = sp.check_output(cmd_lst, stderr=f)
         except sp.CalledProcessError as e:
             logger.error("%s returned an error code '%s'", cmd_lst[0], e.returncode)
             logger.error("it wrote this: '%s' ", e.output)
+            with os.open(stderr_fd, "r") as f:
+                logger.error("stderr: \n%s", f.read())
             raise
+        finally:
+            os.remove(stderr_path)
         # NOTE: sinfo et al add an empty line to the end of its output. Remove that here.
         lns = [ln for ln in out_str.split('\n') if ln]
         logger.debug("read %d lines" % len(lns))
@@ -582,9 +588,6 @@ class SlurmScheduler(BaseSlurmScheduler):
 
         have_job_handles = job_handle_iter is not None and len(job_handle_iter) > 0
         idlst = [jh.job_id for jh in job_handle_iter] if have_job_handles else None
-        rdctlst = cls._do_squeue(opts=['--format=%i %j %P %V',
-                                       '-p', ",".join(cls._qnames.values())],
-                                 job_id_iter=idlst)
 
         accounting_info = {}
         # Create proper datetime objects with the following format string.
@@ -592,26 +595,38 @@ class SlurmScheduler(BaseSlurmScheduler):
         # We also want to make our datetime objects timezone-aware.
         curr_timezone = timezone.get_current_timezone()
 
-        # Keys are: JOBID NAME PARTITION SUBMIT_TIME
-        for rdct in rdctlst:
-            prio_num = cls._revlookup.get(rdct["PARTITION"], None)
-            if prio_num is not None:
-                job_id = rdct["JOBID"]
-                accdct = cls._empty_info_dct(job_id)
-                accdct[cls.ACC_PRIONUM] = prio_num
-                accdct[cls.ACC_PRIOSTR] = cls._acclookup[prio_num]
+        # We do a first pass using squeue to retrieve information for pending jobs;
+        # their information will not be available from sacct yet.
+        try:
+            rdctlst = cls._do_squeue(opts=['--format=%i %j %P %V',
+                                           '-p', ",".join(cls._qnames.values())],
+                                     job_id_iter=idlst)
 
-                # Localize the submission time.
-                sub_time = rdct["SUBMIT_TIME"]
-                if sub_time == cls.TIME_UNKNOWN:
-                    accdct[cls.ACC_SUBMIT_TIME] = None
-                else:
-                    raw_sub_time = datetime.strptime(sub_time, date_format)
-                    accdct[cls.ACC_SUBMIT_TIME] = timezone.make_aware(raw_sub_time, curr_timezone)
+            # Keys are: JOBID NAME PARTITION SUBMIT_TIME
+            for rdct in rdctlst:
+                prio_num = cls._revlookup.get(rdct["PARTITION"], None)
+                if prio_num is not None:
+                    job_id = rdct["JOBID"]
+                    accdct = cls._empty_info_dct(job_id)
+                    accdct[cls.ACC_PRIONUM] = prio_num
+                    accdct[cls.ACC_PRIOSTR] = cls._acclookup[prio_num]
 
-                accdct[cls.ACC_JOB_NAME] = rdct["NAME"]
-                accdct[cls.ACC_STATE] = BaseSlurmScheduler.WAITING
-                accounting_info[job_id] = accdct
+                    # Localize the submission time.
+                    sub_time = rdct["SUBMIT_TIME"]
+                    if sub_time == cls.TIME_UNKNOWN:
+                        accdct[cls.ACC_SUBMIT_TIME] = None
+                    else:
+                        raw_sub_time = datetime.strptime(sub_time, date_format)
+                        accdct[cls.ACC_SUBMIT_TIME] = timezone.make_aware(raw_sub_time, curr_timezone)
+
+                    accdct[cls.ACC_JOB_NAME] = rdct["NAME"]
+                    accdct[cls.ACC_STATE] = BaseSlurmScheduler.WAITING
+                    accounting_info[job_id] = accdct
+        except sp.CalledProcessError as e:
+            # This can happen if we call squeue on a single job that's already finished.
+            # The error messages were already logged elsewhere, so we do nothing.
+            # Said job information should be handled by sacct below.
+            pass
 
         # Now get accounting information.
         # The --parsable2 option creates parsable output: fields are separated by a pipe, with
