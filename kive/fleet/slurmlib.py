@@ -429,8 +429,13 @@ class SlurmScheduler(BaseSlurmScheduler):
         except sp.CalledProcessError as e:
             logger.error("%s returned an error code '%s'", cmd_lst[0], e.returncode)
             logger.error("it wrote this: '%s' ", e.output)
-            with os.fdopen(stderr_fd, "r") as f:
-                logger.error("stderr: \n%s", f.read())
+            try:
+                with open(stderr_path, "r") as f:
+                    logger.error("stderr: \n%s", f.read())
+            except IOError as e:
+                logger.error("The stderr log for the squeue call appears to have been lost!",
+                             exc_info=True)
+
             raise
         finally:
             os.remove(stderr_path)
