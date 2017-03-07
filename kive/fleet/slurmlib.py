@@ -339,12 +339,30 @@ class SlurmScheduler(BaseSlurmScheduler):
         cmd_lst.append(os.path.join(workingdir, driver_name))
         cmd_lst.extend(driver_arglst)
         logger.debug(" ".join(cmd_lst))
+
+        stderr_fd, stderr_path = tempfile.mkstemp()
         try:
-            out_str = sp.check_output(cmd_lst)
+            with os.fdopen(stderr_fd, "w") as f:
+                out_str = sp.check_output(cmd_lst, stderr=f)
+
         except sp.CalledProcessError as e:
-            logger.error("sbatch returned an error code '%d'", e.returncode)
-            logger.error("sbatch wrote this: '%s' ", e.output)
+            status_report = "sbatch returned an error code '%s'\n\nCommand list:\n%s\n\nOutput:\n%s\n\n%s"
+            try:
+                with open(stderr_path, "r") as f:
+                    stderr_str = "stderr:\n{}".format(f.read())
+            except IOError as e:
+                stderr_str = "The stderr log for the sbatch call appears to have been lost!"
+            logger.error(status_report, cmd_lst[0], e.returncode, cmd_lst, e.output, stderr_str,
+                         exc_info=True)
             raise
+
+        finally:
+            # Clean up the stderr log file.
+            try:
+                os.remove(stderr_path)
+            except OSError:
+                pass
+
         if out_str.startswith("Submitted"):
             cl = out_str.split()
             try:
@@ -363,12 +381,28 @@ class SlurmScheduler(BaseSlurmScheduler):
         Raise an exception if an error occurs, otherwise return nothing.
         """
         cmd_lst = ["scancel", "{}".format(jobhandle.job_id)]
+        stderr_fd, stderr_path = tempfile.mkstemp()
         try:
-            sp.check_output(cmd_lst)
+            with os.fdopen(stderr_fd, "w") as f:
+                sp.check_output(cmd_lst, stderr=f)
+
         except sp.CalledProcessError as e:
-            logger.error("scancel returned an error code '%s'", e.returncode)
-            logger.error("scancel wrote this: '%s' ", e.output)
+            status_report = "scancel returned an error code '%s'\n\nCommand list:\n%s\n\nOutput:\n%s\n\n%s"
+            try:
+                with open(stderr_path, "r") as f:
+                    stderr_str = "stderr:\n{}".format(f.read())
+            except IOError as e:
+                stderr_str = "The stderr log for the scancel call appears to have been lost!"
+
+            logger.error(status_report, e.returncode, cmd_lst, e.output, stderr_str, exc_info=True)
             raise
+
+        finally:
+            # Clean up the stderr log file.
+            try:
+                os.remove(stderr_path)
+            except OSError:
+                pass
 
     @classmethod
     def slurm_is_alive(cls):
@@ -407,8 +441,8 @@ class SlurmScheduler(BaseSlurmScheduler):
             # If this file is not present, the sbatch commands will crash terribly
             manage_fp = os.path.join(settings.KIVE_HOME, MANAGE_PY)
             if not os.access(manage_fp, os.X_OK):
-                logger.error("An executable '%s' was not found" % manage_fp)
-                logger.error("settings.KIVE_HOME = %s", settings.KIVE_HOME)
+                status_report = "An executable '%s' was not found\nsettings.KIVE_HOME = %s"
+                logger.error(status_report, manage_fp, settings.KIVE_HOME)
                 return False
             logger.info("manager script found at '%s'" % manage_fp)
         return is_alive
@@ -426,19 +460,25 @@ class SlurmScheduler(BaseSlurmScheduler):
         try:
             with os.fdopen(stderr_fd, "w") as f:
                 out_str = sp.check_output(cmd_lst, stderr=f)
+
         except sp.CalledProcessError as e:
-            logger.error("%s returned an error code '%s'", cmd_lst[0], e.returncode)
-            logger.error("it wrote this: '%s' ", e.output)
+            status_report = "%s returned an error code '%s'\n\nCommand list:\n%s\n\nOutput:\n%s\n\n%s"
             try:
                 with open(stderr_path, "r") as f:
-                    logger.error("stderr: \n%s", f.read())
+                    stderr_str = "stderr:\n{}".format(f.read())
             except IOError as e:
-                logger.error("The stderr log for the squeue call appears to have been lost!",
-                             exc_info=True)
-
+                stderr_str = "The stderr log appears to have been lost!"
+            logger.warning(status_report, cmd_lst[0], e.returncode, cmd_lst, e.output, stderr_str,
+                           exc_info=True)
             raise
+
         finally:
-            os.remove(stderr_path)
+            # Clean up the stderr log file.
+            try:
+                os.remove(stderr_path)
+            except OSError:
+                pass
+
         # NOTE: sinfo et al add an empty line to the end of its output. Remove that here.
         lns = [ln for ln in out_str.split('\n') if ln]
         logger.debug("read %d lines" % len(lns))
@@ -711,13 +751,23 @@ class SlurmScheduler(BaseSlurmScheduler):
                     ",".join([jh.job_id for jh in jobhandle_lst]),
                     "Partition={}".format(queue_to_use)]
         logger.debug(" ".join(cmd_list))
+
+        stderr_fd, stderr_path = tempfile.mkstemp()
         try:
-            sp.check_output(cmd_list)
+            with os.fdopen(stderr_fd, "w") as f:
+                _ = sp.check_output(cmd_lst, stderr=f)
+
         except sp.CalledProcessError as e:
-            logger.debug("scontrol returned an error code '%s'", e.returncode)
-            logger.debug("scontrol wrote this: '%s' ", e.output)
-            # scontrol returns 1 if a job is already running or has completed
-            # catch this case silently, but raise an exception in all other cases.
+            status_report = "scontrol returned an error code '%s'\n\nCommand list:\n%s\n\nOutput:\n%s\n\n%s"
+            try:
+                with open(stderr_path, "r") as f:
+                    stderr_str = "stderr:\n{}".format(f.read())
+            except IOError as e:
+                stderr_str = "The stderr log appears to have been lost!"
+            logger.debug(status_report, e.returncode, cmd_list, e.output, stderr_str)
+
+            # scontrol returns 1 if a job is already running or has completed.
+            # Catch this case silently, but raise an exception in all other cases.
             if e.returncode != 1:
                 raise
 
