@@ -1,8 +1,9 @@
 from django.core.management.base import BaseCommand
-from django.conf import settings
 
 from sandbox.execute import Sandbox
 from fleet.exceptions import StopExecution
+import file_access_utils
+
 import json
 import sys
 import time
@@ -29,6 +30,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         worker_logger.debug("start time : %f" % time.time())
+        file_access_utils.confirm_file_created(options["step_execution_info_json"])
         with open(options["step_execution_info_json"], "rb") as f:
             step_execute_dict = json.loads(f.read())
 

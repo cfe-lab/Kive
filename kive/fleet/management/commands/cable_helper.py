@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 from sandbox.execute import Sandbox
 import json
+import file_access_utils
 
 
 class Command(BaseCommand):
@@ -13,6 +14,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        file_access_utils.confirm_file_created(options["cable_execution_info_json"])
         with open(options["cable_execution_info_json"], "rb") as f:
             cable_execute_dict = json.loads(f.read())
 
