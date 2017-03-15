@@ -4338,9 +4338,13 @@ class RunBatchTests(TestCase):
         """
         Testing that the eligible permissions on an empty RunBatch are everything.
         """
-        expected_users = {'Joe', 'Suzy'}
+        user_1 = User("Joe", "joe@ponzi.io", "joe", pk=1)
+        user_2 = User("Suzy", "suzy@ponzi.io", "suzy", pk=2)
+        expected_users = {user_1, user_2}
         User.objects.add(*expected_users)
-        expected_groups = {'Floor 1', 'Floor 2'}
+        group_1 = Group("Floor 1", pk=101)
+        group_2 = Group("Floor 2", pk=102)
+        expected_groups = {group_1, group_2}
         Group.objects.add(*expected_groups)
 
         rb = RunBatch()

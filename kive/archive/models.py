@@ -160,14 +160,18 @@ class RunBatch(metadata.models.AccessControl):
         if not self.all_runs_complete():
             raise RuntimeError("Eligible permissions cannot be found until all runs are complete")
 
-        addable_users = User.objects.all()
-        addable_groups = Group.objects.all()
+        # We don't use querysets here with many filter statements as it leads to very very long
+        # query strings that can be problematic in deployment.
+        addable_users = set(User.objects.all())
+        addable_groups = set(Group.objects.all())
         for run in self.runs.all():
             run_addable_users, run_addable_groups = run.eligible_permissions(include_runbatch=False)
-            addable_users = addable_users.filter(pk__in=run_addable_users.values_list("pk", flat=True))
-            addable_groups = addable_groups.filter(pk__in=run_addable_groups.values_list("pk", flat=True))
+            addable_users = addable_users.intersection(set(run_addable_users))
+            addable_groups = addable_groups.intersection(set(run_addable_groups))
 
-        return addable_users, addable_groups
+        addable_users_qs = User.objects.filter(pk__in=[x.pk for x in addable_users])
+        addable_groups_qs = Group.objects.filter(pk__in=[x.pk for x in addable_groups])
+        return addable_users_qs, addable_groups_qs
 
 
 @python_2_unicode_compatible
