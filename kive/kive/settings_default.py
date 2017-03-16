@@ -327,6 +327,19 @@ KIVE_HOME = "/usr/local/share/Kive/kive"
 STEP_HELPER_COMMAND = "step_helper"
 CABLE_HELPER_COMMAND = "cable_helper"
 
+# Steps in Pipelines will run as Slurm tasks, using a script like this:
+"""
+#!/usr/bin/env bash
+
+[SANDBOX_DRIVER_PREAMBLE]
+
+[DRIVER] [INPUTS] [OUTPUTS]
+"""
+# If there's anything system-specific that you need in that spot, put it
+# into this variable:
+SANDBOX_DRIVER_PREAMBLE = """\
+"""
+
 CONFIRM_COPY_RETRIES = 5
 CONFIRM_COPY_WAIT_MIN = 3
 CONFIRM_COPY_WAIT_MAX = 7

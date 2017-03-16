@@ -1933,6 +1933,9 @@ class Sandbox:
             # Wrap the driver in a script.
             driver_template = """\
 #! /usr/bin/env bash
+
+{}
+
 {} {} {}
 
 """
@@ -1943,6 +1946,7 @@ class Sandbox:
             with os.fdopen(wrapped_driver_fd, "wb") as f:
                 f.write(
                     driver_template.format(
+                        settings.SANDBOX_DRIVER_PREAMBLE if settings.SANDBOX_DRIVER_PREAMBLE is not None else "",
                         os.path.join(step_execute_info.step_run_dir, driver.coderesource.filename),
                         " ".join(input_paths),
                         " ".join(step_execute_info.output_paths)
