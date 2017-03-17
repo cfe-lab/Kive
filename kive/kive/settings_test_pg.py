@@ -23,3 +23,8 @@ CONFIRM_FILE_CREATED_WAIT_MAX = 0.02
 
 # An alternate settings file for the fleet to use.
 FLEET_SETTINGS = "kive.settings_test_fleet_pg"
+
+# If there's anything system-specific that you need in that spot, put it
+# into this variable:
+SANDBOX_DRIVER_PREAMBLE = """\
+"""
