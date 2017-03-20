@@ -266,6 +266,9 @@ SANDBOX_PURGE_MINUTES = 0
 # Whether the fleet Manager should run idle tasks.
 DO_IDLE_TASKS = True
 
+# try to run an idle task every IDLE_TASK_FACTOR * FLEET_POLLING_INTERVAL
+IDLE_TASK_FACTOR = 50
+
 # Keep this many of the most recent Sandboxes for any PipelineFamily.
 SANDBOX_KEEP_RECENT = 10
 

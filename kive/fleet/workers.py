@@ -275,6 +275,7 @@ class Manager(object):
         self._add_idletask(MethodOutput.idle_logfile_purge())
 
         time_to_purge = None
+        idle_counter = 0
         while True:
             self.find_stopped_runs()
 
@@ -291,8 +292,11 @@ class Manager(object):
             # if we have time, do some idle tasks until poll_until and
             # then check and see if anything has finished.
             if settings.DO_IDLE_TASKS and time.time() < poll_until:
-                self._do_idle_tasks(poll_until)
-
+                if idle_counter < settings.IDLE_TASK_FACTOR:
+                    idle_counter += 1
+                else:
+                    self._do_idle_tasks(poll_until)
+                    idle_counter = 0
             if self.quit_idle and not self.runs_in_progress:
                 mgr_logger.info('Fleet is idle, quitting.')
                 return

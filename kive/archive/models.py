@@ -920,7 +920,6 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             # if self.runbatch is not None:
             #     self.validate_restrict_access([self.runbatch])
             #
-            
             addable_users, addable_groups = ds.intersect_permissions(
                 addable_users,
                 addable_groups
