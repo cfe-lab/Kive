@@ -988,8 +988,9 @@ class Foreman(object):
             self.sandbox.run.start(save=True)
 
         if self.sandbox.run.is_complete():
-            # This run already completed, so we ignore this call.92
-            mgr_logger.warn("Run (pk=%d) is already complete; ignoring stop request.", self.run.pk)
+            # This run already completed, so we ignore this call.
+            mgr_logger.warn("Run (pk=%d) is already complete; ignoring stop request.",
+                            self.sandbox.run.pk)
             return
 
         else:
@@ -1005,7 +1006,12 @@ class Foreman(object):
             self.sandbox.run.cancel(save=True)
         self.sandbox.run.stop(save=True)
 
-        foreman_logger.debug("Run (pk={}) stopped by user {}".format(self.run.pk, self.run.stopped_by))
+        foreman_logger.debug(
+            "Run (pk={}) stopped by user {}".format(
+                self.sandbox.run.pk,
+                self.sandbox.run.stopped_by
+            )
+        )
 
     def cancel_all_slurm_jobs(self):
         """
