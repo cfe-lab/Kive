@@ -743,10 +743,10 @@ code on a developer workstation.
     Python code and the static files. Don't forget to configure SSL.
 
 4. Navigate to `localhost:8000` in your web browser!
-5. To launch a fleet manager and workers, you need to run the following command
-    and replace X with the number of workers you want:
+5. To launch the fleet, you need to run the following command as the user that will
+    handle execution:
 
-        python manage.py runfleet --workers X
+        python manage.py runfleet
 
 [mod_wsgi]: https://docs.djangoproject.com/en/1.9/howto/deployment/wsgi/modwsgi/
     

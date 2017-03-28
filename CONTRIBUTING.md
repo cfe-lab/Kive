@@ -130,36 +130,21 @@ Once you have set up your production server, this is how to deploy a new release
         sudo mv static_root static
         sudo rm static_root.tar.gz
         
-9. Launch the fleet.  If `kiveuser` is the user account used to run the fleet
-    (this may be `apache`, but setting up a dedicated account for this purpose
-    is recommended, especially if you're using virtualenv):
+9. Launch the fleet.  If `kiveuser` is the user account used to run the fleet, and it utilizes a 
+virtualenv based at `~/vkive/`:
 
         sudo su kiveuser
         source ~/vkive/bin/activate
         cd /usr/local/share/Kive/kive
-        ./manage.py runfleet --workers 100 &
-
-    If you're still using the apache user, launch is slightly different.
-    
-        sudo -u apache ls /  # Just test that you can log in as apache
-        sudo -u apache LD_LIBRARY_PATH=$LD_LIBRARY_PATH PATH=$PATH ./manage.py runfleet --workers 191 &>/dev/null &
-
-    On CentOS 6, it's more complicated.
-
-        sudo su kiveuser
-        scl enable python27 bash
-        source ~/vkive/bin/activate
-        module load openmpi/gnu/1.6.5
-        cd /usr/local/share/Kive/kive
-        mpirun -np 1 ./manage.py runfleet --workers 191 &
+        ./manage.py runfleet &
         
 10. Restart apache:
 
         sudo /usr/sbin/apachectl restart
 
-    On CentOS 6, the software collections make it a bit different:
+    On CentOS 7, use `systemctl`:
 
-        sudo service httpd24-httpd restart
+        sudo systemctl httpd restart
 
 11. Update the Kive API library if needed.
 
