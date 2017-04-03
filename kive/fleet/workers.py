@@ -24,7 +24,24 @@ import fleet.slurmlib
 
 mgr_logger = logging.getLogger("fleet.Manager")
 foreman_logger = logging.getLogger("fleet.Foreman")
-worker_logger = logging.getLogger("fleet.Worker")
+
+
+def disable_worker_file_logging(target_logger):
+    """
+    Disable all file logging done by the specified logger.
+    """
+    file_handlers = []
+    for handler in target_logger.handlers:
+        filename = getattr(handler, 'baseFilename', None)
+        if filename is not None:
+            file_handlers.append(handler)
+
+    for file_handler in file_handlers:
+        file_handler.close()
+        target_logger.removeHandler(file_handler)
+
+    if target_logger.parent is not None:
+        disable_worker_file_logging(target_logger.parent)
 
 
 class Manager(object):
@@ -40,6 +57,10 @@ class Manager(object):
             history=0,
             slurm_sched_class=fleet.slurmlib.SlurmScheduler
     ):
+        # Configure logging so that the process running this keeps its output
+        # from writing to the same place as the web server.
+        self.managerize_logger(mgr_logger)
+
         self.shutdown_exception = None
         self.quit_idle = quit_idle
 
@@ -65,6 +86,26 @@ class Manager(object):
             raise RuntimeError("Slurm is not running")
         # log some slurm information
         mgr_logger.info("Slurm identifies as: '%s'" % self.slurm_sched_class.slurm_ident())
+
+    @staticmethod
+    def configure_manager_file_logger(self, target_logger):
+        """
+        Affix "_fleet" to any file logging handlers' output basenames.
+
+        This keeps the log from interfering with the regular Kive system logging.
+        """
+        for handler in target_logger.handlers:
+            filename = getattr(handler, 'baseFilename', None)
+
+            if filename is not None:
+                handler.close()
+                file_root, file_ext = os.path.splitext(filename)
+                fleet_suffix = "_fleet"
+                if not file_root.endswith(fleet_suffix):
+                    handler.baseFilename = "{}{}.{}".format(file_root, fleet_suffix, file_ext)
+
+        if target_logger.parent is not None:
+            self.configure_manager_file_logger(target_logger.parent)
 
     def monitor_queue(self, time_to_stop):
         """

@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 
 from sandbox.execute import Sandbox
 from fleet.exceptions import StopExecution
+from fleet.workers import disable_worker_file_logging
 import file_access_utils
 
 import json
@@ -29,6 +30,10 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        # Disable file logging, as this is running as a Slurm job anyway so the console
+        # logging will be captured in a file.
+        disable_worker_file_logging(worker_logger)
+
         worker_logger.debug("start time : %f" % time.time())
         file_access_utils.confirm_file_created(options["step_execution_info_json"])
         with open(options["step_execution_info_json"], "rb") as f:
