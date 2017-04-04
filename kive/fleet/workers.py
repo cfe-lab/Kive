@@ -59,7 +59,7 @@ class Manager(object):
     ):
         # Configure logging so that the process running this keeps its output
         # from writing to the same place as the web server.
-        self.managerize_logger(mgr_logger)
+        self.configure_manager_file_logger(mgr_logger)
 
         self.shutdown_exception = None
         self.quit_idle = quit_idle
@@ -87,7 +87,6 @@ class Manager(object):
         # log some slurm information
         mgr_logger.info("Slurm identifies as: '%s'" % self.slurm_sched_class.slurm_ident())
 
-    @staticmethod
     def configure_manager_file_logger(self, target_logger):
         """
         Affix "_fleet" to any file logging handlers' output basenames.
@@ -102,7 +101,7 @@ class Manager(object):
                 file_root, file_ext = os.path.splitext(filename)
                 fleet_suffix = "_fleet"
                 if not file_root.endswith(fleet_suffix):
-                    handler.baseFilename = "{}{}.{}".format(file_root, fleet_suffix, file_ext)
+                    handler.baseFilename = "{}{}{}".format(file_root, fleet_suffix, file_ext)
 
         if target_logger.parent is not None:
             self.configure_manager_file_logger(target_logger.parent)
