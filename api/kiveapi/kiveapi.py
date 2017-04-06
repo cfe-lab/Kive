@@ -59,6 +59,7 @@ class KiveAPI(Session):
         }
         super(KiveAPI, self).__init__()
         self.verify = verify
+        self.csrf_token = None
 
     def login(self, username, password):
         self.fetch_csrf_token()  # for the login request
@@ -76,6 +77,10 @@ class KiveAPI(Session):
 
     def fetch_csrf_token(self):
         login_response = self.head('@api_auth')
+        if login_response.status_code == requests.codes['found']:
+            message = 'Fetching a CSRF token failed with a redirect to {!r}.'.format(
+                login_response.headers.get('location'))
+            raise RuntimeError(message)
         self.csrf_token = login_response.cookies['csrftoken']
 
     def _prep_url(self, url):
@@ -89,7 +94,7 @@ class KiveAPI(Session):
         if context is None:
             context = []
         messages = []
-        for field, errors in fields.iteritems():
+        for field, errors in fields.items():
             context.append(field)
             if isinstance(errors, list):
                 for error in errors:
@@ -218,7 +223,7 @@ class KiveAPI(Session):
             filters['cdt'] = cdt.cdt_id
         filter_text = '&'.join(
             'filters[{}][key]={}&filters[{}][val]={}'.format(i, key, i, val)
-            for i, (key, val) in enumerate(filters.iteritems()))
+            for i, (key, val) in enumerate(filters.items()))
         datasets = self.get('@api_find_datasets',
                             context={'filters': filter_text}).json()
         return [Dataset(d, self) for d in datasets]
@@ -475,7 +480,7 @@ class KiveAPI(Session):
         filters = kwargs
         filter_text = '&'.join(
             'filters[{}][key]={}&filters[{}][val]={}'.format(i, key, i, val)
-            for i, (key, val) in enumerate(filters.iteritems()))
+            for i, (key, val) in enumerate(filters.items()))
         runs = self.get('@api_find_runs',
                         context={'filters': filter_text}).json()
         return [RunStatus(run, self) for run in runs]

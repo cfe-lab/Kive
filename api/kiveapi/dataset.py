@@ -64,5 +64,5 @@ class Dataset(object):
         """ Returns an iterator to lines in the data set, including newlines.
         """
 
-        for line in self._request_download().iter_lines():
+        for line in self._request_download().iter_lines(decode_unicode=True):
             yield line + '\n'
