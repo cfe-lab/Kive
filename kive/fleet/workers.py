@@ -493,6 +493,9 @@ class Foreman(object):
                         terminated_during = "setup"
 
                     else:
+                        assert setup_state in self.slurm_sched_class.SUCCESS_STATES, \
+                            "Unexpected Slurm state: {}".format(setup_state)
+
                         # Having reached here, we know that setup is all clear, so check on the driver.
                         # Note that we don't check on whether it's in FAILED_STATES, because
                         # that will be handled in the bookkeeping stage.
@@ -545,6 +548,10 @@ class Foreman(object):
                             continue
 
                         else:
+                            assert (driver_state in self.slurm_sched_class.FAILED_STATES
+                                    or driver_state in self.slurm_sched_class.SUCCESS_STATES), \
+                                "Unexpected Slurm state: {}".format(driver_state)
+
                             # The driver is finished, but sacct hasn't properly gotten the start and end times.
                             # For all intents and purposes, this is still running.
                             foreman_logger.debug(
@@ -576,6 +583,9 @@ class Foreman(object):
                         # Something went wrong, so we bail.
                         failed = True
                         terminated_during = "bookkeeping"
+                    else:
+                        assert bookkeeping_state in self.slurm_sched_class.SUCCESS_STATES, \
+                            "Unexpected Slurm state: {}".format(bookkeeping_state)
 
             else:
                 cable_info = task_accounting_info.get(task_dict["cable"].job_id, None)
@@ -595,10 +605,11 @@ class Foreman(object):
                     # Something went wrong, so we get ready to bail.
                     failed = True
                     terminated_during = "cable processing"
+                else:
+                    assert cable_state in self.slurm_sched_class.SUCCESS_STATES, \
+                        "Unexpected Slurm state: {}".format(cable_state)
 
             # Having reached here, we know we're done with this task.
-            if os.path.exists(task_dict["info_path"]):
-                os.remove(task_dict["info_path"])
             if failed or cancelled:
                 foreman_logger.error(
                     'Run "%s" (pk=%d, Pipeline: %s, User: %s) %s while handling task %s (pk=%d) during %s',
