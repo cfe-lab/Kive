@@ -931,11 +931,11 @@ class Sandbox:
 
         exec_info.set_stdout_path(
             os.path.join(log_dir,
-                         "{}{}_stdout.txt".format(cable_type_str, cable_idx))
+                         "{}{}_stdout_slurmID%J_node%N.txt".format(cable_type_str, cable_idx))
         )
         exec_info.set_stderr_path(
             os.path.join(log_dir,
-                         "{}{}_stderr.txt".format(cable_type_str, cable_idx))
+                         "{}{}_stderr_slurmID%J_node%N.txt".format(cable_type_str, cable_idx))
         )
         exec_info.set_cable_info_dir(cable_info_dir)
 
@@ -2556,22 +2556,28 @@ class RunStepExecuteInfo:
         }
 
     def driver_stdout_path(self):
-        return os.path.join(self.log_dir, "step{}_stdout.txt".format(self.runstep.pipelinestep.step_num))
+        return os.path.join(
+            self.log_dir,
+            "step{}_stdout_slurmID%J_node%N.txt".format(self.runstep.pipelinestep.step_num)
+        )
 
     def driver_stderr_path(self):
-        return os.path.join(self.log_dir, "step{}_stderr.txt".format(self.runstep.pipelinestep.step_num))
+        return os.path.join(
+            self.log_dir,
+            "step{}_stderr_slurmID%J_node%N.txt".format(self.runstep.pipelinestep.step_num)
+        )
 
     def setup_stdout_path(self):
-        return os.path.join(self.log_dir, "setup_out.txt")
+        return os.path.join(self.log_dir, "setup_out_slurmID%J_node%N.txt")
 
     def setup_stderr_path(self):
-        return os.path.join(self.log_dir, "setup_err.txt")
+        return os.path.join(self.log_dir, "setup_err_slurmID%J_node%N.txt")
 
     def bookkeeping_stdout_path(self):
-        return os.path.join(self.log_dir, "bookkeeping_out.txt")
+        return os.path.join(self.log_dir, "bookkeeping_out_slurmID%J_node%N.txt")
 
     def bookkeeping_stderr_path(self):
-        return os.path.join(self.log_dir, "bookkeeping_err.txt")
+        return os.path.join(self.log_dir, "bookkeeping_err_slurmID%J_node%N.txt")
 
 
 class RunCableExecuteInfo:
