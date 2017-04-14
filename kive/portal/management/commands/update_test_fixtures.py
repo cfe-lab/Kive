@@ -28,6 +28,7 @@ from pipeline.models import PipelineFamily
 import portal.models
 import sandbox.tests
 from fleet.workers import Manager
+from fleet.test_slurmscheduler import execute_simple_run, execute_nested_run
 
 
 class FixtureBuilder(object):
@@ -420,23 +421,7 @@ class SimpleRunBuilder(FixtureBuilder):
         return 'simple_run.json'
 
     def build(self):
-        tools.create_eric_martin_test_environment(self)
-        tools.create_sandbox_testing_tools_environment(self)
-
-        user = User.objects.get(username='john')
-        # Everything in this pipeline will be a no-op, so all can be linked together
-        # without remorse.
-        p_basic = tools.make_first_pipeline("P_basic", "Innermost pipeline", user)
-        tools.create_linear_pipeline(p_basic, [self.method_noop, self.method_noop], "basic_in", "basic_out")
-        p_basic.family.grant_everyone_access()
-        p_basic.grant_everyone_access()
-        p_basic.create_outputs()
-        p_basic.save()
-
-        # Set up a dataset with words in it called self.dataset_words.
-        tools.make_words_dataset(self)
-
-        Manager.execute_pipeline(self.user_bob, p_basic, [self.dataset_words], groups_allowed=[everyone_group()])
+        execute_simple_run(self)
 
 
 class DeepNestedRunBuilder(FixtureBuilder):
@@ -444,37 +429,7 @@ class DeepNestedRunBuilder(FixtureBuilder):
         return 'deep_nested_run.json'
 
     def build(self):
-        tools.create_eric_martin_test_environment(self)
-        tools.create_sandbox_testing_tools_environment(self)
-        user = User.objects.get(username='john')
-
-        # Everything in this pipeline will be a no-op, so all can be linked together
-        # without remorse.
-        p_basic = tools.make_first_pipeline("p_basic", "innermost pipeline", user)
-        tools.create_linear_pipeline(p_basic, [self.method_noop, self.method_noop], "basic_in", "basic_out")
-        p_basic.family.grant_everyone_access()
-        p_basic.grant_everyone_access()
-        p_basic.create_outputs()
-        p_basic.save()
-
-        p_sub = tools.make_first_pipeline("p_sub", "second-level pipeline", user)
-        tools.create_linear_pipeline(p_sub, [p_basic, p_basic], "sub_in", "sub_out")
-        p_sub.family.grant_everyone_access()
-        p_sub.grant_everyone_access()
-        p_sub.create_outputs()
-        p_sub.save()
-
-        p_top = tools.make_first_pipeline("p_top", "top-level pipeline", user)
-        tools.create_linear_pipeline(p_top, [p_sub, p_sub, p_sub], "top_in", "top_out")
-        p_top.family.grant_everyone_access()
-        p_top.grant_everyone_access()
-        p_top.create_outputs()
-        p_top.save()
-
-        # Set up a dataset with words in it called self.dataset_words.
-        tools.make_words_dataset(self)
-
-        Manager.execute_pipeline(self.user_bob, p_top, [self.dataset_words], groups_allowed=[everyone_group()])
+        execute_nested_run(self)
 
 
 class RestoreReusableDatasetBuilder(FixtureBuilder):

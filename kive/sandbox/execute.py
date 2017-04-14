@@ -918,25 +918,6 @@ class Sandbox:
                                         by_step=by_step,
                                         could_be_reused=could_be_reused)
 
-        # Set the stdout and stderr path for the execution.
-        # We need to get some information about the cable: the step that it feeds (RunSIC)
-        # or that it's fed by (RunOutputCable), and the input/output that it feeds/is fed by.
-        # We need this so that we can write the stderr and stdout to the appropriate locations.
-        if isinstance(curr_record, RunSIC):
-            cable_idx = curr_record.component.dest.dataset_idx
-            cable_type_str = "input"
-        else:
-            cable_idx = curr_record.component.source.dataset_idx
-            cable_type_str = "output"
-
-        exec_info.set_stdout_path(
-            os.path.join(log_dir,
-                         "{}{}_stdout_slurmID%J_node%N.txt".format(cable_type_str, cable_idx))
-        )
-        exec_info.set_stderr_path(
-            os.path.join(log_dir,
-                         "{}{}_stderr_slurmID%J_node%N.txt".format(cable_type_str, cable_idx))
-        )
         exec_info.set_cable_info_dir(cable_info_dir)
 
         self.cable_execute_info[(curr_record.parent_run, cable)] = exec_info
@@ -2555,16 +2536,32 @@ class RunStepExecuteInfo:
             "threads_required": self.threads_required
         }
 
+    def driver_stdout_path_prefix(self):
+        """
+        Return the filename prefix for the stdout log file.
+
+        This is used not only to assemble the actual path of the file, but also
+        for finding it in the sandbox after it's complete, as the actual path
+        contains some Slurm macros.
+        """
+        return "step{}_stdout".format(self.runstep.pipelinestep.step_num)
+
+    def driver_stderr_path_prefix(self):
+        """
+        Counterpart to driver_stdout_path_prefix for the stderr log file.
+        """
+        return "step{}_stderr".format(self.runstep.pipelinestep.step_num)
+
     def driver_stdout_path(self):
         return os.path.join(
             self.log_dir,
-            "step{}_stdout_slurmID%J_node%N.txt".format(self.runstep.pipelinestep.step_num)
+            "{}_slurmID%J_node%N.txt".format(self.driver_stdout_path_prefix())
         )
 
     def driver_stderr_path(self):
         return os.path.join(
             self.log_dir,
-            "step{}_stderr_slurmID%J_node%N.txt".format(self.runstep.pipelinestep.step_num)
+            "{}_slurmID%J_node%N.txt".format(self.driver_stderr_path_prefix())
         )
 
     def setup_stdout_path(self):
@@ -2629,11 +2626,46 @@ class RunCableExecuteInfo:
             "cable_info_dir": self.cable_info_dir
         }
 
-    def set_stdout_path(self, stdout_path):
-        self.stdout_path = stdout_path
+    def stdout_prefix(self):
+        """
+        Reports the prefix of the stdout log file that should be produced.
 
-    def set_stderr_path(self, stderr_path):
-        self.stderr_path = stderr_path
+        This is useful because we use this to identify the resulting log file,
+        which will have some Slurm-specific information added to it.
+        """
+        if isinstance(cable_record, RunSIC):
+            cable_idx = cable_record.component.dest.dataset_idx
+            cable_type_str = "input"
+        else:
+            cable_idx = cable_record.component.source.dataset_idx
+            cable_type_str = "output"
+
+        return "{}{}_stdout".format(cable_type_str, cable_idx)
+
+    def stderr_prefix(self):
+        """
+        Counterpart of stdout_prefix for the stderr log file.
+        """
+        if isinstance(cable_record, RunSIC):
+            cable_idx = cable_record.component.dest.dataset_idx
+            cable_type_str = "input"
+        else:
+            cable_idx = cable_record.component.source.dataset_idx
+            cable_type_str = "output"
+
+        return "{}{}_stderr".format(cable_type_str, cable_idx)
+
+    def stdout_path(self):
+        """
+        Produces the actual path with Slurm macros that will be used for stdout logging.
+        """
+        return "{}_slurmID%J_node%N.txt".format(self.stdout_prefix())
+
+    def stderr_path(self):
+        """
+        Produces the actual path with Slurm macros that will be used for stderr logging.
+        """
+        return "{}_slurmID%J_node%N.txt".format(self.stderr_prefix())
 
     def set_cable_info_dir(self, cable_info_dir):
         self.cable_info_dir = cable_info_dir

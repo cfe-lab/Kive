@@ -179,21 +179,6 @@ class ExecuteTestsBase(BaseTestCases.SlurmExecutionTestCase):
         clean_up_all_files()
         remove_fixture_files()
 
-    def check_run_OK(self, run):
-        for step in run.runsteps.all():
-            for rsic in step.RSICs.all():
-                self.assertTrue(rsic.is_successful())
-
-            if step.has_subrun():
-                self.check_run_OK(step.child_run)
-
-            self.assertTrue(step.is_successful())
-
-        for outcable in run.runoutputcables.all():
-            self.assertTrue(outcable.is_successful())
-
-        self.assertTrue(run.is_successful())
-
 
 class ExecuteTests(ExecuteTestsBase):
 
