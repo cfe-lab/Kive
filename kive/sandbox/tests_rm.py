@@ -15,7 +15,7 @@ from kive.tests import install_fixture_files, remove_fixture_files, BaseTestCase
 from method.models import Method
 from fleet.workers import Manager
 from archive.models import Run
-from fleet.slurmlib import SlurmScheduler, DummySlurmScheduler
+from fleet.slurmlib import DummySlurmScheduler
 import file_access_utils
 
 
@@ -356,10 +356,12 @@ class ExecuteDiscardedIntermediateTests(BaseTestCases.SlurmExecutionTestCase):
         self.assertTrue(run.is_successful())
 
 
-@skipIfDBFeature('is_mocked')
-class BadRunTests(BaseTestCases.SlurmExecutionTestCase):
+class BadRunTestsBase(object):
     """
-    Tests for when things go wrong during Pipeline execution.
+    Foundations of tests for when things go wrong during Pipeline execution.
+
+    We split this code out into an object (not a TestCase) so it can be
+    reused in another test class.
     """
     def setUp(self):
         tools.create_grandpa_sandbox_environment(self)
@@ -371,33 +373,14 @@ class BadRunTests(BaseTestCases.SlurmExecutionTestCase):
         for rsic in runstep.RSICs.all():
             self.assertTrue(rsic.is_successful())
 
-    # @unittest.skipIf(
-    #     settings.KIVE_SANDBOX_WORKER_ACCOUNT,
-    #     "OSError will not be thrown when using SSH to the Kive sandbox worker account"
-    # )
-    # def test_code_bad_execution(self):
-    #     """
-    #     If the user's code causes subprocess to throw an OSError, the ExecLog should have a -1 return code.
-    #
-    #     Note that this doesn't occur if using ssh to an unprivileged account for execution.
-    #     """
-    #     run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_faulty, [self.dataset_grandpa]).get_last_run()
-    #     runstep1 = run.runsteps.first()
-    #     log = runstep1.log
-    #     interm_dataset = runstep1.execrecord.execrecordouts.first().dataset
-    #
-    #     self.cable_tester(runstep1)
-    #     self.assertTrue(runstep1.is_failed())
-    #
-    #     self.assertTrue(run.is_failed())
-    #
-    #     self.assertEqual(log.is_successful(), False)
-    #     self.assertEqual(log.methodoutput.return_code, -1)
-    #     self.assertEqual(log.missing_outputs(), [interm_dataset])
-
-    def test_method_fails(self):
+    def test_method_fails(self, slurm_sched_class=DummySlurmScheduler):
         """Properly handle a failed method in a pipeline."""
-        run = Manager.execute_pipeline(self.user_grandpa, self.pipeline_fubar, [self.dataset_grandpa]).get_last_run()
+        run = Manager.execute_pipeline(
+            self.user_grandpa,
+            self.pipeline_fubar,
+            [self.dataset_grandpa],
+            slurm_sched_class=slurm_sched_class
+        ).get_last_run()
 
         self.assertTrue(run.is_failed())
         self.assertIsNone(run.complete_clean())
@@ -417,6 +400,22 @@ class BadRunTests(BaseTestCases.SlurmExecutionTestCase):
         self.assertFalse(log.is_successful())
         self.assertEqual(log.methodoutput.return_code, 1)
         self.assertEqual(log.missing_outputs(), [runstep2.execrecord.execrecordouts.first().dataset])
+
+
+@skipIfDBFeature('is_mocked')
+class BadRunTests(BaseTestCases.SlurmExecutionTestCase, BadRunTestsBase):
+    """
+    Tests for when things go wrong during Pipeline execution.
+    """
+    def setUp(self):
+        BaseTestCases.SlurmExecutionTestCase.setUp(self)
+        BadRunTestsBase.setUp(self)
+
+    def tearDown(self):
+        BaseTestCases.SlurmExecutionTestCase.tearDown(self)
+        BadRunTestsBase.tearDown(self)
+
+    pass
 
 
 @skipIfDBFeature('is_mocked')

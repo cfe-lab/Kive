@@ -533,9 +533,29 @@ class Foreman(object):
                                 task_log.methodoutput.return_code = driver_info["return_code"]
 
                                 step_execute_info = self.sandbox.step_execute_info[(task.parent_run, task.pipelinestep)]
-                                with open(step_execute_info.driver_stdout_path(), "rb") as f:
+                                # Find the stdout and stderr log files from their prefixes
+                                # (since the full filename is produced using some Slurm macros).
+                                stdout_log = glob.glob(
+                                    os.path.join(
+                                        step_execute_info.log_dir,
+                                        "{}*.txt".format(step_execute_info.driver_stdout_path_prefix())
+                                    )
+                                )
+                                assert len(stdout_log) == 1, \
+                                    "Should be exactly 1 stdout log but found this: {}".format(stdout_log)
+
+                                stderr_log = glob.glob(
+                                    os.path.join(
+                                        step_execute_info.log_dir,
+                                        "{}*.txt".format(step_execute_info.driver_stderr_path_prefix())
+                                    )
+                                )
+                                assert len(stderr_log) == 1, \
+                                    "Should be exactly 1 stderr log but found this: {}".format(stderr_log)
+
+                                with open(stdout_log[0], "rb") as f:
                                     task_log.methodoutput.output_log.save(f.name, File(f))
-                                with open(step_execute_info.driver_stderr_path(), "rb") as f:
+                                with open(stderr_log[0], "rb") as f:
                                     task_log.methodoutput.error_log.save(f.name, File(f))
 
                                 task_log.methodoutput.save()
