@@ -4,7 +4,7 @@ python:
 sudo: required
 services: postgresql
 before_install:
-    - sudo apt-get install -y -q openmpi-bin libopenmpi-dev munge slurm-wlm slurmctld slurm-wlm-basic-plugins
+    - sudo apt-get install -y -q openmpi-bin libopenmpi-dev munge slurm-llnl slurmctld slurm-llnl-basic-plugins
     - sudo chmod g-w /var/log
     - sudo service munge start
     - sudo cp travis_slurm.conf /etc/slurm-llnl/slurm.conf
