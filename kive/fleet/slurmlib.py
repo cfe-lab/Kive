@@ -850,7 +850,7 @@ class SlurmScheduler(BaseSlurmScheduler):
 
         step_cmd = os.path.join(settings.KIVE_HOME, MANAGE_PY)
         step_args = " ".join([settings.STEP_HELPER_COMMAND] + cls.fleet_settings + [step_execute_dict_path])
-        step_exec_path = cls._create_wrapperfile(step_dir, "step",
+        step_exec_path = cls._create_wrapperfile(step_dir, "setup",
                                                  settings.SANDBOX_SETUP_PREAMBLE or "",
                                                  step_cmd, step_args)
         setup_slurm_handle = cls.submit_job(
