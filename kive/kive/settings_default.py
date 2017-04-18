@@ -334,14 +334,20 @@ CABLE_HELPER_COMMAND = "cable_helper"
 """
 #!/usr/bin/env bash
 
-[SANDBOX_DRIVER_PREAMBLE]
+[SANDBOX_XXX_PREAMBLE]
 
 [DRIVER] [INPUTS] [OUTPUTS]
 """
 # If there's anything system-specific that you need in that spot, put it
 # into this variable:
-SANDBOX_DRIVER_PREAMBLE = """\
-"""
+SANDBOX_SETUP_PREAMBLE = ""
+
+SANDBOX_DRIVER_PREAMBLE = ""
+
+SANDBOX_BOOKKEEPING_PREAMBLE = ""
+
+SANDBOX_CABLE_PREAMBLE = ""
+
 
 CONFIRM_COPY_RETRIES = 5
 CONFIRM_COPY_WAIT_MIN = 3

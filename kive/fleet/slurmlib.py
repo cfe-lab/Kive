@@ -1,5 +1,7 @@
 # A low level interface to slurm using the calls to sbatch, scancel and squeue via Popen
 
+import os
+import stat
 import os.path
 import logging
 import tempfile
@@ -270,6 +272,36 @@ class BaseSlurmScheduler:
         information path as produced by submit_step_setup.
         """
         raise NotImplementedError
+
+    @classmethod
+    def _dump_json(self, directory, prefix, datastruct):
+        """ Helper routine: Create a temporary file in the provided directory
+        with the prefix provided and the suffix json.
+        Write the provided data structure to this file and return the path to the file.
+        """
+        fd, path = tempfile.mkstemp(dir=directory, prefix=prefix, suffix=".json")
+        with os.fdopen(fd, "wb") as f:
+            f.write(json.dumps(datastruct))
+        return path
+
+    @classmethod
+    def _create_wrapperfile(self, directory, prefix, preamble, cmd, args):
+        """ Helper routine: Create a temporary file in the provided directory with the prefix provided.
+        Write the preamble, cmd and args (all strings) to the file.
+        Return the filename created.
+        """
+        fd, path = tempfile.mkstemp(dir=directory, prefix=prefix)
+        os.fchmod(fd, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        template = """\
+#!/usr/bin/env bash
+
+{}
+
+{} {}
+"""
+        with os.fdopen(fd, "w") as fo:
+            fo.write(template.format(preamble, cmd, args))
+        return path
 
 
 class SlurmScheduler(BaseSlurmScheduler):
@@ -672,7 +704,7 @@ class SlurmScheduler(BaseSlurmScheduler):
                     accdct[cls.ACC_JOB_NAME] = rdct["NAME"]
                     accdct[cls.ACC_STATE] = BaseSlurmScheduler.WAITING
                     accounting_info[job_id] = accdct
-        except sp.CalledProcessError as e:
+        except sp.CalledProcessError:
             # This can happen if we call squeue on a single job that's already finished.
             # The error messages were already logged elsewhere, so we do nothing.
             # Said job information should be handled by sacct below.
@@ -755,7 +787,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         stderr_fd, stderr_path = tempfile.mkstemp()
         try:
             with os.fdopen(stderr_fd, "w") as f:
-                _ = sp.check_output(cmd_lst, stderr=f)
+                _ = sp.check_output(cmd_list, stderr=f)
 
         except sp.CalledProcessError as e:
             status_report = "scontrol returned an error code '%s'\n\nCommand list:\n%s\n\nOutput:\n%s\n\n%s"
@@ -774,24 +806,25 @@ class SlurmScheduler(BaseSlurmScheduler):
     @classmethod
     def submit_runcable(cls, runcable, sandbox):
         """
-        Submit a RunCable to Slurm for processing.
+        SlurmScheduler: Submit a RunCable to Slurm for processing.
         """
         # First, serialize the task execution information.
         cable_info = sandbox.cable_execute_info[(runcable.parent_run, runcable.component)]
-
         # Submit the job.
-        cable_execute_dict_fd, cable_execute_dict_path = tempfile.mkstemp(
-            dir=cable_info.cable_info_dir,
-            prefix="cable_info",
-            suffix=".json"
-        )
-        with os.fdopen(cable_execute_dict_fd, "wb") as f:
-            f.write(json.dumps(cable_info.dict_repr()))
-
+        cable_dir = cable_info.cable_info_dir
+        cable_execute_dict_path = cls._dump_json(cable_dir,
+                                                 "cable_info",
+                                                 cable_info.dict_repr())
+        cable_cmd = os.path.join(settings.KIVE_HOME, MANAGE_PY)
+        cable_args = " ".join([settings.CABLE_HELPER_COMMAND] +
+                              cls.fleet_settings + [cable_execute_dict_path])
+        cable_exec_path = cls._create_wrapperfile(cable_dir, "cable",
+                                                  settings.SANDBOX_CABLE_PREAMBLE or "",
+                                                  cable_cmd, cable_args)
         cable_slurm_handle = cls.submit_job(
             settings.KIVE_HOME,
-            os.path.join(settings.KIVE_HOME, MANAGE_PY),
-            [settings.CABLE_HELPER_COMMAND] + cls.fleet_settings + [cable_execute_dict_path],
+            cable_exec_path,
+            [],
             sandbox.uid,
             sandbox.gid,
             sandbox.run.priority,
@@ -806,25 +839,24 @@ class SlurmScheduler(BaseSlurmScheduler):
     @classmethod
     def submit_step_setup(cls, runstep, sandbox):
         """
-        Submit the setup portion of a RunStep to Slurm.
+        SlurmScheduler: Submit the setup portion of a RunStep to Slurm.
 
         This uses the step helper management command defined in settings.
         """
         # First, serialize the task execution information.
         step_info = sandbox.step_execute_info[(runstep.run, runstep.pipelinestep)]
+        step_dir = step_info.step_run_dir
+        step_execute_dict_path = cls._dump_json(step_dir, "step_info", step_info.dict_repr())
 
-        step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp(
-            dir=step_info.step_run_dir,
-            prefix="step_info",
-            suffix=".json"
-        )
-        with os.fdopen(step_execute_dict_fd, "wb") as f:
-            f.write(json.dumps(step_info.dict_repr()))
-
+        step_cmd = os.path.join(settings.KIVE_HOME, MANAGE_PY)
+        step_args = " ".join([settings.STEP_HELPER_COMMAND] + cls.fleet_settings + [step_execute_dict_path])
+        step_exec_path = cls._create_wrapperfile(step_dir, "step",
+                                                 settings.SANDBOX_SETUP_PREAMBLE or "",
+                                                 step_cmd, step_args)
         setup_slurm_handle = cls.submit_job(
             settings.KIVE_HOME,
-            os.path.join(settings.KIVE_HOME, MANAGE_PY),
-            [settings.STEP_HELPER_COMMAND] + cls.fleet_settings + [step_execute_dict_path],
+            step_exec_path,
+            [],
             sandbox.uid,
             sandbox.gid,
             sandbox.run.priority,
@@ -842,22 +874,23 @@ class SlurmScheduler(BaseSlurmScheduler):
         Submit the bookkeeping part of a RunStep to Slurm.
         """
         step_info = sandbox.step_execute_info[(runstep.run, runstep.pipelinestep)]
+        step_dir = step_info.step_run_dir
 
         # Submit a job for the setup.
         step_execute_dict_path = info_path
         if info_path is None:
-            step_execute_dict_fd, step_execute_dict_path = tempfile.mkstemp(
-                dir=step_info.step_run_dir,
-                prefix="step_info",
-                suffix=".json"
-            )
-            with os.fdopen(step_execute_dict_fd, "wb") as f:
-                f.write(json.dumps(step_info.dict_repr()))
+            step_execute_dict_path = cls._dump_json(step_dir, "step_info", step_info.dict_repr())
 
+        book_cmd = os.path.join(settings.KIVE_HOME, MANAGE_PY)
+        book_args = " ".join([settings.STEP_HELPER_COMMAND, "--bookkeeping"] +
+                             cls.fleet_settings + [step_execute_dict_path])
+        book_exec_path = cls._create_wrapperfile(step_dir, "book",
+                                                 settings.SANDBOX_BOOKKEEPING_PREAMBLE or "",
+                                                 book_cmd, book_args)
         bookkeeping_slurm_handle = cls.submit_job(
             settings.KIVE_HOME,
-            os.path.join(settings.KIVE_HOME, MANAGE_PY),
-            [settings.STEP_HELPER_COMMAND, "--bookkeeping"] + cls.fleet_settings + [step_execute_dict_path],
+            book_exec_path,
+            [],
             sandbox.uid,
             sandbox.gid,
             sandbox.run.priority,
