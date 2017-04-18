@@ -533,7 +533,7 @@ class SlurmScheduler(BaseSlurmScheduler):
             # Use sinfo to check that all queues are up.
             defined_queue_names = [x[1] for x in settings.SLURM_QUEUES]
             if len(defined_queue_names) == 0:
-                logger.error("slurm partition config error: SLURM_QUEUES is lenght 0")
+                logger.error("slurm partition config error: SLURM_QUEUES is length 0")
                 return False
             logger.debug("Calling sinfo to get information on queues: {}".
                          format(defined_queue_names))
@@ -543,8 +543,8 @@ class SlurmScheduler(BaseSlurmScheduler):
                 return False
             cmd_list = [
                 "sinfo",
-                "-O",
-                "available,partitionname,{}".format(settings.SLURM_PRIO_KEYWORD),
+                "-o",
+                "%a %R %p",
                 "-p",
                 ",".join(defined_queue_names)
             ]
@@ -582,8 +582,8 @@ class SlurmScheduler(BaseSlurmScheduler):
             cmd_lst = [
                 'sinfo',
                 '-a',
-                '-O',
-                'available,partitionname,{}'.format(settings.SLURM_PRIO_KEYWORD)
+                '-o',
+                '%a %R %p'
             ]
             dictlst = cls._call_to_dict(cmd_lst)
             logger.debug("got information of %d partitions" % len(dictlst))
