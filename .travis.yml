@@ -4,7 +4,12 @@ python:
 sudo: required
 services: postgresql
 before_install:
-    - sudo apt-get install -y -q openmpi-bin libopenmpi-dev
+    - sudo apt-get install -y -q openmpi-bin libopenmpi-dev munge slurm-wlm slurmctld slurm-wlm-basic-plugins
+    - sudo chmod g-w /var/log
+    - sudo service munge start
+    - sudo cp travis_slurm.conf /etc/slurm-llnl/slurm.conf
+    - sudo service slurmd start
+    - sudo service slurmctld start
 install: "pip install -r requirements-dev.txt"
 before_script:
     - sed "s/\[YOUR DB NAME HERE\]/kive/;s/\[YOUR DB USER NAME HERE\]/postgres/;s/\[YOUR DB USER PASSWORD HERE\]//;s#MEDIA_ROOT = ''#MEDIA_ROOT = '/tmp'#" kive/kive/settings_default.py > kive/kive/settings.py
