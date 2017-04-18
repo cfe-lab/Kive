@@ -829,8 +829,8 @@ class SlurmScheduler(BaseSlurmScheduler):
             sandbox.gid,
             sandbox.run.priority,
             cable_info.threads_required,
-            cable_info.stdout_path,
-            cable_info.stderr_path,
+            cable_info.stdout_path(),
+            cable_info.stderr_path(),
             job_name="run{}_cable{}".format(runcable.parent_run.pk, runcable.pk)
         )
 
@@ -1331,8 +1331,8 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                      ('group_id', sandbox.gid),
                      ('prio_level', sandbox.run.priority),
                      ('num_cpus', cable_info.threads_required),
-                     ('stdoutfile', cable_info.stdout_path),
-                     ('stderrfile', cable_info.stderr_path),
+                     ('stdoutfile', cable_info.stdout_path()),
+                     ('stderrfile', cable_info.stderr_path()),
                      ('after_okay', None),
                      ('after_any', None),
                      ('job_name', job_name),

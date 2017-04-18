@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.test import skipIfDBFeature
 
 from fleet.workers import Manager
 from kive.tests import BaseTestCases
@@ -90,6 +91,7 @@ def execute_nested_run(environment, slurm_sched_class=DummySlurmScheduler):
     )
 
 
+@skipIfDBFeature('is_mocked')
 class SlurmExecutionTests(BaseTestCases.SlurmExecutionTestCase):
 
     def test_simple_run(self):
@@ -123,6 +125,7 @@ class SlurmExecutionTests(BaseTestCases.SlurmExecutionTestCase):
         self.assertIsNone(run.complete_clean())
 
 
+@skipIfDBFeature('is_mocked')
 class SlurmBadRunTests(BaseTestCases.SlurmExecutionTestCase, BadRunTestsBase):
     """
     Tests a bad run using SlurmScheduler instead of DummySlurmScheduler.

@@ -856,6 +856,7 @@ class Sandbox:
                                             input_dataset,
                                             self.dataset_fs_map[input_dataset],
                                             output_path,
+                                            log_dir=log_dir,
                                             by_step=by_step)
             exec_info.cancel()
             self.cable_execute_info[(curr_record.parent_run, cable)] = exec_info
@@ -915,6 +916,7 @@ class Sandbox:
                                         input_dataset,
                                         self.dataset_fs_map[input_dataset],
                                         output_path,
+                                        log_dir=log_dir,
                                         by_step=by_step,
                                         could_be_reused=could_be_reused)
 
@@ -2579,7 +2581,7 @@ class RunStepExecuteInfo:
 
 class RunCableExecuteInfo:
     def __init__(self, cable_record, user, execrecord, input_dataset, input_dataset_path, output_path,
-                 recovering_record=None, by_step=None, could_be_reused=False):
+                 log_dir, recovering_record=None, by_step=None, could_be_reused=False):
         """
         Constructor.
         """
@@ -2596,9 +2598,8 @@ class RunCableExecuteInfo:
         self.ready_to_go = False
         self.cancelled = False
         self.could_be_reused = could_be_reused
-        self.stdout_path = None
-        self.stderr_path = None
         self.cable_info_dir = None
+        self.log_dir = log_dir
 
     def flag_for_recovery(self, recovering_record, by_step=None):
         assert self.recovering_record is None
@@ -2623,7 +2624,8 @@ class RunCableExecuteInfo:
             "by_step_pk": None if self.by_step is None else self.by_step.pk,
             "threads_required": self.threads_required,
             "ready_to_go": self.ready_to_go,
-            "cable_info_dir": self.cable_info_dir
+            "cable_info_dir": self.cable_info_dir,
+            "log_dir": self.log_dir
         }
 
     def stdout_prefix(self):
@@ -2633,11 +2635,11 @@ class RunCableExecuteInfo:
         This is useful because we use this to identify the resulting log file,
         which will have some Slurm-specific information added to it.
         """
-        if isinstance(cable_record, RunSIC):
-            cable_idx = cable_record.component.dest.dataset_idx
+        if isinstance(self.cable_record, RunSIC):
+            cable_idx = self.cable_record.component.dest.dataset_idx
             cable_type_str = "input"
         else:
-            cable_idx = cable_record.component.source.dataset_idx
+            cable_idx = self.cable_record.component.source.dataset_idx
             cable_type_str = "output"
 
         return "{}{}_stdout".format(cable_type_str, cable_idx)
@@ -2646,11 +2648,11 @@ class RunCableExecuteInfo:
         """
         Counterpart of stdout_prefix for the stderr log file.
         """
-        if isinstance(cable_record, RunSIC):
-            cable_idx = cable_record.component.dest.dataset_idx
+        if isinstance(self.cable_record, RunSIC):
+            cable_idx = self.cable_record.component.dest.dataset_idx
             cable_type_str = "input"
         else:
-            cable_idx = cable_record.component.source.dataset_idx
+            cable_idx = self.cable_record.component.source.dataset_idx
             cable_type_str = "output"
 
         return "{}{}_stderr".format(cable_type_str, cable_idx)
@@ -2659,13 +2661,13 @@ class RunCableExecuteInfo:
         """
         Produces the actual path with Slurm macros that will be used for stdout logging.
         """
-        return "{}_slurmID%J_node%N.txt".format(self.stdout_prefix())
+        return os.path.join(self.log_dir, "{}_slurmID%J_node%N.txt".format(self.stdout_prefix()))
 
     def stderr_path(self):
         """
         Produces the actual path with Slurm macros that will be used for stderr logging.
         """
-        return "{}_slurmID%J_node%N.txt".format(self.stderr_prefix())
+        return os.path.join(self.log_dir, "{}_slurmID%J_node%N.txt".format(self.stderr_prefix()))
 
     def set_cable_info_dir(self, cable_info_dir):
         self.cable_info_dir = cable_info_dir
