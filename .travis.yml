@@ -13,7 +13,7 @@ before_install:
     - echo "Testing squeue...."
     - squeue
     - echo "Testing sinfo...."
-    - sinfo -o "available,partitionname,prioritytier" -p LOW_PRIO,MEDIUM_PRIO,HIGH_PRIO
+    - sinfo -O "available,partitionname,prioritytier" -p LOW_PRIO,MEDIUM_PRIO,HIGH_PRIO
 install: "pip install -r requirements-dev.txt"
 before_script:
     - sed -f travis_settings_modification.sed kive/kive/settings_default.py > kive/kive/settings.py
