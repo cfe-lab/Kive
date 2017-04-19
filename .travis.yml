@@ -1,10 +1,12 @@
 language: python
 python:
     - "2.7"
+dist: trusty
 sudo: required
 services: postgresql
 before_install:
     - sudo apt-get install -y -q openmpi-bin libopenmpi-dev munge slurm-llnl slurm-llnl-basic-plugins
+    - sudo chmod g-w /var/log
     - sudo /usr/sbin/create-munge-key
     - sudo service munge start
     - sudo cp travis_slurm.conf /etc/slurm-llnl/slurm.conf
