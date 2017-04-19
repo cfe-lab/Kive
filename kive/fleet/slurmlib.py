@@ -543,8 +543,8 @@ class SlurmScheduler(BaseSlurmScheduler):
                 return False
             cmd_list = [
                 "sinfo",
-                "-o",
-                "%a %P %p",
+                "-O",
+                "available,partitionname,{}".format(settings.SLURM_PRIO_KEYWORD),
                 "-p",
                 ",".join(defined_queue_names)
             ]
@@ -582,8 +582,8 @@ class SlurmScheduler(BaseSlurmScheduler):
             cmd_lst = [
                 'sinfo',
                 '-a',
-                '-o',
-                '%a %P %p'
+                '-O',
+                'available,partitionname,{}'.format(settings.SLURM_PRIO_KEYWORD)
             ]
             dictlst = cls._call_to_dict(cmd_lst)
             logger.debug("got information of %d partitions" % len(dictlst))
