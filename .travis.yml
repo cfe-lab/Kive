@@ -12,7 +12,7 @@ before_install:
     - echo "Testing squeue...."
     - squeue
     - echo "Testing sinfo...."
-    - sinfo -o "%a %R %p"
+    - sinfo -o "%a %P %p"
 install: "pip install -r requirements-dev.txt"
 before_script:
     - sed "s/\[YOUR DB NAME HERE\]/kive/;s/\[YOUR DB USER NAME HERE\]/postgres/;s/\[YOUR DB USER PASSWORD HERE\]//;s#MEDIA_ROOT = ''#MEDIA_ROOT = '/tmp'#" kive/kive/settings_default.py > kive/kive/settings.py

@@ -544,7 +544,7 @@ class SlurmScheduler(BaseSlurmScheduler):
             cmd_list = [
                 "sinfo",
                 "-o",
-                "%a %R %p",
+                "%a %P %p",
                 "-p",
                 ",".join(defined_queue_names)
             ]
@@ -583,7 +583,7 @@ class SlurmScheduler(BaseSlurmScheduler):
                 'sinfo',
                 '-a',
                 '-o',
-                '%a %R %p'
+                '%a %P %p'
             ]
             dictlst = cls._call_to_dict(cmd_lst)
             logger.debug("got information of %d partitions" % len(dictlst))
