@@ -17,6 +17,12 @@ chown slurm /var/run/slurm
 chown slurm /var/log/slurm
 chown slurm /var/lib/slurm
 
+mkdir /var/lib/slurm/slurmctld
+mkdir /var/lib/slurm/slurmd
+
+chown slurm /var/lib/slurm/slurmctld
+chown slurm /var/lib/slurm/slurmd
+
 cp travis_slurm.conf /etc/slurm/slurm.conf
 
 slurmd
