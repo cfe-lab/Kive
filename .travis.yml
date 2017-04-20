@@ -1,27 +1,14 @@
 language: python
 python:
     - "2.7"
-dist: trusty
 sudo: required
 services: postgresql
 before_install:
-    - sudo apt-get install -y -q openmpi-bin libopenmpi-dev munge
-    - sudo chmod g-w /var/log
-    - sudo /usr/sbin/create-munge-key
-    - sudo service munge start
-    - sudo bash travis_slurm_install.bash
-    - echo "Testing squeue...."
-    - squeue
-    - echo "Testing sinfo...."
-    - sinfo -O "available,partitionname,prioritytier" -p LOW_PRIO,MEDIUM_PRIO,HIGH_PRIO
-    - echo "Testing srun...."
-    - srun who
-    - echo "Testing sacct...."
-    - sacct -a
+    - sudo apt-get install -y -q openmpi-bin libopenmpi-dev
 install: "pip install -r requirements-dev.txt"
 before_script:
     - sed -f travis_settings_modification.sed kive/kive/settings_default.py > kive/kive/settings.py
-script: "cd kive && ./manage.py test --failfast --setting kive.settings_test_pg_loud fleet.test_slurmscheduler && ./manage.py test --setting kive.settings_mocked && coverage run manage.py test --setting kive.settings_test_pg"
+script: "cd kive && ./manage.py test --setting kive.settings_mocked && coverage run manage.py test --setting kive.settings_test_pg"
 
 after_success:
     - pip install codecov
