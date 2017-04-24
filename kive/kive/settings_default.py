@@ -363,3 +363,6 @@ FLEET_SETTINGS = None
 # and the name of the corresponding column returned.
 SLURM_PRIO_KEYWORD = "priority"
 SLURM_PRIO_COLNAME = "PRIORITY"
+
+# Attempt to run the system tests that use Slurm.
+RUN_SLURM_TESTS = False
