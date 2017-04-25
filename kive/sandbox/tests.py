@@ -1453,7 +1453,7 @@ class ExecuteSandboxPathWithSpacesTests(ExecuteTestsBase):
         self.media_root_original = settings.MEDIA_ROOT
         # Make a temporary directory whose name has spaces in it.
         self.base_with_spaces = tempfile.mkdtemp(
-            suffix="Extra Folder With Spaces",
+            suffix="Extra\ Folder\ With\ Spaces",
             dir=self.media_root_original
         )
         # The value of MEDIA_ROOT must end with a directory named "Testing" to pass
