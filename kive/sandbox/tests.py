@@ -11,6 +11,7 @@ from django.core.files import File
 from django.core.files.base import ContentFile
 from django.test import TestCase, skipIfDBFeature
 from django.utils import timezone
+from django.conf import settings
 
 from archive.models import Run, RunComponent
 from constants import datatypes
@@ -179,9 +180,6 @@ class ExecuteTestsBase(BaseTestCases.SlurmExecutionTestCase):
         clean_up_all_files()
         remove_fixture_files()
 
-
-class ExecuteTests(ExecuteTestsBase):
-
     def find_raw_pipeline(self, user):
         """Find a Pipeline with a raw input."""
         for p in Pipeline.filter_by_user(user):
@@ -224,6 +222,9 @@ class ExecuteTests(ExecuteTestsBase):
                     dataset = None
             input_datasets.append(dataset)
         return input_datasets
+
+
+class ExecuteTests(ExecuteTestsBase):
 
     def test_pipeline_execute_A_simple_onestep_pipeline(self):
         """Execution of a one-step pipeline."""
@@ -1444,6 +1445,44 @@ class ExecuteTests(ExecuteTestsBase):
         self.assertFalse(hasattr(mock_cancel_running, "assert_not_called"))
 
         shutil.rmtree(self.working_dir)
+
+
+class ExecuteSandboxPathWithSpacesTests(ExecuteTestsBase):
+
+    def setUp(self):
+        self.media_root_original = settings.MEDIA_ROOT
+        # Make a temporary directory whose name has spaces in it.
+        self.base_with_spaces = tempfile.mkdtemp(
+            suffix="Extra Folder With Spaces",
+            dir=self.media_root_original
+        )
+        # The value of MEDIA_ROOT must end with a directory named "Testing" to pass
+        # the tests in ExecuteTestsBase.setUp().
+        self.media_root_with_spaces = os.path.join(self.base_with_spaces, "Testing")
+        settings.MEDIA_ROOT = self.media_root_with_spaces
+        ExecuteTestsBase.setUp(self)
+
+    def tearDown(self):
+        ExecuteTestsBase.tearDown(self)
+        settings.MEDIA_ROOT = self.media_root_original
+        shutil.rmtree(self.media_root_with_spaces)
+
+    def test_pipeline_sandbox_path_has_spaces(self):
+        """Execute a Pipeline in a sandbox that has spaces in the path."""
+        pipeline = self.find_nonraw_pipeline(self.myUser)
+        inputs = self.find_inputs_for_pipeline(pipeline)
+        self.assertTrue(all(i.is_OK() for i in inputs))
+        self.assertFalse(all(i.is_raw() for i in inputs))
+        run = Manager.execute_pipeline(self.myUser, pipeline, inputs).get_last_run()
+
+        self.check_run_OK(run)
+
+        # Check the full is_complete and is_successful.
+        self.assertTrue(run.is_complete())
+        self.assertTrue(run.is_successful())
+
+        self.assertIsNone(run.clean())
+        self.assertIsNone(run.complete_clean())
 
 
 class SandboxTests(ExecuteTestsBase):
