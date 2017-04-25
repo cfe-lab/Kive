@@ -9,6 +9,7 @@ import tempfile
 import time
 import itertools
 import pwd
+import re
 
 from django.utils import timezone
 from django.db import transaction, OperationalError, InternalError
@@ -1870,7 +1871,7 @@ class Sandbox:
         Submit the step execution to Slurm.
 
         step_execute_info is an object of class RunStepExecuteInfo.
-        fter_okay is a list of Slurm job handles; These are submitted jobs that must be
+        after_okay is a list of Slurm job handles; These are submitted jobs that must be
         completed (successfully) before the execution of this driver can proceed.
 
         NOTE: under 'normal circumstances', i.e. when submitting the driver to slurm
@@ -1926,13 +1927,14 @@ class Sandbox:
                                                                       prefix=driver.coderesource.filename)
             # Make sure the job script is executable.
             os.fchmod(wrapped_driver_fd, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            # Note the use of re.escape to deal with spaces and other weird stuff in the filenames.
             with os.fdopen(wrapped_driver_fd, "wb") as f:
                 f.write(
                     driver_template.format(
                         settings.SANDBOX_DRIVER_PREAMBLE if settings.SANDBOX_DRIVER_PREAMBLE is not None else "",
-                        os.path.join(step_execute_info.step_run_dir, driver.coderesource.filename),
-                        " ".join(input_paths),
-                        " ".join(step_execute_info.output_paths)
+                        re.escape(os.path.join(step_execute_info.step_run_dir, driver.coderesource.filename)),
+                        " ".join([re.escape(x) for x in input_paths]),
+                        " ".join([re.escape(x) for x in step_execute_info.output_paths])
                     )
                 )
             job_handle = slurm_sched_class.submit_job(

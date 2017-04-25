@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "/home/rliang/Documents/Kive/media/Sandboxes/userkive_run2_rBOMWE/step1/prelim_map.py", line 186, in <module>
+    main()
+  File "/home/rliang/Documents/Kive/media/Sandboxes/userkive_run2_rBOMWE/step1/prelim_map.py", line 182, in main
+    gzip=args.gzip)  # defaults to False
+  File "/home/rliang/Documents/Kive/media/Sandboxes/userkive_run2_rBOMWE/step1/prelim_map.py", line 65, in prelim_map
+    bowtie2 = Bowtie2(BOWTIE_VERSION, BOWTIE_PATH + '-' + BOWTIE_VERSION)
+  File "/home/rliang/Documents/Kive/media/Sandboxes/userkive_run2_rBOMWE/step1/micall/utils/externals.py", line 162, in __init__
+    stdout = self.check_output(['--version'], stderr=subprocess.STDOUT)
+  File "/home/rliang/Documents/Kive/media/Sandboxes/userkive_run2_rBOMWE/step1/micall/utils/externals.py", line 47, in check_output
+    return subprocess.check_output(final_args, *popenargs, **kwargs)
+  File "/usr/lib/python2.7/subprocess.py", line 567, in check_output
+    process = Popen(stdout=PIPE, *popenargs, **kwargs)
+  File "/usr/lib/python2.7/subprocess.py", line 711, in __init__
+    errread, errwrite)
+  File "/usr/lib/python2.7/subprocess.py", line 1343, in _execute_child
+    raise child_exception
+OSError: [Errno 2] No such file or directory for command ['bowtie2-align-s-2.2.8', '--version']

@@ -2,10 +2,10 @@
 
 import os
 import argparse
-from collections import Counter
-from csv import DictReader, DictWriter
 import errno
 import itertools
+from collections import Counter
+from csv import DictReader, DictWriter
 from operator import itemgetter
 import tarfile
 
@@ -23,8 +23,7 @@ def coverage_plot(amino_csv,
                   coverage_scores_csv,
                   coverage_maps_path=None,
                   coverage_maps_prefix=None,
-                  filetype='png',
-                  excluded_projects=None):
+                  filetype='png'):
     """ Generate coverage plots.
 
     @param amino_csv: an open file object that holds amino acid frequencies
@@ -36,7 +35,6 @@ def coverage_plot(amino_csv,
     if there is no prefix.
     @param filetype: controls which file type will be saved, must be supported
     by matplotlib (probably png, pdf, ps, eps and svg).
-    @param excluded_projects: a list of project names to exclude
     @return: a list of full paths to the image files.
     """
     # imports project information from JSON
@@ -58,48 +56,24 @@ def coverage_plot(amino_csv,
     paths = []
 
     MAX_COVERAGE = 1000000
-    fontsize = 8
     axis_formatter = FuncFormatter(lambda x, p: format(int(x), ','))
     _fig, ax = plt.subplots(figsize=(4, 3), dpi=100)
     for (seed, region), group in itertools.groupby(reader, itemgetter('seed',
                                                                       'region')):
-        coverage_counts = Counter()
-        stop_counts = Counter()
-        low_quality_counts = Counter()
-        deletion_counts = Counter()
-        partial_counts = Counter()
-        insertion_counts = Counter()
-        clipping_counts = Counter()
+        counts = Counter()
         for row in group:
             pos = int(row['refseq.aa.pos'])
-            deletion_count = int(row['del'])
             total = sum([int(row[aa]) for aa in aln2counts.AMINO_ALPHABET])
-            total += deletion_count
-            coverage_counts[pos] = total
-            stop_counts[pos] = int(row['*'])
-            low_quality_counts[pos] = int(row['X'])
-            deletion_counts[pos] = deletion_count
-            partial_counts[pos] = int(row['partial'])
-            insertion_counts[pos] = int(row['ins'])
-            clipping_counts[pos] = int(row['clip'])
+            counts[pos] = total
             qcut = row['q-cutoff']
         # use region to retrieve coordinate reference
-        for project_region in projects.getProjectRegions(
-                seed,
-                region,
-                excluded_projects=excluded_projects):
+        for project_region in projects.getProjectRegions(seed, region):
             min_coverage = None
             min_coverage_pos = None
             project_name = project_region['project_name']
             region_length = project_region['coordinate_region_length']
             x = range(1, region_length+1)
-            y_coverage = [coverage_counts[pos] for pos in x]
-            y_stops = [stop_counts[pos] for pos in x]
-            y_low_quality = [low_quality_counts[pos] for pos in x]
-            y_deletions = [deletion_counts[pos] for pos in x]
-            y_partials = [partial_counts[pos] for pos in x]
-            y_insertions = [insertion_counts[pos] for pos in x]
-            y_clipping = [clipping_counts[pos] for pos in x]
+            y = [counts[pos] for pos in x]
 
             key_positions = project_region['key_positions']
             if not key_positions:
@@ -111,7 +85,7 @@ def coverage_plot(amino_csv,
                 if end is None:
                     end = start
                 for pos in range(start, end+1):
-                    count = coverage_counts[pos]
+                    count = counts[pos]
                     if min_coverage is None or count < min_coverage:
                         min_coverage = count
                         min_coverage_pos = pos
@@ -120,10 +94,8 @@ def coverage_plot(amino_csv,
                 ax.add_patch(patches.Rectangle(xy=(start, 50),
                                                width=end-start,
                                                height=150,
-                                               fc='black',
-                                               ec='grey',
-                                               zorder=50,
-                                               alpha=.5))
+                                               fc='grey',
+                                               ec='grey'))
             if min_coverage <= project_region['min_coverage1']:
                 coverage_score_on = 1
             elif min_coverage <= project_region['min_coverage2']:
@@ -132,7 +104,7 @@ def coverage_plot(amino_csv,
                 coverage_score_on = 3
             else:
                 coverage_score_on = 4
-            max_coverage = max(y_coverage)
+            max_coverage = max(y)
             if max_coverage == 0:
                 coverage_score_off = 0
             elif max_coverage <= 10:
@@ -141,43 +113,36 @@ def coverage_plot(amino_csv,
                 coverage_score_off = -2
             else:
                 coverage_score_off = -3
-            plt.step(x, y_deletions, where='mid', label='deletions', zorder=100)
-            plt.step(x, y_stops, where='mid', label='stop codons', zorder=101)
-            plt.step(x, y_coverage, linewidth=2, where='mid', label='coverage', zorder=102)
-            plt.step(x, y_partials, where='mid', label='partial dels', zorder=99)
-            plt.step(x, y_clipping, where='mid', label='soft clipped', zorder=98)
-            plt.step(x, y_insertions, where='mid', label='insertions', zorder=97)
-            plt.step(x, y_low_quality, where='mid', label='low quality', zorder=96)
-            plt.legend(loc='best', fontsize=fontsize, fancybox=True)
-            left_margin = -region_length / 25.0
+            plt.step(x, y, linewidth=2, where='mid')
+            left_margin = -region_length / 50.0
             plt.xlim([left_margin, region_length])
             plt.ylim([0.5, MAX_COVERAGE])
             plt.yscale('log')
             ax.yaxis.set_major_formatter(axis_formatter)
-            plt.tick_params(axis='both', labelsize=fontsize)
-            ax.add_patch(patches.Rectangle(xy=(left_margin*0.5, 0),
-                                           width=-left_margin*0.4,
+            plt.tick_params(axis='both', labelsize=8)
+            ax.add_patch(patches.Rectangle(xy=(left_margin, 0),
+                                           width=-left_margin,
                                            height=10,
                                            fc='black',
                                            ec='black'))
-            ax.add_patch(patches.Rectangle(xy=(left_margin*0.5, 10),
-                                           width=-left_margin*0.4,
+            ax.add_patch(patches.Rectangle(xy=(left_margin, 10),
+                                           width=-left_margin,
                                            height=40,
                                            fc='red',
                                            ec='red'))
-            ax.add_patch(patches.Rectangle(xy=(left_margin*0.5, 50),
-                                           width=-left_margin*0.4,
+            ax.add_patch(patches.Rectangle(xy=(left_margin, 50),
+                                           width=-left_margin,
                                            height=50,
                                            fc='yellow',
                                            ec='yellow'))
-            ax.add_patch(patches.Rectangle(xy=(left_margin*0.5, 100),
-                                           width=-left_margin*0.4,
+            ax.add_patch(patches.Rectangle(xy=(left_margin, 100),
+                                           width=-left_margin,
                                            height=MAX_COVERAGE-100,
                                            fc='lightgreen',
                                            ec='lightgreen'))
-            plt.plot((1, region_length), (100, 100), 'k--', zorder=51)
+            plt.plot((1, region_length), (100, 100), 'k--')
             plt.xlabel('Reference coordinates (AA)', fontsize=9)
-            plt.ylabel('Read count', fontsize=9)
+            plt.ylabel('Coverage', fontsize=9)
             plt.tight_layout()
             figname_parts = [project_name, region, filetype]
             if coverage_maps_prefix:
@@ -250,10 +215,10 @@ elif __name__ == '__live_coding__':
         print(test_results.errors)
         print(test_results.failures)
     else:
-        amino_path = '../tests/working/2110A-V3LOOP_S13.amino.csv'
-        coverage_scores_path = '../tests/working/2110A-V3LOOP_S13.coverage_scores.csv'
+        amino_path = '../tests/working/1234A-V3LOOP_S1.amino.csv'
+        coverage_scores_path = '../tests/working/1234A-V3LOOP_S1.coverage_scores.csv'
         coverage_maps_path = '../tests/working/coverage_maps'
-        coverage_maps_prefix = '2110A-V3LOOP_S13'
+        coverage_maps_prefix = '1234A-V3LOOP_S1'
         make_tar_path(coverage_maps_path)
 
         with open(amino_path, 'rU') as amino_csv, \

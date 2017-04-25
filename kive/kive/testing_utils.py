@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import logging
 import hashlib
+import time
 
 from django.contrib.auth.models import User
 from django.core.files import File
@@ -22,6 +23,7 @@ from archive.models import RunStep, ExecLog, MethodOutput
 from datachecking.models import VerificationLog
 from portal.models import StagedFile
 from fleet.workers import Manager
+from fleet.slurmlib import DummySlurmScheduler
 
 
 samplecode_path = "../samplecode"
@@ -908,7 +910,7 @@ def create_removal_test_environment():
     # - a Method using that CDT
     # - a Pipeline containing that Method
     # - two Runs from that pipeline, the second reusing the first
-    remover = User.objects.create_user("Rem Over", "rem@over.sucks", "baleeted")
+    remover = User.objects.create_user("RemOver", "rem@over.sucks", "baleeted")
     remover.save()
     remover.groups.add(everyone_group())
     remover.save()
@@ -1887,8 +1889,23 @@ cat "$1" | cut -d ',' -f 2 | tr 'T' 'U' | paste -d, "$1" - | cut -d ',' -f 1,3 >
     file_access_utils.configure_sandbox_permissions(tmpdir)
 
     outfile = os.path.join(tmpdir, "output")
-    complement_popen = case.method_complement.invoke_code(tmpdir, [case.datafile.name], [outfile])
-    complement_popen.wait()
+    stdout_path = os.path.join(tmpdir, "stdout.txt")
+    stderr_path = os.path.join(tmpdir, "stderr.txt")
+
+    # Run this code using the DummySlurmScheduler; it returns a SlurmJobHandle
+    # and the job should be done.
+    case.method_complement.install(tmpdir)
+    complement_sjh = case.method_complement.submit_code(
+        tmpdir,
+        [case.datafile.name],
+        [outfile],
+        stdout_path,
+        stderr_path,
+        slurm_sched_class=DummySlurmScheduler
+    )
+    while complement_sjh.get_state() != DummySlurmScheduler.COMPLETED:
+        time.sleep(1)
+
     case.labdata_compd_md5 = file_access_utils.compute_md5(open(outfile))
     shutil.rmtree(tmpdir)
 

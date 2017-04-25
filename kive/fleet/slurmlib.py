@@ -33,7 +33,9 @@ class SlurmJobHandle:
         self.slurm_sched_class = slurm_sched_class
 
     def get_state(self):
-        """ Get the current state of this job.
+        """
+        Get the current state of this job.
+
         The 'jobstate': value can be one of the predefined constants
         defined in SlurmScheduler:
 
@@ -815,9 +817,9 @@ class SlurmScheduler(BaseSlurmScheduler):
         cable_execute_dict_path = cls._dump_json(cable_dir,
                                                  "cable_info",
                                                  cable_info.dict_repr())
-        cable_cmd = os.path.join(settings.KIVE_HOME, MANAGE_PY)
-        cable_args = " ".join([settings.CABLE_HELPER_COMMAND] +
-                              cls.fleet_settings + [cable_execute_dict_path])
+        cable_cmd = re.escape(os.path.join(settings.KIVE_HOME, MANAGE_PY))
+        cable_args_list = [settings.CABLE_HELPER_COMMAND] + cls.fleet_settings + [cable_execute_dict_path]
+        cable_args = " ".join([re.escape(x) for x in cable_args_list])
         cable_exec_path = cls._create_wrapperfile(cable_dir, "cable",
                                                   settings.SANDBOX_CABLE_PREAMBLE or "",
                                                   cable_cmd, cable_args)
@@ -848,8 +850,9 @@ class SlurmScheduler(BaseSlurmScheduler):
         step_dir = step_info.step_run_dir
         step_execute_dict_path = cls._dump_json(step_dir, "step_info", step_info.dict_repr())
 
-        step_cmd = os.path.join(settings.KIVE_HOME, MANAGE_PY)
-        step_args = " ".join([settings.STEP_HELPER_COMMAND] + cls.fleet_settings + [step_execute_dict_path])
+        step_cmd = re.escape(os.path.join(settings.KIVE_HOME, MANAGE_PY))
+        step_args_list = [settings.STEP_HELPER_COMMAND] + cls.fleet_settings + [step_execute_dict_path]
+        step_args = " ".join([re.escape(x) for x in step_args_list])
         step_exec_path = cls._create_wrapperfile(step_dir, "setup",
                                                  settings.SANDBOX_SETUP_PREAMBLE or "",
                                                  step_cmd, step_args)
@@ -881,9 +884,9 @@ class SlurmScheduler(BaseSlurmScheduler):
         if info_path is None:
             step_execute_dict_path = cls._dump_json(step_dir, "step_info", step_info.dict_repr())
 
-        book_cmd = os.path.join(settings.KIVE_HOME, MANAGE_PY)
-        book_args = " ".join([settings.STEP_HELPER_COMMAND, "--bookkeeping"] +
-                             cls.fleet_settings + [step_execute_dict_path])
+        book_cmd = re.escape(os.path.join(settings.KIVE_HOME, MANAGE_PY))
+        book_args_list = [settings.STEP_HELPER_COMMAND, "--bookkeeping"] + cls.fleet_settings + [step_execute_dict_path]
+        book_args = " ".join([re.escape(x) for x in book_args_list])
         book_exec_path = cls._create_wrapperfile(step_dir, "book",
                                                  settings.SANDBOX_BOOKKEEPING_PREAMBLE or "",
                                                  book_cmd, book_args)
@@ -918,8 +921,11 @@ def startit(wdir, dname, arglst, stdout, stderr):
     NOTE: shell MUST be False here, otherwise the popen.wait() will NOT wait
     for completion of the command.
     """
-    act_cmdstr = "cd {}; {} {}".format(wdir, os.path.join(wdir, dname), " ".join(arglst))
-    cclst = ["/bin/bash", "-c", '%s' % act_cmdstr]
+    act_cmdstr = "cd {}; {} {}".format(
+        re.escape(wdir),
+        re.escape(os.path.join(wdir, dname)),
+        " ".join([re.escape(x) for x in arglst]))
+    cclst = ["/bin/bash", "-c", '{}'.format(act_cmdstr)]
     p = sp.Popen(cclst, shell=False, stdout=stdout, stderr=stderr)
     return p
 

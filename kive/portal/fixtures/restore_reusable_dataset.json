@@ -12,10 +12,10 @@
         "fields": {
             "_redacted": null, 
             "_runcomponentstate": 3, 
-            "end_time": "2000-01-01T00:00:34Z", 
+            "end_time": "2000-01-01T00:00:11Z", 
             "execrecord": 2, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:32Z"
+            "start_time": "2000-01-01T00:00:01Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 1
@@ -24,10 +24,10 @@
         "fields": {
             "_redacted": null, 
             "_runcomponentstate": 3, 
-            "end_time": "2000-01-01T00:00:35Z", 
+            "end_time": "2000-01-01T00:00:24Z", 
             "execrecord": 4, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:34Z"
+            "start_time": "2000-01-01T00:00:13Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 2
@@ -36,10 +36,10 @@
         "fields": {
             "_redacted": null, 
             "_runcomponentstate": 3, 
-            "end_time": "2000-01-01T00:00:05Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execrecord": 1, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:32Z"
+            "start_time": "2000-01-01T00:00:01Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 3
@@ -48,10 +48,10 @@
         "fields": {
             "_redacted": null, 
             "_runcomponentstate": 3, 
-            "end_time": "2000-01-01T00:00:34Z", 
+            "end_time": "2000-01-01T00:00:13Z", 
             "execrecord": 3, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:34Z"
+            "start_time": "2000-01-01T00:00:13Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 4
@@ -60,10 +60,10 @@
         "fields": {
             "_redacted": null, 
             "_runcomponentstate": 3, 
-            "end_time": "2000-01-01T00:00:36Z", 
+            "end_time": "2000-01-01T00:00:26Z", 
             "execrecord": 5, 
             "reused": false, 
-            "start_time": "2000-01-01T00:00:36Z"
+            "start_time": "2000-01-01T00:00:25Z"
         }, 
         "model": "archive.runcomponent", 
         "pk": 5
@@ -110,50 +110,50 @@
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:05Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "invoking_record": 3, 
             "record": 3, 
-            "start_time": "2000-01-01T00:00:32Z"
+            "start_time": "2000-01-01T00:00:01Z"
         }, 
         "model": "archive.execlog", 
         "pk": 1
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:33Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "invoking_record": 1, 
             "record": 1, 
-            "start_time": "2000-01-01T00:00:33Z"
+            "start_time": "2000-01-01T00:00:01Z"
         }, 
         "model": "archive.execlog", 
         "pk": 2
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:34Z", 
+            "end_time": "2000-01-01T00:00:13Z", 
             "invoking_record": 4, 
             "record": 4, 
-            "start_time": "2000-01-01T00:00:34Z"
+            "start_time": "2000-01-01T00:00:13Z"
         }, 
         "model": "archive.execlog", 
         "pk": 3
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:35Z", 
+            "end_time": "2000-01-01T00:00:14Z", 
             "invoking_record": 2, 
             "record": 2, 
-            "start_time": "2000-01-01T00:00:06Z"
+            "start_time": "2000-01-01T00:00:13Z"
         }, 
         "model": "archive.execlog", 
         "pk": 4
     }, 
     {
         "fields": {
-            "end_time": "2000-01-01T00:00:36Z", 
+            "end_time": "2000-01-01T00:00:25Z", 
             "invoking_record": 5, 
             "record": 5, 
-            "start_time": "2000-01-01T00:00:36Z"
+            "start_time": "2000-01-01T00:00:25Z"
         }, 
         "model": "archive.execlog", 
         "pk": 5
@@ -162,10 +162,11 @@
         "fields": {
             "are_checksums_OK": true, 
             "code_redacted": false, 
-            "error_log": "Logs/step1_stderr.txt", 
+            "error_log": "Logs/step1_stderr_slurmIDJ_nodeN.txt", 
             "error_redacted": false, 
             "execlog": 2, 
-            "output_log": "Logs/step1_stdout.txt", 
+            "install_failed": false, 
+            "output_log": "Logs/step1_stdout_slurmIDJ_nodeN.txt", 
             "output_redacted": false, 
             "return_code": 0
         }, 
@@ -176,10 +177,11 @@
         "fields": {
             "are_checksums_OK": true, 
             "code_redacted": false, 
-            "error_log": "Logs/step2_stderr.txt", 
+            "error_log": "Logs/step2_stderr_slurmIDJ_nodeN.txt", 
             "error_redacted": false, 
             "execlog": 4, 
-            "output_log": "Logs/step2_stdout.txt", 
+            "install_failed": false, 
+            "output_log": "Logs/step2_stdout_slurmIDJ_nodeN.txt", 
             "output_redacted": false, 
             "return_code": 0
         }, 
@@ -590,16 +592,16 @@
     }, 
     {
         "fields": {
-            "x": 0.857142857142857, 
-            "y": 0.857142857142857
+            "x": 0.571428571428571, 
+            "y": 0.571428571428571
         }, 
         "model": "transformation.transformationxput", 
         "pk": 10
     }, 
     {
         "fields": {
-            "x": 0.571428571428571, 
-            "y": 0.571428571428571
+            "x": 0.857142857142857, 
+            "y": 0.857142857142857
         }, 
         "model": "transformation.transformationxput", 
         "pk": 11
@@ -687,8 +689,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 2, 
-            "dataset_name": "total_products", 
+            "dataset_idx": 1, 
+            "dataset_name": "total_sums", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -696,8 +698,8 @@
     }, 
     {
         "fields": {
-            "dataset_idx": 1, 
-            "dataset_name": "total_sums", 
+            "dataset_idx": 2, 
+            "dataset_name": "total_products", 
             "transformation": 5
         }, 
         "model": "transformation.transformationoutput", 
@@ -707,18 +709,19 @@
         "fields": {
             "_runstate": 3, 
             "description": "", 
-            "end_time": "2000-01-01T00:00:07Z", 
+            "end_time": "2000-01-01T00:00:27Z", 
             "groups_allowed": [], 
             "name": "", 
             "parent_runstep": null, 
             "paused_by": null, 
             "pipeline": 4, 
+            "priority": 0, 
             "purged": true, 
             "runbatch": null, 
-            "sandbox_path": "/home/walter/kivemediaroot/Sandboxes/userkive_run1_3_uvSx", 
-            "start_time": "2000-01-01T00:00:32Z", 
+            "sandbox_path": "/home/rliang/Documents/Kive/media/Sandboxes/userkive_run1_NI801W", 
+            "start_time": "2000-01-01T00:00:01Z", 
             "stopped_by": null, 
-            "time_queued": "2016-10-19T16:31:57.766Z", 
+            "time_queued": "2017-04-25T01:00:10.181Z", 
             "user": 1, 
             "users_allowed": []
         }, 
@@ -729,8 +732,8 @@
         "fields": {
             "MD5_checksum": "e093c9eac5d0cae832d4e2071ccfdc5f", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_10/pairs.csv", 
-            "date_created": "2000-01-01T00:00:01Z", 
+            "dataset_file": "Datasets/2017_04/pairs.csv", 
+            "date_created": "2000-01-01T00:00:00Z", 
             "description": "", 
             "external_path": "", 
             "externalfiledirectory": null, 
@@ -738,7 +741,7 @@
             "groups_allowed": [
                 1
             ], 
-            "last_time_checked": "2016-10-19T16:31:57.577Z", 
+            "last_time_checked": "2017-04-25T01:00:10.167Z", 
             "name": "pairs", 
             "user": 1, 
             "users_allowed": []
@@ -748,16 +751,16 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "b58d1b348e496403d03ce2d635b4589f", 
+            "MD5_checksum": "44c997f011190635c1e8e618b330a452", 
             "_redacted": false, 
             "dataset_file": "", 
-            "date_created": "2000-01-01T00:00:33Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-10-19 16:32:28.086600+00:00 by kive\nrun: 1\nuser: kive\nstep: 1\noutput: sums_and_products", 
+            "date_created": "2000-01-01T00:00:11Z", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2017-04-25 01:00:10.287539+00:00 by kive\nrun: 1\nuser: kive\nstep: 1\noutput: sums_and_products", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 1, 
             "groups_allowed": [], 
-            "last_time_checked": "2016-10-19T16:32:29.611Z", 
+            "last_time_checked": "2017-04-25T01:00:20.441Z", 
             "name": "run1_step1_outputsums_and_products", 
             "user": 1, 
             "users_allowed": []
@@ -767,16 +770,16 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "ba9d3a9e10d9f54046b7f0199a284b86", 
+            "MD5_checksum": "e237ca8bb33ea0dd3f8d6bb8d1ede977", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2016_10/step2_total_sums.raw", 
-            "date_created": "2000-01-01T00:00:35Z", 
-            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2016-10-19 16:32:28.086600+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
+            "dataset_file": "Datasets/2017_04/step2_total_sums.raw", 
+            "date_created": "2000-01-01T00:00:23Z", 
+            "description": "Generated data from a run of pipeline \"sums and products:1 (sums only)\" started at 2017-04-25 01:00:10.287539+00:00 by kive\nrun: 1\nuser: kive\nstep: 2\noutput: total_sums", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": 2, 
             "groups_allowed": [], 
-            "last_time_checked": "2016-10-19T16:32:31.428Z", 
+            "last_time_checked": "2017-04-25T01:00:32.762Z", 
             "name": "run1_step2_outputtotal_sums", 
             "user": 1, 
             "users_allowed": []
@@ -1087,9 +1090,9 @@
     {
         "fields": {
             "dataset": 2, 
-            "end_time": "2000-01-01T00:00:33Z", 
+            "end_time": "2000-01-01T00:00:11Z", 
             "execlog": 2, 
-            "start_time": "2000-01-01T00:00:33Z", 
+            "start_time": "2000-01-01T00:00:11Z", 
             "user": 1
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1098,9 +1101,9 @@
     {
         "fields": {
             "dataset": 3, 
-            "end_time": "2000-01-01T00:00:35Z", 
+            "end_time": "2000-01-01T00:00:24Z", 
             "execlog": 4, 
-            "start_time": "2000-01-01T00:00:35Z", 
+            "start_time": "2000-01-01T00:00:24Z", 
             "user": 1
         }, 
         "model": "datachecking.contentchecklog", 
@@ -1109,14 +1112,40 @@
     {
         "fields": {
             "dataset": 1, 
-            "end_time": "2000-01-01T00:00:32Z", 
+            "end_time": "2000-01-01T00:00:01Z", 
             "execlog": null, 
             "read_failed": false, 
             "runcomponent": 3, 
-            "start_time": "2000-01-01T00:00:32Z", 
+            "start_time": "2000-01-01T00:00:01Z", 
             "user": 1
         }, 
         "model": "datachecking.integritychecklog", 
         "pk": 1
+    }, 
+    {
+        "fields": {
+            "dataset": 2, 
+            "end_time": "2000-01-01T00:00:11Z", 
+            "execlog": 2, 
+            "read_failed": false, 
+            "runcomponent": null, 
+            "start_time": "2000-01-01T00:00:11Z", 
+            "user": 1
+        }, 
+        "model": "datachecking.integritychecklog", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "dataset": 3, 
+            "end_time": "2000-01-01T00:00:24Z", 
+            "execlog": 4, 
+            "read_failed": false, 
+            "runcomponent": null, 
+            "start_time": "2000-01-01T00:00:24Z", 
+            "user": 1
+        }, 
+        "model": "datachecking.integritychecklog", 
+        "pk": 3
     }
 ]

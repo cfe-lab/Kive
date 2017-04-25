@@ -28,7 +28,7 @@ from pipeline.models import PipelineFamily
 import portal.models
 import sandbox.tests
 from fleet.workers import Manager
-from fleet.test_slurmscheduler import execute_simple_run, execute_nested_run
+from fleet.tests_slurmscheduler import execute_simple_run, execute_nested_run
 
 
 class FixtureBuilder(object):

@@ -1204,7 +1204,7 @@ class CodeResourceRevisionSerializerTests(TestCase):
 
     def setUp(self):
         # This user is defined in the removal fixture.
-        self.remover = User.objects.get(username="Rem Over")
+        self.remover = User.objects.get(username="RemOver")
         crr_test_setup(self)
 
     def tearDown(self):
@@ -1262,7 +1262,7 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
 
     def setUp(self):
         # This user is defined in the removal fixture.
-        self.remover = User.objects.get(username="Rem Over")
+        self.remover = User.objects.get(username="RemOver")
         super(CodeResourceRevisionApiTests, self).setUp()
 
         self.list_path = reverse("coderesourcerevision-list")

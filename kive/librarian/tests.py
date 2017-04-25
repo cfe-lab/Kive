@@ -491,7 +491,7 @@ class RemovalTests(TestCase):
     def setUp(self):
         install_fixture_files("removal")
 
-        self.remover = User.objects.get(username="Rem Over")
+        self.remover = User.objects.get(username="RemOver")
         self.noop_plf = PipelineFamily.objects.get(name="Nucleotide Sequence Noop")
         self.noop_pl = self.noop_plf.members.get(revision_name="v1")
         self.first_run = self.noop_pl.pipeline_instances.order_by("start_time").first()

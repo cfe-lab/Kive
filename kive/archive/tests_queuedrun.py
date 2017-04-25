@@ -302,7 +302,7 @@ class GarbageCollectionTest(TestCase):
 
         self.assertRaisesRegexp(
             SandboxActiveException,
-            re.escape("Run (pk={}, Pipeline={}, queued {}, User=Rem Over) has no sandbox path".format(
+            re.escape("Run (pk={}, Pipeline={}, queued {}, User=RemOver) has no sandbox path".format(
                 run.id,
                 self.noop_pl,
                 run.time_queued)),
@@ -318,7 +318,7 @@ class GarbageCollectionTest(TestCase):
 
         self.assertRaisesRegexp(
             SandboxActiveException,
-            re.escape("Run (pk={}, Pipeline={}, queued {}, User=Rem Over) is not finished".format(
+            re.escape("Run (pk={}, Pipeline={}, queued {}, User=RemOver) is not finished".format(
                 run.id,
                 self.noop_pl,
                 run.time_queued)),
