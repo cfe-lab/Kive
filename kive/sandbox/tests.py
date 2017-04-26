@@ -3,6 +3,7 @@ import re
 import sys
 import tempfile
 import shutil
+import glob
 
 from mock import call, patch
 
@@ -29,6 +30,7 @@ import file_access_utils
 
 
 def execute_tests_environment_setup(case):
+    print "FOOOOOOBAR {}".format(settings.MEDIA_ROOT)
     # Users + method/pipeline families
     case.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
     case.myUser.save()
@@ -1450,29 +1452,13 @@ class ExecuteTests(ExecuteTestsBase):
 class ExecuteSandboxPathWithSpacesTests(ExecuteTestsBase):
 
     def setUp(self):
-        self.media_root_original = settings.MEDIA_ROOT
-        # Create this directory/probe that it exists.
-        try:
-            os.mkdir(settings.MEDIA_ROOT)
-        except OSError:
-            # It already exists.
-            pass
-
-        # Make a temporary directory whose name has spaces in it.
-        self.base_with_spaces = tempfile.mkdtemp(
-            suffix="Extra Folder With Spaces",
-            dir=self.media_root_original
-        )
-        # The value of MEDIA_ROOT must end with a directory named "Testing" to pass
-        # the tests in ExecuteTestsBase.setUp().
-        self.media_root_with_spaces = os.path.join(self.base_with_spaces, "Testing")
-        settings.MEDIA_ROOT = self.media_root_with_spaces
         ExecuteTestsBase.setUp(self)
+        self.sandbox_path_original = settings.SANDBOX_PATH
+        settings.SANDBOX_PATH = "Sandbox path with spaces"
 
     def tearDown(self):
         ExecuteTestsBase.tearDown(self)
-        settings.MEDIA_ROOT = self.media_root_original
-        shutil.rmtree(self.base_with_spaces)
+        settings.SANDBOX_PATH = self.sandbox_path_original
 
     def test_pipeline_sandbox_path_has_spaces(self):
         """Execute a Pipeline in a sandbox that has spaces in the path."""
