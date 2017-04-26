@@ -1451,9 +1451,16 @@ class ExecuteSandboxPathWithSpacesTests(ExecuteTestsBase):
 
     def setUp(self):
         self.media_root_original = settings.MEDIA_ROOT
+        # Create this directory/probe that it exists.
+        try:
+            os.mkdir(settings.MEDIA_ROOT)
+        except OSError:
+            # It already exists.
+            pass
+
         # Make a temporary directory whose name has spaces in it.
         self.base_with_spaces = tempfile.mkdtemp(
-            suffix="Extra\ Folder\ With\ Spaces",
+            suffix="Extra Folder With Spaces",
             dir=self.media_root_original
         )
         # The value of MEDIA_ROOT must end with a directory named "Testing" to pass
@@ -1465,7 +1472,7 @@ class ExecuteSandboxPathWithSpacesTests(ExecuteTestsBase):
     def tearDown(self):
         ExecuteTestsBase.tearDown(self)
         settings.MEDIA_ROOT = self.media_root_original
-        shutil.rmtree(self.media_root_with_spaces)
+        shutil.rmtree(self.base_with_spaces)
 
     def test_pipeline_sandbox_path_has_spaces(self):
         """Execute a Pipeline in a sandbox that has spaces in the path."""
