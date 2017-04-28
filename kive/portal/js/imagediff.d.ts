@@ -6,7 +6,7 @@ import CustomMatcherFactories = jasmine.CustomMatcherFactories;
 type ImageType = HTMLImageElement | HTMLCanvasElement | CanvasRenderingContext2D | ImageData;
 
 declare namespace jasmine {
-    interface Matchers {
+    interface Matchers<T> {
         toImageDiffEqual(compareImg: ImageType, tolerance?: number): boolean;
         toBeImageData(): boolean;
     }
