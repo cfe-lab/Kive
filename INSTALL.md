@@ -459,15 +459,17 @@ of the file on your system: e.g. on CentOS 6 this file is typically in PostgreSQ
 data directory.
 
     sudo vi /etc/postgresql/9.3/main/pg_hba.conf
-    # Add the following line before the default for user postgres or all
+    # Add the following line before the default for user postgres or all:
     local   all             kive                                md5
+    # You may also need a line like the following if you're using an IPv4 local connection:
+    host    all             kive         192.168.1.0/24         md5
     # Then save the file and reload the PostgreSQL configuration
     sudo /etc/init.d/postgresql reload
 
 To test that the `kive` user can connect to the `kive` database, connect
 with `psql` and then exit.
 
-    psql kive kive
+    psql kive kive  # or psql -h [hostname] kive kive if you're using a local IPv4 connection
     \q
 
 Restricted user for running user-submitted code
