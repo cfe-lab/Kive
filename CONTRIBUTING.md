@@ -97,7 +97,7 @@ Once you have set up your production server, this is how to deploy a new release
     so it's important to not let the files' actual locations become desynchronized from the
     stored locations.
     
-    We wrote some rsync scripts to do the backup:
+    We wrote some rsync scripts to do the backup (not provided in the repo):
     
         sudo su kivefleet
         cd ~/bin
@@ -114,8 +114,8 @@ Once you have set up your production server, this is how to deploy a new release
         git checkout tags/vX.Y
 
 7. Check if you need to set any new settings by running
-    `diff kive/settings_default.py kive/settings.py`. Do the same
-    comparison of `hostfile`.
+    `diff kive/settings_default.py kive/settings.py`.
+    
 8. Migrate the database as described in the Creating Database Tables section
     of INSTALL.md, and deploy the static files:
     
@@ -144,7 +144,7 @@ virtualenv based at `~/vkive/`:
 
     On CentOS 7, use `systemctl`:
 
-        sudo systemctl httpd restart
+        sudo systemctl restart httpd
 
 11. Update the Kive API library if needed.
 
@@ -215,6 +215,13 @@ the default settings.  Alternatively, to run the tests with all the default
 settings but with reduced console output:
     
     ./manage.py test --settings kive.settings_test_pg
+    
+All of these options disable some system tests that cover the parts of the
+Pipeline execution code that use Slurm.  To enable the entire suite of tests:
+
+    ./manage.py test --settings kive.settings_test_pg_slurm
+    
+These tests should be run before making a new release.
     
 See [the Django documentation][unit-tests] for details on running specific tests.
 

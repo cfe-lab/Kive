@@ -13,9 +13,7 @@ Before installing Kive, you need to install some other software.
 * psycopg2 (Python library for interfacing with PostgreSQL)
 * scandir (python module for efficient scanning of a filesystem)
 * pytz
-* OpenMPI (optional, for running Kive on a cluster)
-* mpi4py (optional, for running Kive on a cluster)
-* slurm (optional, for running Kive with the slurm workload manager)
+* slurm
 * django-extensions (optional, for creating a UML diagram of the backend
   models used to store all the records in the database)
 * pygraphviz (optional, for the UML diagram)
@@ -172,6 +170,18 @@ to start the service, run the following with root privileges using `sudo`:
     service postgresql initdb  # this creates /var/lib/pgsql
     chkconfig postgresql on  # configures Postgres to run on startup
     /etc/init.d/postgresql start
+    
+#### Installing on CentOS 7
+
+As with CentOS 6, PostgreSQL is best installed on CentOS 7 via `yum`.  
+The procedure for starting it, and for configuring it to run at startup,
+differs, as `systemd` was introduced to replace the old `init.d` system.  
+For example, if you have installed version 9.2 of PostgreSQL,
+run the following with root privileges using `sudo`:
+
+    /usr/pgsql-9.2/bin/postgresql92-setup initdb  # replace with appropriate version number
+    systemctl enable postgresql-9.2.service
+    systemctl start postgresql-9.2
 
 #### Initial configuration
 
@@ -385,30 +395,6 @@ be installed separately before then. Install it using pip:
 
    sudo pip install scandir
 
-Installing OpenMPI and mpi4py
------------------------------
-Test that MPI is installed correctly with this command:
-
-    python -c "from mpi4py import MPI"
-
-### Ubuntu
-
-Just directly install the mpi4py library with
-
-    sudo apt-get install python-mpi4py
-
-This will automatically install the necessary components of OpenMPI.
-
-### CentOS 6.7
-Install `mpi4py` into the `vkive` virtual environment using `pip`.
-
-    pip install mpi4py
-
-There are several versions of MPI available as modules. The only version
-currently compatible with `mpi4py` is 1.6.5.
-
-    module load openmpi/gnu/1.6.5
-
 Project structure
 -----------------
 Download the Kive source code, and install it in a location where the apache
@@ -612,13 +598,6 @@ data in your development environment, you will probably need to set it to
 need to call `./manage.py runserver --insecure`. That lets it serve static
 files.
 
-Another configuration file is `hostfile` in the same folder as `settings.py`.
-Copy `hostfile_default` to `hostfile`, and uncomment the `localhost` line. If
-you want to launch worker processes on multiple hosts, add a line for each host.
-Options are described in the [Open MPI FAQ][mpifaq].
-
-[mpifaq]: http://www.open-mpi.org/faq/?category=running#mpirun-hostfile
-
 #### Enabling Kive to run code as an unprivileged user
 
 Assuming that you've set up an unprivileged user as in the "Restricted user 
@@ -726,6 +705,10 @@ code on a developer workstation.
      you can run
      
         sudo scl enable python27 "./manage.py collectstatic"
+        
+    On CentOS 7, you can simply run
+    
+        sudo ./manage.py collectstatic
 
 2. Clear and re-populate the database with the following command:
 
