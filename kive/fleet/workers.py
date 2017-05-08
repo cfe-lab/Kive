@@ -20,7 +20,7 @@ from django.db import transaction
 from archive.models import Dataset, Run, RunStep, RunSIC, MethodOutput, ExecLog
 import file_access_utils
 from sandbox.execute import Sandbox, sandbox_glob
-import fleet.slurmlib
+from fleet.slurmlib import SlurmScheduler, DummySlurmScheduler, BaseSlurmScheduler
 
 mgr_logger = logging.getLogger("fleet.Manager")
 foreman_logger = logging.getLogger("fleet.Foreman")
@@ -55,7 +55,7 @@ class Manager(object):
             self,
             quit_idle=False,
             history=0,
-            slurm_sched_class=fleet.slurmlib.SlurmScheduler
+            slurm_sched_class=SlurmScheduler
     ):
         # Configure logging so that the process running this keeps its output
         # from writing to the same place as the web server.
@@ -367,7 +367,7 @@ class Manager(object):
                          groups_allowed=None,
                          name=None,
                          description=None,
-                         slurm_sched_class=fleet.slurmlib.DummySlurmScheduler):
+                         slurm_sched_class=DummySlurmScheduler):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
@@ -465,11 +465,17 @@ class Foreman(object):
         terminated_during = ""
         still_running = []
 
+        state_keyword = self.slurm_sched_class.ACC_STATE
+        raw_state_keyword = self.slurm_sched_class.ACC_RAW_STATE_STRING
+        start_keyword = self.slurm_sched_class.ACC_START_TIME
+        end_keyword = self.slurm_sched_class.ACC_END_TIME
+        return_code_keyword = self.slurm_sched_class.ACC_RETURN_CODE
+
         # self.tasks_in_progress may change during this loop, so we iterate over the keys.
         tasks = self.tasks_in_progress.keys()
         for task in tasks:
             task_dict = self.tasks_in_progress[task]
-            terminal_slurm_state = None
+            raw_slurm_state = None
 
             # Check on the status of the jobs.
             if isinstance(task, RunStep):
@@ -478,8 +484,9 @@ class Foreman(object):
                     driver_info = task_accounting_info.get(task_dict["driver"].job_id, None)
 
                     setup_state = None
-                    if setup_info is not None and setup_info["state"] != fleet.slurmlib.BaseSlurmScheduler.UNKNOWN:
-                        setup_state = setup_info["state"]
+                    if setup_info is not None and setup_info[state_keyword] != BaseSlurmScheduler.UNKNOWN:
+                        setup_state = setup_info[state_keyword]
+                        raw_setup_state = setup_info[raw_state_keyword]
 
                     if setup_state is None or setup_state in self.slurm_sched_class.RUNNING_STATES:
                         # This is still going, so we move on.
@@ -488,24 +495,28 @@ class Foreman(object):
                     elif setup_state in self.slurm_sched_class.CANCELLED_STATES:
                         cancelled = True
                         terminated_during = "setup"
-                        terminal_slurm_state = setup_state
+                        raw_slurm_state = raw_setup_state
                     elif setup_state in self.slurm_sched_class.FAILED_STATES:
                         # Something went wrong, so we get ready to bail.
                         failed = True
                         terminated_during = "setup"
-                        terminal_slurm_state = setup_state
+                        raw_slurm_state = raw_setup_state
 
                     else:
                         assert setup_state in self.slurm_sched_class.SUCCESS_STATES, \
-                            "Unexpected Slurm state: {}".format(setup_state)
+                            "Unexpected Slurm state: {} (raw Slurm state: {})".format(
+                                setup_state,
+                                raw_setup_state
+                            )
 
                         # Having reached here, we know that setup is all clear, so check on the driver.
                         # Note that we don't check on whether it's in FAILED_STATES, because
                         # that will be handled in the bookkeeping stage.
                         driver_state = None
                         if (driver_info is not None and
-                                driver_info["state"] != fleet.slurmlib.BaseSlurmScheduler.UNKNOWN):
-                            driver_state = driver_info["state"]
+                                driver_info[state_keyword] != BaseSlurmScheduler.UNKNOWN):
+                            driver_state = driver_info[state_keyword]
+                            raw_driver_state = driver_info[raw_state_keyword]
 
                         if driver_state is None or driver_state in self.slurm_sched_class.RUNNING_STATES:
                             still_running.append(task_dict["driver"])
@@ -514,9 +525,9 @@ class Foreman(object):
                             # This was externally cancelled, so we get ready to bail.
                             cancelled = True
                             terminated_during = "driver"
-                            terminal_slurm_state = driver_state
+                            raw_slurm_state = raw_driver_state
 
-                        elif driver_info["start_time"] is not None and driver_info["end_time"] is not None:
+                        elif driver_info[start_keyword] is not None and driver_info[end_keyword] is not None:
                             # Having reached here, we know that the driver ran to completion,
                             # successfully or no, and has the start and end times properly set.
                             # As such, we remove the wrapped driver if necessary
@@ -532,9 +543,9 @@ class Foreman(object):
                             # so we explicitly retrieve it.
                             task_log = ExecLog.objects.get(record=task)
                             with transaction.atomic():
-                                task_log.start_time = driver_info["start_time"]
-                                task_log.end_time = driver_info["end_time"]
-                                task_log.methodoutput.return_code = driver_info["return_code"]
+                                task_log.start_time = driver_info[start_keyword]
+                                task_log.end_time = driver_info[end_keyword]
+                                task_log.methodoutput.return_code = driver_info[return_code_keyword]
 
                                 step_execute_info = self.sandbox.step_execute_info[(task.parent_run, task.pipelinestep)]
                                 # Find the stdout and stderr log files from their prefixes
@@ -574,7 +585,10 @@ class Foreman(object):
                         else:
                             assert (driver_state in self.slurm_sched_class.FAILED_STATES
                                     or driver_state in self.slurm_sched_class.SUCCESS_STATES), \
-                                "Unexpected Slurm state: {}".format(driver_state)
+                                "Unexpected Slurm state: {} (raw Slurm state: {})".format(
+                                    driver_state,
+                                    raw_driver_state
+                                )
 
                             # The driver is finished, but sacct hasn't properly gotten the start and end times.
                             # For all intents and purposes, this is still running.
@@ -594,8 +608,9 @@ class Foreman(object):
                     # Check on the bookkeeping script.
                     bookkeeping_state = None
                     if (bookkeeping_info is not None and
-                            bookkeeping_info["state"] != fleet.slurmlib.BaseSlurmScheduler.UNKNOWN):
-                        bookkeeping_state = bookkeeping_info["state"]
+                            bookkeeping_info[state_keyword] != BaseSlurmScheduler.UNKNOWN):
+                        bookkeeping_state = bookkeeping_info[state_keyword]
+                        raw_bookkeeping_state = bookkeeping_info[raw_state_keyword]
 
                     if bookkeeping_state is None or bookkeeping_state in self.slurm_sched_class.RUNNING_STATES:
                         still_running.append(task_dict["bookkeeping"])
@@ -603,22 +618,26 @@ class Foreman(object):
                     elif bookkeeping_state in self.slurm_sched_class.CANCELLED_STATES:
                         cancelled = True
                         terminated_during = "bookkeeping"
-                        terminal_slurm_state = bookkeeping_state
+                        raw_slurm_state = raw_bookkeeping_state
                     elif bookkeeping_state in self.slurm_sched_class.FAILED_STATES:
                         # Something went wrong, so we bail.
                         failed = True
                         terminated_during = "bookkeeping"
-                        terminal_slurm_state = bookkeeping_state
+                        raw_slurm_state = raw_bookkeeping_state
                     else:
                         assert bookkeeping_state in self.slurm_sched_class.SUCCESS_STATES, \
-                            "Unexpected Slurm state: {}".format(bookkeeping_state)
+                            "Unexpected Slurm state: {} (raw Slurm state: {})".format(
+                                bookkeeping_state,
+                                raw_bookkeeping_state
+                            )
 
             else:
                 cable_info = task_accounting_info.get(task_dict["cable"].job_id, None)
                 cable_state = None
                 if (cable_info is not None and
-                        cable_info["state"] != fleet.slurmlib.BaseSlurmScheduler.UNKNOWN):
-                    cable_state = cable_info["state"]
+                        cable_info[state_keyword] != BaseSlurmScheduler.UNKNOWN):
+                    cable_state = cable_info[state_keyword]
+                    raw_cable_state = cable_info[raw_state_keyword]
 
                 if cable_state is None or cable_state in self.slurm_sched_class.RUNNING_STATES:
                     # This is still going, so we move on.
@@ -627,21 +646,24 @@ class Foreman(object):
                 elif cable_state in self.slurm_sched_class.CANCELLED_STATES:
                     cancelled = True
                     terminated_during = "cable processing"
-                    terminal_slurm_state = cable_state
+                    raw_slurm_state = raw_cable_state
                 elif cable_state in self.slurm_sched_class.FAILED_STATES:
                     # Something went wrong, so we get ready to bail.
                     failed = True
                     terminated_during = "cable processing"
-                    terminal_slurm_state = cable_state
+                    raw_slurm_state = raw_cable_state
                 else:
                     assert cable_state in self.slurm_sched_class.SUCCESS_STATES, \
-                        "Unexpected Slurm state: {}".format(cable_state)
+                        "Unexpected Slurm state: {} (raw Slurm state: {})".format(
+                            cable_state,
+                            raw_cable_state
+                        )
 
             # Having reached here, we know we're done with this task.
             if failed or cancelled:
                 foreman_logger.error(
                     'Run "%s" (pk=%d, Pipeline: %s, User: %s) %s while handling task %s (pk=%d) during %s '
-                    '(terminal Slurm state: %s)',
+                    '(raw Slurm state: %s)',
                     self.sandbox.run,
                     self.sandbox.run.pk,
                     self.sandbox.pipeline,
@@ -650,7 +672,7 @@ class Foreman(object):
                     task,
                     task.pk,
                     terminated_during,
-                    terminal_slurm_state
+                    raw_slurm_state
                 )
 
                 task.refresh_from_db()
