@@ -469,6 +469,7 @@ class Foreman(object):
         tasks = self.tasks_in_progress.keys()
         for task in tasks:
             task_dict = self.tasks_in_progress[task]
+            terminal_slurm_state = None
 
             # Check on the status of the jobs.
             if isinstance(task, RunStep):
@@ -487,10 +488,12 @@ class Foreman(object):
                     elif setup_state in self.slurm_sched_class.CANCELLED_STATES:
                         cancelled = True
                         terminated_during = "setup"
+                        terminal_slurm_state = setup_state
                     elif setup_state in self.slurm_sched_class.FAILED_STATES:
                         # Something went wrong, so we get ready to bail.
                         failed = True
                         terminated_during = "setup"
+                        terminal_slurm_state = setup_state
 
                     else:
                         assert setup_state in self.slurm_sched_class.SUCCESS_STATES, \
@@ -511,6 +514,7 @@ class Foreman(object):
                             # This was externally cancelled, so we get ready to bail.
                             cancelled = True
                             terminated_during = "driver"
+                            terminal_slurm_state = driver_state
 
                         elif driver_info["start_time"] is not None and driver_info["end_time"] is not None:
                             # Having reached here, we know that the driver ran to completion,
@@ -599,10 +603,12 @@ class Foreman(object):
                     elif bookkeeping_state in self.slurm_sched_class.CANCELLED_STATES:
                         cancelled = True
                         terminated_during = "bookkeeping"
+                        terminal_slurm_state = bookkeeping_state
                     elif bookkeeping_state in self.slurm_sched_class.FAILED_STATES:
                         # Something went wrong, so we bail.
                         failed = True
                         terminated_during = "bookkeeping"
+                        terminal_slurm_state = bookkeeping_state
                     else:
                         assert bookkeeping_state in self.slurm_sched_class.SUCCESS_STATES, \
                             "Unexpected Slurm state: {}".format(bookkeeping_state)
@@ -621,10 +627,12 @@ class Foreman(object):
                 elif cable_state in self.slurm_sched_class.CANCELLED_STATES:
                     cancelled = True
                     terminated_during = "cable processing"
+                    terminal_slurm_state = cable_state
                 elif cable_state in self.slurm_sched_class.FAILED_STATES:
                     # Something went wrong, so we get ready to bail.
                     failed = True
                     terminated_during = "cable processing"
+                    terminal_slurm_state = cable_state
                 else:
                     assert cable_state in self.slurm_sched_class.SUCCESS_STATES, \
                         "Unexpected Slurm state: {}".format(cable_state)
@@ -632,7 +640,8 @@ class Foreman(object):
             # Having reached here, we know we're done with this task.
             if failed or cancelled:
                 foreman_logger.error(
-                    'Run "%s" (pk=%d, Pipeline: %s, User: %s) %s while handling task %s (pk=%d) during %s',
+                    'Run "%s" (pk=%d, Pipeline: %s, User: %s) %s while handling task %s (pk=%d) during %s '
+                    '(terminal Slurm state: %s)',
                     self.sandbox.run,
                     self.sandbox.run.pk,
                     self.sandbox.pipeline,
@@ -640,7 +649,8 @@ class Foreman(object):
                     "failed" if failed else "cancelled",
                     task,
                     task.pk,
-                    terminated_during
+                    terminated_during,
+                    terminal_slurm_state
                 )
 
                 task.refresh_from_db()
