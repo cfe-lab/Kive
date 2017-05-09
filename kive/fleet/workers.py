@@ -168,7 +168,7 @@ class Manager(object):
         num_tasks = len(self.idle_job_queue)
         num_done = 0
         while (time.time() < time_limit) and num_done < num_tasks:
-            mgr_logger.info("Running an idle task....")
+            mgr_logger.debug("Running an idle task....")
             jobtodo = self.idle_job_queue[0]
             jobtodo.send(time_limit)
             self.idle_job_queue.rotate(1)

@@ -288,14 +288,17 @@ For a single workstation installation do:
     sudo apt-get install munge slurm-wlm slurmctld slurm-wlm-basic-plugins
 
 Note that the munge daemon must be running before the other two will successfully start.
-Under various versions of Ubuntu, munge fails to start out of the box, complaining about 
-'group-writable permissions set on "/var/log"'. First, run
+Under various versions of Ubuntu, munge fails to start out of the box,
+[complaining][munge-issue] about 'group-writable permissions set on "/var/log"'. You can
+solve it temporarily by changing the permissions, but a better solution is to configure
+munge to use the syslog. This command will open an editor on the munge configuration file.
+Append `--syslog` to the `ExecStart` line, save, and exit.
 
-    sudo chmod g-w /var/log
+    sudo systemctl edit --system --full munge  
     
 followed by:
 
-    sudo service munge start
+    sudo systemctl start munge
     
 to start the daemon. Do not proceed until munge is running successfully.
 
@@ -386,6 +389,7 @@ c) the 'sinfo' command should show partitions compatible with the above requirem
     up                  sco-fast            3500
 
 
+[munge-issue]: https://github.com/dun/munge/issues/31#issuecomment-127726497
 
 Installing scandir
 ------------------
