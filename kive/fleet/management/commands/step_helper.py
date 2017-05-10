@@ -34,7 +34,7 @@ class Command(BaseCommand):
         # logging will be captured in a file.
         disable_worker_file_logging(worker_logger)
 
-        worker_logger.debug("start time : %f" % time.time())
+        worker_logger.debug("start time: %f" % time.time())
         file_access_utils.confirm_file_created(options["step_execution_info_json"])
         with open(options["step_execution_info_json"], "rb") as f:
             step_execute_dict = json.loads(f.read())
@@ -52,4 +52,4 @@ class Command(BaseCommand):
                 sys.exit(102)
         else:
             Sandbox.step_execution_bookkeeping(step_execute_dict)
-        worker_logger.debug("stop time : %f" % time.time())
+        worker_logger.debug("stop time: %f" % time.time())

@@ -6,6 +6,7 @@ import file_access_utils
 
 import json
 import logging
+import time
 
 worker_logger = logging.getLogger("fleet.Worker")
 
@@ -24,8 +25,10 @@ class Command(BaseCommand):
         # logging will be captured in a file.
         disable_worker_file_logging(worker_logger)
 
+        worker_logger.debug("start time: %f" % time.time())
         file_access_utils.confirm_file_created(options["cable_execution_info_json"])
         with open(options["cable_execution_info_json"], "rb") as f:
             cable_execute_dict = json.loads(f.read())
 
         Sandbox.finish_cable(cable_execute_dict)
+        worker_logger.debug("stop time: %f" % time.time())

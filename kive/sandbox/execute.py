@@ -1545,8 +1545,7 @@ class Sandbox:
             md5 = cable.run_cable(input_dataset_path, output_path, curr_record, curr_log)
         except (OSError, FileCreationError) as e:
             cable_failed = True
-            logger.error("[%d] could not run cable %s to file %s.",
-                         worker_rank,
+            logger.error("could not run cable %s to file %s.",
                          input_dataset_path,
                          output_path,
                          exc_info=True)
