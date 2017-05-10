@@ -3,11 +3,13 @@ body {
 	margin: 0;
 	background: url('/static/portal/bg_tile.png');
 }
-a:link {
+a:link, a.link {
     text-decoration: none;
     color: #4ae;
+    cursor: pointer;
 }
 a:link:hover,
+a.link:hover,
 tr.hover {
     outline: 1px dotted #000;
 }

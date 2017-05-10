@@ -10,7 +10,7 @@
         this.session_page_key = runbatch_pk === null ? "runPage" : "batchPage_" + runbatch_pk;
         this.runbatch_pk = runbatch_pk;
         this.list_url = "/api/runs/status/";
-        this.reload_interval = pollingInterval;
+        this.setReloadInterval(pollingInterval);
         this.create_url = "/api/runs/";
 
         this.registerColumn("Status", function($td, run) {

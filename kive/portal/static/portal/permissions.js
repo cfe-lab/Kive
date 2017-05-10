@@ -31,8 +31,8 @@ var permissions = (function() {
      *  url: if removal_plan or redaction_plan are present, this is used for
      *      DELETE or PATCH requests.
      *  
-     *  Derived classes can also set this.reload_interval in milliseconds for
-     *  the table to continuously poll the server.
+     *  Derived classes can also use this.setReloadInterval to make the table
+     *  continuously poll the server.
      */
     my.PermissionsTable = function($table, is_user_admin, $navigation_links) {
         this.$table = $table;
@@ -43,9 +43,20 @@ var permissions = (function() {
         this.$lockImage = $('<img/>');
         this.$lockSpan = $('<span/>');
 
-        this.$navigation_links = $navigation_links;
         this.page_size = 25;
         this.page = 1;
+
+        if ($navigation_links) {
+            this.$navigation_links = $navigation_links;
+            this.$navigation_links.on('click', '.prev.link', prevLink.bind(this));
+            this.$navigation_links.on('click', '.next.link', nextLink.bind(this));
+            this.$navigation_links.append(
+                $('<span class="record_count"/>'),
+                $('<a class="nav prev">prev</a>'),
+                $('<span class="page_num"/>'),
+                $('<a class="nav next">next</a>')
+            );
+        }
     };
     
     /**
@@ -66,6 +77,28 @@ var permissions = (function() {
             column.data = source;
         }
         this.registered_columns.push(column);
+    };
+
+    /**
+     * Sets the table to refresh per given interval.
+     *
+     * @param interval: the interval at which to poll in ms
+     */
+    my.PermissionsTable.prototype.setReloadInterval = function(interval) {
+        // Schedule reload if it's been requested.
+        if (interval !== undefined) {
+            this.timeout_id = setInterval(this.reloadTable.bind(this), interval);
+        }
+    };
+
+    /**
+     * Stops the reload cycle if present.
+     */
+    my.PermissionsTable.prototype.clearReloadInterval = function() {
+        if (this.timeout_id || this.timeout_id === 0) {
+            clearInterval(this.timeout_id);
+        }
+        this.timeout_id = undefined;
     };
 
     /**
@@ -152,6 +185,7 @@ var permissions = (function() {
     my.PermissionsTable.prototype.buildTable = function(rows) {
         var $tr,
             permissions_table = this,
+            $rows = [],
             lock_icon = this.image_path +
                 (this.is_locked ? '/lock-locked-2x.png' : '/lock-unlocked-2x.png');
 
@@ -160,7 +194,6 @@ var permissions = (function() {
             this.buildHeaders($tr);
             this.$thead = $('<thead/>').append($tr);
             this.$table.append(this.$thead);
-
         }
 
         if (this.$tbody !== undefined) {
@@ -172,21 +205,14 @@ var permissions = (function() {
         }
         this.$lockImage.attr('src', lock_icon);
         this.$lockSpan.text(this.is_locked ? '' : 'Administrator');
+
         $.each(rows, function() {
             var row = this;
             $tr = $('<tr/>');
             permissions_table.buildCells($tr, row);
-            permissions_table.$tbody.append($tr);
+            $rows.push($tr);
         });
-
-        // Schedule reload if it's been requested.
-        if (this.reload_interval !== undefined) {
-            this.timeout_id = setTimeout(
-                function() {
-                    permissions_table.reloadTable();
-                },
-                this.reload_interval);
-        }
+        permissions_table.$tbody.append($rows);
     };
     
     my.PermissionsTable.prototype.buildHeaders = function($tr) {
@@ -214,33 +240,30 @@ var permissions = (function() {
     };
     
     my.PermissionsTable.prototype.buildPermissionCells = function($tr, row) {
-        var $td;
+        var cells = [];
         $.each(this.registered_columns, function() {
             var $td = $('<td/>');
             this.builder($td, row, this.data);
-            $tr.append($td);
+            cells.push($td);
         });
-        $td = $('<td/>');
         if ( ! this.is_locked) {
             if (row.removal_plan !== undefined && row.removal_plan !== null) {
-                $tr.append($('<td/>').append($('<a/>')
+                cells.push($('<td/>').append($('<a/>')
                         .attr('plan', row.removal_plan)
                         .attr('href', row.url)
                         .text('Remove')
                         .click(this, clickRemove)));
             }
             if (row.redaction_plan !== undefined && row.redaction_plan !== null) {
-                $tr.append($('<td/>').append($('<a/>')
+                cells.push($('<td/>').append($('<a/>')
                         .attr('plan', row.redaction_plan)
                         .attr('href', row.url)
                         .text('Redact')
                         .click(this, clickRedact)));
             }
         }
-        if ($td.children().length === 0) {
-            $td.html('&nbsp;');
-        }
-        $tr.append($td);
+        cells.push($('<td>&nbsp;</td>'));
+        $tr.append(cells);
     };
     
     my.PermissionsTable.prototype.toggleLock = function() {
@@ -248,103 +271,86 @@ var permissions = (function() {
         this.reloadTable();
     };
 
-    function navLink(event) {
+    function navLink(event) {// called with bind(), apply(), or call()
         event.preventDefault();
-        var permissions_table = event.data;
         // At this point, the page number has already been incremented/decremented by
         // prevLink or nextLink.
-        permissions_table.reloadTable();
+        this.reloadTable();
     }
 
-    function prevLink(event) {
-        event.data.page = event.data.page - 1;
-        navLink(event);
+    function prevLink(event) {// called with bind(), apply(), or call()
+        this.page = this.page - 1;
+        navLink.call(this, event);
     }
 
-    function nextLink(event) {
-        event.data.page = event.data.page + 1;
-        navLink(event);
+    function nextLink(event) {// called with bind(), apply(), or call()
+        this.page = this.page + 1;
+        navLink.call(this, event);
+    }
+
+    function handleTableUpdate(callback, response) {// called with bind(), apply(), or call()
+        var rows = this.extractRows(response);
+        if (this.$navigation_links !== undefined) {
+            var $nav_links = this.$navigation_links;
+            var $page_num = $nav_links.children('.page_num');
+            var $prev = $nav_links.children('.nav.prev');
+            var $next = $nav_links.children('.nav.next');
+
+            $nav_links.children('.record_count').text(response.count + ' found');
+            if (response.count > this.page_size) {
+                var first_row = this.page_size * (this.page - 1) + 1;
+                var last_row = Math.min(
+                    this.page_size * this.page,
+                    response.count
+                );
+                $page_num.text("Page " + this.page)
+                    .attr("title", first_row + " to " + last_row);
+
+                if ("previous" in response && response.previous !== null) {
+                    $prev.addClass('link').removeClass('nolink');
+                } else {
+                    $prev.addClass('nolink').removeClass('link');
+                }
+                if ("next" in response && response.next !== null) {
+                    $next.addClass('link').removeClass('nolink');
+                } else {
+                    $next.addClass('nolink').removeClass('link');
+                }
+            }
+        }
+        this.buildTable(rows);
+        this.setCaption("");
+        if (typeof callback === 'function') {
+            callback(this);
+        }
+    }
+
+    function handleTableFail(request) {// called with bind(), apply(), or call()
+        var response = request.responseJSON,
+            detail = (
+                response ?
+                    response.detail :
+                    "Failed to reload table");
+        if (this.$tbody !== undefined) {
+            this.$tbody.empty();
+        }
+        this.setCaption(detail);
     }
     
     my.PermissionsTable.prototype.reloadTable = function(callback) {
         var permissions_table = this;
-        if (permissions_table.timeout_id !== undefined) {
-            window.clearTimeout(permissions_table.timeout_id);
-            permissions_table.timeout_id = undefined;
-        }
         if (permissions_table.ajax_request !== undefined) {
             permissions_table.ajax_request.abort();
             permissions_table.ajax_request = undefined;
         }
-
         var query_params = permissions_table.getQueryParams();
         query_params.page_size = permissions_table.page_size;
         query_params.page = permissions_table.page;
 
-        permissions_table.ajax_request = $.getJSON(
-            permissions_table.list_url,
-            query_params).done(function(response) {
-                var rows = permissions_table.extractRows(response);
-
-                if (permissions_table.$navigation_links !== undefined) {
-                    permissions_table.$navigation_links.html(
-                        $('<span class="record_count"/>').text(response.count + " found")
-                    );
-
-                    if (response.count > permissions_table.page_size) {
-
-                        if ("previous" in response && response.previous !== null) {
-                            permissions_table.$navigation_links.append(
-                                $('<a class="nav"/>').attr("href", response.previous)
-                                    .text("prev")
-                                    .click(permissions_table, prevLink)
-                            );
-                        }
-                        else {
-                            permissions_table.$navigation_links.append($('<span class="nolink"/>').text("prev"));
-                        }
-
-                        var first_row = permissions_table.page_size * (permissions_table.page - 1) + 1;
-                        var last_row = Math.min(
-                            permissions_table.page_size * permissions_table.page,
-                            response.count
-                        );
-
-                        permissions_table.$navigation_links.append(
-                            $('<span class="page_num"/>').text("Page " + permissions_table.page)
-                                .attr("title", first_row + " to " + last_row)
-                        );
-
-                        if ("next" in response && response.next !== null) {
-                            permissions_table.$navigation_links.append(
-                                $('<a class="nav"/>').attr("href", response.next)
-                                .text("next")
-                                .click(permissions_table, nextLink)
-                            );
-                        }
-                        else {
-                            permissions_table.$navigation_links.append($('<span class="nolink"/>').text("next"));
-                        }
-                    }
-                }
-
-                permissions_table.buildTable(rows);
-                permissions_table.setCaption("");
-
-                if (typeof callback == 'function') {
-                    callback(permissions_table);
-                }
-            }).fail(function(request) {
-                var response = request.responseJSON,
-                    detail = (
-                            response ?
-                            response.detail :
-                            "Failed to reload table");
-                if (permissions_table.$tbody !== undefined) {
-                    permissions_table.$tbody.empty();
-                }
-                permissions_table.setCaption(detail);
-            }).always(function() {
+        permissions_table.ajax_request = $.getJSON(permissions_table.list_url, query_params)
+            .done(handleTableUpdate.bind(permissions_table, callback))
+            .fail(handleTableFail.bind(permissions_table))
+            .always(function() {
                 permissions_table.ajax_request = undefined;
             });
     };
