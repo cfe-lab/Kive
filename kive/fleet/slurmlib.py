@@ -386,7 +386,7 @@ class SlurmScheduler(BaseSlurmScheduler):
                     stderr_str = "stderr:\n{}".format(f.read())
             except IOError as e:
                 stderr_str = "The stderr log for the sbatch call appears to have been lost!"
-            logger.error(status_report, cmd_lst[0], e.returncode, cmd_lst, e.output, stderr_str,
+            logger.error(status_report, e.returncode, cmd_lst, e.output, stderr_str,
                          exc_info=True)
             raise
 
