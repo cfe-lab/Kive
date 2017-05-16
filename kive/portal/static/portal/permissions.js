@@ -340,8 +340,10 @@ var permissions = (function() {
     my.PermissionsTable.prototype.reloadTable = function(callback) {
         var permissions_table = this;
         if (permissions_table.ajax_request !== undefined) {
-            permissions_table.ajax_request.abort();
-            permissions_table.ajax_request = undefined;
+            // already a reload in progress
+            return;
+            // permissions_table.ajax_request.abort();
+            // permissions_table.ajax_request = undefined;
         }
         var query_params = permissions_table.getQueryParams();
         query_params.page_size = permissions_table.page_size;
