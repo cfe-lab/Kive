@@ -74,11 +74,13 @@ class BaseSlurmScheduler:
     TIMEOUT = "TIMEOUT"
     PENDING = "PENDING"
     WAITING = 'WAITING'
+
+    OOM = 'OOM'
     # include an unknown state (no accounting information available)
     UNKNOWN = 'UNKNOWN'
 
     RUNNING_STATES = set([PENDING, WAITING, RUNNING, COMPLETING, PREEMPTED, RESIZING, SUSPENDED])
-    CANCELLED_STATES = set([CANCELLED, BOOT_FAIL, DEADLINE, NODE_FAIL, TIMEOUT])
+    CANCELLED_STATES = set([CANCELLED, BOOT_FAIL, DEADLINE, NODE_FAIL, TIMEOUT, OOM])
     FAILED_STATES = set([FAILED])
     SUCCESS_STATES = set([COMPLETED])
 
@@ -353,7 +355,8 @@ class SlurmScheduler(BaseSlurmScheduler):
                    "-J", re.escape(job_name), "-p", partname,
                    "-s", "--uid={}".format(user_id),
                    "-c", str(num_cpus),
-                   "--export=PYTHONPATH={}".format(workingdir)]
+                   "--export=PYTHONPATH={}".format(workingdir),
+                   "--export=all"]
         # "--get-user-env",
         if stdoutfile:
             cmd_lst.append("--output=%s" % stdoutfile)
@@ -378,7 +381,10 @@ class SlurmScheduler(BaseSlurmScheduler):
         try:
             with os.fdopen(stderr_fd, "w") as f:
                 out_str = sp.check_output(cmd_lst, stderr=f)
-
+        except OSError:
+            status_report = "failed to execute '%s'" % " ".join(cmd_lst)
+            logger.warning(status_report, exc_info=True)
+            raise
         except sp.CalledProcessError as e:
             status_report = "sbatch returned an error code '%s'\n\nCommand list:\n%s\n\nOutput:\n%s\n\n%s"
             try:
@@ -419,7 +425,10 @@ class SlurmScheduler(BaseSlurmScheduler):
         try:
             with os.fdopen(stderr_fd, "w") as f:
                 sp.check_output(cmd_lst, stderr=f)
-
+        except OSError:
+            status_report = "failed to execute '%s'" % " ".join(cmd_lst)
+            logger.warning(status_report, exc_info=True)
+            raise
         except sp.CalledProcessError as e:
             status_report = "scancel returned an error code '%s'\n\nCommand list:\n%s\n\nOutput:\n%s\n\n%s"
             try:
@@ -452,7 +461,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         is_alive = True
         try:
             cls._do_squeue()
-        except sp.CalledProcessError:
+        except (sp.CalledProcessError, OSError):
             logger.exception("_do_squeue")
             is_alive = False
         logger.info("squeue passed: %s" % is_alive)
@@ -494,8 +503,13 @@ class SlurmScheduler(BaseSlurmScheduler):
         try:
             with os.fdopen(stderr_fd, "w") as f:
                 out_str = sp.check_output(cmd_lst, stderr=f)
-
+        except OSError:
+            # typically happens if the executable cannot execute at all (e.g. not installed)
+            status_report = "failed to execute '%s'" % " ".join(cmd_lst)
+            logger.warning(status_report, exc_info=True)
+            raise
         except sp.CalledProcessError as e:
+            # typically happens if the executable did run, but returned an error
             status_report = "%s returned an error code '%s'\n\nCommand list:\n%s\n\nOutput:\n%s\n\n%s"
             try:
                 with open(stderr_path, "r") as f:
@@ -789,8 +803,11 @@ class SlurmScheduler(BaseSlurmScheduler):
         stderr_fd, stderr_path = tempfile.mkstemp()
         try:
             with os.fdopen(stderr_fd, "w") as f:
-                _ = sp.check_output(cmd_list, stderr=f)
-
+                sp.check_output(cmd_list, stderr=f)
+        except OSError:
+            status_report = "failed to execute '%s'" % " ".join(cmd_list)
+            logger.warning(status_report, exc_info=True)
+            raise
         except sp.CalledProcessError as e:
             status_report = "scontrol returned an error code '%s'\n\nCommand list:\n%s\n\nOutput:\n%s\n\n%s"
             try:
