@@ -701,7 +701,6 @@ $(function() {
     var mainSubmitHandler = function(e) {
         e.preventDefault();
         var serialized_data = serialize();
-
         if (serialized_data) {
             $.ajax(
                 '/api/runbatches/',
@@ -741,7 +740,8 @@ $(function() {
                     users_allowed: [],
                     groups_allowed: [],
                     inputs: [],
-                    name: $('.run-name', row).val()
+                    name: $('.run-name', row).val(),
+		    priority: $('#id_prioselect').val()
                 };
                 $('.input-dataset', row).each(function() {
                     var cell = $(this);

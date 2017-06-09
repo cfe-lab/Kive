@@ -3,6 +3,7 @@ import os
 from django.template.defaultfilters import filesizeformat
 from django.utils import timezone
 from django.contrib.auth.models import User, Group
+from django.conf import settings
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
@@ -391,7 +392,8 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
             'inputs',
             'stopped_by',
             'runbatch',
-            'runbatch_name'
+            'runbatch_name',
+            'priority'
         )
         read_only_fields = (
             "purged",
@@ -422,6 +424,10 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
             raise serializers.ValidationError(
                 'Pipeline inputs must be uniquely specified'
             )
+        # check range of priority level
+        prio = data.get("priority", 0)
+        if not (0 <= prio <= len(settings.SLURM_QUEUES)):
+            raise serializers.ValidationError("Illegal priority level")
 
         errors = RunSerializer.validate_permissions(data)
         if len(errors) > 0:

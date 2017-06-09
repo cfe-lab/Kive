@@ -8,6 +8,7 @@ from django.http import HttpResponse, Http404, HttpResponseRedirect
 from django.template import loader
 from django.views.decorators.http import require_GET
 from django.contrib.auth.models import User, Group
+from django.conf import settings
 
 from rest_framework.renderers import JSONRenderer
 
@@ -18,7 +19,6 @@ from portal.views import admin_check
 from sandbox.forms import RunDetailsForm, RunBatchDetailsForm, StartRunBatchForm
 
 from constants import runstates
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -56,7 +56,8 @@ def _choose_inputs_for_batch(request,
     context = {"inputs": pipeline.inputs.order_by("dataset_idx"),
                "start_form": start_form,
                "input_error_msg": input_error_message,
-               "pipeline": pipeline}
+               "pipeline": pipeline,
+               "priolist": [t[0] for t in settings.SLURM_QUEUES]}
     return HttpResponse(template.render(context, request))
 
 

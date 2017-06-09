@@ -131,18 +131,28 @@
                 <td>
                     <a id="permissions_ctrl" class="button">Manage Permissions</a>
                 </td>
+		<td>
+		  <label>Run Priority:</label>
+		  <select id="id_prioselect" class="button">
+		    <option value="0">         {{priolist.0}}</option>
+		    <option value="1" selected>{{priolist.1}}</option>
+		    <option value="2">         {{priolist.2}}</option>
+		  </select>
+		</td>
+		<td>
+		  <form action="run_pipeline" id="run_pipeline" method="post">
+		    {% csrf_token %}
+		    <input type="submit" id="submit" value="Start Run(s)">
+		    <div class="errortext">{{ name.errors }}</div>
+		    {{ start_form.pipeline }}
+		    <div class="errortext">{{ non_field_errors }}</div>
+		    <div class="errortext">{{ pipeline.errors }}</div>
+		    <div class="error non_field_errors"></div>
+		    <div class="error pipeline-error"></div>
+		  </form>
+		</td>
             </tr>
         </table>
-        <form action="run_pipeline" id="run_pipeline" method="post">
-            {% csrf_token %}
-            <input type="submit" id="submit" value="Start Run(s)">
-            <div class="errortext">{{ name.errors }}</div>
-            {{ start_form.pipeline }}
-            <div class="errortext">{{ non_field_errors }}</div>
-            <div class="errortext">{{ pipeline.errors }}</div>
-            <div class="error non_field_errors"></div>
-            <div class="error pipeline-error"></div>
-        </form>
     </div>
 
     <div id="progress"></div>

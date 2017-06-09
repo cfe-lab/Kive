@@ -789,6 +789,36 @@ class RunSerializerTests(RunSerializerTestBase):
                               self.em_pipeline, 4
                           )])
 
+    def test_validate_illegal_priority(self):
+        """
+        Validation fails if the job's priority is out of bounds (normally 0..2)
+        """
+        serialized_rtp = {
+            "pipeline": self.em_pipeline.pk,
+            "inputs": [
+                {
+                    "dataset": self.triplet_SD.pk,
+                    "index": 1
+                },
+                {
+                    "dataset": self.singlet_SD.pk,
+                    "index": 2
+                },
+                {
+                    "dataset": self.triplet_SD.pk,
+                    "index": 4
+                },
+            ],
+            "users_allowed": [],
+            "groups_allowed": [],
+            "priority": 1001
+        }
+        rtp_serializer = RunSerializer(data=serialized_rtp, context=self.john_context)
+
+        self.assertFalse(rtp_serializer.is_valid())
+        self.assertEquals(rtp_serializer.errors["non_field_errors"],
+                          [u"Illegal priority level"])
+
     def test_validate_input_CDT_incompatible(self):
         """
         Validation fails if an input Dataset is incompatible with the Pipeline input.
