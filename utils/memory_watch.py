@@ -62,8 +62,8 @@ class LogWriter(object):
         for entry in entries:
             prefix = entry['node'] + '_' + entry['mem_node'] + '_'
             prefixes.append(prefix)
-            row[prefix + 'free'] = entry.get('free_mem')
-            row[prefix + 'min'] = entry.get('min_mem')
+            row[prefix + 'free'] = self.format(entry.get('free_mem'))
+            row[prefix + 'min'] = self.format(entry.get('min_mem'))
             row[prefix + 'unexpected'] = entry.get('unexpected')
         if self.writer is None:
             prefixes.sort()
@@ -76,6 +76,11 @@ class LogWriter(object):
             self.writer.writeheader()
         self.writer.writerow(row)
         self.log.flush()
+
+    def format(self, pages):
+        if pages is None:
+            return None
+        return '{:.02f}'.format(pages*4.0/1024/1024)
 
 
 def main():

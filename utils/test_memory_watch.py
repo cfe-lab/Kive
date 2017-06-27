@@ -95,17 +95,17 @@ class LogWriterTest(TestCase):
     def test_simple(self):
         entries = [dict(node='2',
                         mem_node='0',
-                        free_mem=1363343,
-                        min_mem=9891),
+                        free_mem=1024*1024,
+                        min_mem=10*1024),
                    dict(node='3',
                         mem_node='0',
-                        free_mem=2000000,
-                        min_mem=9999)]
+                        free_mem=2*1024*1024,
+                        min_mem=128*1024)]
         time = datetime(2017, 10, 15, 19, 30, 1)
         report = BytesIO()
         expected_report = """\
 time,2_0_min,2_0_free,3_0_min,3_0_free,2_0_unexpected,3_0_unexpected
-2017-10-15 19:30:01,9891,1363343,9999,2000000,,
+2017-10-15 19:30:01,0.04,4.00,0.50,8.00,,
 """
         writer = LogWriter(report)
 
@@ -116,27 +116,27 @@ time,2_0_min,2_0_free,3_0_min,3_0_free,2_0_unexpected,3_0_unexpected
     def test_multiple_times(self):
         entries1 = [dict(node='2',
                          mem_node='0',
-                         free_mem=1363343,
-                         min_mem=9891),
+                         free_mem=262144,  # 1.00GB
+                         min_mem=2621),    # 0.01GB
                     dict(node='3',
                          mem_node='0',
-                         free_mem=2000000,
-                         min_mem=9999)]
+                         free_mem=262144,  # 1.00GB
+                         min_mem=2621)]    # 0.01GB
         entries2 = [dict(node='2',
                          mem_node='0',
-                         free_mem=1363342,
-                         min_mem=9891),
+                         free_mem=267387,  # 1.02GB
+                         min_mem=5242),    # 0.02GB
                     dict(node='3',
                          mem_node='0',
-                         free_mem=1999999,
-                         min_mem=9999)]
+                         free_mem=270008,  # 1.03GB
+                         min_mem=7864)]    # 0.03GB
         time1 = datetime(2017, 10, 15, 19, 30, 1)
         time2 = datetime(2017, 10, 15, 19, 31, 1)
         report = BytesIO()
         expected_report = """\
 time,2_0_min,2_0_free,3_0_min,3_0_free,2_0_unexpected,3_0_unexpected
-2017-10-15 19:30:01,9891,1363343,9999,2000000,,
-2017-10-15 19:31:01,9891,1363342,9999,1999999,,
+2017-10-15 19:30:01,0.01,1.00,0.01,1.00,,
+2017-10-15 19:31:01,0.02,1.02,0.03,1.03,,
 """
         writer = LogWriter(report)
 
@@ -148,23 +148,23 @@ time,2_0_min,2_0_free,3_0_min,3_0_free,2_0_unexpected,3_0_unexpected
     def test_node_missing(self):
         entries1 = [dict(node='2',
                          mem_node='0',
-                         free_mem=1363343,
-                         min_mem=9891),
+                         free_mem=262144,
+                         min_mem=2621),
                     dict(node='3',
                          mem_node='0',
-                         free_mem=2000000,
-                         min_mem=9999)]
+                         free_mem=262144,
+                         min_mem=2621)]
         entries2 = [dict(node='2',
                          mem_node='0',
-                         free_mem=1363342,
-                         min_mem=9891)]
+                         free_mem=262144,
+                         min_mem=2621)]
         time1 = datetime(2017, 10, 15, 19, 30, 1)
         time2 = datetime(2017, 10, 15, 19, 31, 1)
         report = BytesIO()
         expected_report = """\
 time,2_0_min,2_0_free,3_0_min,3_0_free,2_0_unexpected,3_0_unexpected
-2017-10-15 19:30:01,9891,1363343,9999,2000000,,
-2017-10-15 19:31:01,9891,1363342,,,,
+2017-10-15 19:30:01,0.01,1.00,0.01,1.00,,
+2017-10-15 19:31:01,0.01,1.00,,,,
 """
         writer = LogWriter(report)
 
@@ -176,7 +176,7 @@ time,2_0_min,2_0_free,3_0_min,3_0_free,2_0_unexpected,3_0_unexpected
     def test_unexpected(self):
         entries = [dict(node='2',
                         mem_node='0',
-                        free_mem=1363343,
+                        free_mem=262144,
                         unexpected='bogus line\n'),
                    dict(node='3',
                         mem_node='0',
@@ -185,7 +185,7 @@ time,2_0_min,2_0_free,3_0_min,3_0_free,2_0_unexpected,3_0_unexpected
         report = BytesIO()
         expected_report = """\
 time,2_0_min,2_0_free,3_0_min,3_0_free,2_0_unexpected,3_0_unexpected
-2017-10-15 19:30:01,,1363343,,,"bogus line
+2017-10-15 19:30:01,,1.00,,,"bogus line
 ","bogus line 1
 bogus line 2
 "
