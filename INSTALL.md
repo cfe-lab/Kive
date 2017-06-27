@@ -278,7 +278,9 @@ across all machines.
 ### Ubuntu Minimal Setup
 
 The [slurm](http://slurm.schedmd.com/) workload manager can be installed from the
-Ubuntu repositories. The slurm packages in Ubuntu are somewhat in flux at the time of
+Ubuntu repositories, but there seems to be a bug with SlurmDBD accounting. If the
+basic file accounting isn't good enough, install Slurm from source.
+The slurm packages in Ubuntu are somewhat in flux at the time of
 writing, with a transition from `slurm-llnl` to `slurm-wlm` underway. The nomenclature is,
 however, still inconsistent in the installation.
 For Ubuntu 16.04 (xenial xerus), transitionary packages are provided.

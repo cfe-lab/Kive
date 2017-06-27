@@ -17,6 +17,9 @@ from requests.adapters import HTTPAdapter
 
 from kiveapi import KiveAPI
 
+CONFIG_FILE = os.path.expanduser("~/.dump_pipeline.config")
+UNSET = '***'
+
 
 def recent_pipelines(all_pipelines):
     for family, pipelines in groupby(all_pipelines, attrgetter('family')):
@@ -29,8 +32,6 @@ def main():
     logging.basicConfig(level=logging.INFO)
     logging.getLogger('requests.packages.urllib3.connectionpool').setLevel(
         logging.WARN)
-    CONFIG_FILE = os.path.expanduser("~/.dump_pipeline.config")
-    UNSET = '***'
     print 'Starting.'
 
     try:
@@ -93,9 +94,9 @@ def main():
         for dep in method['dependencies']:
             dep['requirement'] = code_resource_revisions[dep['requirement']]
         method['dependencies'].sort(
-            key=lambda dep: (dep['path'],
-                             dep['filename'],
-                             dep['requirement']['coderesource']['filename']))
+            key=lambda x: (x['path'],
+                           x['filename'],
+                           x['requirement']['coderesource']['filename']))
         dump = {'driver': code_resource_revisions[method['driver']]}
         for field in ('groups_allowed',
                       'users_allowed',
@@ -109,13 +110,21 @@ def main():
     pipeline_wrapper = kive.get_pipeline(pipeline_id)
     pipeline = pipeline_wrapper.details
     print 'Dumping {} in {}.'.format(pipeline_wrapper, dump_folder)
-    dump = {}
+    dump = dict(positions=dict(inputs={},
+                               outputs={},
+                               steps={}))
     for input_item in pipeline['inputs']:
+        input_name = input_item['dataset_name']
+        dump['positions']['inputs'][input_name] = dict(x=input_item['x'],
+                                                       y=input_item['y'])
         del input_item['x']
         del input_item['y']
         replace_structure(input_item, compound_datatypes)
     dump['inputs'] = pipeline['inputs']
     for output_item in pipeline['outputs']:
+        output_name = output_item['dataset_name']
+        dump['positions']['outputs'][output_name] = dict(x=output_item['x'],
+                                                         y=output_item['y'])
         del output_item['x']
         del output_item['y']
         del output_item['dataset_idx']
@@ -131,8 +140,11 @@ def main():
     pipeline['outcables'].sort(key=itemgetter('output_idx'))
     dump['outcables'] = pipeline['outcables']
     for step in pipeline['steps']:
+        step_name = step['name']
+        dump['positions']['steps'][step_name] = dict(x=step['x'], y=step['y'])
         del step['x']
         del step['y']
+        step['cables_in'].sort(key=itemgetter('dest_dataset_name'))
         for cable in step['cables_in']:
             del cable['dest']
             del cable['source']
@@ -182,6 +194,7 @@ def main():
 
 class CodeResourceRevision(dict):
     def __init__(self, data, code_resources):
+        super(CodeResourceRevision, self).__init__()
         for field in ('groups_allowed',
                       'users_allowed',
                       'MD5_checksum'):
