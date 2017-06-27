@@ -13,7 +13,7 @@ from time import sleep
 
 def parse_args():
     parser = ArgumentParser(description='Log free memory.')
-    parser.add_argument('-d', '--delay', type=int, default=1)
+    parser.add_argument('-d', '--delay', type=int, default=60)
     parser.add_argument('log', type=FileType('w'))
 
     return parser.parse_args()
@@ -75,6 +75,7 @@ class LogWriter(object):
             self.writer = DictWriter(self.log, columns, lineterminator=os.linesep)
             self.writer.writeheader()
         self.writer.writerow(row)
+        self.log.flush()
 
 
 def main():
