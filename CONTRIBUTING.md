@@ -130,11 +130,10 @@ Once you have set up your production server, this is how to deploy a new release
         sudo mv static_root static
         sudo rm static_root.tar.gz
         
-9. Launch the fleet.  If `kiveuser` is the user account used to run the fleet, and it utilizes a 
-virtualenv based at `~/vkive/`:
+9. Launch the fleet.  This assumes that `kiveuser` is the user account used to run the fleet. The `su -l` will run
+    that user's login scripts that should activate any needed virtual environment:
 
-        sudo su kiveuser
-        source ~/vkive/bin/activate
+        sudo su -l kiveuser
         cd /usr/local/share/Kive/kive
         ./manage.py runfleet &
         
