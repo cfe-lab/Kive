@@ -87,8 +87,10 @@ def main():
     args = parse_args()
     writer = LogWriter(args.log)
     while True:
+        zone_info = check_output(['bpsh', '-1', 'cat', '/proc/zoneinfo'])
+        lines = ['head: ' + line for line in zone_info.splitlines()]
         zone_info = check_output(['bpsh', '-sap', 'cat', '/proc/zoneinfo'])
-        lines = zone_info.splitlines()
+        lines += zone_info.splitlines()
         entries = ZoneInfoScanner(lines)
         writer.write(datetime.now(), entries)
 
