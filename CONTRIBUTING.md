@@ -149,8 +149,10 @@ Once you have set up your production server, this is how to deploy a new release
 
         cd /usr/local/share/Kive/api
         cat setup.py  # look at the new version number
-        python /usr/local/bin/pip show kiveapi  # compare with the installed
+        pip show kiveapi  # compare with the version installed in Python 2
         sudo python setup.py install  # if needed
+        pip3 show kiveapi  # compare with the version installed in Python 3
+        sudo python3 setup.py install  # if needed
 
 12. Remove the pre-release flag from the release.
 13. Close the milestone for this release, create one for the next release, and
@@ -283,5 +285,3 @@ and then run `grunt pngicons` to compile them into the Javascript files.
 
 \* *Recommended*: If `pngquant` is available on your system, Grunt will use
 it to compress the icons.
-
-[nodejs]: https://nodejs.org/download/
