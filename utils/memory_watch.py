@@ -9,6 +9,7 @@ from subprocess import check_output
 
 from datetime import datetime
 from time import sleep
+from traceback import format_exc
 
 
 def parse_args():
@@ -86,15 +87,21 @@ class LogWriter(object):
 def main():
     args = parse_args()
     writer = LogWriter(args.log)
-    while True:
-        zone_info = check_output(['bpsh', '-1', 'cat', '/proc/zoneinfo'])
-        lines = ['head: ' + line for line in zone_info.splitlines()]
-        zone_info = check_output(['bpsh', '-sap', 'cat', '/proc/zoneinfo'])
-        lines += zone_info.splitlines()
-        entries = ZoneInfoScanner(lines)
-        writer.write(datetime.now(), entries)
+    try:
+        while True:
+            zone_info = check_output(['bpsh', '-1', 'cat', '/proc/zoneinfo'])
+            lines = ['head: ' + line for line in zone_info.splitlines()]
+            zone_info = check_output(['bpsh', '-sap', 'cat', '/proc/zoneinfo'])
+            lines += zone_info.splitlines()
+            entries = ZoneInfoScanner(lines)
+            writer.write(datetime.now(), entries)
 
-        sleep(args.delay)
+            sleep(args.delay)
+    except Exception as ex:
+        writer.write(datetime.now(), [dict(node='head',
+                                           mem_node='0',
+                                           unexpected=format_exc())])
+        raise
 
 if __name__ == '__main__':
     main()

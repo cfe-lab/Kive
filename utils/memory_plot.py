@@ -51,11 +51,17 @@ def main():
         times = []
         for i, row in enumerate(reader):
             times.append(parse_date(row['time']))
-            free.append([float(row[name]) for name in free_columns])
+            free.append([float(row[name]) if row[name] != '' else None
+                         for name in free_columns])
     fig, ax = plt.subplots()
     ax.set_title('Memory')
     ax.set_ylabel('Free GB')
-    ax.plot(times, free)
+    lines = ax.plot(times, free)
+    cmap = plt.get_cmap('jet')
+    num_lines = len(free_labels)
+    for i, line in enumerate(lines):
+        line.set_color(cmap(i//2*2.0 / num_lines))
+        line.set_linewidth(i % 2 + 1)
     ax.legend(free_labels,
               loc='best',
               ncol=3)
