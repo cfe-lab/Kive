@@ -3,7 +3,6 @@ import re
 import sys
 import tempfile
 import shutil
-import glob
 
 from mock import call, patch
 
@@ -1810,13 +1809,15 @@ class ExecuteExternalInputTests(ExecuteTestsBase):
 
         # Execute pipeline
         run = Manager.execute_pipeline(self.myUser, self.pX_raw, [external_missing_ds]).get_last_run()
-
+        # 2017-07-11, issue #661: the Manager no longer attempts to run a pipeline with a missing
+        # input -- get_last_run() will return None in this case.
+        self.assertTrue(run is None)
         # The run should be cancelled by the first cable.
-        self.assertTrue(run.is_cancelled())
-        rsic = run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
-        self.assertTrue(rsic.is_cancelled())
-        self.assertTrue(hasattr(rsic, "input_integrity_check"))
-        self.assertTrue(rsic.input_integrity_check.read_failed)
+        # self.assertTrue(run.is_cancelled())
+        # rsic = run.runsteps.get(pipelinestep__step_num=1).RSICs.first()
+        # self.assertTrue(rsic.is_cancelled())
+        # self.assertTrue(hasattr(rsic, "input_integrity_check"))
+        # self.assertTrue(rsic.input_integrity_check.read_failed)
 
     def test_pipeline_external_file_input_corrupted(self):
         """Execution of a pipeline whose input is corrupted."""

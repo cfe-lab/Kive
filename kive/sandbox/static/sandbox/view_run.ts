@@ -72,6 +72,9 @@ var grabStatus: TimerFunction = function() {
                 clearInterval(grabStatus.timer);
             } else if (status.match(/[\+\.:]/)) {
                 status_message.set('In progress', true, true);
+	    } else if (status.indexOf('CANCELLED') >= 0) {
+                status_message.set('CANCELLED', true);
+                clearInterval(grabStatus.timer);
             } else {
                 clearInterval(grabStatus.timer);
             }

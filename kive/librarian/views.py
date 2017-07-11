@@ -17,12 +17,12 @@ from wsgiref.util import FileWrapper
 from django.conf import settings
 from django.utils.encoding import DjangoUnicodeDecodeError
 
-from librarian.forms import DatasetForm, DatasetDetailsForm, BulkAddDatasetForm, BulkDatasetUpdateForm,\
+from librarian.forms import DatasetDetailsForm, BulkAddDatasetForm, BulkDatasetUpdateForm,\
     ArchiveAddDatasetForm
 from archive.models import RunInput
 from librarian.models import Dataset
 from portal.views import admin_check
-from metadata.models import CompoundDatatype
+# from metadata.models import CompoundDatatype
 import librarian.models
 
 LOGGER = logging.getLogger(__name__)
@@ -64,7 +64,10 @@ def dataset_download(request, dataset_id):
     except ObjectDoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
-    with dataset.get_open_file_handle() as data_handle:
+    data_handle = dataset.get_open_file_handle()
+    if data_handle is None:
+        raise Http404("ID {} cannot be accessed (file access)".format(dataset_id))
+    else:
         return _build_download_response(data_handle)
 
 
@@ -168,13 +171,14 @@ def dataset_view(request, dataset_id):
 
         # Test whether this is a binary file or not.
         # Read 1000 characters.
-        with dataset.get_open_file_handle() as data_handle:
-            sample_content = data_handle.read(1000)
-        c.update(
-            {
-                "sample_content": sample_content
-            }
-        )
+        data_handle = dataset.get_open_file_handle()
+        if data_handle is None:
+            c["missing_data_message"] = "Data has been removed or renamed."
+        else:
+            sample_content = ""
+            with data_handle as dh:
+                sample_content = dh.read(1000)
+            c.update({"sample_content": sample_content})
         c["is_binary"] = False
         try:
             rendered_response = t.render(c, request)

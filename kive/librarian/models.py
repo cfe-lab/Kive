@@ -227,12 +227,21 @@ class Dataset(metadata.models.AccessControl):
         and otherwise returns None.
         """
         if self.dataset_file:
-            self.dataset_file.open(mode)
+            try:
+                self.dataset_file.open(mode)
+            except IOError as e:
+                self.logger.warn('error accessing dataset file', e)
+                return None
             return self.dataset_file
         elif self.external_path:
             abs_path = self.external_absolute_path()
             if os.path.exists(abs_path) and os.access(abs_path, os.R_OK):
-                return File(open(abs_path, mode))
+                try:
+                    fhandle = open(abs_path, mode)
+                except IOError as e:
+                    self.logger.warn('error accessing external file', e)
+                    return None
+                return File(fhandle)
         return None
 
     def all_rows(self, data_check=False, insert_at=None, limit=None, extra_errors=None):
@@ -480,13 +489,19 @@ class Dataset(metadata.models.AccessControl):
     def get_formatted_filesize(self):
         unformatted_size = self.get_filesize()
         if unformatted_size is None:
-            return None
+            return 'missing'
         return filesizeformat(unformatted_size)
 
     def compute_md5(self):
-        """Computes the MD5 checksum of the Dataset."""
-        with self.get_open_file_handle() as data_handle:
-            return file_access_utils.compute_md5(data_handle.file)
+        """Computes the MD5 checksum of the Dataset.
+        Return None if the file could not be accessed.
+        """
+        data_handle = self.get_open_file_handle()
+        if data_handle is None:
+            self.logger.warn('cannot access file handle')
+            return None
+        with data_handle.file as ff:
+            return file_access_utils.compute_md5(ff)
 
     def check_md5(self):
         """
@@ -511,7 +526,7 @@ class Dataset(metadata.models.AccessControl):
             return False
         return True
 
-    def has_data(self):
+    def OLDhas_data(self):
         """
         True if an actual dataset file exists; False otherwise.
 
@@ -529,6 +544,9 @@ class Dataset(metadata.models.AccessControl):
             if os.path.exists(abs_path) and os.access(abs_path, os.R_OK):
                 return True
         return False
+
+    def has_data(self):
+        return self.get_open_file_handle() is not None
 
     def has_structure(self):
         """True if associated DatasetStructure exists; False otherwise."""

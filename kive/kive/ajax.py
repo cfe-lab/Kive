@@ -18,7 +18,7 @@ from archive.exceptions import RunNotFinished
 
 def convert_validation(ex):
     """ Convert Django validation error to REST framework validation error """
-    
+
     errors = {}
     for message in ex:
         if message is tuple:
@@ -31,7 +31,7 @@ def convert_validation(ex):
             translated_field = api_settings.NON_FIELD_ERRORS_KEY
             error = message
         errors[translated_field] = error
-    
+
     return serializers.ValidationError(errors)
 
 
@@ -41,7 +41,7 @@ class StandardPagination(PageNumberPagination):
 
 class IsGrantedReadOnly(permissions.BasePermission):
     """ Custom permission for historical resources like runs.
-    
+
     All authenticated users can see instances they have been allowed access to
     either because they own them, they are in users_allowed, or they are in
     groups_allowed.
@@ -50,7 +50,7 @@ class IsGrantedReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
         return (admin_check(request.user) or
                 request.method in permissions.SAFE_METHODS)
-    
+
     def has_object_permission(self, request, view, obj):
         if admin_check(request.user):
             return True
@@ -77,7 +77,7 @@ class IsGrantedReadCreate(permissions.BasePermission):
 
 class IsDeveloperOrGrantedReadOnly(IsGrantedReadOnly):
     """ Custom permission for developer resources like code
-    
+
     Developers can create new instances, and all authenticated users can see
     instances they have been allowed access to either because they own them,
     they are in users_allowed, or they are in groups_allowed.
@@ -92,13 +92,13 @@ class IsDeveloperOrGrantedReadOnly(IsGrantedReadOnly):
 
 class GrantedModelMixin(object):
     """ Filter instances that the user has been granted access to.
-    
+
     Mix this in with a view set to add a query parameter:
-    
+
     * is_granted - true For administrators, this limits the list to only include
         records that the user has been explicitly granted access to. For other
         users, this has no effect.
-    
+
     The model must derive from AccessControl, or filter_granted() must be
     overridden.
     """
@@ -159,10 +159,10 @@ class RedactModelMixin(object):
 
 class RemoveModelMixin(mixins.DestroyModelMixin):
     """ Remove a model instance and build a removal plan.
-    
+
     Mix this in with a view set to call remove() instead of destroy() on a
     DELETE command. The model must define the following methods:
-    
+
     * remove() - deletes the given instance, as well as any instances of this
         and other models that reference it. Intended as a drastic clean up
         measure when sensitive data has been inappropriately added to Kive and
@@ -175,7 +175,7 @@ class RemoveModelMixin(mixins.DestroyModelMixin):
     def removal_plan(self, request, pk=None):
         removal_plan = self.get_object().build_removal_plan()
         return Response(summarize_redaction_plan(removal_plan))
-    
+
     def perform_destroy(self, instance):
         try:
             instance.remove()
@@ -187,7 +187,6 @@ class RemovableModelViewSet(RemoveModelMixin,
                             GrantedModelMixin,
                             ReadOnlyModelViewSet):
     """ The most common view set for developer models.
-    
     For now, we only support GET and DELETE through the REST API. The DELETE
     command actually triggers the remove() method instead of destroy().
     """

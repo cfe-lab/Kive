@@ -576,7 +576,8 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
         result = {'name': self.display_name,
                   'start': self._format_time(self.start_time),
-                  'end': self._format_time(self.end_time)}
+                  'end': self._format_time(self.end_time),
+                  'id': self.pk}
         if hasattr(self, "not_enough_CPUs"):
             esc = self.not_enough_CPUs
             result['status'] = "Too many threads ({} from {})".format(
@@ -592,6 +593,9 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
             result['status'] = '?'
             return result
 
+        if self.is_cancelled():
+            result['status'] = 'CANCELLED'
+            return result
         status = ""
         step_progress = []
         cable_progress = {}

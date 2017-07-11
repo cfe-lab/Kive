@@ -112,8 +112,7 @@ class DatasetViewSet(RemovableModelViewSet,
         return Dataset.filter_by_user(self.request.user)
 
     def filter_queryset(self, queryset):
-        queryset = super(DatasetViewSet, self).filter_queryset(queryset)
-        return self.apply_filters(queryset)
+        return self.apply_filters(super(DatasetViewSet, self).filter_queryset(queryset))
 
     @staticmethod
     def _add_filter(queryset, key, value):
@@ -135,7 +134,6 @@ class DatasetViewSet(RemovableModelViewSet,
                 return queryset.filter(structure__compounddatatype_id=int(value))
         if key == 'md5':
             return queryset.filter(MD5_checksum=value)
-
         if key in ('createdafter', 'createdbefore'):
             t = timezone.make_aware(datetime.strptime(value, '%d %b %Y %H:%M'),
                                     timezone.get_current_timezone())
@@ -143,7 +141,6 @@ class DatasetViewSet(RemovableModelViewSet,
                 return queryset.filter(date_created__gte=t)
             if key == 'createdbefore':
                 return queryset.filter(date_created__lte=t)
-
         raise APIException('Unknown filter key: {}'.format(key))
 
     @transaction.atomic
@@ -155,7 +152,8 @@ class DatasetViewSet(RemovableModelViewSet,
             raise convert_validation(ex)
 
     def patch_object(self, request, pk=None):
-        return Response(DatasetSerializer(self.get_object(), context={'request': request}).data)
+        obj = self.get_object()
+        return Response(DatasetSerializer(obj, context={'request': request}).data)
 
     # noinspection PyUnusedLocal
     @detail_route(methods=['get'])
@@ -169,5 +167,24 @@ class DatasetViewSet(RemovableModelViewSet,
         if not accessible_datasets.filter(pk=dataset.pk).exists():
             return Response(None, status=status.HTTP_404_NOT_FOUND)
 
-        with dataset.get_open_file_handle() as data_handle:
-            return _build_download_response(data_handle)
+        data_handle = dataset.get_open_file_handle()
+        if data_handle is None:
+            return Response(None, status=status.HTTP_404_NOT_FOUND)
+        with data_handle as dh:
+            return _build_download_response(dh)
+
+
+class InputDatasetViewSet(DatasetViewSet):
+    """ This class is identical to DatasetViewset, apart from the fact that
+    it has an additional filter based on the Dataset.has_data() method.
+    This view is called from the web client via api (/api/inputdatasets ) from
+    choose_inputs.js for selection of pipeline inputs.
+    This ensures that only those files that actually exist on the file system can
+    be selected as pipeline inputs.
+    NOTE: The disadvantage of this approach is that a list of id's is created, which
+    can potentially be large.
+    """
+    def filter_queryset(self, queryset):
+        qs = super(InputDatasetViewSet, self).filter_queryset(queryset)
+        qids = [o.id for o in qs if o.has_data()]
+        return qs.filter(id__in=qids)

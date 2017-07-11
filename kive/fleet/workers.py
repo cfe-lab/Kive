@@ -185,26 +185,37 @@ class Manager(object):
         mgr_logger.debug("Pending runs: {}".format(pending_runs))
 
         for run_to_process in pending_runs:
-            foreman = Foreman(run_to_process, self.slurm_sched_class)
-            foreman.start_run()
+            if run_to_process.all_inputs_have_data():
+                # lets try and run this run
+                foreman = Foreman(run_to_process, self.slurm_sched_class)
+                foreman.start_run()
 
-            run_to_process.refresh_from_db()
-            if run_to_process.is_successful():
-                # Well, that was easy.
-                mgr_logger.info("Run id %d, pipeline %s, user %s completely reused",
-                                run_to_process.pk,
-                                run_to_process.pipeline,
-                                run_to_process.user)
-                if self.history_queue.maxlen > 0:
-                    self.history_queue.append(foreman.sandbox)
+                run_to_process.refresh_from_db()
+                if run_to_process.is_successful():
+                    # Well, that was easy.
+                    mgr_logger.info("Run id %d, pipeline %s, user %s completely reused",
+                                    run_to_process.pk,
+                                    run_to_process.pipeline,
+                                    run_to_process.user)
+                    if self.history_queue.maxlen > 0:
+                        self.history_queue.append(foreman.sandbox)
+                else:
+                    self.runs.append(run_to_process)
+                    self.runs_in_progress[run_to_process] = foreman
+                    mgr_logger.info("Started run id %d, pipeline %s, user %s",
+                                    run_to_process.pk,
+                                    run_to_process.pipeline,
+                                    run_to_process.user)
             else:
-                self.runs.append(run_to_process)
-                self.runs_in_progress[run_to_process] = foreman
-                mgr_logger.info("Started run id %d, pipeline %s, user %s",
+                # there is something wrong with the inputs (such as a maliciously moved input file)
+                mgr_logger.info("Missing input for run id %d, pipeline %s, user %s: RUN BEING CANCELLED",
                                 run_to_process.pk,
                                 run_to_process.pipeline,
                                 run_to_process.user)
-
+                run_to_process.start(save=True)
+                run_to_process.cancel(save=True)
+                run_to_process.stop(save=True)
+                run_to_process.refresh_from_db()
             mgr_logger.debug("Active runs: {}".format(self.runs_in_progress.keys()))
 
             if time.time() > time_to_stop:
