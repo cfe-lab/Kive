@@ -189,7 +189,6 @@ class SlurmBadRunTests(BaseTestCases.SlurmExecutionTestCase, BadRunTestsBase):
     def test_method_fails(self):
         BadRunTestsBase.test_method_fails(self, slurm_sched_class=SlurmScheduler)
 
-
 class MockSlurmScheduler(DummySlurmScheduler):
     """ A mocked -up slurm scheduler which will create NODE_FAIL events
     with a job end time set to now() + my_time_delta.
@@ -237,7 +236,7 @@ class Recent_NF_Scheduler(MockSlurmScheduler):
     my_time_delta = datetime.timedelta(seconds=0)
     name_tag = "RECENT--"
 
-
+@skipIfDBFeature('is_mocked')
 class NodeFailExecutionTests(BaseTestCases.SlurmExecutionTestCase):
 
     def _sched_run_simple(self, slurm_sched_class):
