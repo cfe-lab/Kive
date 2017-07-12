@@ -13,6 +13,9 @@ LOGGING['handlers']['console']['level'] = 'CRITICAL'
 # Speed up short runs during tests.
 DEFAULT_SLURM_CHECK_INTERVAL = 0.5
 
+# fail any slurm job that reports a NODE_FAIL for longer than this time (in seconds)
+NODE_FAIL_TIME_OUT_SECS = 5
+
 FLEET_POLLING_INTERVAL = 0.1
 CONFIRM_COPY_RETRIES = 5
 CONFIRM_COPY_WAIT_MIN = 0.1

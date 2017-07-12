@@ -49,7 +49,7 @@ class SlurmJobHandle:
         return "slurm job_id {}".format(self.job_id)
 
 
-class BaseSlurmScheduler:
+class BaseSlurmScheduler(object):
     # All possible run states we expose to the outside. In fact, these are states as
     # reported by sacct.
     # These states will be reported by SlurmJobHandle.getstate() and
@@ -516,8 +516,8 @@ class SlurmScheduler(BaseSlurmScheduler):
                     stderr_str = "stderr:\n{}".format(f.read())
             except IOError as e:
                 stderr_str = "The stderr log appears to have been lost!"
-            logger.warning(status_report, cmd_lst[0], e.returncode, cmd_lst, e.output, stderr_str,
-                           exc_info=True)
+            logger.debug(status_report, cmd_lst[0], e.returncode, cmd_lst, e.output, stderr_str,
+                         exc_info=True)
             raise
 
         finally:

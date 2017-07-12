@@ -472,7 +472,8 @@ class Foreman(object):
         # the states of the RunComponents in the database.  (We may have to
         # use them to update said database states.)
         failed = False
-        cancelled = False
+        cancelled, is_node_fail, cancel_end_time = False, False, None
+        node_fail_delta = datetime.timedelta(seconds=settings.NODE_FAIL_TIME_OUT_SECS)
         terminated_during = ""
         still_running = []
 
@@ -481,13 +482,13 @@ class Foreman(object):
         start_keyword = self.slurm_sched_class.ACC_START_TIME
         end_keyword = self.slurm_sched_class.ACC_END_TIME
         return_code_keyword = self.slurm_sched_class.ACC_RETURN_CODE
+        NODE_FAIL = self.slurm_sched_class.NODE_FAIL
 
         # self.tasks_in_progress may change during this loop, so we iterate over the keys.
         tasks = self.tasks_in_progress.keys()
         for task in tasks:
             task_dict = self.tasks_in_progress[task]
             raw_slurm_state = None
-
             # Check on the status of the jobs.
             if isinstance(task, RunStep):
                 if "bookkeeping" not in task_dict:
@@ -504,7 +505,19 @@ class Foreman(object):
                         still_running.extend([task_dict["setup"], task_dict["driver"]])
                         continue
                     elif setup_state in self.slurm_sched_class.CANCELLED_STATES:
-                        cancelled = True
+                        cancel_end_time = setup_info[end_keyword]
+                        is_node_fail = setup_state == NODE_FAIL
+                        if is_node_fail:
+                            expiry_time = cancel_end_time + node_fail_delta
+                            now_time = datetime.datetime.now(timezone.get_current_timezone())
+                            cancelled = expiry_time < now_time
+                            foreman_logger.info("NODE_FAIL ({} vs {}):  {} < {} ==> {}".format(
+                                node_fail_delta, now_time-cancel_end_time,
+                                expiry_time, now_time, cancelled))
+                            if not cancelled:
+                                continue
+                        else:
+                            cancelled = True
                         terminated_during = "setup"
                         raw_slurm_state = raw_setup_state
                     elif setup_state in self.slurm_sched_class.FAILED_STATES:
@@ -519,7 +532,6 @@ class Foreman(object):
                                 setup_state,
                                 raw_setup_state
                             )
-
                         # Having reached here, we know that setup is all clear, so check on the driver.
                         # Note that we don't check on whether it's in FAILED_STATES, because
                         # that will be handled in the bookkeeping stage.
@@ -534,7 +546,19 @@ class Foreman(object):
                             continue
                         elif driver_state in self.slurm_sched_class.CANCELLED_STATES:
                             # This was externally cancelled, so we get ready to bail.
-                            cancelled = True
+                            is_node_fail = driver_state == NODE_FAIL
+                            cancel_end_time = driver_info[end_keyword]
+                            if is_node_fail:
+                                expiry_time = cancel_end_time + node_fail_delta
+                                now_time = datetime.datetime.now(timezone.get_current_timezone())
+                                cancelled = expiry_time < now_time
+                                foreman_logger.info("NODE_FAIL ({} vs {}):  {} < {} ==> {}".format(
+                                    node_fail_delta, now_time-cancel_end_time,
+                                    expiry_time, now_time, cancelled))
+                                if not cancelled:
+                                    continue
+                            else:
+                                cancelled = True
                             terminated_during = "driver"
                             raw_slurm_state = raw_driver_state
 
@@ -627,7 +651,19 @@ class Foreman(object):
                         still_running.append(task_dict["bookkeeping"])
                         continue
                     elif bookkeeping_state in self.slurm_sched_class.CANCELLED_STATES:
-                        cancelled = True
+                        is_node_fail = bookkeeping_state == NODE_FAIL
+                        cancel_end_time = bookkeeping_info[end_keyword]
+                        if is_node_fail:
+                            expiry_time = cancel_end_time + node_fail_delta
+                            now_time = datetime.datetime.now(timezone.get_current_timezone())
+                            cancelled = expiry_time < now_time
+                            foreman_logger.info("NODE_FAIL ({} vs {}):  {} < {} ==> {}".format(
+                                node_fail_delta, now_time-cancel_end_time,
+                                expiry_time, now_time, cancelled))
+                            if not cancelled:
+                                continue
+                        else:
+                            cancelled = True
                         terminated_during = "bookkeeping"
                         raw_slurm_state = raw_bookkeeping_state
                     elif bookkeeping_state in self.slurm_sched_class.FAILED_STATES:
@@ -655,7 +691,19 @@ class Foreman(object):
                     still_running.append(task_dict["cable"])
                     continue
                 elif cable_state in self.slurm_sched_class.CANCELLED_STATES:
-                    cancelled = True
+                    is_node_fail = cable_state == NODE_FAIL
+                    cancel_end_time = cable_info[end_keyword]
+                    if is_node_fail:
+                        expiry_time = cancel_end_time + node_fail_delta
+                        now_time = datetime.datetime.now(timezone.get_current_timezone())
+                        cancelled = expiry_time < now_time
+                        foreman_logger.info("NODE_FAIL ({} vs {}):  {} < {} ==> {}".format(
+                            node_fail_delta, now_time-cancel_end_time,
+                            expiry_time, now_time, cancelled))
+                        if not cancelled:
+                            continue
+                    else:
+                        cancelled = True
                     terminated_during = "cable processing"
                     raw_slurm_state = raw_cable_state
                 elif cable_state in self.slurm_sched_class.FAILED_STATES:
@@ -671,6 +719,17 @@ class Foreman(object):
                         )
 
             # Having reached here, we know we're done with this task.
+            if is_node_fail:
+                foreman_logger.debug('Run "%s" (pk=%d, Pipeline: %s, User: %s) NODE_FAIL while '
+                                     'handling task %s (pk=%d) during %s (raw Slurm state: %s)',
+                                     self.sandbox.run,
+                                     self.sandbox.run.pk,
+                                     self.sandbox.pipeline,
+                                     self.sandbox.user,
+                                     task,
+                                     task.pk,
+                                     terminated_during,
+                                     raw_slurm_state)
             if failed or cancelled:
                 foreman_logger.error(
                     'Run "%s" (pk=%d, Pipeline: %s, User: %s) %s while handling task %s (pk=%d) during %s '
@@ -695,11 +754,10 @@ class Foreman(object):
                     else:
                         task.cancel()
 
-            self.tasks_in_progress.pop(task)
-
             # At this point, the task has either run to completion or been
             # terminated either through failure or cancellation.
             # The worker_finished routine will handle it from here.
+            self.tasks_in_progress.pop(task)
             self.worker_finished(task)
 
         # Lastly, check if the priority has changed.

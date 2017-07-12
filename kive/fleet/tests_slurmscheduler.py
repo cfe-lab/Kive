@@ -1,11 +1,15 @@
+
+import datetime
+from unittest import skipIf
+
 from django.contrib.auth.models import User
 from django.conf import settings
 from django.test import skipIfDBFeature
+from django.utils import timezone
 
-from unittest import skipIf
-import tempfile
-import os
-import shutil
+# import tempfile
+# import os
+# import shutil
 
 from fleet.workers import Manager
 from kive.tests import BaseTestCases
@@ -15,7 +19,7 @@ from fleet.slurmlib import SlurmScheduler, DummySlurmScheduler
 from sandbox.tests_rm import BadRunTestsBase
 
 
-def execute_simple_run(environment, slurm_sched_class=DummySlurmScheduler):
+def execute_simple_run(environment, slurm_sched_class):
     """
     A helper function that creates a simple pipeline and executes a run.
 
@@ -184,3 +188,86 @@ class SlurmBadRunTests(BaseTestCases.SlurmExecutionTestCase, BadRunTestsBase):
     @skipIf(not settings.RUN_SLURM_TESTS, "Slurm tests are disabled")
     def test_method_fails(self):
         BadRunTestsBase.test_method_fails(self, slurm_sched_class=SlurmScheduler)
+
+
+class MockSlurmScheduler(DummySlurmScheduler):
+    """ A mocked -up slurm scheduler which will create NODE_FAIL events
+    with a job end time set to now() + my_time_delta.
+    The NODE_FAIL events are injected every second time get_accounting_info() is called,
+    in other times, the status information is passed through unchanged.
+    """
+    count = 0
+    my_time_delta = datetime.timedelta(seconds=-2*settings.NODE_FAIL_TIME_OUT_SECS)
+    name_tag = "PAST--"
+
+    @classmethod
+    def slurm_ident(cls):
+        return "{}--{}--{}".format(cls.name_tag,
+                                   cls.my_time_delta,
+                                   super(MockSlurmScheduler, cls).slurm_ident())
+
+    @classmethod
+    def _mod_to_node_fail(cls, stat_dct):
+        """ Modify the status dict to a node_fail state
+        with an end time of now() + cls.my_time_delta
+        """
+        now_time = datetime.datetime.now(timezone.get_current_timezone())
+        end_time = now_time + cls.my_time_delta
+        for dct in stat_dct.values():
+            dct[SlurmScheduler.ACC_STATE] = SlurmScheduler.NODE_FAIL
+            dct[SlurmScheduler.ACC_END_TIME] = end_time
+
+    @classmethod
+    def get_accounting_info(cls, job_handle_iter=None):
+        # print("mock accounting {}".format(cls.count))
+        stat_dct = super(MockSlurmScheduler, cls).get_accounting_info(job_handle_iter=job_handle_iter)
+        if cls.count % 2 == 0:
+            # print("overriding to NODE_FAIL: {}".format(cls.my_time_delta))
+            cls._mod_to_node_fail(stat_dct)
+        else:
+            pass
+            # print("returning unchanged accounting info")
+        # print("RETURNING {}".format(stat_dct))
+        cls.count += 1
+        return stat_dct
+
+
+class Recent_NF_Scheduler(MockSlurmScheduler):
+    count = 0
+    my_time_delta = datetime.timedelta(seconds=0)
+    name_tag = "RECENT--"
+
+
+class NodeFailExecutionTests(BaseTestCases.SlurmExecutionTestCase):
+
+    def _sched_run_simple(self, slurm_sched_class):
+        # print("Running simple run with slurm : '%s'" % slurm_sched_class.slurm_ident())
+        mgr = execute_simple_run(self, slurm_sched_class=slurm_sched_class)
+        return mgr
+
+    def test_NF_future_run(self):
+        """
+        Execute a simple run.
+        NODE_FAIL is set with a recent job end_time  --> the job should complete
+        as normal.
+        """
+        mgr = self._sched_run_simple(Recent_NF_Scheduler)
+        run = mgr.get_last_run()
+
+        self.check_run_OK(run)
+
+        self.assertTrue(run.is_complete())
+        self.assertTrue(run.is_successful())
+
+        self.assertIsNone(run.clean())
+        self.assertIsNone(run.complete_clean())
+
+    def test_NF_fail_run(self):
+        """
+        Execute a simple run.
+        NODE_FAIL is set with a job end_time in the distant past -->
+        the job should fail.
+        """
+        mgr = self._sched_run_simple(MockSlurmScheduler)
+        run = mgr.get_last_run()
+        self.assertTrue(run.is_failed())
