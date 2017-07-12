@@ -3,8 +3,8 @@ python:
     - "2.7"
 sudo: required
 services: postgresql
-before_install:
-    - sudo apt-get install -y -q openmpi-bin libopenmpi-dev
+# before_install:
+#    - sudo apt-get install -y -q openmpi-bin libopenmpi-dev
 install: "pip install -r requirements-dev.txt"
 before_script:
     - sed -f travis_settings_modification.sed kive/kive/settings_default.py > kive/kive/settings.py
