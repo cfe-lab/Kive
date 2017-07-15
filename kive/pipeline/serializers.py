@@ -1,3 +1,4 @@
+import logging
 from rest_framework import serializers
 
 from kive.serializers import AccessControlSerializer
@@ -8,8 +9,10 @@ from pipeline.models import PipelineFamily, Pipeline, CustomCableWire,\
 from transformation.models import XputStructure
 from transformation.serializers import TransformationInputSerializer,\
     TransformationOutputSerializer
-from metadata.models import KiveUser
-from portal.views import developer_check
+# from metadata.models import KiveUser
+# from portal.views import developer_check
+
+LOGGER = logging.getLogger('pipeline.ajax')
 
 
 class CustomCableWireSerializer(serializers.ModelSerializer):
@@ -217,14 +220,6 @@ def _source_transf_finder(step_num, dataset_name, step_data_dicts):
     return curr_transf.outputs.get(dataset_name=dataset_name)
 
 
-class PipelineSummarySerializer(AccessControlSerializer, serializers.ModelSerializer):
-    inputs = TransformationInputSerializer(many=True)
-
-    class Meta:
-        model = Pipeline
-        fields = ("id", "display_name", "url", "published", 'revision_number', 'inputs')
-
-
 class PipelineSerializer(AccessControlSerializer,
                          serializers.ModelSerializer):
 
@@ -236,7 +231,6 @@ class PipelineSerializer(AccessControlSerializer,
     outputs = TransformationOutputSerializer(many=True, read_only=True)
 
     # revision_number = serializers.IntegerField(read_only=True, required=False)
-
     steps = PipelineStepSerializer(many=True)
     outcables = PipelineOutputCableSerializer(many=True)
 
@@ -278,13 +272,26 @@ class PipelineSerializer(AccessControlSerializer,
     def __init__(self, *args, **kwargs):
         super(PipelineSerializer, self).__init__(*args, **kwargs)
         # Set the querysets of the related model fields.
-
         curr_user = self.context["request"].user
+        LOGGER.debug("PL SERIALIZER INIT %s" % self.context.get("only_is_published", False))
+
         revision_parent_field = self.fields["revision_parent"]
         revision_parent_field.queryset = Pipeline.filter_by_user(curr_user)
 
         family_field = self.fields["family"]
         family_field.queryset = PipelineFamily.filter_by_user(curr_user)
+
+    def to_representation(self, instance):
+        """ We override this method here in order to handle the
+        case where a non-staff member should only see published pipeline versions.
+
+        This routine normally returns an OrderedDict instance
+        """
+        only_is_published = self.context.get("only_is_published", False)
+        LOGGER.debug("TOREP  %s: %s" % (only_is_published, instance.published))
+        if only_is_published and not instance.published:
+            return None
+        return super(PipelineSerializer, self).to_representation(instance)
 
     def validate(self, data):
         """
@@ -510,6 +517,5 @@ class PipelineFamilySerializer(AccessControlSerializer,
         """
         if not obj:
             return None
-
-        serializer = PipelineSummarySerializer(obj.members, many=True, context=self.context)
+        serializer = PipelineSerializer(obj.members, many=True, context=self.context)
         return serializer.data

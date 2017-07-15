@@ -48,8 +48,8 @@ function buildMembers($td, row) {
         $select = $('<select name="pipeline">'),
         already_have_one_selected = false,
         i, member, $option;
-
-    if (row.members.length === 0) {
+	
+    if (((row.members.length == 1) && (! row.members[0])) || (row.members.length === 0)) {
         $option = $("<option>")
             .attr("disabled", 1)
             .text("No published versions");
@@ -66,7 +66,7 @@ function buildMembers($td, row) {
                 }
             } else {
                 // De-emphasize this.
-                $option.text("(" + member.display_name + ")");
+                $option.text(member.display_name + "*");
             }
             $select.append($option);
         }

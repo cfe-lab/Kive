@@ -1,3 +1,5 @@
+import logging
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Q
@@ -14,6 +16,8 @@ from pipeline.models import Pipeline, PipelineFamily
 from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer,\
     PipelineStepUpdateSerializer
 from portal.views import admin_check
+
+LOGGER = logging.getLogger(__name__)
 
 
 class PipelineFamilyViewSet(CleanCreateModelMixin,
@@ -38,18 +42,29 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
 
     @detail_route(methods=["get"])
     def pipelines(self, request, pk=None):
-        if self.request.query_params.get('is_granted') == 'true':
+        """In this routine, we are responding to an API request which looks something
+        like: 'hostname:/api/pipelinefamilies/2/pipelines/'
+
+        """
+        qp = self.request.query_params
+        if qp.get('is_granted') == 'true':
             is_admin = False
         else:
             is_admin = admin_check(self.request.user)
+        only_is_published = qp.get('only_is_published') == 'true'
+        LOGGER.debug("ISPUBLISHED {} ISADMIN {}".format(only_is_published, is_admin))
+        qs = self.get_object().members.all()
+        if only_is_published:
+            qids = [o.id for o in qs if o.published]
+            qs = qs.filter(id__in=qids)
 
-        member_pipelines = AccessControl.filter_by_user(
-            request.user,
-            is_admin=is_admin,
-            queryset=self.get_object().members.all())
+        member_pipelines = AccessControl.filter_by_user(request.user,
+                                                        is_admin=is_admin,
+                                                        queryset=qs)
 
-        member_serializer = PipelineSerializer(
-            member_pipelines, many=True, context={"request": request})
+        member_serializer = PipelineSerializer(member_pipelines, many=True,
+                                               context={"request": request,
+                                                        "only_is_published": only_is_published})
         return Response(member_serializer.data)
 
     def partial_update(self, request, pk=None):
@@ -61,6 +76,15 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
             return self.change_published_version(request)
 
         return Response({"message": "No action taken."})
+
+    def get_serializer_context(self):
+        """ Return the context for the serializer.
+        Here, we add the only_is_published flag to the context.
+        """
+        context = super(PipelineFamilyViewSet, self).get_serializer_context()
+        is_admin = admin_check(self.request.user)
+        context["only_is_published"] = not is_admin
+        return context
 
     def change_published_version(self, request):
         family_to_publish = self.get_object()
@@ -77,10 +101,6 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
         )
         return Response({'message': response_msg})
 
-    def filter_queryset(self, queryset):
-        queryset = super(PipelineFamilyViewSet, self).filter_queryset(queryset)
-        return self.apply_filters(queryset)
-
     @staticmethod
     def _add_filter(queryset, key, value):
         """
@@ -95,7 +115,6 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
             return queryset.filter(description__icontains=value)
         if key == "user":
             return queryset.filter(user__username__icontains=value)
-
         raise APIException('Unknown filter key: {}'.format(key))
 
 
@@ -184,10 +203,6 @@ class PipelineViewSet(CleanCreateModelMixin,
         )
         return Response({'message': response_msg})
 
-    def filter_queryset(self, queryset):
-        queryset = super(PipelineViewSet, self).filter_queryset(queryset)
-        return self.apply_filters(queryset)
-
     @staticmethod
     def _add_filter(queryset, key, value):
         """
@@ -204,5 +219,4 @@ class PipelineViewSet(CleanCreateModelMixin,
             return queryset.filter(revision_desc__icontains=value)
         if key == "user":
             return queryset.filter(user__username__icontains=value)
-
         raise APIException('Unknown filter key: {}'.format(key))
