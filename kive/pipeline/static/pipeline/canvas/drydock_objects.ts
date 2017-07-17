@@ -306,7 +306,7 @@ interface INodeUpdateSignalDefinition {
 
 export const STATUS_COLOR_MAP = {
     CLEAR: 'green',
-    FAILURE: 'red',
+    FAILED: 'red',
     RUNNING: 'orange',
     READY: 'orange',
     WAITING: 'yellow'
@@ -1216,9 +1216,9 @@ export class Connector implements CanvasObject {
                     // Whatever, everything else is fine!
                     cable_stat = "CLEAR";
                 }
-                else if (src.status === 'FAILURE') {// Source is borked
+                else if (src.status === 'FAILED') {// Source is borked
                     // so is any cable that pokes out of it...
-                    cable_stat = "FAILURE";
+                    cable_stat = "FAILED";
                 }
             }
 
