@@ -745,9 +745,11 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
 
     def __str__(self):
         if self.is_subrun():
-            unicode_rep = "Run with pipeline [{}] parent_runstep [{}]".format(self.pipeline, self.parent_runstep)
+            name_to_show = self.top_level_run.name or "[blank]"
+            unicode_rep = "{} (pk={}):{}".format(name_to_show, self.top_level_run.pk, self.get_coordinates())
         else:
-            unicode_rep = "Run with pipeline [{}]".format(self.pipeline)
+            name_to_show = self.name or "[blank]"
+            unicode_rep = "{} (pk={})".format(name_to_show, self.pk)
         return unicode_rep
 
     def is_subrun(self):
