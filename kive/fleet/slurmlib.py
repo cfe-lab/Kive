@@ -352,7 +352,7 @@ class SlurmScheduler(BaseSlurmScheduler):
             raise sp.CalledProcessError(cmd=full_path, output=None, returncode=-1)
         prio_level, partname = cls._int_prio_to_part_name(prio_level)
         cmd_lst = ["sbatch", "-D", workingdir, "--gid={}".format(group_id),
-                   "-J", re.escape(job_name), "-p", partname,
+                   "-J", job_name, "-p", partname,
                    "-s", "--uid={}".format(user_id),
                    "-c", str(num_cpus),
                    "--export=PYTHONPATH={}".format(workingdir),
