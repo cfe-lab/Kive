@@ -230,7 +230,7 @@ class Dataset(metadata.models.AccessControl):
             try:
                 self.dataset_file.open(mode)
             except IOError as e:
-                self.logger.warn('error accessing dataset file', e)
+                self.logger.warn('error accessing dataset file: %s', e)
                 return None
             return self.dataset_file
         elif self.external_path:
@@ -239,7 +239,7 @@ class Dataset(metadata.models.AccessControl):
                 try:
                     fhandle = open(abs_path, mode)
                 except IOError as e:
-                    self.logger.warn('error accessing external file', e)
+                    self.logger.warn('error accessing external file: %s', e)
                     return None
                 return File(fhandle)
         return None
