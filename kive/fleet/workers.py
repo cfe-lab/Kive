@@ -732,10 +732,9 @@ class Foreman(object):
                                      raw_slurm_state)
             if failed or cancelled:
                 foreman_logger.error(
-                    'Run "%s" (pk=%d, Pipeline: %s, User: %s) %s while handling task %s (pk=%d) during %s '
+                    'Run "%s" (Pipeline: %s, User: %s) %s while handling task %s (pk=%d) during %s '
                     '(raw Slurm state: %s)',
                     self.sandbox.run,
-                    self.sandbox.run.pk,
                     self.sandbox.pipeline,
                     self.sandbox.user,
                     "failed" if failed else "cancelled",
@@ -766,9 +765,8 @@ class Foreman(object):
         self.priority = self.sandbox.run.priority
         if priority_changed:
             foreman_logger.debug(
-                'Changing priority of Run "%s" (pk=%d, Pipeline: %s, User: %s) to %d',
+                'Changing priority of Run "%s" (Pipeline: %s, User: %s) to %d',
                 self.sandbox.run,
-                self.sandbox.run.pk,
                 self.sandbox.pipeline,
                 self.sandbox.user,
                 self.priority
@@ -801,9 +799,8 @@ class Foreman(object):
             # just report it and discard it.
             status_str = "failed" if self.sandbox.run.is_failing() else "cancelled"
             foreman_logger.info(
-                'Run "%s" (pk=%d, Pipeline: %s, User: %s) %s before execution',
+                'Run "%s" (Pipeline: %s, User: %s) %s before execution',
                 self.sandbox.run,
-                self.sandbox.run.pk,
                 self.sandbox.run.pipeline,
                 self.sandbox.run.user,
                 status_str
@@ -922,9 +919,8 @@ class Foreman(object):
     def worker_finished(self, finished_task):
         """Handle bookkeeping when a worker finishes."""
         foreman_logger.info(
-            "Run %s (pk=%d) reports task with PK %d is finished",
+            "Run %s reports task with PK %d is finished",
             self.sandbox.run,
-            self.sandbox.run.pk,
             finished_task.pk
         )
 
@@ -976,11 +972,10 @@ class Foreman(object):
             if self.sandbox.run.is_failing() or self.sandbox.run.is_cancelling():
                 assert self.shutting_down
                 foreman_logger.debug(
-                    'Task %s (pk=%d) was successful but run "%s" (pk=%d) (Pipeline: %s, User: %s) %s.',
+                    'Task %s (pk=%d) was successful but run "%s" (Pipeline: %s, User: %s) %s.',
                     finished_task,
                     finished_task.pk,
                     self.sandbox.run,
-                    self.sandbox.run.pk,
                     self.sandbox.pipeline,
                     self.sandbox.user,
                     "failing" if self.sandbox.run.is_failing() else "cancelling"
@@ -998,11 +993,10 @@ class Foreman(object):
                 if task_execute_info.is_recovery():
                     foreman_logger.debug(
                         'Recovering task %s (pk=%d) was successful; '
-                        'queueing waiting tasks from run "%s" (pk=%d, Pipeline: %s, User: %s).',
+                        'queueing waiting tasks from run "%s" (Pipeline: %s, User: %s).',
                         finished_task,
                         finished_task.pk,
                         self.sandbox.run,
-                        self.sandbox.run.pk,
                         self.sandbox.pipeline,
                         self.sandbox.user
                     )
@@ -1016,11 +1010,10 @@ class Foreman(object):
                 else:
                     foreman_logger.debug(
                         'Task %s (pk=%d) was successful; '
-                        'advancing run "%s" (pk=%d, Pipeline: %s, User: %s).',
+                        'advancing run "%s" (Pipeline: %s, User: %s).',
                         finished_task,
                         finished_task.pk,
                         self.sandbox.run,
-                        self.sandbox.run.pk,
                         self.sandbox.pipeline,
                         self.sandbox.user
                     )
@@ -1034,19 +1027,17 @@ class Foreman(object):
                         clean_up_now = not tasks_currently_running
                         if clean_up_now and self.sandbox.run.is_successful():
                             foreman_logger.info(
-                                'Run "%s" (pk=%d, Pipeline: %s, User: %s) finished successfully',
+                                'Run "%s" (Pipeline: %s, User: %s) finished successfully',
                                 self.sandbox.run,
-                                self.sandbox.run.pk,
                                 self.sandbox.pipeline,
                                 self.sandbox.user
                             )
                     elif self.sandbox.run.is_failing() or self.sandbox.run.is_cancelling():
                         # Something just failed in advance_pipeline.
                         foreman_logger.debug(
-                            'Run "%s" (pk=%d, Pipeline: %s, User: %s) failed to advance '
+                            'Run "%s" (Pipeline: %s, User: %s) failed to advance '
                             'after finishing task %s (pk=%d)',
                             self.sandbox.run,
-                            self.sandbox.run.pk,
                             self.sandbox.pipeline,
                             self.sandbox.user,
                             finished_task,
@@ -1068,12 +1059,11 @@ class Foreman(object):
             if self.sandbox.run.is_failing() or self.sandbox.run.is_cancelling():
                 assert self.shutting_down
                 foreman_logger.debug(
-                    'Task %s (pk=%d) %s; run "%s" (pk=%d, Pipeline: %s, User: %s) was already %s',
+                    'Task %s (pk=%d) %s; run "%s" (Pipeline: %s, User: %s) was already %s',
                     finished_task,
                     finished_task.pk,
                     finished_task.get_state_name(),
                     self.sandbox.run,
-                    self.sandbox.run.pk,
                     self.sandbox.pipeline,
                     self.sandbox.user,
                     "failing" if self.sandbox.run.is_failing() else "cancelling"
@@ -1082,12 +1072,11 @@ class Foreman(object):
             else:
                 assert self.sandbox.run.is_running(), "{} != Running".format(self.sandbox.run.get_state_name())
                 foreman_logger.info(
-                    'Task %s (pk=%d) of run "%s" (pk=%d, Pipeline: %s, User: %s) failed; '
+                    'Task %s (pk=%d) of run "%s" (Pipeline: %s, User: %s) failed; '
                     'marking run as failing',
                     finished_task,
                     finished_task.pk,
                     self.sandbox.run,
-                    self.sandbox.run.pk,
                     self.sandbox.pipeline,
                     self.sandbox.user
                 )
@@ -1135,10 +1124,9 @@ class Foreman(object):
         else:
             self.sandbox.run.refresh_from_db()
             foreman_logger.info(
-                'Cleaning up %s run "%s" (pk=%d, Pipeline: %s, User: %s)',
+                'Cleaning up %s run "%s" (Pipeline: %s, User: %s)',
                 self.sandbox.run.get_state_name(),
                 self.sandbox.run,
-                self.sandbox.run.pk,
                 self.sandbox.pipeline,
                 self.sandbox.user
             )
