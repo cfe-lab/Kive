@@ -873,7 +873,11 @@ class SlurmScheduler(BaseSlurmScheduler):
         step_exec_path = cls._create_wrapperfile(step_dir, "setup",
                                                  settings.SANDBOX_SETUP_PREAMBLE or "",
                                                  step_cmd, step_args)
-        coord_str = "({})".format(",".join(str(x) for x in runstep.get_coordinates()))
+        coordinates = runstep.get_coordinates()
+        if len(coordinates) == 1:
+            coord_str = coordinates[0]
+        else:
+            coord_str = "({})".format(",".join(str(x) for x in coordinates))
         setup_slurm_handle = cls.submit_job(
             settings.KIVE_HOME,
             step_exec_path,
@@ -907,7 +911,11 @@ class SlurmScheduler(BaseSlurmScheduler):
         book_exec_path = cls._create_wrapperfile(step_dir, "book",
                                                  settings.SANDBOX_BOOKKEEPING_PREAMBLE or "",
                                                  book_cmd, book_args)
-        coord_str = "({})".format(",".join(str(x) for x in runstep.get_coordinates()))
+        coordinates = runstep.get_coordinates()
+        if len(coordinates) == 1:
+            coord_str = coordinates[0]
+        else:
+            coord_str = "({})".format(",".join(str(x) for x in coordinates))
         bookkeeping_slurm_handle = cls.submit_job(
             settings.KIVE_HOME,
             book_exec_path,

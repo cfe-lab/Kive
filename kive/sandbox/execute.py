@@ -1892,9 +1892,14 @@ class Sandbox:
         # Driver name
         driver = curr_RS.pipelinestep.transformation.definite.driver
 
+        coordinates = curr_RS.get_coordinates()
+        if len(coordinates) == 1:
+            coord_str = coordinates[0]
+        else:
+            coord_str = "({})".format(",".join(str(x) for x in coordinates))
         job_name = "r{}s{}driver[{}]".format(
             curr_RS.top_level_run.pk,
-            "({})".format(",".join(str(x) for x in curr_RS.get_coordinates())),
+            coord_str,
             driver.coderesource.filename
         )
         logger.debug("Submitting driver '%s', task_pk %d", driver.coderesource.filename, curr_RS.pk)
