@@ -367,5 +367,5 @@ SLURM_PRIO_COLNAME = "PRIORITY"
 # Attempt to run the system tests that use Slurm.
 RUN_SLURM_TESTS = False
 
-# fail any slurm job that reports a NODE_FAIL for longer than this time (in seconds)
+# Fail any slurm job that reports a NODE_FAIL for longer than this time (in seconds).
 NODE_FAIL_TIME_OUT_SECS = 5*60

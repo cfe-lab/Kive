@@ -1894,7 +1894,7 @@ class Sandbox:
 
         job_name = "r{}s{}driver[{}]".format(
             curr_RS.top_level_run.pk,
-            curr_RS.get_coordinates(),
+            "({})".format(",".join(str(x) for x in curr_RS.get_coordinates())),
             driver.coderesource.filename
         )
         logger.debug("Submitting driver '%s', task_pk %d", driver.coderesource.filename, curr_RS.pk)

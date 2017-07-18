@@ -873,6 +873,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         step_exec_path = cls._create_wrapperfile(step_dir, "setup",
                                                  settings.SANDBOX_SETUP_PREAMBLE or "",
                                                  step_cmd, step_args)
+        coord_str = "({})".format(",".join(str(x) for x in runstep.get_coordinates()))
         setup_slurm_handle = cls.submit_job(
             settings.KIVE_HOME,
             step_exec_path,
@@ -883,8 +884,7 @@ class SlurmScheduler(BaseSlurmScheduler):
             1,
             step_info.setup_stdout_path(),
             step_info.setup_stderr_path(),
-            job_name="r{}s{}_setup".format(runstep.top_level_run.pk,
-                                           runstep.get_coordinates())
+            job_name="r{}s{}_setup".format(runstep.top_level_run.pk, coord_str)
         )
         return setup_slurm_handle, step_execute_dict_path
 
@@ -907,6 +907,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         book_exec_path = cls._create_wrapperfile(step_dir, "book",
                                                  settings.SANDBOX_BOOKKEEPING_PREAMBLE or "",
                                                  book_cmd, book_args)
+        coord_str = "({})".format(",".join(str(x) for x in runstep.get_coordinates()))
         bookkeeping_slurm_handle = cls.submit_job(
             settings.KIVE_HOME,
             book_exec_path,
@@ -917,8 +918,7 @@ class SlurmScheduler(BaseSlurmScheduler):
             1,
             step_info.bookkeeping_stdout_path(),
             step_info.bookkeeping_stderr_path(),
-            job_name="r{}s{}_bookkeeping".format(runstep.top_level_run.pk,
-                                                 runstep.get_coordinates())
+            job_name="r{}s{}_bookkeeping".format(runstep.top_level_run.pk, coord_str)
         )
 
         return bookkeeping_slurm_handle
