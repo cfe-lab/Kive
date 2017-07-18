@@ -1,7 +1,5 @@
-import os
-
-from django.template.defaultfilters import filesizeformat
 from django.utils import timezone
+from django.template.defaultfilters import filesizeformat
 from django.contrib.auth.models import User, Group
 from django.conf import settings
 from rest_framework import serializers
@@ -73,8 +71,9 @@ class _RunDataset(object):
         self.filename = filename
 
     def set_dataset(self, dataset, request):
+        """Set some values when we are referring to a Dataset."""
         self.id = dataset.id
-        self.size = dataset.get_filesize()
+        self.filename, self.size = dataset.get_basename_and_formatted_size()
         self.date = dataset.date_created
         self.url = reverse('dataset-detail',
                            kwargs={'pk': dataset.id},
@@ -82,8 +81,6 @@ class _RunDataset(object):
         self.redaction_plan = reverse('dataset-redaction-plan',
                                       kwargs={'pk': dataset.id},
                                       request=request)
-        with dataset.get_open_file_handle() as data_handle:
-            self.filename = os.path.basename(data_handle.name)
 
     def set_redacted(self):
         self.size = self.date = 'redacted'
@@ -92,6 +89,76 @@ class _RunDataset(object):
         self.size = self.date = 'not created'
         self.errors.append(self.size)
         self.is_ok = False
+
+    def handle_output_log(self, output_name, methodoutput, request, execlog):
+        """ Fill in the fields required for an output log file (stdout or stderr):
+        set our state based on the exit code.
+
+        NOTE: the javascript OutputsTable.js uses output.id to decide whether
+        to display a 'View' and 'Download' link ==> Only set
+        the id here iff we actually have a clickable/viewable output file.
+
+        This routine may raise a ValueError if there is a problem with
+        serialisation.
+        """
+        if output_name not in set(['output', 'error']):
+            raise ValueError("wrong output_name")
+        if methodoutput.is_output_redacted():
+            self.set_redacted()
+        else:
+            log_fh = methodoutput.output_log if output_name == 'output' else methodoutput.error_log
+            retcode, methodid = methodoutput.return_code, methodoutput.id
+            self.id = None
+            self.is_ok = True
+            # we attach the return_code as an error to stdout and stderr entry
+            # if its nonzero
+            if (retcode is not None and retcode != 0):
+                self.errors.append('return code {}'.format(retcode))
+            if execlog.start_time is None:
+                self.display = 'Did not run'
+                self.date = None
+                self.size = None
+                self.errors.append('Did not run.')
+                self.is_ok = False
+            elif execlog.end_time is None:
+                self.display = 'Running'
+                self.date = None
+                self.size = None
+                self.is_ok = False
+            else:
+                if not log_fh:
+                    self.date = self.size = 'removed'
+                    self.url = self.redaction_plan = None
+                else:
+                    ismissing = False
+                    try:
+                        self.size = filesizeformat(log_fh.size)
+                    except OSError:
+                        ismissing = True
+                    if ismissing:
+                        self.date = self.size = 'missing'
+                        self.url = self.redaction_plan = None
+                    else:
+                        self.id = methodid
+                        self.date = execlog.end_time
+                        self.url = reverse('methodoutput-detail',
+                                           kwargs={'pk': methodid},
+                                           request=request)
+                        self.redaction_plan = reverse(
+                            'methodoutput-%s-redaction-plan' % output_name,
+                            kwargs={'pk': methodid},
+                            request=request)
+
+    def finalise_state(self):
+        """Set the 'final verdict' of the state of this dataset and do any
+        final data type conversions."""
+        self.is_invalid = not self.is_ok and self.id is not None
+        try:
+            if self.date is not None:
+                self.date = timezone.localtime(self.date).strftime(
+                    '%d %b %Y %H:%M:%S')
+        except Exception:
+            pass
 
 
 class RunOutputsSerializer(serializers.ModelSerializer):
@@ -124,19 +191,8 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                                      type='dataset')
             if has_data:
                 input_data.set_dataset(input.dataset, request)
-            inputs += [input_data]
-
-        for input in inputs:
-            input.is_invalid = not input.is_ok and input.id is not None
-
-            try:
-                input.size += 0
-                # It's a number, so format it nicely, along with date.
-                input.size = filesizeformat(input.size)
-                input.date = timezone.localtime(input.date).strftime(
-                    '%d %b %Y %H:%M:%S')
-            except TypeError:
-                pass  # Size was not a number, so leave it alone.
+            input_data.finalise_state()
+            inputs.append(input_data)
 
         return [inp.__dict__ for inp in inputs]
 
@@ -162,7 +218,6 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                     output.set_dataset(dataset, request)
                 elif execrecordout.dataset.is_redacted():
                     output.set_redacted()
-
                 outputs.append(output)
 
         for runstep in run.runsteps_in_order:
@@ -176,111 +231,21 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                                  name=step_prefix + 'stdout',
                                  display='Standard out',
                                  type='stdout')
-            if methodoutput.is_output_redacted():
-                output.set_redacted()
+            try:
+                output.handle_output_log('output', methodoutput, request, execlog)
                 outputs.append(output)
-            else:
-                try:
-                    # a set the state of the run based on the exit code
-                    # NOTE: the javascript OutputsTable.js uses output.id to decide whether
-                    # to display a 'View' and 'Download' link ==> Only set
-                    # the id here iff we actually have a clickable/viewable output file.
-                    output.id = None
-                    output.is_ok = True
-                    # we attach the return_code as an error to the standard output entry
-                    # if its nonzero
-                    retcode = methodoutput.return_code
-                    if retcode is not None and retcode != 0:
-                        output.errors.append('return code {}'.format(retcode))
-                    if execlog.start_time is None:
-                        output.display = 'Did not run'
-                        output.date = None
-                        output.size = None
-                        output.errors.append('Did not run.')
-                        output.is_ok = False
-                    elif execlog.end_time is None:
-                        output.display = 'Running'
-                        output.date = None
-                        output.size = None
-                        output.is_ok = False
-                    else:
-                        if not methodoutput.output_log:
-                            output.date = output.size = 'removed'
-                            output.url = output.redaction_plan = None
-                        else:
-                            ismissing = False
-                            try:
-                                output.size = methodoutput.output_log.size
-                            except OSError:
-                                ismissing = True
-                            if ismissing:
-                                output.date = output.size = 'missing'
-                                output.url = output.redaction_plan = None
-                            else:
-                                output.url = reverse('methodoutput-detail',
-                                                     kwargs={'pk': methodoutput.id},
-                                                     request=request)
-                                output.id = methodoutput.id
-                                output.date = execlog.end_time
-                                output.redaction_plan = reverse(
-                                    'methodoutput-output-redaction-plan',
-                                    kwargs={'pk': methodoutput.id},
-                                    request=request)
-                    outputs.append(output)
-                except ValueError as e:
-                    print "stdout serializer", e
+            except ValueError as e:
+                print "stdout serializer", e
             # Now handle the stderr file
             output = _RunDataset(step_name="",
                                  name=step_prefix + 'stderr',
                                  display='Standard error',
                                  type='stderr')
-            if methodoutput.is_error_redacted():
-                output.set_redacted()
+            try:
+                output.handle_output_log('error', methodoutput, request, execlog)
                 outputs.append(output)
-            else:
-                try:
-                    output.id = None
-                    output.is_ok = True
-                    if retcode is not None and retcode != 0:
-                        output.errors.append('return code {}'.format(retcode))
-                    if execlog.start_time is None:
-                        output.display = 'Did not run'
-                        output.date = None
-                        output.size = None
-                        output.errors.append('Did not run.')
-                        output.is_ok = False
-                    elif execlog.end_time is None:
-                        output.display = 'Running'
-                        output.date = None
-                        output.size = None
-                        output.is_ok = False
-                    else:
-                        if not methodoutput.error_log:
-                            output.date = output.size = 'removed'
-                            output.url = output.redaction_plan = None
-                        else:
-                            ismissing = False
-                            try:
-                                output.size = methodoutput.error_log.size
-                            except OSError:
-                                ismissing = True
-                            if ismissing:
-                                output.date = output.size = 'missing'
-                                output.url = output.redaction_plan = None
-                            else:
-                                output.id = methodoutput.id
-                                output.date = execlog.end_time
-                                output.url = reverse('methodoutput-detail',
-                                                     kwargs={'pk': methodoutput.id},
-                                                     request=request)
-                                output.redaction_plan = reverse(
-                                    'methodoutput-error-redaction-plan',
-                                    kwargs={'pk': methodoutput.id},
-                                    request=request)
-                    outputs.append(output)
-                except ValueError as e:
-                    print "stderr serializer", e
-
+            except ValueError as e:
+                print "stderr serializer", e
             if runstep.execrecord is not None:
                 for execrecordout in runstep.execrecord.execrecordouts_in_order:
                     transform_output = execrecordout.generic_output.definite
@@ -290,7 +255,6 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                         display=execrecordout.generic_output,
                         is_ok=execrecordout.is_OK(),
                         type='dataset')
-
                     # Look for any failed checks.
                     content_checks = ContentCheckLog.objects.filter(
                         dataset=execrecordout.dataset)
@@ -315,24 +279,9 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                         output.set_redacted()
                     elif missing_data.exists():
                         output.set_missing_output()
-
                     outputs.append(output)
         for output in outputs:
-            output.is_invalid = not output.is_ok and output.id is not None
-
-            try:
-                output.size += 0
-                # It's a number, so format it nicely, along with date.
-                output.size = filesizeformat(output.size)
-            except TypeError:
-                pass  # Size was not a number, so leave it alone.
-            try:
-                if output.date:
-                    output.date = timezone.localtime(output.date).strftime(
-                        '%d %b %Y %H:%M:%S')
-            except Exception:
-                pass
-
+            output.finalise_state()
         return [output.__dict__ for output in outputs]
 
 

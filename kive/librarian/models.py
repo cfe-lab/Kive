@@ -474,7 +474,8 @@ class Dataset(metadata.models.AccessControl):
 
     def get_filesize(self):
         """
-        :return int: size of dataset_file in bytes
+        :return int: size of dataset_file in bytes or None if the file handle
+        cannot be accessed.
         """
         data_handle = None
         try:
@@ -482,6 +483,22 @@ class Dataset(metadata.models.AccessControl):
             if data_handle is None:
                 return None
             return data_handle.size
+        finally:
+            if data_handle is not None:
+                data_handle.close()
+
+    def get_basename_and_formatted_size(self):
+        """
+        :return str: basename of the dataset file.
+        :return str: size of dataset_file in bytes.
+        If the file handle cannot be accessed, this routine returns (None, 'missing').
+        """
+        data_handle = None
+        try:
+            data_handle = self.get_open_file_handle()
+            if data_handle is None:
+                return None, 'missing'
+            return os.path.basename(data_handle.name), filesizeformat(data_handle.size)
         finally:
             if data_handle is not None:
                 data_handle.close()
