@@ -126,7 +126,7 @@ class DatasetViewSet(RemovableModelViewSet,
         if key == "user":
             return queryset.filter(user__username__icontains=value)
         if key == 'uploaded':
-            return queryset.filter(file_source=None)
+            return queryset.filter(file_source=None).filter(usurps__isnull=True)
         if key == 'cdt':
             if value == '':
                 return queryset.filter(structure__isnull=True)
