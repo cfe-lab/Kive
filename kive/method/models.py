@@ -386,6 +386,12 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         validators=[MinValueValidator(1)]
     )
 
+    memory = models.PositiveIntegerField(
+        "Memory required (MB)",
+        help_text="Megabytes of memory Slurm will allocate for this Method (0 allocates all memory)",
+        default=6000
+    )
+
     class Meta:
         unique_together = (("family", "revision_number"))
         ordering = ["family__name", "-revision_number"]
@@ -613,6 +619,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
         job_name = job_name or self.driver.coderesource.filename
 
+        # FIXME
         job_handle = slurm_sched_class.submit_job(
             run_path,
             self.driver.coderesource.filename,
@@ -624,7 +631,8 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             stdout_path,
             stderr_path,
             after_okay,
-            job_name=job_name
+            job_name=job_name,
+            mem=self.memory
         )
         return job_handle
 

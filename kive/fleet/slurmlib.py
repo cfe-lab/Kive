@@ -158,9 +158,10 @@ class BaseSlurmScheduler(object):
                    stderrfile,
                    after_okay=None,
                    after_any=None,
-                   job_name=None):
+                   job_name=None,
+                   mem=6000):
         """ Submit a job to the slurm queue.
-        The executable submitted will be of the form:
+                The executable submitted will be of the form:
 
         workingdir/driver_name arglst[0] arglst[1] ...
 
@@ -343,7 +344,8 @@ class SlurmScheduler(BaseSlurmScheduler):
                    stderrfile,
                    after_okay=None,
                    after_any=None,
-                   job_name=None):
+                   job_name=None,
+                   mem=6000):
         job_name = job_name or driver_name
         if cls._qnames is None:
             raise RuntimeError("Must call slurm_is_alive before submitting jobs")
@@ -355,6 +357,7 @@ class SlurmScheduler(BaseSlurmScheduler):
                    "-J", job_name, "-p", partname,
                    "-s", "--uid={}".format(user_id),
                    "-c", str(num_cpus),
+                   "--mem", mem,
                    "--export=PYTHONPATH={}".format(workingdir),
                    "--export=all"]
         # "--get-user-env",
@@ -850,7 +853,9 @@ class SlurmScheduler(BaseSlurmScheduler):
             cable_info.threads_required,
             cable_info.stdout_path(),
             cable_info.stderr_path(),
-            job_name="run{}_cable{}".format(runcable.parent_run.pk, runcable.pk)
+            stderrfile="run{}_cable{}".format(runcable.parent_run.pk, runcable.pk),
+            job_name="run{}_cable{}".format(runcable.parent_run.pk, runcable.pk),
+            mem=100
         )
 
         return cable_slurm_handle, cable_execute_dict_path
@@ -888,7 +893,9 @@ class SlurmScheduler(BaseSlurmScheduler):
             1,
             step_info.setup_stdout_path(),
             step_info.setup_stderr_path(),
-            job_name="r{}s{}_setup".format(runstep.top_level_run.pk, coord_str)
+            stderrfile="r{}s{}_setup".format(runstep.top_level_run.pk, coord_str),
+            job_name="r{}s{}_setup".format(runstep.top_level_run.pk, coord_str),
+            mem=100
         )
         return setup_slurm_handle, step_execute_dict_path
 
@@ -926,7 +933,9 @@ class SlurmScheduler(BaseSlurmScheduler):
             1,
             step_info.bookkeeping_stdout_path(),
             step_info.bookkeeping_stderr_path(),
-            job_name="r{}s{}_bookkeeping".format(runstep.top_level_run.pk, coord_str)
+            stderrfile="r{}s{}_bookkeeping".format(runstep.top_level_run.pk, coord_str),
+            job_name="r{}s{}_bookkeeping".format(runstep.top_level_run.pk, coord_str),
+            mem=100
         )
 
         return bookkeeping_slurm_handle
@@ -1237,13 +1246,14 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                    driver_arglst,
                    user_id,
                    group_id,
-                   priority,
+                   prio_level,
                    num_cpus,
                    stdoutfile,
                    stderrfile,
                    after_okay=None,
                    after_any=None,
-                   job_name=None):
+                   job_name=None,
+                   mem=6000):
 
         if cls.mproc is None:
             cls._init_masterproc()
@@ -1257,18 +1267,23 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         if user_id <= 0 or group_id <= 0 or num_cpus <= 0:
             raise sp.CalledProcessError(cmd=full_path, output=None, returncode=-1)
 
-        jdct = dict([('workingdir', workingdir),
-                     ('driver_name', driver_name),
-                     ('driver_arglst', driver_arglst),
-                     ('user_id', user_id),
-                     ('group_id', group_id),
-                     ('prio_level', prio_level),
-                     ('num_cpus', num_cpus),
-                     ('stdoutfile', stdoutfile),
-                     ('stderrfile', stderrfile),
-                     ('after_okay', after_okay),
-                     ('after_any', after_any),
-                     ('job_name', job_name)])
+        jdct = dict(
+            [
+                ('workingdir', workingdir),
+                ('driver_name', driver_name),
+                ('driver_arglst', driver_arglst),
+                ('user_id', user_id),
+                ('group_id', group_id),
+                ('prio_level', prio_level),
+                ('num_cpus', num_cpus),
+                ('stdoutfile', stdoutfile),
+                ('stderrfile', stderrfile),
+                ('after_okay', after_okay),
+                ('after_any', after_any),
+                ('job_name', job_name),
+                ('mem', mem)
+            ]
+        )
         cls._jobqueue.put(('new', jdct))
         jid = cls._resqueue.get()
         return SlurmJobHandle(jid, cls)
@@ -1367,6 +1382,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                      ('after_okay', None),
                      ('after_any', None),
                      ('job_name', job_name),
+                     ('mem', 100),
                      ('return_code', 0)])
         cls._jobqueue.put(('finstep', jdct))
         jid = cls._resqueue.get()
@@ -1417,6 +1433,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                      ('after_okay', None),
                      ('after_any', None),
                      ('job_name', job_name),
+                     ('mem', 100),
                      ('return_code', exit_code)])
         cls._jobqueue.put(('finstep', jdct))
         jid = cls._resqueue.get()
@@ -1460,6 +1477,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                      ('after_okay', None),
                      ('after_any', None),
                      ('job_name', job_name),
+                     ('mem', 100),
                      ('return_code', 0)])
         cls._jobqueue.put(('finstep', jdct))
         jid = cls._resqueue.get()

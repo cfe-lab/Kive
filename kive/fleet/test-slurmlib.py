@@ -45,13 +45,20 @@ def _submit_Njob(n, prio, afteroklst=None, afteranylst=None):
     group_id = os.getgid()
     wdir = osp.join(TEST_DIR, "job%02d" % n)
     jobname = "sleep%02d.sh" % n
-    return SlurmScheduler.submit_job(wdir,
-                                     jobname, [], user_id, group_id,
-                                     prio, 1,
-                                     osp.join(wdir, "out.txt"),
-                                     osp.join(wdir, "err.txt"),
-                                     after_okay=afteroklst,
-                                     after_any=afteranylst)
+    return SlurmScheduler.submit_job(
+        wdir,
+        jobname,
+        [],
+        user_id,
+        group_id,
+        prio,
+        1,
+        osp.join(wdir, "out.txt"),
+        osp.join(wdir, "err.txt"),
+        stderrfile=afteroklst,
+        after_okay=afteroklst,
+        after_any=afteranylst
+    )
 
 
 def submit_all(prio):
@@ -150,12 +157,18 @@ class SlurmTests(TestCase):
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % m
         with self.assertRaises(sp.CalledProcessError):
-            SlurmScheduler.submit_job(wdir,
-                                      jobname, [], user_id, group_id,
-                                      prio, 1,
-                                      osp.join(wdir, "out.txt"),
-                                      osp.join(wdir, "err.txt"),
-                                      None)
+            SlurmScheduler.submit_job(
+                wdir,
+                jobname,
+                [],
+                user_id,
+                group_id,
+                prio,
+                1,
+                osp.join(wdir, "out.txt"),
+                osp.join(wdir, "err.txt"),
+                None
+            )
 
     def test_submit_job03(self, lverb=False):
         """Submission should fail (priority a string instead of int)"""
@@ -168,12 +181,18 @@ class SlurmTests(TestCase):
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
         with self.assertRaises(RuntimeError):
-            SlurmScheduler.submit_job(wdir,
-                                      jobname, [], user_id, group_id,
-                                      prio, 1,
-                                      osp.join(wdir, "out.txt"),
-                                      osp.join(wdir, "err.txt"),
-                                      None)
+            SlurmScheduler.submit_job(
+                wdir,
+                jobname,
+                [],
+                user_id,
+                group_id,
+                prio,
+                1,
+                osp.join(wdir, "out.txt"),
+                osp.join(wdir, "err.txt"),
+                None
+            )
 
     def test_submit_job04(self, lverb=False):
         """Submit a job that should run, but returns a nonzero exit code.
@@ -210,12 +229,18 @@ class SlurmTests(TestCase):
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
         with self.assertRaises(sp.CalledProcessError):
-            SlurmScheduler.submit_job(wdir,
-                                      jobname, [], user_id, group_id,
-                                      prio, 1,
-                                      osp.join(wdir, "out.txt"),
-                                      osp.join(wdir, "err.txt"),
-                                      None)
+            SlurmScheduler.submit_job(
+                wdir,
+                jobname,
+                [],
+                user_id,
+                group_id,
+                prio,
+                1,
+                osp.join(wdir, "out.txt"),
+                osp.join(wdir, "err.txt"),
+                None
+            )
         if lverb:
             print "--test_submit_job05 SUCCESS"
 
@@ -231,12 +256,18 @@ class SlurmTests(TestCase):
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
         with self.assertRaises(sp.CalledProcessError):
-            SlurmScheduler.submit_job(wdir,
-                                      jobname, [], user_id, group_id,
-                                      prio, 1,
-                                      osp.join(wdir, "out.txt"),
-                                      osp.join(wdir, "err.txt"),
-                                      None)
+            SlurmScheduler.submit_job(
+                wdir,
+                jobname,
+                [],
+                user_id,
+                group_id,
+                prio,
+                1,
+                osp.join(wdir, "out.txt"),
+                osp.join(wdir, "err.txt"),
+                None
+            )
         if lverb:
             print "--test_submit_job06 SUCCESS"
 
@@ -252,12 +283,18 @@ class SlurmTests(TestCase):
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
         with self.assertRaises(sp.CalledProcessError):
-            SlurmScheduler.submit_job(wdir,
-                                      jobname, [], user_id, group_id,
-                                      prio, num_cpu,
-                                      osp.join(wdir, "out.txt"),
-                                      osp.join(wdir, "err.txt"),
-                                      None)
+            SlurmScheduler.submit_job(
+                wdir,
+                jobname,
+                [],
+                user_id,
+                group_id,
+                prio,
+                num_cpu,
+                osp.join(wdir, "out.txt"),
+                osp.join(wdir, "err.txt"),
+                None
+            )
         if lverb:
             print "--test_submit_job07 SUCCESS"
 
