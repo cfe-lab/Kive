@@ -285,7 +285,7 @@ class Manager(object):
             mgr_logger.debug("Removing sandbox at %r.", rtp.sandbox_path)
             try:
                 rtp.collect_garbage()
-            except:
+            except OSError:
                 mgr_logger.error('Failed to purge sandbox at %r.',
                                  rtp.sandbox_path,
                                  exc_info=True)
