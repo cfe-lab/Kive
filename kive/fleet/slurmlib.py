@@ -855,7 +855,7 @@ class SlurmScheduler(BaseSlurmScheduler):
             cable_info.stderr_path(),
             stderrfile="run{}_cable{}".format(runcable.parent_run.pk, runcable.pk),
             job_name="run{}_cable{}".format(runcable.parent_run.pk, runcable.pk),
-            mem=100
+            mem=settings.SANDBOX_CABLE_MEMORY
         )
 
         return cable_slurm_handle, cable_execute_dict_path
@@ -895,7 +895,7 @@ class SlurmScheduler(BaseSlurmScheduler):
             step_info.setup_stderr_path(),
             stderrfile="r{}s{}_setup".format(runstep.top_level_run.pk, coord_str),
             job_name="r{}s{}_setup".format(runstep.top_level_run.pk, coord_str),
-            mem=100
+            mem=settings.SANDBOX_SETUP_MEMORY
         )
         return setup_slurm_handle, step_execute_dict_path
 
@@ -935,7 +935,7 @@ class SlurmScheduler(BaseSlurmScheduler):
             step_info.bookkeeping_stderr_path(),
             stderrfile="r{}s{}_bookkeeping".format(runstep.top_level_run.pk, coord_str),
             job_name="r{}s{}_bookkeeping".format(runstep.top_level_run.pk, coord_str),
-            mem=100
+            mem=settings.SANDBOX_BOOKKEEPING_MEMORY
         )
 
         return bookkeeping_slurm_handle
@@ -1382,7 +1382,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                      ('after_okay', None),
                      ('after_any', None),
                      ('job_name', job_name),
-                     ('mem', 100),
+                     ('mem', settings.SANDBOX_CABLE_MEMORY),
                      ('return_code', 0)])
         cls._jobqueue.put(('finstep', jdct))
         jid = cls._resqueue.get()
@@ -1433,7 +1433,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                      ('after_okay', None),
                      ('after_any', None),
                      ('job_name', job_name),
-                     ('mem', 100),
+                     ('mem', settings.SANDBOX_SETUP_MEMORY),
                      ('return_code', exit_code)])
         cls._jobqueue.put(('finstep', jdct))
         jid = cls._resqueue.get()
@@ -1477,7 +1477,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                      ('after_okay', None),
                      ('after_any', None),
                      ('job_name', job_name),
-                     ('mem', 100),
+                     ('mem', settings.SANDBOX_BOOKKEEPING_MEMORY),
                      ('return_code', 0)])
         cls._jobqueue.put(('finstep', jdct))
         jid = cls._resqueue.get()
