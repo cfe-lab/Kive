@@ -116,6 +116,22 @@ Revise method '{{ parent.revision_name }}' in family '{{ family.name }}'
     </tr>
 
     <tr>
+        <th>{{ method_form.memory.label }}</th>
+
+        {% if parent == None %}
+        <td colspan="3">
+        {% else %}
+        <td>{{ parent.memory }}</td>
+        <td colspan="2">
+        {% endif %}
+            {{ method_form.memory }}
+            <div class="helptext">{{ method_form.memory.help_text }}</div>
+            <br/>
+            <div class="errortext">{{ method_form.memory.errors }}</div>
+        </td>
+    </tr>
+
+    <tr>
         <th>{{ method_form.permissions.label }}
             <div class="helptext">{{ method_form.permissions.help_text }}</div>
         </th>

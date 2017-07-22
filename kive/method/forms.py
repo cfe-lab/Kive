@@ -233,6 +233,9 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
     threads = forms.IntegerField(min_value=1, initial=1,
                                  help_text="Number of threads used during execution")
 
+    memory = forms.IntegerField(min_value=0, initial=6000,
+                                help_text="Memory (MB) required for execution (0 allocates all memory on the node)")
+
     confirm_shebang = forms.BooleanField(label="Override a missing shebang?",
                                          help_text="Click to override a missing shebang in the code resource",
                                          initial=False,

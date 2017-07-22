@@ -1951,7 +1951,6 @@ class Sandbox:
                 step_execute_info.threads_required,
                 step_execute_info.driver_stdout_path(),
                 step_execute_info.driver_stderr_path(),
-                stderrfile=after_okay,
                 after_okay=after_okay,
                 job_name=job_name,
                 mem=curr_RS.pipelinestep.transformation.definite.memory

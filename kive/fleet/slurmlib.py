@@ -357,7 +357,7 @@ class SlurmScheduler(BaseSlurmScheduler):
                    "-J", job_name, "-p", partname,
                    "-s", "--uid={}".format(user_id),
                    "-c", str(num_cpus),
-                   "--mem", mem,
+                   "--mem={}".format(mem),
                    "--export=PYTHONPATH={}".format(workingdir),
                    "--export=all"]
         # "--get-user-env",
@@ -853,7 +853,6 @@ class SlurmScheduler(BaseSlurmScheduler):
             cable_info.threads_required,
             cable_info.stdout_path(),
             cable_info.stderr_path(),
-            stderrfile="run{}_cable{}".format(runcable.parent_run.pk, runcable.pk),
             job_name="run{}_cable{}".format(runcable.parent_run.pk, runcable.pk),
             mem=settings.SANDBOX_CABLE_MEMORY
         )
@@ -893,7 +892,6 @@ class SlurmScheduler(BaseSlurmScheduler):
             1,
             step_info.setup_stdout_path(),
             step_info.setup_stderr_path(),
-            stderrfile="r{}s{}_setup".format(runstep.top_level_run.pk, coord_str),
             job_name="r{}s{}_setup".format(runstep.top_level_run.pk, coord_str),
             mem=settings.SANDBOX_SETUP_MEMORY
         )
@@ -933,7 +931,6 @@ class SlurmScheduler(BaseSlurmScheduler):
             1,
             step_info.bookkeeping_stdout_path(),
             step_info.bookkeeping_stderr_path(),
-            stderrfile="r{}s{}_bookkeeping".format(runstep.top_level_run.pk, coord_str),
             job_name="r{}s{}_bookkeeping".format(runstep.top_level_run.pk, coord_str),
             mem=settings.SANDBOX_BOOKKEEPING_MEMORY
         )
