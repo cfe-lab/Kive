@@ -101,6 +101,10 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
         )
         return Response({'message': response_msg})
 
+    def filter_queryset(self, queryset):
+        queryset = super(PipelineFamilyViewSet, self).filter_queryset(queryset)
+        return self.apply_filters(queryset)
+
     @staticmethod
     def _add_filter(queryset, key, value):
         """
@@ -202,6 +206,10 @@ class PipelineViewSet(CleanCreateModelMixin,
             "" if publish_update else "un"
         )
         return Response({'message': response_msg})
+
+    def filter_queryset(self, queryset):
+        queryset = super(PipelineViewSet, self).filter_queryset(queryset)
+        return self.apply_filters(queryset)
 
     @staticmethod
     def _add_filter(queryset, key, value):
