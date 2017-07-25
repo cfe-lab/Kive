@@ -1,4 +1,5 @@
 from argparse import ArgumentParser, FileType
+from collections import Counter
 from csv import DictReader
 
 from datetime import datetime
@@ -40,19 +41,22 @@ def main():
     args = parse_args()
     with args.file:
         reader = DictReader(args.file)
-        columns = sorted(reader.fieldnames,
-                         key=lambda name: ((1 if name.startswith('head')
-                                            else 2),
-                                           name))
-        free_columns = [name for name in columns
+        free_columns = [name for name in reader.fieldnames
                         if name.endswith('_free')]
-        free_labels = [name[:-5] for name in free_columns]
+        free_labels = sorted({name[:-7] for name in free_columns},
+                             key=lambda s: ((1 if s.startswith('head')
+                                             else 2),
+                                            s))
         free = []
         times = []
         for i, row in enumerate(reader):
+            row_totals = Counter()
+            for column in free_columns:
+                if row[column] != '':
+                    row_totals[column[:-7]] += float(row[column])
             times.append(parse_date(row['time']))
-            free.append([float(row[name]) if row[name] != '' else None
-                         for name in free_columns])
+            free.append([row_totals[name] if name in row_totals else None
+                         for name in free_labels])
     fig, ax = plt.subplots()
     ax.set_title('Memory')
     ax.set_ylabel('Free GB')
