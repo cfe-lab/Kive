@@ -273,7 +273,7 @@ class PipelineSerializer(AccessControlSerializer,
         super(PipelineSerializer, self).__init__(*args, **kwargs)
         # Set the querysets of the related model fields.
         curr_user = self.context["request"].user
-        LOGGER.debug("PL SERIALIZER INIT %s" % self.context.get("only_is_published", False))
+        # LOGGER.debug("PL SERIALIZER INIT %s" % self.context.get("only_is_published", False))
 
         revision_parent_field = self.fields["revision_parent"]
         revision_parent_field.queryset = Pipeline.filter_by_user(curr_user)
@@ -281,17 +281,17 @@ class PipelineSerializer(AccessControlSerializer,
         family_field = self.fields["family"]
         family_field.queryset = PipelineFamily.filter_by_user(curr_user)
 
-    def to_representation(self, instance):
-        """ We override this method here in order to handle the
-        case where a non-staff member should only see published pipeline versions.
-
-        This routine normally returns an OrderedDict instance
-        """
-        only_is_published = self.context.get("only_is_published", False)
-        LOGGER.debug("TOREP  %s: %s" % (only_is_published, instance.published))
-        if only_is_published and not instance.published:
-            return None
-        return super(PipelineSerializer, self).to_representation(instance)
+    # def to_representation(self, instance):
+    #     """ We override this method here in order to handle the
+    #     case where a non-staff member should only see published pipeline versions.
+    #
+    #     This routine normally returns an OrderedDict instance
+    #     """
+    #     only_is_published = self.context.get("only_is_published", False)
+    #     LOGGER.debug("TOREP  %s: %s" % (only_is_published, instance.published))
+    #     if only_is_published and not instance.published:
+    #         return None
+    #     return super(PipelineSerializer, self).to_representation(instance)
 
     def validate(self, data):
         """
@@ -513,9 +513,15 @@ class PipelineFamilySerializer(AccessControlSerializer,
 
     def get_members(self, obj):
         """
-        Wrapper for a PipelineSummarySerializer that allows us to pass in some context.
+        Wrapper for a PipelineSerializer that allows us to pass in some context.
         """
         if not obj:
             return None
-        serializer = PipelineSerializer(obj.members, many=True, context=self.context)
+
+        only_published = self.context["only_is_published"]
+        pipelines_to_show = obj.members.all()
+        if only_published:
+            pipelines_to_show = pipelines_to_show.filter(published=True)
+
+        serializer = PipelineSerializer(pipelines_to_show, many=True, context=self.context)
         return serializer.data

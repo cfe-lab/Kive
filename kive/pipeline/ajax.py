@@ -15,7 +15,7 @@ from metadata.models import AccessControl
 from pipeline.models import Pipeline, PipelineFamily
 from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer,\
     PipelineStepUpdateSerializer
-from portal.views import admin_check
+from portal.views import admin_check, developer_check
 
 LOGGER = logging.getLogger(__name__)
 
@@ -48,23 +48,23 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
         """
         qp = self.request.query_params
         if qp.get('is_granted') == 'true':
-            is_admin = False
+            is_developer = False
         else:
-            is_admin = admin_check(self.request.user)
+            is_developer = developer_check(self.request.user)
         only_is_published = qp.get('only_is_published') == 'true'
-        LOGGER.debug("ISPUBLISHED {} ISADMIN {}".format(only_is_published, is_admin))
+        LOGGER.debug("ISPUBLISHED {} ISADMIN {}".format(only_is_published, is_developer))
+
         qs = self.get_object().members.all()
+        # Filter out the unpublished ones if necessary.
         if only_is_published:
-            qids = [o.id for o in qs if o.published]
-            qs = qs.filter(id__in=qids)
+            qs = qs.filter(published=True)
 
         member_pipelines = AccessControl.filter_by_user(request.user,
-                                                        is_admin=is_admin,
+                                                        is_admin=is_developer,
                                                         queryset=qs)
 
         member_serializer = PipelineSerializer(member_pipelines, many=True,
-                                               context={"request": request,
-                                                        "only_is_published": only_is_published})
+                                               context={"request": request})
         return Response(member_serializer.data)
 
     def partial_update(self, request, pk=None):
@@ -78,12 +78,14 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
         return Response({"message": "No action taken."})
 
     def get_serializer_context(self):
-        """ Return the context for the serializer.
+        """
+        Return the context for the serializer.
+
         Here, we add the only_is_published flag to the context.
         """
         context = super(PipelineFamilyViewSet, self).get_serializer_context()
-        is_admin = admin_check(self.request.user)
-        context["only_is_published"] = not is_admin
+        is_developer = developer_check(self.request.user)
+        context["only_is_published"] = not is_developer
         return context
 
     def change_published_version(self, request):

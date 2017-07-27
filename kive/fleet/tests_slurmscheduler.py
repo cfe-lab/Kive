@@ -189,6 +189,7 @@ class SlurmBadRunTests(BaseTestCases.SlurmExecutionTestCase, BadRunTestsBase):
     def test_method_fails(self):
         BadRunTestsBase.test_method_fails(self, slurm_sched_class=SlurmScheduler)
 
+
 class MockSlurmScheduler(DummySlurmScheduler):
     """ A mocked -up slurm scheduler which will create NODE_FAIL events
     with a job end time set to now() + my_time_delta.

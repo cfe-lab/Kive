@@ -1254,9 +1254,9 @@ class DummySlurmScheduler(BaseSlurmScheduler):
 
         if cls.mproc is None:
             cls._init_masterproc()
-        if not isinstance(priority, int):
-            raise RuntimeError('priority must be an integer')
-        prio_level = min(max(priority, cls.MIN_PRIO), cls.MAX_PRIO)
+        if not isinstance(prio_level, int):
+            raise RuntimeError('prio_level must be an integer')
+        prio_level = min(max(prio_level, cls.MIN_PRIO), cls.MAX_PRIO)
         # make sure the job script exists and is executable
         full_path = os.path.join(workingdir, driver_name)
         if not os.path.isfile(full_path):

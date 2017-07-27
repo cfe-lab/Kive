@@ -7,7 +7,7 @@ import re
 import shutil
 import tempfile
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.core.files.base import File
 from django.core.urlresolvers import resolve
@@ -28,7 +28,7 @@ from pipeline.models import Pipeline, PipelineFamily, \
     PipelineStep, PipelineStepInputCable, \
     PipelineOutputCable
 from pipeline.serializers import PipelineSerializer,\
-    PipelineStepUpdateSerializer
+    PipelineStepUpdateSerializer, PipelineFamilySerializer
 import kive.testing_utils as tools
 
 samplecode_path = tools.samplecode_path
@@ -2578,6 +2578,132 @@ class PipelineSerializerTests(TestCase):
         self.assertTrue(pl.published)
 
 
+@skipIfDBFeature("is_mocked")
+class PipelineFamilySerializerTests(TestCase):
+    """
+    Tests of PipelineFamilySerializer and its offshoots.
+    """
+    def setUp(self):
+        tools.create_sandbox_testing_tools_environment(self)
+        create_pipeline_deserialization_environment(self)
+
+        # That created a PipelineFamily (self.test_pf).  Create some Pipelines to go into it.
+        ps = PipelineSerializer(data=self.pipeline_dict,
+                                context=self.duck_context)
+        ps.is_valid()
+        self.pl = ps.save()
+
+        ps_raw = PipelineSerializer(data=self.pipeline_raw_dict,
+                                    context=self.duck_context)
+        ps_raw.is_valid()
+        self.pl_raw = ps_raw.save()
+
+        ps_cw = PipelineSerializer(data=self.pipeline_cw_dict,
+                                   context=self.duck_context)
+        ps_cw.is_valid()
+        self.pl_cw = ps_cw.save()
+
+    def tearDown(self):
+        tools.clean_up_all_files()
+
+    def test_show_all_none_published(self):
+        """
+        Test that the serializer properly filters out unpublished members.
+        """
+        self.duck_context["only_is_published"] = False
+
+        pfs = PipelineFamilySerializer(self.test_pf, context=self.duck_context)
+        test_pf_serialized = pfs.data
+
+        # None of the pipelines are published.
+        self.assertEqual(len(test_pf_serialized["members"]), 3)
+        id_set = set(x["id"] for x in test_pf_serialized["members"])
+        self.assertSetEqual(id_set, set([self.pl.pk, self.pl_raw.pk, self.pl_cw.pk]))
+
+    def test_show_all_some_published(self):
+        """
+        Test that the serializer properly filters out unpublished members.
+        """
+        self.duck_context["only_is_published"] = False
+
+        self.pl.published = True
+
+        pfs = PipelineFamilySerializer(self.test_pf, context=self.duck_context)
+        test_pf_serialized = pfs.data
+
+        # One of the pipelines are published.
+        self.assertEqual(len(test_pf_serialized["members"]), 3)
+        id_set = set(x["id"] for x in test_pf_serialized["members"])
+        self.assertSetEqual(id_set, set([self.pl.pk, self.pl_raw.pk, self.pl_cw.pk]))
+
+    def test_show_all_all_published(self):
+        """
+        Test that the serializer properly filters out unpublished members.
+        """
+        self.duck_context["only_is_published"] = False
+
+        self.pl.published = True
+        self.pl_raw.published = True
+        self.pl_cw.published = True
+
+        pfs = PipelineFamilySerializer(self.test_pf, context=self.duck_context)
+        test_pf_serialized = pfs.data
+
+        # One of the pipelines are published.
+        self.assertEqual(len(test_pf_serialized["members"]), 3)
+        id_set = set(x["id"] for x in test_pf_serialized["members"])
+        self.assertSetEqual(id_set, set([self.pl.pk, self.pl_raw.pk, self.pl_cw.pk]))
+
+    def test_only_is_published_none_published(self):
+        """
+        Test that the serializer properly filters out unpublished members.
+        """
+        self.duck_context["only_is_published"] = True
+
+        pfs = PipelineFamilySerializer(self.test_pf, context=self.duck_context)
+        test_pf_serialized = pfs.data
+
+        # None of the pipelines are published.
+        self.assertEqual(len(test_pf_serialized["members"]), 0)
+
+    def test_only_is_published_some_published(self):
+        """
+        Test that the serializer properly filters out unpublished members.
+        """
+        self.duck_context["only_is_published"] = True
+
+        self.pl.published = True
+        self.pl.save()
+
+        pfs = PipelineFamilySerializer(self.test_pf, context=self.duck_context)
+        test_pf_serialized = pfs.data
+
+        # One of the pipelines are published.
+        self.assertEqual(len(test_pf_serialized["members"]), 1)
+        self.assertEqual(test_pf_serialized["members"][0]["id"], self.pl.pk)
+
+    def test_only_is_published_all_published(self):
+        """
+        Test that the serializer properly filters out unpublished members.
+        """
+        self.duck_context["only_is_published"] = True
+
+        self.pl.published = True
+        self.pl.save()
+        self.pl_raw.published = True
+        self.pl_raw.save()
+        self.pl_cw.published = True
+        self.pl_cw.save()
+
+        pfs = PipelineFamilySerializer(self.test_pf, context=self.duck_context)
+        test_pf_serialized = pfs.data
+
+        # One of the pipelines are published.
+        self.assertEqual(len(test_pf_serialized["members"]), 3)
+        id_set = set(x["id"] for x in test_pf_serialized["members"])
+        self.assertSetEqual(id_set, set([self.pl.pk, self.pl_raw.pk, self.pl_cw.pk]))
+
+
 @skipIfDBFeature('is_mocked')
 class PipelineApiTests(BaseTestCases.ApiTestCase):
     fixtures = ['simple_run']
@@ -2858,3 +2984,84 @@ class PipelineFamilyApiTests(BaseTestCases.ApiTestCase):
         new_pf = PipelineFamily.objects.get(name=pf_name)
         self.assertEquals(new_pf.description, pf_description)
         self.assertEquals(new_pf.members.count(), 0)
+
+
+@skipIfDBFeature("is_mocked")
+class PipelineFamilyApiOnlyIsPublishedTests(BaseTestCases.ApiTestCase):
+    """
+    Tests whether unpublished pipelines are properly filtered if the user is/is not a developer.
+    """
+    def setUp(self):
+        super(PipelineFamilyApiOnlyIsPublishedTests, self).setUp()
+
+        self.list_path = reverse("pipelinefamily-list")
+        self.detail_pk = 2
+        self.detail_path = reverse("pipelinefamily-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("pipelinefamily-removal-plan",
+                                    kwargs={'pk': self.detail_pk})
+
+        self.list_view, _, _ = resolve(self.list_path)
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+        # Create a PipelineFamily to use in the tests.
+        tools.create_sandbox_testing_tools_environment(self)
+        create_pipeline_deserialization_environment(self)
+
+        # That created a PipelineFamily (self.test_pf).  Create some Pipelines to go into it.
+        # This one is published.
+        ps = PipelineSerializer(data=self.pipeline_dict,
+                                context=self.duck_context)
+        ps.is_valid()
+        self.pl = ps.save()
+        self.pl.published = True
+        self.pl.save()
+
+        # This one is unpublished.
+        ps_raw = PipelineSerializer(data=self.pipeline_raw_dict,
+                                    context=self.duck_context)
+        ps_raw.is_valid()
+        self.pl_raw = ps_raw.save()
+
+        # This one is published.
+        ps_cw = PipelineSerializer(data=self.pipeline_cw_dict,
+                                   context=self.duck_context)
+        ps_cw.is_valid()
+        self.pl_cw = ps_cw.save()
+        self.pl_cw.published = True
+        self.pl_cw.save()
+
+    def tearDown(self):
+        tools.clean_up_all_files()
+
+    def test_pipelines_unfiltered_for_developer(self):
+        """
+        All pipelines should show up if the user is a developer.
+        """
+        dev = User.objects.create_user("dev", "dev@developers.net", "foobar")
+        dev.groups.add(everyone_group())
+        dev.groups.add(Group.objects.get(name="Developers"))
+
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=dev)
+        response = self.detail_view(request, pk=self.test_pf.pk)
+
+        expected_revision_pks = [self.pl.pk, self.pl_cw.pk, self.pl_raw.pk]
+        actual_revision_pks = [x['id'] for x in response.data['members']]
+        self.assertItemsEqual(expected_revision_pks, actual_revision_pks)
+
+    def test_pipelines_filtered_for_non_developer(self):
+        """
+        Only published pipelines should show up if the user is not a developer.
+        """
+        non_dev = User.objects.create_user("non_dev", "non_dev@users.net", "barf")
+        non_dev.groups.add(everyone_group())
+
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=non_dev)
+        response = self.detail_view(request, pk=self.test_pf.pk)
+
+        expected_revision_pks = [self.pl.pk, self.pl_cw.pk]
+        actual_revision_pks = [x['id'] for x in response.data['members']]
+        self.assertItemsEqual(expected_revision_pks, actual_revision_pks)
