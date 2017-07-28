@@ -93,6 +93,8 @@ def main():
     for method in kive.get('/api/methods/').json():
         for dep in method['dependencies']:
             dep['requirement'] = code_resource_revisions[dep['requirement']]
+            if dep['path'] == '././':
+                dep['path'] = '.'
         method['dependencies'].sort(
             key=lambda x: (x['path'],
                            x['filename'],

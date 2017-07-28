@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from __future__ import unicode_literals
 
 from argparse import ArgumentParser, FileType
@@ -9,7 +11,6 @@ from subprocess import check_output
 
 from datetime import datetime
 from time import sleep
-from traceback import format_exc
 
 
 def parse_args():
@@ -32,9 +33,9 @@ class ZoneInfoScanner(object):
             if entry is None:
                 if (len(fields) == 5 and
                         fields[1] == 'Node' and
-                        fields[3:5] == ['zone', 'Normal']):
+                        fields[3] == 'zone'):
                     i = 0
-                    entry = dict(node=fields[0], mem_node=fields[2])
+                    entry = dict(node=fields[0], mem_node=fields[2], zone=fields[4])
             elif i == 1:
                 if len(fields) == 4 and fields[1:3] == ['pages', 'free']:
                     entry['free_mem'] = int(fields[3])
@@ -60,8 +61,16 @@ class LogWriter(object):
     def write(self, time, entries):
         row = dict(time=time.strftime('%Y-%m-%d %H:%M:%S'))
         prefixes = []
+        zones = {}  # {name: index}
         for entry in entries:
-            prefix = entry['node'] + '_' + entry['mem_node'] + '_'
+            zone_name = entry['zone']
+            zone_index = zones.get(zone_name)
+            if zone_index is None:
+                zone_index = len(zones)
+                zones[zone_name] = zone_index
+            prefix_fields = dict(entry)
+            prefix_fields['zone_index'] = zone_index
+            prefix = '{node}_{mem_node}_{zone_index}_'.format(**prefix_fields)
             prefixes.append(prefix)
             row[prefix + 'free'] = self.format(entry.get('free_mem'))
             row[prefix + 'min'] = self.format(entry.get('min_mem'))
@@ -87,21 +96,19 @@ class LogWriter(object):
 def main():
     args = parse_args()
     writer = LogWriter(args.log)
-    try:
-        while True:
-            zone_info = check_output(['bpsh', '-1', 'cat', '/proc/zoneinfo'])
-            lines = ['head: ' + line for line in zone_info.splitlines()]
+    while True:
+        with open('/proc/zoneinfo') as f:
+            zone_info = f.read()
+        lines = ['head: ' + line for line in zone_info.splitlines()]
+        try:
             zone_info = check_output(['bpsh', '-sap', 'cat', '/proc/zoneinfo'])
             lines += zone_info.splitlines()
-            entries = ZoneInfoScanner(lines)
-            writer.write(datetime.now(), entries)
+        except OSError:
+            pass
+        entries = ZoneInfoScanner(lines)
+        writer.write(datetime.now(), entries)
 
-            sleep(args.delay)
-    except Exception as ex:
-        writer.write(datetime.now(), [dict(node='head',
-                                           mem_node='0',
-                                           unexpected=format_exc())])
-        raise
+        sleep(args.delay)
 
 if __name__ == '__main__':
     main()
