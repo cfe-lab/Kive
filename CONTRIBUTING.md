@@ -135,7 +135,7 @@ Once you have set up your production server, this is how to deploy a new release
 
         sudo su -l kiveuser
         cd /usr/local/share/Kive/kive
-        ./manage.py runfleet &
+        ./manage.py runfleet </dev/null &
         
 10. Restart apache:
 

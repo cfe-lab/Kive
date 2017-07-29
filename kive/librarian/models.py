@@ -517,8 +517,8 @@ class Dataset(metadata.models.AccessControl):
         if data_handle is None:
             self.logger.warn('cannot access file handle')
             return None
-        with data_handle.file as ff:
-            return file_access_utils.compute_md5(ff)
+        with data_handle:
+            return file_access_utils.compute_md5(data_handle.file)
 
     def check_md5(self):
         """
@@ -563,7 +563,11 @@ class Dataset(metadata.models.AccessControl):
         return False
 
     def has_data(self):
-        return self.get_open_file_handle() is not None
+        data_handle = self.get_open_file_handle()
+        if data_handle is not None:
+            data_handle.close()
+            return True
+        return False
 
     def has_structure(self):
         """True if associated DatasetStructure exists; False otherwise."""

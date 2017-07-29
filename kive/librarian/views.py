@@ -68,7 +68,8 @@ def dataset_download(request, dataset_id):
     if data_handle is None:
         raise Http404("ID {} cannot be accessed (file access)".format(dataset_id))
     else:
-        return _build_download_response(data_handle)
+        with data_handle:
+            return _build_download_response(data_handle)
 
 
 @login_required
@@ -175,9 +176,8 @@ def dataset_view(request, dataset_id):
         if data_handle is None:
             c["missing_data_message"] = "Data has been removed or renamed."
         else:
-            sample_content = ""
-            with data_handle as dh:
-                sample_content = dh.read(1000)
+            with data_handle:
+                sample_content = data_handle.read(1000)
             c.update({"sample_content": sample_content})
         c["is_binary"] = False
         try:
