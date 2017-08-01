@@ -987,7 +987,7 @@ def method_revise(request, id):
             return HttpResponseRedirect('/methods/{}'.format(family.pk))
 
     else:
-        # initialize forms with values of parent Method
+        # Initialize forms with values of parent Method.
         family_form = MethodFamilyForm({"name": family.name, "description": family.description})
         parent_users_allowed = [x.username for x in parent_method.users_allowed.all()]
         parent_groups_allowed = [x.name for x in parent_method.groups_allowed.all()]
@@ -997,6 +997,7 @@ def method_revise(request, id):
                 "driver_revisions": parent_revision.pk,
                 "reusable": parent_method.reusable,
                 "threads": parent_method.threads,
+                "memory": parent_method.memory,
                 "permissions": [parent_users_allowed, parent_groups_allowed]
             })
 
