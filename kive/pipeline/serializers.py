@@ -414,6 +414,7 @@ class PipelineSerializer(AccessControlSerializer,
                         reusable=old_method.reusable,
                         tainted=old_method.tainted,
                         threads=old_method.threads,
+                        memory=old_method.memory,
                         user=pipeline.user
                     )
                     new_method.copy_io_from_parent()

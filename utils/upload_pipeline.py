@@ -461,6 +461,7 @@ def create_methods(kive, steps, revision_name):
                                            driver=step.driver.code_resource_revision['id'],
                                            reusable=transformation['reusable'],
                                            threads=transformation['threads'],
+                                           memory=transformation['memory'],
                                            inputs=inputs,
                                            outputs=outputs,
                                            dependencies=dependencies,

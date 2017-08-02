@@ -104,6 +104,7 @@ def main():
                       'users_allowed',
                       'reusable',
                       'threads',
+                      'memory',
                       'dependencies'):
             dump[field] = method[field]
         methods[method['id']] = dump

@@ -238,6 +238,7 @@ class MethodSerializer(AccessControlSerializer,
             "driver",
             "reusable",
             "threads",
+            "memory",
             "dependencies",
             "inputs",
             "outputs"
