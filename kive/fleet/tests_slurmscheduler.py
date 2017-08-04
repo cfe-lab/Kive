@@ -237,6 +237,7 @@ class Recent_NF_Scheduler(MockSlurmScheduler):
     my_time_delta = datetime.timedelta(seconds=0)
     name_tag = "RECENT--"
 
+
 @skipIfDBFeature('is_mocked')
 class NodeFailExecutionTests(BaseTestCases.SlurmExecutionTestCase):
 
