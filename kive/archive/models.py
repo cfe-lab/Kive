@@ -2032,7 +2032,7 @@ class RunStep(RunComponent):
         return result
 
     @transaction.atomic
-    def get_suitable_ER(self, input_datasets):
+    def get_suitable_ER(self, input_datasets, reuse_failures=True):
         """
         Retrieve a suitable ExecRecord for this RunStep.
 
@@ -2059,7 +2059,7 @@ class RunStep(RunComponent):
             else:
                 other.append(curr_entry)
 
-        if len(failed) > 0:
+        if reuse_failures and len(failed) > 0:
             return _first_ER_h(failed)
 
         if len(fully_reusable) > 0:
@@ -2089,7 +2089,7 @@ def _first_ER_h(execrecord_summary_list):
         num_outputs = sum(1 if x.has_data() else 0 for x in er.execrecordouts.all())
         list_decorated.append((er, curr_summary, num_outputs))
     list_sorted = sorted(list_decorated, key=itemgetter(2))
-    return (list_sorted[0][0], list_sorted[0][1])
+    return list_sorted[0][0], list_sorted[0][1]
 
 
 class RunCable(RunComponent):
@@ -2435,7 +2435,7 @@ class RunCable(RunComponent):
         return summary
 
     @transaction.atomic
-    def get_suitable_ER(self, input_SD):
+    def get_suitable_ER(self, input_SD, reuse_failures=True):
         """
         Retrieve a suitable ExecRecord for this RunCable.
 
@@ -2461,7 +2461,7 @@ class RunCable(RunComponent):
             else:
                 other.append((er, curr_summary))
 
-        if len(failed) > 0:
+        if reuse_failures and len(failed) > 0:
             return _first_ER_h(failed)
 
         if len(fully_reusable) > 0:

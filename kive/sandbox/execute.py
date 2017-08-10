@@ -872,7 +872,7 @@ class Sandbox:
         while not succeeded_yet:
             try:
                 with transaction.atomic():
-                    curr_ER, can_reuse = curr_record.get_suitable_ER(input_dataset)
+                    curr_ER, can_reuse = curr_record.get_suitable_ER(input_dataset, reuse_failures=False)
 
                     if curr_ER is not None:
                         output_dataset = curr_ER.execrecordouts.first().dataset
@@ -1424,7 +1424,7 @@ class Sandbox:
                         curr_ER = ExecRecord.objects.get(pk=cable_execute_dict["execrecord_pk"])
                         can_reuse = curr_record.check_ER_usable(curr_ER)
                     else:
-                        curr_ER, can_reuse = curr_record.get_suitable_ER(input_dataset)
+                        curr_ER, can_reuse = curr_record.get_suitable_ER(input_dataset, reuse_failures=False)
 
                     if curr_ER is not None:
                         if curr_ER.generator.record.is_quarantined():
@@ -2338,7 +2338,7 @@ class RunPlan(object):
                     method = step_plan.pipeline_step.transformation.definite
                     if method.reusable == Method.NON_REUSABLE:
                         continue
-                    execrecord, summary = step_plan.run_step.get_suitable_ER(input_datasets)
+                    execrecord, summary = step_plan.run_step.get_suitable_ER(input_datasets, reuse_failures=False)
 
                     if not summary:
                         # no exec record, have to run
