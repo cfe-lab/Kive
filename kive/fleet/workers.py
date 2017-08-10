@@ -489,6 +489,7 @@ class Foreman(object):
         for task in tasks:
             task_dict = self.tasks_in_progress[task]
             raw_slurm_state = None
+            failed = cancelled = is_node_fail = False
             # Check on the status of the jobs.
             if isinstance(task, RunStep):
                 if "bookkeeping" not in task_dict:
@@ -525,7 +526,6 @@ class Foreman(object):
                         failed = True
                         terminated_during = "setup"
                         raw_slurm_state = raw_setup_state
-
                     else:
                         assert setup_state in self.slurm_sched_class.SUCCESS_STATES, \
                             "Unexpected Slurm state: {} (raw Slurm state: {})".format(
@@ -540,7 +540,6 @@ class Foreman(object):
                                 driver_info[state_keyword] != BaseSlurmScheduler.UNKNOWN):
                             driver_state = driver_info[state_keyword]
                             raw_driver_state = driver_info[raw_state_keyword]
-
                         if driver_state is None or driver_state in self.slurm_sched_class.RUNNING_STATES:
                             still_running.append(task_dict["driver"])
                             continue
@@ -561,7 +560,6 @@ class Foreman(object):
                                 cancelled = True
                             terminated_during = "driver"
                             raw_slurm_state = raw_driver_state
-
                         elif driver_info[start_keyword] is not None and driver_info[end_keyword] is not None:
                             # Having reached here, we know that the driver ran to completion,
                             # successfully or no, and has the start and end times properly set.
@@ -646,7 +644,6 @@ class Foreman(object):
                             bookkeeping_info[state_keyword] != BaseSlurmScheduler.UNKNOWN):
                         bookkeeping_state = bookkeeping_info[state_keyword]
                         raw_bookkeeping_state = bookkeeping_info[raw_state_keyword]
-
                     if bookkeeping_state is None or bookkeeping_state in self.slurm_sched_class.RUNNING_STATES:
                         still_running.append(task_dict["bookkeeping"])
                         continue
