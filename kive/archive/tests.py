@@ -3421,76 +3421,6 @@ class TopLevelRunOnDeepNestedRunTests(TestCase):
                 self.assertEquals(self.deep_nested_run, roc.top_level_run)
 
 
-# @skipIfDBFeature('is_mocked')
-# class RunStepReuseFailedExecRecordTests(BaseTestCases.SlurmExecutionTestCase):
-#     def setUp(self):
-#         tools.create_grandpa_sandbox_environment(self)
-#         tools.make_words_dataset(self)
-#
-#     def tearDown(self):
-#         tools.destroy_grandpa_sandbox_environment(self)
-#
-#     def test_reuse_failed_ER_can_have_missing_outputs(self):
-#         """
-#         A RunStep that reuses a failed ExecRecord does not care if its required outputs are not in the ExecRecord.
-#         """
-#         # The environment provides a method that always fails called method_fubar, which takes in data
-#         # with CDT cdt_string (string: "word"), and puts out data with the same CDT in principle.
-#
-#         failing_pipeline = tools.make_first_pipeline("failing pipeline", "a pipeline which always fails",
-#                                                      self.user_grandpa)
-#         # self.method_fubar always exits with exit code 1, and creates no output.
-#         tools.create_linear_pipeline(
-#             failing_pipeline,
-#             [self.method_fubar, self.method_noop], "indata", "outdata"
-#         )
-#         failing_pipeline.create_outputs()
-#
-#         first_step = failing_pipeline.steps.get(step_num=1)
-#         first_step.add_deletion(self.method_fubar.outputs.first())
-#
-#         # This Pipeline is identical to the first but doesn't discard output.
-#         failing_pl_2 = tools.make_first_pipeline("failing pipeline 2", "another pipeline which always fails",
-#                                                  self.user_grandpa)
-#         tools.create_linear_pipeline(
-#             failing_pl_2,
-#             [self.method_fubar, self.method_noop], "indata", "outdata"
-#         )
-#         failing_pl_2.create_outputs()
-#
-#         # The first Pipeline should fail.  The second will reuse the first step's ExecRecord, and will not
-#         # throw an exception, even though the ExecRecord doesn't provide the necessary output.
-#         run_1 = Manager.execute_pipeline(
-#             self.user_grandpa,
-#             failing_pipeline,
-#             [self.dataset_words],
-#             groups_allowed=[everyone_group()]
-#         ).get_last_run()
-#         run_2 = Manager.execute_pipeline(
-#             self.user_grandpa,
-#             failing_pl_2,
-#             [self.dataset_words],
-#             groups_allowed=[everyone_group()]
-#         ).get_last_run()
-#
-#         failing_er = run_1.runsteps.get(pipelinestep__step_num=1).execrecord
-#         self.assertEquals(failing_er,
-#                           run_2.runsteps.get(pipelinestep__step_num=1).execrecord)
-#
-#         self.assertEquals(failing_er.generator.methodoutput.return_code, 1)
-#         self.assertFalse(failing_er.outputs_OK())
-#
-#         self.assertEquals(failing_er.execrecordouts.count(), 1)
-#         produced_dataset = failing_er.execrecordouts.first().dataset
-#         self.assertEquals(produced_dataset.content_checks.count(), 1)
-#         self.assertFalse(produced_dataset.integrity_checks.exists())
-#
-#         bad_ccl = produced_dataset.content_checks.first()
-#         self.assertEquals(bad_ccl, failing_er.generator.content_checks.first())
-#
-#         self.assertTrue(bad_ccl.baddata.missing_output)
-
-
 @skipIfDBFeature('is_mocked')
 class RunStepDoNotReuseFailedExecRecordTests(BaseTestCases.SlurmExecutionTestCase):
     def setUp(self):
@@ -3500,9 +3430,9 @@ class RunStepDoNotReuseFailedExecRecordTests(BaseTestCases.SlurmExecutionTestCas
     def tearDown(self):
         tools.destroy_grandpa_sandbox_environment(self)
 
-    def test_reuse_failed_ER_can_have_missing_outputs(self):
+    def test_failed_ER_is_not_reused(self):
         """
-        A RunStep that reuses a failed ExecRecord does not care if its required outputs are not in the ExecRecord.
+        Failed ExecRecords are not reused.
         """
         # The environment provides a method that always fails called method_fubar, which takes in data
         # with CDT cdt_string (string: "word"), and puts out data with the same CDT in principle.
@@ -3528,8 +3458,7 @@ class RunStepDoNotReuseFailedExecRecordTests(BaseTestCases.SlurmExecutionTestCas
         )
         failing_pl_2.create_outputs()
 
-        # The first Pipeline should fail.  The second will reuse the first step's ExecRecord, and will not
-        # throw an exception, even though the ExecRecord doesn't provide the necessary output.
+        # The first Pipeline should fail.  The second will not reuse the first step's ExecRecord.
         run_1 = Manager.execute_pipeline(
             self.user_grandpa,
             failing_pipeline,
