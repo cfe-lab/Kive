@@ -6,7 +6,7 @@ import os.path
 import logging
 import tempfile
 import json
-
+import time
 import multiprocessing as mp
 import Queue
 
@@ -24,6 +24,40 @@ from fleet.exceptions import StopExecution
 logger = logging.getLogger("fleet.slurmlib")
 
 MANAGE_PY = "manage.py"
+
+
+DEFAULT_MEM = 6000
+
+NUM_RETRY = settings.SLURM_COMMAND_RETRY_NUM
+SLEEP_SECS = settings.SLURM_COMMAND_RETRY_SLEEP_SECS
+
+
+def multi_check_output(cmd_lst, stderr=None):
+    itry, cmd_retry = 1, True
+    while cmd_retry:
+        cmd_retry = False
+        try:
+            out_str = sp.check_output(cmd_lst, stderr=stderr)
+        except OSError:
+            # typically happens if the executable cannot execute at all (e.g. not installed)
+            # ==> we just pass this error up
+            raise
+        except sp.CalledProcessError as e:
+            # typically happens if the executable did run, but returned an error
+            # ==> assume the command timed out, so we retry
+            cmd_retry = True
+            logger.debug("timeout #%d/%d on command %s (retcode %s)",
+                         itry, NUM_RETRY, cmd_lst[0], e.returncode)
+            if itry < NUM_RETRY:
+                itry += 1
+                time.sleep(SLEEP_SECS)
+            else:
+                raise
+
+    return out_str
+
+# CHECK_OUTPUT = sp.check_output
+CHECK_OUTPUT = multi_check_output
 
 
 class SlurmJobHandle:
@@ -159,7 +193,7 @@ class BaseSlurmScheduler(object):
                    after_okay=None,
                    after_any=None,
                    job_name=None,
-                   mem=6000):
+                   mem=DEFAULT_MEM):
         """ Submit a job to the slurm queue.
                 The executable submitted will be of the form:
 
@@ -345,7 +379,7 @@ class SlurmScheduler(BaseSlurmScheduler):
                    after_okay=None,
                    after_any=None,
                    job_name=None,
-                   mem=6000):
+                   mem=DEFAULT_MEM):
         job_name = job_name or driver_name
         if cls._qnames is None:
             raise RuntimeError("Must call slurm_is_alive before submitting jobs")
@@ -383,7 +417,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         stderr_fd, stderr_path = tempfile.mkstemp()
         try:
             with os.fdopen(stderr_fd, "w") as f:
-                out_str = sp.check_output(cmd_lst, stderr=f)
+                out_str = CHECK_OUTPUT(cmd_lst, stderr=f)
         except OSError:
             status_report = "failed to execute '%s'" % " ".join(cmd_lst)
             logger.warning(status_report, exc_info=True)
@@ -427,7 +461,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         stderr_fd, stderr_path = tempfile.mkstemp()
         try:
             with os.fdopen(stderr_fd, "w") as f:
-                sp.check_output(cmd_lst, stderr=f)
+                CHECK_OUTPUT(cmd_lst, stderr=f)
         except OSError:
             status_report = "failed to execute '%s'" % " ".join(cmd_lst)
             logger.warning(status_report, exc_info=True)
@@ -505,7 +539,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         stderr_fd, stderr_path = tempfile.mkstemp()
         try:
             with os.fdopen(stderr_fd, "w") as f:
-                out_str = sp.check_output(cmd_lst, stderr=f)
+                out_str = CHECK_OUTPUT(cmd_lst, stderr=f)
         except OSError:
             # typically happens if the executable cannot execute at all (e.g. not installed)
             status_report = "failed to execute '%s'" % " ".join(cmd_lst)
@@ -806,7 +840,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         stderr_fd, stderr_path = tempfile.mkstemp()
         try:
             with os.fdopen(stderr_fd, "w") as f:
-                sp.check_output(cmd_list, stderr=f)
+                CHECK_OUTPUT(cmd_list, stderr=f)
         except OSError:
             status_report = "failed to execute '%s'" % " ".join(cmd_list)
             logger.warning(status_report, exc_info=True)
@@ -1250,7 +1284,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                    after_okay=None,
                    after_any=None,
                    job_name=None,
-                   mem=6000):
+                   mem=DEFAULT_MEM):
 
         if cls.mproc is None:
             cls._init_masterproc()

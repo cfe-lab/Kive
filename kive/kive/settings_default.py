@@ -349,9 +349,9 @@ SANDBOX_BOOKKEEPING_PREAMBLE = ""
 SANDBOX_CABLE_PREAMBLE = ""
 
 # The amount of memory to allocate to setup, bookkeeping, and cable tasks (in MB).
-SANDBOX_SETUP_MEMORY = 100
-SANDBOX_BOOKKEEPING_MEMORY = 100
-SANDBOX_CABLE_MEMORY = 100
+SANDBOX_SETUP_MEMORY = 10000
+SANDBOX_BOOKKEEPING_MEMORY = 10000
+SANDBOX_CABLE_MEMORY = 10000
 
 CONFIRM_COPY_RETRIES = 5
 CONFIRM_COPY_WAIT_MIN = 3
@@ -371,6 +371,11 @@ SLURM_PRIO_COLNAME = "PRIORITY"
 
 # Attempt to run the system tests that use Slurm.
 RUN_SLURM_TESTS = False
+
+# the number of times to retry a slurm command such as sbatch or sacct
+# as well as the interval in seconds to wait between retries
+SLURM_COMMAND_RETRY_NUM = 10
+SLURM_COMMAND_RETRY_SLEEP_SECS = 10
 
 # Fail any slurm job that reports a NODE_FAIL for longer than this time (in seconds).
 NODE_FAIL_TIME_OUT_SECS = 5*60
