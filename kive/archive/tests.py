@@ -3422,7 +3422,7 @@ class TopLevelRunOnDeepNestedRunTests(TestCase):
 
 
 @skipIfDBFeature('is_mocked')
-class RunStepReuseFailedExecRecordTests(BaseTestCases.SlurmExecutionTestCase):
+class RunStepDoNotReuseFailedExecRecordTests(BaseTestCases.SlurmExecutionTestCase):
     def setUp(self):
         tools.create_grandpa_sandbox_environment(self)
         tools.make_words_dataset(self)
@@ -3430,9 +3430,9 @@ class RunStepReuseFailedExecRecordTests(BaseTestCases.SlurmExecutionTestCase):
     def tearDown(self):
         tools.destroy_grandpa_sandbox_environment(self)
 
-    def test_reuse_failed_ER_can_have_missing_outputs(self):
+    def test_failed_ER_is_not_reused(self):
         """
-        A RunStep that reuses a failed ExecRecord does not care if its required outputs are not in the ExecRecord.
+        Failed ExecRecords are not reused.
         """
         # The environment provides a method that always fails called method_fubar, which takes in data
         # with CDT cdt_string (string: "word"), and puts out data with the same CDT in principle.
@@ -3458,8 +3458,7 @@ class RunStepReuseFailedExecRecordTests(BaseTestCases.SlurmExecutionTestCase):
         )
         failing_pl_2.create_outputs()
 
-        # The first Pipeline should fail.  The second will reuse the first step's ExecRecord, and will not
-        # throw an exception, even though the ExecRecord doesn't provide the necessary output.
+        # The first Pipeline should fail.  The second will not reuse the first step's ExecRecord.
         run_1 = Manager.execute_pipeline(
             self.user_grandpa,
             failing_pipeline,
@@ -3474,8 +3473,7 @@ class RunStepReuseFailedExecRecordTests(BaseTestCases.SlurmExecutionTestCase):
         ).get_last_run()
 
         failing_er = run_1.runsteps.get(pipelinestep__step_num=1).execrecord
-        self.assertEquals(failing_er,
-                          run_2.runsteps.get(pipelinestep__step_num=1).execrecord)
+        self.assertNotEquals(failing_er, run_2.runsteps.get(pipelinestep__step_num=1).execrecord)
 
         self.assertEquals(failing_er.generator.methodoutput.return_code, 1)
         self.assertFalse(failing_er.outputs_OK())

@@ -543,25 +543,6 @@ class Dataset(metadata.models.AccessControl):
             return False
         return True
 
-    def OLDhas_data(self):
-        """
-        True if an actual dataset file exists; False otherwise.
-
-        This returns True if there is either a file registered in the database or if
-        there is a working pointer to an external file.
-        """
-        # Note: "self.dataset_file is not None" won't work here because self.dataset_file
-        # is a FieldFile with no file, not None.
-        if bool(self.dataset_file):
-            return True
-
-        # we have an external file: check existence and MD5 sum...
-        abs_path = self.external_absolute_path()
-        if abs_path is not None:
-            if os.path.exists(abs_path) and os.access(abs_path, os.R_OK):
-                return True
-        return False
-
     def has_data(self):
         data_handle = self.get_open_file_handle()
         if data_handle is not None:
