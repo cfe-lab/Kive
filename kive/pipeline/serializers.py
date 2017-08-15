@@ -220,6 +220,14 @@ def _source_transf_finder(step_num, dataset_name, step_data_dicts):
     return curr_transf.outputs.get(dataset_name=dataset_name)
 
 
+class PipelineSummarySerializer(AccessControlSerializer, serializers.ModelSerializer):
+    inputs = TransformationInputSerializer(many=True)
+
+    class Meta:
+        model = Pipeline
+        fields = ("id", "display_name", "url", "published", 'revision_number', 'inputs')
+
+
 class PipelineSerializer(AccessControlSerializer,
                          serializers.ModelSerializer):
 
@@ -524,5 +532,5 @@ class PipelineFamilySerializer(AccessControlSerializer,
         if only_published:
             pipelines_to_show = pipelines_to_show.filter(published=True)
 
-        serializer = PipelineSerializer(pipelines_to_show, many=True, context=self.context)
+        serializer = PipelineSummarySerializer(pipelines_to_show, many=True, context=self.context)
         return serializer.data
