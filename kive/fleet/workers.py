@@ -14,6 +14,7 @@ import inspect
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from django.core.files import File
 from django.db import transaction
@@ -102,7 +103,7 @@ class Manager(object):
             else:
                 try:
                     stop_user = User.objects.get(username=stop_username)
-                except User.DoesNotExist:
+                except ObjectDoesNotExist:
                     raise User.DoesNotExist(
                         'Username {!r} not found.'.format(stop_username))
             active_tasks = Run.objects.filter(start_time__isnull=False,
