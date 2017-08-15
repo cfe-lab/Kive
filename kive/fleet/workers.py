@@ -13,6 +13,7 @@ import shutil
 import inspect
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.files import File
 from django.db import transaction
@@ -24,6 +25,13 @@ from fleet.slurmlib import SlurmScheduler, DummySlurmScheduler, BaseSlurmSchedul
 
 mgr_logger = logging.getLogger("fleet.Manager")
 foreman_logger = logging.getLogger("fleet.Foreman")
+
+
+class ActiveRunsException(Exception):
+    def __init__(self, count):
+        super(ActiveRunsException, self).__init__(
+            'Found {} active runs.'.format(count))
+        self.count = count
 
 
 def disable_worker_file_logging(target_logger):
@@ -55,7 +63,9 @@ class Manager(object):
             self,
             quit_idle=False,
             history=0,
-            slurm_sched_class=SlurmScheduler
+            slurm_sched_class=SlurmScheduler,
+            stop_username=None,
+            no_stop=False
     ):
         # Configure logging so that the process running this keeps its output
         # from writing to the same place as the web server.
@@ -82,10 +92,26 @@ class Manager(object):
         slurm_is_ok = self.slurm_sched_class.slurm_is_alive()
         mgr_logger.info("Slurm is OK: %s" % slurm_is_ok)
         if not slurm_is_ok:
-            mgr_logger.error("Slurm cannot be contacted, exiting")
-            raise RuntimeError("Slurm is not running")
+            raise RuntimeError("Slurm is down or badly configured.")
         # log some slurm information
         mgr_logger.info("Slurm identifies as: '%s'" % self.slurm_sched_class.slurm_ident())
+
+        if not no_stop:
+            if stop_username is None:
+                stop_user = None
+            else:
+                try:
+                    stop_user = User.objects.get(username=stop_username)
+                except User.DoesNotExist:
+                    raise User.DoesNotExist(
+                        'Username {!r} not found.'.format(stop_username))
+            active_tasks = Run.objects.filter(start_time__isnull=False,
+                                              end_time__isnull=True)
+            for task in active_tasks:
+                if stop_user is None:
+                    raise ActiveRunsException(active_tasks.count())
+                task.stopped_by = stop_user
+                task.save()
 
     def configure_manager_file_logger(self, target_logger):
         """
