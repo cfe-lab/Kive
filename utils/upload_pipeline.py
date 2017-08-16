@@ -165,16 +165,15 @@ class CodeResourceRequest(object):
                 self.code_resource = response.json()
         if self.code_resource_revision is None:
             with open(self.path, 'rb') as f:
-                response = self.kive.post('/api/stagedfiles/',
-                                          files=dict(uploaded_file=f))
-            staged_file = response.json()
-            response = self.kive.post(
-                '/api/coderesourcerevisions/',
-                json=dict(coderesource=self.code_resource['name'],
-                          revision_name=revision_name,
-                          staged_file=staged_file['pk'],
-                          users_allowed=self.config['users_allowed'],
-                          groups_allowed=self.config['groups_allowed']))
+                response = self.kive.post(
+                    '/api/coderesourcerevisions/',
+                    json=dict(coderesource=self.code_resource['name'],
+                              revision_name=revision_name,
+                              users_allowed=self.config['users_allowed'],
+                              groups_allowed=self.config['groups_allowed']),
+                    files=dict(content_file=f)
+                )
+
             self.code_resource_revision = response.json()
         CodeResourceRequest.existing[self.name] = self.code_resource_revision
 

@@ -8,13 +8,12 @@ import os.path
 import shutil
 import tempfile
 import copy
-import unittest
 import re
 
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
+from django.core.files.base import ContentFile
 from django.core.urlresolvers import resolve
 from django.db import transaction
 
@@ -24,7 +23,6 @@ from rest_framework.reverse import reverse
 from rest_framework.test import force_authenticate
 
 from constants import datatypes
-import file_access_utils
 from kive.tests import BaseTestCases
 import librarian.models
 from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
@@ -1164,23 +1162,17 @@ def crr_test_setup(case):
     case.cr.save()
     case.cr.grant_everyone_access()
 
-    with tempfile.TemporaryFile() as f:
-        f.write("""#!/bin/bash
+    case.hello_world = """#!/bin/bash
 
 echo "Hello World"
-""")
-        f.seek(0)
-        case.staged_file = portal.models.StagedFile(
-            uploaded_file=File(f),
-            user=kive_user()
-        )
-        case.staged_file.save()
+"""
+    case.hello_world_file = ContentFile(case.hello_world)
 
     case.crr_data = {
         "coderesource": case.cr_name,
         "revision_name": "v1",
         "revision_desc": "First version",
-        "staged_file": case.staged_file.pk,
+        "content_file": case.hello_world_file,
         "groups_allowed": [everyone_group().name]
     }
 
@@ -1225,8 +1217,6 @@ class CodeResourceRevisionSerializerTests(TestCase):
         """
         Test creation of a CodeResourceRevision with no dependencies.
         """
-        staged_file_pk = self.staged_file.pk
-
         crr_s = CodeResourceRevisionSerializer(
             data=self.crr_data,
             context={"request": self.duck_request}
@@ -1237,23 +1227,6 @@ class CodeResourceRevisionSerializerTests(TestCase):
         # Inspect the revision we just added.
         new_crr = self.cr.revisions.get(revision_name="v1")
         self.assertEquals(new_crr.revision_desc, "First version")
-
-        # Make sure the staged file was removed.
-        self.assertFalse(portal.models.StagedFile.objects.filter(pk=staged_file_pk).exists())
-
-    def test_validate_not_your_staged_file(self):
-        """
-        If the StagedFile specified is not the user's, then complain.
-        """
-        self.duck_request.user = self.remover
-        crr_s = CodeResourceRevisionSerializer(
-            data=self.crr_data,
-            context={"request": self.duck_request}
-        )
-        self.cr.grant_everyone_access()
-
-        self.assertFalse(crr_s.is_valid())
-        self.assertTrue("staged_file" in crr_s.errors)
 
 
 @skipIfDBFeature('is_mocked')
@@ -1335,7 +1308,6 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         """
         Test creation of a new CodeResourceRevision via the API.
         """
-        staged_file_pk = self.staged_file.pk
         request = self.factory.post(self.list_path, self.crr_data)
         force_authenticate(request, user=kive_user())
         self.list_view(request)
@@ -1343,9 +1315,6 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         # Inspect the revision we just added.
         new_crr = self.cr.revisions.get(revision_name="v1")
         self.assertEquals(new_crr.revision_desc, "First version")
-
-        # Make sure the staged file was removed.
-        self.assertFalse(portal.models.StagedFile.objects.filter(pk=staged_file_pk).exists())
 
     def test_create_clean_fails(self):
         """

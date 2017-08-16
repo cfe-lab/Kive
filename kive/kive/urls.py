@@ -7,7 +7,7 @@ from kive.kive_router import KiveRouter
 from metadata.ajax import DatatypeViewSet, CompoundDatatypeViewSet
 from method.ajax import MethodViewSet, MethodFamilyViewSet, CodeResourceViewSet, CodeResourceRevisionViewSet
 from pipeline.ajax import PipelineFamilyViewSet, PipelineViewSet
-from portal.ajax import StagedFileViewSet, UserViewSet
+from portal.ajax import UserViewSet
 from portal.forms import LoginForm
 
 import portal.views
@@ -37,7 +37,6 @@ router.register(r'pipelines', PipelineViewSet)
 router.register(r'pipelinefamilies', PipelineFamilyViewSet)
 router.register(r'runs', RunViewSet)
 router.register(r'runbatches', RunBatchViewSet)
-router.register(r'stagedfiles', StagedFileViewSet)
 router.register(r'users', UserViewSet)
 
 urlpatterns = [

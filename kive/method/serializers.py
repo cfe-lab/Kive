@@ -79,12 +79,6 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
         default=CRRevisionNumberGetter()
     )
 
-    staged_file = serializers.PrimaryKeyRelatedField(
-        queryset=portal.models.StagedFile.objects.all(),
-        allow_null=True,
-        write_only=True
-    )
-
     class Meta:
         model = CodeResourceRevision
         fields = (
@@ -103,7 +97,6 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
             'revision_desc',
             'revision_DateTime',
             "content_file",
-            "staged_file",
             "download_url",
             "MD5_checksum"
         )
@@ -120,10 +113,6 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
             # Set the queryset of the coderesource field.
             cr_field = self.fields["coderesource"]
             cr_field.queryset = CodeResource.filter_by_user(request.user)
-    
-            staged_file_field = self.fields["staged_file"]
-            staged_file_field.queryset = portal.models.StagedFile.objects.filter(
-                user=request.user)
 
     # This is a nested serializer so we need to customize the create method.
     def create(self, validated_data):
@@ -135,20 +124,11 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
         crr_data = validated_data
         users_allowed = crr_data.pop("users_allowed") if "users_allowed" in crr_data else []
         groups_allowed = crr_data.pop("groups_allowed") if "groups_allowed" in crr_data else []
-        staged_file = crr_data.pop("staged_file") if "staged_file" in crr_data else None
 
         with transaction.atomic():
             crr = CodeResourceRevision(**crr_data)
-            if staged_file is not None:
-                crr.content_file = File(staged_file.uploaded_file.file)
-                crr.clean()  # This sets the MD5.
-                crr.save()
-
             crr.users_allowed.add(*users_allowed)
             crr.groups_allowed.add(*groups_allowed)
-
-        if staged_file is not None:
-            staged_file.delete()
 
         return crr
 

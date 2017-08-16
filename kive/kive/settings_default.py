@@ -372,8 +372,8 @@ SLURM_PRIO_COLNAME = "PRIORITY"
 # Attempt to run the system tests that use Slurm.
 RUN_SLURM_TESTS = False
 
-# the number of times to retry a slurm command such as sbatch or sacct
-# as well as the interval in seconds to wait between retries
+# The number of times to retry a slurm command such as sbatch or sacct,
+# and the interval in seconds to wait between retries.
 SLURM_COMMAND_RETRY_NUM = 10
 SLURM_COMMAND_RETRY_SLEEP_SECS = 10
 
