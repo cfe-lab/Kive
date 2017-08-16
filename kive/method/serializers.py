@@ -101,7 +101,7 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
             "MD5_checksum"
         )
         # revision_DateTime, removal_plan, absolute_url, and display_name are already read_only.
-        read_only_fields = ("content_file", "MD5_checksum")
+        read_only_fields = ("MD5_checksum")
         extra_kwargs = {
             "content_file": {"use_url": False},
         }
@@ -127,6 +127,8 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
 
         with transaction.atomic():
             crr = CodeResourceRevision(**crr_data)
+            crr.clean()  # this sets the MD5
+            crr.save()
             crr.users_allowed.add(*users_allowed)
             crr.groups_allowed.add(*groups_allowed)
 

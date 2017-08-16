@@ -23,7 +23,7 @@ from rest_framework.reverse import reverse
 from rest_framework.test import force_authenticate
 
 from constants import datatypes
-from kive.tests import BaseTestCases
+from kive.tests import BaseTestCases, install_fixture_files
 import librarian.models
 from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
 import metadata.tests
@@ -31,7 +31,6 @@ from method.ajax import MethodViewSet, MethodFamilyViewSet
 from method.models import CodeResource, CodeResourceRevision, \
     Method, MethodFamily, MethodDependency
 from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
-import portal.models
 import kive.testing_utils as tools
 from fleet.workers import Manager
 from portal.utils import update_all_contenttypes
@@ -1168,6 +1167,7 @@ echo "Hello World"
 """
     case.hello_world_file = ContentFile(case.hello_world)
 
+    # Note: we have to add content_file on the fly so we can wrap it in a Django File.
     case.crr_data = {
         "coderesource": case.cr_name,
         "revision_name": "v1",
@@ -1176,18 +1176,25 @@ echo "Hello World"
         "groups_allowed": [everyone_group().name]
     }
 
-    with tempfile.TemporaryFile() as f:
-        f.write("""language = ENG""")
-        f.seek(0)
-        case.crd = CodeResourceRevision(
-            coderesource=case.cr,
-            revision_name="dependency",
-            revision_desc="Dependency",
-            user=kive_user(),
-            content_file=File(f))
-        case.crd.clean()
-        case.crd.save()
-        case.crd.grant_everyone_access()
+    # In many situations below, the ContentFile object doesn't work with the DRF serializers.
+    # In those situations, we'll open the file in the test and insert it into case.crr_data
+    # so that we don't have an open file handle being passed around.
+    case.hello_world_fd, case.hello_world_filename = tempfile.mkstemp()
+    with os.fdopen(case.hello_world_fd, "wb") as f:
+        f.write(case.hello_world)
+
+    case.crr_dependency = """language = ENG"""
+    case.crr_dependency_file = ContentFile(case.crr_dependency)
+    case.crd = CodeResourceRevision(
+        coderesource=case.cr,
+        revision_name="dependency",
+        revision_desc="Dependency",
+        user=kive_user(),
+        content_file=case.crr_dependency_file
+    )
+    case.crd.clean()
+    case.crd.save()
+    case.crd.grant_everyone_access()
 
 
 @skipIfDBFeature('is_mocked')
@@ -1195,6 +1202,7 @@ class CodeResourceRevisionSerializerTests(TestCase):
     fixtures = ["removal"]
 
     def setUp(self):
+        install_fixture_files("removal")
         # This user is defined in the removal fixture.
         self.remover = User.objects.get(username="RemOver")
         crr_test_setup(self)
@@ -1207,22 +1215,27 @@ class CodeResourceRevisionSerializerTests(TestCase):
         """
         Test validation of a CodeResourceRevision with no dependencies.
         """
-        crr_s = CodeResourceRevisionSerializer(
-            data=self.crr_data,
-            context={"request": self.duck_request}
-        )
-        self.assertTrue(crr_s.is_valid())
+        with open(self.hello_world_filename, "rb") as f:
+            self.crr_data["content_file"] = File(f)
+            crr_s = CodeResourceRevisionSerializer(
+                data=self.crr_data,
+                context={"request": self.duck_request}
+            )
+            foo = crr_s.is_valid()
+            self.assertTrue(crr_s.is_valid())
 
     def test_create(self):
         """
         Test creation of a CodeResourceRevision with no dependencies.
         """
-        crr_s = CodeResourceRevisionSerializer(
-            data=self.crr_data,
-            context={"request": self.duck_request}
-        )
-        crr_s.is_valid()
-        crr_s.save()
+        with open(self.hello_world_filename, "rb") as f:
+            self.crr_data["content_file"] = File(f)
+            crr_s = CodeResourceRevisionSerializer(
+                data=self.crr_data,
+                context={"request": self.duck_request}
+            )
+            crr_s.is_valid()
+            crr_s.save()
 
         # Inspect the revision we just added.
         new_crr = self.cr.revisions.get(revision_name="v1")
@@ -1234,6 +1247,7 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
     fixtures = ["removal"]
 
     def setUp(self):
+        install_fixture_files("removal")
         # This user is defined in the removal fixture.
         self.remover = User.objects.get(username="RemOver")
         super(CodeResourceRevisionApiTests, self).setUp()
@@ -1256,6 +1270,7 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
 
     def tearDown(self):
         tools.clean_up_all_files()
+        os.remove(self.hello_world_filename)
 
     def test_list(self):
         request = self.factory.get(self.list_path)
@@ -1308,9 +1323,11 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         """
         Test creation of a new CodeResourceRevision via the API.
         """
-        request = self.factory.post(self.list_path, self.crr_data)
-        force_authenticate(request, user=kive_user())
-        self.list_view(request)
+        with open(self.hello_world_filename, "rb") as f:
+            self.crr_data["content_file"] = f
+            request = self.factory.post(self.list_path, self.crr_data)
+            force_authenticate(request, user=kive_user())
+            self.list_view(request)
 
         # Inspect the revision we just added.
         new_crr = self.cr.revisions.get(revision_name="v1")
@@ -1323,9 +1340,11 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         # Disallow everyone from accessing self.cr, which will cause clean to fail.
         self.cr.groups_allowed.remove(everyone_group())
 
-        request = self.factory.post(self.list_path, self.crr_data, format="json")
-        force_authenticate(request, user=kive_user())
-        response = self.list_view(request)
+        with open(self.hello_world_filename, "rb") as f:
+            self.crr_data["content_file"] = f
+            request = self.factory.post(self.list_path, self.crr_data)
+            force_authenticate(request, user=kive_user())
+            response = self.list_view(request)
 
         self.assertDictEqual(
             response.data,
@@ -1348,9 +1367,11 @@ def method_test_setup(case):
     crr_test_setup(case)
 
     # We need a CodeResourceRevision to create a Method from.
-    crr_s = CodeResourceRevisionSerializer(data=case.crr_data, context=case.duck_context)
-    crr_s.is_valid()
-    case.crr = crr_s.save()
+    with open(case.hello_world_filename, "rb") as f:
+        case.crr_data["content_file"] = File(f)
+        crr_s = CodeResourceRevisionSerializer(data=case.crr_data, context=case.duck_context)
+        crr_s.is_valid()
+        case.crr = crr_s.save()
 
     # We need a MethodFamily to add the Method to.
     case.dtf_mf = MethodFamily(
@@ -1413,6 +1434,7 @@ class MethodSerializerTests(TestCase):
     fixtures = ["removal"]
 
     def setUp(self):
+        install_fixture_files("removal")
         method_test_setup(self)
 
     def tearDown(self):
