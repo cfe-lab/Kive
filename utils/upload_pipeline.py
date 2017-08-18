@@ -167,10 +167,10 @@ class CodeResourceRequest(object):
             with open(self.path, 'rb') as f:
                 response = self.kive.post(
                     '/api/coderesourcerevisions/',
-                    json=dict(coderesource=self.code_resource['name'],
-                              revision_name=revision_name,
-                              users_allowed=self.config['users_allowed'],
-                              groups_allowed=self.config['groups_allowed']),
+                    dict(coderesource=self.code_resource['name'],
+                         revision_name=revision_name,
+                         users_allowed=self.config['users_allowed'],
+                         groups_allowed=self.config['groups_allowed']),
                     files=dict(content_file=f)
                 )
 
