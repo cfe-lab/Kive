@@ -19,7 +19,7 @@ from django.conf import settings
 from django.test import TestCase
 
 # NOTE: Here, select which SlurmScheduler to test.
-# we select the DummySlurmScuduler by default, so that the automatic tests
+# we select the DummySlurmScheduler by default, so that the automatic tests
 # can run without slurm
 # SlurmScheduler = slurmlib.SlurmScheduler
 SlurmScheduler = slurmlib.DummySlurmScheduler

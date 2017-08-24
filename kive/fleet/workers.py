@@ -23,6 +23,8 @@ from archive.models import Dataset, Run, RunStep, RunSIC, MethodOutput, ExecLog
 import file_access_utils
 from sandbox.execute import Sandbox, sandbox_glob
 from fleet.slurmlib import SlurmScheduler, DummySlurmScheduler, BaseSlurmScheduler
+from fleet.dockerlib import DockerHandler, DummyDockerHandler
+
 
 mgr_logger = logging.getLogger("fleet.Manager")
 foreman_logger = logging.getLogger("fleet.Foreman")
@@ -65,6 +67,7 @@ class Manager(object):
             quit_idle=False,
             history=0,
             slurm_sched_class=SlurmScheduler,
+            docker_handler_class=DockerHandler,
             stop_username=None,
             no_stop=False
     ):
@@ -96,6 +99,13 @@ class Manager(object):
             raise RuntimeError("Slurm is down or badly configured.")
         # log some slurm information
         mgr_logger.info("Slurm identifies as: '%s'" % self.slurm_sched_class.slurm_ident())
+
+        self.docker_handler_class = docker_handler_class
+        docker_is_ok = self.docker_handler_class.docker_is_alive()
+        mgr_logger.info("Docker is OK: %s" % docker_is_ok)
+        if not docker_is_ok:
+            raise RuntimeError("Docker is down or badly configured.")
+        mgr_logger.info("Docker identifies as: '%s'" % self.docker_handler_class.docker_ident())
 
         if not no_stop:
             if stop_username is None:
@@ -214,7 +224,9 @@ class Manager(object):
         for run_to_process in pending_runs:
             if run_to_process.all_inputs_have_data():
                 # lets try and run this run
-                foreman = Foreman(run_to_process, self.slurm_sched_class)
+                foreman = Foreman(run_to_process,
+                                  self.slurm_sched_class,
+                                  self.docker_handler_class)
                 foreman.start_run()
 
                 run_to_process.refresh_from_db()
@@ -405,7 +417,8 @@ class Manager(object):
                          groups_allowed=None,
                          name=None,
                          description=None,
-                         slurm_sched_class=DummySlurmScheduler):
+                         slurm_sched_class=DummySlurmScheduler,
+                         docker_handler_class=DockerHandler):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
@@ -434,7 +447,8 @@ class Manager(object):
         # The run is already in the queue, so we can just start the manager and let it exit
         # when it finishes.
         manager = cls(quit_idle=True, history=1,
-                      slurm_sched_class=slurm_sched_class)
+                      slurm_sched_class=slurm_sched_class,
+                      docker_handler_class=docker_handler_class)
         manager.main_procedure()
         return manager
 
@@ -457,7 +471,7 @@ class Foreman(object):
     """
     Coordinates the execution of a Run in a Sandbox.
     """
-    def __init__(self, run, slurm_sched_class):
+    def __init__(self, run, slurm_sched_class, docker_handler_class):
         # tasks_in_progress tracks the Slurm IDs of currently running tasks:
         # If the task is a RunStep:
         # task -|--> {
@@ -472,6 +486,7 @@ class Foreman(object):
         #     "info_path": [path of file specifying details of execution]
         # }
         self.slurm_sched_class = slurm_sched_class
+        self.docker_handler_class = docker_handler_class
         self.tasks_in_progress = {}
         self.sandbox = Sandbox(run=run)
         # A flag to indicate that this Foreman is in the process of terminating its Run and Sandbox.
@@ -917,7 +932,8 @@ class Foreman(object):
         driver_slurm_handle = self.sandbox.submit_step_execution(
             step_info,
             after_okay=[setup_slurm_handle],
-            slurm_sched_class=self.slurm_sched_class
+            slurm_sched_class=self.slurm_sched_class,
+            docker_handler_class=self.docker_handler_class
         )
 
         return {

@@ -1,5 +1,7 @@
 # Django settings for server project.
 
+import os
+
 # Copy this file to settings.py, then adjust the settings in the copy.
 # Kive-specific things to set:
 # DATABASES: NAME, USER, and PASSWORD are site-specific
@@ -372,10 +374,36 @@ SLURM_PRIO_COLNAME = "PRIORITY"
 # Attempt to run the system tests that use Slurm.
 RUN_SLURM_TESTS = False
 
+
 # the number of times to retry a slurm command such as sbatch or sacct
 # as well as the interval in seconds to wait between retries
+# NOTE: these timeouts are also used for DOCKER_COMMAND.
 SLURM_COMMAND_RETRY_NUM = 10
 SLURM_COMMAND_RETRY_SLEEP_SECS = 10
 
 # Fail any slurm job that reports a NODE_FAIL for longer than this time (in seconds).
 NODE_FAIL_TIME_OUT_SECS = 5*60
+
+
+# Attempt to run the system tests that use Docker
+RUN_DOCKER_TESTS = False
+
+DOCK_DOCKER_COMMAND = "/usr/bin/docker"
+DOCK_BZIP2_COMMAND = "/usr/bin/bzip2"
+
+# the directory that contains the bz2 files of the docker images
+DOCK_IMAGE_DIRECTORY = os.path.join(MEDIA_ROOT, 'DockerImages')
+
+
+# Absolute filesystem path to the directory that will hold user-uploaded files
+# on the host file system of a system running docker.
+# In most cases, this can be set to None.
+# When running kive from within a docker image, however, kive will launch a sibling
+# docker image to run the methods. This sibling container needs to know the original
+# MEDIA_ROOT and will get it from HOST_MEDIA_ROOT.
+HOST_MEDIA_ROOT = None
+
+
+# The name of the docker image to use when non other is provided. This file must
+# exist when a dockerlib.DockerHandler  is initialised with docker_is_alive()
+DOCK_DEFAULT_DOCKER_IMAGE = "comp-base-01.tar.bz2"

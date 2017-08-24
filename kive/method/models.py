@@ -6,7 +6,11 @@ do with CodeResources.
 """
 
 from __future__ import unicode_literals
-import pwd
+
+import os
+import stat
+import hashlib
+import logging
 
 from django.db import models, transaction
 from django.db.models import Max
@@ -15,7 +19,6 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator
 from django.utils.encoding import python_2_unicode_compatible
 from django.core.urlresolvers import reverse
-from django.conf import settings
 
 import metadata.models
 import transformation.models
@@ -23,12 +26,6 @@ import file_access_utils
 from constants import maxlengths
 import method.signals
 from metadata.models import empty_removal_plan, remove_helper, update_removal_plan
-from fleet.slurmlib import SlurmScheduler
-
-import os
-import stat
-import hashlib
-import logging
 
 
 @python_2_unicode_compatible
@@ -576,65 +573,6 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
             dep_path = os.path.join(dep_dir, dep.get_filename())
             # This may raise an exception.
             file_access_utils.copy_and_confirm(dep.requirement.content_file.path, dep_path)
-
-    def submit_code(self,
-                    run_path,
-                    input_paths,
-                    output_paths,
-                    stdout_path,
-                    stderr_path,
-                    after_okay=None,
-                    uid=None,
-                    gid=None,
-                    priority=0,
-                    job_name=None,
-                    slurm_sched_class=SlurmScheduler):
-        """
-        Submit this Method to Slurm for execution.
-
-        The method runs with the specified inputs and outputs, writing its
-        stdout/stderr to the specified streams.
-
-        Return a SlurmJobHandle.
-
-        INPUTS
-        run_path        Directory where code will be run
-        input_paths     List of input files expected by the code
-        output_paths    List of where code will write results
-        stdout_path     File path to write stdout to
-        stderr_path     Path to write stderr to
-        """
-        if settings.KIVE_SANDBOX_WORKER_ACCOUNT:
-            pwd_info = pwd.getpwnam(settings.KIVE_SANDBOX_WORKER_ACCOUNT)
-            default_uid = pwd_info.pw_uid
-            default_gid = pwd_info.pw_gid
-        else:
-            # Get our own current uid/gid.
-            default_uid = os.getuid()
-            default_gid = os.getgid()
-
-        # Override the default UID and GID if possible.
-        uid = uid or default_uid
-        gid = gid or default_gid
-
-        job_name = job_name or self.driver.coderesource.filename
-
-        # FIXME
-        job_handle = slurm_sched_class.submit_job(
-            run_path,
-            self.driver.coderesource.filename,
-            input_paths + output_paths,
-            uid,
-            gid,
-            priority,
-            self.threads,
-            stdout_path,
-            stderr_path,
-            after_okay,
-            job_name=job_name,
-            mem=self.memory
-        )
-        return job_handle
 
     def is_identical(self, other):
         """Is this Method identical to another one?"""

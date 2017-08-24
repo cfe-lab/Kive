@@ -9,7 +9,6 @@ import tempfile
 import time
 import itertools
 import pwd
-import re
 
 from django.utils import timezone
 from django.db import transaction, OperationalError, InternalError
@@ -1448,7 +1447,7 @@ class Sandbox:
                                 curr_record.finish_successfully(save=True)
                             else:
                                 # Mark curr_record as failed; if this is a recovery, recovering_record
-                                # will be handled elsewhere.
+                                # will be handled elsewhere
                                 curr_record.finish_failure(save=True)
 
                             curr_record.complete_clean()
@@ -1865,7 +1864,9 @@ class Sandbox:
 
         return curr_RS
 
-    def submit_step_execution(self, step_execute_info, after_okay, slurm_sched_class, wrap=True):
+    def submit_step_execution(self, step_execute_info, after_okay,
+                              slurm_sched_class,
+                              docker_handler_class):
         """
         Submit the step execution to Slurm.
 
@@ -1873,8 +1874,7 @@ class Sandbox:
         after_okay is a list of Slurm job handles; These are submitted jobs that must be
         completed (successfully) before the execution of this driver can proceed.
 
-        NOTE: under 'normal circumstances', i.e. when submitting the driver to slurm
-        wrap must be true for this to succeed.
+        NOTE: when submitting the driver to slurm, the jobscript to run must be wrapped.
         This is because at the time of submission, the driver code has not been installed yet,
         and slurm submission will fail.
         The way of getting around this problem is the following:
@@ -1883,14 +1883,19 @@ class Sandbox:
         b) at slurm run time:
            the setup script, which must run successfully before this one is started,
            has copied the driver into place, which the wrapper code now can run.
+
+        NOTE: for docker support, we wrap the wrapper script again in order to launch it
+        within a docker container.
         """
         # From here on the code is assumed not to be corrupted, and all the required files
         # have been placed in their right places.
         curr_RS = step_execute_info.runstep
 
         input_paths = [x.output_path for x in step_execute_info.cable_info_list]
+        arglst = input_paths + step_execute_info.output_paths
         # Driver name
         driver = curr_RS.pipelinestep.transformation.definite.driver
+        driver_filename = driver.coderesource.filename
 
         coordinates = curr_RS.get_coordinates()
         if len(coordinates) == 1:
@@ -1900,64 +1905,48 @@ class Sandbox:
         job_name = "r{}s{}driver[{}]".format(
             curr_RS.top_level_run.pk,
             coord_str,
-            driver.coderesource.filename
+            driver_filename
         )
-        logger.debug("Submitting driver '%s', task_pk %d", driver.coderesource.filename, curr_RS.pk)
-        if not wrap:
-            job_handle = curr_RS.pipelinestep.transformation.definite.submit_code(
-                step_execute_info.step_run_dir,
-                input_paths,
-                step_execute_info.output_paths,
-                step_execute_info.driver_stdout_path(),
-                step_execute_info.driver_stderr_path(),
-                after_okay=after_okay,
-                uid=self.uid,
-                gid=self.gid,
-                priority=curr_RS.top_level_run.priority,
-                job_name=job_name,
-                slurm_sched_class=slurm_sched_class
-            )
-        else:
-            # Wrap the driver in a script.
-            driver_template = """\
-#! /usr/bin/env bash
+        logger.debug("Submitting driver '%s', task_pk %d", driver_filename, curr_RS.pk)
+        # Collect information we need for the wrapper script
+        host_rundir = rundir = step_execute_info.step_run_dir
+        preamble = settings.SANDBOX_DRIVER_PREAMBLE if settings.SANDBOX_DRIVER_PREAMBLE is not None else ""
+        host_media_root = settings.HOST_MEDIA_ROOT or ""
+        if host_media_root:
+            # if HOST_MEDIA_ROOT is defined, then we have to replace the host_rundir
+            host_rundir = host_rundir.replace(settings.MEDIA_ROOT, host_media_root, 1)
+            if host_rundir == rundir:
+                raise RuntimeError('wonky string replace')
+        # Create the wrapper file and make sure its executable, then generate the file's contents from
+        # the docker_handler_class and write it to the file. Finally, submit the wrapper to slurm.
+        wrapped_driver_fd, wrapped_driver_path = tempfile.mkstemp(dir=rundir, prefix=driver_filename)
+        os.fchmod(wrapped_driver_fd, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        # NOTE: currently, we always launch a driver with the default image_id
+        launch_str = docker_handler_class.generate_launchstring(host_rundir, rundir,
+                                                                preamble,
+                                                                driver_filename,
+                                                                arglst,
+                                                                image_id=None)
+        logger.debug("LAUNCH STRING {}".format(launch_str))
+        with os.fdopen(wrapped_driver_fd, "wb") as f:
+            f.write(launch_str)
+        job_handle = slurm_sched_class.submit_job(
+            rundir,
+            wrapped_driver_path,
+            [],
+            self.uid,
+            self.gid,
+            self.run.priority,
+            step_execute_info.threads_required,
+            step_execute_info.driver_stdout_path(),
+            step_execute_info.driver_stderr_path(),
+            after_okay=after_okay,
+            job_name=job_name,
+            mem=curr_RS.pipelinestep.transformation.definite.memory
+        )
 
-{}
-
-{} {} {}
-
-"""
-            wrapped_driver_fd, wrapped_driver_path = tempfile.mkstemp(dir=step_execute_info.step_run_dir,
-                                                                      prefix=driver.coderesource.filename)
-            # Make sure the job script is executable.
-            os.fchmod(wrapped_driver_fd, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-            # Note the use of re.escape to deal with spaces and other weird stuff in the filenames.
-            with os.fdopen(wrapped_driver_fd, "wb") as f:
-                f.write(
-                    driver_template.format(
-                        settings.SANDBOX_DRIVER_PREAMBLE if settings.SANDBOX_DRIVER_PREAMBLE is not None else "",
-                        re.escape(os.path.join(step_execute_info.step_run_dir, driver.coderesource.filename)),
-                        " ".join([re.escape(x) for x in input_paths]),
-                        " ".join([re.escape(x) for x in step_execute_info.output_paths])
-                    )
-                )
-            job_handle = slurm_sched_class.submit_job(
-                step_execute_info.step_run_dir,
-                wrapped_driver_path,
-                [],
-                self.uid,
-                self.gid,
-                self.run.priority,
-                step_execute_info.threads_required,
-                step_execute_info.driver_stdout_path(),
-                step_execute_info.driver_stderr_path(),
-                after_okay=after_okay,
-                job_name=job_name,
-                mem=curr_RS.pipelinestep.transformation.definite.memory
-            )
-
-            # Stick the path to the job handle so it can be disposed of later.
-            job_handle.wrapped_driver_path = wrapped_driver_path
+        # Stick the path to the job handle so it can be disposed of later.
+        job_handle.wrapped_driver_path = wrapped_driver_path
         logger.debug("Submitted task with pk=%d; Slurm job ID=%s, wrapper name=%s",
                      curr_RS.pk, job_handle.job_id, wrapped_driver_path)
         return job_handle
