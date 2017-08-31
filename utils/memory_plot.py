@@ -3,6 +3,8 @@ from collections import Counter
 from csv import DictReader
 
 from datetime import datetime
+from itertools import groupby
+
 from matplotlib import pyplot as plt
 
 
@@ -52,7 +54,7 @@ def main():
         for i, row in enumerate(reader):
             row_totals = Counter()
             for column in free_columns:
-                if row[column] != '':
+                if row[column]:
                     row_totals[column[:-7]] += float(row[column])
             times.append(parse_date(row['time']))
             free.append([row_totals[name] if name in row_totals else None
@@ -62,10 +64,20 @@ def main():
     ax.set_ylabel('Free GB')
     lines = ax.plot(times, free)
     cmap = plt.get_cmap('jet')
-    num_lines = len(free_labels)
+    node_count = len(list(groupby(free_labels,
+                                  lambda label: label.split('_')[0])))
+    node_num = -1
+    prev_node = None
+    line_num = 0
     for i, line in enumerate(lines):
-        line.set_color(cmap(i//2*2.0 / num_lines))
-        line.set_linewidth(i % 2 + 1)
+        node_name = free_labels[i].split('_')[0]
+        if node_name != prev_node:
+            node_num += 1
+            prev_node = node_name
+            line_num = 0
+        line.set_color(cmap(float(node_num) / node_count))
+        line.set_linewidth(line_num + 1)
+        line_num += 1
     ax.legend(free_labels,
               loc='best',
               ncol=3)

@@ -56,7 +56,7 @@ Once you have set up your production server, this is how to deploy a new release
         cd /path/to/git/Kive
         npm install
         cd kive
-        ./manage.py collectstatic
+        ./manage.py collectstatic -c
         cd ..
         tar -czvf static_root.tar.gz static_root
 
