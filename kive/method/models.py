@@ -209,12 +209,14 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
     def __str__(self):
         """Represent a resource revision by its revision name"""
-        if self.revision_name == "":
-            return "[no revision name]"
-        elif not hasattr(self, "coderesource"):
-            return self.revision_name
-        else:
-            return "{}:{} ({})".format(self.coderesource.name, self.revision_number, self.revision_name)
+        revision_name_str = self.revision_name or "[no revision name]"
+        coderesource_name_str = "[no code resource name]"
+        revision_number = "[no revision number]"
+        if hasattr(self, "coderesource"):
+            coderesource_name_str = self.coderesource.name
+            revision_number = self.revision_number
+
+        return "{}:{} ({})".format(coderesource_name_str, revision_number, revision_name_str)
 
     def save(self, *args, **kwargs):
         """Save this CodeResourceRevision, incrementing the revision number."""
