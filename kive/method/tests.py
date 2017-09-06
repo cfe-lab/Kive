@@ -327,11 +327,11 @@ class CodeResourceRevisionTests(MethodTestCase):
 
         # Define a crRev without a linking cr, or a revision_name
         no_cr_set = CodeResourceRevision()
-        self.assertEquals(unicode(no_cr_set), "[no revision name]")
+        self.assertEquals(unicode(no_cr_set), "[no code resource name]:[no revision number] ([no revision name])")
 
         # Define a crRev without a linking cr, with a revision_name of foo
         no_cr_set.revision_name = "foo"
-        self.assertEquals(unicode(no_cr_set), "foo")
+        self.assertEquals(unicode(no_cr_set), "[no code resource name]:[no revision number] (foo)")
 
     def test_clean_valid_MD5(self):
         """

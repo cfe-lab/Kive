@@ -776,6 +776,7 @@ class MethodViewMockTests(ViewMockTestCase):
         MethodFamily.objects.add(self.method_family)
 
         self.driver = CodeResourceRevision(user=self.user)
+        self.driver.pk = 1337  # needed for viewing a method
         self.driver.coderesource = CodeResource()
         self.method = Method(pk='199', user=self.user)
         self.method.driver = self.driver
@@ -819,6 +820,8 @@ class MethodViewMockTests(ViewMockTestCase):
 
     def test_method_new(self):
         response = self.client.get(reverse('method_new'))
+
+        print response
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(None, response.context['family'])
