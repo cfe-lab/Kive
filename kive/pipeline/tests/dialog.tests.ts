@@ -84,6 +84,9 @@ describe("MethodDialog fixture", function() {
     let $error;
     let $expand_outputs_ctrl;
     let canvas;
+    let expected_canvas;
+    let expected_ctx;
+    let expected_method;
 
     let mockData1 = {
         "status": 200,
@@ -361,6 +364,23 @@ describe("MethodDialog fixture", function() {
         $error = $('#id_method_error');
         $expand_outputs_ctrl = $('.ctrl_menu .expand_outputs_ctrl');
         canvas = <HTMLCanvasElement> $('canvas')[0];
+        expected_canvas = imagediff.createCanvas(canvas.width, 78);
+        expected_ctx = expected_canvas.getContext('2d');
+        expected_method = new MethodNode(
+            99,  // pk
+            null,  // family
+            103.349365,  // x
+            31,  // y (for 3 outputs)
+            "#999",  // fill
+            null,  // label
+            [
+              {"structure": {"compounddatatype": null}}
+            ],  // inputs
+            [
+              {"structure": {"compounddatatype": null}},
+              {"structure": {"compounddatatype": null}},
+              {"structure": {"compounddatatype": null}}
+            ]);  // outputs
 
         $select_method_family.find('option')
             .filter(function() { return $(this).val() !== ""; })
@@ -415,16 +435,16 @@ describe("MethodDialog fixture", function() {
     }
 
     it('should update when the family menu changes', function(done) {
+        expected_method.draw(expected_ctx);
         dlg.activator.click();
 
         loadMockMethod(function () {
-            let sam2aln = new Image();
-            sam2aln.src = "/pipeline/test_assets/sam2aln_node.png";
-            sam2aln.onload = function() {
-                expect(canvas).toImageDiffEqual(sam2aln);
-                done();
-            };
+
+            // No extra calls, just checking default drawing.
+
+            expect(canvas).toImageDiffEqual(expected_canvas);
         });
+        done();
     });
 
     it('should toggle visibility of the outputs list', function() {
@@ -480,6 +500,11 @@ describe("MethodDialog fixture", function() {
     });
 
     it('should update the preview canvas when child outputs-to-delete change', function(done) {
+        expected_method.out_magnets.forEach(function(magnet) {
+            magnet.toDelete = true;
+        });
+        expected_method.draw(expected_ctx);
+
         dlg.activator.click();
         loadMockMethod(function () {
             let outputs = $delete_outputs_details.find('input');
@@ -490,43 +515,53 @@ describe("MethodDialog fixture", function() {
             ];
             outputs[1].change();
 
-            let sam2aln_custom = new Image();
-            sam2aln_custom.src = "/pipeline/test_assets/sam2aln_custom_node3.png";
-            sam2aln_custom.onload = function() {
-                expect(canvas).toImageDiffEqual(sam2aln_custom);
-                done();
-            };
+            expect(canvas).toImageDiffEqual(expected_canvas);
         });
+        done();
     });
 
     it('should update the preview canvas when parent outputs-to-delete change', function(done) {
+        expected_method.out_magnets.forEach(function(magnet) {
+            magnet.toDelete = true;
+        });
+        expected_method.draw(expected_ctx);
+
         dlg.activator.click();
         loadMockMethod(function () {
             $delete_outputs.prop('checked', false).change();
 
-            let sam2aln_custom = new Image();
-            sam2aln_custom.src = "/pipeline/test_assets/sam2aln_custom_node3.png";
-            sam2aln_custom.onload = function() {
-                expect(canvas).toImageDiffEqual(sam2aln_custom);
-                done();
-            };
+            expect(canvas).toImageDiffEqual(expected_canvas);
         });
+        done();
     });
 
     it('should refresh preview when method revision changes', function(done) {
+        expected_method = new MethodNode(
+            99,  // pk
+            null,  // family
+            110.2775682,  // x
+            35,  // y (for 2 outputs)
+            "#999",  // fill
+            null,  // label
+            [
+              {"structure": {"compounddatatype": null}},
+              {"structure": {"compounddatatype": null}}
+            ],  // inputs
+            [
+              {"structure": {"compounddatatype": null}},
+              {"structure": {"compounddatatype": null}}
+            ]);  // outputs
+        expected_method.draw(expected_ctx);
+
         dlg.activator.click();
         loadMockMethod(function() {
             $select_method.append($('<option>').val(8));
             $select_method.val(8).change();
             jasmine.Ajax.requests.mostRecent().respondWith(mockData3);
 
-            let sam2aln_custom = new Image();
-            sam2aln_custom.src = "/pipeline/test_assets/sam2aln_custom_node4.png";
-            sam2aln_custom.onload = function() {
-                expect(canvas).toImageDiffEqual(sam2aln_custom);
-                done();
-            };
+            expect(canvas).toImageDiffEqual(expected_canvas);
         });
+        done();
     });
 
     it('should open the colour picker', function() {
@@ -548,13 +583,11 @@ describe("MethodDialog fixture", function() {
             expect($cp_hidden_input.val()).toBe(bgcol);
             expect($cp_menu).toBeHidden();
 
-            let sam2aln_custom = new Image();
-            sam2aln_custom.src = "/pipeline/test_assets/sam2aln_custom_node2.png";
-            sam2aln_custom.onload = function() {
-                expect(canvas).toImageDiffEqual(sam2aln_custom);
-                done();
-            };
+            expected_method.fill = bgcol;
+            expected_method.draw(expected_ctx);
+            expect(canvas).toImageDiffEqual(expected_canvas);
         });
+        done();
     });
 
     it('should move to a specified coordinate', function() {
@@ -600,6 +633,10 @@ describe("MethodDialog fixture", function() {
         mock_method_node.outputs_to_delete = [ "conseq_ins" ];
         mock_method_node.out_magnets[1].toDelete = true;
 
+        expected_method.fill = "#0d8";
+        expected_method.out_magnets[1].toDelete = true;
+        expected_method.draw(expected_ctx);
+
         jasmine.Ajax.withMock(function() {
             dlg.load(mock_method_node);
             jasmine.Ajax.requests.mostRecent().respondWith(mockData1);
@@ -617,13 +654,9 @@ describe("MethodDialog fixture", function() {
             expect(delete_checkboxes.eq(1).prop('checked')).toBeFalsy();
             expect(delete_checkboxes.eq(2).prop('checked')).toBeTruthy();
 
-            let sam2aln_custom = new Image();
-            sam2aln_custom.src = "/pipeline/test_assets/sam2aln_custom_node.png";
-            sam2aln_custom.onload = function() {
-                expect(canvas).toImageDiffEqual(sam2aln_custom);
-                done();
-            };
+            expect(canvas).toImageDiffEqual(expected_canvas);
         });
+        done();
     });
 
     it('should not submit when required fields are missing', function() {
@@ -719,6 +752,9 @@ describe("InputDialog fixture", function() {
     let $select_cdt;
     let $error;
     let canvas;
+    let expected_canvas;
+    let expected_ctx;
+    let expected_input;
 
     jasmine.getFixtures().fixturesPath = '/templates/pipeline';
     jasmine.getFixtures().preload('./pipeline_input_dialog.tpl.html');
@@ -742,6 +778,9 @@ describe("InputDialog fixture", function() {
         $error = $('#id_dt_error');
         $select_cdt = $('#id_select_cdt');
         canvas = <HTMLCanvasElement> $('canvas')[0];
+        expected_canvas = imagediff.createCanvas(canvas.width, canvas.height);
+        expected_ctx = expected_canvas.getContext('2d');
+        expected_input = new CdtNode(99, 125, 30, '');
     });
 
     it('should initialize properly', function() {
@@ -768,16 +807,14 @@ describe("InputDialog fixture", function() {
     });
 
     it('should show a CDTNode preview when a CDT is selected', function(done) {
+        expected_input.draw(expected_ctx);
+
         dlg.activator.click();
         $select_cdt.append($('<option>').val(23));
         $select_cdt.val(23).change();
 
-        let cdt_node = new Image();
-        cdt_node.src = "/pipeline/test_assets/cdtnode.png";
-        cdt_node.onload = function() {
-            expect(canvas).toImageDiffEqual(cdt_node);
-            done();
-        };
+        expect(canvas).toImageDiffEqual(expected_canvas);
+        done();
     });
 
     it('should show a RawNode preview when no CDT is selected', function(done) {
