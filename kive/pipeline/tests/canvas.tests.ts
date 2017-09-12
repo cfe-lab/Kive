@@ -1022,7 +1022,7 @@ describe("Canvas classes", function() {
                     15);
             this.expectedCanvas.ctx.stroke();
 
-            this.sourceParent.status = "FAILURE";
+            this.sourceParent.status = "FAILED";
             this.connector.dest = this.dest;
             this.connector.draw(this.ctx);
         });
@@ -1786,8 +1786,8 @@ describe("Canvas classes", function() {
             });
 
             it('should detect collisions', function() {
-                this.expectedInput.x = 95 - 19.4454;
-                this.expectedInput.y = 55 + 19.4454;
+                this.expectedInput.x = 95 - 19.44544;
+                this.expectedInput.y = 55 + 19.44544;
                 this.expectedMethod.x = 100 + 8.8388;
                 this.expectedMethod.y = 50 - 8.8388;
                 this.expectedInput.draw(this.expectedCanvas.ctx);

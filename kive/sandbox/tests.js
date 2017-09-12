@@ -88,9 +88,6 @@
             var table = new permissions.DatasetsTable(
                     this.$table,
                     this.is_user_admin,
-                    this.input_index,
-                    this.compounddatatype_id,
-                    undefined,
                     this.$navigation_links
             );
             table.image_path = "portal/static/portal/img";
