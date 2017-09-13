@@ -13,6 +13,7 @@ puppeteer.launch().then(function(browser) {
                 else {
                     report.push(summary);
                     $('div.spec-detail.failed').each(function() {
+                        report.push($('div.description', this).text());
                         report.push($('div.result-message', this).text());
                     });
                 }
