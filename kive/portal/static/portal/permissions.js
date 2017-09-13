@@ -613,7 +613,7 @@ var permissions = (function() {
             // We wrapped around into the next month.
             value.setDate(0);
         }
-        var textValue = my.formatDate(value);
+        var textValue = 'XYZ' + my.formatDate(value);
         return this.add(key, textValue, skip_trigger);
     };
 
