@@ -3,7 +3,6 @@ import { CanvasState } from "../static/pipeline/canvas/drydock";
 import { Pipeline } from "../static/pipeline/io/pipeline_load";
 import { serializePipeline } from "../static/pipeline/io/serializer";
 import "jasmine";
-import 'jasmine-html';
 import 'imagediff';
 import 'jquery';
 

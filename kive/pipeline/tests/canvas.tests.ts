@@ -4,7 +4,6 @@ import {
 } from "../static/pipeline/canvas/drydock_objects";
 import { CanvasState } from "../static/pipeline/canvas/drydock";
 import "jasmine";
-import 'jasmine-html';
 import 'jquery';
 import 'imagediff';
 

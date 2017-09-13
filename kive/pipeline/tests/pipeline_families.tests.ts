@@ -1,11 +1,9 @@
 "use strict";
 import "jasmine";
-import 'jasmine-html';
 import 'jquery';
-import '/static/portal/permissions.js';
-import '/static/pipeline/PipelineFamiliesTable.js';
+import '../../portal/static/portal/permissions.js';
+import '../static/pipeline/PipelineFamiliesTable.js';
 declare var permissions: any;
-
 
 describe('Pipeline families', function() {
     beforeEach(function() {

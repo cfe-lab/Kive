@@ -4,7 +4,6 @@ import { CanvasState } from "../static/pipeline/canvas/drydock";
 import { buildPipelineSubmit } from "../static/pipeline/io/pipeline_submit";
 import { RawNode, MethodNode, OutputNode, Connector } from "../static/pipeline/canvas/drydock_objects";
 import "jasmine";
-import 'jasmine-html';
 import 'jquery';
 import 'jasmine-jquery';
 import 'jasmine-ajax';

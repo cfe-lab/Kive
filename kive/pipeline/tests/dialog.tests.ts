@@ -4,7 +4,6 @@ import { MethodDialog, Dialog, InputDialog, OutputDialog } from "../static/pipel
 import { MethodNode, CdtNode, OutputNode } from "../static/pipeline/canvas/drydock_objects";
 import { REDRAW_INTERVAL, CanvasState } from "../static/pipeline/canvas/drydock";
 import "jasmine";
-import 'jasmine-html';
 import 'jquery';
 import 'jasmine-jquery';
 import 'jasmine-ajax';
