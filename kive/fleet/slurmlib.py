@@ -32,7 +32,7 @@ NUM_RETRY = settings.SLURM_COMMAND_RETRY_NUM
 SLEEP_SECS = settings.SLURM_COMMAND_RETRY_SLEEP_SECS
 
 
-def multi_check_output(cmd_lst, stderr=None):
+def multi_check_output(cmd_lst, stderr=None, num_retry=NUM_RETRY):
     itry, cmd_retry = 1, True
     while cmd_retry:
         cmd_retry = False
@@ -47,8 +47,8 @@ def multi_check_output(cmd_lst, stderr=None):
             # ==> assume the command timed out, so we retry
             cmd_retry = True
             logger.debug("timeout #%d/%d on command %s (retcode %s)",
-                         itry, NUM_RETRY, cmd_lst[0], e.returncode)
-            if itry < NUM_RETRY:
+                         itry, num_retry, cmd_lst[0], e.returncode)
+            if itry < num_retry:
                 itry += 1
                 time.sleep(SLEEP_SECS)
             else:
@@ -528,7 +528,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         return is_alive
 
     @classmethod
-    def _call_to_dict(cls, cmd_lst, splitchar=None):
+    def _call_to_dict(cls, cmd_lst, splitchar=None, num_retry=NUM_RETRY):
         """ Helper routine:
         Call a slurm command provided in cmd_lst and parse the tabular output, returning
         a list of dictionaries.
@@ -539,7 +539,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         stderr_fd, stderr_path = tempfile.mkstemp()
         try:
             with os.fdopen(stderr_fd, "w") as f:
-                out_str = CHECK_OUTPUT(cmd_lst, stderr=f)
+                out_str = CHECK_OUTPUT(cmd_lst, stderr=f, num_retry=num_retry)
         except OSError:
             # typically happens if the executable cannot execute at all (e.g. not installed)
             status_report = "failed to execute '%s'" % " ".join(cmd_lst)
@@ -709,7 +709,10 @@ class SlurmScheduler(BaseSlurmScheduler):
         has_jlst = job_id_iter is not None and len(job_id_iter) > 0
         if has_jlst:
             cmd_lst.extend(["-j", ",".join(job_id_iter)])
-        return cls._call_to_dict(cmd_lst, splitchar=' ')
+            num_retry = 0
+        else:
+            num_retry = NUM_RETRY
+        return cls._call_to_dict(cmd_lst, splitchar=' ', num_retry=num_retry)
 
     @classmethod
     def get_accounting_info(cls, job_handle_iter=None):
@@ -722,7 +725,11 @@ class SlurmScheduler(BaseSlurmScheduler):
             raise RuntimeError("Must call slurm_is_alive before get_accounting_info")
 
         have_job_handles = job_handle_iter is not None and len(job_handle_iter) > 0
-        idlst = [jh.job_id for jh in job_handle_iter] if have_job_handles else None
+        if have_job_handles:
+            idlst = [jh.job_id for jh in job_handle_iter]
+            needset = set(idlst)
+        else:
+            idlst = needset = None
 
         accounting_info = {}
         # Create proper datetime objects with the following format string.
@@ -742,6 +749,8 @@ class SlurmScheduler(BaseSlurmScheduler):
                 prio_num = cls._revlookup.get(rdct["PARTITION"], None)
                 if prio_num is not None:
                     job_id = rdct["JOBID"]
+                    if needset is not None:
+                        needset.remove(job_id)
                     accdct = cls._empty_info_dct(job_id)
                     accdct[cls.ACC_PRIONUM] = prio_num
                     accdct[cls.ACC_PRIOSTR] = cls._acclookup[prio_num]
@@ -763,60 +772,62 @@ class SlurmScheduler(BaseSlurmScheduler):
             # Said job information should be handled by sacct below.
             pass
 
-        # Now get accounting information.
-        # The --parsable2 option creates parsable output: fields are separated by a pipe, with
-        # no trailing pipe (the difference between --parsable2 and --parsable).
-        cmd_lst = ["sacct", "--parsable2", "--format",
-                   "JobID,JobName,Start,End,State,Partition,Submit,ExitCode"]
-        if have_job_handles:
-            cmd_lst.extend(["-j", ",".join(idlst)])
-        for raw_job_dict in cls._call_to_dict(cmd_lst, splitchar='|'):
-            # Pre-process the fields.
-            # There might be non-kive slurm partitions. Only report those jobs in partitions
-            # we know about, as defined in the list of partition names.
-            prio_num = cls._revlookup.get(raw_job_dict["Partition"], None)
-            if prio_num is not None:
-                job_id = raw_job_dict["JobID"]
-                tdct = {}
+        if needset is None or needset:
+            # Now get accounting information.
+            # The --parsable2 option creates parsable output: fields are separated by a pipe, with
+            # no trailing pipe (the difference between --parsable2 and --parsable).
+            cmd_lst = ["sacct", "--parsable2", "--format",
+                       "JobID,JobName,Start,End,State,Partition,Submit,ExitCode"]
+            if needset is not None:
+                cmd_lst.extend(["-j", ",".join(needset)])
+            raw_job_dicts = cls._call_to_dict(cmd_lst, splitchar='|')
+            for raw_job_dict in raw_job_dicts:
+                # Pre-process the fields.
+                # There might be non-kive slurm partitions. Only report those jobs in partitions
+                # we know about, as defined in the list of partition names.
+                prio_num = cls._revlookup.get(raw_job_dict["Partition"], None)
+                if prio_num is not None:
+                    job_id = raw_job_dict["JobID"]
+                    if needset is not None:
+                        needset.remove(job_id)
+                    tdct = {}
 
-                # Localize any datetime objects.
-                for field_name, field_val in [(fn, raw_job_dict[fn]) for fn in ["Start", "End", "Submit"]]:
-                    if field_val == cls.TIME_UNKNOWN:
-                        tdct[field_name] = None
-                    else:
-                        raw_datetime = datetime.strptime(field_val, date_format)
-                        tdct[field_name] = timezone.make_aware(raw_datetime, curr_timezone)
+                    # Localize any datetime objects.
+                    for field_name, field_val in [(fn, raw_job_dict[fn]) for fn in ["Start", "End", "Submit"]]:
+                        if field_val == cls.TIME_UNKNOWN:
+                            tdct[field_name] = None
+                        else:
+                            raw_datetime = datetime.strptime(field_val, date_format)
+                            tdct[field_name] = timezone.make_aware(raw_datetime, curr_timezone)
 
-                # Split sacct's ExitCode field, which looks like "[return code]:[signal]".
-                return_code, signal = (int(x) for x in raw_job_dict["ExitCode"].split(":"))
+                    # Split sacct's ExitCode field, which looks like "[return code]:[signal]".
+                    return_code, signal = (int(x) for x in raw_job_dict["ExitCode"].split(":"))
 
-                current_state = ""
-                for state_str in cls.ALL_STATES:
-                    if raw_job_dict["State"].startswith(state_str):
-                        current_state = state_str
-                        break
-                if current_state == "":
-                    raise RuntimeError(
-                        "received undefined state from sacct: '{}'".format(raw_job_dict["State"])
-                    )
-                accounting_info[job_id] = {
-                    cls.ACC_JOB_NAME: raw_job_dict["JobName"],
-                    cls.ACC_START_TIME: tdct["Start"],
-                    cls.ACC_END_TIME: tdct["End"],
-                    cls.ACC_SUBMIT_TIME: tdct["Submit"],
-                    cls.ACC_RETURN_CODE: return_code,
-                    cls.ACC_STATE: current_state,
-                    cls.ACC_SIGNAL: signal,
-                    cls.ACC_JOB_ID: job_id,
-                    cls.ACC_PRIONUM: prio_num,
-                    cls.ACC_PRIOSTR: cls._acclookup[prio_num],
-                    cls.ACC_RAW_STATE_STRING: raw_job_dict["State"]
-                }
+                    current_state = ""
+                    for state_str in cls.ALL_STATES:
+                        if raw_job_dict["State"].startswith(state_str):
+                            current_state = state_str
+                            break
+                    if current_state == "":
+                        raise RuntimeError(
+                            "received undefined state from sacct: '{}'".format(raw_job_dict["State"])
+                        )
+                    accounting_info[job_id] = {
+                        cls.ACC_JOB_NAME: raw_job_dict["JobName"],
+                        cls.ACC_START_TIME: tdct["Start"],
+                        cls.ACC_END_TIME: tdct["End"],
+                        cls.ACC_SUBMIT_TIME: tdct["Submit"],
+                        cls.ACC_RETURN_CODE: return_code,
+                        cls.ACC_STATE: current_state,
+                        cls.ACC_SIGNAL: signal,
+                        cls.ACC_JOB_ID: job_id,
+                        cls.ACC_PRIONUM: prio_num,
+                        cls.ACC_PRIOSTR: cls._acclookup[prio_num],
+                        cls.ACC_RAW_STATE_STRING: raw_job_dict["State"]
+                    }
         # make sure all requested job handles have an entry...
-        if have_job_handles:
-            needset = set(idlst)
-            gotset = set(accounting_info.keys())
-            for missing_pid in needset - gotset:
+        if needset is not None:
+            for missing_pid in needset:
                 accounting_info[missing_pid] = cls._empty_info_dct(missing_pid)
         return accounting_info
 
