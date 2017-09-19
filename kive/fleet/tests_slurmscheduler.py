@@ -101,10 +101,9 @@ def execute_nested_run(environment, slurm_sched_class=DummySlurmScheduler):
     )
 
 
+@skipIf(not settings.RUN_SLURM_TESTS, "Slurm tests are disabled")
 @skipIfDBFeature('is_mocked')
 class SlurmExecutionTests(BaseTestCases.SlurmExecutionTestCase):
-
-    @skipIf(not settings.RUN_SLURM_TESTS, "Slurm tests are disabled")
     def test_simple_run(self):
         """
         Execute a simple run.
@@ -120,7 +119,6 @@ class SlurmExecutionTests(BaseTestCases.SlurmExecutionTestCase):
         self.assertIsNone(run.clean())
         self.assertIsNone(run.complete_clean())
 
-    @skipIf(not settings.RUN_SLURM_TESTS, "Slurm tests are disabled")
     def test_nested_run(self):
         """
         Execute a nested run.
@@ -168,8 +166,8 @@ class SlurmExecutionTests(BaseTestCases.SlurmExecutionTestCase):
 #         shutil.rmtree(self.base_with_spaces)
 
 
-@skipIfDBFeature('is_mocked')
 @skipIf(not settings.RUN_SLURM_TESTS, "Slurm tests are disabled")
+@skipIfDBFeature('is_mocked')
 class SlurmBadRunTests(BaseTestCases.SlurmExecutionTestCase, BadRunTestsBase):
     """
     Tests a bad run using SlurmScheduler instead of DummySlurmScheduler.
@@ -185,9 +183,8 @@ class SlurmBadRunTests(BaseTestCases.SlurmExecutionTestCase, BadRunTestsBase):
         BaseTestCases.SlurmExecutionTestCase.tearDown(self)
         BadRunTestsBase.tearDown(self)
 
-    @skipIf(not settings.RUN_SLURM_TESTS, "Slurm tests are disabled")
-    def test_method_fails(self):
-        BadRunTestsBase.test_method_fails(self, slurm_sched_class=SlurmScheduler)
+    def test_method_fails(self, slurm_sched_class=SlurmScheduler):
+        super(SlurmBadRunTests, self).test_method_fails(slurm_sched_class)
 
 
 class MockSlurmScheduler(DummySlurmScheduler):
