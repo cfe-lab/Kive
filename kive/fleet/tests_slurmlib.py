@@ -108,11 +108,13 @@ class SlurmTests(TestCase):
             print "---test_callit01", n
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
-        arglst, stderr, stdout = [], None, None
-        retval = slurmlib.callit(wdir, jobname, arglst, stdout, stderr)
-        if retval != 0:
-            print "the error is '%s'" % os.strerror(retval)
-            assert retval == 0, "expected retval 0"
+        # arglst, stderr, stdout = [], None, None
+        arglst = []
+        with open("/tmp/out.txt", "w") as stdout, open("/tmp/err.txt", "w") as stderr:
+            retval = slurmlib.callit(wdir, jobname, arglst, stdout, stderr)
+            if retval != 0:
+                print "the error is '%s'" % os.strerror(retval)
+                assert retval == 0, "expected retval 0"
         if lverb:
             print "---END test_callit01", n
 
@@ -124,9 +126,9 @@ class SlurmTests(TestCase):
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
         arglst = []
-        stderr = stdout = None
-        retval = slurmlib.callit(wdir, jobname, arglst, stdout, stderr)
-        assert retval == 2, "expected retval 2"
+        with open("/tmp/out.txt", "w") as stdout, open("/tmp/err.txt", "w") as stderr:
+            retval = slurmlib.callit(wdir, jobname, arglst, stdout, stderr)
+            assert retval == 2, "expected retval 2"
         if lverb:
             print "---END test_callit01", n
 
