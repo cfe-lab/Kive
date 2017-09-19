@@ -1072,11 +1072,17 @@ class DummyWorkerProc(DummyJobState):
         """Invoke the code described in the _jdct"""
         self.set_runstate(BaseSlurmScheduler.RUNNING)
         j = self._jdct
-
-        stdout = open(j["stdoutfile"], "w")
-        stderr = open(j["stderrfile"], "w")
-        self.popen = startit(j["workingdir"], j["driver_name"],
-                             j["driver_arglst"], stdout, stderr)
+        self._launch_ok = False
+        ofiles_ok = True
+        try:
+            stdout = open(j["stdoutfile"], "w")
+            stderr = open(j["stderrfile"], "w")
+        except:
+            ofiles_ok = False
+        if ofiles_ok:
+            self.popen = startit(j["workingdir"], j["driver_name"],
+                                 j["driver_arglst"], stdout, stderr)
+            self._launch_ok = True
 
     def check_ready_state(self, findct):
         """ Return a 2 tuple of Boolean:
@@ -1125,13 +1131,18 @@ class DummyWorkerProc(DummyJobState):
         self.set_runstate(BaseSlurmScheduler.CANCELLED)
 
     def is_finished(self):
-        self.popen.poll()
-        self.sco_retcode = self.popen.returncode
-        if self.sco_retcode is not None:
-            self.my_state = BaseSlurmScheduler.COMPLETED if self.sco_retcode == 0 else BaseSlurmScheduler.FAILED
-            return True
+        if self._launch_ok:
+            self.popen.poll()
+            self.sco_retcode = self.popen.returncode
+            if self.sco_retcode is not None:
+                self.my_state = BaseSlurmScheduler.COMPLETED if self.sco_retcode == 0 else BaseSlurmScheduler.FAILED
+                return True
+            else:
+                return False
         else:
-            return False
+            # did not even launch
+            self.my_state = BaseSlurmScheduler.FAILED
+            return True
 
 
 class DummySlurmScheduler(BaseSlurmScheduler):

@@ -55,7 +55,6 @@ def _submit_Njob(n, prio, afteroklst=None, afteranylst=None):
         1,
         osp.join(wdir, "out.txt"),
         osp.join(wdir, "err.txt"),
-        stderrfile=afteroklst,
         after_okay=afteroklst,
         after_any=afteranylst
     )
@@ -476,7 +475,7 @@ class SlurmTests(TestCase):
         if lverb:
             print "--test_dep_jobs01_multi SUCCESS"
 
-    def test_cancel_jobs01(self, lverb=False):
+    def test_cancel_jobs01(self, lverb=True):
         """Submit a job, then cancel it"""
         if lverb:
             print "--test_cancel_jobs01"

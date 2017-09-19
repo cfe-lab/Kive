@@ -7,7 +7,7 @@ import unittest
 import shutil
 
 from django.conf import settings
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 
 import fleet.slurmlib as slurmlib
 from datetime import date, timedelta
@@ -17,6 +17,7 @@ from librarian.models import Dataset
 from archive.models import MethodOutput
 
 
+@skipIfDBFeature('is_mocked')
 class IdleTaskTests(TestCase):
     def setUp(self):
         self.man = Manager(quit_idle=False, history=0,
