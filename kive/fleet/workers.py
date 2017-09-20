@@ -601,7 +601,18 @@ class Foreman(object):
 
                             # Weirdly, task.log doesn't appear to be set even if you refresh task from the database,
                             # so we explicitly retrieve it.
-                            task_log = ExecLog.objects.get(record=task)
+                            # noinspection PyUnresolvedReferences
+                            try:
+                                # noinspection PyUnresolvedReferences
+                                task_log = ExecLog.objects.get(record=task)
+                            except ExecLog.DoesNotExist:
+                                foreman_logger.exception(
+                                    'ExecLog not found for %r, retrying.',
+                                    task)
+                                time.sleep(5)
+                                # noinspection PyUnresolvedReferences
+                                task_log = ExecLog.objects.get(record=task)
+
                             with transaction.atomic():
                                 task_log.start_time = driver_info[start_keyword]
                                 task_log.end_time = driver_info[end_keyword]
