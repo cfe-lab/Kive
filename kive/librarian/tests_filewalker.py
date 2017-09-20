@@ -83,17 +83,18 @@ def create_randomfile(dirname, size, atime):
     return name, size, atime
 
 
-def create_Gaussfiles(dirname, N, sizemu, sizesigma, timemu, timesigma):
+def create_Gaussfiles(dirname, N, sizemu, sizesigma, timemu, timesigma, lverb=False):
     """ Create N files with random names in directory dirname.
     The size and time of the files follow a Normal distribution with the parameters
     provided.
     A list of tuples (filename, size, atime) is returned.
     """
-    print "Creating %d random files " % N
-    print "In directory '%s'" % dirname
-    print "Average size: %d" % sizemu
-    print "Average time: ", dt.datetime.fromtimestamp(timemu)
-    print
+    if lverb:
+        print "Creating %d random files " % N
+        print "In directory '%s'" % dirname
+        print "Average size: %d" % sizemu
+        print "Average time: ", dt.datetime.fromtimestamp(timemu)
+        print
     return [create_randomfile(dirname,
                               max(int(random.gauss(sizemu, sizesigma)), 0),
                               random.gauss(timemu, timesigma)) for n in xrange(N)]
@@ -159,9 +160,10 @@ class FileWalkerTests(TestCase):
         fp = FilePurger(BIG_testdir, 1.0, 1.0, LOGGER)
         self.assertIsNotNone(fp, "FilePurger creation failed")
 
-    def test_iterwalk01(self):
+    def test_iterwalk01(self, lverb=False):
         """ Test the low-level routine that walks a directory tree."""
-        print "---test_iterwalk01"
+        if lverb:
+            print "---test_iterwalk01"
         # grace_time_limit = time.time()
         grace_time_limit = None
         iwalk = iter_walk(BIG_testdir, set(), grace_time_limit, LOGGER)
@@ -180,7 +182,8 @@ class FileWalkerTests(TestCase):
         setneed = self.bigtest_nameset
         setgot = set([dir_entry.path for dir_entry in plst])
         self.assertEqual(setneed, setgot, "failed to return expected files")
-        print "---test_iterwalk01 SUCCESS"
+        if lverb:
+            print "---test_iterwalk01 SUCCESS"
 
     def test_nodir(self):
         """Make sure we handle the purging of a nonexistent dir gracefully."""
@@ -191,9 +194,10 @@ class FileWalkerTests(TestCase):
                                         upper_size_limit=0, dodelete=False))
         self.assertEqual(len(lst_one), 0, "unexpected list length")
 
-    def test_too_big_01(self):
+    def test_too_big_01(self, lverb=False):
         """Call next_to_purge with a number that is too big."""
-        print "---test_purge04"
+        if lverb:
+            print "---test_purge04"
         fp = FilePurger(BIG_testdir, 1.0, 1.0, LOGGER)
         numtoget = fp.MAX_CACHE + 1
         exclude_set = set()
@@ -201,7 +205,8 @@ class FileWalkerTests(TestCase):
             fp.next_to_purge(numtoget, exclude_set,
                              upper_size_limit=0,
                              dodelete=True)
-        print "---test_purge04 passed"
+        if lverb:
+            print "---test_purge04 passed"
 
     def test_exclude_set(self):
         grace_period_hrs = 0.0
@@ -213,9 +218,10 @@ class FileWalkerTests(TestCase):
         self.assertEqual(exclude_set & set_got, set(), "returned an excluded file!")
         self.assertEqual(len(set_got), fp.MAX_CACHE, "unexpected number of files")
 
-    def test_purge01(self):
+    def test_purge01(self, lverb=False):
         """Test next_to_purge with dodelete=False """
-        print "---test_purge01"
+        if lverb:
+            print "---test_purge01"
         fp = FilePurger(BIG_testdir, 1.0, 1.0, LOGGER)
         exclude_set = self._get_big_excset(10.0)
         DT_SECS = 1.0
@@ -234,8 +240,10 @@ class FileWalkerTests(TestCase):
                 if t_act-t_stop > 0.0:
                     ntoo_late += 1
         except StopIteration:
-            print "got the stop lst1"
-        print "ncount 01 : %d, ntoo_late: %d " % (ncount1, ntoo_late)
+            if lverb:
+                print "got the stop lst1"
+        if lverb:
+            print "ncount 01 : %d, ntoo_late: %d " % (ncount1, ntoo_late)
         self.assertEqual(len(lst1), fp.MAX_CACHE, "wrong length of list1")
         # we will let it pass if its late just once...
         self.assertTrue(ntoo_late <= 1, "filepurger returned too late too often")
@@ -255,22 +263,27 @@ class FileWalkerTests(TestCase):
                 if t_act-t_stop > 0.0:
                     ntoo_late += 1
         except StopIteration:
-            print "got the stop lst2"
-        print "ncount 02 : %d, ntoo_late: %d " % (ncount2, ntoo_late)
+            if lverb:
+                print "got the stop lst2"
+        if lverb:
+            print "ncount 02 : %d, ntoo_late: %d " % (ncount2, ntoo_late)
         self.assertEqual(len(lst2), fp.MAX_CACHE, "wrong length of list2")
         self.assertTrue(ntoo_late <= 1, "filepurger returned too late too often")
         self.assertEqual(lst1, lst2, "lists are not equal")
-        print "---test_purge01 pass"
+        if lverb:
+            print "---test_purge01 pass"
 
-    def test_purge02(self):
+    def test_purge02(self, lverb=False):
         """Test next_to_purge with dodelete=True and False.
         """
-        print "---test_purge02"
+        if lverb:
+            print "---test_purge02"
         fp = FilePurger(BIG_testdir, 1.0, 1.0, LOGGER)
         exclude_set = self._get_big_excset(10.0)
         fp._do_walk(exclude_set)
         assert fp._num_scanned_files > 0, "num scanned files is zero!"
-        print "walk completed, scanned files:", fp._num_scanned_files
+        if lverb:
+            print "walk completed, scanned files:", fp._num_scanned_files
         lst_one = [x for x in fp.next_to_purge(6, exclude_set,
                                                upper_size_limit=0, dodelete=False)]
         lsta = [x for x in fp.next_to_purge(3, exclude_set,
@@ -287,26 +300,29 @@ class FileWalkerTests(TestCase):
             for i, j in zip(lst_one, lst_two):
                 print i, j
         self.assertTrue(is_equal, "lists are not equal")
-        print "---test_purge02 pass"
+        if lverb:
+            print "---test_purge02 pass"
 
-    def test_purge03(self):
+    def test_purge03(self, lverb=False):
         """Test next_to_purge : force a recalculation of the cache.
         """
-        print "---test_purge03 (force a cache recalc)"
+        if lverb:
+            print "---test_purge03 (force a cache recalc)"
         # grace_period_hrs = 1
         # grace_time_limit = datetime.datetime.now() - datetime.timedelta(hours=grace_period_hrs)
         fp = FilePurger(BIG_testdir, 1.0, 1.0, LOGGER)
         exclude_set = self._get_big_excset(10.0)
         fp._do_walk(exclude_set)
         self.assertTrue(fp._num_scanned_files > 0, "num scanned files is zero!")
-        print "walk completed, scanned files:", fp._num_scanned_files
-
-        print "MAX_CACHE", fp.MAX_CACHE
-        print "MIN_CACHE", fp.MIN_CACHE
+        if lverb:
+            print "walk completed, scanned files:", fp._num_scanned_files
+            print "MAX_CACHE", fp.MAX_CACHE
+            print "MIN_CACHE", fp.MIN_CACHE
         numtoget = fp.MAX_CACHE - fp.MIN_CACHE + 1
         lst_one = [x for x in fp.next_to_purge(numtoget, exclude_set,
                                                upper_size_limit=0, dodelete=True)]
-        print "got lst1", len(lst_one)
+        if lverb:
+            print "got lst1", len(lst_one)
         # NOTE: even though we have set dodelete to true above, we should get
         # the same list again, assuming that the files haven't changed in the interim,
         # because the next call to next_to_purge will rewalk
@@ -314,9 +330,11 @@ class FileWalkerTests(TestCase):
         # have purged the files in lst_one between calls.
         lst_two = [x for x in fp.next_to_purge(numtoget, exclude_set,
                                                upper_size_limit=0, dodelete=True)]
-        print "got lst2", len(lst_two)
+        if lverb:
+            print "got lst2", len(lst_two)
         self.assertEqual(lst_one, lst_two, "lists are not equal")
-        print "--test_purge03 pass"
+        if lverb:
+            print "--test_purge03 pass"
 
 if __name__ == "__main__":
     unittest.main()

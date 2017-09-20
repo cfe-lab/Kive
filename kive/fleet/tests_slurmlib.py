@@ -138,9 +138,9 @@ class SlurmTests(TestCase):
         assert is_alive, "Calling is_alive fails"
 
     def test_slurm_ident(self):
-        """Print out the slurm_ident"""
+        """slurm_ident must return a string"""
         idstr = SlurmScheduler.slurm_ident()
-        print "slurm ident is '%s'" % idstr
+        assert isinstance(idstr, str), "slurm ident must be a string"
 
     def test_submit_job01(self, lverb=False):
         """ Submitting this job should succeed."""
