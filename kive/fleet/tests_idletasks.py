@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import errno
 import inspect
 import time
 import os.path
@@ -27,7 +28,7 @@ class IdleTaskTests(TestCase):
         self.man.slurm_sched_class.shutdown()
 
     def test_manager_ok(self):
-        "Make sure we have  a manager class"
+        """ Make sure we have  a manager class """
         self.assertIsNotNone(self.man)
 
     def test_add_idletask01(self):
@@ -42,7 +43,7 @@ class IdleTaskTests(TestCase):
         """Adding a generator should work."""
         def test_generator(myargs):
             while True:
-                bla = (yield None)
+                bla = (yield myargs)
                 bla += 1
 
         gen = test_generator(100)
@@ -53,23 +54,23 @@ class IdleTaskTests(TestCase):
     def do_idle_tasks_test(self, lst, time_limit):
         """Add three generators and call do_idle_tasks.
         The generators modify lst if they are called."""
-        def GG1(lst):
+        def gen1(target):
             while True:
                 (yield None)
-                lst.append(1)
+                target.append(1)
 
-        def GG2(lst):
+        def gen2(target):
             while True:
                 (yield None)
-                lst.append(2)
+                target.append(2)
 
-        def GG3(lst):
+        def gen3(target):
             while True:
                 (yield None)
-                lst.append(3)
-        self.man._add_idletask(GG1(lst))
-        self.man._add_idletask(GG2(lst))
-        self.man._add_idletask(GG3(lst))
+                target.append(3)
+        self.man._add_idletask(gen1(lst))
+        self.man._add_idletask(gen2(lst))
+        self.man._add_idletask(gen3(lst))
         self.man._do_idle_tasks(time_limit)
 
     def test_add_do_idle_tasks01(self):
@@ -78,7 +79,7 @@ class IdleTaskTests(TestCase):
         lst, time_limit = [], time.time() + 1000.0
         self.do_idle_tasks_test(lst, time_limit)
         self.assertTrue(len(lst) == 3, "unexpected lst length")
-        self.assertTrue(set(lst) == set([1, 2, 3]), "unexpected set")
+        self.assertTrue(set(lst) == {1, 2, 3}, "unexpected set")
 
     def test_add_do_idle_tasks02(self):
         """Add three generators. Calling do_idle_tasks with a negative time_limit
@@ -90,26 +91,26 @@ class IdleTaskTests(TestCase):
 
     def test_add_do_idle_tasks03(self):
         """ Add four time-delayed generators. Waiting a specific time should
-        result in some of the being called and others not.
+        result in some of them being called and others not.
         """
-        def sleep_generator(lst, id, secs_to_sleep):
+        def sleep_generator(target, task_id, secs_to_sleep):
             while True:
                 (yield None)
-                lst.append(id)
+                target.append(task_id)
                 time.sleep(secs_to_sleep)
 
-        WAIT_SECS = 1.0
+        wait_secs = 1.0
         lst = []
-        self.man._add_idletask(sleep_generator(lst, 1, WAIT_SECS))
-        self.man._add_idletask(sleep_generator(lst, 2, WAIT_SECS))
-        self.man._add_idletask(sleep_generator(lst, 3, WAIT_SECS))
-        self.man._add_idletask(sleep_generator(lst, 4, WAIT_SECS))
-        time_limit = time.time() + 1.5*WAIT_SECS
+        self.man._add_idletask(sleep_generator(lst, 1, wait_secs))
+        self.man._add_idletask(sleep_generator(lst, 2, wait_secs))
+        self.man._add_idletask(sleep_generator(lst, 3, wait_secs))
+        self.man._add_idletask(sleep_generator(lst, 4, wait_secs))
+        time_limit = time.time() + 1.5*wait_secs
         self.man._do_idle_tasks(time_limit)
         self.assertTrue(len(lst) == 2, "unexpected lst length")
         # NOTE: the order of the idle_tasks is not defined by the interface
         # However, in fact the queue is rotated to the right...
-        self.assertTrue(set(lst) == set([1, 4]), "unexpected set")
+        self.assertTrue(set(lst) == {1, 4}, "unexpected set")
 
     def test_create_next_month_upload_dir01(self):
         """ Test the creation of a monthly directory when the
@@ -119,25 +120,16 @@ class IdleTaskTests(TestCase):
         date_str = (date.today() + timedelta(days=30)).strftime('%Y_%m')
         next_dirname = os.path.join(dataset_dir, date_str)
         # delete the dir iff it exists.
-        dotest = True
         try:
             shutil.rmtree(dataset_dir)
         except os.error as e:
-            if e.errno == 2:
-                # its doesn't exist, which is fine
-                pass
-            else:
-                # the Datasets dir might not be empty, in which case we cannot remove it:
-                # we bail from the test
-                print "Cannot delete Datasets directory... skipping the test"
-                dotest = False
-        if dotest:
-            print "missing Dataset dir: testing creation of", next_dirname
-            gg = Dataset.idle_create_next_month_upload_dir()
-            self.man._add_idletask(gg)
-            time_limit = time.time() + 1000.0
-            self.man._do_idle_tasks(time_limit)
-            self.assertTrue(os.path.exists(next_dirname), "directory was not made")
+            if e.errno != errno.ENOENT:
+                raise
+        gg = Dataset.idle_create_next_month_upload_dir()
+        self.man._add_idletask(gg)
+        time_limit = time.time() + 1000.0
+        self.man._do_idle_tasks(time_limit)
+        self.assertTrue(os.path.exists(next_dirname), "directory was not made")
 
     def test_create_next_month_upload_dir02(self):
         """ Test the creation of a monthly directory where Dataset may be present."""
@@ -148,11 +140,8 @@ class IdleTaskTests(TestCase):
         try:
             shutil.rmtree(next_dirname)
         except os.error as e:
-            if e.errno == 2:
-                pass
-            else:
+            if e.errno != errno.ENOENT:
                 raise
-        print "testing creation of", next_dirname
         gg = Dataset.idle_create_next_month_upload_dir()
         self.man._add_idletask(gg)
         time_limit = time.time() + 1000.0
@@ -166,11 +155,7 @@ class IdleTaskTests(TestCase):
         next_dirname = os.path.join(dataset_dir, date_str)
         # make the directory iff it doesn't exist
         if not os.path.exists(next_dirname):
-            try:
-                os.makedirs(next_dirname)
-            except os.error:
-                raise
-        print "testing creation of", next_dirname
+            os.makedirs(next_dirname)
         gg = Dataset.idle_create_next_month_upload_dir()
         self.man._add_idletask(gg)
         time_limit = time.time() + 1000.0

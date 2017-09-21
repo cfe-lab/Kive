@@ -89,10 +89,11 @@ def main():
     ax.set_xlim(xlim)
     ylim = list(ax.get_ylim())
     ylim[0] = 0
-    ylim[1] *= 1.25
+    ylim[1] *= 1.6
     ax.set_ylim(ylim)
     fig.autofmt_xdate()
     plt.savefig(args.plot)
+
 
 if __name__ == '__main__':
     main()

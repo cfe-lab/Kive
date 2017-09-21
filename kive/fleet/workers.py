@@ -107,7 +107,8 @@ class Manager(object):
                     raise User.DoesNotExist(
                         'Username {!r} not found.'.format(stop_username))
             active_tasks = Run.objects.filter(start_time__isnull=False,
-                                              end_time__isnull=True)
+                                              end_time__isnull=True,
+                                              stopped_by=None)
             for task in active_tasks:
                 if stop_user is None:
                     raise ActiveRunsException(active_tasks.count())
@@ -478,6 +479,9 @@ class Foreman(object):
         self.shutting_down = False
         self.priority = run.priority
 
+    def is_node_fail(self, job_state):
+        return job_state == self.slurm_sched_class.NODE_FAIL
+
     def monitor_queue(self):
         """
         Look to see if any of this Run's tasks are done.
@@ -498,8 +502,6 @@ class Foreman(object):
         # These flags reflect the status from the actual execution, not
         # the states of the RunComponents in the database.  (We may have to
         # use them to update said database states.)
-        failed = False
-        cancelled, is_node_fail, cancel_end_time = False, False, None
         node_fail_delta = datetime.timedelta(seconds=settings.NODE_FAIL_TIME_OUT_SECS)
         terminated_during = ""
         still_running = []
@@ -509,7 +511,6 @@ class Foreman(object):
         start_keyword = self.slurm_sched_class.ACC_START_TIME
         end_keyword = self.slurm_sched_class.ACC_END_TIME
         return_code_keyword = self.slurm_sched_class.ACC_RETURN_CODE
-        NODE_FAIL = self.slurm_sched_class.NODE_FAIL
 
         # self.tasks_in_progress may change during this loop, so we iterate over the keys.
         tasks = self.tasks_in_progress.keys()
@@ -534,8 +535,7 @@ class Foreman(object):
                         continue
                     elif setup_state in self.slurm_sched_class.CANCELLED_STATES:
                         cancel_end_time = setup_info[end_keyword]
-                        is_node_fail = setup_state == NODE_FAIL
-                        if is_node_fail:
+                        if self.is_node_fail(setup_state):
                             expiry_time = cancel_end_time + node_fail_delta
                             now_time = datetime.datetime.now(timezone.get_current_timezone())
                             cancelled = expiry_time < now_time
@@ -572,9 +572,8 @@ class Foreman(object):
                             continue
                         elif driver_state in self.slurm_sched_class.CANCELLED_STATES:
                             # This was externally cancelled, so we get ready to bail.
-                            is_node_fail = driver_state == NODE_FAIL
                             cancel_end_time = driver_info[end_keyword]
-                            if is_node_fail:
+                            if self.is_node_fail(driver_state):
                                 expiry_time = cancel_end_time + node_fail_delta
                                 now_time = datetime.datetime.now(timezone.get_current_timezone())
                                 cancelled = expiry_time < now_time
@@ -602,16 +601,7 @@ class Foreman(object):
                             # Weirdly, task.log doesn't appear to be set even if you refresh task from the database,
                             # so we explicitly retrieve it.
                             # noinspection PyUnresolvedReferences
-                            try:
-                                # noinspection PyUnresolvedReferences
-                                task_log = ExecLog.objects.get(record=task)
-                            except ExecLog.DoesNotExist:
-                                foreman_logger.exception(
-                                    'ExecLog not found for %r, retrying.',
-                                    task)
-                                time.sleep(5)
-                                # noinspection PyUnresolvedReferences
-                                task_log = ExecLog.objects.get(record=task)
+                            task_log = ExecLog.objects.get(record=task)
 
                             with transaction.atomic():
                                 task_log.start_time = driver_info[start_keyword]
@@ -686,9 +676,8 @@ class Foreman(object):
                         still_running.append(task_dict["bookkeeping"])
                         continue
                     elif bookkeeping_state in self.slurm_sched_class.CANCELLED_STATES:
-                        is_node_fail = bookkeeping_state == NODE_FAIL
                         cancel_end_time = bookkeeping_info[end_keyword]
-                        if is_node_fail:
+                        if self.is_node_fail(bookkeeping_state):
                             expiry_time = cancel_end_time + node_fail_delta
                             now_time = datetime.datetime.now(timezone.get_current_timezone())
                             cancelled = expiry_time < now_time
@@ -726,9 +715,8 @@ class Foreman(object):
                     still_running.append(task_dict["cable"])
                     continue
                 elif cable_state in self.slurm_sched_class.CANCELLED_STATES:
-                    is_node_fail = cable_state == NODE_FAIL
                     cancel_end_time = cable_info[end_keyword]
-                    if is_node_fail:
+                    if self.is_node_fail(cable_state):
                         expiry_time = cancel_end_time + node_fail_delta
                         now_time = datetime.datetime.now(timezone.get_current_timezone())
                         cancelled = expiry_time < now_time
