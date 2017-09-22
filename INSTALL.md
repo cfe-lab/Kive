@@ -321,6 +321,13 @@ Use the simple, built-in scheduler
     FastSchedule=1
     SchedulerType=sched/builtin
     
+It is advised to use cgroup-based process tracking, which is more reliable than pgid tracking.
+
+	ProctrackType=proctrack/cgroup
+
+NOTE: cgroup tracking by slurm requires the linux kernel to appropriately configured to allow cgroup-based tracking. If the machine is wrongly configured, slurmd will fail to start. cgroup is
+configured if the /sys/fs/cgroup/ directory is mounted. In August 2017, on our machine running scyld 7.3, proper cgroup configuration required a modified /etc/beowulf/init.d/98slurm startup script to be put into place in order to accomplish this.
+
 By default, Kive requires three slurm partitions (job queues) of differing priority to be defined
 in order to work. On startup, Kive will check the slurm configuration.
  
