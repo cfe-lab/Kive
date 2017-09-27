@@ -1,5 +1,5 @@
 const webpack = require('webpack');
-const UglifyJSPlugin = require('uglifyjs-webpack-plugin');
+// const UglifyJSPlugin = require('uglifyjs-webpack-plugin');
 
 module.exports = {
     entry: {
@@ -11,7 +11,7 @@ module.exports = {
     },
 
     // Enable sourcemaps for debugging webpack's output.
-    devtool: "source-map",
+    devtool: "inline-source-map",
 
     plugins: [
         // new webpack.DefinePlugin({
@@ -21,8 +21,15 @@ module.exports = {
         // }),
         // new UglifyJSPlugin(),
 
-        // only include 'en' locale for moment.js
-        new webpack.IgnorePlugin(/^\.\/locale$/, /moment$/)
+        new webpack.ProvidePlugin({
+            $: 'jquery',
+            jQuery: 'jquery'
+        }),
+
+        new webpack.SourceMapDevToolPlugin({
+            filename: null, // if no value is provided the sourcemap is inlined
+            test: /\.(ts|js)($|\?)/i // process .js and .ts files only
+        })
     ],
 
     resolve: {
@@ -32,9 +39,6 @@ module.exports = {
 
     module: {
         rules: [
-            // All output '.js' files will have any sourcemaps re-processed by 'source-map-loader'.
-            { enforce: 'pre', test: /\.js$/, loader: "source-map-loader" },
-
             // All files with a '.ts' or '.tsx' extension will be handled by 'awesome-typescript-loader'.
             { test: /\.tsx?$/, loader: "awesome-typescript-loader" },
 
@@ -55,13 +59,5 @@ module.exports = {
                 ]
             }
         ]
-    },
-
-    // When importing a module whose path matches one of the following, just
-    // assume a corresponding global variable exists and use that instead.
-    // This is important because it allows us to avoid bundling all of our
-    // dependencies, which allows browsers to cache those libraries between builds.
-    externals: {
-        "jquery": "$"
-    },
+    }
 };

@@ -6,10 +6,14 @@
         "removeComments": true,
         "preserveConstEnums": true,
         "sourceMap": true,
+        "allowJs": false,
         "baseUrl": "kive",
         "paths": {
             "static/pipeline/*": [ "pipeline/static/pipeline/*" ]
         }
+    },
+    "awesomeTypescriptLoaderOptions": {
+        "silent": true
     },
     "exclude": [
         "node_modules",

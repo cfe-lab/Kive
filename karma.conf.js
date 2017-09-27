@@ -1,43 +1,61 @@
 var webpackConfig = require('./webpack.config');
+
 module.exports = function(config) {
-    config.set({
-        frameworks: ['jasmine'],
+    var cfgObj = {
+        frameworks: ['jasmine-ajax', 'jasmine-jquery', 'jasmine'],
+        basePath: 'kive',
         files: [
-            'kive/pipeline/tests.ts'
+            'tests.ts',
+            { pattern: '**/*.js.map', included: false } // serve source-maps
         ],
         preprocessors: {
-            'kive/pipeline/tests.ts': ['webpack']
+            'tests.ts': ['webpack', 'sourcemap']
         },
-        reporters: ['progress'],
+        reporters: ['spec','kjhtml'],
         port: 9876,  // karma web server port
         colors: true,
         logLevel: config.LOG_INFO,
-        browsers: ['Chrome', 'ChromeHeadless', 'MyHeadlessChrome'],
-        autoWatch: false,
-        // singleRun: false, // Karma captures browsers, runs the tests and exits
+        browsers: ['Chrome', 'ChromeHeadless'],
+        autoWatch: true,
         concurrency: Infinity,
-        customLaunchers: {
-            MyHeadlessChrome: {
-                base: 'ChromeHeadless',
-                flags: ['--disable-translate', '--disable-extensions', '--remote-debugging-port=9223']
+        mime: { 'text/x-typescript': ['ts','tsx'] }, // required for typescript usage
+        plugins: [
+            '@metahub/karma-jasmine-jquery', // forked repo uses jasmine up to 2.5.2
+            "karma-*",
+        ],
+        webpack: Object.assign({},
+            webpackConfig,
+            {
+                entry: undefined, // remove entry points for bundling
+                node: { fs: 'empty' }
             }
-        },
-        webpack: {
-            devtool: webpackConfig.devtool,
-            resolve: webpackConfig.resolve,
-            module: webpackConfig.module,
-            node: {
-                fs: 'empty'
-            }
-        },
+        ),
         webpackMiddleware: {
             // webpack-dev-middleware configuration
             quiet: true
-            // and use stats to turn off verbose output
-            // stats: {
-                // options i.e.
-                // chunks: false
-            // }
         }
-    })
+    };
+
+    // simulate the way Django structures directories
+    serveDjangoPath(cfgObj, {
+        'pipeline': ['templates', 'static', 'test_assets'],
+        'portal': ['static'],
+    });
+    cfgObj.proxies['/portal/'] = '/base/portal/';
+    config.set(cfgObj);
 };
+
+function serveDjangoPath(cfgObj, pathDefinitions) {
+    if (!cfgObj.hasOwnProperty('proxies')) {
+        cfgObj.proxies = {};
+    }
+    for (let dir in pathDefinitions) if (pathDefinitions.hasOwnProperty(dir)) {
+        let subDirs = pathDefinitions[dir];
+        for (let subDir of subDirs) {
+            cfgObj.files.push(
+                { pattern: [ dir, subDir, dir, '**/*' ].join('/'), watched: true, served: true, included: false }
+            );
+            cfgObj.proxies[ ['', subDir, dir, ''].join('/') ] = ['/base', dir, subDir, dir, ''].join('/');
+        }
+    }
+}

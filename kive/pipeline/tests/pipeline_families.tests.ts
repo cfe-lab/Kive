@@ -1,9 +1,9 @@
 "use strict";
-import "jasmine";
-import 'jquery';
-import '../../portal/static/portal/permissions.js';
-import '../static/pipeline/PipelineFamiliesTable.js';
-declare var permissions: any;
+(window as any).$ = $;
+require("script-loader!../../portal/static/portal/permissions.js");
+require("script-loader!../static/pipeline/PipelineFamiliesTable.js");
+declare var permissions: { [key: string]: any };
+let {PipelineFamiliesTable} = permissions;
 
 describe('Pipeline families', function() {
     beforeEach(function() {
@@ -21,7 +21,7 @@ describe('Pipeline families', function() {
     });
 
     it('should build a table', function() {
-        var table = new permissions.PipelineFamiliesTable(
+        var table = new PipelineFamiliesTable(
             this.$table, this.is_user_admin, this.$navigation_links
         );
         table.image_path = "portal/static/portal/img";

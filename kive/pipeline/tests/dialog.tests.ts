@@ -1,25 +1,25 @@
-"use strict";
-
 import { MethodDialog, Dialog, InputDialog, OutputDialog } from "../static/pipeline/pipeline_dialogs";
 import { MethodNode, CdtNode, OutputNode } from "../static/pipeline/canvas/drydock_objects";
 import { REDRAW_INTERVAL, CanvasState } from "../static/pipeline/canvas/drydock";
-import "jasmine";
-import 'jquery';
-import 'jasmine-jquery';
-import 'jasmine-ajax';
-import 'imagediff';
+import * as imagediff from 'imagediff';
+
+let basePath = '';
+jasmine.getFixtures().fixturesPath = basePath + '/templates/pipeline';
+jasmine.getStyleFixtures().fixturesPath = basePath + '/static/pipeline';
+jasmine.getFixtures().preload(
+    'pipeline_view_dialog.tpl.html',
+    'pipeline_method_dialog.tpl.html',
+    'pipeline_input_dialog.tpl.html',
+    'pipeline_output_dialog.tpl.html'
+);
+jasmine.getStyleFixtures().preload('drydock.css');
 
 describe("Dialog fixture", function() {
     let dlg;
 
-    jasmine.getFixtures().fixturesPath = '/templates/pipeline';
-    jasmine.getFixtures().preload('./pipeline_view_dialog.tpl.html');
-    jasmine.getStyleFixtures().fixturesPath = '/static/pipeline';
-    jasmine.getStyleFixtures().preload('./drydock.css');
-
     beforeEach(function(){
-        appendLoadFixtures('./pipeline_view_dialog.tpl.html');
-        appendLoadStyleFixtures('./drydock.css');
+        appendLoadFixtures('pipeline_view_dialog.tpl.html');
+        appendLoadStyleFixtures('drydock.css');
         appendSetFixtures("<a id='activator'>Activator</a>");
         dlg = new Dialog(
             $('.ctrl_menu').attr('id', '#id_view_ctrl'),
@@ -333,18 +333,14 @@ describe("MethodDialog fixture", function() {
         }`
     };
 
-    jasmine.getFixtures().fixturesPath = '/templates/pipeline';
-    jasmine.getFixtures().preload('./pipeline_method_dialog.tpl.html');
-    jasmine.getStyleFixtures().fixturesPath = '/static/pipeline';
-    jasmine.getStyleFixtures().preload('./drydock.css');
 
     beforeAll(function() {
         jasmine.addMatchers(imagediff.jasmine);
     });
 
     beforeEach(function(){
-        appendLoadFixtures('./pipeline_method_dialog.tpl.html');
-        appendLoadStyleFixtures('./drydock.css');
+        appendLoadFixtures('pipeline_method_dialog.tpl.html');
+        appendLoadStyleFixtures('drydock.css');
         appendSetFixtures("<a id='activator'>Activator</a>");
         dlg = new MethodDialog(
             $('.ctrl_menu').attr('id', '#id_method_ctrl'),
@@ -441,7 +437,7 @@ describe("MethodDialog fixture", function() {
 
             // No extra calls, just checking default drawing.
 
-            expect(canvas).toImageDiffEqual(expected_canvas);
+            (expect(canvas) as any).toImageDiffEqual(expected_canvas);
         });
         done();
     });
@@ -514,7 +510,8 @@ describe("MethodDialog fixture", function() {
             ];
             outputs[1].change();
 
-            expect(canvas).toImageDiffEqual(expected_canvas);
+            (expect(canvas) as any).toImageDiffEqual(expected_canvas);
+
         });
         done();
     });
@@ -529,7 +526,7 @@ describe("MethodDialog fixture", function() {
         loadMockMethod(function () {
             $delete_outputs.prop('checked', false).change();
 
-            expect(canvas).toImageDiffEqual(expected_canvas);
+            (expect(canvas) as any).toImageDiffEqual(expected_canvas);
         });
         done();
     });
@@ -558,7 +555,7 @@ describe("MethodDialog fixture", function() {
             $select_method.val(8).change();
             jasmine.Ajax.requests.mostRecent().respondWith(mockData3);
 
-            expect(canvas).toImageDiffEqual(expected_canvas);
+            (expect(canvas) as any).toImageDiffEqual(expected_canvas);
         });
         done();
     });
@@ -584,7 +581,7 @@ describe("MethodDialog fixture", function() {
 
             expected_method.fill = bgcol;
             expected_method.draw(expected_ctx);
-            expect(canvas).toImageDiffEqual(expected_canvas);
+            (expect(canvas) as any).toImageDiffEqual(expected_canvas);
         });
         done();
     });
@@ -653,7 +650,7 @@ describe("MethodDialog fixture", function() {
             expect(delete_checkboxes.eq(1).prop('checked')).toBeFalsy();
             expect(delete_checkboxes.eq(2).prop('checked')).toBeTruthy();
 
-            expect(canvas).toImageDiffEqual(expected_canvas);
+            (expect(canvas) as any).toImageDiffEqual(expected_canvas);
         });
         done();
     });
@@ -755,18 +752,13 @@ describe("InputDialog fixture", function() {
     let expected_ctx;
     let expected_input;
 
-    jasmine.getFixtures().fixturesPath = '/templates/pipeline';
-    jasmine.getFixtures().preload('./pipeline_input_dialog.tpl.html');
-    jasmine.getStyleFixtures().fixturesPath = '/static/pipeline';
-    jasmine.getStyleFixtures().preload('./drydock.css');
-
     beforeAll(function() {
         jasmine.addMatchers(imagediff.jasmine);
     });
 
     beforeEach(function(){
-        appendLoadFixtures('./pipeline_input_dialog.tpl.html');
-        appendLoadStyleFixtures('./drydock.css');
+        appendLoadFixtures('pipeline_input_dialog.tpl.html');
+        appendLoadStyleFixtures('drydock.css');
         appendSetFixtures("<a id='activator'>Activator</a>");
         dlg = new InputDialog(
             $('.ctrl_menu').attr('id', '#id_view_ctrl'),
@@ -812,7 +804,7 @@ describe("InputDialog fixture", function() {
         $select_cdt.append($('<option>').val(23));
         $select_cdt.val(23).change();
 
-        expect(canvas).toImageDiffEqual(expected_canvas);
+        (expect(canvas) as any).toImageDiffEqual(expected_canvas);
         done();
     });
 
@@ -822,9 +814,9 @@ describe("InputDialog fixture", function() {
         $select_cdt.val('foo').change();
 
         let raw_node = new Image();
-        raw_node.src = "/pipeline/test_assets/rawnode.png";
+        raw_node.src = "/test_assets/pipeline/rawnode.png";
         raw_node.onload = function() {
-            expect(canvas).toImageDiffEqual(raw_node);
+            (expect(canvas) as any).toImageDiffEqual(raw_node);
             done();
         };
     });
@@ -880,18 +872,13 @@ describe("OutputDialog fixture", function() {
     let $error;
     let canvas;
 
-    jasmine.getFixtures().fixturesPath = '/templates/pipeline';
-    jasmine.getFixtures().preload('./pipeline_output_dialog.tpl.html');
-    jasmine.getStyleFixtures().fixturesPath = '/static/pipeline';
-    jasmine.getStyleFixtures().preload('./drydock.css');
-
     beforeAll(function() {
         jasmine.addMatchers(imagediff.jasmine);
     });
 
     beforeEach(function(){
-        appendLoadFixtures('./pipeline_output_dialog.tpl.html');
-        appendLoadStyleFixtures('./drydock.css');
+        appendLoadFixtures('pipeline_output_dialog.tpl.html');
+        appendLoadStyleFixtures('drydock.css');
         appendSetFixtures("<a id='activator'>Activator</a>");
         dlg = new OutputDialog(
             $('.ctrl_menu').attr('id', '#id_output_ctrl'),
@@ -929,9 +916,9 @@ describe("OutputDialog fixture", function() {
     it('should show an OutputNode preview', function(done) {
         dlg.activator.click();
         let outputnode = new Image();
-        outputnode.src = "/pipeline/test_assets/outputnode.png";
+        outputnode.src = "/test_assets/pipeline/outputnode.png";
         outputnode.onload = function() {
-            expect(canvas).toImageDiffEqual(outputnode);
+            (expect(canvas) as any).toImageDiffEqual(outputnode);
             done();
         };
     });

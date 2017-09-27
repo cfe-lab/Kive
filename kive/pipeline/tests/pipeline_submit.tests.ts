@@ -1,13 +1,11 @@
-"use strict";
-
 import { CanvasState } from "../static/pipeline/canvas/drydock";
 import { buildPipelineSubmit } from "../static/pipeline/io/pipeline_submit";
 import { RawNode, MethodNode, OutputNode, Connector } from "../static/pipeline/canvas/drydock_objects";
-import "jasmine";
-import 'jquery';
-import 'jasmine-jquery';
-import 'jasmine-ajax';
-import 'imagediff';
+import * as imagediff from 'imagediff';
+
+(window as any).document.cookie = 'csrftoken=csrfdummytoken';
+(window as any).$ = (window as any).jQuery = $;
+require("script-loader!../../portal/static/portal/noxss.js");
 
 interface BuildSubmitArgs extends Array<any> {
     0: CanvasState;

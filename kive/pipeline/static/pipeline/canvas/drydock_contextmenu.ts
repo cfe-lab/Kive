@@ -2,7 +2,7 @@
 
 import { CanvasState } from "./drydock";
 import { CNode, Connector } from "./drydock_objects";
-import "jquery";
+import * as $ from "jquery";
 
 interface ContextMenuInterface {
     [action: string]: ContextMenuAction;

@@ -9,7 +9,7 @@ import {
     CanvasWrapper, STATUS_COLOR_MAP
 } from "./drydock_objects";
 import { Geometry, Point, Rectangle } from "./geometry";
-import 'jquery';
+import * as $ from 'jquery';
 
 export const REDRAW_INTERVAL = 50; // ms
 

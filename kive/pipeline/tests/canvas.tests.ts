@@ -3,9 +3,7 @@ import {
     OutputNode, OutputZone, Magnet, Connector
 } from "../static/pipeline/canvas/drydock_objects";
 import { CanvasState } from "../static/pipeline/canvas/drydock";
-import "jasmine";
-import 'jquery';
-import 'imagediff';
+import * as imagediff from 'imagediff';
 
 "use strict";
 
@@ -22,7 +20,6 @@ describe("Canvas classes", function() {
         this.ctx = this.canvas.ctx;
         this.expectedCanvas.ctx.fillStyle = "white";
         this.rgb_tolerance = 16; // max 255
-
         this.allowedGlobals = {};
         for (var key in window) {
             this.allowedGlobals[key] = true;
@@ -35,7 +32,8 @@ describe("Canvas classes", function() {
                 fail('leaked global ' + key);
             }
         }
-        expect(this.rawCanvas).toImageDiffEqual(
+
+        (expect(this.rawCanvas) as any).toImageDiffEqual(
                 this.expectedRawCanvas,
                 this.rgb_tolerance);
     });
@@ -1934,6 +1932,14 @@ describe("Canvas classes", function() {
                 });
 
                 it('should autolayout', function() {
+                    // this.expectedCanvas.ctx.beginPath();
+                    // this.expectedCanvas.ctx.arc(50, 50, 25, 0, 2 * Math.PI);
+                    // this.expectedCanvas.ctx.closePath();
+                    // this.expectedCanvas.ctx.fill();
+                    //
+                    // this.canvas.ctx.fillStyle = "white";
+                    // this.canvas.drawCircle({x: 50, y: 50, r: 25});
+
                     this.expectedInput.x = 92.44925586885002;
                     this.expectedInput.y = 22.5;
                     this.expectedMethod.x = 207.55074413115;
