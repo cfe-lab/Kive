@@ -44,7 +44,7 @@
     "webpack": "^3.5.6"
   },
   "scripts": {
-    "preinstall": "grunt pngicons",
+    "postinstall": "grunt pngicons",
     "install": "webpack",
     "watch:all": "npm run build:watch & npm run sass:watch",
     "build:watch": "webpack --watch",
