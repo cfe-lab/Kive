@@ -1,7 +1,7 @@
-import { CanvasWrapper } from "../static/pipeline/canvas/drydock_objects";
-import { CanvasState } from "../static/pipeline/canvas/drydock";
-import { Pipeline } from "../static/pipeline/io/pipeline_load";
-import { serializePipeline } from "../static/pipeline/io/serializer";
+import { CanvasWrapper } from "@canvas/drydock_objects";
+import { CanvasState } from "@canvas/drydock";
+import { Pipeline } from "@pipeline/io/pipeline_load";
+import { serializePipeline } from "@pipeline/io/serializer";
 import * as imagediff from 'imagediff';
 
 describe("Pipeline functions", function() {

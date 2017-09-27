@@ -1,4 +1,4 @@
-require("script-loader!./static/librarian/md5.js");
+require("@librarian/md5.js");
 declare var md5: any;
 
 describe("MD5 library", function() {

@@ -1,5 +1,5 @@
 (window as any).$ = $;
-require("script-loader!./static/portal/permissions.js");
+require("@portal/permissions.js");
 declare var permissions: { [key: string]: any };
 var {PermissionsTable, FilterSet} = permissions;
 

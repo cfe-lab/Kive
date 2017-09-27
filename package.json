@@ -44,10 +44,11 @@
     "webpack": "^3.5.6"
   },
   "scripts": {
-    "install": "grunt pngicons && tsc",
-    "watch-all": "npm run ts-watch & npm run sass-watch",
-    "ts-watch": "tsc -w",
-    "sass-watch": "node-sass --watch --recursive --output kive --source-map true --source-map-contents kive",
+    "preinstall": "grunt pngicons",
+    "install": "webpack",
+    "watch:all": "npm run build:watch & npm run sass:watch",
+    "build:watch": "webpack --watch",
+    "sass:watch": "node-sass --watch --recursive --output kive --source-map true --source-map-contents kive",
     "test:browser": "karma start --browsers Chrome",
     "test": "karma start --browsers ChromeHeadless"
   },

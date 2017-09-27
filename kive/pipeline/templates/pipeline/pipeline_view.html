@@ -6,14 +6,9 @@
 {% block javascript %}
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
-    <script src="/static/portal/core.min.js"></script>
-    <script src="/static/portal/system.js"></script>
-    <script src="/static/portal/system.config.js"></script>
     <script>
         var is_owner = {{ is_owner|lower }},
             is_admin = {{ is_admin|lower }};
-
-        System.import('/static/pipeline/pipeline_view');
     </script>
     <script src="/static/portal/edit_details.js"></script>
 
@@ -118,5 +113,6 @@
     <div>
         <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
     </div>
+    <script src="/static/portal/pipeline_view.bundle.js"></script>
 
 {% endblock %}

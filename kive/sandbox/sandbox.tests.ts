@@ -1,6 +1,6 @@
 (window as any).$ = $;
-require("./static/sandbox/PipelineRunTable");
-require("../librarian/static/librarian/DatasetsTable.js");
+require("@sandbox/PipelineRunTable");
+require("@librarian/DatasetsTable.js");
 declare var permissions: { [key: string]: any };
 var {PipelineRunTable, DatasetsTable} = permissions;
 

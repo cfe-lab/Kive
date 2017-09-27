@@ -7,11 +7,6 @@
 
 {% block javascript %}
     <script src="/static/portal/noxss.js"></script>
-    <script src="/static/portal/system.js"></script>
-    <script src="/static/portal/system.config.js"></script>
-    <script>
-        System.import('/static/sandbox');
-    </script>
 {% endblock %}
 
 {% block stylesheets %}
@@ -93,5 +88,7 @@
     <input type="hidden" id="run_id" value="{{run.id}}">
     <input type="hidden" id="run_pipeline_id" value="{{run.pipeline.id}}">
     <input type="hidden" id="run_md5" value="{{ md5 }}">
+
+    <script src="/static/portal/view_run.bundle.js"></script>
 
 {% endblock %}

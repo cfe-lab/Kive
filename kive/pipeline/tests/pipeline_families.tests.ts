@@ -1,7 +1,7 @@
 "use strict";
 (window as any).$ = $;
-require("script-loader!../../portal/static/portal/permissions.js");
-require("script-loader!../static/pipeline/PipelineFamiliesTable.js");
+require("@portal/permissions.js");
+require("@pipeline/PipelineFamiliesTable.js");
 declare var permissions: { [key: string]: any };
 let {PipelineFamiliesTable} = permissions;
 

@@ -1,6 +1,6 @@
-import { MethodDialog, Dialog, InputDialog, OutputDialog } from "../static/pipeline/pipeline_dialogs";
-import { MethodNode, CdtNode, OutputNode } from "../static/pipeline/canvas/drydock_objects";
-import { REDRAW_INTERVAL, CanvasState } from "../static/pipeline/canvas/drydock";
+import { MethodDialog, Dialog, InputDialog, OutputDialog } from "@pipeline/pipeline_dialogs";
+import { MethodNode, CdtNode, OutputNode } from "@canvas/drydock_objects";
+import { REDRAW_INTERVAL, CanvasState } from "@canvas/drydock";
 import * as imagediff from 'imagediff';
 
 let basePath = '';

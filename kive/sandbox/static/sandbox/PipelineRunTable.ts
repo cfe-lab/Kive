@@ -1,8 +1,6 @@
-"use strict";
-
-import { CanvasState, Pipeline } from "../../../pipeline/static/pipeline/pipeline_all";
+import { CanvasState, Pipeline } from "@pipeline/pipeline_all";
 (window as any).$ = $;
-require("script-loader!../../../portal/static/portal/permissions.js");
+require("@portal/permissions.js");
 declare var permissions: { [key: string]: any };
 
 permissions.PipelineRunTable = function($table, is_user_admin, $navigation_links) {
