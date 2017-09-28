@@ -47,7 +47,14 @@ TEST-*
 .sass-cache/
 
 # Specific generated JS files
+kive/librarian/librarian.tests.js
+kive/pipeline/pipeline.tests.js
 kive/pipeline/tests.js
 kive/pipeline/tests/*.js
+kive/portal/portal.tests.js
+kive/portal/static/portal/noxss_jq.js
+kive/sandbox/sandbox.tests.js
+kive/sandbox/static/sandbox/choose_pipeline.js
 kive/sandbox/static/sandbox/view_run.js
 kive/sandbox/static/sandbox/PipelineRunTable.js
+kive/tests.js
