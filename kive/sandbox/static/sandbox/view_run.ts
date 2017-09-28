@@ -1,10 +1,7 @@
-"use strict";
-
 import {
     CanvasState, CanvasContextMenu, CanvasListeners,
     Pipeline, REDRAW_INTERVAL
-} from "static/pipeline/pipeline_all";
-import 'jquery';
+} from "@pipeline/pipeline_all";
 
 const RUN_ID         = parseInt($('#run_id').val(), 10);
 const PIPELINE_ID    = parseInt($('#run_pipeline_id').val(), 10);

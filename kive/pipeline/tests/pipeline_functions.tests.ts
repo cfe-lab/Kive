@@ -1,13 +1,8 @@
-import { CanvasWrapper } from "../static/pipeline/canvas/drydock_objects";
-import { CanvasState } from "../static/pipeline/canvas/drydock";
-import { Pipeline } from "../static/pipeline/io/pipeline_load";
-import { serializePipeline } from "../static/pipeline/io/serializer";
-import "jasmine";
-import 'jasmine-html';
-import 'imagediff';
-import 'jquery';
-
-"use strict";
+import { CanvasWrapper } from "@canvas/drydock_objects";
+import { CanvasState } from "@canvas/drydock";
+import { Pipeline } from "@pipeline/io/pipeline_load";
+import { serializePipeline } from "@pipeline/io/serializer";
+import * as imagediff from 'imagediff';
 
 describe("Pipeline functions", function() {
     beforeEach(function() {
@@ -399,7 +394,7 @@ describe("Pipeline functions", function() {
             pipeline = loadApiPipeline(expectedCanvasState, this.api_pipeline);
             pipeline.draw();
 
-            expect(this.rawCanvas).toImageDiffEqual(
+            (expect(this.rawCanvas) as any).toImageDiffEqual(
                 expectedCanvas);
         });
     });

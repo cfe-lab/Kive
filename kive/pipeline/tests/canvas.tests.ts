@@ -1,12 +1,9 @@
 import {
     CanvasWrapper, MethodNode, CdtNode, RawNode,
     OutputNode, OutputZone, Magnet, Connector
-} from "../static/pipeline/canvas/drydock_objects";
-import { CanvasState } from "../static/pipeline/canvas/drydock";
-import "jasmine";
-import 'jasmine-html';
-import 'jquery';
-import 'imagediff';
+} from "@canvas/drydock_objects";
+import { CanvasState } from "@canvas/drydock";
+import * as imagediff from 'imagediff';
 
 "use strict";
 
@@ -23,7 +20,6 @@ describe("Canvas classes", function() {
         this.ctx = this.canvas.ctx;
         this.expectedCanvas.ctx.fillStyle = "white";
         this.rgb_tolerance = 16; // max 255
-
         this.allowedGlobals = {};
         for (var key in window) {
             this.allowedGlobals[key] = true;
@@ -36,7 +32,7 @@ describe("Canvas classes", function() {
                 fail('leaked global ' + key);
             }
         }
-        expect(this.rawCanvas).toImageDiffEqual(
+        (expect(this.rawCanvas) as any).toImageDiffEqual(
                 this.expectedRawCanvas,
                 this.rgb_tolerance);
     });

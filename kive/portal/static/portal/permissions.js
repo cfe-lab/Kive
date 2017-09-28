@@ -638,7 +638,7 @@ var permissions = (function() {
                     $field.attr('name'),
                     $field.is(':checked') ? undefined : value);
             if ($field.is(':checked')) {
-                $field.attr('checked', false);
+                $field.prop('checked', false);
             }
             else {
                 $field.val('');

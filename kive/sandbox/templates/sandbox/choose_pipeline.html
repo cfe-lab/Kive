@@ -2,29 +2,6 @@
 
 {% block title %}Analysis{% endblock %}
 
-{% block javascript %}
-    <script src="/static/portal/jquery-2.0.3.min.js"></script>
-	<script src="/static/portal/noxss.js"></script>
-    <script src="/static/portal/permissions.js"></script>
-    <script src="/static/portal/ajaxsearchfilter.js"></script>
-    <script src="/static/portal/system.js"></script>
-    <script src="/static/portal/system.config.js"></script>
-    <script type="text/javascript">
-
-    System.import('/static/sandbox/PipelineRunTable').then(function() {
-        var IS_USER_ADMIN = false; // Never show admin tools on this page
-        var table = new permissions.PipelineRunTable(
-                $('#pipeline_families'),
-                IS_USER_ADMIN,
-                $(".navigation_links")
-        );
-        var asf = new AjaxSearchFilter(table);
-        asf.reloadTable();
-    });
-
-    </script>
-{% endblock %}
-
 {% block stylesheets %}
     <link rel="stylesheet" href="/static/sandbox/sandbox.css"/>
     <link rel="stylesheet" href="/static/portal/search.css"/>
@@ -53,6 +30,7 @@ Please select a pipeline you would like to run on this page.
 <div class="results2">
     <table id="pipeline_families"></table>
 </div>
+<script src="/static/portal/choose_pipeline.bundle.js"></script>
 
 <div> * Revisions marked with an asterisk are not published. </div>
 <div class="errortext">{{ error_msg }}</div>

@@ -1,3 +1,2 @@
 # ignore generated js and map files
-noxss_jq.js
 *.js.map

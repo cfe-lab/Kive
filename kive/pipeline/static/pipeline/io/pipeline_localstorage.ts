@@ -1,5 +1,5 @@
 import { CanvasState } from "../canvas/drydock";
-import {Pipeline} from "pipeline_load";
+import {Pipeline} from "./pipeline_load";
 // import {buildPipelineSubmit} from "pipeline_submit";
 
 /*

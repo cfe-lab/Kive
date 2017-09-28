@@ -1,6 +1,6 @@
 (function(permissions) {
     "use strict";
-    permissions.DatasetsTable = function($table, is_user_admin, $navigation_links) {
+    permissions.DatasetSearchTable = function($table, is_user_admin, $navigation_links) {
         permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
         this.list_url = "/api/inputdatasets/";
         this.registerColumn("Name", buildName);
@@ -11,8 +11,8 @@
         this.registerStandardColumn("groups_allowed");
         this.page_size = 8;
     };
-    permissions.DatasetsTable.prototype = Object.create(permissions.PermissionsTable.prototype);
-    permissions.DatasetsTable.prototype.extractRows = function(response) {
+    permissions.DatasetSearchTable.prototype = Object.create(permissions.PermissionsTable.prototype);
+    permissions.DatasetSearchTable.prototype.extractRows = function(response) {
         var datasets = [],
             caption,
             count;
@@ -35,10 +35,10 @@
         this.setCaption(caption);
         return datasets;
     };
-    permissions.DatasetsTable.prototype.getMaxYPosition = function() {
+    permissions.DatasetSearchTable.prototype.getMaxYPosition = function() {
         return window.innerHeight;
     };
-    permissions.DatasetsTable.prototype.checkOverflow = function() {
+    permissions.DatasetSearchTable.prototype.checkOverflow = function() {
         var dataset_table = this,
             available_space = this.getMaxYPosition() -
                 this.$table.offset().top - this.$table.outerHeight() + 10,

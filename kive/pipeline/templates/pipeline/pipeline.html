@@ -9,13 +9,6 @@
     <!-- Do not remove - Accumulator still uses jQuery as a global. -->
     <script src="/static/portal/jquery-2.0.3.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
-
-    <script src="/static/portal/core.min.js"></script>
-    <script src="/static/portal/system.js"></script>
-    <script src="/static/portal/system.config.js"></script>
-    <script>
-        System.import('/static/pipeline');
-    </script>
 {% endblock %}
 
 {% block stylesheets %}
@@ -87,5 +80,6 @@
         {% include 'pipeline/pipeline_output_dialog.tpl.html' with dlg_id="id_output_ctrl" %}
 
     </div>
+    <script src="/static/portal/pipeline_add.bundle.js"></script>
 
 {% endblock %}
