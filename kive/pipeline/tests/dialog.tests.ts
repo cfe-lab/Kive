@@ -3,9 +3,8 @@ import { MethodNode, CdtNode, OutputNode } from "@canvas/drydock_objects";
 import { REDRAW_INTERVAL, CanvasState } from "@canvas/drydock";
 import * as imagediff from 'imagediff';
 
-let basePath = '';
-jasmine.getFixtures().fixturesPath = basePath + '/templates/pipeline';
-jasmine.getStyleFixtures().fixturesPath = basePath + '/static/pipeline';
+jasmine.getFixtures().fixturesPath = '/templates/pipeline';
+jasmine.getStyleFixtures().fixturesPath = '/static/pipeline';
 jasmine.getFixtures().preload(
     'pipeline_view_dialog.tpl.html',
     'pipeline_method_dialog.tpl.html',
@@ -60,7 +59,9 @@ describe("Dialog fixture", function() {
         spyOnEvent('body', 'mousedown');
         spyOnEvent('body', 'keydown');
 
-        dlg.jqueryRef.click().mousedown().keydown();
+        dlg.jqueryRef[0].dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        dlg.jqueryRef[0].dispatchEvent(new KeyboardEvent('keydown', { key: "Enter", bubbles: true, cancelable: true }));
+
         expect('click').not.toHaveBeenTriggeredOn('body');
         expect('mousedown').not.toHaveBeenTriggeredOn('body');
         expect('keydown').not.toHaveBeenTriggeredOn('body');
