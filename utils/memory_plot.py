@@ -1,9 +1,9 @@
 from argparse import ArgumentParser, FileType
 from collections import Counter
 from csv import DictReader
-
 from datetime import datetime
 from itertools import groupby
+import math
 
 from matplotlib import pyplot as plt
 
@@ -25,6 +25,13 @@ def parse_args():
     parser.add_argument('--end',
                         '-e',
                         help='end date in YYYY-MM-DD HH:MM format')
+    parser.add_argument('--nodes',
+                        '-n',
+                        help='comma-separated list of node names to plot')
+    parser.add_argument('--mem',
+                        '-m',
+                        type=float,
+                        help='Maximum memory in GB to plot')
     return parser.parse_args()
 
 
@@ -43,8 +50,14 @@ def main():
     args = parse_args()
     with args.file:
         reader = DictReader(args.file)
-        free_columns = [name for name in reader.fieldnames
-                        if name.endswith('_free')]
+        all_free_columns = [name for name in reader.fieldnames
+                            if name.endswith('_free')]
+        if args.nodes is None:
+            free_columns = all_free_columns
+        else:
+            node_names = args.nodes.split(',')
+            free_columns = [name for name in all_free_columns
+                            if name.split('_')[0] in node_names]
         free_labels = sorted({name[:-7] for name in free_columns},
                              key=lambda s: ((1 if s.startswith('head')
                                              else 2),
@@ -80,7 +93,7 @@ def main():
         line_num += 1
     ax.legend(free_labels,
               loc='best',
-              ncol=3)
+              ncol=4)
     xlim = list(ax.get_xlim())
     if args.start is not None:
         xlim[0] = parse_date(args.start)
@@ -89,10 +102,13 @@ def main():
     ax.set_xlim(xlim)
     ylim = list(ax.get_ylim())
     ylim[0] = 0
-    ylim[1] *= 1.25
+    if args.mem is None:
+        ylim[1] *= 1 + 0.1 * (math.ceil(len(free_labels)*0.25))
+    else:
+        ylim[1] = args.mem
     ax.set_ylim(ylim)
     fig.autofmt_xdate()
     plt.savefig(args.plot)
 
-if __name__ == '__main__':
-    main()
+
+main()

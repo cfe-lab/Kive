@@ -821,8 +821,6 @@ class MethodViewMockTests(ViewMockTestCase):
     def test_method_new(self):
         response = self.client.get(reverse('method_new'))
 
-        print response
-
         self.assertEqual(200, response.status_code)
         self.assertEqual(None, response.context['family'])
 

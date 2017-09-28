@@ -55,7 +55,6 @@ def _submit_Njob(n, prio, afteroklst=None, afteranylst=None):
         1,
         osp.join(wdir, "out.txt"),
         osp.join(wdir, "err.txt"),
-        stderrfile=afteroklst,
         after_okay=afteroklst,
         after_any=afteranylst
     )
@@ -97,7 +96,7 @@ class SlurmTests(TestCase):
         if not is_alive:
             raise RuntimeError("slurm is not alive")
         idstr = SlurmScheduler.slurm_ident()
-        print "Slurm is alive and idents as '%s'" % idstr
+        # print "Slurm is alive and idents as '%s'" % idstr
 
     def tearDown(self):
         SlurmScheduler.shutdown()
@@ -109,11 +108,13 @@ class SlurmTests(TestCase):
             print "---test_callit01", n
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
-        arglst, stderr, stdout = [], None, None
-        retval = slurmlib.callit(wdir, jobname, arglst, stdout, stderr)
-        if retval != 0:
-            print "the error is '%s'" % os.strerror(retval)
-            assert retval == 0, "expected retval 0"
+        # arglst, stderr, stdout = [], None, None
+        arglst = []
+        with open("/tmp/out.txt", "w") as stdout, open("/tmp/err.txt", "w") as stderr:
+            retval = slurmlib.callit(wdir, jobname, arglst, stdout, stderr)
+            if retval != 0:
+                print "the error is '%s'" % os.strerror(retval)
+                assert retval == 0, "expected retval 0"
         if lverb:
             print "---END test_callit01", n
 
@@ -125,25 +126,29 @@ class SlurmTests(TestCase):
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
         arglst = []
-        stderr = stdout = None
-        retval = slurmlib.callit(wdir, jobname, arglst, stdout, stderr)
-        assert retval == 2, "expected retval 2"
+        with open("/tmp/out.txt", "w") as stdout, open("/tmp/err.txt", "w") as stderr:
+            retval = slurmlib.callit(wdir, jobname, arglst, stdout, stderr)
+            assert retval == 2, "expected retval 2"
         if lverb:
             print "---END test_callit01", n
 
     def test_is_alive(self):
+        """test_is_alive() should return True"""
         is_alive = SlurmScheduler.slurm_is_alive()
-        print "Calling is_alive says:", is_alive
+        assert is_alive, "Calling is_alive fails"
 
     def test_slurm_ident(self):
+        """slurm_ident must return a string"""
         idstr = SlurmScheduler.slurm_ident()
-        print "slurm ident is '%s'" % idstr
+        assert isinstance(idstr, str), "slurm ident must be a string"
 
-    def test_submit_job01(self):
+    def test_submit_job01(self, lverb=False):
         """ Submitting this job should succeed."""
-        print "--test_submit_job01"
+        if lverb:
+            print "--test_submit_job01"
         jhandle = _submit_Njob(1, PRIO_MEDIUM)
-        print "submitted job", jhandle
+        if lverb:
+            print "submitted job", jhandle
 
     def test_submit_job02(self, lverb=False):
         """Submission should fail (nonexistent job script)
@@ -206,7 +211,8 @@ class SlurmTests(TestCase):
         time.sleep(2)
         NTRY, i = 20, 0
         curstate = jhandle.get_state()
-        print curstate
+        if lverb:
+            print "gotstate", curstate
         while (i < NTRY) and (curstate != SlurmScheduler.FAILED):
             if lverb:
                 print i, "curstate...", curstate
@@ -301,7 +307,8 @@ class SlurmTests(TestCase):
     def test_dep_jobs01_okay(self, lverb=False):
         """Submit one job dependent on the other with an after_okay dependency.
         Both jobs should succeed."""
-        print "--test_dep_jobs01_okay"
+        if lverb:
+            print "--test_dep_jobs01_okay"
         jobid_01 = _submit_Njob(1, PRIO_MEDIUM)
         if lverb:
             print "first job", jobid_01
@@ -323,7 +330,8 @@ class SlurmTests(TestCase):
             raise RuntimeError("test inconclusive: didn't wait long enough")
         assert curstate[jobid_01.job_id][ACC_STATE] == SlurmScheduler.COMPLETED, "job01: failed to run successfully"
         assert curstate[jobid_02.job_id][ACC_STATE] == SlurmScheduler.COMPLETED, "job02: failed to run successfully"
-        print "--test_dep_jobs01_okay SUCCESS"
+        if lverb:
+            print "--test_dep_jobs01_okay SUCCESS"
 
     def test_dep_jobs01_any(self, lverb=False):
         """Submit one job dependent on the other with an after_any dependency.
@@ -397,7 +405,8 @@ class SlurmTests(TestCase):
         if lverb:
             print "first job that will fail:", jobid_01
         jobid_02 = _submit_Njob(3, PRIO_MEDIUM, None, [jobid_01])
-        print "dependent job:", jobid_02
+        if lverb:
+            print "dependent job:", jobid_02
         joblst = [jobid_01, jobid_02]
         jidlst = [jh.job_id for jh in joblst]
         if lverb:
@@ -638,7 +647,7 @@ class SlurmTests(TestCase):
         assert all([p == high_prio for p in priolst]), "Failed to set high priority"
 
     def test_acc_info_01(self, lverb=False):
-        """ Get_accounting_info must return information about all jobs handles
+        """ Get_accounting_info must return information about all job handles
         requested.
         Where accounting info is not available, it must return the UNKNOWN state.
         NOTE: in particular with slurm, accounting information is not available in the following
