@@ -1,8 +1,8 @@
 (window as any).$ = $;
 require("@sandbox/PipelineRunTable");
-require("@librarian/DatasetsTable.js");
+require("@sandbox/choose_inputs.js");
 declare var permissions: { [key: string]: any };
-var {PipelineRunTable, DatasetsTable} = permissions;
+var {PipelineRunTable, DatasetSearchTable} = permissions;
 
 describe("Pipeline Families table for sandbox", function() {
     beforeEach(function() {
@@ -87,7 +87,7 @@ describe("Pipeline inputs table for sandbox", function() {
     });
 
     it('should build table', function() {
-        var table = new DatasetsTable(
+        var table = new DatasetSearchTable(
                 this.$table,
                 this.is_user_admin,
                 this.$navigation_links
