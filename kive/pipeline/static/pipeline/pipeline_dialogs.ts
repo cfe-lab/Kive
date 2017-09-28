@@ -1,7 +1,5 @@
-
 import { RawNode, CdtNode, MethodNode, OutputNode } from "./canvas/drydock_objects";
 import { CanvasState } from "./canvas/drydock";
-import * as $ from 'jquery';
 
 /**
  * Mini jQuery plugin to make dialogs draggable.

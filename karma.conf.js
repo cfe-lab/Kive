@@ -11,7 +11,7 @@ module.exports = function(config) {
         preprocessors: {
             'tests.ts': ['webpack', 'sourcemap']
         },
-        reporters: ['spec','kjhtml'],
+        reporters: ['progress', /* 'spec', */'kjhtml'],
         port: 9876,  // karma web server port
         colors: true,
         logLevel: config.LOG_INFO,
