@@ -611,23 +611,23 @@ class Foreman(object):
                                 step_execute_info = self.sandbox.step_execute_info[(task.parent_run, task.pipelinestep)]
                                 # Find the stdout and stderr log files from their prefixes
                                 # (since the full filename is produced using some Slurm macros).
-                                stdout_log = glob.glob(
-                                    os.path.join(
-                                        step_execute_info.log_dir,
-                                        "{}*.txt".format(step_execute_info.driver_stdout_path_prefix())
-                                    )
-                                )
-                                assert len(stdout_log) == 1, \
-                                    "Should be exactly 1 stdout log but found this: {}".format(stdout_log)
+                                stdout_pattern = os.path.join(
+                                    step_execute_info.log_dir,
+                                    "{}*.txt".format(step_execute_info.driver_stdout_path_prefix()))
+                                stdout_log = glob.glob(stdout_pattern)
+                                expected = "Expected 1 stdout log in {}, found {}".format(
+                                    stdout_pattern,
+                                    stdout_log)
+                                assert len(stdout_log) == 1, expected
 
-                                stderr_log = glob.glob(
-                                    os.path.join(
-                                        step_execute_info.log_dir,
-                                        "{}*.txt".format(step_execute_info.driver_stderr_path_prefix())
-                                    )
-                                )
-                                assert len(stderr_log) == 1, \
-                                    "Should be exactly 1 stderr log but found this: {}".format(stderr_log)
+                                stderr_pattern = os.path.join(
+                                    step_execute_info.log_dir,
+                                    "{}*.txt".format(step_execute_info.driver_stderr_path_prefix()))
+                                stderr_log = glob.glob(stderr_pattern)
+                                expected = "Expected 1 stderr log in {}, found {}".format(
+                                    stderr_pattern,
+                                    stderr_log)
+                                assert len(stderr_log) == 1, expected
 
                                 with open(stdout_log[0], "rb") as f:
                                     task_log.methodoutput.output_log.save(f.name, File(f))
