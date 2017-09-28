@@ -2,7 +2,6 @@ from django.core.management.base import BaseCommand
 
 from sandbox.execute import Sandbox
 from fleet.exceptions import StopExecution
-from fleet.workers import disable_worker_file_logging
 import file_access_utils
 
 import json
@@ -30,10 +29,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        # Disable file logging, as this is running as a Slurm job anyway so the console
-        # logging will be captured in a file.
-        disable_worker_file_logging(worker_logger)
-
         worker_logger.debug("start time: %f" % time.time())
         file_access_utils.confirm_file_created(options["step_execution_info_json"])
         with open(options["step_execution_info_json"], "rb") as f:
@@ -41,14 +36,14 @@ class Command(BaseCommand):
 
         if not options["bookkeeping"]:
             try:
-                curr_RS = Sandbox.step_execution_setup(step_execute_dict)
+                curr_run_step = Sandbox.step_execution_setup(step_execute_dict)
             except StopExecution:
                 worker_logger.exception("Execution was stopped during setup.")
                 sys.exit(103)
 
-            if curr_RS.is_failed():
+            if curr_run_step.is_failed():
                 sys.exit(101)
-            elif curr_RS.is_cancelled():
+            elif curr_run_step.is_cancelled():
                 sys.exit(102)
         else:
             Sandbox.step_execution_bookkeeping(step_execute_dict)
