@@ -402,7 +402,11 @@ export class Pipeline {
                     $canvas.fadeIn();
                 }
             });
+            this.canvasState.canvas.dispatchEvent(
+                new CustomEvent('CanvasStateChange', { detail: { revert: true } })
+            );
         });
+
     }
 
     setUpdateCtrl(ctrl: string) {
