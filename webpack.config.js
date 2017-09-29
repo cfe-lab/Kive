@@ -3,9 +3,9 @@ const { TsConfigPathsPlugin } = require('awesome-typescript-loader');
 
 module.exports = {
     entry: {
-        // pipeline_add: "./kive/pipeline/static/pipeline/pipeline_add.ts",
-        // pipeline_view: "./kive/pipeline/static/pipeline/pipeline_view.ts",
-        // choose_pipeline: "./kive/sandbox/static/sandbox/choose_pipeline.ts",
+        pipeline_add: "./kive/pipeline/static/pipeline/pipeline_add.ts",
+        pipeline_view: "./kive/pipeline/static/pipeline/pipeline_view.ts",
+        choose_pipeline: "./kive/sandbox/static/sandbox/choose_pipeline.ts",
         view_run: "./kive/sandbox/static/sandbox/view_run.ts"
     },
     output: {
