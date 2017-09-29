@@ -875,6 +875,8 @@ export class MethodDialog extends NodePreviewDialog {
         this.$error.text('');
         this.hideChildCheckboxes();
         this.$select_method.empty();
+        this.$delete_outputs.prop('checked', true);
+        this.$delete_outputs_details.empty();
         this.setToAdd();
         this.editing_node = null;
         this.methodInputs = null;
