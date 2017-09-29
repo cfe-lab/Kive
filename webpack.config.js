@@ -1,4 +1,5 @@
 const webpack = require('webpack');
+const UglifyJSPlugin = require('uglifyjs-webpack-plugin');
 const { TsConfigPathsPlugin } = require('awesome-typescript-loader');
 
 module.exports = {
@@ -17,12 +18,12 @@ module.exports = {
     devtool: "inline-source-map",
 
     plugins: [
-        // new webpack.DefinePlugin({
-        //     'process.env': {
-        //         NODE_ENV: JSON.stringify('production')
-        //     }
-        // }),
-        // new UglifyJSPlugin(),
+        new webpack.DefinePlugin({
+            'process.env': {
+                NODE_ENV: JSON.stringify('production')
+            }
+        }),
+        new UglifyJSPlugin(),
 
         new webpack.ProvidePlugin({
             $: 'jquery',
