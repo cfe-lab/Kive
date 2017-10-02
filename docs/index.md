@@ -78,14 +78,25 @@ You can upload data, launch pipelines, and update pipelines all through Kive's
 API. You can also use our [Python library][kive-api] to script calls to the
 API.
 
-[kive-api]: https://github.com/cfe-lab/py-kive-api
+[kive-api]: https://github.com/cfe-lab/Kive/tree/master/api
 
 
 What are we working on?
 -----------------------
 
-You can see active tasks on [our project board][waffle], or look at the [current milestone's burndown][burndown].
+You can see active tasks on [our project board][waffle].
 
 [waffle]: https://waffle.io/cfe-lab/kive
-[burndown]: http://burndown.io/#cfe-lab/kive
 
+Development
+-----------
+
+To upload a pipeline to Kive, read the [developer documentation].
+
+To work on Kive itself, read about [installation], [contributing], and
+look at the [model classes].
+
+[developer documentation]: http://cfe-lab.github.io/Kive/dev_docs
+[installation]: https://github.com/cfe-lab/Kive/blob/master/INSTALL.md
+[contributing]: https://github.com/cfe-lab/Kive/blob/master/CONTRIBUTING.md
+[model classes]: http://cfe-lab.github.io/Kive/models/

@@ -1,3 +1,8 @@
+---
+title: Kive Models
+subtitle: generated diagrams
+---
+
 These class diagrams are generated from the model classes. You can run the following command to regenerate them.
 
     cd ~/git/Kive/kive
