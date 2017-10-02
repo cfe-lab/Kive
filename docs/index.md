@@ -99,4 +99,4 @@ look at the [model classes].
 [developer documentation]: http://cfe-lab.github.io/Kive/dev_docs
 [installation]: https://github.com/cfe-lab/Kive/blob/master/INSTALL.md
 [contributing]: https://github.com/cfe-lab/Kive/blob/master/CONTRIBUTING.md
-[model classes]: http://cfe-lab.github.io/Kive/models/
+[model classes]: http://cfe-lab.github.io/Kive/models/README
