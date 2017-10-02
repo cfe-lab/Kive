@@ -60,11 +60,18 @@ class BaseDockerHandler(object):
     @staticmethod
     def _check_user_settings():
         """Make sure user and group settings have been set."""
-        if not (settings.KIVE_SANDBOX_WORKER_ACCOUNT and
-                settings.KIVE_PROCESSING_GROUP):
+        err = False
+        if not settings.KIVE_SANDBOX_WORKER_ACCOUNT:
             logger.error("settings.KIVE_SANDBOX_WORKER_ACCOUNT: {}".format(settings.KIVE_SANDBOX_WORKER_ACCOUNT))
+            err = True
+        if not settings.KIVE_PROCESSING_GROUP:
             logger.error("settings.KIVE_PROCESSING_GROUP: {}".format(settings.KIVE_PROCESSING_GROUP))
-            raise RuntimeError("dockerlib requires both of these to be set")
+            err = True
+        if err:
+            raise RuntimeError("""dockerlib requires both KIVE_SANDBOX_WORKER_ACCOUNT: '{}'
+ and  KIVE_PROCESSING_GROUP: '{}' to be set""".format(
+                settings.KIVE_SANDBOX_WORKER_ACCOUNT,
+                settings.KIVE_PROCESSING_GROUP))
 
     @classmethod
     def docker_is_alive(cls):
