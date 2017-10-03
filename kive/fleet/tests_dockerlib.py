@@ -15,8 +15,8 @@ from django.test import TestCase
 # we select the DummyDockerHandler by default, so that the automatic tests
 # can run without docker
 
-DockerHandler = dockerlib.DockerHandler
-# DockerHandler = dockerlib.DummyDockerHandler
+# DockerHandler = dockerlib.DockerHandler
+DockerHandler = dockerlib.DummyDockerHandler
 
 TEST_DIR = osp.join(settings.KIVE_HOME, "fleet/dockerlib_test_files")
 
