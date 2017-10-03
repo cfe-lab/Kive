@@ -307,7 +307,7 @@ LOGFILE_PURGE_SCAN_PERIOD_HRS = 12.0
 # - should have access to any tools used in any of your CodeResources on PATH
 # - should use bash as its default shell
 # Leave blank to run as the user that launches the fleet.
-KIVE_SANDBOX_WORKER_ACCOUNT = ""
+KIVE_SANDBOX_WORKER_ACCOUNT = "kivefleet"
 
 # The system group that contains both the user that launches the fleet and
 # the sandbox worker account.  This is ignored if KIVE_SANDBOX_WORKER_ACCOUNT is blank.

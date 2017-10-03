@@ -36,7 +36,7 @@ class DockerLibTests(TestCase):
         """Test the docker_ident call"""
         idstr = DockerHandler.docker_ident()
         # print("Docker idents as:\n{}".format(idstr))
-        assert isinstance(str, idstr)
+        assert isinstance(idstr, str)
 
     @skipIf(not settings.RUN_DOCKER_TESTS, "Docker tests are disabled")
     def test_docker_images01(self):
