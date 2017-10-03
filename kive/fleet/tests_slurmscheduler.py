@@ -51,7 +51,7 @@ def execute_simple_run(environment, slurm_sched_class):
         [environment.dataset_words],
         groups_allowed=[everyone_group()],
         slurm_sched_class=slurm_sched_class,
-        docker_handler_class==DummyDockerHandler
+        docker_handler_class=DummyDockerHandler
     )
 
 
