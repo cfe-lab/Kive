@@ -11,7 +11,8 @@ install: "pip install -r requirements-dev.txt"
 before_script:
     - sed -f travis_settings_modification.sed kive/kive/settings_default.py > kive/kive/settings.py
 script: "cd kive && ./manage.py test --setting kive.settings_mocked && coverage run manage.py test --setting kive.settings_test_pg"
-
+    - groupadd kiveprocessing
+    - useradd kivefleet -G kiveprocessing
 after_success:
     - pip install codecov
     - codecov
