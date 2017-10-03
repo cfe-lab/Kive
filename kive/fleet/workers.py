@@ -418,13 +418,14 @@ class Manager(object):
                          name=None,
                          description=None,
                          slurm_sched_class=DummySlurmScheduler,
-                         docker_handler_class=DockerHandler):
+                         docker_handler_class=DummyDockerHandler):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
         This will create a run and start a fleet to run it.  This is mainly used for testing,
         and so a precondition is that sys.argv[1] is the management script used to invoke
         the tests.
+        Also: the default slurm and docker handlers are set to the Dummy versions here.
         """
         if settings.FLEET_POLLING_INTERVAL >= 1:
             raise RuntimeError('FLEET_POLLING_INTERVAL has not been overridden.')

@@ -16,6 +16,7 @@ from kive.tests import BaseTestCases
 import kive.testing_utils as tools
 from metadata.models import everyone_group
 from fleet.slurmlib import SlurmScheduler, DummySlurmScheduler
+from fleet.dockerlib import DummyDockerHandler
 from sandbox.tests_rm import BadRunTestsBase
 
 
@@ -49,7 +50,8 @@ def execute_simple_run(environment, slurm_sched_class):
         p_basic,
         [environment.dataset_words],
         groups_allowed=[everyone_group()],
-        slurm_sched_class=slurm_sched_class
+        slurm_sched_class=slurm_sched_class,
+        docker_handler_class==DummyDockerHandler
     )
 
 

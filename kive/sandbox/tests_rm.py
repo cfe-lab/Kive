@@ -16,6 +16,7 @@ from method.models import Method
 from fleet.workers import Manager
 from archive.models import Run
 from fleet.slurmlib import DummySlurmScheduler
+from fleet.dockerlib import DummyDockerHandler
 import file_access_utils
 
 
@@ -350,7 +351,8 @@ class ExecuteDiscardedIntermediateTests(BaseTestCases.SlurmExecutionTestCase):
         run = Manager.execute_pipeline(
             self.user_alice,
             self.pipeline_revcomp_v3,
-            [self.dataset_labdata]
+            [self.dataset_labdata],
+            docker_handler_class=DummyDockerHandler
         ).get_last_run()
 
         self.assertTrue(run.is_successful())
@@ -373,13 +375,16 @@ class BadRunTestsBase(object):
         for rsic in runstep.RSICs.all():
             self.assertTrue(rsic.is_successful())
 
-    def test_method_fails(self, slurm_sched_class=DummySlurmScheduler):
+    def test_method_fails(self,
+                          slurm_sched_class=DummySlurmScheduler,
+                          docker_handler_class=DummyDockerHandler):
         """Properly handle a failed method in a pipeline."""
         run = Manager.execute_pipeline(
             self.user_grandpa,
             self.pipeline_fubar,
             [self.dataset_grandpa],
-            slurm_sched_class=slurm_sched_class
+            slurm_sched_class=slurm_sched_class,
+            docker_handler_class=docker_handler_class
         ).get_last_run()
 
         self.assertTrue(run.is_failed())
@@ -443,7 +448,10 @@ class FindDatasetTests(BaseTestCases.SlurmExecutionTestCase):
         self.dataset_words = Dataset.objects.get(name='blahblah')
         self.user_bob = User.objects.get(username='bob')
 
-        mgr = Manager.execute_pipeline(self.user_bob, self.pipeline_noop, [self.dataset_words])
+        mgr = Manager.execute_pipeline(self.user_bob,
+                                       self.pipeline_noop,
+                                       [self.dataset_words],
+                                       docker_handler_class=DummyDockerHandler)
         x = mgr.history_queue.pop()
         self.assertIsNone(x.run.complete_clean())
         self.assertTrue(x.run.is_successful())
@@ -471,7 +479,10 @@ class FindDatasetTests(BaseTestCases.SlurmExecutionTestCase):
         self.dataset_backwords = Dataset.objects.get(name='backwords')
         self.user_bob = User.objects.get(username='bob')
 
-        mgr = Manager.execute_pipeline(self.user_bob, self.pipeline_twostep, [self.dataset_backwords])
+        mgr = Manager.execute_pipeline(self.user_bob,
+                                       self.pipeline_twostep,
+                                       [self.dataset_backwords],
+                                       docker_handler_class=DummyDockerHandler)
         sandbox = mgr.history_queue.pop()
         self.assertIsNone(sandbox.run.complete_clean())
         self.assertTrue(sandbox.run.is_successful())
@@ -502,7 +513,10 @@ class FindDatasetTests(BaseTestCases.SlurmExecutionTestCase):
         self.dataset_backwords = Dataset.objects.get(name='backwords')
         self.user_bob = User.objects.get(username='bob')
 
-        mgr = Manager.execute_pipeline(self.user_bob, self.pipeline_nested, [self.dataset_backwords])
+        mgr = Manager.execute_pipeline(self.user_bob,
+                                       self.pipeline_nested,
+                                       [self.dataset_backwords],
+                                       docker_handler_class=DummyDockerHandler)
         sandbox = mgr.history_queue.pop()
         self.assertIsNone(sandbox.run.complete_clean())
         self.assertTrue(sandbox.run.is_successful())
@@ -547,17 +561,26 @@ class RawTests(SandboxRMTestCase):
 
     def test_execute_pipeline_raw(self):
         """Execute a raw Pipeline."""
-        run = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
+        run = Manager.execute_pipeline(self.user_bob,
+                                       self.pipeline_raw,
+                                       [self.dataset_raw],
+                                       docker_handler_class=DummyDockerHandler).get_last_run()
         run.refresh_from_db()
         self.assertTrue(run.is_successful())
 
     def test_execute_pipeline_raw_twice(self):
         """Execute a raw Pipeline and reuse an ExecRecord."""
-        run = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
+        run = Manager.execute_pipeline(self.user_bob,
+                                       self.pipeline_raw,
+                                       [self.dataset_raw],
+                                       docker_handler_class=DummyDockerHandler).get_last_run()
         run = Run.objects.get(pk=run.pk)
         self.assertTrue(run.is_successful())
 
-        run2 = Manager.execute_pipeline(self.user_bob, self.pipeline_raw, [self.dataset_raw]).get_last_run()
+        run2 = Manager.execute_pipeline(self.user_bob,
+                                        self.pipeline_raw,
+                                        [self.dataset_raw],
+                                        docker_handler_class=DummyDockerHandler).get_last_run()
         run2 = Run.objects.get(pk=run2.pk)
         self.assertTrue(run2.is_successful())
 
