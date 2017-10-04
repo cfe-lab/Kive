@@ -42,21 +42,24 @@ class ManagerMockTest(TestCase):
     @mocked_relations(Run)
     def test_active_run_not_stopped(self):
         Run.objects.create(start_time=datetime(2000, 12, 21))
-        Manager(slurm_sched_class=self.scheduler_class, no_stop=True,
+        Manager(slurm_sched_class=self.scheduler_class,
+                no_stop=True,
                 docker_handler_class=self.docker_class)
 
     @mocked_relations(Run)
     def test_completed_run_does_not_abort(self):
         Run.objects.create(start_time=datetime(2000, 12, 21),
                            end_time=datetime(2000, 12, 22))
-        Manager(slurm_sched_class=self.scheduler_class)
+        Manager(slurm_sched_class=self.scheduler_class,
+                docker_handler_class=self.docker_class)
 
     @mocked_relations(Run, User)
     def test_stopping_run_does_not_abort(self):
         stop_user = User.objects.create(username='jblow')
         Run.objects.create(start_time=datetime(2000, 12, 21),
                            stopped_by=stop_user)
-        Manager(slurm_sched_class=self.scheduler_class)
+        Manager(slurm_sched_class=self.scheduler_class,
+                docker_handler_class=self.docker_class)
 
     @mocked_relations(Run, User)
     def test_active_run_stopped(self):
