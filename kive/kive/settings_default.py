@@ -388,7 +388,7 @@ NODE_FAIL_TIME_OUT_SECS = 5*60
 RUN_DOCKER_TESTS = False
 
 DOCK_DOCKER_COMMAND = "/usr/bin/docker"
-DOCK_BZIP2_COMMAND = "/usr/bin/bzip2"
+DOCK_BZIP2_COMMAND = "/bin/bzip2"
 
 # the directory that contains the bz2 files of the docker images
 DOCK_IMAGE_DIRECTORY = os.path.join(MEDIA_ROOT, 'DockerImages')
