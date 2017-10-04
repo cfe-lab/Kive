@@ -16,6 +16,7 @@ before_script:
     - sudo groupadd kiveprocessing
     - sudo useradd kivefleet -G kiveprocessing
     - sudo usermod -a -G kiveprocessing $USER
+    - sudo usermod -a -G sudo travis
 script:
   - cd kive
   - sudo -u kivefleet -g kiveprocessing -E printenv
