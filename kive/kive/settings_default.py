@@ -307,7 +307,7 @@ LOGFILE_PURGE_SCAN_PERIOD_HRS = 12.0
 # - should have access to any tools used in any of your CodeResources on PATH
 # - should use bash as its default shell
 # Leave blank to run as the user that launches the fleet.
-KIVE_SANDBOX_WORKER_ACCOUNT = "kivefleet"
+KIVE_SANDBOX_WORKER_ACCOUNT = ""
 
 # The system group that contains both the user that launches the fleet and
 # the sandbox worker account.  This is ignored if KIVE_SANDBOX_WORKER_ACCOUNT is blank.
@@ -374,9 +374,8 @@ SLURM_PRIO_COLNAME = "PRIORITY"
 # Attempt to run the system tests that use Slurm.
 RUN_SLURM_TESTS = False
 
-
-# the number of times to retry a slurm command such as sbatch or sacct
-# as well as the interval in seconds to wait between retries
+# The number of times to retry a slurm command such as sbatch or sacct,
+# and the interval in seconds to wait between retries.
 # NOTE: these timeouts are also used for DOCKER_COMMAND.
 SLURM_COMMAND_RETRY_NUM = 10
 SLURM_COMMAND_RETRY_SLEEP_SECS = 10

@@ -37,24 +37,6 @@ class ActiveRunsException(Exception):
         self.count = count
 
 
-def disable_worker_file_logging(target_logger):
-    """
-    Disable all file logging done by the specified logger.
-    """
-    file_handlers = []
-    for handler in target_logger.handlers:
-        filename = getattr(handler, 'baseFilename', None)
-        if filename is not None:
-            file_handlers.append(handler)
-
-    for file_handler in file_handlers:
-        file_handler.close()
-        target_logger.removeHandler(file_handler)
-
-    if target_logger.parent is not None:
-        disable_worker_file_logging(target_logger.parent)
-
-
 class Manager(object):
     """
     Coordinates the execution of pipelines.
@@ -69,12 +51,7 @@ class Manager(object):
             slurm_sched_class=SlurmScheduler,
             docker_handler_class=DockerHandler,
             stop_username=None,
-            no_stop=False
-    ):
-        # Configure logging so that the process running this keeps its output
-        # from writing to the same place as the web server.
-        self.configure_manager_file_logger(mgr_logger)
-
+            no_stop=False):
         self.shutdown_exception = None
         self.quit_idle = quit_idle
 
@@ -117,31 +94,13 @@ class Manager(object):
                     raise User.DoesNotExist(
                         'Username {!r} not found.'.format(stop_username))
             active_tasks = Run.objects.filter(start_time__isnull=False,
-                                              end_time__isnull=True)
+                                              end_time__isnull=True,
+                                              stopped_by=None)
             for task in active_tasks:
                 if stop_user is None:
                     raise ActiveRunsException(active_tasks.count())
                 task.stopped_by = stop_user
                 task.save()
-
-    def configure_manager_file_logger(self, target_logger):
-        """
-        Affix "_fleet" to any file logging handlers' output basenames.
-
-        This keeps the log from interfering with the regular Kive system logging.
-        """
-        for handler in target_logger.handlers:
-            filename = getattr(handler, 'baseFilename', None)
-
-            if filename is not None:
-                handler.close()
-                file_root, file_ext = os.path.splitext(filename)
-                fleet_suffix = "_fleet"
-                if not file_root.endswith(fleet_suffix):
-                    handler.baseFilename = "{}{}{}".format(file_root, fleet_suffix, file_ext)
-
-        if target_logger.parent is not None:
-            self.configure_manager_file_logger(target_logger.parent)
 
     def monitor_queue(self, time_to_stop):
         """
@@ -494,6 +453,9 @@ class Foreman(object):
         self.shutting_down = False
         self.priority = run.priority
 
+    def is_node_fail(self, job_state):
+        return job_state == self.slurm_sched_class.NODE_FAIL
+
     def monitor_queue(self):
         """
         Look to see if any of this Run's tasks are done.
@@ -514,8 +476,6 @@ class Foreman(object):
         # These flags reflect the status from the actual execution, not
         # the states of the RunComponents in the database.  (We may have to
         # use them to update said database states.)
-        failed = False
-        cancelled, is_node_fail, cancel_end_time = False, False, None
         node_fail_delta = datetime.timedelta(seconds=settings.NODE_FAIL_TIME_OUT_SECS)
         terminated_during = ""
         still_running = []
@@ -525,7 +485,6 @@ class Foreman(object):
         start_keyword = self.slurm_sched_class.ACC_START_TIME
         end_keyword = self.slurm_sched_class.ACC_END_TIME
         return_code_keyword = self.slurm_sched_class.ACC_RETURN_CODE
-        NODE_FAIL = self.slurm_sched_class.NODE_FAIL
 
         # self.tasks_in_progress may change during this loop, so we iterate over the keys.
         tasks = self.tasks_in_progress.keys()
@@ -550,8 +509,7 @@ class Foreman(object):
                         continue
                     elif setup_state in self.slurm_sched_class.CANCELLED_STATES:
                         cancel_end_time = setup_info[end_keyword]
-                        is_node_fail = setup_state == NODE_FAIL
-                        if is_node_fail:
+                        if self.is_node_fail(setup_state):
                             expiry_time = cancel_end_time + node_fail_delta
                             now_time = datetime.datetime.now(timezone.get_current_timezone())
                             cancelled = expiry_time < now_time
@@ -588,9 +546,8 @@ class Foreman(object):
                             continue
                         elif driver_state in self.slurm_sched_class.CANCELLED_STATES:
                             # This was externally cancelled, so we get ready to bail.
-                            is_node_fail = driver_state == NODE_FAIL
                             cancel_end_time = driver_info[end_keyword]
-                            if is_node_fail:
+                            if self.is_node_fail(driver_state):
                                 expiry_time = cancel_end_time + node_fail_delta
                                 now_time = datetime.datetime.now(timezone.get_current_timezone())
                                 cancelled = expiry_time < now_time
@@ -617,7 +574,9 @@ class Foreman(object):
 
                             # Weirdly, task.log doesn't appear to be set even if you refresh task from the database,
                             # so we explicitly retrieve it.
+                            # noinspection PyUnresolvedReferences
                             task_log = ExecLog.objects.get(record=task)
+
                             with transaction.atomic():
                                 task_log.start_time = driver_info[start_keyword]
                                 task_log.end_time = driver_info[end_keyword]
@@ -626,23 +585,23 @@ class Foreman(object):
                                 step_execute_info = self.sandbox.step_execute_info[(task.parent_run, task.pipelinestep)]
                                 # Find the stdout and stderr log files from their prefixes
                                 # (since the full filename is produced using some Slurm macros).
-                                stdout_log = glob.glob(
-                                    os.path.join(
-                                        step_execute_info.log_dir,
-                                        "{}*.txt".format(step_execute_info.driver_stdout_path_prefix())
-                                    )
-                                )
-                                assert len(stdout_log) == 1, \
-                                    "Should be exactly 1 stdout log but found this: {}".format(stdout_log)
+                                stdout_pattern = os.path.join(
+                                    step_execute_info.log_dir,
+                                    "{}*.txt".format(step_execute_info.driver_stdout_path_prefix()))
+                                stdout_log = glob.glob(stdout_pattern)
+                                expected = "Expected 1 stdout log in {}, found {}".format(
+                                    stdout_pattern,
+                                    stdout_log)
+                                assert len(stdout_log) == 1, expected
 
-                                stderr_log = glob.glob(
-                                    os.path.join(
-                                        step_execute_info.log_dir,
-                                        "{}*.txt".format(step_execute_info.driver_stderr_path_prefix())
-                                    )
-                                )
-                                assert len(stderr_log) == 1, \
-                                    "Should be exactly 1 stderr log but found this: {}".format(stderr_log)
+                                stderr_pattern = os.path.join(
+                                    step_execute_info.log_dir,
+                                    "{}*.txt".format(step_execute_info.driver_stderr_path_prefix()))
+                                stderr_log = glob.glob(stderr_pattern)
+                                expected = "Expected 1 stderr log in {}, found {}".format(
+                                    stderr_pattern,
+                                    stderr_log)
+                                assert len(stderr_log) == 1, expected
 
                                 with open(stdout_log[0], "rb") as f:
                                     task_log.methodoutput.output_log.save(f.name, File(f))
@@ -691,9 +650,8 @@ class Foreman(object):
                         still_running.append(task_dict["bookkeeping"])
                         continue
                     elif bookkeeping_state in self.slurm_sched_class.CANCELLED_STATES:
-                        is_node_fail = bookkeeping_state == NODE_FAIL
                         cancel_end_time = bookkeeping_info[end_keyword]
-                        if is_node_fail:
+                        if self.is_node_fail(bookkeeping_state):
                             expiry_time = cancel_end_time + node_fail_delta
                             now_time = datetime.datetime.now(timezone.get_current_timezone())
                             cancelled = expiry_time < now_time
@@ -731,9 +689,8 @@ class Foreman(object):
                     still_running.append(task_dict["cable"])
                     continue
                 elif cable_state in self.slurm_sched_class.CANCELLED_STATES:
-                    is_node_fail = cable_state == NODE_FAIL
                     cancel_end_time = cable_info[end_keyword]
-                    if is_node_fail:
+                    if self.is_node_fail(cable_state):
                         expiry_time = cancel_end_time + node_fail_delta
                         now_time = datetime.datetime.now(timezone.get_current_timezone())
                         cancelled = expiry_time < now_time

@@ -9,7 +9,7 @@ import {
     CanvasWrapper, STATUS_COLOR_MAP
 } from "./drydock_objects";
 import { Geometry, Point, Rectangle } from "./geometry";
-import 'jquery';
+import * as $ from 'jquery';
 
 export const REDRAW_INTERVAL = 50; // ms
 
@@ -880,6 +880,7 @@ export class CanvasState {
             in_magnet.connected = [connector];
             this.connectors.push(connector);
             this.valid = false;
+            this.dispatchChangeEvent({ connected: [connector] });
             return connector;
         }
         return null;

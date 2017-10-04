@@ -13,7 +13,7 @@ class Command(BaseCommand):
         if 'django_extensions' not in settings.INSTALLED_APPS:
             exit('django_extensions not found, try using --setting kive.UML_settings')
 
-        docs_path = os.path.join(os.path.pardir, 'doc', 'models')
+        docs_path = os.path.join(os.path.pardir, 'docs', 'models')
         apps = [app for app in settings.INSTALLED_APPS
                 if not (app.startswith('django') or app == 'rest_framework')]
         apps.sort()

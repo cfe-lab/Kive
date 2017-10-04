@@ -1,30 +1,17 @@
-env:
-  global:
-    - USER=root
 language: python
 python:
     - "2.7"
 sudo: required
-services:
-  - postgresql
-  - docker
-# before_install:
-#    - sudo apt-get install -y -q openmpi-bin libopenmpi-dev
-install: "pip install -r requirements-dev.txt"
+services: postgresql
+install:
+    - pip install -r requirements-dev.txt
+    - curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
+    - sudo apt-get install -y nodejs
+    - npm install
 before_script:
     - sed -f travis_settings_modification.sed kive/kive/settings_default.py > kive/kive/settings.py
-    - sudo groupadd kiveprocessing
-    - sudo useradd kivefleet -G kiveprocessing
-    - chmod a+rx /home/travis/virtualenv/python2.7/bin/activate
-#    - sudo usermod -a -G kiveprocessing $USER
-#    - sudo usermod -a -G sudo travis
-script:
-  - cd kive
-  - sudo -E su kivefleet -c printenv
-#  - sudo -E su kivefleet -c "source ~travis/virtualenv/python2.7/bin/activate; ./manage.py test --setting kive.settings_mocked"
-#  - sudo -E su kivefleet -c "source ~travis/virtualenv/python2.7/bin/activate; coverage run manage.py test --setting kive.settings_test_pg"
-  - ./manage.py test --setting kive.settings_mocked
-  - coverage run manage.py test --setting kive.settings_test_pg
+script: "npm run test:travis && cd kive && ./manage.py test --setting kive.settings_mocked && coverage run manage.py test --setting kive.settings_test_pg"
+
 after_success:
     - pip install codecov
     - codecov

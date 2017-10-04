@@ -1,2 +1,2 @@
 finished sleeping...
-/home/walter/Kive/kive/fleet/slurm_test_files/slurmrundir/job03
+/home/don/git/Kive/kive/fleet/slurm_test_files/slurmrundir/job03

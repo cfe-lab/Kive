@@ -1770,51 +1770,8 @@ class Sandbox:
                 assert preexisting_ER
                 curr_ER = ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
             else:
-                succeeded_yet = False
-                while not succeeded_yet:
-                    try:
-                        with transaction.atomic():
-                            if preexisting_ER:
-                                curr_ER = ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
-
-                                if curr_ER.generator.record.is_quarantined():
-                                    logger.debug(
-                                        "ExecRecord %s is quarantined; "
-                                        "will try again and decontaminate if successful",
-                                        curr_ER
-                                    )
-
-                                else:
-                                    can_reuse = curr_RS.check_ER_usable(curr_ER)
-                                    if can_reuse["successful"] and not can_reuse["fully reusable"]:
-                                        logger.debug("ExecRecord not fully reusable -- filling it in %s",
-                                                     curr_ER)
-
-                                    else:
-                                        # We can fully reuse this (either successfully or unsuccessfully).
-                                        logger.debug("ExecRecord %s is reusable (successful = %s)",
-                                                     curr_ER, can_reuse["successful"])
-                                        curr_RS.reused = True
-                                        curr_RS.execrecord = curr_ER
-
-                                        if can_reuse["successful"]:
-                                            curr_RS.finish_successfully(save=True)  # calls stop()
-                                        else:
-                                            curr_RS.cancel_running(save=True)  # also calls stop()
-
-                                        curr_RS.complete_clean()
-                                        return curr_RS
-                            else:
-                                logger.debug("No compatible ExecRecord found yet")
-
-                            curr_RS.reused = False
-                            curr_RS.save()
-                        succeeded_yet = True
-                    except (OperationalError, InternalError):
-                        wait_time = random.random()
-                        logger.debug("Database conflict.  Waiting for %f seconds before retrying.",
-                                     wait_time)
-                        time.sleep(wait_time)
+                curr_RS.reused = False
+                curr_RS.save()
 
             pipelinestep = curr_RS.pipelinestep
 

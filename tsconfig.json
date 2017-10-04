@@ -1,18 +1,22 @@
 {
     "compilerOptions": {
         "target": "es5",
-        "module": "system",
+        "module": "commonjs",
         "noImplicitAny": false,
         "removeComments": true,
         "preserveConstEnums": true,
         "sourceMap": true,
+        "allowJs": false,
         "baseUrl": "kive",
         "paths": {
-            "static/pipeline/*": [ "pipeline/static/pipeline/*" ]
+            "@pipeline/*":  ["pipeline/static/pipeline/*"],
+            "@canvas/*":    ["pipeline/static/pipeline/canvas/*"],
+            "@portal/*":    ["portal/static/portal/*"],
+            "@sandbox/*":   ["sandbox/static/sandbox/*"],
+            "@librarian/*": ["librarian/static/librarian/*"]
         }
     },
-    "exclude": [
-        "node_modules",
-        "kive/portal/js/imagediff.d.ts"
-    ]
+    "awesomeTypescriptLoaderOptions": {
+        "silent": true
+    }
 }

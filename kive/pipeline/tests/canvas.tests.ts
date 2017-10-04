@@ -1,12 +1,9 @@
 import {
     CanvasWrapper, MethodNode, CdtNode, RawNode,
     OutputNode, OutputZone, Magnet, Connector
-} from "../static/pipeline/canvas/drydock_objects";
-import { CanvasState } from "../static/pipeline/canvas/drydock";
-import "jasmine";
-import 'jasmine-html';
-import 'jquery';
-import 'imagediff';
+} from "@canvas/drydock_objects";
+import { CanvasState } from "@canvas/drydock";
+import * as imagediff from 'imagediff';
 
 "use strict";
 
@@ -23,7 +20,6 @@ describe("Canvas classes", function() {
         this.ctx = this.canvas.ctx;
         this.expectedCanvas.ctx.fillStyle = "white";
         this.rgb_tolerance = 16; // max 255
-
         this.allowedGlobals = {};
         for (var key in window) {
             this.allowedGlobals[key] = true;
@@ -36,7 +32,7 @@ describe("Canvas classes", function() {
                 fail('leaked global ' + key);
             }
         }
-        expect(this.rawCanvas).toImageDiffEqual(
+        (expect(this.rawCanvas) as any).toImageDiffEqual(
                 this.expectedRawCanvas,
                 this.rgb_tolerance);
     });
@@ -1022,7 +1018,7 @@ describe("Canvas classes", function() {
                     15);
             this.expectedCanvas.ctx.stroke();
 
-            this.sourceParent.status = "FAILURE";
+            this.sourceParent.status = "FAILED";
             this.connector.dest = this.dest;
             this.connector.draw(this.ctx);
         });
@@ -1786,8 +1782,8 @@ describe("Canvas classes", function() {
             });
 
             it('should detect collisions', function() {
-                this.expectedInput.x = 95 - 19.4454;
-                this.expectedInput.y = 55 + 19.4454;
+                this.expectedInput.x = 95 - 19.44544;
+                this.expectedInput.y = 55 + 19.44544;
                 this.expectedMethod.x = 100 + 8.8388;
                 this.expectedMethod.y = 50 - 8.8388;
                 this.expectedInput.draw(this.expectedCanvas.ctx);

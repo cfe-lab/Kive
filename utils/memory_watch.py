@@ -36,6 +36,11 @@ class ZoneInfoScanner(object):
                         fields[3] == 'zone'):
                     i = 0
                     entry = dict(node=fields[0], mem_node=fields[2], zone=fields[4])
+                elif fields[1] == 'MemAvailable':
+                    yield dict(node=fields[0],
+                               mem_node='avail',
+                               free_mem=int(fields[2])//4)
+                    entry = None
             elif i == 1:
                 if len(fields) == 4 and fields[1:3] == ['pages', 'free']:
                     entry['free_mem'] = int(fields[3])
@@ -63,7 +68,7 @@ class LogWriter(object):
         prefixes = []
         zones = {}  # {name: index}
         for entry in entries:
-            zone_name = entry['zone']
+            zone_name = entry.get('zone', 'avail')
             zone_index = zones.get(zone_name)
             if zone_index is None:
                 zone_index = len(zones)
@@ -73,7 +78,9 @@ class LogWriter(object):
             prefix = '{node}_{mem_node}_{zone_index}_'.format(**prefix_fields)
             prefixes.append(prefix)
             row[prefix + 'free'] = self.format(entry.get('free_mem'))
-            row[prefix + 'min'] = self.format(entry.get('min_mem'))
+            min_mem = entry.get('min_mem')
+            if min_mem is not None:
+                row[prefix + 'min'] = self.format(min_mem)
             row[prefix + 'unexpected'] = entry.get('unexpected')
         if self.writer is None:
             prefixes.sort()
@@ -96,13 +103,13 @@ class LogWriter(object):
 def main():
     args = parse_args()
     writer = LogWriter(args.log)
+    command = ['bpsh', '-sap', 'cat', '/proc/zoneinfo', '/proc/meminfo']
     while True:
-        with open('/proc/zoneinfo') as f:
-            zone_info = f.read()
+        zone_info = check_output(command[2:])
         lines = ['head: ' + line for line in zone_info.splitlines()]
         try:
-            zone_info = check_output(['bpsh', '-sap', 'cat', '/proc/zoneinfo'])
-            lines += zone_info.splitlines()
+            zone_info = check_output(command)
+            lines.extend(zone_info.splitlines())
         except OSError:
             pass
         entries = ZoneInfoScanner(lines)

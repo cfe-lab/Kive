@@ -93,7 +93,7 @@
 </tr>
 <tr>
     <td>Driver:</td>
-    <td>{{ method.driver }}</td>
+    <td><a href="{{ method.driver.view_url }}">{{ method.driver }}</a></td>
 </tr>
 <tr>
     <td>Reusable:</td>
@@ -128,7 +128,7 @@
     <tbody>
     {% for dep in method.dependencies.all %}
         <tr>
-        <td>{{ dep.requirement }}</td>
+        <td><a href="{{ dep.requirement.view_url }}">{{ dep.requirement }}</a></td>
         <td>{{ dep.path }}</td>
         <td>{{ dep.filename }}</td>
         </tr>

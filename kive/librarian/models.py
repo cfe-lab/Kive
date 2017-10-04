@@ -1469,12 +1469,16 @@ class Dataset(metadata.models.AccessControl):
         b) sorted in ascending order by last_time_checked
         c) in batches of N at a time.
         """
-        BATCH_SIZE = 10
+        batch_size = 10
+        missing_count = 0
+        report_start = None
         while True:
             time_to_stop = (yield None)
             cut_off_time = timezone.now() - timedelta(days=settings.EXTERNAL_FILE_CHECK_DAYS,
                                                       hours=settings.EXTERNAL_FILE_CHECK_HOURS,
                                                       minutes=settings.EXTERNAL_FILE_CHECK_MINUTES)
+            if report_start is not None and cut_off_time > report_start:
+                cut_off_time = report_start
 
             # aset: only external files
             a_set = Dataset.objects.filter(externalfiledirectory__isnull=False)
@@ -1483,7 +1487,7 @@ class Dataset(metadata.models.AccessControl):
             # prioritise least recently checked files
             c_set = b_set.order_by('last_time_checked')
             # limit number of results returned to 10. This must be the last filter to apply
-            d_set = c_set[:BATCH_SIZE]
+            d_set = c_set[:batch_size]
             did_something = True
             while time.time() < time_to_stop and did_something:
                 did_something = False
@@ -1492,13 +1496,30 @@ class Dataset(metadata.models.AccessControl):
                     path_name = dataset.external_absolute_path()
                     if path_name is None:
                         raise RuntimeError("Unexpected None for external dataset path!")
-                    kive_name = dataset.name
-                    if not os.path.exists(path_name):
-                        cls.logger.warn("missing external file '%s' at '%s'" % (kive_name, path_name))
                     # --update the last_time_checked regardless of
-                    # whether we issued a warning or not
+                    # whether we issue a warning or not
+                    if report_start and dataset.last_time_checked > report_start:
+                        did_something = False
+                        break
                     dataset.last_time_checked = timezone.now()
                     dataset.save()
+                    kive_name = dataset.name
+                    if not os.path.exists(path_name):
+                        if missing_count == 0:
+                            cls.logger.warn("Missing external file '%s' at '%s'",
+                                            kive_name,
+                                            path_name)
+                            report_start = dataset.last_time_checked
+                        missing_count += 1
+            if not did_something and report_start is not None:
+                # See if all external datasets have now been checked.
+                unchecked_set = a_set.filter(last_time_checked__lt=report_start)
+                if not unchecked_set.exists():
+                    # We've checked all external files since reporting the first missing file
+                    if missing_count > 1:
+                        cls.logger.warn("Missing %d more external files.", missing_count-1)
+                    missing_count = 0
+                    report_start = None
 
     def increase_permissions_from_json(self, permissions_json):
         """

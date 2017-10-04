@@ -776,6 +776,7 @@ class MethodViewMockTests(ViewMockTestCase):
         MethodFamily.objects.add(self.method_family)
 
         self.driver = CodeResourceRevision(user=self.user)
+        self.driver.pk = 1337  # needed for viewing a method
         self.driver.coderesource = CodeResource()
         self.method = Method(pk='199', user=self.user)
         self.method.driver = self.driver

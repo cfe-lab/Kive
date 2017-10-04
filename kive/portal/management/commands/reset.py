@@ -34,7 +34,6 @@ class Command(BaseCommand):
             librarian.models.Dataset.UPLOAD_DIR,
             archive.models.MethodOutput.UPLOAD_DIR,
             datachecking.models.VerificationLog.UPLOAD_DIR,
-            portal.models.StagedFile.UPLOAD_DIR,
             settings.SANDBOX_PATH
         ]
         for target in targets:

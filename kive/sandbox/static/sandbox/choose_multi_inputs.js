@@ -18,7 +18,7 @@ $(function() {
             options_btn: $('#insert_many_dataset'),
             options_menu: $('#insert_many_menu')
         },
-        dataset_search_table = new permissions.DatasetsTable(
+        dataset_search_table = new permissions.DatasetSearchTable(
             dataset_search_dialog.find('table'),
             IS_USER_ADMIN,
             dataset_search_dialog.find(".navigation_links")

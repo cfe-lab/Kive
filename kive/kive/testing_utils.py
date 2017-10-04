@@ -21,7 +21,6 @@ from method.models import CodeResource, CodeResourceRevision, Method, MethodFami
 from pipeline.models import Pipeline, PipelineFamily, PipelineStep
 from archive.models import RunStep, ExecLog, MethodOutput
 from datachecking.models import VerificationLog
-from portal.models import StagedFile
 from fleet.workers import Manager
 from fleet.slurmlib import DummySlurmScheduler
 
@@ -363,11 +362,6 @@ def clean_up_all_files():
         vl.error_log.close()
         vl.error_log.delete()
         vl.delete()
-
-    for sf in StagedFile.objects.all():
-        sf.uploaded_file.close()
-        sf.uploaded_file.delete()
-        sf.delete()
 
 
 def create_eric_martin_test_environment(case):

@@ -25,6 +25,27 @@ class ZoneInfoScannerTest(TestCase):
 
         self.assertEqual(expected_entries, entries)
 
+    def test_available(self):
+        zone_info = StringIO("""\
+  2: Node 0, zone   Normal
+  2:   pages free     1363343
+  2:         min      9891
+  2: MemAvailable:  8000000 kB
+""")
+        expected_entries = [dict(node='2',
+                                 mem_node='0',
+                                 zone='Normal',
+                                 free_mem=1363343,
+                                 min_mem=9891),
+                            dict(node='2',
+                                 mem_node='avail',
+                                 free_mem=2000000)]
+        scanner = ZoneInfoScanner(zone_info)
+
+        entries = list(scanner)
+
+        self.assertEqual(expected_entries, entries)
+
     def test_two_nodes(self):
         zone_info = StringIO("""\
   2: Node 0, zone   Normal
@@ -114,6 +135,27 @@ class LogWriterTest(TestCase):
         expected_report = """\
 time,2_0_0_min,2_0_0_free,3_0_0_min,3_0_0_free,2_0_0_unexpected,3_0_0_unexpected
 2017-10-15 19:30:01,0.04,4.00,0.50,8.00,,
+"""
+        writer = LogWriter(report)
+
+        writer.write(time, entries)
+
+        self.assertEqual(expected_report, report.getvalue().decode('UTF-8'))
+
+    def test_available(self):
+        entries = [dict(node='2',
+                        mem_node='0',
+                        zone='Normal',
+                        free_mem=1024*1024,
+                        min_mem=10*1024),
+                   dict(node='2',
+                        mem_node='avail',
+                        free_mem=2*1024*1024)]
+        time = datetime(2017, 10, 15, 19, 30, 1)
+        report = BytesIO()
+        expected_report = """\
+time,2_0_0_min,2_0_0_free,2_avail_1_min,2_avail_1_free,2_0_0_unexpected,2_avail_1_unexpected
+2017-10-15 19:30:01,0.04,4.00,,8.00,,
 """
         writer = LogWriter(report)
 

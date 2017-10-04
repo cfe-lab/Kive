@@ -56,7 +56,7 @@ Once you have set up your production server, this is how to deploy a new release
         cd /path/to/git/Kive
         npm install
         cd kive
-        ./manage.py collectstatic
+        ./manage.py collectstatic -c
         cd ..
         tar -czvf static_root.tar.gz static_root
 
@@ -263,17 +263,13 @@ re-created by running `update_test_fixtures` again.
 
 ### Updating TypeScript and Sass files ###
 
-To update Javascript generated from TypeScript (.ts) files, you must have the
-TypeScript compiler installed, which should happen when you run `npm install`.
-Don't edit any js file which has a ts equivalent as these changes will be
-overwritten. When editing ts files, it is useful to have the compiler run in
-watch mode as a background task using `npm run ts-watch`. Be sure to adhere to
-Kive's TypeScript style by running `grunt tslint` on your contributions.
+Kive uses Webpack to bundle Javascript files. These bundles are generated on
+install, and should not be committed to the repository.
 
-A similar pattern is true for CSS and Sass files. You can run the Sass compiler
-in watch mode using `npm run sass-watch`.
+Be sure to adhere to Kive's TypeScript style by running `grunt tslint` on your 
+contributions.
 
-Run both the TypeScript and Sass watchers simultaneously with `npm run watch-all`.
+Run both the Webpack and Sass watchers simultaneously with `npm run watch:all`.
 
 ### Updating embedded icon files ###
 
@@ -281,7 +277,8 @@ Some icon files are stored as base64-encoded strings which describe PNG images
 inside Javascript files.
 
 Find the original icon in `raw_assets` in the project root. Make your modifications
-and then run `grunt pngicons` to compile them into the Javascript files.
+and then run `grunt pngicons` to compile them into the Javascript files. This
+command is also run on install.
 
 \* *Recommended*: If `pngquant` is available on your system, Grunt will use
 it to compress the icons.

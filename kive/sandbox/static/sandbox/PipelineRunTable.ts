@@ -1,8 +1,7 @@
-"use strict";
-
-import { CanvasState, Pipeline } from "static/pipeline/pipeline_all";
-import 'jquery';
-declare var permissions: any;
+import { CanvasState, Pipeline } from "@pipeline/pipeline_all";
+(window as any).$ = $;
+require("@portal/permissions.js");
+declare var permissions: { [key: string]: any };
 
 permissions.PipelineRunTable = function($table, is_user_admin, $navigation_links) {
     permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
