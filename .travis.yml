@@ -15,6 +15,7 @@ before_script:
     - sed -f travis_settings_modification.sed kive/kive/settings_default.py > kive/kive/settings.py
     - sudo groupadd kiveprocessing
     - sudo useradd kivefleet -G kiveprocessing
+    - chmod a+rx /home/travis/virtualenv/python2.7/bin/activate
 #    - sudo usermod -a -G kiveprocessing $USER
 #    - sudo usermod -a -G sudo travis
 script:
