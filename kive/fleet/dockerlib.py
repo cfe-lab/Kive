@@ -152,7 +152,7 @@ class DummyDockerHandler(BaseDockerHandler):
     @classmethod
     def docker_is_alive(cls):
         if not cls._is_alive:
-            cls._check_user_settings()
+            # cls._check_user_settings()
             cls._is_alive = True
         return cls._is_alive
 
@@ -324,7 +324,7 @@ class DockerHandler(BaseDockerHandler):
     @classmethod
     def docker_is_alive(cls):
         if not cls._is_alive:
-            cls._check_user_settings()
+            # cls._check_user_settings()
             is_alive = cls.check_is_alive()
             # print("CHECKO A!", is_alive)
             if is_alive:

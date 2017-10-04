@@ -13,14 +13,13 @@ services:
 install: "pip install -r requirements-dev.txt"
 before_script:
     - sed -f travis_settings_modification.sed kive/kive/settings_default.py > kive/kive/settings.py
-    - sudo groupadd kiveprocessing
-    - sudo useradd kivefleet -G kiveprocessing
-    - chmod a+rx /home/travis/virtualenv/python2.7/bin/activate
+#    - sudo groupadd kiveprocessing
+#    - sudo useradd kivefleet -G kiveprocessing
+#    - chmod a+rx /home/travis/virtualenv/python2.7/bin/activate
 #    - sudo usermod -a -G kiveprocessing $USER
 #    - sudo usermod -a -G sudo travis
 script:
   - cd kive
-  - sudo -E su kivefleet -c printenv
 #  - sudo -E su kivefleet -c "source ~travis/virtualenv/python2.7/bin/activate; ./manage.py test --setting kive.settings_mocked"
 #  - sudo -E su kivefleet -c "source ~travis/virtualenv/python2.7/bin/activate; coverage run manage.py test --setting kive.settings_test_pg"
   - ./manage.py test --setting kive.settings_test_pg
