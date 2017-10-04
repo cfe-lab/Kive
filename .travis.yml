@@ -15,13 +15,13 @@ before_script:
     - sed -f travis_settings_modification.sed kive/kive/settings_default.py > kive/kive/settings.py
     - sudo groupadd kiveprocessing
     - sudo useradd kivefleet -G kiveprocessing
-    - sudo usermod -a -G kiveprocessing $USER
-    - sudo usermod -a -G sudo travis
+#    - sudo usermod -a -G kiveprocessing $USER
+#    - sudo usermod -a -G sudo travis
 script:
   - cd kive
   - sudo -E su kivefleet -c printenv
-  - sudo -E su kivefleet -c ./manage.py test --setting kive.settings_mocked
-  - sudo -E su kivefleet -c coverage run manage.py test --setting kive.settings_test_pg
+  - sudo -E su kivefleet -c "./manage.py test --setting kive.settings_mocked"
+  - sudo -E su kivefleet -c "coverage run manage.py test --setting kive.settings_test_pg"
 after_success:
     - pip install codecov
     - codecov
