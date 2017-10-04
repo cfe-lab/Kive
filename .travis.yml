@@ -2,7 +2,9 @@ language: python
 python:
     - "2.7"
 sudo: required
-services: postgresql
+services:
+  - postgresql
+  - docker
 install:
     - pip install -r requirements-dev.txt
     - curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
@@ -10,8 +12,11 @@ install:
     - npm install
 before_script:
     - sed -f travis_settings_modification.sed kive/kive/settings_default.py > kive/kive/settings.py
-script: "npm run test:travis && cd kive && ./manage.py test --setting kive.settings_mocked && coverage run manage.py test --setting kive.settings_test_pg"
-
+script:
+  - npm run test:travis
+  - cd kive
+  - ./manage.py test --setting kive.settings_mocked
+  - coverage run manage.py test --setting kive.settings_test_pg
 after_success:
     - pip install codecov
     - codecov
