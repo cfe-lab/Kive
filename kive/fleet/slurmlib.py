@@ -39,9 +39,10 @@ def multi_check_output(cmd_lst, stderr=None, num_retry=NUM_RETRY):
         cmd_retry = False
         try:
             out_str = sp.check_output(cmd_lst, stderr=stderr)
-        except OSError:
+        except OSError as e:
             # typically happens if the executable cannot execute at all (e.g. not installed)
-            # ==> we just pass this error up
+            # ==> we just pass this error up with extra context
+            e.strerror += ': ' + ' '.join(cmd_lst)
             raise
         except sp.CalledProcessError as e:
             # typically happens if the executable did run, but returned an error

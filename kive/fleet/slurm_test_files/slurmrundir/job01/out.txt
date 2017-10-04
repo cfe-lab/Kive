@@ -1,3 +1,0 @@
-this goes to stdout
-finished sleeping...
-/home/don/git/Kive/kive/fleet/slurm_test_files/slurmrundir/job01

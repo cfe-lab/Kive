@@ -92,6 +92,7 @@ def get_accounting_info(jhandles=None):
 
 class SlurmTests(TestCase):
     def setUp(self):
+        self.addTypeEqualityFunc(str, self.assertMultiLineEqual)
         is_alive = SlurmScheduler.slurm_is_alive()
         if not is_alive:
             raise RuntimeError("slurm is not alive")
@@ -679,6 +680,22 @@ class SlurmTests(TestCase):
         assert i < numtests, "job02 failed to complete in 40 iterations"
         if lverb:
             print "--test_acc_info_01(): SUCCESS"
+
+    def test_multi_check_output_echo(self):
+        expected_output = 'Lorem ipsum\n'
+
+        output = slurmlib.multi_check_output(['echo', 'Lorem', 'ipsum'])
+
+        self.assertEqual(expected_output, output)
+
+    def test_multi_check_output_echoxxx(self):
+        expected_error = (
+            '[Errno 2] No such file or directory: echoxxx Lorem ipsum')
+
+        with self.assertRaises(OSError) as context:
+            slurmlib.multi_check_output(['echoxxx', 'Lorem', 'ipsum'])
+
+        self.assertEqual(expected_error, str(context.exception))
 
     def show_squeue_jobs01(self, lverb=False):
         """Submit all jobs with a low priority, then an additional one with high

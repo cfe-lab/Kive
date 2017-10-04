@@ -39,40 +39,6 @@ class BaseDockerHandler(object):
                                 DOCKER_IMG_CREATED_AT, DOCKER_IMG_CREATED_SINCE,
                                 DOCKER_IMG_SIZE, DOCKER_IMG_DIGEST])
 
-    # These are strings used in the keys of dicts returned by docker_ps
-    DOCKER_PS_CONTAINER_ID = "CONTAINER ID"
-    DOCKER_PS_IMAGE_ID = "IMAGE"
-    DOCKER_PS_COMMAND = "COMMAND"
-    DOCKER_PS_CREATED_AT = "CREATED AT"
-    DOCKER_PS_RUNNING_FOR = "CREATED"
-    DOCKER_PS_PORTS = "PORTS"
-    DOCKER_PS_STATUS = "STATUS"
-    DOCKER_PS_SIZE = "SIZE"
-    DOCKER_PS_NAMES = "NAMES"
-    DOCKER_PS_LABELS = "LABELS"
-    DOCKER_PS_MOUNTS = "MOUNTS"
-    DOCKER_PS_NETWORKS = "NETWORKS"
-    DOCKER_PS_SET = frozenset([DOCKER_PS_CONTAINER_ID, DOCKER_PS_IMAGE_ID, DOCKER_PS_COMMAND,
-                               DOCKER_PS_CREATED_AT, DOCKER_PS_RUNNING_FOR, DOCKER_PS_PORTS,
-                               DOCKER_PS_STATUS, DOCKER_PS_SIZE, DOCKER_PS_NAMES,
-                               DOCKER_PS_LABELS, DOCKER_PS_MOUNTS, DOCKER_PS_NETWORKS])
-
-    @staticmethod
-    def _check_user_settings():
-        """Make sure user and group settings have been set."""
-        err = False
-        if not settings.KIVE_SANDBOX_WORKER_ACCOUNT:
-            logger.error("settings.KIVE_SANDBOX_WORKER_ACCOUNT: {}".format(settings.KIVE_SANDBOX_WORKER_ACCOUNT))
-            err = True
-        if not settings.KIVE_PROCESSING_GROUP:
-            logger.error("settings.KIVE_PROCESSING_GROUP: {}".format(settings.KIVE_PROCESSING_GROUP))
-            err = True
-        if err:
-            raise RuntimeError("""dockerlib requires both KIVE_SANDBOX_WORKER_ACCOUNT: '{}'
- and  KIVE_PROCESSING_GROUP: '{}' to be set""".format(
-                settings.KIVE_SANDBOX_WORKER_ACCOUNT,
-                settings.KIVE_PROCESSING_GROUP))
-
     @classmethod
     def docker_is_alive(cls):
         """Return True if the docker configuration is adequate for Kive's purposes."""
@@ -90,21 +56,6 @@ class BaseDockerHandler(object):
         Return a possibly empty list of dicts on success.
         The keys of the dicts are defined as DOCKER_IMG_* above.
         The values are all strings as returned by the docker images command.
-        """
-        raise NotImplementedError
-
-    @classmethod
-    def docker_ps(cls, nlast=None, filter_str=None):
-        """Perform a 'docker ps' command, which shows the run state of containers.
-        See https://docs.docker.com/engine/reference/commandline/ps/
-        nlast (int): if provided, show at most nlast containers (regardless of state,
-                     i.e. not just running containers are shown)
-        filter_str: select images about which we return information. The format is a comma
-        separated keyword=value string, e.g. 'exited=0,'
-
-        Upon success, the routine returns a possibly empty list of dicts, the keys of which
-        are defined as DOCKER_PS_* above.
-        The values are all strings as returned by the docker ps command.
         """
         raise NotImplementedError
 
@@ -129,8 +80,6 @@ class BaseDockerHandler(object):
         # kive to be in the sudoers group...
         # cmd_lst = ["cd", docker_rundir, ";",
         #           SUDO_COMMAND, "-E",
-        #           "-u", settings.KIVE_SANDBOX_WORKER_ACCOUNT,
-        #           "-g", settings.KIVE_PROCESSING_GROUP,
         #           cmd]
         # Wrap the driver in a script.
         driver_template = """\
@@ -152,7 +101,6 @@ class DummyDockerHandler(BaseDockerHandler):
     @classmethod
     def docker_is_alive(cls):
         if not cls._is_alive:
-            cls._check_user_settings()
             cls._is_alive = True
         return cls._is_alive
 
@@ -164,18 +112,6 @@ class DummyDockerHandler(BaseDockerHandler):
 
     @staticmethod
     def docker_images(repotag_name=None):
-        return []
-
-    @classmethod
-    def docker_ps(cls, nlast=None, filter_str=None):
-        """Check input, but don't actually do anything."""
-        if not cls._is_alive:
-            raise RuntimeError("Must call docker_is_alive before docker_ps")
-        if nlast is not None:
-            try:
-                "%d" % nlast
-            except TypeError as e:
-                raise RuntimeError("illegal argument to nlast", e)
         return []
 
 
@@ -264,18 +200,11 @@ class DockerHandler(BaseDockerHandler):
         and whether the permissions on /var/run/docker.sock (used to connect to the docker daemon)
         allows communication.
         """
-        is_alive = True
         for cmd_lst in [[DOCKER_COMMAND, '-v'],
                         [BZIP2_COMMAND, '-h'],
                         [DOCKER_COMMAND, 'version']]:
-            try:
-                DockerHandler._run_shell_command(cmd_lst)
-            except (sp.CalledProcessError, OSError):
-                is_alive = False
-            logger.info("%s passed: %s" % (" ".join(cmd_lst), is_alive))
-            if not is_alive:
-                return False
-        return is_alive
+            DockerHandler._run_shell_command(cmd_lst)
+            logger.debug("%s passed.", " ".join(cmd_lst))
 
     @classmethod
     def _load_image_from_file(cls, image_filename):
@@ -324,19 +253,14 @@ class DockerHandler(BaseDockerHandler):
     @classmethod
     def docker_is_alive(cls):
         if not cls._is_alive:
-            cls._check_user_settings()
-            is_alive = cls.check_is_alive()
+            cls.check_is_alive()
             # print("CHECKO A!", is_alive)
-            if is_alive:
-                # make sure the default image is loaded. MUST set the cls boolean before we do this
-                cls._is_alive = True
-                try:
-                    cls._def_dct = cls._load_image_from_file(DEFAULT_IM_FILE)
-                except RuntimeError:
-                    is_alive = False
+            # make sure the default image is loaded. MUST set the cls boolean before we do this
+            cls._is_alive = True
+            cls._def_dct = cls._load_image_from_file(DEFAULT_IM_FILE)
             # print("CHECKO B!", is_alive)
-            cls._is_alive = is_alive
-        return cls._is_alive
+            cls._is_alive = True
+        return True
 
     @classmethod
     def docker_ident(cls):
@@ -344,23 +268,6 @@ class DockerHandler(BaseDockerHandler):
         if not cls._is_alive:
             raise RuntimeError("Must call docker_is_alive before docker_ident")
         return DockerHandler._run_shell_command([DOCKER_COMMAND, "version"])
-
-    @classmethod
-    def docker_ps(cls, nlast=None, filter_str=None):
-        if not cls._is_alive:
-            raise RuntimeError("Must call docker_is_alive before docker_ps")
-        fmt_str = """table {{.ID}}|{{.Image}}|{{.Command}}|\
-{{.CreatedAt}}|{{.RunningFor}}|{{.Ports}}|{{.Status}}|{{.Size}}|{{.Names}}|\
-{{.Labels}}|{{.Mounts}}|{{.Networks}}"""
-        cmd_lst = [DOCKER_COMMAND, "ps", "--no-trunc", "--format", fmt_str]
-        if nlast is not None:
-            try:
-                cmd_lst.extend(["-n", "%d" % nlast])
-            except TypeError as e:
-                raise RuntimeError("illegal argument to nlast", e)
-        if filter_str is not None:
-            cmd_lst.extend(["--filter", filter_str])
-        return DockerHandler._run_shell_command_to_dict(cmd_lst, splitchar="|")
 
     @classmethod
     def generate_launchstring(cls, host_rundir, docker_rundir, preamble_cmd,
@@ -375,7 +282,6 @@ class DockerHandler(BaseDockerHandler):
         actual_docker_rundir = "/data"
         actual_arglst = [oldarg.replace(docker_rundir, actual_docker_rundir, 1) for oldarg in arglst]
         dockercmd_lst = [DOCKER_COMMAND, "run",
-                         "--user", "%s:%s" % (settings.KIVE_SANDBOX_WORKER_ACCOUNT, settings.KIVE_PROCESSING_GROUP),
                          "-v", "/var/run/docker.sock:/var/run/docker.sock",
                          "-v", "%s:%s" % (host_rundir, actual_docker_rundir),
                          "-w", actual_docker_rundir,
