@@ -20,8 +20,8 @@ before_script:
 script:
   - cd kive
   - sudo -E su kivefleet -c printenv
-  - sudo -E su kivefleet -c "./manage.py test --setting kive.settings_mocked"
-  - sudo -E su kivefleet -c "coverage run manage.py test --setting kive.settings_test_pg"
+  - sudo -E su kivefleet -c "source ~travis/virtualenv/python2.7/bin/activate; ./manage.py test --setting kive.settings_mocked"
+  - sudo -E su kivefleet -c "source ~travis/virtualenv/python2.7/bin/activate; coverage run manage.py test --setting kive.settings_test_pg"
 after_success:
     - pip install codecov
     - codecov
