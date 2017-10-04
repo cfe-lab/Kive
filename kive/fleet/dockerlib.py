@@ -160,22 +160,16 @@ class DockerHandler(BaseDockerHandler):
         Raise an exception if an error occurs.
         """
         try:
-            p1 = sp.Popen(cmd_lst1, stdout=sp.PIPE)
-            p2 = sp.Popen(cmd_lst2, stdin=p1.stdout, stdout=sp.PIPE)
-            out_tup = p2.communicate()
+            with open(os.devnull, 'w') as devnull:
+                p1 = sp.Popen(cmd_lst1, stdout=sp.PIPE, stderr=devnull)
+                return sp.check_output(cmd_lst2,
+                                       stdin=p1.stdout,
+                                       stderr=devnull)
         except OSError as e:
-            # typically happens if the executable cannot execute at all (e.g. not installed)
-            status_report = "failed to execute '{} | {} ".format(" ".join(" ".join(cmd_lst1),
-                                                                          " ".join(cmd_lst2)))
-            logger.warning(status_report, exc_info=True)
+            # Typically happens if the executable wasn't found.
+            e.strerror += ': {} | {}'.format(" ".join(cmd_lst1),
+                                             " ".join(cmd_lst2))
             raise
-        except sp.CalledProcessError as e:
-            # typically happens if the executable did run, but returned an error
-            status_report = "%s returned an error code '%s'"
-            logger.debug(status_report, e.returncode, exc_info=True)
-            raise
-        stdout, stderr = out_tup
-        return stdout
 
     @staticmethod
     def _run_shell_command_to_dict(cmd_lst, splitchar=None):

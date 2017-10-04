@@ -19,6 +19,7 @@ class DummyDockerLibTests(TestCase):
         return dockerlib.DummyDockerHandler
 
     def setUp(self):
+        self.addTypeEqualityFunc(str, self.assertMultiLineEqual)
         self.docker_handler_class = self.get_docker_handler_class()
         is_docker_alive = self.docker_handler_class.docker_is_alive()
         self.assertTrue(is_docker_alive)
@@ -43,7 +44,7 @@ class DockerLibTests(DummyDockerLibTests):
                    'IMAGE ID': '7328f6f8b418',
                    'SIZE': '3.97MB',
                    'DIGEST': '<none>'}
-        img_info_dct = self.docker_handler_class._load_image_from_file(image_name)
+        img_info_dct = dockerlib.DockerHandler._load_image_from_file(image_name)
         # NOTE: we do not check the correctness of the CREATED_SINCE entry (the value
         # will obviously depend on when the test is run). Instead, we simply delete it
         # from the returned dict.
@@ -52,8 +53,8 @@ class DockerLibTests(DummyDockerLibTests):
 
     def test_load_image02(self):
         """Loading a nonexistent docker image should raise an exception"""
-        with self.assertRaises(RuntimeError):
-            self.docker_handler_class._load_image_from_file("NONEXISTENT-IMAGE")
+        with self.assertRaises(sp.CalledProcessError):
+            dockerlib.DockerHandler._load_image_from_file("NONEXISTENT-IMAGE")
 
     def test_docker_images01(self):
         """Sanity check the docker_images output."""
@@ -67,3 +68,65 @@ class DockerLibTests(DummyDockerLibTests):
         """Search for a nonexistent docker image"""
         out_lst = self.docker_handler_class.docker_images("BLAA")
         assert len(out_lst) == 0, "got nonzero docker images!"
+
+    def test_two_pipe_command(self):
+        expected_output = 'Beta\n'
+
+        output = dockerlib.DockerHandler._run_twopipe_command(
+            ['echo', 'Alpha\nBeta\nDelta'],
+            ['grep', 'B', '-'])
+
+        self.assertEqual(expected_output, output)
+
+    def test_two_pipe_command_first_not_found(self):
+        expected_error = """\
+[Errno 2] No such file or directory: echoxxx Alpha
+Beta
+Delta | grep B -"""
+
+        with self.assertRaises(OSError) as context:
+            dockerlib.DockerHandler._run_twopipe_command(
+                ['echoxxx', 'Alpha\nBeta\nDelta'],
+                ['grep', 'B', '-'])
+
+        self.assertEqual(expected_error, str(context.exception))
+
+    def test_two_pipe_command_second_not_found(self):
+        expected_error = """\
+[Errno 2] No such file or directory: echo Alpha
+Beta
+Delta | grepxxx B -"""
+
+        with self.assertRaises(OSError) as context:
+            dockerlib.DockerHandler._run_twopipe_command(
+                ['echo', 'Alpha\nBeta\nDelta'],
+                ['grepxxx', 'B', '-'])
+
+        self.assertEqual(expected_error, str(context.exception))
+
+    def test_two_pipe_command_second_fails(self):
+        expected_error = (
+            "Command '['grep', '-X', 'B', '-']' returned non-zero exit status 2")
+        expected_output = ""
+
+        with self.assertRaises(sp.CalledProcessError) as context:
+            dockerlib.DockerHandler._run_twopipe_command(
+                ['echo', 'Alpha\nBeta\nDelta'],
+                ['grep', '-X', 'B', '-'])
+
+        self.assertEqual(expected_error, str(context.exception))
+        self.assertEqual(expected_output, context.exception.output)
+
+    def test(self):
+        """ Failure in first process causes failure in second. """
+        expected_error = (
+            "Command '['grep', 'B', '-']' returned non-zero exit status 1")
+        expected_output = ""
+
+        with self.assertRaises(sp.CalledProcessError) as context:
+            dockerlib.DockerHandler._run_twopipe_command(
+                ['bzip2', 'unknown_file.bz2'],
+                ['grep', 'B', '-'])
+
+        self.assertEqual(expected_error, str(context.exception))
+        self.assertEqual(expected_output, context.exception.output)

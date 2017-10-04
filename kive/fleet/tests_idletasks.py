@@ -13,6 +13,7 @@ from django.test import TestCase, skipIfDBFeature
 import fleet.slurmlib as slurmlib
 from datetime import date, timedelta
 
+from fleet import dockerlib
 from fleet.workers import Manager
 from librarian.models import Dataset
 from archive.models import MethodOutput
@@ -22,7 +23,8 @@ from archive.models import MethodOutput
 class IdleTaskTests(TestCase):
     def setUp(self):
         self.man = Manager(quit_idle=False, history=0,
-                           slurm_sched_class=slurmlib.DummySlurmScheduler)
+                           slurm_sched_class=slurmlib.DummySlurmScheduler,
+                           docker_handler_class=dockerlib.DummyDockerHandler)
 
     def tearDown(self):
         self.man.slurm_sched_class.shutdown()
