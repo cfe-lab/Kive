@@ -19,6 +19,7 @@ BZIP2_COMMAND = settings.DOCK_BZIP2_COMMAND
 
 DEFAULT_IM_FILE = osp.join(settings.DOCK_IMAGE_DIRECTORY,
                            settings.DOCK_DEFAULT_DOCKER_IMAGE)
+DEFAULT_IMAGE_NAME = 'kive-default'
 
 
 # CHECK_OUTPUT = sp.check_output
@@ -251,9 +252,17 @@ class DockerHandler(BaseDockerHandler):
             # print("CHECKO A!", is_alive)
             # make sure the default image is loaded. MUST set the cls boolean before we do this
             cls._is_alive = True
-            cls._def_dct = cls._load_image_from_file(DEFAULT_IM_FILE)
+            try:
+                cls._def_dct = cls._get_image_info(DEFAULT_IMAGE_NAME)
+            except RuntimeError:
+                loaded = cls._load_image_from_file(DEFAULT_IM_FILE)
+                loaded_tag = loaded[BaseDockerHandler.DOCKER_IMG_REPO_TAG]
+                sp.check_call([DOCKER_COMMAND,
+                               'tag',
+                               loaded_tag,
+                               DEFAULT_IMAGE_NAME])
+                cls._def_dct = cls._get_image_info(DEFAULT_IMAGE_NAME)
             # print("CHECKO B!", is_alive)
-            cls._is_alive = True
         return True
 
     @classmethod
