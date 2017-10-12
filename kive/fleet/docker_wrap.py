@@ -47,6 +47,7 @@ def parse_args():
         '--inputs',
         '-i',
         nargs='*',
+        default=tuple(),
         help='List of input files to copy')
     launch_parser.add_argument('image', help='Docker image hash or name')
     launch_parser.add_argument('session',
@@ -93,14 +94,16 @@ def handle_launch(args):
         print('\nSession:')
         import_args = create_subcommand('import', args)
         importer = Popen(import_args, stdin=PIPE)
-        tar_file = tarfile.open(fileobj=importer.stdin, mode='w|')
-        for input_file in args.inputs:
-            tar_file.add(input_file, arcname=os.path.basename(input_file))
-        tar_file.close()
-        importer.stdin.close()
-        importer.wait()
-        if importer.returncode:
-            raise CalledProcessError(importer.returncode, import_args)
+        try:
+            tar_file = tarfile.open(fileobj=importer.stdin, mode='w|')
+            for input_file in args.inputs:
+                tar_file.add(input_file, arcname=os.path.basename(input_file))
+            tar_file.close()
+        finally:
+            importer.stdin.close()
+            importer.wait()
+            if importer.returncode:
+                raise CalledProcessError(importer.returncode, import_args)
 
         # Run
         run_args = create_subcommand('run', args)
@@ -113,24 +116,20 @@ def handle_launch(args):
         export_args = create_subcommand('export', args)
         exporter = Popen(export_args, stdout=PIPE)
         tar_file = tarfile.open(fileobj=exporter.stdout, mode='r|')
-        tar_file.extractall(args.output_path, members=remove_output_parent(tar_file))
+        tar_file.extractall(args.output_path, members=exclude_root(tar_file))
         exporter.wait()
         if exporter.returncode:
             raise CalledProcessError(exporter.returncode, export_args)
     print('\nDone.')
 
 
-def remove_output_parent(tarinfos):
+def exclude_root(tarinfos):
     print('\nOutputs:')
-    expected_root = 'output/'
     for tarinfo in tarinfos:
-        new_info = copy.copy(tarinfo)
-        assert (new_info.name == expected_root[:-1] or
-                new_info.name.startswith(expected_root)), new_info.name
-        if new_info.name != expected_root[:-1]:
-            new_info.name = new_info.name[len(expected_root):]
-            print(new_info.name)
-            yield new_info
+        if tarinfo.name != '.':
+            assert tarinfo.name.startswith('./'), tarinfo.name
+            print(tarinfo.name[2:])
+            yield tarinfo
 
 
 def create_subcommand(subcommand, args):
@@ -147,7 +146,7 @@ def expand_session(name):
 
 def handle_import(args):
     session = expand_session(args.session)
-    check_call(['docker', 'volume', 'create', session])
+    check_call(['docker', 'volume', 'create', '--name', session])
     check_call(['docker',
                 'run',
                 '--name', session,
@@ -171,8 +170,8 @@ def handle_run(args):
 
 def handle_export(args):
     session = expand_session(args.session)
-    check_call(['docker', 'cp', session + ':/data/output/', '-'])
-    check_call(['docker', 'container', 'rm', session])
+    check_call(['docker', 'cp', session + ':/data/output/.', '-'])
+    check_call(['docker', 'rm', session])
     check_call(['docker', 'volume', 'rm', session])
 
 
